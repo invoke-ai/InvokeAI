@@ -1,5 +1,6 @@
 import {
   Button,
+  ConfirmationAlertDialog,
   Divider,
   Flex,
   IconButton,
@@ -13,13 +14,14 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Text,
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { Hotkey } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { useHotkeyData } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { isHotkeysModified, useHotkeyData } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import { allHotkeysReset } from 'features/system/store/hotkeysSlice';
 import type { ChangeEventHandler, ReactElement } from 'react';
@@ -27,7 +29,7 @@ import { cloneElement, Fragment, memo, useCallback, useMemo, useState } from 're
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
-import HotkeyListItem from './HotkeyListItem';
+import { HotkeyListItem } from './HotkeyListItem';
 
 type HotkeysModalProps = {
   /* The button to open the Settings Modal */
@@ -39,51 +41,50 @@ type TransformedHotkeysCategoryData = {
   hotkeys: Hotkey[];
 };
 
+// Helper to check if a hotkey matches the search filter
+const matchesFilter = (item: Hotkey, filter: string): boolean => {
+  return [item.title, item.desc, item.category, ...item.platformKeys.flat()].some((text) =>
+    text.toLowerCase().includes(filter)
+  );
+};
+
 const HotkeysModal = ({ children }: HotkeysModalProps) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen: isResetDialogOpen, onOpen: onResetDialogOpen, onClose: onResetDialogClose } = useDisclosure();
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const [hotkeyFilter, setHotkeyFilter] = useState('');
-  const [isEditMode, setIsEditMode] = useState(false);
   const clearHotkeyFilter = useCallback(() => setHotkeyFilter(''), []);
   const onChange = useCallback<ChangeEventHandler<HTMLInputElement>>((e) => setHotkeyFilter(e.target.value), []);
-  const toggleEditMode = useCallback(() => setIsEditMode((prev) => !prev), []);
   const handleResetAll = useCallback(() => {
     dispatch(allHotkeysReset());
-  }, [dispatch]);
+    onResetDialogClose();
+  }, [dispatch, onResetDialogClose]);
   const hotkeysData = useHotkeyData();
   const filteredHotkeys = useMemo<TransformedHotkeysCategoryData[]>(() => {
     const trimmedHotkeyFilter = hotkeyFilter.trim().toLowerCase();
     const filteredCategories: TransformedHotkeysCategoryData[] = [];
-    Object.values(hotkeysData).forEach((category) => {
+    for (const category of Object.values(hotkeysData)) {
       const filteredGroup: TransformedHotkeysCategoryData = {
         title: category.title,
         hotkeys: [],
       };
-      Object.values(category.hotkeys).forEach((item) => {
+      for (const item of Object.values(category.hotkeys)) {
         if (!item.isEnabled) {
-          return;
+          continue;
         }
-        if (!trimmedHotkeyFilter.length) {
-          filteredGroup.hotkeys.push(item);
-        } else if (item.title.toLowerCase().includes(trimmedHotkeyFilter)) {
-          filteredGroup.hotkeys.push(item);
-        } else if (item.desc.toLowerCase().includes(trimmedHotkeyFilter)) {
-          filteredGroup.hotkeys.push(item);
-        } else if (item.category.toLowerCase().includes(trimmedHotkeyFilter)) {
-          filteredGroup.hotkeys.push(item);
-        } else if (
-          item.platformKeys.some((hotkey) => hotkey.some((key) => key.toLowerCase().includes(trimmedHotkeyFilter)))
-        ) {
+        if (!trimmedHotkeyFilter.length || matchesFilter(item, trimmedHotkeyFilter)) {
           filteredGroup.hotkeys.push(item);
         }
-      });
+      }
       if (filteredGroup.hotkeys.length) {
         filteredCategories.push(filteredGroup);
       }
-    });
+    }
     return filteredCategories;
   }, [hotkeysData, hotkeyFilter]);
+
+  const canResetHotkeys = useMemo(() => isHotkeysModified(hotkeysData), [hotkeysData]);
 
   return (
     <>
@@ -104,7 +105,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
                 onChange={onChange}
                 tabIndex={1}
               />
-              {hotkeyFilter.length && (
+              {hotkeyFilter.length > 0 ? (
                 <InputRightElement h="full" pe={2}>
                   <IconButton
                     onClick={clearHotkeyFilter}
@@ -115,7 +116,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
                     icon={<PiXBold />}
                   />
                 </InputRightElement>
-              )}
+              ) : null}
             </InputGroup>
 
             <ScrollableContent>
@@ -124,7 +125,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
                   <StickyScrollable key={category.title} title={category.title}>
                     {category.hotkeys.map((hotkey, i) => (
                       <Fragment key={hotkey.id}>
-                        <HotkeyListItem hotkey={hotkey} showEditor={isEditMode} />
+                        <HotkeyListItem hotkey={hotkey} />
                         {i < category.hotkeys.length - 1 && <Divider />}
                       </Fragment>
                     ))}
@@ -136,18 +137,25 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
           </ModalBody>
           <ModalFooter>
             <Flex gap={2} w="full" justifyContent="space-between">
-              <Button onClick={toggleEditMode} size="sm">
-                {isEditMode ? t('hotkeys.viewMode') : t('hotkeys.editMode')}
+              <Button onClick={onResetDialogOpen} size="sm" colorScheme="error" disabled={!canResetHotkeys}>
+                {t('hotkeys.resetAll')}
               </Button>
-              {isEditMode && (
-                <Button onClick={handleResetAll} size="sm" colorScheme="error">
-                  {t('hotkeys.resetAll')}
-                </Button>
-              )}
             </Flex>
           </ModalFooter>
         </ModalContent>
       </Modal>
+      <ConfirmationAlertDialog
+        isOpen={isResetDialogOpen}
+        onClose={onResetDialogClose}
+        title={t('hotkeys.resetAll')}
+        acceptCallback={handleResetAll}
+        acceptButtonText={t('common.reset')}
+        useInert={false}
+      >
+        <Flex flexDirection="column" gap={2}>
+          <Text>{t('hotkeys.resetAllConfirmation')}</Text>
+        </Flex>
+      </ConfirmationAlertDialog>
     </>
   );
 };
