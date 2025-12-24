@@ -1,5 +1,6 @@
 """Tests for model cache keep-alive timeout functionality."""
 
+import logging
 import time
 from unittest.mock import MagicMock
 
@@ -12,7 +13,10 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCac
 @pytest.fixture
 def mock_logger():
     """Create a mock logger."""
-    return MagicMock()
+    logger = MagicMock()
+    # Configure the mock to return a valid log level for getEffectiveLevel()
+    logger.getEffectiveLevel.return_value = logging.INFO
+    return logger
 
 
 @pytest.fixture
