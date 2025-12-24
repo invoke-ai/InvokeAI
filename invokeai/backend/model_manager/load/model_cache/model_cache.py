@@ -227,7 +227,10 @@ class ModelCache:
         self._stats = stats
 
     def _record_activity(self) -> None:
-        """Record model activity and reset the timeout timer if configured."""
+        """Record model activity and reset the timeout timer if configured.
+        
+        Note: This method should only be called when self._lock is already held.
+        """
         if self._keep_alive_minutes <= 0:
             return
 
@@ -250,7 +253,8 @@ class ModelCache:
             return
             
         with self._lock:
-            # Check if there has been activity since the timer was set
+            # Double-check if there has been activity since the timer was set
+            # This handles the race condition where activity occurred just before the timer fired
             if self._last_activity_time is not None and self._keep_alive_minutes > 0:
                 elapsed_minutes = (time.time() - self._last_activity_time) / 60
                 if elapsed_minutes < self._keep_alive_minutes:
@@ -266,9 +270,10 @@ class ModelCache:
     def shutdown(self) -> None:
         """Shutdown the model cache, cancelling any pending timers."""
         self._shutdown_event.set()
-        if self._timeout_timer is not None:
-            self._timeout_timer.cancel()
-            self._timeout_timer = None
+        with self._lock:
+            if self._timeout_timer is not None:
+                self._timeout_timer.cancel()
+                self._timeout_timer = None
 
     @synchronized
     def put(self, key: str, model: AnyModel) -> None:
