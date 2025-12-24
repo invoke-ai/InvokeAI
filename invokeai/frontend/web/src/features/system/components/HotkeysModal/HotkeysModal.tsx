@@ -197,9 +197,7 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
       })}
       <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false}>
         <ModalOverlay />
-        <ModalContent h="80vh">
-          {isOpen && <HotkeysModalContent />}
-        </ModalContent>
+        <ModalContent h="80vh">{isOpen && <HotkeysModalContent />}</ModalContent>
       </Modal>
     </>
   );
