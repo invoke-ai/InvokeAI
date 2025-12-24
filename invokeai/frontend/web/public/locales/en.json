@@ -2676,7 +2676,9 @@
         "useForTemplate": "Use For Prompt Template",
         "viewList": "View Template List",
         "viewModeTooltip": "This is how your prompt will look with your currently selected template. To edit your prompt, click anywhere in the text box.",
-        "togglePromptPreviews": "Toggle Prompt Previews"
+        "togglePromptPreviews": "Toggle Prompt Previews",
+        "selectPreset": "Select Style Preset",
+        "noMatchingPresets": "No matching presets"
     },
 
     "ui": {
