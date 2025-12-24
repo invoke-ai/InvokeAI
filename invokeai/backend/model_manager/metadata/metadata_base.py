@@ -95,13 +95,15 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         self,
         variant: Optional[ModelRepoVariant] = None,
         subfolder: Optional[Path] = None,
+        subfolders: Optional[List[Path]] = None,
         session: Optional[Session] = None,
     ) -> List[RemoteModelFile]:
         """
-        Return list of downloadable files, filtering by variant and subfolder, if any.
+        Return list of downloadable files, filtering by variant and subfolder(s), if any.
 
         :param variant: Return model files needed to reconstruct the indicated variant
-        :param subfolder: Return model files from the designated subfolder only
+        :param subfolder: Return model files from the designated subfolder only (deprecated, use subfolders)
+        :param subfolders: Return model files from the designated subfolders
         :param session: A request.Session object used for internet-free testing
 
         Note that there is special variant-filtering behavior here:
@@ -111,10 +113,15 @@ class HuggingFaceMetadata(ModelMetadataWithFiles):
         session = session or Session()
         configure_http_backend(backend_factory=lambda: session)  # used in testing
 
-        paths = filter_files([x.path for x in self.files], variant, subfolder)  #  all files in the model
-        prefix = f"{subfolder}/" if subfolder else ""
+        paths = filter_files([x.path for x in self.files], variant, subfolder, subfolders)  #  all files in the model
+
+        # Determine prefix for model_index.json check - only applies for single subfolder
+        prefix = ""
+        if subfolder and not subfolders:
+            prefix = f"{subfolder}/"
+
         # the next step reads model_index.json to determine which subdirectories belong
-        # to the model
+        # to the model (only for single subfolder case)
         if Path(f"{prefix}model_index.json") in paths:
             url = hf_hub_url(self.id, filename="model_index.json", subfolder=str(subfolder) if subfolder else None)
             resp = session.get(url)

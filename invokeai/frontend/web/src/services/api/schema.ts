@@ -9557,9 +9557,12 @@ export type components = {
         };
         /**
          * HFModelSource
-         * @description A HuggingFace repo_id with optional variant, sub-folder and access token.
+         * @description A HuggingFace repo_id with optional variant, sub-folder(s) and access token.
          *     Note that the variant option, if not provided to the constructor, will default to fp16, which is
          *     what people (almost) always want.
+         *
+         *     The subfolder can be a single path or multiple paths joined by '+' (e.g., "text_encoder+tokenizer").
+         *     When multiple subfolders are specified, all of them will be downloaded and combined into the model directory.
          */
         HFModelSource: {
             /** Repo Id */
