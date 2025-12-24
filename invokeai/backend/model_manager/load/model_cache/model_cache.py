@@ -243,6 +243,7 @@ class ModelCache:
         # Start a new timer
         timeout_seconds = self._keep_alive_minutes * 60
         self._timeout_timer = threading.Timer(timeout_seconds, self._on_timeout)
+        # Set as daemon so it doesn't prevent application shutdown
         self._timeout_timer.daemon = True
         self._timeout_timer.start()
         self._logger.debug(f"Model cache activity recorded. Timeout set to {self._keep_alive_minutes} minutes.")
@@ -264,7 +265,9 @@ class ModelCache:
             self._logger.info(
                 f"Model cache keep-alive timeout of {self._keep_alive_minutes} minutes expired. Clearing model cache."
             )
-            # Clear the cache by requesting a huge amount of space (same logic as empty_model_cache endpoint)
+            # Clear the cache by requesting a very large amount of space.
+            # This is the same logic used by the "Clear Model Cache" button.
+            # Using 1000 GB ensures all unlocked models are removed.
             self.make_room(1000 * GB)
 
     def shutdown(self) -> None:

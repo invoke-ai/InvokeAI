@@ -76,7 +76,7 @@ def test_activity_resets_timeout(model_cache_with_timeout):
     time.sleep(0.4)
     
     # Access the model to reset the timeout
-    cache_entry = cache.get("test_model")
+    cache.get("test_model")
     
     # Wait another half timeout (model should still be in cache)
     time.sleep(0.4)
