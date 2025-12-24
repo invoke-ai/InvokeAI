@@ -367,15 +367,30 @@ class Qwen3EncoderLoader(ModelLoader):
         if not isinstance(config, Qwen3Encoder_Qwen3Encoder_Config):
             raise ValueError("Only Qwen3Encoder_Qwen3Encoder_Config models are supported here.")
 
+        model_path = Path(config.path)
+
+        # Support both structures:
+        # 1. Full model: model_root/text_encoder/ and model_root/tokenizer/
+        # 2. Standalone download: model_root/ contains text_encoder files directly
+        text_encoder_path = model_path / "text_encoder"
+        tokenizer_path = model_path / "tokenizer"
+
+        # Check if this is a standalone text_encoder download (no nested text_encoder folder)
+        is_standalone = not text_encoder_path.exists() and (model_path / "config.json").exists()
+
+        if is_standalone:
+            text_encoder_path = model_path
+            tokenizer_path = model_path  # Tokenizer files should also be in root
+
         match submodel_type:
             case SubModelType.Tokenizer:
-                return AutoTokenizer.from_pretrained(Path(config.path) / "tokenizer")
+                return AutoTokenizer.from_pretrained(tokenizer_path)
             case SubModelType.TextEncoder:
                 # Determine safe dtype based on target device capabilities
                 target_device = TorchDevice.choose_torch_device()
                 model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
                 return Qwen3ForCausalLM.from_pretrained(
-                    Path(config.path) / "text_encoder",
+                    text_encoder_path,
                     torch_dtype=model_dtype,
                     low_cpu_mem_usage=True,
                 )
