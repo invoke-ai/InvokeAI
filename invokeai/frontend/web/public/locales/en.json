@@ -1985,6 +1985,7 @@
         "allLoaded": "All Workflows Loaded",
         "searchPlaceholder": "Search by name, description or tags",
         "filterByTags": "Filter by Tags",
+        "tags": "Tags",
         "yourWorkflows": "Your Workflows",
         "recentlyOpened": "Recently Opened",
         "noRecentWorkflows": "No Recent Workflows",
