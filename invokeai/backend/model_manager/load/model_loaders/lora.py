@@ -41,6 +41,10 @@ from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_u
     is_state_dict_likely_in_flux_onetrainer_format,
     lora_model_from_flux_onetrainer_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_xlabs_format,
+    lora_model_from_flux_xlabs_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
 from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
 from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils import lora_model_from_z_image_state_dict
@@ -118,6 +122,8 @@ class LoRALoader(ModelLoader):
                     model = lora_model_from_flux_control_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_in_flux_aitoolkit_format(state_dict=state_dict):
                     model = lora_model_from_flux_aitoolkit_state_dict(state_dict=state_dict)
+                elif is_state_dict_likely_in_flux_xlabs_format(state_dict=state_dict):
+                    model = lora_model_from_flux_xlabs_state_dict(state_dict=state_dict)
                 else:
                     raise ValueError("LoRA model is in unsupported FLUX format")
             else:
