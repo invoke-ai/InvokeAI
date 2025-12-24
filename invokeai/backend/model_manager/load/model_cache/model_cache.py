@@ -266,15 +266,24 @@ class ModelCache:
                     )
                     return
 
-            # Only log and clear if we actually have models to clear
-            if len(self._cached_models) > 0:
+            # Check if there are any unlocked models that can be cleared
+            unlocked_models = [key for key, entry in self._cached_models.items() if not entry.is_locked]
+
+            if len(unlocked_models) > 0:
                 self._logger.info(
-                    f"Model cache keep-alive timeout of {self._keep_alive_minutes} minutes expired. Clearing model cache."
+                    f"Model cache keep-alive timeout of {self._keep_alive_minutes} minutes expired. "
+                    f"Clearing {len(unlocked_models)} unlocked model(s) from cache."
                 )
                 # Clear the cache by requesting a very large amount of space.
                 # This is the same logic used by the "Clear Model Cache" button.
                 # Using 1000 GB ensures all unlocked models are removed.
                 self.make_room(1000 * GB)
+            elif len(self._cached_models) > 0:
+                # All models are locked, don't log at info level
+                self._logger.debug(
+                    f"Model cache timeout fired but all {len(self._cached_models)} model(s) are locked. "
+                    f"Skipping cache clear."
+                )
             else:
                 self._logger.debug("Model cache timeout fired but cache is already empty.")
 
