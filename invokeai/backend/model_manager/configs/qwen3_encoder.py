@@ -94,8 +94,23 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        # Check for text_encoder config
-        expected_config_path = mod.path / "text_encoder" / "config.json"
+        # Check for text_encoder config - support both:
+        # 1. Full model structure: model_root/text_encoder/config.json
+        # 2. Standalone text_encoder download: model_root/config.json (when text_encoder subfolder is downloaded separately)
+        config_path_nested = mod.path / "text_encoder" / "config.json"
+        config_path_direct = mod.path / "config.json"
+
+        if config_path_nested.exists():
+            expected_config_path = config_path_nested
+        elif config_path_direct.exists():
+            expected_config_path = config_path_direct
+        else:
+            from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
+
+            raise NotAMatchError(
+                f"unable to load config file(s): {{PosixPath('{config_path_nested}'): 'file does not exist'}}"
+            )
+
         # Qwen3 uses Qwen2VLForConditionalGeneration or similar
         raise_for_class_name(
             expected_config_path,
