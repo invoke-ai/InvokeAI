@@ -11,24 +11,30 @@ type Whitespace = string;
 
 type Embedding = string;
 
-type Token =
-  | { type: 'word'; value: Word }
-  | { type: 'whitespace'; value: Whitespace }
-  | { type: 'punct'; value: Punct }
-  | { type: 'lparen' }
-  | { type: 'rparen' }
-  | { type: 'weight'; value: Attention }
-  | { type: 'lembed' }
-  | { type: 'rembed' }
-  | { type: 'escaped_paren'; value: '(' | ')' };
+export type Token =
+  | { type: 'word'; value: Word; start: number; end: number }
+  | { type: 'whitespace'; value: Whitespace; start: number; end: number }
+  | { type: 'punct'; value: Punct; start: number; end: number }
+  | { type: 'lparen'; start: number; end: number }
+  | { type: 'rparen'; start: number; end: number }
+  | { type: 'weight'; value: Attention; start: number; end: number }
+  | { type: 'lembed'; start: number; end: number }
+  | { type: 'rembed'; start: number; end: number }
+  | { type: 'escaped_paren'; value: '(' | ')'; start: number; end: number };
 
 export type ASTNode =
-  | { type: 'word'; text: Word; attention?: Attention }
-  | { type: 'group'; children: ASTNode[]; attention?: Attention }
-  | { type: 'embedding'; value: Embedding }
-  | { type: 'whitespace'; value: Whitespace }
-  | { type: 'punct'; value: Punct }
-  | { type: 'escaped_paren'; value: '(' | ')' };
+  | { type: 'word'; text: Word; attention?: Attention; range: { start: number; end: number }; isSelection?: boolean }
+  | {
+      type: 'group';
+      children: ASTNode[];
+      attention?: Attention;
+      range: { start: number; end: number };
+      isSelection?: boolean;
+    }
+  | { type: 'embedding'; value: Embedding; range: { start: number; end: number }; isSelection?: boolean }
+  | { type: 'whitespace'; value: Whitespace; range: { start: number; end: number }; isSelection?: boolean }
+  | { type: 'punct'; value: Punct; range: { start: number; end: number }; isSelection?: boolean }
+  | { type: 'escaped_paren'; value: '(' | ')'; range: { start: number; end: number }; isSelection?: boolean };
 
 const WEIGHT_PATTERN = /^[+-]?(\d+(\.\d+)?|[+-]+)/;
 const WHITESPACE_PATTERN = /^\s+/;
@@ -90,7 +96,7 @@ type TokenizeResult = {
 function tokenizeWhitespace(char: string, i: number): TokenizeResult {
   if (WHITESPACE_PATTERN.test(char)) {
     return {
-      token: { type: 'whitespace', value: char },
+      token: { type: 'whitespace', value: char, start: i, end: i + 1 },
       nextIndex: i + 1,
     };
   }
@@ -103,7 +109,7 @@ function tokenizeEscapedParen(prompt: string, i: number): TokenizeResult {
     const nextChar = prompt[i + 1];
     if (nextChar === '(' || nextChar === ')') {
       return {
-        token: { type: 'escaped_paren', value: nextChar },
+        token: { type: 'escaped_paren', value: nextChar, start: i, end: i + 2 },
         nextIndex: i + 2,
       };
     }
@@ -114,7 +120,7 @@ function tokenizeEscapedParen(prompt: string, i: number): TokenizeResult {
 function tokenizeLeftParen(char: string, i: number): TokenizeResult {
   if (char === '(') {
     return {
-      token: { type: 'lparen' },
+      token: { type: 'lparen', start: i, end: i + 1 },
       nextIndex: i + 1,
     };
   }
@@ -131,14 +137,15 @@ function tokenizeRightParen(prompt: string, i: number): TokenizeResult {
       if (!isNaN(Number(weight))) {
         weight = Number(weight);
       }
+      const weightEnd = i + 1 + weightMatch[0].length;
       return {
-        token: { type: 'rparen' },
-        extraToken: { type: 'weight', value: weight },
-        nextIndex: i + 1 + weightMatch[0].length,
+        token: { type: 'rparen', start: i, end: i + 1 },
+        extraToken: { type: 'weight', value: weight, start: i + 1, end: weightEnd },
+        nextIndex: weightEnd,
       };
     }
     return {
-      token: { type: 'rparen' },
+      token: { type: 'rparen', start: i, end: i + 1 },
       nextIndex: i + 1,
     };
   }
@@ -148,7 +155,7 @@ function tokenizeRightParen(prompt: string, i: number): TokenizeResult {
 function tokenizePunctuation(char: string, i: number): TokenizeResult {
   if (PUNCTUATION_PATTERN.test(char)) {
     return {
-      token: { type: 'punct', value: char },
+      token: { type: 'punct', value: char, start: i, end: i + 1 },
       nextIndex: i + 1,
     };
   }
@@ -171,15 +178,16 @@ function tokenizeWord(prompt: string, i: number): TokenizeResult {
     // Check for weight immediately after word (e.g., "Lorem+", "consectetur-")
     const weightMatch = prompt.slice(j).match(/^[+-]?(\d+(\.\d+)?|[+-]+)/);
     if (weightMatch && weightMatch[0]) {
+      const weightEnd = j + weightMatch[0].length;
       return {
-        token: { type: 'word', value: word },
-        extraToken: { type: 'weight', value: weightMatch[0] },
-        nextIndex: j + weightMatch[0].length,
+        token: { type: 'word', value: word, start: i, end: j },
+        extraToken: { type: 'weight', value: weightMatch[0], start: j, end: weightEnd },
+        nextIndex: weightEnd,
       };
     }
 
     return {
-      token: { type: 'word', value: word },
+      token: { type: 'word', value: word, start: i, end: j },
       nextIndex: j,
     };
   }
@@ -189,13 +197,13 @@ function tokenizeWord(prompt: string, i: number): TokenizeResult {
 function tokenizeEmbedding(char: string, i: number): TokenizeResult {
   if (char === '<') {
     return {
-      token: { type: 'lembed' },
+      token: { type: 'lembed', start: i, end: i + 1 },
       nextIndex: i + 1,
     };
   }
   if (char === '>') {
     return {
-      token: { type: 'rembed' },
+      token: { type: 'rembed', start: i, end: i + 1 },
       nextIndex: i + 1,
     };
   }
@@ -206,7 +214,7 @@ function tokenizeOther(char: string, i: number): TokenizeResult {
   // Any other single character punctuation
   if (OTHER_PATTERN.test(char)) {
     return {
-      token: { type: 'punct', value: char },
+      token: { type: 'punct', value: char, start: i, end: i + 1 },
       nextIndex: i + 1,
     };
   }
@@ -237,65 +245,88 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
       if (!token || token.type === 'rparen') {
         break;
       }
-      // console.log('Parsing token:', token);
 
       switch (token.type) {
         case 'whitespace': {
           const wsToken = consume() as Token & { type: 'whitespace' };
-          nodes.push({ type: 'whitespace', value: wsToken.value });
+          nodes.push({ type: 'whitespace', value: wsToken.value, range: { start: wsToken.start, end: wsToken.end } });
           break;
         }
         case 'lparen': {
-          consume();
+          const lparen = consume() as Token & { type: 'lparen' };
           const groupChildren = parseGroup();
 
           let attention: Attention | undefined;
+          let end = lparen.end; // Default end if no rparen
+
           if (peek()?.type === 'rparen') {
-            consume(); // consume ')'
+            const rparen = consume() as Token & { type: 'rparen' };
+            end = rparen.end;
             if (peek()?.type === 'weight') {
-              attention = (consume() as Token & { type: 'weight' }).value;
+              const weightToken = consume() as Token & { type: 'weight' };
+              attention = weightToken.value;
+              end = weightToken.end;
             }
           }
 
-          nodes.push({ type: 'group', children: groupChildren, attention });
+          // If we hit EOF without rparen, the group extends to the end of the last child
+          if (end === lparen.end && groupChildren.length > 0) {
+            end = groupChildren[groupChildren.length - 1]!.range.end;
+          }
+
+          nodes.push({ type: 'group', children: groupChildren, attention, range: { start: lparen.start, end } });
           break;
         }
         case 'lembed': {
-          consume(); // consume '<'
+          const lembed = consume() as Token & { type: 'lembed' };
           let embedValue = '';
+          let end = lembed.end;
           while (peek() && peek()!.type !== 'rembed') {
             const embedToken = consume()!;
             embedValue +=
               embedToken.type === 'word' || embedToken.type === 'punct' || embedToken.type === 'whitespace'
                 ? embedToken.value
                 : '';
+            end = embedToken.end;
           }
           if (peek()?.type === 'rembed') {
-            consume(); // consume '>'
+            const rembed = consume() as Token & { type: 'rembed' };
+            end = rembed.end;
           }
-          nodes.push({ type: 'embedding', value: embedValue.trim() });
+          nodes.push({ type: 'embedding', value: embedValue.trim(), range: { start: lembed.start, end } });
           break;
         }
         case 'word': {
           const wordToken = consume() as Token & { type: 'word' };
           let attention: Attention | undefined;
+          let end = wordToken.end;
 
           // Check for immediate weight after word
           if (peek()?.type === 'weight') {
-            attention = (consume() as Token & { type: 'weight' }).value;
+            const weightToken = consume() as Token & { type: 'weight' };
+            attention = weightToken.value;
+            end = weightToken.end;
           }
 
-          nodes.push({ type: 'word', text: wordToken.value, attention });
+          nodes.push({ type: 'word', text: wordToken.value, attention, range: { start: wordToken.start, end } });
           break;
         }
         case 'punct': {
           const punctToken = consume() as Token & { type: 'punct' };
-          nodes.push({ type: 'punct', value: punctToken.value });
+          nodes.push({
+            type: 'punct',
+            value: punctToken.value,
+            range: { start: punctToken.start, end: punctToken.end },
+          });
           break;
         }
         case 'escaped_paren': {
           const escapedToken = consume() as Token & { type: 'escaped_paren' };
-          nodes.push({ type: 'escaped_paren', value: escapedToken.value });
+          nodes.push({
+            type: 'escaped_paren',
+            value: escapedToken.value,
+            range: { start: escapedToken.start, end: escapedToken.end },
+          });
           break;
         }
         default: {
