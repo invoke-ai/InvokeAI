@@ -161,6 +161,30 @@ const slice = createSlice({
       }
       state.clipGEmbedModel = result.data;
     },
+    zImageVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.zImageVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.zImageVaeModel = result.data;
+    },
+    zImageQwen3EncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.zImageQwen3EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.zImageQwen3EncoderModel = result.data;
+    },
+    zImageQwen3SourceModelSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.zImageQwen3SourceModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.zImageQwen3SourceModel = result.data;
+    },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
     },
@@ -404,6 +428,9 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.t5EncoderModel = oldState.t5EncoderModel;
   newState.clipEmbedModel = oldState.clipEmbedModel;
   newState.refinerModel = oldState.refinerModel;
+  newState.zImageVaeModel = oldState.zImageVaeModel;
+  newState.zImageQwen3EncoderModel = oldState.zImageQwen3EncoderModel;
+  newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
   return newState;
 };
 
@@ -437,6 +464,9 @@ export const {
   clipEmbedModelSelected,
   clipLEmbedModelSelected,
   clipGEmbedModelSelected,
+  zImageVaeModelSelected,
+  zImageQwen3EncoderModelSelected,
+  zImageQwen3SourceModelSelected,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   setColorCompensation,
@@ -501,6 +531,7 @@ export const selectIsSDXL = createParamsSelector((params) => params.model?.base 
 export const selectIsFLUX = createParamsSelector((params) => params.model?.base === 'flux');
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
+export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -518,6 +549,9 @@ export const selectCLIPEmbedModel = createParamsSelector((params) => params.clip
 export const selectCLIPLEmbedModel = createParamsSelector((params) => params.clipLEmbedModel);
 
 export const selectCLIPGEmbedModel = createParamsSelector((params) => params.clipGEmbedModel);
+export const selectZImageVaeModel = createParamsSelector((params) => params.zImageVaeModel);
+export const selectZImageQwen3EncoderModel = createParamsSelector((params) => params.zImageQwen3EncoderModel);
+export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);

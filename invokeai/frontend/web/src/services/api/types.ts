@@ -95,6 +95,7 @@ export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
   S['AnyModelConfig'],
   { type: 't5_encoder'; format: 'bnb_quantized_int8b' }
 >;
+export type Qwen3EncoderModelConfig = Extract<S['AnyModelConfig'], { type: 'qwen3_encoder' }>;
 export type SpandrelImageToImageModelConfig = Extract<S['AnyModelConfig'], { type: 'spandrel_image_to_image' }>;
 export type CheckpointModelConfig = Extract<S['AnyModelConfig'], { type: 'main'; format: 'checkpoint' }>;
 type CLIPVisionDiffusersConfig = Extract<S['AnyModelConfig'], { type: 'clip_vision' }>;
@@ -220,6 +221,10 @@ export const isT5EncoderModelConfig = (
   return config.type === 't5_encoder';
 };
 
+export const isQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwen3EncoderModelConfig => {
+  return config.type === 'qwen3_encoder';
+};
+
 export const isCLIPEmbedModelConfigOrSubmodel = (
   config: AnyModelConfig,
   excludeSubmodels?: boolean
@@ -280,16 +285,20 @@ export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is M
   return config.type === 'main' && config.base !== 'sdxl-refiner';
 };
 
-export const isCheckpointMainModelConfig = (config: AnyModelConfig): config is CheckpointModelConfig => {
-  return config.type === 'main' && (config.format === 'checkpoint' || config.format === 'bnb_quantized_nf4b');
-};
-
 export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'sdxl-refiner';
 };
 
+export const isFluxDevMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'flux' && config.variant === 'dev';
+};
+
 export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'flux' && config.variant === 'dev_fill';
+};
+
+export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'z-image' && config.format === 'diffusers';
 };
 
 export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
