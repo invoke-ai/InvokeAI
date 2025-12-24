@@ -1,11 +1,11 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Flex, IconButton, Kbd, Text, Tooltip } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import type { Hotkey } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { IS_MAC_OS, useHotkeyConflictMap } from 'features/system/components/HotkeysModal/useHotkeyData';
+import type { AppThunkDispatch } from 'app/store/store';
+import type { Hotkey, HotkeyConflictInfo } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { IS_MAC_OS } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { hotkeyChanged, hotkeyReset } from 'features/system/store/hotkeysSlice';
+import type { TFunction } from 'i18next';
 import { Fragment, memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
   PiArrowCounterClockwiseBold,
   PiCheckBold,
@@ -82,8 +82,6 @@ type HotkeyEditProps = {
   onEditDelete?: (index: number) => void;
 };
 
-type HotkeyConflictInfo = { category: string; id: string; title: string; fullId: string };
-
 type HotkeyItemProps = HotkeyEditProps & {
   sx?: SystemStyleObject;
   keyString: string;
@@ -92,6 +90,7 @@ type HotkeyItemProps = HotkeyEditProps & {
   currentHotkeyId: string;
   isNewHotkey?: boolean;
   conflictMap: Map<string, HotkeyConflictInfo>;
+  t: TFunction;
 };
 
 const HotkeyRecorderSx: SystemStyleObject = {
@@ -126,8 +125,8 @@ const HotkeyItem = memo(
     currentHotkeyId,
     isNewHotkey,
     conflictMap,
+    t,
   }: HotkeyItemProps) => {
-    const { t } = useTranslation();
     const [recordedKey, setRecordedKey] = useState<string | null>(null);
     const [isRecording, setIsRecording] = useState(false);
 
@@ -380,6 +379,7 @@ type HotkeyItemsDisplayProps = HotkeyEditProps & {
   conflictMap: Map<string, HotkeyConflictInfo>;
   isCustomized?: boolean;
   onReset?: () => void;
+  t: TFunction;
 };
 
 const HotkeyItemsDisplaySx: SystemStyleObject = {
@@ -403,8 +403,8 @@ const HotkeyItemsDisplay = memo(
     conflictMap,
     isCustomized,
     onReset,
+    t,
   }: HotkeyItemsDisplayProps) => {
-    const { t } = useTranslation();
     const isAddingNew = editingIndex === hotkeys.length;
 
     return (
@@ -422,6 +422,7 @@ const HotkeyItemsDisplay = memo(
                 onEditDelete={onEditDelete}
                 currentHotkeyId={currentHotkeyId}
                 conflictMap={conflictMap}
+                t={t}
               />
             ))
           : !isAddingNew && (
@@ -441,6 +442,7 @@ const HotkeyItemsDisplay = memo(
             currentHotkeyId={currentHotkeyId}
             isNewHotkey={true}
             conflictMap={conflictMap}
+            t={t}
           />
         )}
         <Flex>
@@ -476,23 +478,26 @@ const HotkeyItemsDisplay = memo(
 HotkeyItemsDisplay.displayName = 'HotkeyItemsDisplay';
 
 type HotkeyListItemProps = {
+  lastItem?: boolean;
   hotkey: Hotkey;
   sx?: SystemStyleObject;
+  conflictMap: Map<string, HotkeyConflictInfo>;
+  t: TFunction;
+  dispatch: AppThunkDispatch;
 };
 
 const HotkeyListItemSx: SystemStyleObject = {
-  gap: 2,
   alignItems: 'start',
   justifyContent: 'space-between',
   width: '100%',
+  py: 3,
+  gap: 2,
 };
 
-export const HotkeyListItem = memo(({ hotkey, sx }: HotkeyListItemProps) => {
+export const HotkeyListItem = memo(({ lastItem, hotkey, sx, conflictMap, t, dispatch }: HotkeyListItemProps) => {
   const { title, desc, hotkeys: hotkeyKeys, defaultHotkeys } = hotkey;
 
-  const dispatch = useAppDispatch();
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const conflictMap = useHotkeyConflictMap();
 
   // Check if hotkeys have been customized
   const isCustomized = useMemo(() => {
@@ -560,7 +565,7 @@ export const HotkeyListItem = memo(({ hotkey, sx }: HotkeyListItemProps) => {
   }, [dispatch, currentHotkeyId]);
 
   return (
-    <Flex sx={{ ...HotkeyListItemSx, ...sx }}>
+    <Flex sx={{ ...HotkeyListItemSx, borderBottomWidth: lastItem ? 0 : 1, ...sx }}>
       <Flex lineHeight={1} gap={1} w="100%" flexDir="column">
         <Text fontWeight="semibold">{title}</Text>
         <Text variant="subtext">{desc}</Text>
@@ -578,6 +583,7 @@ export const HotkeyListItem = memo(({ hotkey, sx }: HotkeyListItemProps) => {
           conflictMap={conflictMap}
           isCustomized={isCustomized}
           onReset={handleReset}
+          t={t}
         />
       </Flex>
     </Flex>
