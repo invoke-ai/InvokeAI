@@ -1985,6 +1985,7 @@
         "allLoaded": "All Workflows Loaded",
         "searchPlaceholder": "Search by name, description or tags",
         "filterByTags": "Filter by Tags",
+        "tags": "Tags",
         "yourWorkflows": "Your Workflows",
         "recentlyOpened": "Recently Opened",
         "noRecentWorkflows": "No Recent Workflows",
@@ -2676,7 +2677,9 @@
         "useForTemplate": "Use For Prompt Template",
         "viewList": "View Template List",
         "viewModeTooltip": "This is how your prompt will look with your currently selected template. To edit your prompt, click anywhere in the text box.",
-        "togglePromptPreviews": "Toggle Prompt Previews"
+        "togglePromptPreviews": "Toggle Prompt Previews",
+        "selectPreset": "Select Style Preset",
+        "noMatchingPresets": "No matching presets"
     },
 
     "ui": {
