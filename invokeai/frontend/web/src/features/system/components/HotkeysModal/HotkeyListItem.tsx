@@ -298,28 +298,30 @@ const HotkeyItem = memo(
       }
 
       return (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onStartEdit}
-          rightIcon={<PiPencilSimpleBold />}
-          gap={0.5}
-          alignItems="center"
-          px={2}
-        >
-          {displayKeyParts.map((part, j) => (
-            <Fragment key={j}>
-              <Kbd fontSize="xs" textTransform="lowercase">
-                {part}
-              </Kbd>
-              {j !== displayKeyParts.length - 1 && (
-                <Text as="span" fontSize="xs" fontWeight="semibold" mx={0.5} mt={-0.5}>
-                  +
-                </Text>
-              )}
-            </Fragment>
-          ))}
-        </Button>
+        <Tooltip label={t('hotkeys.editHotkey')}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onStartEdit}
+            rightIcon={<PiPencilSimpleBold />}
+            gap={0.5}
+            alignItems="center"
+            px={2}
+          >
+            {displayKeyParts.map((part, j) => (
+              <Fragment key={j}>
+                <Kbd fontSize="xs" textTransform="lowercase">
+                  {part}
+                </Kbd>
+                {j !== displayKeyParts.length - 1 && (
+                  <Text as="span" fontSize="xs" fontWeight="semibold" mx={0.5} mt={-0.5}>
+                    +
+                  </Text>
+                )}
+              </Fragment>
+            ))}
+          </Button>
+        </Tooltip>
       );
     };
 
@@ -566,7 +568,7 @@ export const HotkeyListItem = memo(({ lastItem, hotkey, sx, conflictMap, t, disp
 
   return (
     <Flex sx={{ ...HotkeyListItemSx, borderBottomWidth: lastItem ? 0 : 1, ...sx }}>
-      <Flex lineHeight={1} gap={1} w="100%" flexDir="column">
+      <Flex lineHeight={1} gap={2} w="100%" flexDir="column">
         <Text fontWeight="semibold">{title}</Text>
         <Text variant="subtext">{desc}</Text>
       </Flex>
