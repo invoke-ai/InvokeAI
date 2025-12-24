@@ -529,7 +529,10 @@ class ModelInstallService(ModelInstallServiceBase):
             finally:
                 # if this is an install of a remote file, then clean up the temporary directory
                 if job._install_tmpdir is not None:
-                    rmtree(job._install_tmpdir)
+                    try:
+                        rmtree(job._install_tmpdir)
+                    except OSError as e:
+                        self._logger.warning(f"Failed to remove temporary directory {job._install_tmpdir}: {e}. It will be removed on next server start.")
                 self._install_completed_event.set()
                 self._install_queue.task_done()
         self._logger.info(f"Installer thread {threading.get_ident()} exiting")
