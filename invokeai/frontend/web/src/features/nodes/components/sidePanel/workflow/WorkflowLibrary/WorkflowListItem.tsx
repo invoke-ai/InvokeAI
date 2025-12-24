@@ -39,6 +39,16 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
     return workflowId === workflow.workflow_id;
   }, [workflowId, workflow.workflow_id]);
 
+  const tags = useMemo(() => {
+    if (!workflow.tags) {
+      return [];
+    }
+    return workflow.tags
+      .split(',')
+      .map((tag) => tag.trim())
+      .filter((tag) => tag.length > 0);
+  }, [workflow.tags]);
+
   const handleClickLoad = useCallback(() => {
     loadWorkflowWithDialog({
       type: 'library',
@@ -109,6 +119,16 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
           <Text variant="subtext" fontSize="xs" noOfLines={3}>
             {workflow.description}
           </Text>
+          {tags.length > 0 && (
+            <Text fontSize="xs" noOfLines={1}>
+              <Text as="span" color="base.400">
+                {t('workflows.tags')}:{' '}
+              </Text>
+              <Text as="span" color="base.400">
+                {tags.join(', ')}
+              </Text>
+            </Text>
+          )}
         </Flex>
         <Flex className={WORKFLOW_ACTION_BUTTONS_CN} alignItems="center" display="none" h={8}>
           {workflow.opened_at && (
