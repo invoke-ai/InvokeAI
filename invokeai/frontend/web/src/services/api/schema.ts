@@ -13263,6 +13263,12 @@ export type components = {
              */
             log_memory_usage?: boolean;
             /**
+             * Model Cache Keep Alive
+             * @description How long to keep models in cache after last use, in minutes. A value of 0 means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.
+             * @default 0
+             */
+            model_cache_keep_alive?: number;
+            /**
              * Device Working Mem Gb
              * @description The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.
              * @default 3
