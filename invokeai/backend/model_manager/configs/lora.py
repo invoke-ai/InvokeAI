@@ -150,10 +150,15 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
 
     @classmethod
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
-        # First rule out ControlLoRA and Diffusers LoRA
+        # First rule out ControlLoRA
         flux_format = _get_flux_lora_format(mod)
         if flux_format in [FluxLoRAFormat.Control]:
             raise NotAMatchError("model looks like Control LoRA")
+
+        # If it's a recognized Flux LoRA format (Kohya, Diffusers, OneTrainer, AIToolkit, XLabs, etc.),
+        # it's valid and we skip the heuristic check
+        if flux_format is not None:
+            return
 
         # Note: Existence of these key prefixes/suffixes does not guarantee that this is a LoRA.
         # Some main models have these keys, likely due to the creator merging in a LoRA.

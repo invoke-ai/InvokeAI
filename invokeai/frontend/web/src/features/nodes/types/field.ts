@@ -19,6 +19,7 @@ import {
   zModelIdentifierField,
   zModelType,
   zSchedulerField,
+  zStylePresetField,
 } from './common';
 
 /**
@@ -169,6 +170,11 @@ const zBoardFieldType = zFieldTypeBase.extend({
   originalType: zStatelessFieldType.optional(),
 });
 
+const zStylePresetFieldType = zFieldTypeBase.extend({
+  name: z.literal('StylePresetField'),
+  originalType: zStatelessFieldType.optional(),
+});
+
 const zColorFieldType = zFieldTypeBase.extend({
   name: z.literal('ColorField'),
   originalType: zStatelessFieldType.optional(),
@@ -205,6 +211,7 @@ const zStatefulFieldType = z.union([
   zEnumFieldType,
   zImageFieldType,
   zBoardFieldType,
+  zStylePresetFieldType,
   zModelIdentifierFieldType,
   zColorFieldType,
   zSchedulerFieldType,
@@ -605,6 +612,27 @@ export type BoardFieldInputInstance = z.infer<typeof zBoardFieldInputInstance>;
 export type BoardFieldInputTemplate = z.infer<typeof zBoardFieldInputTemplate>;
 export const isBoardFieldInputInstance = buildInstanceTypeGuard(zBoardFieldInputInstance);
 export const isBoardFieldInputTemplate = buildTemplateTypeGuard<BoardFieldInputTemplate>('BoardField');
+// #endregion
+
+// #region StylePresetField
+export const zStylePresetFieldValue = zStylePresetField.optional();
+const zStylePresetFieldInputInstance = zFieldInputInstanceBase.extend({
+  value: zStylePresetFieldValue,
+});
+const zStylePresetFieldInputTemplate = zFieldInputTemplateBase.extend({
+  type: zStylePresetFieldType,
+  originalType: zFieldType.optional(),
+  default: zStylePresetFieldValue,
+});
+const zStylePresetFieldOutputTemplate = zFieldOutputTemplateBase.extend({
+  type: zStylePresetFieldType,
+});
+export type StylePresetFieldValue = z.infer<typeof zStylePresetFieldValue>;
+export type StylePresetFieldInputInstance = z.infer<typeof zStylePresetFieldInputInstance>;
+export type StylePresetFieldInputTemplate = z.infer<typeof zStylePresetFieldInputTemplate>;
+export const isStylePresetFieldInputInstance = buildInstanceTypeGuard(zStylePresetFieldInputInstance);
+export const isStylePresetFieldInputTemplate =
+  buildTemplateTypeGuard<StylePresetFieldInputTemplate>('StylePresetField');
 // #endregion
 
 // #region ColorField
@@ -1257,6 +1285,7 @@ export const zStatefulFieldValue = z.union([
   zImageFieldValue,
   zImageFieldCollectionValue,
   zBoardFieldValue,
+  zStylePresetFieldValue,
   zModelIdentifierFieldValue,
   zColorFieldValue,
   zSchedulerFieldValue,
@@ -1284,6 +1313,7 @@ const zStatefulFieldInputInstance = z.union([
   zImageFieldInputInstance,
   zImageFieldCollectionInputInstance,
   zBoardFieldInputInstance,
+  zStylePresetFieldInputInstance,
   zModelIdentifierFieldInputInstance,
   zColorFieldInputInstance,
   zSchedulerFieldInputInstance,
@@ -1310,6 +1340,7 @@ const zStatefulFieldInputTemplate = z.union([
   zImageFieldInputTemplate,
   zImageFieldCollectionInputTemplate,
   zBoardFieldInputTemplate,
+  zStylePresetFieldInputTemplate,
   zModelIdentifierFieldInputTemplate,
   zColorFieldInputTemplate,
   zSchedulerFieldInputTemplate,
@@ -1337,6 +1368,7 @@ const zStatefulFieldOutputTemplate = z.union([
   zImageFieldOutputTemplate,
   zImageFieldCollectionOutputTemplate,
   zBoardFieldOutputTemplate,
+  zStylePresetFieldOutputTemplate,
   zModelIdentifierFieldOutputTemplate,
   zColorFieldOutputTemplate,
   zSchedulerFieldOutputTemplate,

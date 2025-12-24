@@ -1,7 +1,6 @@
 import {
   Button,
   ConfirmationAlertDialog,
-  Divider,
   Flex,
   IconButton,
   Input,
@@ -14,6 +13,7 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  Spinner,
   Text,
   useDisclosure,
 } from '@invoke-ai/ui-library';
@@ -21,15 +21,18 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import type { Hotkey } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { isHotkeysModified, useHotkeyData } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { StickyScrollable } from 'features/system/components/StickyScrollable';
+import {
+  isHotkeysModified,
+  useHotkeyConflictMap,
+  useHotkeyData,
+} from 'features/system/components/HotkeysModal/useHotkeyData';
 import { allHotkeysReset } from 'features/system/store/hotkeysSlice';
 import type { ChangeEventHandler, ReactElement } from 'react';
-import { cloneElement, Fragment, memo, useCallback, useMemo, useState } from 'react';
+import { cloneElement, memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
-import { HotkeyListItem } from './HotkeyListItem';
+import { HotkeysListWrapper } from './HotkeysListWrapper';
 
 type HotkeysModalProps = {
   /* The button to open the Settings Modal */
@@ -48,11 +51,10 @@ const matchesFilter = (item: Hotkey, filter: string): boolean => {
   );
 };
 
-const HotkeysModal = ({ children }: HotkeysModalProps) => {
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const { isOpen: isResetDialogOpen, onOpen: onResetDialogOpen, onClose: onResetDialogClose } = useDisclosure();
+const HotkeysModalInner = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const { isOpen: isResetDialogOpen, onOpen: onResetDialogOpen, onClose: onResetDialogClose } = useDisclosure();
   const [hotkeyFilter, setHotkeyFilter] = useState('');
   const clearHotkeyFilter = useCallback(() => setHotkeyFilter(''), []);
   const onChange = useCallback<ChangeEventHandler<HTMLInputElement>>((e) => setHotkeyFilter(e.target.value), []);
@@ -60,7 +62,10 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
     dispatch(allHotkeysReset());
     onResetDialogClose();
   }, [dispatch, onResetDialogClose]);
+
   const hotkeysData = useHotkeyData();
+  const conflictMap = useHotkeyConflictMap();
+
   const filteredHotkeys = useMemo<TransformedHotkeysCategoryData[]>(() => {
     const trimmedHotkeyFilter = hotkeyFilter.trim().toLowerCase();
     const filteredCategories: TransformedHotkeysCategoryData[] = [];
@@ -88,62 +93,54 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
 
   return (
     <>
-      {cloneElement(children, {
-        onClick: onOpen,
-      })}
-      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false}>
-        <ModalOverlay />
-        <ModalContent maxH="80vh" h="80vh">
-          <ModalHeader>{t('hotkeys.hotkeys')}</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody display="flex" flexDir="column" gap={4}>
-            <InputGroup>
-              <Input
-                autoFocus
-                placeholder={t('hotkeys.searchHotkeys')}
-                value={hotkeyFilter}
-                onChange={onChange}
-                tabIndex={1}
+      <ModalBody display="flex" flexDir="column" gap={4}>
+        <InputGroup>
+          <Input
+            autoFocus
+            placeholder={t('hotkeys.searchHotkeys')}
+            value={hotkeyFilter}
+            onChange={onChange}
+            tabIndex={1}
+          />
+          {hotkeyFilter.length > 0 ? (
+            <InputRightElement h="full" pe={2}>
+              <IconButton
+                onClick={clearHotkeyFilter}
+                size="sm"
+                variant="ghost"
+                aria-label={t('hotkeys.clearSearch')}
+                boxSize={4}
+                icon={<PiXBold />}
               />
-              {hotkeyFilter.length > 0 ? (
-                <InputRightElement h="full" pe={2}>
-                  <IconButton
-                    onClick={clearHotkeyFilter}
-                    size="sm"
-                    variant="ghost"
-                    aria-label={t('hotkeys.clearSearch')}
-                    boxSize={4}
-                    icon={<PiXBold />}
-                  />
-                </InputRightElement>
-              ) : null}
-            </InputGroup>
+            </InputRightElement>
+          ) : null}
+        </InputGroup>
 
-            <ScrollableContent>
-              <Flex flexDir="column" gap={4}>
-                {filteredHotkeys.map((category) => (
-                  <StickyScrollable key={category.title} title={category.title}>
-                    {category.hotkeys.map((hotkey, i) => (
-                      <Fragment key={hotkey.id}>
-                        <HotkeyListItem hotkey={hotkey} />
-                        {i < category.hotkeys.length - 1 && <Divider />}
-                      </Fragment>
-                    ))}
-                  </StickyScrollable>
-                ))}
-                {!filteredHotkeys.length && <IAINoContentFallback label={t('hotkeys.noHotkeysFound')} icon={null} />}
-              </Flex>
-            </ScrollableContent>
-          </ModalBody>
-          <ModalFooter>
-            <Flex gap={2} w="full" justifyContent="space-between">
-              <Button onClick={onResetDialogOpen} size="sm" colorScheme="error" disabled={!canResetHotkeys}>
-                {t('hotkeys.resetAll')}
-              </Button>
-            </Flex>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+        <ScrollableContent>
+          <Flex flexDir="column">
+            {filteredHotkeys.map((category) => (
+              <HotkeysListWrapper
+                key={category.title}
+                title={category.title}
+                hotkeysList={category.hotkeys}
+                conflictMap={conflictMap}
+                t={t}
+                dispatch={dispatch}
+              />
+            ))}
+            {!filteredHotkeys.length && <IAINoContentFallback label={t('hotkeys.noHotkeysFound')} icon={null} />}
+          </Flex>
+        </ScrollableContent>
+      </ModalBody>
+
+      <ModalFooter>
+        <Flex gap={2} w="full" justifyContent="space-between">
+          <Button onClick={onResetDialogOpen} size="sm" colorScheme="error" disabled={!canResetHotkeys}>
+            {t('hotkeys.resetAll')}
+          </Button>
+        </Flex>
+      </ModalFooter>
+
       <ConfirmationAlertDialog
         isOpen={isResetDialogOpen}
         onClose={onResetDialogClose}
@@ -156,6 +153,52 @@ const HotkeysModal = ({ children }: HotkeysModalProps) => {
           <Text>{t('hotkeys.resetAllConfirmation')}</Text>
         </Flex>
       </ConfirmationAlertDialog>
+    </>
+  );
+});
+
+HotkeysModalInner.displayName = 'HotkeysModalInner';
+
+const HotkeysModalContent = memo(() => {
+  const { t } = useTranslation();
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setIsReady(true), 0);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  return (
+    <>
+      <ModalHeader>{t('hotkeys.hotkeys')}</ModalHeader>
+      <ModalCloseButton />
+      {isReady ? (
+        <HotkeysModalInner />
+      ) : (
+        <ModalBody display="flex" flexDir="column" gap={4}>
+          <Flex flex="1" alignItems="center" justifyContent="center">
+            <Spinner />
+          </Flex>
+        </ModalBody>
+      )}
+    </>
+  );
+});
+
+HotkeysModalContent.displayName = 'HotkeysModalContent';
+
+const HotkeysModal = ({ children }: HotkeysModalProps) => {
+  const { isOpen, onOpen, onClose } = useDisclosure();
+
+  return (
+    <>
+      {cloneElement(children, {
+        onClick: onOpen,
+      })}
+      <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false}>
+        <ModalOverlay />
+        <ModalContent h="80vh">{isOpen && <HotkeysModalContent />}</ModalContent>
+      </Modal>
     </>
   );
 };
