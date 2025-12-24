@@ -228,18 +228,18 @@ class ModelCache:
 
     def _record_activity(self) -> None:
         """Record model activity and reset the timeout timer if configured.
-        
+
         Note: This method should only be called when self._lock is already held.
         """
         if self._keep_alive_minutes <= 0:
             return
 
         self._last_activity_time = time.time()
-        
+
         # Cancel any existing timer
         if self._timeout_timer is not None:
             self._timeout_timer.cancel()
-        
+
         # Start a new timer
         timeout_seconds = self._keep_alive_minutes * 60
         self._timeout_timer = threading.Timer(timeout_seconds, self._on_timeout)
@@ -252,7 +252,7 @@ class ModelCache:
         """Called when the keep-alive timeout expires. Clears the model cache."""
         if self._shutdown_event.is_set():
             return
-            
+
         with self._lock:
             # Double-check if there has been activity since the timer was set
             # This handles the race condition where activity occurred just before the timer fired
@@ -260,15 +260,23 @@ class ModelCache:
                 elapsed_minutes = (time.time() - self._last_activity_time) / 60
                 if elapsed_minutes < self._keep_alive_minutes:
                     # Activity occurred, don't clear cache
+                    self._logger.debug(
+                        f"Model cache timeout fired but activity detected {elapsed_minutes:.2f} minutes ago. "
+                        f"Skipping cache clear."
+                    )
                     return
-            
-            self._logger.info(
-                f"Model cache keep-alive timeout of {self._keep_alive_minutes} minutes expired. Clearing model cache."
-            )
-            # Clear the cache by requesting a very large amount of space.
-            # This is the same logic used by the "Clear Model Cache" button.
-            # Using 1000 GB ensures all unlocked models are removed.
-            self.make_room(1000 * GB)
+
+            # Only log and clear if we actually have models to clear
+            if len(self._cached_models) > 0:
+                self._logger.info(
+                    f"Model cache keep-alive timeout of {self._keep_alive_minutes} minutes expired. Clearing model cache."
+                )
+                # Clear the cache by requesting a very large amount of space.
+                # This is the same logic used by the "Clear Model Cache" button.
+                # Using 1000 GB ensures all unlocked models are removed.
+                self.make_room(1000 * GB)
+            else:
+                self._logger.debug("Model cache timeout fired but cache is already empty.")
 
     def shutdown(self) -> None:
         """Shutdown the model cache, cancelling any pending timers."""
@@ -316,7 +324,7 @@ class ModelCache:
         self._logger.debug(
             f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size / MB:.2f}MB)"
         )
-        
+
         # Record activity when a model is added
         self._record_activity()
 
@@ -372,10 +380,10 @@ class ModelCache:
         self._logger.debug(f"Cache hit: {key} (Type: {cache_entry.cached_model.model.__class__.__name__})")
         for cb in self._on_cache_hit_callbacks:
             cb(model_key=key, cache_snapshot=self._get_cache_snapshot())
-        
+
         # Record activity when a model is accessed
         self._record_activity()
-        
+
         return cache_entry
 
     @synchronized
@@ -390,7 +398,7 @@ class ModelCache:
             )
         # cache_entry = self._cached_models[key]
         cache_entry.lock()
-        
+
         # Record activity when a model is locked
         self._record_activity()
 
@@ -432,7 +440,7 @@ class ModelCache:
         self._logger.debug(
             f"Unlocked model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
         )
-        
+
         # Record activity when a model is unlocked
         self._record_activity()
 

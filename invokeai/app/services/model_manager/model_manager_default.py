@@ -63,7 +63,7 @@ class ModelManagerService(ModelManagerServiceBase):
         # Shutdown the model cache to cancel any pending timers
         if hasattr(self._load, "ram_cache"):
             self._load.ram_cache.shutdown()
-        
+
         for service in [self._store, self._install, self._load]:
             if hasattr(service, "stop"):
                 service.stop(invoker)
