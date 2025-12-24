@@ -132,6 +132,7 @@ class ModelCache:
         storage_device: torch.device | str = "cpu",
         log_memory_usage: bool = False,
         logger: Optional[Logger] = None,
+        keep_alive_minutes: float = 0,
     ):
         """Initialize the model RAM cache.
 
@@ -151,6 +152,7 @@ class ModelCache:
             snapshots, so it is recommended to disable this feature unless you are actively inspecting the model cache's
             behaviour.
         :param logger: InvokeAILogger to use (otherwise creates one)
+        :param keep_alive_minutes: How long to keep models in cache after last use (in minutes). 0 means keep indefinitely.
         """
         self._enable_partial_loading = enable_partial_loading
         self._keep_ram_copy_of_weights = keep_ram_copy_of_weights
@@ -181,6 +183,12 @@ class ModelCache:
         self._on_cache_hit_callbacks: set[CacheHitCallback] = set()
         self._on_cache_miss_callbacks: set[CacheMissCallback] = set()
         self._on_cache_models_cleared_callbacks: set[CacheModelsClearedCallback] = set()
+
+        # Keep-alive timeout support
+        self._keep_alive_minutes = keep_alive_minutes
+        self._last_activity_time: Optional[float] = None
+        self._timeout_timer: Optional[threading.Timer] = None
+        self._shutdown_event = threading.Event()
 
     def on_cache_hit(self, cb: CacheHitCallback) -> Callable[[], None]:
         self._on_cache_hit_callbacks.add(cb)
@@ -217,6 +225,50 @@ class ModelCache:
     def stats(self, stats: CacheStats) -> None:
         """Set the CacheStats object for collecting cache statistics."""
         self._stats = stats
+
+    def _record_activity(self) -> None:
+        """Record model activity and reset the timeout timer if configured."""
+        if self._keep_alive_minutes <= 0:
+            return
+
+        self._last_activity_time = time.time()
+        
+        # Cancel any existing timer
+        if self._timeout_timer is not None:
+            self._timeout_timer.cancel()
+        
+        # Start a new timer
+        timeout_seconds = self._keep_alive_minutes * 60
+        self._timeout_timer = threading.Timer(timeout_seconds, self._on_timeout)
+        self._timeout_timer.daemon = True
+        self._timeout_timer.start()
+        self._logger.debug(f"Model cache activity recorded. Timeout set to {self._keep_alive_minutes} minutes.")
+
+    def _on_timeout(self) -> None:
+        """Called when the keep-alive timeout expires. Clears the model cache."""
+        if self._shutdown_event.is_set():
+            return
+            
+        with self._lock:
+            # Check if there has been activity since the timer was set
+            if self._last_activity_time is not None and self._keep_alive_minutes > 0:
+                elapsed_minutes = (time.time() - self._last_activity_time) / 60
+                if elapsed_minutes < self._keep_alive_minutes:
+                    # Activity occurred, don't clear cache
+                    return
+            
+            self._logger.info(
+                f"Model cache keep-alive timeout of {self._keep_alive_minutes} minutes expired. Clearing model cache."
+            )
+            # Clear the cache by requesting a huge amount of space (same logic as empty_model_cache endpoint)
+            self.make_room(1000 * GB)
+
+    def shutdown(self) -> None:
+        """Shutdown the model cache, cancelling any pending timers."""
+        self._shutdown_event.set()
+        if self._timeout_timer is not None:
+            self._timeout_timer.cancel()
+            self._timeout_timer = None
 
     @synchronized
     def put(self, key: str, model: AnyModel) -> None:
@@ -256,6 +308,9 @@ class ModelCache:
         self._logger.debug(
             f"Added model {key} (Type: {model.__class__.__name__}, Wrap mode: {wrapped_model.__class__.__name__}, Model size: {size / MB:.2f}MB)"
         )
+        
+        # Record activity when a model is added
+        self._record_activity()
 
     @synchronized
     def _get_cache_snapshot(self) -> dict[str, CacheEntrySnapshot]:
@@ -309,6 +364,10 @@ class ModelCache:
         self._logger.debug(f"Cache hit: {key} (Type: {cache_entry.cached_model.model.__class__.__name__})")
         for cb in self._on_cache_hit_callbacks:
             cb(model_key=key, cache_snapshot=self._get_cache_snapshot())
+        
+        # Record activity when a model is accessed
+        self._record_activity()
+        
         return cache_entry
 
     @synchronized
@@ -323,6 +382,9 @@ class ModelCache:
             )
         # cache_entry = self._cached_models[key]
         cache_entry.lock()
+        
+        # Record activity when a model is locked
+        self._record_activity()
 
         self._logger.debug(
             f"Locking model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
@@ -362,6 +424,9 @@ class ModelCache:
         self._logger.debug(
             f"Unlocked model {cache_entry.key} (Type: {cache_entry.cached_model.model.__class__.__name__})"
         )
+        
+        # Record activity when a model is unlocked
+        self._record_activity()
 
     def _load_locked_model(self, cache_entry: CacheRecord, working_mem_bytes: Optional[int] = None) -> None:
         """Helper function for self.lock(). Loads a locked model into VRAM."""

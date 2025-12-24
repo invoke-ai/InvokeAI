@@ -60,6 +60,10 @@ class ModelManagerService(ModelManagerServiceBase):
                 service.start(invoker)
 
     def stop(self, invoker: Invoker) -> None:
+        # Shutdown the model cache to cancel any pending timers
+        if hasattr(self._load, "ram_cache"):
+            self._load.ram_cache.shutdown()
+        
         for service in [self._store, self._install, self._load]:
             if hasattr(service, "stop"):
                 service.stop(invoker)
@@ -89,6 +93,7 @@ class ModelManagerService(ModelManagerServiceBase):
             max_vram_cache_size_gb=app_config.max_cache_vram_gb,
             execution_device=execution_device or TorchDevice.choose_torch_device(),
             logger=logger,
+            keep_alive_minutes=app_config.model_cache_keep_alive,
         )
         loader = ModelLoadService(
             app_config=app_config,
