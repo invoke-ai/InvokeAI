@@ -1,7 +1,6 @@
 import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
-import { adjustPromptAttention } from 'common/util/promptAttention';
 import {
   positivePromptChanged,
   selectModelSupportsNegativePrompt,
@@ -16,6 +15,7 @@ import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModeP
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
+import { usePromptAttentionHotkeys } from 'features/prompt/usePromptAttentionHotkeys';
 import {
   selectStylePresetActivePresetId,
   selectStylePresetViewMode,
@@ -193,66 +193,9 @@ export const ParamPositivePrompt = memo(() => {
     dependencies: [promptHistoryApi.next, isPromptFocused],
   });
 
-  // Adjust prompt attention up
-  useRegisteredHotkeys({
-    id: 'promptWeightUp',
-    category: 'app',
-    callback: (e) => {
-      if (isPromptFocused() && textareaRef.current) {
-        e.preventDefault();
-        const textarea = textareaRef.current;
-        const result = adjustPromptAttention(
-          textarea.value,
-          textarea.selectionStart,
-          textarea.selectionEnd,
-          'increment'
-        );
-
-        // Update the prompt
-        dispatch(positivePromptChanged(result.prompt));
-
-        // Update selection after React re-renders
-        setTimeout(() => {
-          if (textareaRef.current) {
-            textareaRef.current.setSelectionRange(result.selectionStart, result.selectionEnd);
-            textareaRef.current.focus();
-          }
-        }, 0);
-      }
-    },
-    options: { preventDefault: true, enableOnFormTags: ['TEXTAREA'] },
-    dependencies: [dispatch, isPromptFocused],
-  });
-
-  // Adjust prompt attention down
-  useRegisteredHotkeys({
-    id: 'promptWeightDown',
-    category: 'app',
-    callback: (e) => {
-      if (isPromptFocused() && textareaRef.current) {
-        e.preventDefault();
-        const textarea = textareaRef.current;
-        const result = adjustPromptAttention(
-          textarea.value,
-          textarea.selectionStart,
-          textarea.selectionEnd,
-          'decrement'
-        );
-
-        // Update the prompt
-        dispatch(positivePromptChanged(result.prompt));
-
-        // Update selection after React re-renders
-        setTimeout(() => {
-          if (textareaRef.current) {
-            textareaRef.current.setSelectionRange(result.selectionStart, result.selectionEnd);
-            textareaRef.current.focus();
-          }
-        }, 0);
-      }
-    },
-    options: { preventDefault: true, enableOnFormTags: ['TEXTAREA'] },
-    dependencies: [dispatch, isPromptFocused],
+  usePromptAttentionHotkeys({
+    textareaRef,
+    onPromptChange: (prompt) => dispatch(positivePromptChanged(prompt)),
   });
 
   return (
