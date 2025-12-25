@@ -1,5 +1,6 @@
 """Model installation class."""
 
+import gc
 import locale
 import os
 import re
@@ -187,6 +188,21 @@ class ModelInstallService(ModelInstallServiceBase):
         config.source_type = ModelSourceType.Path
         return self._register(model_path, config)
 
+    # TODO: Replace this with a proper fix for underlying problem of Windows holding open
+    # the file when it needs to be moved.
+    @staticmethod
+    def _move_with_retries(src: Path, dst: Path, attempts: int = 5, delay: float = 1.0) -> None:
+        """Workaround for Windows file-handle issues when moving files."""
+        for tries_left in range(attempts, 0, -1):
+            try:
+                move(src, dst)
+                return
+            except PermissionError:
+                gc.collect()
+                if tries_left == 1:
+                    raise
+                time.sleep(delay)
+
     def install_path(
         self,
         model_path: Union[Path, str],
@@ -205,7 +221,7 @@ class ModelInstallService(ModelInstallServiceBase):
             dest_dir.mkdir(parents=True)
             dest_path = dest_dir / model_path.name if model_path.is_file() else dest_dir
             if model_path.is_file():
-                move(model_path, dest_path)
+                self._move_with_retries(model_path, dest_path)  # Windows workaround TODO: fix root cause
             elif model_path.is_dir():
                 # Move the contents of the directory, not the directory itself
                 for item in model_path.iterdir():
