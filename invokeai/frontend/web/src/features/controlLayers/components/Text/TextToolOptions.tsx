@@ -5,13 +5,11 @@ import {
   CompositeNumberInput,
   CompositeSlider,
   Flex,
-  FormControl,
-  FormLabel,
   IconButton,
+  Text,
   Tooltip,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import {
   selectTextAlignment,
   selectTextFontId,
@@ -47,8 +45,7 @@ const formatPx = (value: number | string) => `${value} px`;
 
 export const TextToolOptions = () => {
   return (
-    <Flex alignItems="center" gap={2} minW={0} data-text-tool-safezone="true" w="full">
-      <ToolFillColorPicker />
+    <Flex alignItems="center" gap={2} minW={0} data-text-tool-safezone="true">
       <FontSelect />
       <FontSizeControl />
       <FormatControls />
@@ -82,17 +79,21 @@ const FontSelect = () => {
   );
 
   return (
-    <FormControl minW={48} display="flex" alignItems="center" gap={2} maxW={64}>
-      <FormLabel size="sm" m={0} whiteSpace="nowrap">
+    <Flex minW={48} display="flex" alignItems="center" gap={2} maxW={64}>
+      <Text fontSize="sm" lineHeight="1" whiteSpace="nowrap">
         {t('controlLayers.text.font', { defaultValue: 'Font' })}
-      </FormLabel>
-      <Combobox
-        isSearchable={false}
-        options={options}
-        value={selectedOption}
-        onChange={handleFontChange}
-      />
-    </FormControl>
+      </Text>
+      <Tooltip label={t('controlLayers.text.font', { defaultValue: 'Font' })}>
+        <Combobox
+          size="sm"
+          variant="outline"
+          isSearchable={false}
+          options={options}
+          value={selectedOption}
+          onChange={handleFontChange}
+        />
+      </Tooltip>
+    </Flex>
   );
 };
 
@@ -108,32 +109,40 @@ const FontSizeControl = () => {
   );
 
   return (
-    <FormControl w="auto" flexShrink={0}>
-      <FormLabel size="sm" m={0} whiteSpace="nowrap">
+    <Flex w="auto" flexShrink={0} alignItems="center" gap={2}>
+      <Text fontSize="sm" lineHeight="1" whiteSpace="nowrap">
         {t('controlLayers.text.size', { defaultValue: 'Size' })}
-      </FormLabel>
+      </Text>
       <Flex gap={2} alignItems="center">
-        <Box w="80px" minW="80px">
-          <CompositeNumberInput
-            min={TEXT_MIN_FONT_SIZE}
-            max={TEXT_MAX_FONT_SIZE}
-            step={1}
-            value={fontSize}
-            onChange={handleFontSizeChange}
-            format={formatPx}
-          />
-        </Box>
-        <Box w="140px" minW="120px">
-          <CompositeSlider
-            min={TEXT_MIN_FONT_SIZE}
-            max={TEXT_MAX_FONT_SIZE}
-            step={2}
-            value={fontSize}
-            onChange={handleFontSizeChange}
-          />
-        </Box>
+        <Tooltip label={t('controlLayers.text.size', { defaultValue: 'Size' })}>
+          <Box w="80px" minW="80px">
+            <CompositeNumberInput
+              size="sm"
+              variant="outline"
+              min={TEXT_MIN_FONT_SIZE}
+              max={TEXT_MAX_FONT_SIZE}
+              step={1}
+              value={fontSize}
+              onChange={handleFontSizeChange}
+              format={formatPx}
+            />
+          </Box>
+        </Tooltip>
+        <Tooltip label={t('controlLayers.text.size', { defaultValue: 'Size' })}>
+          <Box w="140px" minW="120px">
+            <CompositeSlider
+              size="sm"
+              variant="outline"
+              min={TEXT_MIN_FONT_SIZE}
+              max={TEXT_MAX_FONT_SIZE}
+              step={2}
+              value={fontSize}
+              onChange={handleFontSizeChange}
+            />
+          </Box>
+        </Tooltip>
       </Flex>
-    </FormControl>
+    </Flex>
   );
 };
 
@@ -150,13 +159,14 @@ const FormatControls = () => {
   const handleStrikethroughToggle = useCallback(() => dispatch(textStrikethroughToggled()), [dispatch]);
 
   return (
-    <ButtonGroup isAttached variant="outline" flexShrink={0}>
+    <ButtonGroup isAttached variant="outline" flexShrink={0} size="sm">
       <Tooltip label={t('controlLayers.text.bold', { defaultValue: 'Bold' })}>
         <IconButton
           aria-label={t('controlLayers.text.bold', { defaultValue: 'Bold' })}
           isChecked={isBold}
           onClick={handleBoldToggle}
           icon={<PiTextBBold />}
+          size="sm"
         />
       </Tooltip>
       <Tooltip label={t('controlLayers.text.italic', { defaultValue: 'Italic' })}>
@@ -165,6 +175,7 @@ const FormatControls = () => {
           isChecked={isItalic}
           onClick={handleItalicToggle}
           icon={<PiTextItalicBold />}
+          size="sm"
         />
       </Tooltip>
       <Tooltip label={t('controlLayers.text.underline', { defaultValue: 'Underline' })}>
@@ -173,6 +184,7 @@ const FormatControls = () => {
           isChecked={isUnderline}
           onClick={handleUnderlineToggle}
           icon={<PiTextUnderlineBold />}
+          size="sm"
         />
       </Tooltip>
       <Tooltip label={t('controlLayers.text.strikethrough', { defaultValue: 'Strikethrough' })}>
@@ -181,6 +193,7 @@ const FormatControls = () => {
           isChecked={isStrikethrough}
           onClick={handleStrikethroughToggle}
           icon={<PiTextStrikethroughBold />}
+          size="sm"
         />
       </Tooltip>
     </ButtonGroup>
@@ -196,13 +209,14 @@ const AlignmentControls = () => {
   const handleAlignRight = useCallback(() => dispatch(textAlignmentChanged('right')), [dispatch]);
 
   return (
-    <ButtonGroup isAttached variant="outline" flexShrink={0}>
+    <ButtonGroup isAttached variant="outline" flexShrink={0} size="sm">
       <Tooltip label={t('controlLayers.text.alignLeft', { defaultValue: 'Align Left' })}>
         <IconButton
           aria-label={t('controlLayers.text.alignLeft', { defaultValue: 'Align Left' })}
           isChecked={alignment === 'left'}
           onClick={handleAlignLeft}
           icon={<PiTextAlignLeftBold />}
+          size="sm"
         />
       </Tooltip>
       <Tooltip label={t('controlLayers.text.alignCenter', { defaultValue: 'Align Center' })}>
@@ -211,6 +225,7 @@ const AlignmentControls = () => {
           isChecked={alignment === 'center'}
           onClick={handleAlignCenter}
           icon={<PiTextAlignCenterBold />}
+          size="sm"
         />
       </Tooltip>
       <Tooltip label={t('controlLayers.text.alignRight', { defaultValue: 'Align Right' })}>
@@ -219,6 +234,7 @@ const AlignmentControls = () => {
           isChecked={alignment === 'right'}
           onClick={handleAlignRight}
           icon={<PiTextAlignRightBold />}
+          size="sm"
         />
       </Tooltip>
     </ButtonGroup>

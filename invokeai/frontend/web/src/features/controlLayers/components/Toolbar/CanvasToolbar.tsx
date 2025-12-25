@@ -3,6 +3,7 @@ import { CanvasSettingsPopover } from 'features/controlLayers/components/Setting
 import { TextToolOptions } from 'features/controlLayers/components/Text/TextToolOptions';
 import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
+import { ToolOptionsRowContainer } from 'features/controlLayers/components/Tool/ToolOptionsRowContainer';
 import { ToolWidthPicker } from 'features/controlLayers/components/Tool/ToolWidthPicker';
 import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
 import { CanvasToolbarFitBboxToMasksButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToMasksButton';
@@ -45,16 +46,10 @@ export const CanvasToolbar = memo(() => {
 
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
-      <Flex alignItems="center" h="full" flexGrow={1}>
-        {isTextSelected ? (
-          <TextToolOptions />
-        ) : (
-          <>
-            <ToolFillColorPicker />
-            {showToolWithPicker && <ToolWidthPicker />}
-          </>
-        )}
-      </Flex>
+      <ToolOptionsRowContainer>
+        <ToolFillColorPicker />
+        {isTextSelected ? <TextToolOptions /> : showToolWithPicker && <ToolWidthPicker />}
+      </ToolOptionsRowContainer>
       <Flex alignItems="center" h="full">
         <CanvasToolbarScale />
         <CanvasToolbarResetViewButton />

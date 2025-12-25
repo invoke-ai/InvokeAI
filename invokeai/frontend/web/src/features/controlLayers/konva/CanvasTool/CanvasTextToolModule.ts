@@ -9,9 +9,9 @@ import {
 } from 'features/controlLayers/store/canvasTextSlice';
 import type { CanvasImageState, Coordinate, RgbaColor, Tool } from 'features/controlLayers/store/types';
 import { RGBA_BLACK, RGBA_WHITE } from 'features/controlLayers/store/types';
-import { getFontStackById,TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
+import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
 import { calculateLayerPosition, hasVisibleGlyphs, renderTextToCanvas } from 'features/controlLayers/text/textRenderer';
-import { type TextSessionStatus,transitionTextSessionStatus } from 'features/controlLayers/text/textSessionMachine';
+import { type TextSessionStatus, transitionTextSessionStatus } from 'features/controlLayers/text/textSessionMachine';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';

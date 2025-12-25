@@ -6,7 +6,7 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { CanvasTextSettingsState } from 'features/controlLayers/store/canvasTextSlice';
 import { selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
-import { getFontStackById,TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
+import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
 import { isAllowedTextShortcut } from 'features/controlLayers/text/textHotkeys';
 import {
   hasVisibleGlyphs,

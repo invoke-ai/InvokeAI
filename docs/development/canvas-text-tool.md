@@ -20,7 +20,7 @@ The canvas text workflow is split between a Konva module that owns tool state an
 Layer placement preserves the original click location:
 
 - The session stores the anchor coordinate (where the user clicked) and current alignment.
-- `getLayerPosition()` calculates the top-left position for the raster layer after applying the configured padding and alignment offsets.
+- `calculateLayerPosition()` calculates the top-left position for the raster layer after applying the configured padding and alignment offsets.
 - New layers are inserted directly above the currently-selected raster layer (when present) and selected automatically.
 
 ## Font stacks
