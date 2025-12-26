@@ -66,6 +66,7 @@ if TYPE_CHECKING:
 
 TMPDIR_PREFIX = "tmpinstall_"
 
+
 class ModelInstallService(ModelInstallServiceBase):
     """class for InvokeAI model installation."""
 
@@ -202,7 +203,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 if tries_left == 1:
                     raise
                 time.sleep(delay)
-                delay *=2 # Exponential backoff
+                delay *= 2  # Exponential backoff
 
     def install_path(
         self,
