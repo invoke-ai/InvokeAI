@@ -12,40 +12,49 @@ export const useSwipeNavigation = () => {
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
   const { imageNames, isFetching } = useGalleryImageNames();
 
-  const isOnFirstItem = useMemo(
-    () => (lastSelectedItem ? imageNames.at(0) === lastSelectedItem : false),
+  const currentIndex = useMemo(
+    () => (lastSelectedItem ? imageNames.findIndex((n) => n === lastSelectedItem) : -1),
     [imageNames, lastSelectedItem]
   );
-  const isOnLastItem = useMemo(
-    () => (lastSelectedItem ? imageNames.at(-1) === lastSelectedItem : false),
-    [imageNames, lastSelectedItem]
+
+  const isOnFirstItem = useMemo(() => currentIndex === 0, [currentIndex]);
+  const isOnLastItem = useMemo(() => currentIndex === imageNames.length - 1, [currentIndex, imageNames.length]);
+
+  const previousImageName = useMemo(
+    () => (currentIndex > 0 ? imageNames[currentIndex - 1] : null),
+    [currentIndex, imageNames]
+  );
+
+  const nextImageName = useMemo(
+    () => (currentIndex < imageNames.length - 1 ? imageNames[currentIndex + 1] : null),
+    [currentIndex, imageNames]
   );
 
   const navigateToPrevious = useCallback(() => {
     if (isOnFirstItem || isFetching) {
       return;
     }
-    const targetIndex = lastSelectedItem ? imageNames.findIndex((n) => n === lastSelectedItem) - 1 : 0;
+    const targetIndex = currentIndex - 1;
     const clampedIndex = clamp(targetIndex, 0, imageNames.length - 1);
     const n = imageNames.at(clampedIndex);
     if (!n) {
       return;
     }
     dispatch(imageSelected(n));
-  }, [dispatch, imageNames, lastSelectedItem, isOnFirstItem, isFetching]);
+  }, [dispatch, imageNames, currentIndex, isOnFirstItem, isFetching]);
 
   const navigateToNext = useCallback(() => {
     if (isOnLastItem || isFetching) {
       return;
     }
-    const targetIndex = lastSelectedItem ? imageNames.findIndex((n) => n === lastSelectedItem) + 1 : 0;
+    const targetIndex = currentIndex + 1;
     const clampedIndex = clamp(targetIndex, 0, imageNames.length - 1);
     const n = imageNames.at(clampedIndex);
     if (!n) {
       return;
     }
     dispatch(imageSelected(n));
-  }, [dispatch, imageNames, lastSelectedItem, isOnLastItem, isFetching]);
+  }, [dispatch, imageNames, currentIndex, isOnLastItem, isFetching]);
 
   const onDragEnd = useCallback(
     (_event: MouseEvent | TouchEvent | PointerEvent, info: { offset: { x: number; y: number } }) => {
@@ -64,5 +73,7 @@ export const useSwipeNavigation = () => {
     onDragEnd,
     canNavigatePrevious: !isOnFirstItem,
     canNavigateNext: !isOnLastItem,
+    previousImageName,
+    nextImageName,
   };
 };

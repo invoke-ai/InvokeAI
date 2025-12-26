@@ -7,8 +7,9 @@ import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { selectShouldShowItemDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
-import { AnimatePresence, motion } from 'framer-motion';
-import { memo, useCallback, useRef, useState } from 'react';
+import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
 import { useImageViewerContext } from './context';
@@ -23,7 +24,15 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const { onLoadImage, $progressEvent, $progressImage } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
-  const { onDragEnd } = useSwipeNavigation();
+  const { onDragEnd, previousImageName, nextImageName } = useSwipeNavigation();
+
+  // Get adjacent images for swipe preview
+  const previousImageDTO = useImageDTO(previousImageName);
+  const nextImageDTO = useImageDTO(nextImageName);
+
+  // Track drag state for showing adjacent images
+  const dragX = useMotionValue(0);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -40,34 +49,99 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
 
   const withProgress = shouldShowProgressInViewer && progressImage !== null;
 
+  // Reset drag state when image changes
+  useEffect(() => {
+    dragX.set(0);
+    setIsDragging(false);
+  }, [imageDTO?.image_name, dragX]);
+
+  const onDragStart = useCallback(() => {
+    setIsDragging(true);
+  }, []);
+
+  const handleDragEnd = useCallback(
+    (event: MouseEvent | TouchEvent | PointerEvent, info: { offset: { x: number; y: number } }) => {
+      setIsDragging(false);
+      onDragEnd(event, info);
+    },
+    [onDragEnd]
+  );
+
   return (
     <Box
-      as={motion.div}
-      drag={imageDTO ? 'x' : false}
-      dragConstraints={{ left: 0, right: 0 }}
-      dragElastic={0.2}
-      onDragEnd={onDragEnd}
       onMouseOver={onMouseOver}
       onMouseOut={onMouseOut}
       width="full"
       height="full"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
       position="relative"
+      overflow="hidden"
     >
-      {imageDTO && (
-        <Flex
-          key={imageDTO.image_name}
-          w="full"
-          h="full"
-          position="absolute"
-          alignItems="center"
-          justifyContent="center"
-        >
-          <DndImage imageDTO={imageDTO} onLoad={onLoadImage} borderRadius="base" />
-        </Flex>
-      )}
+      <Box
+        as={motion.div}
+        drag={imageDTO ? 'x' : false}
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.2}
+        onDragStart={onDragStart}
+        onDragEnd={handleDragEnd}
+        style={{ x: dragX }}
+        width="full"
+        height="full"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        position="relative"
+      >
+        {/* Previous image (shown when dragging right) */}
+        {isDragging && previousImageDTO && (
+          <Box
+            as={motion.div}
+            position="absolute"
+            right="100%"
+            top={0}
+            bottom={0}
+            width="full"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            pointerEvents="none"
+          >
+            <DndImage imageDTO={previousImageDTO} borderRadius="base" />
+          </Box>
+        )}
+
+        {/* Current image */}
+        {imageDTO && (
+          <Flex
+            key={imageDTO.image_name}
+            w="full"
+            h="full"
+            position="absolute"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <DndImage imageDTO={imageDTO} onLoad={onLoadImage} borderRadius="base" />
+          </Flex>
+        )}
+
+        {/* Next image (shown when dragging left) */}
+        {isDragging && nextImageDTO && (
+          <Box
+            as={motion.div}
+            position="absolute"
+            left="100%"
+            top={0}
+            bottom={0}
+            width="full"
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            pointerEvents="none"
+          >
+            <DndImage imageDTO={nextImageDTO} borderRadius="base" />
+          </Box>
+        )}
+      </Box>
+
       {!imageDTO && <NoContentForViewer />}
       {withProgress && (
         <Flex w="full" h="full" position="absolute" alignItems="center" justifyContent="center" bg="base.900">
