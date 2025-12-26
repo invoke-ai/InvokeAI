@@ -30,9 +30,8 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const previousImageDTO = useImageDTO(previousImageName);
   const nextImageDTO = useImageDTO(nextImageName);
 
-  // Track drag state for showing adjacent images
+  // Track drag state
   const dragX = useMotionValue(0);
-  const [isDragging, setIsDragging] = useState(false);
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -52,19 +51,16 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   // Reset drag state when image changes
   useEffect(() => {
     dragX.set(0);
-    setIsDragging(false);
   }, [imageDTO?.image_name, dragX]);
-
-  const onDragStart = useCallback(() => {
-    setIsDragging(true);
-  }, []);
 
   const handleDragEnd = useCallback(
     (event: MouseEvent | TouchEvent | PointerEvent, info: { offset: { x: number; y: number } }) => {
-      setIsDragging(false);
       onDragEnd(event, info);
+      // Animate back to center with spring
+      dragX.stop();
+      dragX.set(0);
     },
-    [onDragEnd]
+    [onDragEnd, dragX]
   );
 
   return (
@@ -80,9 +76,8 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       <Box
         as={motion.div}
         drag={imageDTO ? 'x' : false}
-        dragConstraints={{ left: 0, right: 0 }}
-        dragElastic={0.2}
-        onDragStart={onDragStart}
+        dragElastic={0.1}
+        dragMomentum={false}
         onDragEnd={handleDragEnd}
         style={{ x: dragX }}
         width="300%"
@@ -102,7 +97,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
           position="relative"
           flexShrink={0}
         >
-          {isDragging && previousImageDTO && (
+          {previousImageDTO && (
             <Box
               position="absolute"
               top={0}
@@ -155,7 +150,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
           position="relative"
           flexShrink={0}
         >
-          {isDragging && nextImageDTO && (
+          {nextImageDTO && (
             <Box
               position="absolute"
               top={0}
