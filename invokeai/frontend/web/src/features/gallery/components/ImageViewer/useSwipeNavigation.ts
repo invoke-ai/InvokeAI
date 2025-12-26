@@ -10,7 +10,7 @@ const SWIPE_THRESHOLD = 50; // Minimum distance in pixels to trigger swipe
 export const useSwipeNavigation = () => {
   const dispatch = useAppDispatch();
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
-  const { imageNames } = useGalleryImageNames();
+  const { imageNames, isFetching } = useGalleryImageNames();
 
   const isOnFirstItem = useMemo(
     () => (lastSelectedItem ? imageNames.at(0) === lastSelectedItem : false),
@@ -22,7 +22,7 @@ export const useSwipeNavigation = () => {
   );
 
   const navigateToPrevious = useCallback(() => {
-    if (isOnFirstItem) {
+    if (isOnFirstItem || isFetching) {
       return;
     }
     const targetIndex = lastSelectedItem ? imageNames.findIndex((n) => n === lastSelectedItem) - 1 : 0;
@@ -32,10 +32,10 @@ export const useSwipeNavigation = () => {
       return;
     }
     dispatch(imageSelected(n));
-  }, [dispatch, imageNames, lastSelectedItem, isOnFirstItem]);
+  }, [dispatch, imageNames, lastSelectedItem, isOnFirstItem, isFetching]);
 
   const navigateToNext = useCallback(() => {
-    if (isOnLastItem) {
+    if (isOnLastItem || isFetching) {
       return;
     }
     const targetIndex = lastSelectedItem ? imageNames.findIndex((n) => n === lastSelectedItem) + 1 : 0;
@@ -45,7 +45,7 @@ export const useSwipeNavigation = () => {
       return;
     }
     dispatch(imageSelected(n));
-  }, [dispatch, imageNames, lastSelectedItem, isOnLastItem]);
+  }, [dispatch, imageNames, lastSelectedItem, isOnLastItem, isFetching]);
 
   const onDragEnd = useCallback(
     (_event: MouseEvent | TouchEvent | PointerEvent, info: { offset: { x: number; y: number } }) => {
