@@ -76,6 +76,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       position="relative"
       overflow="hidden"
     >
+      {/* Horizontal carousel container with 3 image slots */}
       <Box
         as={motion.div}
         drag={imageDTO ? 'x' : false}
@@ -84,62 +85,92 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
         onDragStart={onDragStart}
         onDragEnd={handleDragEnd}
         style={{ x: dragX }}
-        width="full"
+        width="300%"
         height="full"
         display="flex"
-        alignItems="center"
-        justifyContent="center"
-        position="relative"
+        flexDirection="row"
+        position="absolute"
+        left="-100%"
       >
-        {/* Previous image (shown when dragging right) */}
-        {isDragging && previousImageDTO && (
-          <Box
-            as={motion.div}
-            position="absolute"
-            right="100%"
-            top={0}
-            bottom={0}
-            width="full"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            pointerEvents="none"
-          >
-            <DndImage imageDTO={previousImageDTO} borderRadius="base" />
-          </Box>
-        )}
+        {/* Previous image slot (left third) */}
+        <Box
+          width="33.333%"
+          height="full"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          position="relative"
+          flexShrink={0}
+        >
+          {isDragging && previousImageDTO && (
+            <Box
+              position="absolute"
+              top={0}
+              left={0}
+              right={0}
+              bottom={0}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              pointerEvents="none"
+            >
+              <DndImage imageDTO={previousImageDTO} borderRadius="base" />
+            </Box>
+          )}
+        </Box>
 
-        {/* Current image */}
-        {imageDTO && (
-          <Flex
-            key={imageDTO.image_name}
-            w="full"
-            h="full"
-            position="absolute"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <DndImage imageDTO={imageDTO} onLoad={onLoadImage} borderRadius="base" />
-          </Flex>
-        )}
+        {/* Current image slot (middle third) */}
+        <Box
+          width="33.333%"
+          height="full"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          position="relative"
+          flexShrink={0}
+        >
+          {imageDTO && (
+            <Box
+              position="absolute"
+              top={0}
+              left={0}
+              right={0}
+              bottom={0}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <DndImage imageDTO={imageDTO} onLoad={onLoadImage} borderRadius="base" />
+            </Box>
+          )}
+        </Box>
 
-        {/* Next image (shown when dragging left) */}
-        {isDragging && nextImageDTO && (
-          <Box
-            as={motion.div}
-            position="absolute"
-            left="100%"
-            top={0}
-            bottom={0}
-            width="full"
-            display="flex"
-            alignItems="center"
-            justifyContent="center"
-            pointerEvents="none"
-          >
-            <DndImage imageDTO={nextImageDTO} borderRadius="base" />
-          </Box>
-        )}
+        {/* Next image slot (right third) */}
+        <Box
+          width="33.333%"
+          height="full"
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          position="relative"
+          flexShrink={0}
+        >
+          {isDragging && nextImageDTO && (
+            <Box
+              position="absolute"
+              top={0}
+              left={0}
+              right={0}
+              bottom={0}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              pointerEvents="none"
+            >
+              <DndImage imageDTO={nextImageDTO} borderRadius="base" />
+            </Box>
+          )}
+        </Box>
       </Box>
 
       {!imageDTO && <NoContentForViewer />}
