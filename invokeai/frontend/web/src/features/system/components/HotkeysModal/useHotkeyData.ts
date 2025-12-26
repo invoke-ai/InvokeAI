@@ -190,7 +190,7 @@ export const useHotkeyData = (): HotkeysData => {
   return hotkeysData;
 };
 
-type HotkeyConflictInfo = { category: string; id: string; title: string; fullId: string };
+export type HotkeyConflictInfo = { category: string; id: string; title: string; fullId: string };
 
 /**
  * Returns a map of all registered hotkeys for conflict detection.
