@@ -89,7 +89,7 @@ The publish jobs will not run if any of the previous jobs fail.
 
 They use [GitHub environments], which are configured as [trusted publishers] on PyPI.
 
-Both jobs require a @hipsterusername or @psychedelicious to approve them from the workflow's **Summary** tab.
+Both jobs require a @lstein or @blessedcoolant to approve them from the workflow's **Summary** tab.
 
 - Click the **Review deployments** button
 - Select the environment (either `testpypi` or `pypi` - typically you select both)
@@ -101,7 +101,7 @@ Both jobs require a @hipsterusername or @psychedelicious to approve them from th
 
 Check the [python infrastructure status page] for incidents.
 
-If there are no incidents, contact @hipsterusername or @lstein, who have owner access to GH and PyPI, to see if access has expired or something like that.
+If there are no incidents, contact @lstein or @blessedcoolant, who have owner access to GH and PyPI, to see if access has expired or something like that.
 
 #### `publish-testpypi` Job
 
