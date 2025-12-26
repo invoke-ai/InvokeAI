@@ -7,7 +7,7 @@ import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { selectShouldShowItemDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
-import { AnimatePresence, motion, useMotionValue } from 'framer-motion';
+import { animate, AnimatePresence, motion, useMotionValue } from 'framer-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
@@ -17,6 +17,10 @@ import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressIndicator } from './ProgressIndicator2';
 import { useSwipeNavigation } from './useSwipeNavigation';
+
+// Minimum duration for carousel transitions (in seconds)
+// This prevents instant transitions when users flick rapidly
+const MIN_TRANSITION_DURATION = 0.3;
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
@@ -56,9 +60,13 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const handleDragEnd = useCallback(
     (event: MouseEvent | TouchEvent | PointerEvent, info: { offset: { x: number; y: number } }) => {
       onDragEnd(event, info);
-      // Animate back to center with spring
-      dragX.stop();
-      dragX.set(0);
+      // Animate back to center with controlled duration to prevent instant transitions
+      animate(dragX, 0, {
+        type: 'spring',
+        stiffness: 300,
+        damping: 30,
+        duration: MIN_TRANSITION_DURATION,
+      });
     },
     [onDragEnd, dragX]
   );
