@@ -40,7 +40,11 @@ def gguf_sd_loader(path: Path, compute_dtype: torch.dtype) -> dict[str, GGMLTens
     with WrappedGGUFReader(path) as reader:
         sd: dict[str, GGMLTensor] = {}
         for tensor in reader.tensors:
-            torch_tensor = torch.from_numpy(tensor.data)
+            # Use .copy() to create a true copy of the data, not a view.
+            # This is critical on Windows where the memory-mapped file cannot be deleted
+            # while tensors still hold references to the mapped memory.
+            torch_tensor = torch.from_numpy(tensor.data.copy())
+
             shape = torch.Size(tuple(int(v) for v in reversed(tensor.shape)))
             if tensor.tensor_type in TORCH_COMPATIBLE_QTYPES:
                 torch_tensor = torch_tensor.view(*shape)

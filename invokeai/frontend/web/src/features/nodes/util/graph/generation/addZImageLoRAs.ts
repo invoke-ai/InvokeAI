@@ -10,7 +10,7 @@ export const addZImageLoRAs = (
   denoise: Invocation<'z_image_denoise'>,
   modelLoader: Invocation<'z_image_model_loader'>,
   posCond: Invocation<'z_image_text_encoder'>,
-  negCond: Invocation<'z_image_text_encoder'>
+  negCond: Invocation<'z_image_text_encoder'> | null
 ): void => {
   const enabledLoRAs = state.loras.loras.filter((l) => l.isEnabled && l.model.base === 'z-image');
   const loraCount = enabledLoRAs.length;
@@ -39,10 +39,13 @@ export const addZImageLoRAs = (
   // Reroute model connections through the LoRA collection loader
   g.deleteEdgesTo(denoise, ['transformer']);
   g.deleteEdgesTo(posCond, ['qwen3_encoder']);
-  g.deleteEdgesTo(negCond, ['qwen3_encoder']);
   g.addEdge(loraCollectionLoader, 'transformer', denoise, 'transformer');
   g.addEdge(loraCollectionLoader, 'qwen3_encoder', posCond, 'qwen3_encoder');
-  g.addEdge(loraCollectionLoader, 'qwen3_encoder', negCond, 'qwen3_encoder');
+  // Only reroute negCond if it exists (guidance_scale > 0)
+  if (negCond !== null) {
+    g.deleteEdgesTo(negCond, ['qwen3_encoder']);
+    g.addEdge(loraCollectionLoader, 'qwen3_encoder', negCond, 'qwen3_encoder');
+  }
 
   for (const lora of enabledLoRAs) {
     const { weight } = lora;
