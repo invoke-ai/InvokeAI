@@ -8,7 +8,7 @@ import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons
 import { selectShouldShowItemDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { animate, AnimatePresence, motion, useMotionValue } from 'framer-motion';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useImageDTO } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
 
@@ -28,7 +28,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const { onLoadImage, $progressEvent, $progressImage } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
-  const { onDragEnd, previousImageName, nextImageName } = useSwipeNavigation();
+  const { onDragEnd, previousImageName, nextImageName, canNavigatePrevious, canNavigateNext } = useSwipeNavigation();
 
   // Get adjacent images for swipe preview
   const previousImageDTO = useImageDTO(previousImageName);
@@ -79,6 +79,15 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     [onDragEnd, dragX]
   );
 
+  // Set drag constraints based on navigation boundaries
+  // Prevent dragging past the first/last image
+  const dragConstraints = useMemo(() => {
+    return {
+      left: canNavigateNext ? undefined : 0, // Prevent dragging left if can't go to next
+      right: canNavigatePrevious ? undefined : 0, // Prevent dragging right if can't go to previous
+    };
+  }, [canNavigatePrevious, canNavigateNext]);
+
   return (
     <Box
       onMouseOver={onMouseOver}
@@ -92,6 +101,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       <Box
         as={motion.div}
         drag={imageDTO ? 'x' : false}
+        dragConstraints={dragConstraints}
         dragElastic={0.1}
         dragMomentum={false}
         onDragEnd={handleDragEnd}
