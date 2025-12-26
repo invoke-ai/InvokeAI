@@ -25556,6 +25556,13 @@ export type components = {
              */
             vae?: components["schemas"]["VAEField"] | null;
             /**
+             * Scheduler
+             * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended for Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.
+             * @default euler
+             * @enum {string}
+             */
+            scheduler?: "euler" | "heun" | "lcm";
+            /**
              * type
              * @default z_image_denoise
              * @constant
