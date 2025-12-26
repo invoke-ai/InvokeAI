@@ -26,6 +26,7 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.z_image_control import ZImageControlField
 from invokeai.app.invocations.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux.schedulers import ZIMAGE_SCHEDULER_LABELS, ZIMAGE_SCHEDULER_MAP, ZIMAGE_SCHEDULER_NAME_VALUES
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_TRANSFORMER_PREFIX
@@ -37,7 +38,6 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
 from invokeai.backend.z_image.text_conditioning import ZImageTextConditioning
 from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
-from invokeai.backend.flux.schedulers import ZIMAGE_SCHEDULER_LABELS, ZIMAGE_SCHEDULER_MAP, ZIMAGE_SCHEDULER_NAME_VALUES
 from invokeai.backend.z_image.z_image_controlnet_extension import (
     ZImageControlNetExtension,
     z_image_forward_with_control,
