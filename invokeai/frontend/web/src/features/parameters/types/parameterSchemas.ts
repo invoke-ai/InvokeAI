@@ -1,7 +1,7 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
-import { zModelIdentifierField, zSchedulerField } from 'features/nodes/types/common';
+import { zFluxSchedulerField, zModelIdentifierField, zSchedulerField } from 'features/nodes/types/common';
 import { z } from 'zod';
 
 /**
@@ -59,6 +59,11 @@ export type ParameterCFGRescaleMultiplier = z.infer<typeof zParameterCFGRescaleM
 // #region Scheduler
 export const [zParameterScheduler, isParameterScheduler] = buildParameter(zSchedulerField);
 export type ParameterScheduler = z.infer<typeof zParameterScheduler>;
+// #endregion
+
+// #region Flux Scheduler
+export const [zParameterFluxScheduler, isParameterFluxScheduler] = buildParameter(zFluxSchedulerField);
+export type ParameterFluxScheduler = z.infer<typeof zParameterFluxScheduler>;
 // #endregion
 
 // #region seed

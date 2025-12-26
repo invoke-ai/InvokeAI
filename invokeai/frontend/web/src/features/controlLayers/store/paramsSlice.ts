@@ -69,6 +69,9 @@ const slice = createSlice({
     setScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.scheduler = action.payload;
     },
+    setFluxScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
+      state.fluxScheduler = action.payload;
+    },
     setUpscaleScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.upscaleScheduler = action.payload;
     },
@@ -449,6 +452,7 @@ export const {
   setCfgRescaleMultiplier,
   setGuidance,
   setScheduler,
+  setFluxScheduler,
   setUpscaleScheduler,
   setUpscaleCfgScale,
   setSeed,
@@ -588,6 +592,7 @@ export const selectModelSupportsOptimizedDenoising = createSelector(
   (model) => !!model && SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS.includes(model.base)
 );
 export const selectScheduler = createParamsSelector((params) => params.scheduler);
+export const selectFluxScheduler = createParamsSelector((params) => params.fluxScheduler);
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
 export const selectSeamlessYAxis = createParamsSelector((params) => params.seamlessYAxis);
 export const selectSeed = createParamsSelector((params) => params.seed);
