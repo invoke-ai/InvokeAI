@@ -15,6 +15,7 @@ import { useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressIndicator } from './ProgressIndicator2';
+import { useSwipeNavigation } from './useSwipeNavigation';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
@@ -22,6 +23,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const { onLoadImage, $progressEvent, $progressImage } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
+  const { onDragEnd } = useSwipeNavigation();
 
   // Show and hide the next/prev buttons on mouse move
   const [shouldShowNextPrevButtons, setShouldShowNextPrevButtons] = useState<boolean>(false);
@@ -39,11 +41,17 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   const withProgress = shouldShowProgressInViewer && progressImage !== null;
 
   return (
-    <Flex
+    <Box
+      as={motion.div}
+      drag={imageDTO ? 'x' : false}
+      dragConstraints={{ left: 0, right: 0 }}
+      dragElastic={0.2}
+      onDragEnd={onDragEnd}
       onMouseOver={onMouseOver}
       onMouseOut={onMouseOut}
       width="full"
       height="full"
+      display="flex"
       alignItems="center"
       justifyContent="center"
       position="relative"
@@ -96,7 +104,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
           </Box>
         )}
       </AnimatePresence>
-    </Flex>
+    </Box>
   );
 });
 CurrentImagePreview.displayName = 'CurrentImagePreview';
