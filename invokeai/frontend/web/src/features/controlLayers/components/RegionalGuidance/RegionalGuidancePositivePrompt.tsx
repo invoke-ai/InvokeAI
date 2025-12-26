@@ -9,6 +9,7 @@ import { selectCanvasSlice, selectEntityOrThrow } from 'features/controlLayers/s
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
+import { usePromptAttentionHotkeys } from 'features/prompt/usePromptAttentionHotkeys';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -45,6 +46,8 @@ export const RegionalGuidancePositivePrompt = memo(() => {
     onChange: _onChange,
   });
 
+  usePromptAttentionHotkeys({ textareaRef, onPromptChange: _onChange });
+
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative" w="full">
@@ -61,6 +64,8 @@ export const RegionalGuidancePositivePrompt = memo(() => {
           paddingInlineEnd={8}
           minH={28}
           zIndex="0 !important"
+          fontFamily="mono"
+          fontSize="sm"
           _focusVisible={_focusVisible}
         />
         <Flex
