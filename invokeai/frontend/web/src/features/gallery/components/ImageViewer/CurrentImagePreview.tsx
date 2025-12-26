@@ -54,19 +54,27 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
 
   // Reset drag state when image changes
   useEffect(() => {
+    // Instantly reset position when image changes (navigation occurred)
     dragX.set(0);
   }, [imageDTO?.image_name, dragX]);
 
   const handleDragEnd = useCallback(
     (event: MouseEvent | TouchEvent | PointerEvent, info: { offset: { x: number; y: number } }) => {
+      // Check if navigation will occur (threshold is 50px in useSwipeNavigation)
+      const willNavigate = Math.abs(info.offset.x) > 50;
+
       onDragEnd(event, info);
-      // Animate back to center with controlled duration to prevent instant transitions
-      animate(dragX, 0, {
-        type: 'spring',
-        stiffness: 300,
-        damping: 30,
-        duration: MIN_TRANSITION_DURATION,
-      });
+
+      // Only animate back to center if navigation did NOT occur
+      // If navigation occurs, the useEffect will reset position when image changes
+      if (!willNavigate) {
+        animate(dragX, 0, {
+          type: 'spring',
+          stiffness: 300,
+          damping: 30,
+          duration: MIN_TRANSITION_DURATION,
+        });
+      }
     },
     [onDragEnd, dragX]
   );
