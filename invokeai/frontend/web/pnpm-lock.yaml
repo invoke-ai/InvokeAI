@@ -243,6 +243,9 @@ importers:
       '@vitest/ui':
         specifier: ^3.2.4
         version: 3.2.4(vitest@3.2.4)
+      babel-plugin-react-compiler:
+        specifier: ^1.0.0
+        version: 1.0.0
       concurrently:
         specifier: ^9.2.1
         version: 9.2.1
@@ -318,6 +321,9 @@ importers:
       vite:
         specifier: ^7.3.0
         version: 7.3.0(@types/node@22.19.3)(jiti@2.6.1)
+      vite-plugin-babel:
+        specifier: ^1.3.2
+        version: 1.3.2(@babel/core@7.28.5)(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1))
       vite-plugin-eslint:
         specifier: ^1.8.1
         version: 1.8.1(eslint@9.39.2(jiti@2.6.1))(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1))
@@ -2053,6 +2059,9 @@ packages:
   babel-plugin-macros@3.1.0:
     resolution: {integrity: sha512-Cg7TFGpIr01vOQNODXOOaGz2NpCU5gl8x1qJFbb6hbZxR7XrcE2vtbAsTAbJ7/xwJtUuJEw8K8Zr/AE0LHlesg==}
     engines: {node: '>=10', npm: '>=6'}
+
+  babel-plugin-react-compiler@1.0.0:
+    resolution: {integrity: sha512-Ixm8tFfoKKIPYdCCKYTsqv+Fd4IJ0DQqMyEimo+pxUOMUR9cVPlwTrFt9Avu+3cb6Zp3mAzl+t1MrG2fxxKsxw==}
 
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
@@ -4312,6 +4321,12 @@ packages:
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
 
+  vite-plugin-babel@1.3.2:
+    resolution: {integrity: sha512-mEld4OVyuNs5+ISN+U5XyTnNcDwln/s2oER2m0PQ32YYPqPR25E3mfnhAA/RkZJxPuwFkprKWV405aZArE6kzA==}
+    peerDependencies:
+      '@babel/core': ^7.0.0
+      vite: ^2.7.0 || ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
+
   vite-plugin-eslint@1.8.1:
     resolution: {integrity: sha512-PqdMf3Y2fLO9FsNPmMX+//2BF5SF8nEWspZdgl4kSt7UvHDRHVVfHvxsD7ULYzZrJDGRxR81Nq7TOFgwMnUang==}
     peerDependencies:
@@ -6251,6 +6266,10 @@ snapshots:
       '@babel/runtime': 7.28.4
       cosmiconfig: 7.1.0
       resolve: 1.22.11
+
+  babel-plugin-react-compiler@1.0.0:
+    dependencies:
+      '@babel/types': 7.28.5
 
   balanced-match@1.0.2: {}
 
@@ -8756,6 +8775,11 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  vite-plugin-babel@1.3.2(@babel/core@7.28.5)(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1)):
+    dependencies:
+      '@babel/core': 7.28.5
+      vite: 7.3.0(@types/node@22.19.3)(jiti@2.6.1)
 
   vite-plugin-eslint@1.8.1(eslint@9.39.2(jiti@2.6.1))(vite@7.3.0(@types/node@22.19.3)(jiti@2.6.1)):
     dependencies:
