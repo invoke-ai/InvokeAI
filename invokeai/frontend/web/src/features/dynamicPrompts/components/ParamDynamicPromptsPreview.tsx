@@ -51,7 +51,9 @@ const ParamDynamicPromptsPreview = () => {
           <OrderedList stylePosition="inside" ms={0}>
             {prompts.map((prompt, i) => (
               <ListItem fontSize="sm" key={`${prompt}.${i}`} sx={listItemStyles}>
-                <Text as="span" fontFamily="mono" fontSize="0.82rem">{prompt}</Text>
+                <Text as="span" fontFamily="mono" fontSize="0.82rem">
+                  {prompt}
+                </Text>
               </ListItem>
             ))}
           </OrderedList>
