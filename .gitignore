@@ -193,6 +193,7 @@ installer/InvokeAI-Installer/
 
 .claude/
 
-# data models
-invokeai_data/models
+# data
+invokeai_data
+outputs
 new-models
