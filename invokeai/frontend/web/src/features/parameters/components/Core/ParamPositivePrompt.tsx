@@ -218,7 +218,7 @@ export const ParamPositivePrompt = memo(() => {
             resize="vertical"
             minH={32}
             fontFamily="mono"
-            fontSize="sm"
+            fontSize="0.82rem"
           />
           <PromptOverlayButtonWrapper>
             <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">

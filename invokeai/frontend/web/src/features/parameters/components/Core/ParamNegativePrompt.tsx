@@ -77,7 +77,7 @@ export const ParamNegativePrompt = memo(() => {
           paddingTop={0}
           paddingBottom={3}
           fontFamily="mono"
-          fontSize="sm"
+          fontSize="0.82rem"
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
