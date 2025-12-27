@@ -1,0 +1,17 @@
+# InvokeAI-Meta Development Aliases
+clear
+set -gx ENV_NAME '.venv'
+set -gx INVOKE_DIR (pwd)
+
+alias rmenv='clear;clean;rm -rf $ENV_NAME uv.lock .envrc; exit'
+alias mkenv='mkuv $ENV_NAME 3.12.10'
+source ./.salias_f
+
+# install  - install invoke ./setup_dev.sh
+# run      - Start InvokeAI server
+# dev      - Start InvokeAI server with frontend in dev mode
+# build-ui - Build frontend
+# update   - Update dependencies
+# clean    - Clean build artifacts
+# data     - Open data directory
+# logs     - View logs

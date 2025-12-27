@@ -1,0 +1,71 @@
+
+# Start InvokeAI server
+function run
+    imd
+    echo "Starting InvokeAI server..."
+    # source .venv/bin/activate.fish - we are using direnv with .envrc file
+    invokeai-web --root $INVOKE_DIR/invokeai_data
+end
+
+# Start InvokeAI server with frontend in dev mode
+function dev
+    imd
+    echo "Starting InvokeAI in development mode..."
+    echo "Backend will run at http://127.0.0.1:9090"
+    echo "Frontend will run at http://127.0.0.1:5173"
+    echo ""
+
+    # Start backend in background
+    # source .venv/bin/activate.fish - we are using direnv with .envrc file
+    invokeai-web --root $INVOKE_DIR/invokeai_data &
+    set -l backend_pid $last_pid
+
+    # Start frontend dev server
+    cd invokeai/frontend/web
+    pnpm dev
+
+    # Kill backend when frontend exits
+    kill $backend_pid
+end
+
+# Build frontend
+function build-ui
+    echo "Building frontend..."
+    imd
+    cd invokeai/frontend/web
+    pnpm build
+    echo "✅ Frontend built"
+end
+
+# Update dependencies
+function update
+    echo "Updating dependencies..."
+    imd
+    uv pip install -e ".[dev,test,docs]" --python 3.12 --torch-backend=cu128 --upgrade
+    echo "✅ Dependencies updated"
+end
+
+# Clean build artifacts
+function clean
+    echo "Cleaning build artifacts..."
+    imd
+    rm -rf invokeai/frontend/web/dist
+    rm -rf invokeai/frontend/web/node_modules/.vite
+    find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null
+    echo "✅ Clean complete"
+end
+
+# View logs
+function logs
+    tail -f $INVOKE_DIR/invokeai_data/logs/invokeai.log
+end
+
+# install server
+function install
+   echo "Installing ./setup_dev.sh"
+   cd $INVOKE_DIR
+   pnpm self-update
+
+   ./setup_dev.sh
+   echo "Close and reopen konsole before running"
+end
