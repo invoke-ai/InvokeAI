@@ -64,6 +64,9 @@ export const zSchedulerField = z.enum([
   'tcd',
 ]);
 export type SchedulerField = z.infer<typeof zSchedulerField>;
+
+// Flux-specific scheduler options (Flow Matching schedulers)
+export const zFluxSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // #endregion
 
 // #region Model-related schemas
