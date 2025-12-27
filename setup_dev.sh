@@ -14,27 +14,33 @@ echo "$PROJECT_DIR"
 
 cd "$PROJECT_DIR"
 
-# 1. Create venv if it doesn't exist
+# 1. Setup git-lfs and pull large files
+echo "Setting up git-lfs..."
+git lfs install
+echo "Downloading large files with git-lfs..."
+git lfs pull
+
+# 2. Create venv if it doesn't exist
 if [ ! -d ".venv" ]; then
     echo "Creating virtual environment..."
     uv venv --relocatable --prompt invoke-meta --python 3.12 --python-preference only-managed .venv
 fi
 
-# 2. Activate venv
+# 3. Activate venv
 echo "Activating virtual environment..."
 source .venv/bin/activate
 
-# 3. Install InvokeAI in editable mode with dev dependencies
+# 4. Install InvokeAI in editable mode with dev dependencies
 echo "Installing InvokeAI with dev dependencies (this may take a while)..."
 uv pip install -e ".[dev,test,docs]" --python 3.12 --python-preference only-managed --torch-backend=cu128 --reinstall
 
-# 4. Create data directory
+# 5. Create data directory
 if [ ! -d "$DATA_DIR" ]; then
     echo "Creating data directory at $DATA_DIR..."
     mkdir -p "$DATA_DIR"
 fi
 
-# 5. Create initial config file
+# 6. Create initial config file
 echo "Creating invokeai.yaml config..."
 cat > "$DATA_DIR/invokeai.yaml" << EOF
 # InvokeAI-Meta Configuration
@@ -59,16 +65,16 @@ port: 9090
 log_level: info
 EOF
 
-# 6. Install Node.js dependencies for frontend
+# 7. Install Node.js dependencies for frontend
 echo "Installing frontend dependencies..."
 cd invokeai/frontend/web
 pnpm i
 
-# 7. Build frontend (skip linting to avoid TypeScript crash)
+# 8. Build frontend (skip linting to avoid TypeScript crash)
 echo "Building frontend (this may take a few minutes)..."
 pnpm exec vite build
 
-# 8. Install pypatchmatch
+# 9. Install pypatchmatch
 uv pip install pypatchmatch
 
 cd "$PROJECT_DIR"

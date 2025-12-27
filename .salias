@@ -9,6 +9,7 @@ source ./.salias_f
 
 # install  - install invoke ./setup_dev.sh
 # run      - Start InvokeAI server
+# stop     - Stop InvokeAI server
 # dev      - Start InvokeAI server with frontend in dev mode
 # build-ui - Build frontend
 # update   - Update dependencies

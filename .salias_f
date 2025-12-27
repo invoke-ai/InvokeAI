@@ -2,9 +2,33 @@
 # Start InvokeAI server
 function run
     imd
+
+    # Kill any existing invokeai-web processes
+    set existing_pids (pgrep -f invokeai-web)
+    if test -n "$existing_pids"
+        echo "Found existing InvokeAI server (PIDs: $existing_pids)"
+        echo "Stopping existing server..."
+        pkill -f invokeai-web
+        sleep 2  # Give it time to shut down gracefully
+    end
+
     echo "Starting InvokeAI server..."
     # source .venv/bin/activate.fish - we are using direnv with .envrc file
     invokeai-web --root $INVOKE_DIR/invokeai_data
+end
+
+# Stop InvokeAI server
+function stop
+    set existing_pids (pgrep -f invokeai-web)
+    if test -n "$existing_pids"
+        echo "Found InvokeAI server (PIDs: $existing_pids)"
+        echo "Stopping server..."
+        pkill -f invokeai-web
+        sleep 2  # Give it time to shut down gracefully
+        echo "✅ Server stopped"
+    else
+        echo "No InvokeAI server is currently running"
+    end
 end
 
 # Start InvokeAI server with frontend in dev mode
