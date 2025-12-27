@@ -51,6 +51,7 @@ import { actionSanitizer } from './middleware/devtools/actionSanitizer';
 import { actionsDenylist } from './middleware/devtools/actionsDenylist';
 import { stateSanitizer } from './middleware/devtools/stateSanitizer';
 import { addArchivedOrDeletedBoardListener } from './middleware/listenerMiddleware/listeners/addArchivedOrDeletedBoardListener';
+import { addPBRFilterListener } from './middleware/listenerMiddleware/listeners/addPBRFilterListener';
 import { addImageUploadedFulfilledListener } from './middleware/listenerMiddleware/listeners/imageUploaded';
 
 const listenerMiddleware = createListenerMiddleware();
@@ -279,5 +280,8 @@ addModelsLoadedListener(startAppListening);
 
 // Ad-hoc upscale workflwo
 addAdHocPostProcessingRequestedListener(startAppListening);
+
+// Filters
+addPBRFilterListener(startAppListening);
 
 addSetDefaultSettingsListener(startAppListening);

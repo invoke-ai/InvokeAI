@@ -21,6 +21,7 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { ImageDTO } from 'services/api/types';
 
 import { ContextMenuItemDeleteImage } from './MenuItems/ContextMenuItemDeleteImage';
+import { ContextMenuItemFiltersSubMenu } from './MenuItems/ContextMenuItemFiltersSubMenu';
 import { ContextMenuItemMetadataRecallActionsUpscaleTab } from './MenuItems/ContextMenuItemMetadataRecallActionsUpscaleTab';
 
 type SingleSelectionMenuItemsProps = {
@@ -50,6 +51,7 @@ const SingleSelectionMenuItems = ({ imageDTO }: SingleSelectionMenuItemsProps) =
       <ContextMenuItemUseAsPromptTemplate />
       <ContextMenuItemNewCanvasFromImageSubMenu />
       {tab === 'canvas' && <ContextMenuItemNewLayerFromImageSubMenu />}
+      <ContextMenuItemFiltersSubMenu />
       <MenuDivider />
       <ContextMenuItemChangeBoard />
       <ContextMenuItemStarUnstar />

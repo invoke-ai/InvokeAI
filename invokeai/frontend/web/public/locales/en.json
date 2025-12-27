@@ -2501,6 +2501,9 @@
                 "y": "Y (YCbCr)",
                 "cb": "Cb (YCbCr)",
                 "cr": "Cr (YCbCr)"
+            },
+            "pbr_maps": {
+                "label": "Create PBR Maps"
             }
         },
         "transform": {
