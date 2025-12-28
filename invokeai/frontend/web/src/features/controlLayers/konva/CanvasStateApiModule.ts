@@ -222,17 +222,19 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     }
 
     await new Promise<void>((resolve) => {
+      // Re-check before subscribing to avoid a race where rasterization completes
+      // between the outer check and listener registration.
+      if (!this.$rasterizingAdapter.get()) {
+        resolve();
+        return;
+      }
+
       const unsubscribe = this.$rasterizingAdapter.listen((adapter) => {
         if (!adapter) {
           unsubscribe();
           resolve();
         }
       });
-
-      if (!this.$rasterizingAdapter.get()) {
-        unsubscribe();
-        resolve();
-      }
     });
   };
 
