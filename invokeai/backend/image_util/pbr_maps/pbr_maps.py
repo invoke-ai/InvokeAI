@@ -2,13 +2,14 @@
 # Adopted and optimized for Invoke AI
 
 import pathlib
-from typing import Any, Literal
+from typing import Any, Literal, OrderedDict
 
 import cv2
 import numpy as np
 import numpy.typing as npt
 import torch
 from PIL import Image
+from torch.serialization import add_safe_globals
 
 from invokeai.backend.image_util.pbr_maps.architecture.pbr_rrdb_net import PBR_RRDB_Net
 from invokeai.backend.image_util.pbr_maps.utils.image_ops import crop_seamless, esrgan_launcher_split_merge
@@ -22,6 +23,7 @@ class PBRMapsGenerator:
         self.normal_map_model = normal_map_model
         self.other_map_model = other_map_model
         self.device = device
+        add_safe_globals([PBR_RRDB_Net, OrderedDict])
 
     @staticmethod
     def load_model(model_path: pathlib.Path, device: torch.device) -> PBR_RRDB_Net:
