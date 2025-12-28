@@ -216,6 +216,16 @@ export class CanvasStateApiModule extends CanvasModuleBase {
     this.manager.invalidateRegionalGuidanceRasterCache();
   };
 
+  /**
+   * Waits for the current rasterization operation to complete.
+   *
+   * If no rasterization is in progress, this returns immediately. Use this
+   * before starting a new rasterization to avoid multiple simultaneous
+   * rasterization operations acting on the same canvas state.
+   *
+   * @returns A promise that resolves once rasterization has finished or
+   *          immediately if no rasterization is in progress.
+   */
   waitForRasterizationToFinish = async () => {
     if (!this.$rasterizingAdapter.get()) {
       return;

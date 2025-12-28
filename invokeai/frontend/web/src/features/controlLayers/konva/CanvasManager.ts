@@ -199,6 +199,11 @@ export class CanvasManager extends CanvasModuleBase {
     ];
   };
 
+  /**
+   * Invalidates the raster cache for all regional guidance adapters.
+   * This should be called when bbox or related regional guidance settings change
+   * to ensure that cached masks are regenerated with the new settings.
+   */
   invalidateRegionalGuidanceRasterCache = () => {
     for (const adapter of this.adapters.regionMasks.values()) {
       adapter.invalidateRasterCache();

@@ -496,9 +496,9 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     const cachedImageName = this.manager.cache.imageNameCache.get(hash);
 
     if (cachedImageName && !ignoreCache) {
-      this.rasterCacheKeys.add(hash);
       imageDTO = await getImageDTOSafe(cachedImageName);
       if (imageDTO) {
+        this.rasterCacheKeys.add(hash);
         this.log.trace({ rect, cachedImageName, imageDTO }, 'Using cached rasterized image');
         return imageDTO;
       }
@@ -540,6 +540,12 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     }
   };
 
+  /**
+   * Invalidates all cached rasterizations for this entity by removing the cached image
+   * names from the image cache and clearing the tracked raster cache keys. This forces
+   * future rasterizations to regenerate images instead of using potentially stale
+   * cached versions.
+   */
   invalidateRasterCache = () => {
     if (this.rasterCacheKeys.size === 0) {
       return;
