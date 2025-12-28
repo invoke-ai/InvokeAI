@@ -1,5 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { Box, Flex, FormControlGroup, SimpleGrid, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -104,13 +104,15 @@ export const AdvancedSettingsAccordion = memo(() => {
             </FormControlGroup>
             <Flex gap={4} w="full">
               <FormControlGroup formLabelProps={formLabelProps2}>
-                <ParamSeamlessXAxis />
-                <ParamSeamlessYAxis />
+                <SimpleGrid columns={2} spacing={4} w="full">
+                  <ParamSeamlessXAxis />
+                  <ParamSeamlessYAxis />
+                  <ParamColorCompensation />
+                  {/* Empty box for visual alignment. Replace with new option when needed. */}
+                  <Box />
+                </SimpleGrid>
               </FormControlGroup>
             </Flex>
-            <FormControlGroup formLabelProps={formLabelProps}>
-              <ParamColorCompensation />
-            </FormControlGroup>
           </>
         )}
         {isFLUX && (
