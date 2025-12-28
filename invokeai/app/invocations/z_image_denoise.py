@@ -631,26 +631,32 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     if is_heun:
                         if not in_first_order:
                             user_step += 1
+                            # Only call step_callback if we haven't exceeded total_steps
+                            if user_step <= total_steps:
+                                step_callback(
+                                    PipelineIntermediateState(
+                                        step=user_step,
+                                        order=2,
+                                        total_steps=total_steps,
+                                        timestep=int(sigma_curr * 1000),
+                                        latents=latents,
+                                    ),
+                                )
+                    else:
+                        # For Euler, LCM and other first-order schedulers
+                        user_step += 1
+                        # Only call step_callback if we haven't exceeded total_steps
+                        # (LCM scheduler may have more internal steps than user-facing steps)
+                        if user_step <= total_steps:
                             step_callback(
                                 PipelineIntermediateState(
                                     step=user_step,
-                                    order=2,
+                                    order=1,
                                     total_steps=total_steps,
                                     timestep=int(sigma_curr * 1000),
                                     latents=latents,
                                 ),
                             )
-                    else:
-                        user_step += 1
-                        step_callback(
-                            PipelineIntermediateState(
-                                step=user_step,
-                                order=1,
-                                total_steps=total_steps,
-                                timestep=int(sigma_curr * 1000),
-                                latents=latents,
-                            ),
-                        )
             else:
                 # Original Euler implementation (default, optimized for Z-Image)
                 for step_idx in tqdm(range(total_steps)):

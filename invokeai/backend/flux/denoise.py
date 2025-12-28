@@ -201,33 +201,38 @@ def denoise(
                 if not in_first_order:
                     # Second order step completed
                     user_step += 1
+                    # Only call step_callback if we haven't exceeded total_steps
+                    if user_step <= total_steps:
+                        preview_img = img - t_curr * pred
+                        if inpaint_extension is not None:
+                            preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
+                        step_callback(
+                            PipelineIntermediateState(
+                                step=user_step,
+                                order=2,
+                                total_steps=total_steps,
+                                timestep=int(t_curr * 1000),
+                                latents=preview_img,
+                            ),
+                        )
+            else:
+                # For Euler, LCM and other first-order schedulers
+                user_step += 1
+                # Only call step_callback if we haven't exceeded total_steps
+                # (LCM scheduler may have more internal steps than user-facing steps)
+                if user_step <= total_steps:
                     preview_img = img - t_curr * pred
                     if inpaint_extension is not None:
                         preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
                     step_callback(
                         PipelineIntermediateState(
                             step=user_step,
-                            order=2,
+                            order=1,
                             total_steps=total_steps,
                             timestep=int(t_curr * 1000),
                             latents=preview_img,
                         ),
                     )
-            else:
-                # For Euler and other first-order schedulers
-                user_step += 1
-                preview_img = img - t_curr * pred
-                if inpaint_extension is not None:
-                    preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
-                step_callback(
-                    PipelineIntermediateState(
-                        step=user_step,
-                        order=1,
-                        total_steps=total_steps,
-                        timestep=int(t_curr * 1000),
-                        latents=preview_img,
-                    ),
-                )
 
         return img
 
