@@ -64,7 +64,7 @@ export const RegionalGuidanceNegativePrompt = memo(() => {
           paddingInlineEnd={8}
           zIndex="0 !important"
           fontFamily="mono"
-          fontSize="sm"
+          fontSize="0.82rem"
           _focusVisible={_focusVisible}
         />
         <Flex
