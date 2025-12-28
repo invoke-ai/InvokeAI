@@ -59,6 +59,17 @@ export const getRegionalGuidanceWarnings = (
       }
     }
 
+    if (model.base === 'z-image') {
+      // Z-Image has similar limitations to FLUX - no negative prompts via CFG by default
+      // Reference images (IP Adapters) are not supported for Z-Image
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
     entity.referenceImages.forEach(({ config }) => {
       if (!config.model) {
         // No model selected
