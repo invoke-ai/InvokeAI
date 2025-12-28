@@ -14,7 +14,7 @@ const zXYPosition = z
   .default({ x: 0, y: 0 });
 export type XYPosition = z.infer<typeof zXYPosition>;
 
-const zWorkflowCategory = z.enum(['user', 'default', 'project']);
+const zWorkflowCategory = z.enum(['user', 'default']);
 export type WorkflowCategory = z.infer<typeof zWorkflowCategory>;
 // #endregion
 
@@ -381,7 +381,6 @@ export const zWorkflowV3 = z.object({
   }),
   // Use the validated form schema!
   form: zValidatedBuilderForm,
-  is_published: z.boolean().nullish(),
 });
 export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
 // #endregion

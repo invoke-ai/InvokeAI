@@ -5,7 +5,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   Button,
-  Checkbox,
   Flex,
   FormControl,
   FormLabel,
@@ -14,7 +13,6 @@ import {
 import { useStore } from '@nanostores/react';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { deepClone } from 'common/util/deepClone';
-import { $workflowLibraryCategoriesOptions } from 'features/nodes/store/workflowLibrarySlice';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { isDraftWorkflow, useCreateLibraryWorkflow } from 'features/workflowLibrary/hooks/useCreateNewWorkflow';
 import { t } from 'i18next';
@@ -83,14 +81,12 @@ export const SaveWorkflowAsDialog = () => {
 };
 
 const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef: RefObject<HTMLButtonElement> }) => {
-  const workflowCategories = useStore($workflowLibraryCategoriesOptions);
   const [name, setName] = useState(() => {
     if (workflow) {
       return getInitialName(workflow);
     }
     return '';
   });
-  const [shouldSaveToProject, setShouldSaveToProject] = useState(() => workflowCategories.includes('project'));
 
   const { createNewWorkflow } = useCreateLibraryWorkflow();
 
@@ -100,13 +96,6 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
     setName(e.target.value);
   }, []);
 
-  const onChangeCheckbox = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      setShouldSaveToProject(e.target.checked);
-    },
-    [setShouldSaveToProject]
-  );
-
   const onClose = useCallback(() => {
     $workflowToSave.set(null);
   }, []);
@@ -114,8 +103,7 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
   const onSave = useCallback(async () => {
     workflow.id = undefined;
     workflow.name = name;
-    workflow.meta.category = shouldSaveToProject ? 'project' : 'user';
-    workflow.is_published = false;
+    workflow.meta.category = 'user';
 
     // We've just made the workflow a draft, but TS doesn't know that. We need to assert it.
     assert(isDraftWorkflow(workflow));
@@ -125,7 +113,7 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
       onSuccess: onClose,
       onError: onClose,
     });
-  }, [workflow, name, shouldSaveToProject, createNewWorkflow, onClose]);
+  }, [workflow, name, createNewWorkflow, onClose]);
 
   return (
     <AlertDialogContent>
@@ -138,11 +126,6 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
           <FormLabel mt="2">{t('workflows.workflowName')}</FormLabel>
           <Flex flexDir="column" width="full" gap="2">
             <Input ref={inputRef} value={name} onChange={onChange} placeholder={t('workflows.workflowName')} />
-            {workflowCategories.includes('project') && (
-              <Checkbox isChecked={shouldSaveToProject} onChange={onChangeCheckbox}>
-                <FormLabel>{t('workflows.saveWorkflowToProject')}</FormLabel>
-              </Checkbox>
-            )}
           </Flex>
         </FormControl>
       </AlertDialogBody>

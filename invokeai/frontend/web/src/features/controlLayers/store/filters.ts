@@ -166,7 +166,7 @@ const _zFilterConfig = z.discriminatedUnion('type', [
 ]);
 export type FilterConfig = z.infer<typeof _zFilterConfig>;
 
-export const zFilterType = z.enum([
+const zFilterType = z.enum([
   'adjust_image',
   'canny_edge_detection',
   'color_map',

@@ -1,47 +1,5 @@
 import type { ComboboxOption } from '@invoke-ai/ui-library';
-import type { BaseModelType } from 'services/api/types';
-
-/**
- * Mapping of base model to human readable name
- */
-export const MODEL_TYPE_MAP: Record<BaseModelType, string> = {
-  any: 'Any',
-  'sd-1': 'Stable Diffusion 1.x',
-  'sd-2': 'Stable Diffusion 2.x',
-  'sd-3': 'Stable Diffusion 3.x',
-  sdxl: 'Stable Diffusion XL',
-  'sdxl-refiner': 'Stable Diffusion XL Refiner',
-  flux: 'FLUX',
-  cogview4: 'CogView4',
-  imagen3: 'Imagen3',
-  imagen4: 'Imagen4',
-  'chatgpt-4o': 'ChatGPT 4o',
-  'flux-kontext': 'Flux Kontext',
-  'gemini-2.5': 'Gemini 2.5',
-  veo3: 'Veo3',
-  runway: 'Runway',
-};
-
-/**
- * Mapping of base model to (short) human readable name
- */
-export const MODEL_TYPE_SHORT_MAP: Record<BaseModelType, string> = {
-  any: 'Any',
-  'sd-1': 'SD1.X',
-  'sd-2': 'SD2.X',
-  'sd-3': 'SD3.X',
-  sdxl: 'SDXL',
-  'sdxl-refiner': 'SDXLR',
-  flux: 'FLUX',
-  cogview4: 'CogView4',
-  imagen3: 'Imagen3',
-  imagen4: 'Imagen4',
-  'chatgpt-4o': 'ChatGPT 4o',
-  'flux-kontext': 'Flux Kontext',
-  'gemini-2.5': 'Gemini 2.5',
-  veo3: 'Veo3',
-  runway: 'Runway',
-};
+import type { BaseModelType } from 'features/nodes/types/common';
 
 /**
  * Mapping of base model to CLIP skip parameter constraints
@@ -79,23 +37,7 @@ export const CLIP_SKIP_MAP: { [key in BaseModelType]?: { maxClip: number; marker
     maxClip: 0,
     markers: [],
   },
-  imagen3: {
-    maxClip: 0,
-    markers: [],
-  },
-  imagen4: {
-    maxClip: 0,
-    markers: [],
-  },
-  'chatgpt-4o': {
-    maxClip: 0,
-    markers: [],
-  },
-  'flux-kontext': {
-    maxClip: 0,
-    markers: [],
-  },
-  'gemini-2.5': {
+  'z-image': {
     maxClip: 0,
     markers: [],
   },
@@ -136,57 +78,3 @@ export const SCHEDULER_OPTIONS: ComboboxOption[] = [
   { value: 'unipc', label: 'UniPC' },
   { value: 'unipc_k', label: 'UniPC Karras' },
 ];
-
-/**
- * List of base models that make API requests
- */
-export const API_BASE_MODELS: BaseModelType[] = ['imagen3', 'imagen4', 'chatgpt-4o', 'flux-kontext', 'gemini-2.5'];
-
-export const SUPPORTS_SEED_BASE_MODELS: BaseModelType[] = ['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'cogview4'];
-
-export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3'];
-
-export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = [
-  'sd-1',
-  'sdxl',
-  'flux',
-  'flux-kontext',
-  'chatgpt-4o',
-  'gemini-2.5',
-];
-
-export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
-  'sd-1',
-  'sd-2',
-  'sdxl',
-  'cogview4',
-  'sd-3',
-  'imagen3',
-  'imagen4',
-];
-
-export const SUPPORTS_PIXEL_DIMENSIONS_BASE_MODELS: BaseModelType[] = [
-  'sd-1',
-  'sd-2',
-  'sd-3',
-  'sdxl',
-  'flux',
-  'cogview4',
-];
-
-export const SUPPORTS_ASPECT_RATIO_BASE_MODELS: BaseModelType[] = [
-  'sd-1',
-  'sd-2',
-  'sd-3',
-  'sdxl',
-  'flux',
-  'cogview4',
-  'imagen3',
-  'imagen4',
-  'flux-kontext',
-  'chatgpt-4o',
-];
-
-export const VIDEO_BASE_MODELS = ['veo3', 'runway'];
-
-export const REQUIRES_STARTING_FRAME_BASE_MODELS = ['runway'];

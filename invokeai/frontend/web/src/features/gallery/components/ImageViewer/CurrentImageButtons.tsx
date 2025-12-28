@@ -13,7 +13,6 @@ import { useRecallSeed } from 'features/gallery/hooks/useRecallSeed';
 import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -52,7 +51,7 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         boardIdSelected({
           boardId: imageDTO.board_id ?? 'none',
           select: {
-            selection: [{ type: 'image', id: imageDTO.image_name }],
+            selection: [imageDTO.image_name],
             galleryView: IMAGE_CATEGORIES.includes(imageDTO.image_category) ? 'images' : 'assets',
           },
         })
@@ -63,8 +62,6 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
   const isCanvasOrGenerateTab = tab === 'canvas' || tab === 'generate';
   const isCanvasOrGenerateOrUpscalingTab = tab === 'canvas' || tab === 'generate' || tab === 'upscaling';
   const doesTabHaveGallery = tab === 'canvas' || tab === 'generate' || tab === 'workflows' || tab === 'upscaling';
-
-  const isUpscalingEnabled = useFeatureStatus('upscaling');
 
   const recallAll = useRecallAll(imageDTO);
   const recallRemix = useRecallRemix(imageDTO);
@@ -182,7 +179,7 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         />
       )}
 
-      {isUpscalingEnabled && <PostProcessingPopover imageDTO={imageDTO} isDisabled={false} />}
+      <PostProcessingPopover imageDTO={imageDTO} isDisabled={false} />
 
       <Divider orientation="vertical" h={8} mx={2} />
 

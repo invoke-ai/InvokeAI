@@ -4,7 +4,6 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectAutoAddBoardId, selectAutoAssignBoardOnClick } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadBold, PiPlusBold, PiTrashSimpleBold } from 'react-icons/pi';
@@ -23,7 +22,6 @@ const NoBoardBoardContextMenu = ({ children }: Props) => {
   const dispatch = useAppDispatch();
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const isSelectedForAutoAdd = useAppSelector(selectIsSelectedForAutoAdd);
-  const isBulkDownloadEnabled = useFeatureStatus('bulkDownload');
 
   const [bulkDownload] = useBulkDownloadImagesMutation();
 
@@ -48,11 +46,9 @@ const NoBoardBoardContextMenu = ({ children }: Props) => {
               {isSelectedForAutoAdd ? t('boards.selectedForAutoAdd') : t('boards.menuItemAutoAdd')}
             </MenuItem>
           )}
-          {isBulkDownloadEnabled && (
-            <MenuItem icon={<PiDownloadBold />} onClickCapture={handleBulkDownload}>
-              {t('boards.downloadBoard')}
-            </MenuItem>
-          )}
+          <MenuItem icon={<PiDownloadBold />} onClickCapture={handleBulkDownload}>
+            {t('boards.downloadBoard')}
+          </MenuItem>
           <MenuItem
             color="error.300"
             icon={<PiTrashSimpleBold />}
@@ -68,7 +64,6 @@ const NoBoardBoardContextMenu = ({ children }: Props) => {
       autoAssignBoardOnClick,
       handleBulkDownload,
       handleSetAutoAdd,
-      isBulkDownloadEnabled,
       isSelectedForAutoAdd,
       t,
       setUncategorizedImagesAsToBeDeleted,

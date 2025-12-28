@@ -1,5 +1,4 @@
 import type {
-  BaseModelType,
   BoardField,
   Classification,
   ColorField,
@@ -10,11 +9,13 @@ import type {
   ModelIdentifierField,
   ProgressImage,
   SchedulerField,
-  SubModelType,
   T2IAdapterField,
+  zBaseModelType,
   zClipVariantType,
+  zFluxVariantType,
   zModelFormat,
   zModelVariantType,
+  zSubModelType,
 } from 'features/nodes/types/common';
 import type { Invocation, S } from 'services/api/types';
 import type { Equals, Extends } from 'tsafe';
@@ -24,7 +25,8 @@ import type z from 'zod';
 
 /**
  * These types originate from the server and are recreated as zod schemas manually, for use at runtime.
- * The tests ensure that the types are correctly recreated.
+ * The tests ensure that the types are correctly recreated. If one of these tests fails, it means the zod
+ * schema and the type have diverged and need to be reconciled - update the zod schema.
  */
 
 describe('Common types', () => {
@@ -40,10 +42,11 @@ describe('Common types', () => {
 
   // Model component types
   test('ModelIdentifier', () => assert<Equals<ModelIdentifierField, S['ModelIdentifierField']>>());
-  test('ModelIdentifier', () => assert<Equals<BaseModelType, S['BaseModelType']>>());
-  test('ModelIdentifier', () => assert<Equals<SubModelType, S['SubModelType']>>());
+  test('ModelIdentifier', () => assert<Equals<z.infer<typeof zBaseModelType>, S['BaseModelType']>>());
+  test('ModelIdentifier', () => assert<Equals<z.infer<typeof zSubModelType>, S['SubModelType']>>());
   test('ClipVariantType', () => assert<Equals<z.infer<typeof zClipVariantType>, S['ClipVariantType']>>());
   test('ModelVariantType', () => assert<Equals<z.infer<typeof zModelVariantType>, S['ModelVariantType']>>());
+  test('FluxVariantType', () => assert<Equals<z.infer<typeof zFluxVariantType>, S['FluxVariantType']>>());
   test('ModelFormat', () => assert<Equals<z.infer<typeof zModelFormat>, S['ModelFormat']>>());
 
   // Misc types

@@ -106,7 +106,6 @@ async def list_workflows(
     tags: Optional[list[str]] = Query(default=None, description="The tags of workflow to get"),
     query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
     has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
-    is_published: Optional[bool] = Query(default=None, description="Whether to include/exclude published workflows"),
 ) -> PaginatedResults[WorkflowRecordListItemWithThumbnailDTO]:
     """Gets a page of workflows"""
     workflows_with_thumbnails: list[WorkflowRecordListItemWithThumbnailDTO] = []
@@ -119,7 +118,6 @@ async def list_workflows(
         categories=categories,
         tags=tags,
         has_been_opened=has_been_opened,
-        is_published=is_published,
     )
     for workflow in workflows.items:
         workflows_with_thumbnails.append(
@@ -223,6 +221,15 @@ async def get_workflow_thumbnail(
         return response
     except Exception:
         raise HTTPException(status_code=404)
+
+
+@workflows_router.get("/tags", operation_id="get_all_tags")
+async def get_all_tags(
+    categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories to include"),
+) -> list[str]:
+    """Gets all unique tags from workflows"""
+
+    return ApiDependencies.invoker.services.workflow_records.get_all_tags(categories=categories)
 
 
 @workflows_router.get("/counts_by_tag", operation_id="get_counts_by_tag")

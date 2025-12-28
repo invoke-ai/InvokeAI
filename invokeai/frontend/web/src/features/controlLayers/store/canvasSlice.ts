@@ -36,7 +36,6 @@ import {
 } from 'features/controlLayers/util/getScaledBoundingBoxDimensions';
 import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import { isMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
-import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import type { IRect } from 'konva/lib/types';
 import type { UndoableOptions } from 'redux-undo';
@@ -70,20 +69,13 @@ import type {
   EntityRectAddedPayload,
   IPMethodV2,
   T2IAdapterConfig,
+  ZImageControlConfig,
 } from './types';
 import {
   ASPECT_RATIO_MAP,
-  CHATGPT_ASPECT_RATIOS,
   DEFAULT_ASPECT_RATIO_CONFIG,
-  FLUX_KONTEXT_ASPECT_RATIOS,
-  GEMINI_2_5_ASPECT_RATIOS,
   getEntityIdentifier,
   getInitialCanvasState,
-  IMAGEN_ASPECT_RATIOS,
-  isChatGPT4oAspectRatioID,
-  isFluxKontextAspectRatioID,
-  isGemini2_5AspectRatioID,
-  isImagenAspectRatioID,
   isRegionalGuidanceFLUXReduxConfig,
   isRegionalGuidanceIPAdapterConfig,
   zCanvasState,
@@ -101,6 +93,7 @@ import {
   initialIPAdapter,
   initialRegionalGuidanceIPAdapter,
   initialT2IAdapter,
+  initialZImageControl,
   makeDefaultRasterLayerAdjustments,
 } from './util';
 
@@ -584,22 +577,47 @@ const slice = createSlice({
 
         // Converting to ControlNet from...
         case 'controlnet': {
-          if (layer.controlAdapter.type === 't2i_adapter') {
-            // ControlNets have all the T2I Adapter properties, plus control mode
-            const controlNetConfig: ControlNetConfig = {
-              ...initialControlNet,
-              ...layer.controlAdapter,
-              type: 'controlnet',
-            };
-            layer.controlAdapter = controlNetConfig;
-          } else if (layer.controlAdapter.type === 'control_lora') {
-            // ControlNets have all the Control LoRA properties, plus control mode and begin/end step pct
-            const controlNetConfig: ControlNetConfig = {
-              ...initialControlNet,
-              ...layer.controlAdapter,
-              type: 'controlnet',
-            };
-            layer.controlAdapter = controlNetConfig;
+          // Check if this is a Z-Image ControlNet (base === 'z-image')
+          const isZImageControl = layer.controlAdapter.model?.base === 'z-image';
+
+          if (isZImageControl) {
+            // Convert to Z-Image Control adapter
+            if (layer.controlAdapter.type !== 'z_image_control') {
+              const zImageControlConfig: ZImageControlConfig = {
+                ...initialZImageControl,
+                model: layer.controlAdapter.model,
+                weight: layer.controlAdapter.weight,
+              };
+              layer.controlAdapter = zImageControlConfig;
+            }
+          } else {
+            // Regular SD/SDXL/Flux ControlNet
+            if (layer.controlAdapter.type === 't2i_adapter') {
+              // ControlNets have all the T2I Adapter properties, plus control mode
+              const controlNetConfig: ControlNetConfig = {
+                ...initialControlNet,
+                ...layer.controlAdapter,
+                type: 'controlnet',
+              };
+              layer.controlAdapter = controlNetConfig;
+            } else if (layer.controlAdapter.type === 'control_lora') {
+              // ControlNets have all the Control LoRA properties, plus control mode and begin/end step pct
+              const controlNetConfig: ControlNetConfig = {
+                ...initialControlNet,
+                ...layer.controlAdapter,
+                type: 'controlnet',
+              };
+              layer.controlAdapter = controlNetConfig;
+            } else if (layer.controlAdapter.type === 'z_image_control') {
+              // Converting from Z-Image Control to regular ControlNet
+              const controlNetConfig: ControlNetConfig = {
+                ...initialControlNet,
+                model: layer.controlAdapter.model,
+                weight: layer.controlAdapter.weight,
+                beginEndStepPct: layer.controlAdapter.beginEndStepPct,
+              };
+              layer.controlAdapter = controlNetConfig;
+            }
           }
           break;
         }
@@ -652,6 +670,7 @@ const slice = createSlice({
     ) => {
       const { entityIdentifier, beginEndStepPct } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
+      // control_lora doesn't have beginEndStepPct
       if (!layer || !layer.controlAdapter || layer.controlAdapter.type === 'control_lora') {
         return;
       }
@@ -1227,33 +1246,6 @@ const slice = createSlice({
       state.bbox.aspectRatio.id = id;
       if (id === 'Free') {
         state.bbox.aspectRatio.isLocked = false;
-      } else if (
-        (state.bbox.modelBase === 'imagen3' || state.bbox.modelBase === 'imagen4') &&
-        isImagenAspectRatioID(id)
-      ) {
-        const { width, height } = IMAGEN_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'chatgpt-4o' && isChatGPT4oAspectRatioID(id)) {
-        const { width, height } = CHATGPT_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'gemini-2.5' && isGemini2_5AspectRatioID(id)) {
-        const { width, height } = GEMINI_2_5_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
-      } else if (state.bbox.modelBase === 'flux-kontext' && isFluxKontextAspectRatioID(id)) {
-        const { width, height } = FLUX_KONTEXT_ASPECT_RATIOS[id];
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
-        state.bbox.aspectRatio.value = state.bbox.rect.width / state.bbox.rect.height;
-        state.bbox.aspectRatio.isLocked = true;
       } else {
         state.bbox.aspectRatio.isLocked = true;
         state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
@@ -1700,14 +1692,6 @@ const slice = createSlice({
       const base = model?.base;
       if (isMainModelBase(base) && state.bbox.modelBase !== base) {
         state.bbox.modelBase = base;
-        if (API_BASE_MODELS.includes(base)) {
-          state.bbox.aspectRatio.isLocked = true;
-          state.bbox.aspectRatio.value = 1;
-          state.bbox.aspectRatio.id = '1:1';
-          state.bbox.rect.width = 1024;
-          state.bbox.rect.height = 1024;
-        }
-
         syncScaledSize(state);
       }
     });
@@ -1832,10 +1816,6 @@ export const {
 } = slice.actions;
 
 const syncScaledSize = (state: CanvasState) => {
-  if (API_BASE_MODELS.includes(state.bbox.modelBase)) {
-    // Imagen3 has fixed sizes. Scaled bbox is not supported.
-    return;
-  }
   if (state.bbox.scaleMethod === 'auto') {
     // Sync both aspect ratio and size
     const { width, height } = state.bbox.rect;

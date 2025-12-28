@@ -1,6 +1,5 @@
 import { Button, Flex, FormControl, FormErrorMessage, FormHelperText, FormLabel, Input } from '@invoke-ai/ui-library';
 import { useInstallModel } from 'features/modelManagerV2/hooks/useInstallModel';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
 import type { ChangeEventHandler } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,7 +13,6 @@ export const HuggingFaceForm = memo(() => {
   const [displayResults, setDisplayResults] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const { t } = useTranslation();
-  const isHFTokenEnabled = useFeatureStatus('hfToken');
 
   const [_getHuggingFaceModels, { isLoading, data }] = useLazyGetHuggingFaceModelsQuery();
   const [installModel] = useInstallModel();
@@ -66,7 +64,7 @@ export const HuggingFaceForm = memo(() => {
         <FormHelperText>{t('modelManager.huggingFaceHelper')}</FormHelperText>
         {!!errorMessage.length && <FormErrorMessage>{errorMessage}</FormErrorMessage>}
       </FormControl>
-      {isHFTokenEnabled && <HFToken />}
+      <HFToken />
       {data && data.urls && displayResults && <HuggingFaceResults results={data.urls} />}
     </Flex>
   );

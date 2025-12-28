@@ -39,6 +39,7 @@ export type ParameterSteps = z.infer<typeof zParameterSteps>;
 // #endregion
 
 // #region CFG scale parameter
+// CFG scale must be > 0. 1.0 means no CFG effect (matching FLUX/Z-Image convention).
 export const [zParameterCFGScale, isParameterCFGScale] = buildParameter(z.number().min(1));
 export type ParameterCFGScale = z.infer<typeof zParameterCFGScale>;
 // #endregion
@@ -133,6 +134,15 @@ export type ParameterSpandrelImageToImageModel = z.infer<typeof zParameterSpandr
 // #region Strength (l2l strength)
 export const [zParameterStrength, isParameterStrength] = buildParameter(z.number().min(0).max(1));
 export type ParameterStrength = z.infer<typeof zParameterStrength>;
+export const PARAMETER_STRENGTH_CONSTRAINTS = {
+  initial: 0.7,
+  sliderMin: 0,
+  sliderMax: 1,
+  numberInputMin: 0,
+  numberInputMax: 1,
+  fineStep: 0.01,
+  coarseStep: 0.05,
+};
 // #endregion
 
 // #region SeamlessX

@@ -3,7 +3,6 @@ import { Button, IconButton } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
-import { selectIsClientSideUploadEnabled } from 'features/system/store/configSlice';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import type { Accept, FileRejection } from 'react-dropzone';
@@ -27,7 +26,6 @@ export const dropzoneAccept: Accept = {
   'image/webp': ['.webp'].reduce(addUpperCaseReducer, [] as string[]),
 };
 
-import { useClientSideUpload } from './useClientSideUpload';
 type UseImageUploadButtonArgs =
   | {
       isDisabled?: boolean;
@@ -73,9 +71,7 @@ export const useImageUploadButton = ({
   onError,
 }: UseImageUploadButtonArgs) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
-  const isClientSideUploadEnabled = useAppSelector(selectIsClientSideUploadEnabled);
   const [uploadImage, request] = useUploadImageMutation();
-  const clientSideUpload = useClientSideUpload();
   const { t } = useTranslation();
 
   const onDropAccepted = useCallback(
@@ -108,20 +104,16 @@ export const useImageUploadButton = ({
           onUploadStarted?.(files);
 
           let imageDTOs: ImageDTO[] = [];
-          if (isClientSideUploadEnabled && files.length > 1) {
-            imageDTOs = await Promise.all(files.map((file, i) => clientSideUpload(file, i)));
-          } else {
-            imageDTOs = await uploadImages(
-              files.map((file, i) => ({
-                file,
-                image_category: 'user',
-                is_intermediate: false,
-                board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-                silent: false,
-                isFirstUploadOfBatch: i === 0,
-              }))
-            );
-          }
+          imageDTOs = await uploadImages(
+            files.map((file, i) => ({
+              file,
+              image_category: 'user',
+              is_intermediate: false,
+              board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
+              silent: false,
+              isFirstUploadOfBatch: i === 0,
+            }))
+          );
           if (onUpload) {
             onUpload(imageDTOs);
           }
@@ -135,17 +127,7 @@ export const useImageUploadButton = ({
         });
       }
     },
-    [
-      allowMultiple,
-      onUploadStarted,
-      uploadImage,
-      autoAddBoardId,
-      onUpload,
-      isClientSideUploadEnabled,
-      clientSideUpload,
-      onError,
-      t,
-    ]
+    [allowMultiple, onUploadStarted, uploadImage, autoAddBoardId, onUpload, onError, t]
   );
 
   const onDropRejected = useCallback(

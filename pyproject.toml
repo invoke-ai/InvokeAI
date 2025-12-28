@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "InvokeAI"
-description = "An implementation of Stable Diffusion which provides various new features and options to aid the image generation process"
-requires-python = ">=3.10, <3.13"
+description = "A full-featured AI-assisted image generation environment designed for creatives and enthusiasts."
+requires-python = ">=3.11, <3.13"
 readme = { content-type = "text/markdown", file = "README.md" }
 keywords = ["stable-diffusion", "AI"]
 dynamic = ["version"]
@@ -36,7 +36,7 @@ dependencies = [
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
   "compel==2.1.1",
-  "diffusers[torch]==0.33.0",
+  "diffusers[torch]==0.36.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",

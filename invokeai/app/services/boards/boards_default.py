@@ -28,8 +28,7 @@ class BoardService(BoardServiceABC):
             cover_image_name = None
         image_count = self.__invoker.services.board_image_records.get_image_count_for_board(board_id)
         asset_count = self.__invoker.services.board_image_records.get_asset_count_for_board(board_id)
-        video_count = 0  # noop for OSS
-        return board_record_to_dto(board_record, cover_image_name, image_count, asset_count, video_count)
+        return board_record_to_dto(board_record, cover_image_name, image_count, asset_count)
 
     def update(
         self,
@@ -45,8 +44,7 @@ class BoardService(BoardServiceABC):
 
         image_count = self.__invoker.services.board_image_records.get_image_count_for_board(board_id)
         asset_count = self.__invoker.services.board_image_records.get_asset_count_for_board(board_id)
-        video_count = 0  # noop for OSS
-        return board_record_to_dto(board_record, cover_image_name, image_count, asset_count, video_count)
+        return board_record_to_dto(board_record, cover_image_name, image_count, asset_count)
 
     def delete(self, board_id: str) -> None:
         self.__invoker.services.board_records.delete(board_id)
@@ -72,8 +70,7 @@ class BoardService(BoardServiceABC):
 
             image_count = self.__invoker.services.board_image_records.get_image_count_for_board(r.board_id)
             asset_count = self.__invoker.services.board_image_records.get_asset_count_for_board(r.board_id)
-            video_count = 0  # noop for OSS
-            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count, asset_count, video_count))
+            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count, asset_count))
 
         return OffsetPaginatedResults[BoardDTO](items=board_dtos, offset=offset, limit=limit, total=len(board_dtos))
 
@@ -91,7 +88,6 @@ class BoardService(BoardServiceABC):
 
             image_count = self.__invoker.services.board_image_records.get_image_count_for_board(r.board_id)
             asset_count = self.__invoker.services.board_image_records.get_asset_count_for_board(r.board_id)
-            video_count = 0  # noop for OSS
-            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count, asset_count, video_count))
+            board_dtos.append(board_record_to_dto(r, cover_image_name, image_count, asset_count))
 
         return board_dtos

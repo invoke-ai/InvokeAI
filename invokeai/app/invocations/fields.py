@@ -154,6 +154,7 @@ class FieldDescriptions:
     clip = "CLIP (tokenizer, text encoder, LoRAs) and skipped layer count"
     t5_encoder = "T5 tokenizer and text encoder"
     glm_encoder = "GLM (THUDM) tokenizer and text encoder"
+    qwen3_encoder = "Qwen3 tokenizer and text encoder"
     clip_embed_model = "CLIP Embed loader"
     clip_g_model = "CLIP-G Embed loader"
     unet = "UNet (scheduler, LoRAs)"
@@ -169,6 +170,7 @@ class FieldDescriptions:
     flux_model = "Flux model (Transformer) to load"
     sd3_model = "SD3 model (MMDiTX) to load"
     cogview4_model = "CogView4 model (Transformer) to load"
+    z_image_model = "Z-Image model (Transformer) to load"
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -235,16 +237,16 @@ class ImageField(BaseModel):
     image_name: str = Field(description="The name of the image")
 
 
-class VideoField(BaseModel):
-    """A video primitive field"""
-
-    video_id: str = Field(description="The id of the video")
-
-
 class BoardField(BaseModel):
     """A board primitive field"""
 
     board_id: str = Field(description="The id of the board")
+
+
+class StylePresetField(BaseModel):
+    """A style preset primitive field"""
+
+    style_preset_id: str = Field(description="The id of the style preset")
 
 
 class DenoiseMaskField(BaseModel):
@@ -325,6 +327,17 @@ class CogView4ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class ZImageConditioningField(BaseModel):
+    """A Z-Image conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+    mask: Optional[TensorField] = Field(
+        default=None,
+        description="The mask associated with this conditioning tensor for regional prompting. "
+        "Excluded regions should be set to False, included regions should be set to True.",
+    )
 
 
 class ConditioningField(BaseModel):
@@ -549,27 +562,6 @@ def migrate_model_ui_type(ui_type: UIType | str, json_schema_extra: dict[str, An
             ui_model_type = [ModelType.FluxRedux]
         case UIType.LlavaOnevisionModel:
             ui_model_type = [ModelType.LlavaOnevision]
-        case UIType.Imagen3Model:
-            ui_model_base = [BaseModelType.Imagen3]
-            ui_model_type = [ModelType.Main]
-        case UIType.Imagen4Model:
-            ui_model_base = [BaseModelType.Imagen4]
-            ui_model_type = [ModelType.Main]
-        case UIType.ChatGPT4oModel:
-            ui_model_base = [BaseModelType.ChatGPT4o]
-            ui_model_type = [ModelType.Main]
-        case UIType.Gemini2_5Model:
-            ui_model_base = [BaseModelType.Gemini2_5]
-            ui_model_type = [ModelType.Main]
-        case UIType.FluxKontextModel:
-            ui_model_base = [BaseModelType.FluxKontext]
-            ui_model_type = [ModelType.Main]
-        case UIType.Veo3Model:
-            ui_model_base = [BaseModelType.Veo3]
-            ui_model_type = [ModelType.Video]
-        case UIType.RunwayModel:
-            ui_model_base = [BaseModelType.Runway]
-            ui_model_type = [ModelType.Video]
         case _:
             pass
 

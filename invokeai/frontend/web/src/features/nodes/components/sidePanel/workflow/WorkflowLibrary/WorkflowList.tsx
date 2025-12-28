@@ -29,15 +29,9 @@ const getCategories = (view: WorkflowLibraryView): WorkflowCategory[] => {
     case 'defaults':
       return ['default'];
     case 'recent':
-      return ['user', 'project', 'default'];
+      return ['user', 'default'];
     case 'yours':
-      return ['user', 'project'];
-    case 'private':
       return ['user'];
-    case 'shared':
-      return ['project'];
-    case 'published':
-      return ['user', 'project', 'default'];
     default:
       assert<Equals<typeof view, never>>(false);
   }
@@ -66,9 +60,8 @@ const useInfiniteQueryAry = () => {
       direction,
       categories: getCategories(view),
       query: debouncedSearchTerm,
-      tags: view === 'defaults' ? selectedTags : [],
+      tags: view === 'defaults' || view === 'yours' ? selectedTags : [],
       has_been_opened: getHasBeenOpened(view),
-      is_published: view === 'published' ? true : undefined,
     } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[0];
   }, [orderBy, direction, view, debouncedSearchTerm, selectedTags]);
 

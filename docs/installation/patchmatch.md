@@ -70,7 +70,7 @@ Prior to installing PyPatchMatch, you need to take the following steps:
    `from patchmatch import patch_match`: It should look like the following:
 
    ```py
-   Python 3.10.12 (main, Jun 11 2023, 05:26:28) [GCC 11.4.0] on linux
+   Python 3.12.3 (main, Aug 14 2025, 17:47:21) [GCC 13.3.0] on linux
    Type "help", "copyright", "credits" or "license" for more information.
    >>> from patchmatch import patch_match
    Compiling and loading c extensions from "/home/lstein/Projects/InvokeAI/.invokeai-env/src/pypatchmatch/patchmatch".

@@ -1,11 +1,9 @@
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
-import { $accountTypeText } from 'app/store/nanostores/accountTypeText';
 import { $false } from 'app/store/nanostores/util';
 import type { AppDispatch, AppStore } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import type { AppConfig } from 'app/types/invokeai';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -24,7 +22,7 @@ import {
 import type { DynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { selectDynamicPromptsSlice } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
-import { $isInPublishFlow } from 'features/nodes/components/sidePanel/workflow/publish';
+import { SUPPORTS_REF_IMAGES_BASE_MODELS } from 'features/modelManagerV2/models';
 import { $templates } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { NodesState, Templates } from 'features/nodes/store/types';
@@ -33,15 +31,9 @@ import type { WorkflowSettingsState } from 'features/nodes/store/workflowSetting
 import { selectWorkflowSettingsSlice } from 'features/nodes/store/workflowSettingsSlice';
 import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
-import { useIsModelDisabled } from 'features/parameters/hooks/useIsModelDisabled';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
-import { selectVideoSlice, type VideoState } from 'features/parameters/store/videoSlice';
-import { SUPPORTS_REF_IMAGES_BASE_MODELS } from 'features/parameters/types/constants';
-import type { ParameterModel } from 'features/parameters/types/parameterSchemas';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
-import { promptExpansionApi, type PromptExpansionRequestState } from 'features/prompt/PromptExpansion/state';
-import { selectAllowVideo, selectConfigSlice } from 'features/system/store/configSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
@@ -90,14 +82,8 @@ type UpdateReasonsArg = {
   workflowSettings: WorkflowSettingsState;
   templates: Templates;
   upscale: UpscaleState;
-  config: AppConfig;
   loras: LoRA[];
   store: AppStore;
-  isInPublishFlow: boolean;
-  isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean;
-  isVideoEnabled: boolean;
-  promptExpansionRequest: PromptExpansionRequestState;
-  video: VideoState;
 };
 
 const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
@@ -117,14 +103,8 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     workflowSettings,
     templates,
     upscale,
-    config,
     loras,
     store,
-    isInPublishFlow,
-    isChatGPT4oHighModelDisabled,
-    isVideoEnabled,
-    promptExpansionRequest,
-    video,
   } = arg;
   if (tab === 'generate') {
     const model = selectMainModelConfig(store.getState());
@@ -134,8 +114,6 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       params,
       refImages,
       dynamicPrompts,
-      isChatGPT4oHighModelDisabled,
-      promptExpansionRequest,
       loras,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
@@ -153,8 +131,6 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       canvasIsRasterizing,
       canvasIsCompositing,
       canvasIsSelectingObject,
-      isChatGPT4oHighModelDisabled,
-      promptExpansionRequest,
       loras,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
@@ -165,27 +141,14 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
       workflowSettingsState: workflowSettings,
       isConnected,
       templates,
-      isInPublishFlow,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else if (tab === 'upscaling') {
     const reasons = getReasonsWhyCannotEnqueueUpscaleTab({
       isConnected,
       upscale,
-      config,
       params,
-      promptExpansionRequest,
       loras,
-    });
-    $reasonsWhyCannotEnqueue.set(reasons);
-  } else if (tab === 'video') {
-    const reasons = getReasonsWhyCannotEnqueueVideoTab({
-      isConnected,
-      video,
-      params,
-      promptExpansionRequest,
-      dynamicPrompts,
-      isVideoEnabled,
     });
     $reasonsWhyCannotEnqueue.set(reasons);
   } else {
@@ -205,7 +168,6 @@ export const useReadinessWatcher = () => {
   const nodes = useAppSelector(selectNodesSlice);
   const workflowSettings = useAppSelector(selectWorkflowSettingsSlice);
   const upscale = useAppSelector(selectUpscaleSlice);
-  const config = useAppSelector(selectConfigSlice);
   const loras = useAppSelector(selectAddedLoRAs);
   const templates = useStore($templates);
   const isConnected = useStore($isConnected);
@@ -214,11 +176,6 @@ export const useReadinessWatcher = () => {
   const canvasIsRasterizing = useStore(canvasManager?.stateApi.$isRasterizing ?? $false);
   const canvasIsSelectingObject = useStore(canvasManager?.stateApi.$isSegmenting ?? $false);
   const canvasIsCompositing = useStore(canvasManager?.compositor.$isBusy ?? $false);
-  const isInPublishFlow = useStore($isInPublishFlow);
-  const { isChatGPT4oHighModelDisabled } = useIsModelDisabled();
-  const isVideoEnabled = useAppSelector(selectAllowVideo);
-  const promptExpansionRequest = useStore(promptExpansionApi.$state);
-  const video = useAppSelector(selectVideoSlice);
   useEffect(() => {
     debouncedUpdateReasons({
       tab,
@@ -236,14 +193,8 @@ export const useReadinessWatcher = () => {
       workflowSettings,
       templates,
       upscale,
-      config,
       loras,
       store,
-      isInPublishFlow,
-      isChatGPT4oHighModelDisabled,
-      isVideoEnabled,
-      promptExpansionRequest,
-      video,
     });
   }, [
     store,
@@ -254,7 +205,6 @@ export const useReadinessWatcher = () => {
     canvasIsRasterizing,
     canvasIsSelectingObject,
     canvasIsTransforming,
-    config,
     dynamicPrompts,
     isConnected,
     nodes,
@@ -264,57 +214,10 @@ export const useReadinessWatcher = () => {
     upscale,
     workflowSettings,
     loras,
-    isInPublishFlow,
-    isChatGPT4oHighModelDisabled,
-    isVideoEnabled,
-    promptExpansionRequest,
-    video,
   ]);
 };
 
 const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invoke.systemDisconnected') });
-
-const getReasonsWhyCannotEnqueueVideoTab = (arg: {
-  isConnected: boolean;
-  video: VideoState;
-  params: ParamsState;
-  dynamicPrompts: DynamicPromptsState;
-  promptExpansionRequest: PromptExpansionRequestState;
-  isVideoEnabled: boolean;
-}) => {
-  const { isConnected, video, params, dynamicPrompts, promptExpansionRequest, isVideoEnabled } = arg;
-  const { positivePrompt } = params;
-  const reasons: Reason[] = [];
-  const accountTypeText = $accountTypeText.get();
-
-  if (!isVideoEnabled) {
-    reasons.push({ content: i18n.t('parameters.invoke.videoIsDisabled', { accountType: accountTypeText }) });
-  }
-
-  if (!isConnected) {
-    reasons.push(disconnectedReason(i18n.t));
-  }
-
-  if (dynamicPrompts.prompts.length === 0 && getShouldProcessPrompt(positivePrompt)) {
-    reasons.push({ content: i18n.t('parameters.invoke.noPrompts') });
-  }
-
-  if (promptExpansionRequest.isPending) {
-    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
-  } else if (promptExpansionRequest.isSuccess) {
-    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
-  }
-
-  if (!video.videoModel) {
-    reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
-  }
-
-  if (video.videoModel?.base === 'runway' && !video.startingFrameImage?.original.image.image_name) {
-    reasons.push({ content: i18n.t('parameters.invoke.noStartingFrameImage') });
-  }
-
-  return reasons;
-};
 
 const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   isConnected: boolean;
@@ -323,19 +226,8 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   refImages: RefImagesState;
   loras: LoRA[];
   dynamicPrompts: DynamicPromptsState;
-  isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean;
-  promptExpansionRequest: PromptExpansionRequestState;
 }) => {
-  const {
-    isConnected,
-    model,
-    params,
-    refImages,
-    loras,
-    dynamicPrompts,
-    isChatGPT4oHighModelDisabled,
-    promptExpansionRequest,
-  } = arg;
+  const { isConnected, model, params, refImages, loras, dynamicPrompts } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
 
@@ -363,8 +255,17 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
-  if (model && isChatGPT4oHighModelDisabled(model)) {
-    reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
+  if (model?.base === 'z-image') {
+    // Check if VAE source is available (either separate VAE or Qwen3 Source)
+    const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
+    if (!hasVaeSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+    }
+    // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
+    const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
+    if (!hasQwen3Source) {
+      reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    }
   }
 
   if (model) {
@@ -375,12 +276,6 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
         break;
       }
     }
-  }
-
-  if (promptExpansionRequest.isPending) {
-    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
-  } else if (promptExpansionRequest.isSuccess) {
-    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
   }
 
   if (model && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)) {
@@ -407,16 +302,15 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = async (arg: {
   workflowSettingsState: WorkflowSettingsState;
   isConnected: boolean;
   templates: Templates;
-  isInPublishFlow: boolean;
 }): Promise<Reason[]> => {
-  const { dispatch, nodesState, workflowSettingsState, isConnected, templates, isInPublishFlow } = arg;
+  const { dispatch, nodesState, workflowSettingsState, isConnected, templates } = arg;
   const reasons: Reason[] = [];
 
   if (!isConnected) {
     reasons.push(disconnectedReason(i18n.t));
   }
 
-  if (workflowSettingsState.shouldValidateGraph || isInPublishFlow) {
+  if (workflowSettingsState.shouldValidateGraph) {
     const { nodes, edges } = nodesState;
     const invocationNodes = nodes.filter(isInvocationNode);
     const batchNodes = invocationNodes.filter(isBatchNode);
@@ -489,12 +383,10 @@ const getReasonsWhyCannotEnqueueWorkflowsTab = async (arg: {
 const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
   isConnected: boolean;
   upscale: UpscaleState;
-  config: AppConfig;
   params: ParamsState;
   loras: LoRA[];
-  promptExpansionRequest: PromptExpansionRequestState;
 }) => {
-  const { isConnected, upscale, config, params, loras, promptExpansionRequest } = arg;
+  const { isConnected, upscale, params, loras } = arg;
   const reasons: Reason[] = [];
 
   if (!isConnected) {
@@ -503,18 +395,10 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
 
   if (!upscale.upscaleInitialImage) {
     reasons.push({ content: i18n.t('upscaling.missingUpscaleInitialImage') });
-  } else if (config.maxUpscaleDimension) {
-    const { width, height } = upscale.upscaleInitialImage;
-    const { scale } = upscale;
-
-    const maxPixels = config.maxUpscaleDimension ** 2;
-    const upscaledPixels = width * scale * height * scale;
-
-    if (upscaledPixels > maxPixels) {
-      reasons.push({ content: i18n.t('upscaling.exceedsMaxSize') });
-    }
   }
+
   const model = params.model;
+
   if (model && !['sd-1', 'sdxl'].includes(model.base)) {
     // When we are using an upsupported model, do not add the other warnings
     reasons.push({ content: i18n.t('upscaling.incompatibleBaseModel') });
@@ -540,12 +424,6 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
     }
   }
 
-  if (promptExpansionRequest.isPending) {
-    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
-  } else if (promptExpansionRequest.isSuccess) {
-    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
-  }
-
   return reasons;
 };
 
@@ -562,8 +440,6 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   canvasIsRasterizing: boolean;
   canvasIsCompositing: boolean;
   canvasIsSelectingObject: boolean;
-  isChatGPT4oHighModelDisabled: (model: ParameterModel) => boolean;
-  promptExpansionRequest: PromptExpansionRequestState;
 }) => {
   const {
     isConnected,
@@ -578,8 +454,6 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     canvasIsRasterizing,
     canvasIsCompositing,
     canvasIsSelectingObject,
-    isChatGPT4oHighModelDisabled,
-    promptExpansionRequest,
   } = arg;
   const { positivePrompt } = params;
   const reasons: Reason[] = [];
@@ -712,6 +586,19 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
+  if (model?.base === 'z-image') {
+    // Check if VAE source is available (either separate VAE or Qwen3 Source)
+    const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
+    if (!hasVaeSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+    }
+    // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
+    const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
+    if (!hasQwen3Source) {
+      reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    }
+  }
+
   if (model) {
     for (const lora of loras.filter(({ isEnabled }) => isEnabled === true)) {
       if (model.base !== lora.model.base) {
@@ -720,16 +607,6 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
         break;
       }
     }
-  }
-
-  if (model && isChatGPT4oHighModelDisabled(model)) {
-    reasons.push({ content: i18n.t('parameters.invoke.modelDisabledForTrial', { modelName: model.name }) });
-  }
-
-  if (promptExpansionRequest.isPending) {
-    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionPending') });
-  } else if (promptExpansionRequest.isSuccess) {
-    reasons.push({ content: i18n.t('parameters.invoke.promptExpansionResultPending') });
   }
 
   const enabledControlLayers = canvas.controlLayers.entities.filter((controlLayer) => controlLayer.isEnabled);

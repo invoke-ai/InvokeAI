@@ -28,14 +28,17 @@ from invokeai.app.services.model_records import (
     UnknownModelException,
 )
 from invokeai.app.util.suppress_output import SuppressOutput
-from invokeai.backend.model_manager import BaseModelType, ModelFormat, ModelType
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    MainCheckpointConfig,
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
+from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_SD1_Config,
+    Main_Checkpoint_SD2_Config,
+    Main_Checkpoint_SDXL_Config,
+    Main_Checkpoint_SDXLRefiner_Config,
 )
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.search import ModelSearch
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
@@ -44,6 +47,7 @@ from invokeai.backend.model_manager.starter_models import (
     StarterModelBundle,
     StarterModelWithoutDependencies,
 )
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 model_manager_router = APIRouter(prefix="/v2/models", tags=["model_manager"])
 
@@ -188,6 +192,40 @@ async def get_model_record(
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@model_manager_router.post(
+    "/i/{key}/reidentify",
+    operation_id="reidentify_model",
+    responses={
+        200: {
+            "description": "The model configuration was retrieved successfully",
+            "content": {"application/json": {"example": example_model_config}},
+        },
+        400: {"description": "Bad request"},
+        404: {"description": "The model could not be found"},
+    },
+)
+async def reidentify_model(
+    key: Annotated[str, Path(description="Key of the model to reidentify.")],
+) -> AnyModelConfig:
+    """Attempt to reidentify a model by re-probing its weights file."""
+    try:
+        config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
+        models_path = ApiDependencies.invoker.services.configuration.models_path
+        if pathlib.Path(config.path).is_relative_to(models_path):
+            model_path = pathlib.Path(config.path)
+        else:
+            model_path = models_path / config.path
+        mod = ModelOnDisk(model_path)
+        result = ModelConfigFactory.from_model_on_disk(mod)
+        if result.config is None:
+            raise InvalidModelException("Unable to identify model format")
+        result.config.key = config.key  # retain the same key
+        new_config = ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
+        return new_config
+    except UnknownModelException as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 class FoundModel(BaseModel):
     path: str = Field(description="Path to the model")
     is_installed: bool = Field(description="Whether or not the model is already installed")
@@ -235,9 +273,10 @@ async def scan_for_models(
             found_model = FoundModel(path=path, is_installed=is_installed)
             scan_results.append(found_model)
     except Exception as e:
+        error_type = type(e).__name__
         raise HTTPException(
             status_code=500,
-            detail=f"An error occurred while searching the directory: {e}",
+            detail=f"An error occurred while searching the directory: {error_type}",
         )
     return scan_results
 
@@ -297,10 +336,8 @@ async def update_model_record(
     """Update a model's config."""
     logger = ApiDependencies.invoker.services.logger
     record_store = ApiDependencies.invoker.services.model_manager.store
-    installer = ApiDependencies.invoker.services.model_manager.install
     try:
-        record_store.update_model(key, changes=changes)
-        config = installer.sync_model_path(key)
+        config = record_store.update_model(key, changes=changes, allow_class_change=True)
         config = add_cover_image_to_model_config(config, ApiDependencies)
         logger.info(f"Updated model: {key}")
     except UnknownModelException as e:
@@ -408,6 +445,59 @@ async def delete_model(
     except UnknownModelException as e:
         logger.error(str(e))
         raise HTTPException(status_code=404, detail=str(e))
+
+
+class BulkDeleteModelsRequest(BaseModel):
+    """Request body for bulk model deletion."""
+
+    keys: List[str] = Field(description="List of model keys to delete")
+
+
+class BulkDeleteModelsResponse(BaseModel):
+    """Response body for bulk model deletion."""
+
+    deleted: List[str] = Field(description="List of successfully deleted model keys")
+    failed: List[dict] = Field(description="List of failed deletions with error messages")
+
+
+@model_manager_router.post(
+    "/i/bulk_delete",
+    operation_id="bulk_delete_models",
+    responses={
+        200: {"description": "Models deleted (possibly with some failures)"},
+    },
+    status_code=200,
+)
+async def bulk_delete_models(
+    request: BulkDeleteModelsRequest = Body(description="List of model keys to delete"),
+) -> BulkDeleteModelsResponse:
+    """
+    Delete multiple model records from database.
+
+    The configuration records will be removed. The corresponding weights files will be
+    deleted as well if they reside within the InvokeAI "models" directory.
+    Returns a list of successfully deleted keys and failed deletions with error messages.
+    """
+    logger = ApiDependencies.invoker.services.logger
+    installer = ApiDependencies.invoker.services.model_manager.install
+
+    deleted = []
+    failed = []
+
+    for key in request.keys:
+        try:
+            installer.delete(key)
+            deleted.append(key)
+            logger.info(f"Deleted model: {key}")
+        except UnknownModelException as e:
+            logger.error(f"Failed to delete model {key}: {str(e)}")
+            failed.append({"key": key, "error": str(e)})
+        except Exception as e:
+            logger.error(f"Failed to delete model {key}: {str(e)}")
+            failed.append({"key": key, "error": str(e)})
+
+    logger.info(f"Bulk delete completed: {len(deleted)} deleted, {len(failed)} failed")
+    return BulkDeleteModelsResponse(deleted=deleted, failed=failed)
 
 
 @model_manager_router.delete(
@@ -743,9 +833,18 @@ async def convert_model(
         logger.error(str(e))
         raise HTTPException(status_code=424, detail=str(e))
 
-    if not isinstance(model_config, MainCheckpointConfig):
-        logger.error(f"The model with key {key} is not a main checkpoint model.")
-        raise HTTPException(400, f"The model with key {key} is not a main checkpoint model.")
+    if not isinstance(
+        model_config,
+        (
+            Main_Checkpoint_SD1_Config,
+            Main_Checkpoint_SD2_Config,
+            Main_Checkpoint_SDXL_Config,
+            Main_Checkpoint_SDXLRefiner_Config,
+        ),
+    ):
+        msg = f"The model with key {key} is not a main SD 1/2/XL checkpoint model."
+        logger.error(msg)
+        raise HTTPException(400, msg)
 
     with TemporaryDirectory(dir=ApiDependencies.invoker.services.configuration.models_path) as tmpdir:
         convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem

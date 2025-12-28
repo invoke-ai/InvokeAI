@@ -43,6 +43,14 @@ type DeleteModelArg = {
 type DeleteModelResponse = void;
 type DeleteModelImageResponse = void;
 
+type BulkDeleteModelsArg = {
+  keys: string[];
+};
+type BulkDeleteModelsResponse = {
+  deleted: string[];
+  failed: string[];
+};
+
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
@@ -147,6 +155,16 @@ export const modelsApi = api.injectEndpoints({
         return {
           url: buildModelsUrl(`i/${key}`),
           method: 'DELETE',
+        };
+      },
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
+    }),
+    bulkDeleteModels: build.mutation<BulkDeleteModelsResponse, BulkDeleteModelsArg>({
+      query: ({ keys }) => {
+        return {
+          url: buildModelsUrl(`i/bulk_delete`),
+          method: 'POST',
+          body: { keys },
         };
       },
       invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
@@ -299,6 +317,40 @@ export const modelsApi = api.injectEndpoints({
     emptyModelCache: build.mutation<void, void>({
       query: () => ({ url: buildModelsUrl('empty_model_cache'), method: 'POST' }),
     }),
+    reidentifyModel: build.mutation<
+      paths['/api/v2/models/i/{key}/reidentify']['post']['responses']['200']['content']['application/json'],
+      { key: string }
+    >({
+      query: ({ key }) => {
+        return {
+          url: buildModelsUrl(`i/${key}/reidentify`),
+          method: 'POST',
+        };
+      },
+      onQueryStarted: async (_, { dispatch, queryFulfilled }) => {
+        try {
+          const { data } = await queryFulfilled;
+
+          // Update the individual model query caches
+          dispatch(modelsApi.util.upsertQueryData('getModelConfig', data.key, data));
+
+          const { base, name, type } = data;
+          dispatch(modelsApi.util.upsertQueryData('getModelConfigByAttrs', { base, name, type }, data));
+
+          // Update the list query cache
+          dispatch(
+            modelsApi.util.updateQueryData('getModelConfigs', undefined, (draft) => {
+              modelConfigsAdapter.updateOne(draft, {
+                id: data.key,
+                changes: data,
+              });
+            })
+          );
+        } catch {
+          // no-op
+        }
+      },
+    }),
   }),
 });
 
@@ -306,6 +358,7 @@ export const {
   useGetModelConfigsQuery,
   useGetModelConfigQuery,
   useDeleteModelsMutation,
+  useBulkDeleteModelsMutation,
   useDeleteModelImageMutation,
   useUpdateModelMutation,
   useUpdateModelImageMutation,
@@ -321,6 +374,7 @@ export const {
   useSetHFTokenMutation,
   useResetHFTokenMutation,
   useEmptyModelCacheMutation,
+  useReidentifyModelMutation,
 } = modelsApi;
 
 export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select();

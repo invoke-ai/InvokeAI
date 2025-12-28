@@ -51,44 +51,14 @@ import { setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
 import type { ChangeEvent, ReactElement } from 'react';
 import { cloneElement, memo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetAppConfigQuery } from 'services/api/endpoints/appInfo';
 
 import { SettingsLanguageSelect } from './SettingsLanguageSelect';
 
-type ConfigOptions = {
-  shouldShowDeveloperSettings?: boolean;
-  shouldShowResetWebUiText?: boolean;
-  shouldShowClearIntermediates?: boolean;
-  shouldShowLocalizationToggle?: boolean;
-  shouldShowInvocationProgressDetailSetting?: boolean;
-};
-
-const defaultConfig: ConfigOptions = {
-  shouldShowDeveloperSettings: true,
-  shouldShowResetWebUiText: true,
-  shouldShowClearIntermediates: true,
-  shouldShowLocalizationToggle: true,
-  shouldShowInvocationProgressDetailSetting: true,
-};
-
-type SettingsModalProps = {
-  /* The button to open the Settings Modal */
-  children: ReactElement;
-  config?: ConfigOptions;
-};
-
 const [useSettingsModal] = buildUseBoolean(false);
 
-const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps) => {
+const SettingsModal = (props: { children: ReactElement }) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-
-  const { isNSFWCheckerAvailable, isWatermarkerAvailable } = useGetAppConfigQuery(undefined, {
-    selectFromResult: ({ data }) => ({
-      isNSFWCheckerAvailable: data?.nsfw_methods.includes('nsfw_checker') ?? false,
-      isWatermarkerAvailable: data?.watermarking_methods.includes('invisible_watermark') ?? false,
-    }),
-  });
 
   const {
     clearIntermediates,
@@ -96,7 +66,8 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
     intermediatesCount,
     isLoading: isLoadingClearIntermediates,
     refetchIntermediatesCount,
-  } = useClearIntermediates(Boolean(config?.shouldShowClearIntermediates));
+  } = useClearIntermediates();
+
   const settingsModal = useSettingsModal();
   const refreshModal = useRefreshAfterResetModal();
 
@@ -116,10 +87,11 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
   }, [dispatch]);
 
   useEffect(() => {
-    if (settingsModal.isTrue && Boolean(config?.shouldShowClearIntermediates)) {
+    // Refetch intermediates count when modal is opened
+    if (settingsModal.isTrue) {
       refetchIntermediatesCount();
     }
-  }, [config?.shouldShowClearIntermediates, refetchIntermediatesCount, settingsModal.isTrue]);
+  }, [refetchIntermediatesCount, settingsModal.isTrue]);
 
   const handleClickResetWebUI = useCallback(() => {
     clearStorage();
@@ -192,14 +164,14 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
 
   return (
     <>
-      {cloneElement(children, {
+      {cloneElement(props.children, {
         onClick: settingsModal.setTrue,
       })}
       <Modal isOpen={settingsModal.isTrue} onClose={settingsModal.setFalse} size="2xl" isCentered useInert={false}>
         <ModalOverlay />
         <ModalContent maxH="80vh" h="68rem">
           <ModalHeader bg="none">{t('common.settingsLabel')}</ModalHeader>
-          <ModalCloseButton />
+          <ModalCloseButton tabIndex={1} />
           <ModalBody display="flex" flexDir="column" gap={4}>
             <ScrollableContent>
               <Flex flexDir="column" gap={4}>
@@ -216,11 +188,11 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
                   </StickyScrollable>
 
                   <StickyScrollable title={t('settings.generation')}>
-                    <FormControl isDisabled={!isNSFWCheckerAvailable}>
+                    <FormControl>
                       <FormLabel>{t('settings.enableNSFWChecker')}</FormLabel>
                       <Switch isChecked={shouldUseNSFWChecker} onChange={handleChangeShouldUseNSFWChecker} />
                     </FormControl>
-                    <FormControl isDisabled={!isWatermarkerAvailable}>
+                    <FormControl>
                       <FormLabel>{t('settings.enableInvisibleWatermark')}</FormLabel>
                       <Switch isChecked={shouldUseWatermarker} onChange={handleChangeShouldUseWatermarker} />
                     </FormControl>
@@ -241,22 +213,20 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
                         onChange={handleChangeShouldAntialiasProgressImage}
                       />
                     </FormControl>
-                    {Boolean(config?.shouldShowInvocationProgressDetailSetting) && (
-                      <FormControl>
-                        <FormLabel>{t('settings.showDetailedInvocationProgress')}</FormLabel>
-                        <Switch
-                          isChecked={shouldShowInvocationProgressDetail}
-                          onChange={handleChangeShouldShowInvocationProgressDetail}
-                        />
-                      </FormControl>
-                    )}
+                    <FormControl>
+                      <FormLabel>{t('settings.showDetailedInvocationProgress')}</FormLabel>
+                      <Switch
+                        isChecked={shouldShowInvocationProgressDetail}
+                        onChange={handleChangeShouldShowInvocationProgressDetail}
+                      />
+                    </FormControl>
                     <FormControl>
                       <InformationalPopover feature="noiseUseCPU" inPortal={false}>
                         <FormLabel>{t('parameters.useCpuNoise')}</FormLabel>
                       </InformationalPopover>
                       <Switch isChecked={shouldUseCpuNoise} onChange={handleChangeShouldUseCpuNoise} />
                     </FormControl>
-                    {Boolean(config?.shouldShowLocalizationToggle) && <SettingsLanguageSelect />}
+                    <SettingsLanguageSelect />
                     <FormControl>
                       <FormLabel>{t('settings.enableInformationalPopovers')}</FormLabel>
                       <Switch
@@ -280,43 +250,35 @@ const SettingsModal = ({ config = defaultConfig, children }: SettingsModalProps)
                     </FormControl>
                   </StickyScrollable>
 
-                  {Boolean(config?.shouldShowDeveloperSettings) && (
-                    <StickyScrollable title={t('settings.developer')}>
-                      <SettingsDeveloperLogIsEnabled />
-                      <SettingsDeveloperLogLevel />
-                      <SettingsDeveloperLogNamespaces />
-                    </StickyScrollable>
-                  )}
+                  <StickyScrollable title={t('settings.developer')}>
+                    <SettingsDeveloperLogIsEnabled />
+                    <SettingsDeveloperLogLevel />
+                    <SettingsDeveloperLogNamespaces />
+                  </StickyScrollable>
 
-                  {Boolean(config?.shouldShowClearIntermediates) && (
-                    <StickyScrollable title={t('settings.clearIntermediates')}>
-                      <Button
-                        tooltip={hasPendingItems ? t('settings.clearIntermediatesDisabled') : undefined}
-                        colorScheme="warning"
-                        onClick={clearIntermediates}
-                        isLoading={isLoadingClearIntermediates}
-                        isDisabled={!intermediatesCount || hasPendingItems}
-                      >
-                        {t('settings.clearIntermediatesWithCount', {
-                          count: intermediatesCount ?? 0,
-                        })}
-                      </Button>
-                      <Text fontWeight="bold">{t('settings.clearIntermediatesDesc1')}</Text>
-                      <Text variant="subtext">{t('settings.clearIntermediatesDesc2')}</Text>
-                      <Text variant="subtext">{t('settings.clearIntermediatesDesc3')}</Text>
-                    </StickyScrollable>
-                  )}
+                  <StickyScrollable title={t('settings.clearIntermediates')}>
+                    <Button
+                      tooltip={hasPendingItems ? t('settings.clearIntermediatesDisabled') : undefined}
+                      colorScheme="warning"
+                      onClick={clearIntermediates}
+                      isLoading={isLoadingClearIntermediates}
+                      isDisabled={!intermediatesCount || hasPendingItems}
+                    >
+                      {t('settings.clearIntermediatesWithCount', {
+                        count: intermediatesCount ?? 0,
+                      })}
+                    </Button>
+                    <Text fontWeight="bold">{t('settings.clearIntermediatesDesc1')}</Text>
+                    <Text variant="subtext">{t('settings.clearIntermediatesDesc2')}</Text>
+                    <Text variant="subtext">{t('settings.clearIntermediatesDesc3')}</Text>
+                  </StickyScrollable>
 
                   <StickyScrollable title={t('settings.resetWebUI')}>
                     <Button colorScheme="error" onClick={handleClickResetWebUI}>
                       {t('settings.resetWebUI')}
                     </Button>
-                    {Boolean(config?.shouldShowResetWebUiText) && (
-                      <>
-                        <Text variant="subtext">{t('settings.resetWebUIDesc1')}</Text>
-                        <Text variant="subtext">{t('settings.resetWebUIDesc2')}</Text>
-                      </>
-                    )}
+                    <Text variant="subtext">{t('settings.resetWebUIDesc1')}</Text>
+                    <Text variant="subtext">{t('settings.resetWebUIDesc2')}</Text>
                   </StickyScrollable>
                 </FormControlGroup>
               </Flex>

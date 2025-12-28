@@ -30,6 +30,7 @@ export const workflowsApi = api.injectEndpoints({
         // Because this may change the order of the list, we need to invalidate the whole list
         { type: 'Workflow', id: LIST_TAG },
         { type: 'Workflow', id: workflow_id },
+        'WorkflowTags',
         'WorkflowTagCounts',
         'WorkflowCategoryCounts',
       ],
@@ -46,6 +47,7 @@ export const workflowsApi = api.injectEndpoints({
       invalidatesTags: [
         // Because this may change the order of the list, we need to invalidate the whole list
         { type: 'Workflow', id: LIST_TAG },
+        'WorkflowTags',
         'WorkflowTagCounts',
         'WorkflowCategoryCounts',
       ],
@@ -61,9 +63,16 @@ export const workflowsApi = api.injectEndpoints({
       }),
       invalidatesTags: (response, error, workflow) => [
         { type: 'Workflow', id: workflow.id },
+        'WorkflowTags',
         'WorkflowTagCounts',
         'WorkflowCategoryCounts',
       ],
+    }),
+    getAllTags: build.query<string[], { categories?: ('user' | 'default')[] } | void>({
+      query: (params) => ({
+        url: `${buildWorkflowsUrl('tags')}${params ? `?${queryString.stringify(params, { arrayFormat: 'none' })}` : ''}`,
+      }),
+      providesTags: ['WorkflowTags'],
     }),
     getCountsByTag: build.query<
       paths['/api/v1/workflows/counts_by_tag']['get']['responses']['200']['content']['application/json'],
@@ -148,18 +157,12 @@ export const workflowsApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, workflow_id) => [{ type: 'Workflow', id: workflow_id }],
     }),
-    unpublishWorkflow: build.mutation<void, string>({
-      query: (workflow_id) => ({
-        url: buildWorkflowsUrl(`i/${workflow_id}/unpublish`),
-        method: 'POST',
-      }),
-      invalidatesTags: (result, error, workflow_id) => [{ type: 'Workflow', id: workflow_id }],
-    }),
   }),
 });
 
 export const {
   useUpdateOpenedAtMutation,
+  useGetAllTagsQuery,
   useGetCountsByTagQuery,
   useGetCountsByCategoryQuery,
   useLazyGetWorkflowQuery,
@@ -170,5 +173,4 @@ export const {
   useListWorkflowsInfiniteInfiniteQuery,
   useSetWorkflowThumbnailMutation,
   useDeleteWorkflowThumbnailMutation,
-  useUnpublishWorkflowMutation,
 } = workflowsApi;

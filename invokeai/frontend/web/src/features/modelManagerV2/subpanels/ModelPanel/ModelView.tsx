@@ -10,9 +10,12 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AnyModelConfig } from 'services/api/types';
 
+import { isExternalModel } from './isExternalModel';
 import { MainModelDefaultSettings } from './MainModelDefaultSettings/MainModelDefaultSettings';
 import { ModelAttrView } from './ModelAttrView';
-import { ModelFooter } from './ModelFooter';
+import { ModelDeleteButton } from './ModelDeleteButton';
+import { ModelReidentifyButton } from './ModelReidentifyButton';
+import { ModelUpdatePathButton } from './ModelUpdatePathButton';
 import { RelatedModels } from './RelatedModels';
 
 type Props = {
@@ -21,6 +24,10 @@ type Props = {
 
 export const ModelView = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
+
+  // Only allow path updates for external models (not Invoke-controlled)
+  const canUpdatePath = useMemo(() => isExternalModel(modelConfig.path), [modelConfig.path]);
+
   const withSettings = useMemo(() => {
     if (modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner') {
       return true;
@@ -42,10 +49,13 @@ export const ModelView = memo(({ modelConfig }: Props) => {
   return (
     <Flex flexDir="column" gap={4} h="full">
       <ModelHeader modelConfig={modelConfig}>
+        {canUpdatePath && <ModelUpdatePathButton modelConfig={modelConfig} />}
+        <ModelReidentifyButton modelConfig={modelConfig} />
         {modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />
         )}
         <ModelEditButton />
+        <ModelDeleteButton modelConfig={modelConfig} />
       </ModelHeader>
       <Divider />
       <Flex flexDir="column" gap={4}>
@@ -53,21 +63,20 @@ export const ModelView = memo(({ modelConfig }: Props) => {
           <SimpleGrid columns={2} gap={4}>
             <ModelAttrView label={t('modelManager.baseModel')} value={modelConfig.base} />
             <ModelAttrView label={t('modelManager.modelType')} value={modelConfig.type} />
-            <ModelAttrView label={t('common.format')} value={modelConfig.format} />
+            <ModelAttrView label={t('modelManager.modelFormat')} value={modelConfig.format} />
             <ModelAttrView label={t('modelManager.path')} value={modelConfig.path} />
             <ModelAttrView label={t('modelManager.fileSize')} value={filesize(modelConfig.file_size)} />
-            {modelConfig.type === 'main' && (
+            {modelConfig.type === 'main' && 'variant' in modelConfig && (
               <ModelAttrView label={t('modelManager.variant')} value={modelConfig.variant} />
             )}
             {modelConfig.type === 'main' && modelConfig.format === 'diffusers' && modelConfig.repo_variant && (
               <ModelAttrView label={t('modelManager.repoVariant')} value={modelConfig.repo_variant} />
             )}
             {modelConfig.type === 'main' && modelConfig.format === 'checkpoint' && (
-              <>
-                <ModelAttrView label={t('modelManager.pathToConfig')} value={modelConfig.config_path} />
-                <ModelAttrView label={t('modelManager.predictionType')} value={modelConfig.prediction_type} />
-                <ModelAttrView label={t('modelManager.upcastAttention')} value={`${modelConfig.upcast_attention}`} />
-              </>
+              <ModelAttrView label={t('modelManager.pathToConfig')} value={modelConfig.config_path} />
+            )}
+            {modelConfig.type === 'main' && modelConfig.format === 'checkpoint' && 'prediction_type' in modelConfig && (
+              <ModelAttrView label={t('modelManager.predictionType')} value={modelConfig.prediction_type} />
             )}
             {modelConfig.type === 'ip_adapter' && modelConfig.format === 'invokeai' && (
               <ModelAttrView label={t('modelManager.imageEncoderModelId')} value={modelConfig.image_encoder_model_id} />
@@ -101,7 +110,6 @@ export const ModelView = memo(({ modelConfig }: Props) => {
           <RelatedModels modelConfig={modelConfig} />
         </Box>
       </Flex>
-      <ModelFooter modelConfig={modelConfig} isEditing={false} />
     </Flex>
   );
 });

@@ -59,6 +59,17 @@ export const getRegionalGuidanceWarnings = (
       }
     }
 
+    if (model.base === 'z-image') {
+      // Z-Image has similar limitations to FLUX - no negative prompts via CFG by default
+      // Reference images (IP Adapters) are not supported for Z-Image
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
     entity.referenceImages.forEach(({ config }) => {
       if (!config.model) {
         // No model selected
@@ -154,7 +165,7 @@ export const getControlLayerWarnings = (
       warnings.push(WARNINGS.CONTROL_ADAPTER_INCOMPATIBLE_BASE_MODEL);
     } else if (
       model.base === 'flux' &&
-      model.variant === 'inpaint' &&
+      model.variant === 'dev_fill' &&
       entity.controlAdapter.model.type === 'control_lora'
     ) {
       // FLUX inpaint variants are FLUX Fill models - not compatible w/ Control LoRA

@@ -9,7 +9,7 @@ import torch
 from safetensors.torch import load_file
 
 from invokeai.app.services.config import InvokeAIAppConfig
-from invokeai.backend.model_manager.config import AnyModelConfig
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -30,6 +30,7 @@ from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import (
     lora_model_from_flux_control_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_diffusers_format,
     lora_model_from_flux_diffusers_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
@@ -40,8 +41,13 @@ from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_u
     is_state_dict_likely_in_flux_onetrainer_format,
     lora_model_from_flux_onetrainer_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_xlabs_format,
+    lora_model_from_flux_xlabs_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
 from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
+from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils import lora_model_from_z_image_state_dict
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.LoRA, format=ModelFormat.OMI)
@@ -96,15 +102,19 @@ class LoRALoader(ModelLoader):
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.Flux:
-            if config.format in [ModelFormat.Diffusers, ModelFormat.OMI]:
+            if config.format is ModelFormat.OMI:
                 # HACK(ryand): We set alpha=None for diffusers PEFT format models. These models are typically
                 # distributed as a single file without the associated metadata containing the alpha value. We chose
                 # alpha=None, because this is treated as alpha=rank internally in `LoRALayerBase.scale()`. alpha=rank
                 # is a popular choice. For example, in the diffusers training scripts:
                 # https://github.com/huggingface/diffusers/blob/main/examples/dreambooth/train_dreambooth_lora_flux.py#L1194
+                #
+                # We assume the same for LyCORIS models in diffusers key format.
                 model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
-            elif config.format == ModelFormat.LyCORIS:
-                if is_state_dict_likely_in_flux_kohya_format(state_dict=state_dict):
+            elif config.format is ModelFormat.LyCORIS:
+                if is_state_dict_likely_in_flux_diffusers_format(state_dict=state_dict):
+                    model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
+                elif is_state_dict_likely_in_flux_kohya_format(state_dict=state_dict):
                     model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_in_flux_onetrainer_format(state_dict=state_dict):
                     model = lora_model_from_flux_onetrainer_state_dict(state_dict=state_dict)
@@ -112,6 +122,8 @@ class LoRALoader(ModelLoader):
                     model = lora_model_from_flux_control_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_in_flux_aitoolkit_format(state_dict=state_dict):
                     model = lora_model_from_flux_aitoolkit_state_dict(state_dict=state_dict)
+                elif is_state_dict_likely_in_flux_xlabs_format(state_dict=state_dict):
+                    model = lora_model_from_flux_xlabs_state_dict(state_dict=state_dict)
                 else:
                     raise ValueError("LoRA model is in unsupported FLUX format")
             else:
@@ -119,6 +131,10 @@ class LoRALoader(ModelLoader):
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
             # Currently, we don't apply any conversions for SD1 and SD2 LoRA models.
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
+        elif self._model_base == BaseModelType.ZImage:
+            # Z-Image LoRAs use diffusers PEFT format with transformer and/or Qwen3 encoder layers.
+            # We set alpha=None to use rank as alpha (common default).
+            model = lora_model_from_z_image_state_dict(state_dict=state_dict, alpha=None)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 

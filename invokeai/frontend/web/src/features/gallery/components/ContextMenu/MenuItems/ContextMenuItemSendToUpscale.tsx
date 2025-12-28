@@ -1,7 +1,7 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { imageDTOToImageWithDims } from 'features/controlLayers/store/util';
-import { useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
+import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { upscaleInitialImageChanged } from 'features/parameters/store/upscaleSlice';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -12,7 +12,7 @@ import { PiShareFatBold } from 'react-icons/pi';
 export const ContextMenuItemSendToUpscale = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const imageDTO = useItemDTOContextImageOnly();
+  const imageDTO = useImageDTOContext();
 
   const handleSendToCanvas = useCallback(() => {
     dispatch(upscaleInitialImageChanged(imageDTOToImageWithDims(imageDTO)));

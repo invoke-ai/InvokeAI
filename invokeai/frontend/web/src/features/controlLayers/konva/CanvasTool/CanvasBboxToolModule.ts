@@ -13,8 +13,6 @@ import { selectBboxOverlay } from 'features/controlLayers/store/canvasSettingsSl
 import { selectModel } from 'features/controlLayers/store/paramsSlice';
 import { selectBbox } from 'features/controlLayers/store/selectors';
 import type { Coordinate, Rect, Tool } from 'features/controlLayers/store/types';
-import type { ModelIdentifierField } from 'features/nodes/types/common';
-import { API_BASE_MODELS } from 'features/parameters/types/constants';
 import Konva from 'konva';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
@@ -238,20 +236,14 @@ export class CanvasBboxToolModule extends CanvasModuleBase {
 
     this.syncOverlay();
 
-    const model = this.manager.stateApi.runSelector(selectModel);
-
     this.konva.transformer.setAttrs({
       listening: tool === 'bbox',
-      enabledAnchors: this.getEnabledAnchors(tool, model),
+      enabledAnchors: this.getEnabledAnchors(tool),
     });
   };
 
-  getEnabledAnchors = (tool: Tool, model?: ModelIdentifierField | null): string[] => {
+  getEnabledAnchors = (tool: Tool): string[] => {
     if (tool !== 'bbox') {
-      return NO_ANCHORS;
-    }
-    if (model?.base && API_BASE_MODELS.includes(model.base)) {
-      // The bbox is not resizable in these modes
       return NO_ANCHORS;
     }
     return ALL_ANCHORS;

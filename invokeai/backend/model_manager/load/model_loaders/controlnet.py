@@ -5,10 +5,8 @@ from typing import Optional
 
 from diffusers import ControlNetModel
 
-from invokeai.backend.model_manager.config import (
-    AnyModelConfig,
-    ControlNetCheckpointConfig,
-)
+from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_Config_Base
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (
@@ -46,7 +44,7 @@ class ControlNetLoader(GenericDiffusersLoader):
         config: AnyModelConfig,
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
-        if isinstance(config, ControlNetCheckpointConfig):
+        if isinstance(config, ControlNet_Checkpoint_Config_Base):
             return ControlNetModel.from_single_file(
                 config.path,
                 torch_dtype=self._torch_dtype,

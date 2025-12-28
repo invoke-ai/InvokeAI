@@ -6,6 +6,7 @@ import type { ChangeEventHandler } from 'react';
 import { memo, useCallback } from 'react';
 import { PiXBold } from 'react-icons/pi';
 
+import { ModelListBulkActions } from './ModelListBulkActions';
 import { ModelTypeFilter } from './ModelTypeFilter';
 
 export const ModelListNavigation = memo(() => {
@@ -24,30 +25,35 @@ export const ModelListNavigation = memo(() => {
   }, [dispatch]);
 
   return (
-    <Flex gap={2} alignItems="center" justifyContent="space-between">
-      <InputGroup>
-        <Input
-          placeholder={t('modelManager.search')}
-          value={searchTerm || ''}
-          data-testid="board-search-input"
-          onChange={handleSearch}
-        />
-
-        {!!searchTerm?.length && (
-          <InputRightElement h="full" pe={2}>
-            <IconButton
-              size="sm"
-              variant="link"
-              aria-label={t('boards.clearSearch')}
-              icon={<PiXBold />}
-              onClick={clearSearch}
+    <Flex flexDirection="column" gap={2} bg="base.800" p={3} pb={2} rounded="base">
+      <Flex gap={2} alignItems="center">
+        <Flex alignItems="center" w="100%">
+          <InputGroup>
+            <Input
+              placeholder={t('modelManager.search')}
+              value={searchTerm || ''}
+              data-testid="board-search-input"
+              onChange={handleSearch}
             />
-          </InputRightElement>
-        )}
-      </InputGroup>
-      <Flex shrink={0}>
-        <ModelTypeFilter />
+
+            {!!searchTerm?.length && (
+              <InputRightElement h="full" pe={2}>
+                <IconButton
+                  size="sm"
+                  variant="link"
+                  aria-label={t('boards.clearSearch')}
+                  icon={<PiXBold />}
+                  onClick={clearSearch}
+                />
+              </InputRightElement>
+            )}
+          </InputGroup>
+        </Flex>
+        <Flex shrink={0}>
+          <ModelTypeFilter />
+        </Flex>
       </Flex>
+      <ModelListBulkActions />
     </Flex>
   );
 });

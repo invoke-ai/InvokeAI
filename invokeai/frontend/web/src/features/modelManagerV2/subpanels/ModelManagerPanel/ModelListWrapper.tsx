@@ -21,10 +21,14 @@ const contentSx = {
   p: 0,
   bg: 'base.900',
   borderRadius: '0',
+  zIndex: 0,
 } satisfies SystemStyleObject;
 
 export const ModelListWrapper = memo((props: ModelListWrapperProps) => {
   const { title, modelList } = props;
+  if (modelList.length === 0) {
+    return null;
+  }
   return (
     <StickyScrollable title={title} contentSx={contentSx} headingSx={headingSx}>
       {modelList.map((model) => (

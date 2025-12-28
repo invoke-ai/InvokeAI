@@ -3,7 +3,7 @@ import { useAppStore } from 'app/store/storeHooks';
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { useItemDTOContextImageOnly } from 'features/gallery/contexts/ItemDTOContext';
+import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { newCanvasFromImage } from 'features/imageActions/actions';
 import { toast } from 'features/toast/toast';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -16,7 +16,7 @@ export const ContextMenuItemNewCanvasFromImageSubMenu = memo(() => {
   const { t } = useTranslation();
   const subMenu = useSubMenu();
   const store = useAppStore();
-  const imageDTO = useItemDTOContextImageOnly();
+  const imageDTO = useImageDTOContext();
   const isBusy = useCanvasIsBusySafe();
   const isStaging = useCanvasIsStaging();
 

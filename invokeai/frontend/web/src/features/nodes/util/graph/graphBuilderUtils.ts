@@ -211,7 +211,8 @@ export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNo
   return (
     modelLoader.type === 'flux_model_loader' ||
     modelLoader.type === 'sd3_model_loader' ||
-    modelLoader.type === 'cogview4_model_loader'
+    modelLoader.type === 'cogview4_model_loader' ||
+    modelLoader.type === 'z_image_model_loader'
   );
 };
 
@@ -236,7 +237,7 @@ export const getDenoisingStartAndEnd = (state: RootState): { denoising_start: nu
       };
     }
     case 'flux': {
-      if (model.variant === 'inpaint') {
+      if (model.variant === 'dev_fill') {
         // This is a FLUX Fill model - we always denoise fully
         return {
           denoising_start: 0,
@@ -255,7 +256,8 @@ export const getDenoisingStartAndEnd = (state: RootState): { denoising_start: nu
     }
     case 'sd-1':
     case 'sd-2':
-    case 'cogview4': {
+    case 'cogview4':
+    case 'z-image': {
       return {
         denoising_start: 1 - denoisingStrength,
         denoising_end: 1,

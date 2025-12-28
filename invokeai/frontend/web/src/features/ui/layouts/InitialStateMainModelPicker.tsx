@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { MdMoneyOff } from 'react-icons/md';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
-import { type AnyModelConfig, isCheckpointMainModelConfig } from 'services/api/types';
+import { type AnyModelConfig, isFluxDevMainModelConfig } from 'services/api/types';
 
 export const InitialStateMainModelPicker = memo(() => {
   const { t } = useTranslation();
@@ -23,10 +23,7 @@ export const InitialStateMainModelPicker = memo(() => {
   );
 
   const isFluxDevSelected = useMemo(
-    () =>
-      selectedModelConfig &&
-      isCheckpointMainModelConfig(selectedModelConfig) &&
-      selectedModelConfig.config_path === 'flux-dev',
+    () => selectedModelConfig && isFluxDevMainModelConfig(selectedModelConfig),
     [selectedModelConfig]
   );
 

@@ -1,14 +1,10 @@
 import { useGlobalModifiersInit } from '@invoke-ai/ui-library';
 import { setupListeners } from '@reduxjs/toolkit/query';
-import type { StudioInitAction } from 'app/hooks/useStudioInitAction';
-import { useStudioInitAction } from 'app/hooks/useStudioInitAction';
+import { useSyncFaviconQueueStatus } from 'app/hooks/useSyncFaviconQueueStatus';
 import { useSyncLangDirection } from 'app/hooks/useSyncLangDirection';
-import { useSyncQueueStatus } from 'app/hooks/useSyncQueueStatus';
-import { useLogger } from 'app/logging/useLogger';
 import { useSyncLoggingConfig } from 'app/logging/useSyncLoggingConfig';
 import { appStarted } from 'app/store/middleware/listenerMiddleware/listeners/appStarted';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import type { PartialAppConfig } from 'app/types/invokeai';
 import { useFocusRegionWatcher } from 'common/hooks/focus';
 import { useCloseChakraTooltipsOnDragFix } from 'common/hooks/useCloseChakraTooltipsOnDragFix';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
@@ -19,7 +15,6 @@ import { useWorkflowBuilderWatcher } from 'features/nodes/components/sidePanel/w
 import { useSyncExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { useSyncNodeErrors } from 'features/nodes/store/util/fieldValidators';
 import { useReadinessWatcher } from 'features/queue/store/readiness';
-import { configChanged } from 'features/system/store/configSlice';
 import { selectLanguage } from 'features/system/store/systemSelectors';
 import { useNavigationApi } from 'features/ui/layouts/use-navigation-api';
 import i18n from 'i18n';
@@ -34,55 +29,46 @@ const queueCountArg = { destination: 'canvas' };
  * GlobalHookIsolator is a logical component that runs global hooks in an isolated component, so that they do not
  * cause needless re-renders of any other components.
  */
-export const GlobalHookIsolator = memo(
-  ({ config, studioInitAction }: { config: PartialAppConfig; studioInitAction?: StudioInitAction }) => {
-    const language = useAppSelector(selectLanguage);
-    const logger = useLogger('system');
-    const dispatch = useAppDispatch();
+export const GlobalHookIsolator = memo(() => {
+  const language = useAppSelector(selectLanguage);
+  const dispatch = useAppDispatch();
 
-    // singleton!
-    useReadinessWatcher();
-    useSocketIO();
-    useGlobalModifiersInit();
-    useGlobalHotkeys();
-    useGetOpenAPISchemaQuery();
-    useSyncLoggingConfig();
-    useCloseChakraTooltipsOnDragFix();
-    useNavigationApi();
-    useDndMonitor();
-    useSyncNodeErrors();
-    useSyncLangDirection();
+  // singleton!
+  useNavigationApi();
+  useReadinessWatcher();
+  useSocketIO();
+  useGlobalModifiersInit();
+  useGlobalHotkeys();
+  useGetOpenAPISchemaQuery();
+  useSyncLoggingConfig();
+  useCloseChakraTooltipsOnDragFix();
+  useDndMonitor();
+  useSyncNodeErrors();
+  useSyncLangDirection();
 
-    // Persistent subscription to the queue counts query - canvas relies on this to know if there are pending
-    // and/or in progress canvas sessions.
-    useGetQueueCountsByDestinationQuery(queueCountArg);
-    useSyncExecutionState();
+  // Persistent subscription to the queue counts query - canvas relies on this to know if there are pending
+  // and/or in progress canvas sessions.
+  useGetQueueCountsByDestinationQuery(queueCountArg);
+  useSyncExecutionState();
 
-    useEffect(() => {
-      i18n.changeLanguage(language);
-    }, [language]);
+  useEffect(() => {
+    i18n.changeLanguage(language);
+  }, [language]);
 
-    useEffect(() => {
-      logger.info({ config }, 'Received config');
-      dispatch(configChanged(config));
-    }, [dispatch, config, logger]);
+  useEffect(() => {
+    dispatch(appStarted());
+  }, [dispatch]);
 
-    useEffect(() => {
-      dispatch(appStarted());
-    }, [dispatch]);
+  useEffect(() => {
+    return setupListeners(dispatch);
+  }, [dispatch]);
 
-    useEffect(() => {
-      return setupListeners(dispatch);
-    }, [dispatch]);
+  useStarterModelsToast();
+  useSyncFaviconQueueStatus();
+  useFocusRegionWatcher();
+  useWorkflowBuilderWatcher();
+  useDynamicPromptsWatcher();
 
-    useStudioInitAction(studioInitAction);
-    useStarterModelsToast();
-    useSyncQueueStatus();
-    useFocusRegionWatcher();
-    useWorkflowBuilderWatcher();
-    useDynamicPromptsWatcher();
-
-    return null;
-  }
-);
+  return null;
+});
 GlobalHookIsolator.displayName = 'GlobalHookIsolator';

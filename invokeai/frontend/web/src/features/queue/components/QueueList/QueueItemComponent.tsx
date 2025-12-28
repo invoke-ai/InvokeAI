@@ -1,18 +1,15 @@
 import type { ChakraProps, CollapseProps, FlexProps } from '@invoke-ai/ui-library';
-import { Badge, ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import { ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
 import { useRetryQueueItem } from 'features/queue/hooks/useRetryQueueItem';
 import { getSecondsFromTimestamps } from 'features/queue/util/getSecondsFromTimestamps';
-import { useFeatureStatus } from 'features/system/hooks/useFeatureStatus';
-import { selectShouldShowCredits } from 'features/system/store/configSlice';
 import type { MouseEvent } from 'react';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
-import { useSelector } from 'react-redux';
 import type { S } from 'services/api/types';
 
 import { COLUMN_WIDTHS } from './constants';
@@ -32,7 +29,6 @@ const sx: ChakraProps['sx'] = {
 
 const QueueItemComponent = ({ index, item }: InnerItemProps) => {
   const { t } = useTranslation();
-  const isRetryEnabled = useFeatureStatus('retryQueueItem');
   const [isOpen, setIsOpen] = useState(false);
   const handleToggle = useCallback(() => setIsOpen((s) => !s), [setIsOpen]);
   const cancelQueueItem = useCancelQueueItem();
@@ -60,11 +56,8 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
     return `${seconds}s`;
   }, [item]);
 
-  const shouldShowCredits = useSelector(selectShouldShowCredits);
-
   const isCanceled = useMemo(() => ['canceled', 'completed', 'failed'].includes(item.status), [item.status]);
   const isFailed = useMemo(() => ['canceled', 'failed'].includes(item.status), [item.status]);
-  const isValidationRun = useMemo(() => item.is_api_validation_run === true, [item.is_api_validation_run]);
   const originText = useOriginText(item.origin);
   const destinationText = useDestinationText(item.destination);
 
@@ -92,11 +85,6 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
         <Flex w={COLUMN_WIDTHS.time} alignItems="center" flexShrink={0}>
           {executionTime || '-'}
         </Flex>
-        {shouldShowCredits && (
-          <Flex w={COLUMN_WIDTHS.credits} alignItems="center" flexShrink={0}>
-            {item.credits || '-'}
-          </Flex>
-        )}
         <Flex w={COLUMN_WIDTHS.origin_destination} flexShrink={0}>
           <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center">
             {originText} / {destinationText}
@@ -124,13 +112,9 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
           )}
         </Flex>
 
-        <Flex alignItems="center" w={COLUMN_WIDTHS.validationRun} flexShrink={0}>
-          {isValidationRun && <Badge>{t('workflows.builder.publishingValidationRun')}</Badge>}
-        </Flex>
-
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>
           <ButtonGroup size="xs" variant="ghost">
-            {(!isFailed || !isRetryEnabled || isValidationRun) && (
+            {!isFailed && (
               <IconButton
                 onClick={onClickCancelQueueItem}
                 isDisabled={isCanceled}
@@ -139,7 +123,7 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
                 icon={<PiXBold />}
               />
             )}
-            {isFailed && isRetryEnabled && !isValidationRun && (
+            {isFailed && (
               <IconButton
                 onClick={onClickRetryQueueItem}
                 isLoading={retryQueueItem.isLoading}
