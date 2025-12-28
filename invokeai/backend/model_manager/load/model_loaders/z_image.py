@@ -526,11 +526,26 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                 return self._load_from_singlefile(config)
             case SubModelType.Tokenizer:
                 # For single-file Qwen3, load tokenizer from HuggingFace
-                return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE)
+                # Try local cache first to support offline usage after initial download
+                return self._load_tokenizer_with_offline_fallback()
 
         raise ValueError(
             f"Only TextEncoder and Tokenizer submodels are supported. Received: {submodel_type.value if submodel_type else 'None'}"
         )
+
+    def _load_tokenizer_with_offline_fallback(self) -> AnyModel:
+        """Load tokenizer with local_files_only fallback for offline support.
+
+        First tries to load from local cache (offline), falling back to network download
+        if the tokenizer hasn't been cached yet. This ensures offline operation after
+        the initial download.
+        """
+        try:
+            # Try loading from local cache first (supports offline usage)
+            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE, local_files_only=True)
+        except OSError:
+            # Not in cache yet, download from HuggingFace
+            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE)
 
     def _load_from_singlefile(
         self,
@@ -686,11 +701,26 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
                 return self._load_from_gguf(config)
             case SubModelType.Tokenizer:
                 # For GGUF Qwen3, load tokenizer from HuggingFace
-                return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE)
+                # Try local cache first to support offline usage after initial download
+                return self._load_tokenizer_with_offline_fallback()
 
         raise ValueError(
             f"Only TextEncoder and Tokenizer submodels are supported. Received: {submodel_type.value if submodel_type else 'None'}"
         )
+
+    def _load_tokenizer_with_offline_fallback(self) -> AnyModel:
+        """Load tokenizer with local_files_only fallback for offline support.
+
+        First tries to load from local cache (offline), falling back to network download
+        if the tokenizer hasn't been cached yet. This ensures offline operation after
+        the initial download.
+        """
+        try:
+            # Try loading from local cache first (supports offline usage)
+            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE, local_files_only=True)
+        except OSError:
+            # Not in cache yet, download from HuggingFace
+            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE)
 
     def _load_from_gguf(
         self,
