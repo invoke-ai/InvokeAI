@@ -5,433 +5,10 @@ import { type ASTNode, type Attention, parseTokens, serialize, tokenize } from '
 
 const log = logger('events');
 
-/**
- * Behavior Rules:
- *
- * ATTENTION SYNTAX:
- * - Words support +/- attention: `word+`, `word-`, `word++`, `word--`, etc.
- * - Groups support both +/- and numeric: `(words)+`, `(words)1.2`, `(words)0.8`
- * - `word++` is roughly equivalent to `(word)1.2` in effect
- * - Mixed attention like `word+-` or numeric on words `word1.2` is invalid
- *
- * ADJUSTMENT RULES:
- * - `word++` down → `word+`
- * - `word+` down → `word` (attention removed)
- * - `word` down → `word-`
- * - `word-` down → `word--`
- * - `(content)1.2` down → `(content)1.1`
- * - `(content)1.1` down → `content` (group unwrapped)
- * - `content content` down → `(content content)0.9` (new group created)
- *
- * SELECTION BEHAVIOR:
- * - Cursor/selection within a word → expand to full word, adjust word attention
- * - Cursor touching group boundary (parens or weight) → adjust group attention
- * - Selection entirely within a group → adjust that group's attention
- * - Selection spans multiple content nodes → create new group with initial attention
- * - Whitespace and punctuation are ignored for content selection
- */
-
 type AttentionDirection = 'increment' | 'decrement';
+type AdjustmentResult = { prompt: string; selectionStart: number; selectionEnd: number };
 
-type SelectionBounds = {
-  start: number;
-  end: number;
-};
-
-type AdjustmentResult = {
-  prompt: string;
-  selectionStart: number;
-  selectionEnd: number;
-};
-
-/**
- * A node with its position in the serialized prompt string.
- */
-type PositionedNode = {
-  node: ASTNode;
-  start: number;
-  end: number;
-  /** Position of content start (after opening paren for groups) */
-  contentStart: number;
-  /** Position of content end (before closing paren for groups) */
-  contentEnd: number;
-  parent: PositionedNode | null;
-};
-
-// ============================================================================
-// ATTENTION COMPUTATION
-// ============================================================================
-
-/**
- * Checks if attention is symbol-based (+, -, ++, etc.)
- */
-function isSymbolAttention(attention: Attention | undefined): attention is string {
-  return typeof attention === 'string' && /^[+-]+$/.test(attention);
-}
-
-/**
- * Checks if attention is numeric (1.2, 0.8, etc.)
- */
-function isNumericAttention(attention: Attention | undefined): attention is number {
-  return typeof attention === 'number';
-}
-
-/**
- * Computes adjusted attention for symbol-based attention (+/-).
- * Used for both words and groups with symbol attention.
- */
-function adjustSymbolAttention(direction: AttentionDirection, attention: string | undefined): string | undefined {
-  if (!attention) {
-    return direction === 'increment' ? '+' : '-';
-  }
-
-  if (direction === 'increment') {
-    // Going up: remove '-' if present, otherwise add '+'
-    if (attention.endsWith('-')) {
-      const result = attention.slice(0, -1);
-      return result || undefined;
-    }
-    return `${attention}+`;
-  } else {
-    // Going down: remove '+' if present, otherwise add '-'
-    if (attention.endsWith('+')) {
-      const result = attention.slice(0, -1);
-      return result || undefined;
-    }
-    return `${attention}-`;
-  }
-}
-
-/**
- * Computes adjusted attention for numeric attention.
- * Only used for groups.
- */
-function adjustNumericAttention(direction: AttentionDirection, attention: number): number | undefined {
-  const step = direction === 'increment' ? 0.1 : -0.1;
-  const result = parseFloat((attention + step).toFixed(1));
-
-  // 1.0 is default - return undefined to signal unwrapping
-  if (result === 1.0) {
-    return undefined;
-  }
-
-  return result;
-}
-
-/**
- * Computes the new attention value based on direction and current attention.
- * Returns undefined if attention should be removed (normalize to default).
- */
-function computeAttention(
-  direction: AttentionDirection,
-  attention: Attention | undefined,
-  isGroup: boolean
-): Attention | undefined {
-  // No current attention
-  if (attention === undefined) {
-    if (isGroup) {
-      // Groups going down from neutral get 0.9
-      return direction === 'increment' ? '+' : 0.9;
-    }
-    return direction === 'increment' ? '+' : '-';
-  }
-
-  // Symbol attention (+, -, ++, etc.)
-  if (isSymbolAttention(attention)) {
-    return adjustSymbolAttention(direction, attention);
-  }
-
-  // Numeric attention (only valid for groups)
-  if (isNumericAttention(attention)) {
-    return adjustNumericAttention(direction, attention);
-  }
-
-  // Parse string numbers
-  const numValue = parseFloat(String(attention));
-  if (!isNaN(numValue)) {
-    return adjustNumericAttention(direction, numValue);
-  }
-
-  // Fallback: treat as no attention
-  return direction === 'increment' ? '+' : '-';
-}
-
-// ============================================================================
-// POSITION MAPPING
-// ============================================================================
-
-/**
- * Builds a flat map of all nodes with their positions in the prompt string.
- * Groups include both their full bounds and content bounds.
- */
-function buildPositionMap(
-  ast: ASTNode[],
-  startPos = 0,
-  parent: PositionedNode | null = null
-): { positions: PositionedNode[]; endPos: number } {
-  const positions: PositionedNode[] = [];
-  let currentPos = startPos;
-
-  for (const node of ast) {
-    const nodeStart = currentPos;
-    let contentStart = currentPos;
-    let contentEnd = currentPos;
-    let nodeEnd = currentPos;
-
-    switch (node.type) {
-      case 'word': {
-        nodeEnd = currentPos + node.text.length;
-        if (node.attention !== undefined) {
-          nodeEnd += String(node.attention).length;
-        }
-        contentStart = currentPos;
-        contentEnd = currentPos + node.text.length;
-        currentPos = nodeEnd;
-        break;
-      }
-
-      case 'whitespace':
-      case 'punct': {
-        nodeEnd = currentPos + node.value.length;
-        contentStart = nodeStart;
-        contentEnd = nodeEnd;
-        currentPos = nodeEnd;
-        break;
-      }
-
-      case 'escaped_paren': {
-        nodeEnd = currentPos + 2; // \( or \)
-        contentStart = nodeStart;
-        contentEnd = nodeEnd;
-        currentPos = nodeEnd;
-        break;
-      }
-
-      case 'embedding': {
-        nodeEnd = currentPos + node.value.length + 2; // <value>
-        contentStart = currentPos + 1;
-        contentEnd = currentPos + 1 + node.value.length;
-        currentPos = nodeEnd;
-        break;
-      }
-
-      case 'group': {
-        // Opening paren
-        currentPos += 1;
-        contentStart = currentPos;
-
-        // Create placeholder for parent reference
-        const groupNode: PositionedNode = {
-          node,
-          start: nodeStart,
-          end: nodeStart, // Will be updated
-          contentStart,
-          contentEnd: contentStart, // Will be updated
-          parent,
-        };
-
-        // Process children with this group as parent
-        const childResult = buildPositionMap(node.children, currentPos, groupNode);
-        positions.push(...childResult.positions);
-        currentPos = childResult.endPos;
-
-        contentEnd = currentPos;
-
-        // Closing paren
-        currentPos += 1;
-
-        // Attention
-        if (node.attention !== undefined) {
-          currentPos += String(node.attention).length;
-        }
-
-        nodeEnd = currentPos;
-
-        // Update the group node with final positions
-        groupNode.end = nodeEnd;
-        groupNode.contentEnd = contentEnd;
-
-        positions.push(groupNode);
-        continue; // Skip the push at the end
-      }
-    }
-
-    positions.push({
-      node,
-      start: nodeStart,
-      end: nodeEnd,
-      contentStart,
-      contentEnd,
-      parent,
-    });
-  }
-
-  return { positions, endPos: currentPos };
-}
-
-// ============================================================================
-// NODE FINDING
-// ============================================================================
-
-/**
- * Finds the deepest group that fully contains the selection.
- * Returns null if selection is not fully within any group.
- */
-function findEnclosingGroup(positions: PositionedNode[], selection: SelectionBounds): PositionedNode | null {
-  const groups = positions
-    .filter((p) => p.node.type === 'group')
-    .filter((p) => selection.start >= p.start && selection.end <= p.end)
-    // Sort by size (smallest = deepest nesting)
-    .sort((a, b) => a.end - a.start - (b.end - b.start));
-
-  return groups[0] ?? null;
-}
-
-/**
- * Checks if the cursor/selection is at the boundary of a group
- * (touching parentheses or weight).
- */
-function isTouchingGroupBoundary(group: PositionedNode, selection: SelectionBounds): boolean {
-  const { start, end, contentStart, contentEnd } = group;
-
-  // Touching or at opening paren
-  if (selection.start <= contentStart && selection.end <= contentStart) {
-    return true;
-  }
-
-  // Touching or at closing paren/weight
-  if (selection.start >= contentEnd && selection.end >= contentEnd) {
-    return true;
-  }
-
-  // Selection spans the entire group content
-  if (selection.start <= contentStart && selection.end >= contentEnd) {
-    return true;
-  }
-
-  // Cursor is exactly at group start or end
-  if (selection.start === selection.end) {
-    if (selection.start === start || selection.start === end) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-/**
- * Finds content nodes (words, groups, embeddings) that intersect with selection.
- */
-function findContentNodes(positions: PositionedNode[], selection: SelectionBounds): PositionedNode[] {
-  return positions.filter((p) => {
-    // Only content nodes
-    if (p.node.type !== 'word' && p.node.type !== 'group' && p.node.type !== 'embedding') {
-      return false;
-    }
-
-    // Check intersection
-    return !(selection.end <= p.start || selection.start >= p.end);
-  });
-}
-
-/**
- * Finds the single word the cursor is within (not just touching).
- */
-function findWordAtCursor(positions: PositionedNode[], selection: SelectionBounds): PositionedNode | null {
-  const words = positions.filter((p) => p.node.type === 'word' && selection.start >= p.start && selection.end <= p.end);
-
-  return words[0] ?? null;
-}
-
-// ============================================================================
-// AST MANIPULATION
-// ============================================================================
-
-/**
- * Replaces a node in the AST with replacement node(s).
- * Uses reference equality to find the target.
- */
-function replaceNodeInAST(ast: ASTNode[], target: ASTNode, replacement: ASTNode | ASTNode[]): ASTNode[] {
-  const replacements = Array.isArray(replacement) ? replacement : [replacement];
-
-  return ast.flatMap((node) => {
-    if (node === target) {
-      return replacements;
-    }
-
-    if (node.type === 'group') {
-      const newChildren = replaceNodeInAST(node.children, target, replacement);
-      // Only create new object if children changed
-      if (newChildren !== node.children) {
-        return [{ ...node, children: newChildren }];
-      }
-    }
-
-    return [node];
-  });
-}
-
-// ============================================================================
-// MAIN ADJUSTMENT FUNCTION
-// ============================================================================
-
-/**
- * Determines the adjustment strategy based on selection and AST structure.
- */
-type AdjustmentStrategy =
-  | { type: 'adjust-word'; node: PositionedNode }
-  | { type: 'adjust-group'; node: PositionedNode }
-  | { type: 'create-group'; nodes: PositionedNode[] }
-  | { type: 'no-op' };
-
-function determineStrategy(positions: PositionedNode[], selection: SelectionBounds): AdjustmentStrategy {
-  const contentNodes = findContentNodes(positions, selection);
-
-  if (contentNodes.length === 0) {
-    return { type: 'no-op' };
-  }
-
-  // Check if we're in a group context first
-  const enclosingGroup = findEnclosingGroup(positions, selection);
-
-  if (enclosingGroup) {
-    // If touching group boundary, adjust the group
-    if (isTouchingGroupBoundary(enclosingGroup, selection)) {
-      return { type: 'adjust-group', node: enclosingGroup };
-    }
-
-    // Check for single word within the group
-    const wordAtCursor = findWordAtCursor(positions, selection);
-    if (wordAtCursor) {
-      return { type: 'adjust-word', node: wordAtCursor };
-    }
-
-    // Selection spans content within group - adjust the group
-    return { type: 'adjust-group', node: enclosingGroup };
-  }
-
-  // No enclosing group - check for single word
-  const wordAtCursor = findWordAtCursor(positions, selection);
-  if (wordAtCursor) {
-    return { type: 'adjust-word', node: wordAtCursor };
-  }
-
-  // Single content node (could be word, embedding, or group)
-  if (contentNodes.length === 1) {
-    const node = contentNodes[0]!;
-    if (node.node.type === 'group') {
-      return { type: 'adjust-group', node };
-    }
-    if (node.node.type === 'word') {
-      return { type: 'adjust-word', node };
-    }
-    // Embeddings don't support attention adjustment - wrap in group
-    return { type: 'create-group', nodes: contentNodes };
-  }
-
-  // Multiple content nodes - create a new group
-  return { type: 'create-group', nodes: contentNodes };
-}
+const ATTENTION_STEP = 1.1;
 
 /**
  * Adjusts the attention of the prompt at the current cursor/selection position.
@@ -443,123 +20,383 @@ export function adjustPromptAttention(
   direction: AttentionDirection
 ): AdjustmentResult {
   try {
-    // Handle empty prompt
-    if (!prompt.trim()) {
+    const tokens = tokenize(prompt);
+    const ast = parseTokens(tokens);
+    const terminals = flattenAST(ast);
+
+    let selectedTerminals = terminals.filter((t) => {
+      const isSelected =
+        (t.range.start < selectionEnd && t.range.end > selectionStart) ||
+        (selectionStart === selectionEnd && t.range.start <= selectionStart && t.range.end >= selectionStart);
+
+      if (!isSelected) {
+        return false;
+      }
+
+      if (t.parentRange) {
+        const parentContainsSelection = t.parentRange.start <= selectionStart && t.parentRange.end >= selectionEnd;
+        const selectionCoversParent = selectionStart <= t.parentRange.start && selectionEnd >= t.parentRange.end;
+
+        if (!parentContainsSelection && !selectionCoversParent) {
+          // Partial overlap.
+          if (t.hasExplicitAttention) {
+            return false; // Don't modify explicit weight in partial group
+          }
+        }
+      }
+      return true;
+    });
+
+    for (const t of selectedTerminals) {
+      t.isSelected = true;
+    }
+
+    if (selectedTerminals.length === 0) {
+      const selectedGroup = findSelectedGroup(ast, selectionStart, selectionEnd);
+      if (selectedGroup) {
+        selectedTerminals = terminals.filter(
+          (t) => t.range.start >= selectedGroup.range.start && t.range.end <= selectedGroup.range.end
+        );
+        for (const t of selectedTerminals) {
+          t.isSelected = true;
+        }
+      }
+    }
+
+    if (selectedTerminals.length === 0) {
       return { prompt, selectionStart, selectionEnd };
     }
 
-    // Normalize selection
-    const selection: SelectionBounds = {
-      start: Math.min(selectionStart, selectionEnd),
-      end: Math.max(selectionStart, selectionEnd),
-    };
-
-    // Parse and build position map
-    const tokens = tokenize(prompt);
-    const ast = parseTokens(tokens);
-    const { positions } = buildPositionMap(ast);
-
-    // Determine what to do
-    const strategy = determineStrategy(positions, selection);
-
-    switch (strategy.type) {
-      case 'no-op':
-        return { prompt, selectionStart, selectionEnd };
-
-      case 'adjust-word': {
-        const wordPos = strategy.node;
-        const word = wordPos.node as ASTNode & { type: 'word' };
-        const newAttention = computeAttention(direction, word.attention, false);
-
-        const updatedWord: ASTNode = {
-          type: 'word',
-          text: word.text,
-          attention: newAttention,
-        };
-
-        const newAST = replaceNodeInAST(ast, word, updatedWord);
-        const newPrompt = serialize(newAST);
-        const newWordText = serialize([updatedWord]);
-
-        return {
-          prompt: newPrompt,
-          selectionStart: wordPos.start,
-          selectionEnd: wordPos.start + newWordText.length,
-        };
-      }
-
-      case 'adjust-group': {
-        const groupPos = strategy.node;
-        const group = groupPos.node as ASTNode & { type: 'group' };
-        const newAttention = computeAttention(direction, group.attention, true);
-
-        // If attention becomes undefined (1.0), unwrap the group
-        if (newAttention === undefined) {
-          const newAST = replaceNodeInAST(ast, group, group.children);
-          const newPrompt = serialize(newAST);
-          const childrenText = serialize(group.children);
-
-          return {
-            prompt: newPrompt,
-            selectionStart: groupPos.start,
-            selectionEnd: groupPos.start + childrenText.length,
-          };
-        }
-
-        const updatedGroup: ASTNode = {
-          type: 'group',
-          children: group.children,
-          attention: newAttention,
-        };
-
-        const newAST = replaceNodeInAST(ast, group, updatedGroup);
-        const newPrompt = serialize(newAST);
-        const newGroupText = serialize([updatedGroup]);
-
-        return {
-          prompt: newPrompt,
-          selectionStart: groupPos.start,
-          selectionEnd: groupPos.start + newGroupText.length,
-        };
-      }
-
-      case 'create-group': {
-        const nodes = strategy.nodes;
-        const firstNode = nodes[0]!;
-        const lastNode = nodes[nodes.length - 1]!;
-
-        // Get the text range to wrap
-        const wrapStart = firstNode.start;
-        const wrapEnd = lastNode.end;
-
-        // Parse just the selected portion
-        const selectedText = prompt.substring(wrapStart, wrapEnd);
-        const selectedTokens = tokenize(selectedText);
-        const selectedAST = parseTokens(selectedTokens);
-
-        // Create new group with appropriate attention
-        const newAttention = computeAttention(direction, undefined, true);
-        const newGroup: ASTNode = {
-          type: 'group',
-          children: selectedAST,
-          attention: newAttention,
-        };
-
-        // Reconstruct prompt
-        const before = prompt.substring(0, wrapStart);
-        const after = prompt.substring(wrapEnd);
-        const newGroupText = serialize([newGroup]);
-        const newPrompt = before + newGroupText + after;
-
-        return {
-          prompt: newPrompt,
-          selectionStart: wrapStart,
-          selectionEnd: wrapStart + newGroupText.length,
-        };
+    for (const terminal of selectedTerminals) {
+      if (direction === 'increment') {
+        terminal.weight *= ATTENTION_STEP;
+      } else {
+        terminal.weight /= ATTENTION_STEP;
       }
     }
-  } catch (error) {
-    log.error({ error: serializeError(error as Error) }, 'Error adjusting prompt attention');
+
+    const newAST = groupTerminals(terminals);
+    const newPrompt = serialize(newAST);
+    const newSelection = calculateSelectionRange(newAST);
+
+    return {
+      prompt: newPrompt,
+      selectionStart: newSelection.start,
+      selectionEnd: newSelection.end,
+    };
+  } catch (e) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    log.error({ error: serializeError(e) as any }, 'Failed to adjust prompt attention');
     return { prompt, selectionStart, selectionEnd };
   }
+}
+
+type Terminal = {
+  text: string;
+  type: ASTNode['type'];
+  weight: number;
+  range: { start: number; end: number };
+  hasExplicitAttention: boolean;
+  parentRange?: { start: number; end: number };
+  isSelected: boolean;
+};
+
+function flattenAST(ast: ASTNode[], currentWeight = 1.0, parentRange?: { start: number; end: number }): Terminal[] {
+  let terminals: Terminal[] = [];
+
+  for (const node of ast) {
+    let nodeWeight = currentWeight;
+    if ('attention' in node && node.attention) {
+      nodeWeight *= parseAttention(node.attention);
+    }
+
+    if (node.type === 'group') {
+      terminals.push(...flattenAST(node.children, nodeWeight, node.range));
+    } else {
+      terminals.push({
+        text: node.type === 'word' ? node.text : node.value,
+        type: node.type,
+        weight: nodeWeight,
+        range: node.range,
+        hasExplicitAttention: 'attention' in node && !!node.attention,
+        parentRange: parentRange,
+        isSelected: false,
+      });
+    }
+  }
+  return terminals;
+}
+
+function findSelectedGroup(nodes: ASTNode[], start: number, end: number): ASTNode | null {
+  for (const node of nodes) {
+    if (node.type === 'group') {
+      const foundInChildren = findSelectedGroup(node.children, start, end);
+      if (foundInChildren) {
+        return foundInChildren;
+      }
+
+      if (rangesOverlap(node.range, { start, end })) {
+        return node;
+      }
+    }
+  }
+  return null;
+}
+
+function rangesOverlap(a: { start: number; end: number }, b: { start: number; end: number }) {
+  return a.start < b.end && a.end > b.start;
+}
+
+function parseAttention(attention: Attention): number {
+  if (typeof attention === 'number') {
+    return attention;
+  }
+  if (attention.startsWith('+')) {
+    return Math.pow(ATTENTION_STEP, attention.length);
+  }
+  if (attention.startsWith('-')) {
+    return Math.pow(ATTENTION_STEP, -attention.length);
+  }
+  const num = Number(attention);
+  return isNaN(num) ? 1.0 : num;
+}
+
+function calculateSelectionRange(nodes: ASTNode[]): { start: number; end: number } {
+  let selectionStart = Infinity;
+  let selectionEnd = -1;
+  let currentPos = 0;
+
+  function traverse(nodes: ASTNode[]) {
+    for (const node of nodes) {
+      if (node.isSelection) {
+        const len = serialize([node]).length;
+        selectionStart = Math.min(selectionStart, currentPos);
+        selectionEnd = Math.max(selectionEnd, currentPos + len);
+        currentPos += len;
+      } else {
+        if (node.type === 'group') {
+          // Group is not fully selected, but children might be.
+          // Group structure: "(" + children + ")" + attention
+          currentPos += 1; // '('
+          traverse(node.children);
+          currentPos += 1; // ')'
+          if (node.attention) {
+            currentPos += String(node.attention).length;
+          }
+        } else {
+          // Leaf node not selected.
+          const len = serialize([node]).length;
+          currentPos += len;
+        }
+      }
+    }
+  }
+
+  traverse(nodes);
+
+  if (selectionStart === Infinity) {
+    return { start: 0, end: serialize(nodes).length };
+  }
+  return { start: selectionStart, end: selectionEnd };
+}
+
+function groupTerminals(terminals: Terminal[]): ASTNode[] {
+  if (terminals.length === 0) {
+    return [];
+  }
+
+  const nodes: ASTNode[] = [];
+  let i = 0;
+  while (i < terminals.length) {
+    const t = terminals[i]!;
+    const weight = t.weight;
+
+    const findRunEnd = (predicate: (w: number) => boolean) => {
+      let j = i;
+      while (j < terminals.length) {
+        const next = terminals[j]!;
+        if (predicate(next.weight)) {
+          j++;
+        } else if (next.type === 'whitespace') {
+          let k = j + 1;
+          while (k < terminals.length && terminals[k]!.type === 'whitespace') {
+            k++;
+          }
+          if (k < terminals.length && predicate(terminals[k]!.weight)) {
+            j = k;
+          } else {
+            break;
+          }
+        } else {
+          break;
+        }
+      }
+      return j;
+    };
+
+    // Check for + (>= 1.1)
+    if (weight >= ATTENTION_STEP - 0.001) {
+      const j = findRunEnd((w) => w >= ATTENTION_STEP - 0.001);
+
+      let runStart = i;
+      let runEnd = j;
+      while (runStart < runEnd && terminals[runStart]!.type === 'whitespace') {
+        runStart++;
+      }
+      while (runEnd > runStart && terminals[runEnd - 1]!.type === 'whitespace') {
+        runEnd--;
+      }
+
+      for (let k = i; k < runStart; k++) {
+        nodes.push(createNodeFromTerminal(terminals[k]!));
+      }
+
+      if (runStart < runEnd) {
+        const slice = terminals.slice(runStart, runEnd).map((t) => ({ ...t, weight: t.weight / ATTENTION_STEP }));
+        const children = groupTerminals(slice);
+        const isSelection = slice.every((t) => t.isSelected);
+
+        if (children.length === 1) {
+          const child = children[0]!;
+          if (child.type === 'word' || child.type === 'group') {
+            const newAttention = addAttention(child.attention, '+');
+            nodes.push({ ...child, attention: newAttention });
+          } else {
+            nodes.push({ type: 'group', children, attention: '+', range: { start: 0, end: 0 }, isSelection });
+          }
+        } else {
+          nodes.push({ type: 'group', children, attention: '+', range: { start: 0, end: 0 }, isSelection });
+        }
+      }
+
+      for (let k = runEnd; k < j; k++) {
+        nodes.push(createNodeFromTerminal(terminals[k]!));
+      }
+
+      i = j;
+      continue;
+    }
+
+    // Check for - (<= 0.909)
+    if (weight <= 1 / ATTENTION_STEP + 0.001) {
+      const j = findRunEnd((w) => w <= 1 / ATTENTION_STEP + 0.001);
+
+      let runStart = i;
+      let runEnd = j;
+      while (runStart < runEnd && terminals[runStart]!.type === 'whitespace') {
+        runStart++;
+      }
+      while (runEnd > runStart && terminals[runEnd - 1]!.type === 'whitespace') {
+        runEnd--;
+      }
+
+      for (let k = i; k < runStart; k++) {
+        nodes.push(createNodeFromTerminal(terminals[k]!));
+      }
+
+      if (runStart < runEnd) {
+        const slice = terminals.slice(runStart, runEnd).map((t) => ({ ...t, weight: t.weight * ATTENTION_STEP }));
+        const children = groupTerminals(slice);
+        const isSelection = slice.every((t) => t.isSelected);
+
+        if (children.length === 1) {
+          const child = children[0]!;
+          if (child.type === 'word' || child.type === 'group') {
+            const newAttention = addAttention(child.attention, '-');
+            nodes.push({ ...child, attention: newAttention });
+          } else {
+            nodes.push({ type: 'group', children, attention: '-', range: { start: 0, end: 0 }, isSelection });
+          }
+        } else {
+          nodes.push({ type: 'group', children, attention: '-', range: { start: 0, end: 0 }, isSelection });
+        }
+      }
+
+      for (let k = runEnd; k < j; k++) {
+        nodes.push(createNodeFromTerminal(terminals[k]!));
+      }
+
+      i = j;
+      continue;
+    }
+
+    // Residual or 1.0
+    if (Math.abs(weight - 1.0) < 0.001) {
+      nodes.push(createNodeFromTerminal(t));
+      i++;
+    } else {
+      let j = i;
+      while (j < terminals.length && Math.abs(terminals[j]!.weight - weight) < 0.001) {
+        j++;
+      }
+
+      const groupTerminalsSlice = terminals.slice(i, j).map((t) => ({ ...t, weight: 1.0 }));
+      const children = groupTerminals(groupTerminalsSlice);
+      const isSelection = groupTerminalsSlice.every((t) => t.isSelected);
+
+      const weightStr = Number(weight.toFixed(4));
+
+      if (children.length === 1) {
+        const child = children[0]!;
+        if (child.type === 'word' || child.type === 'group') {
+          nodes.push({ ...child, attention: weightStr });
+        } else {
+          nodes.push({ type: 'group', children, attention: weightStr, range: { start: 0, end: 0 }, isSelection });
+        }
+      } else {
+        nodes.push({ type: 'group', children, attention: weightStr, range: { start: 0, end: 0 }, isSelection });
+      }
+      i = j;
+    }
+  }
+  return nodes;
+}
+
+function createNodeFromTerminal(t: Terminal): ASTNode {
+  if (t.type === 'word') {
+    return { type: 'word', text: t.text, range: t.range, isSelection: t.isSelected };
+  }
+  if (t.type === 'whitespace') {
+    return { type: 'whitespace', value: t.text, range: t.range, isSelection: t.isSelected };
+  }
+  if (t.type === 'punct') {
+    return { type: 'punct', value: t.text, range: t.range, isSelection: t.isSelected };
+  }
+  if (t.type === 'embedding') {
+    return { type: 'embedding', value: t.text, range: t.range, isSelection: t.isSelected };
+  }
+  if (t.type === 'escaped_paren') {
+    return { type: 'escaped_paren', value: t.text as '(' | ')', range: t.range, isSelection: t.isSelected };
+  }
+  return { type: 'word', text: t.text, range: t.range, isSelection: t.isSelected };
+}
+
+function addAttention(current: Attention | undefined, added: string): Attention | undefined {
+  if (!current) {
+    return added;
+  }
+  if (typeof current === 'number') {
+    if (added === '+') {
+      return current * ATTENTION_STEP;
+    }
+    if (added === '-') {
+      return current / ATTENTION_STEP;
+    }
+    return current;
+  }
+  if (added === '+') {
+    if (current.startsWith('-')) {
+      const res = current.substring(1);
+      return res === '' ? undefined : res;
+    }
+    return `${current}+`;
+  }
+  if (added === '-') {
+    if (current.startsWith('+')) {
+      const res = current.substring(1);
+      return res === '' ? undefined : res;
+    }
+    return `${current}-`;
+  }
+  return current;
 }

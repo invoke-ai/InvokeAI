@@ -1,7 +1,8 @@
-import { Flex, Text, useDisclosure, useToast } from '@invoke-ai/ui-library';
+import { Flex, Text, useToast } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { buildUseDisclosure } from 'common/hooks/useBoolean';
 import { MODEL_CATEGORIES_AS_LIST } from 'features/modelManagerV2/models';
 import {
   clearModelSelection,
@@ -23,10 +24,11 @@ import type { AnyModelConfig } from 'services/api/types';
 
 import { BulkDeleteModelsModal } from './BulkDeleteModelsModal';
 import { FetchingModelsLoader } from './FetchingModelsLoader';
-import { ModelListHeader } from './ModelListHeader';
 import { ModelListWrapper } from './ModelListWrapper';
 
 const log = logger('models');
+
+export const [useBulkDeleteModal] = buildUseDisclosure(false);
 
 const ModelList = () => {
   const dispatch = useAppDispatch();
@@ -35,7 +37,7 @@ const ModelList = () => {
   const selectedModelKeys = useAppSelector(selectSelectedModelKeys);
   const { t } = useTranslation();
   const toast = useToast();
-  const { isOpen, onOpen, onClose } = useDisclosure();
+  const { isOpen, close } = useBulkDeleteModal();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const { data, isLoading } = useGetModelConfigsQuery();
@@ -62,10 +64,6 @@ const ModelList = () => {
     return { total, byCategory };
   }, [data, filteredModelType, searchTerm]);
 
-  const handleBulkDelete = useCallback(() => {
-    onOpen();
-  }, [onOpen]);
-
   const handleConfirmBulkDelete = useCallback(async () => {
     setIsDeleting(true);
     try {
@@ -74,7 +72,7 @@ const ModelList = () => {
       // Clear selection and close modal
       dispatch(clearModelSelection());
       dispatch(setSelectedModelKey(null));
-      onClose();
+      close();
 
       // Show success/failure toast
       if (result.failed.length === 0) {
@@ -127,12 +125,11 @@ const ModelList = () => {
     } finally {
       setIsDeleting(false);
     }
-  }, [bulkDeleteModels, selectedModelKeys, dispatch, onClose, toast, t]);
+  }, [bulkDeleteModels, selectedModelKeys, dispatch, close, toast, t]);
 
   return (
     <>
       <Flex flexDirection="column" w="full" h="full">
-        <ModelListHeader onBulkDelete={handleBulkDelete} />
         <ScrollableContent>
           <Flex flexDirection="column" w="full" h="full" gap={4}>
             {isLoading && <FetchingModelsLoader loadingMessage="Loading..." />}
@@ -147,9 +144,10 @@ const ModelList = () => {
           </Flex>
         </ScrollableContent>
       </Flex>
+
       <BulkDeleteModelsModal
         isOpen={isOpen}
-        onClose={onClose}
+        onClose={close}
         onConfirm={handleConfirmBulkDelete}
         modelCount={selectedModelKeys.length}
         isDeleting={isDeleting}

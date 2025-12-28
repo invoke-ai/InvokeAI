@@ -14,6 +14,9 @@ from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils 
 from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_utils import (
     is_state_dict_likely_in_flux_onetrainer_format,
 )
+from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_xlabs_format,
+)
 
 
 def flux_format_from_state_dict(
@@ -30,5 +33,7 @@ def flux_format_from_state_dict(
         return FluxLoRAFormat.Control
     elif is_state_dict_likely_in_flux_aitoolkit_format(state_dict, metadata):
         return FluxLoRAFormat.AIToolkit
+    elif is_state_dict_likely_in_flux_xlabs_format(state_dict):
+        return FluxLoRAFormat.XLabs
     else:
         return None

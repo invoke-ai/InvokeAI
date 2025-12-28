@@ -1,8 +1,11 @@
+import math
 from contextlib import ExitStack
 from typing import Callable, Iterator, Optional, Tuple
 
+import einops
 import torch
 import torchvision.transforms as tv_transforms
+from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
 
@@ -16,8 +19,10 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     ZImageConditioningField,
 )
-from invokeai.app.invocations.model import TransformerField
+from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.z_image_control import ZImageControlField
+from invokeai.app.invocations.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
@@ -27,6 +32,14 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ZImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
+from invokeai.backend.z_image.text_conditioning import ZImageTextConditioning
+from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
+from invokeai.backend.z_image.z_image_controlnet_extension import (
+    ZImageControlNetExtension,
+    z_image_forward_with_control,
+)
+from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer_for_regional_prompting
 
 
 @invocation(
@@ -34,11 +47,14 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
     category="image",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class ZImageDenoiseInvocation(BaseInvocation):
-    """Run the denoising process with a Z-Image model."""
+    """Run the denoising process with a Z-Image model.
+
+    Supports regional prompting by connecting multiple conditioning inputs with masks.
+    """
 
     # If latents is provided, this means we are doing image-to-image.
     latents: Optional[LatentsField] = InputField(
@@ -53,17 +69,18 @@ class ZImageDenoiseInvocation(BaseInvocation):
     transformer: TransformerField = InputField(
         description=FieldDescriptions.z_image_model, input=Input.Connection, title="Transformer"
     )
-    positive_conditioning: ZImageConditioningField = InputField(
+    positive_conditioning: ZImageConditioningField | list[ZImageConditioningField] = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
-    negative_conditioning: Optional[ZImageConditioningField] = InputField(
+    negative_conditioning: ZImageConditioningField | list[ZImageConditioningField] | None = InputField(
         default=None, description=FieldDescriptions.negative_cond, input=Input.Connection
     )
-    # Z-Image-Turbo uses guidance_scale=0.0 by default (no CFG)
+    # Z-Image-Turbo works best without CFG (guidance_scale=1.0)
     guidance_scale: float = InputField(
-        default=0.0,
-        ge=0.0,
-        description="Guidance scale for classifier-free guidance. Use 0.0 for Z-Image-Turbo.",
+        default=1.0,
+        ge=1.0,
+        description="Guidance scale for classifier-free guidance. 1.0 = no CFG (recommended for Z-Image-Turbo). "
+        "Values > 1.0 amplify guidance.",
         title="Guidance Scale",
     )
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
@@ -71,6 +88,18 @@ class ZImageDenoiseInvocation(BaseInvocation):
     # Z-Image-Turbo uses 8 steps by default
     steps: int = InputField(default=8, gt=0, description="Number of denoising steps. 8 recommended for Z-Image-Turbo.")
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
+    # Z-Image Control support
+    control: Optional[ZImageControlField] = InputField(
+        default=None,
+        description="Z-Image control conditioning for spatial control (Canny, HED, Depth, Pose, MLSD).",
+        input=Input.Connection,
+    )
+    # VAE for encoding control images (required when using control)
+    vae: Optional[VAEField] = InputField(
+        default=None,
+        description=FieldDescriptions.vae + " Required for control conditioning.",
+        input=Input.Connection,
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
@@ -103,25 +132,50 @@ class ZImageDenoiseInvocation(BaseInvocation):
     def _load_text_conditioning(
         self,
         context: InvocationContext,
-        conditioning_name: str,
+        cond_field: ZImageConditioningField | list[ZImageConditioningField],
+        img_height: int,
+        img_width: int,
         dtype: torch.dtype,
         device: torch.device,
-    ) -> torch.Tensor:
-        """Load Z-Image text conditioning."""
-        cond_data = context.conditioning.load(conditioning_name)
-        if len(cond_data.conditionings) != 1:
-            raise ValueError(
-                f"Expected exactly 1 conditioning entry for Z-Image, got {len(cond_data.conditionings)}. "
-                "Ensure you are using the Z-Image text encoder."
-            )
-        z_image_conditioning = cond_data.conditionings[0]
-        if not isinstance(z_image_conditioning, ZImageConditioningInfo):
-            raise TypeError(
-                f"Expected ZImageConditioningInfo, got {type(z_image_conditioning).__name__}. "
-                "Ensure you are using the Z-Image text encoder."
-            )
-        z_image_conditioning = z_image_conditioning.to(dtype=dtype, device=device)
-        return z_image_conditioning.prompt_embeds
+    ) -> list[ZImageTextConditioning]:
+        """Load Z-Image text conditioning with optional regional masks.
+
+        Args:
+            context: The invocation context.
+            cond_field: Single conditioning field or list of fields.
+            img_height: Height of the image token grid (H // patch_size).
+            img_width: Width of the image token grid (W // patch_size).
+            dtype: Target dtype.
+            device: Target device.
+
+        Returns:
+            List of ZImageTextConditioning objects with embeddings and masks.
+        """
+        # Normalize to a list
+        cond_list = [cond_field] if isinstance(cond_field, ZImageConditioningField) else cond_field
+
+        text_conditionings: list[ZImageTextConditioning] = []
+        for cond in cond_list:
+            # Load the text embeddings
+            cond_data = context.conditioning.load(cond.conditioning_name)
+            assert len(cond_data.conditionings) == 1
+            z_image_conditioning = cond_data.conditionings[0]
+            assert isinstance(z_image_conditioning, ZImageConditioningInfo)
+            z_image_conditioning = z_image_conditioning.to(dtype=dtype, device=device)
+            prompt_embeds = z_image_conditioning.prompt_embeds
+
+            # Load the mask, if provided
+            mask: torch.Tensor | None = None
+            if cond.mask is not None:
+                mask = context.tensors.load(cond.mask.tensor_name)
+                mask = mask.to(device=device)
+                mask = ZImageRegionalPromptingExtension.preprocess_regional_prompt_mask(
+                    mask, img_height, img_width, dtype, device
+                )
+
+            text_conditionings.append(ZImageTextConditioning(prompt_embeds=prompt_embeds, mask=mask))
+
+        return text_conditionings
 
     def _get_noise(
         self,
@@ -198,33 +252,58 @@ class ZImageDenoiseInvocation(BaseInvocation):
 
         transformer_info = context.models.load(self.transformer.transformer)
 
-        # Load positive conditioning
-        pos_prompt_embeds = self._load_text_conditioning(
+        # Calculate image token grid dimensions
+        patch_size = 2  # Z-Image uses patch_size=2
+        latent_height = self.height // LATENT_SCALE_FACTOR
+        latent_width = self.width // LATENT_SCALE_FACTOR
+        img_token_height = latent_height // patch_size
+        img_token_width = latent_width // patch_size
+        img_seq_len = img_token_height * img_token_width
+
+        # Load positive conditioning with regional masks
+        pos_text_conditionings = self._load_text_conditioning(
             context=context,
-            conditioning_name=self.positive_conditioning.conditioning_name,
+            cond_field=self.positive_conditioning,
+            img_height=img_token_height,
+            img_width=img_token_width,
             dtype=inference_dtype,
             device=device,
         )
 
-        # Load negative conditioning if provided and guidance_scale > 0
+        # Create regional prompting extension
+        regional_extension = ZImageRegionalPromptingExtension.from_text_conditionings(
+            text_conditionings=pos_text_conditionings,
+            img_seq_len=img_seq_len,
+        )
+
+        # Get the concatenated prompt embeddings for the transformer
+        pos_prompt_embeds = regional_extension.regional_text_conditioning.prompt_embeds
+
+        # Load negative conditioning if provided and guidance_scale != 1.0
+        # CFG formula: pred = pred_uncond + cfg_scale * (pred_cond - pred_uncond)
+        # At cfg_scale=1.0: pred = pred_cond (no effect, skip uncond computation)
+        # This matches FLUX's convention where 1.0 means "no CFG"
         neg_prompt_embeds: torch.Tensor | None = None
-        do_classifier_free_guidance = self.guidance_scale > 0.0 and self.negative_conditioning is not None
+        do_classifier_free_guidance = (
+            not math.isclose(self.guidance_scale, 1.0) and self.negative_conditioning is not None
+        )
         if do_classifier_free_guidance:
-            if self.negative_conditioning is None:
-                raise ValueError("Negative conditioning is required when guidance_scale > 0")
-            neg_prompt_embeds = self._load_text_conditioning(
+            assert self.negative_conditioning is not None
+            # Load all negative conditionings and concatenate embeddings
+            # Note: We ignore masks for negative conditioning as regional negative prompting is not fully supported
+            neg_text_conditionings = self._load_text_conditioning(
                 context=context,
-                conditioning_name=self.negative_conditioning.conditioning_name,
+                cond_field=self.negative_conditioning,
+                img_height=img_token_height,
+                img_width=img_token_width,
                 dtype=inference_dtype,
                 device=device,
             )
-
-        # Calculate image sequence length for timestep shifting
-        patch_size = 2  # Z-Image uses patch_size=2
-        image_seq_len = ((self.height // LATENT_SCALE_FACTOR) * (self.width // LATENT_SCALE_FACTOR)) // (patch_size**2)
+            # Concatenate all negative embeddings
+            neg_prompt_embeds = torch.cat([tc.prompt_embeds for tc in neg_text_conditionings], dim=0)
 
         # Calculate shift based on image sequence length
-        mu = self._calculate_shift(image_seq_len)
+        mu = self._calculate_shift(img_seq_len)
 
         # Generate sigma schedule with time shift
         sigmas = self._get_sigmas(mu, self.steps)
@@ -293,9 +372,6 @@ class ZImageDenoiseInvocation(BaseInvocation):
         )
 
         with ExitStack() as exit_stack:
-            # Load transformer and apply LoRA patches
-            (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
-
             # Get transformer config to determine if it's quantized
             transformer_config = context.models.get_config(self.transformer.transformer)
 
@@ -309,6 +385,102 @@ class ZImageDenoiseInvocation(BaseInvocation):
             else:
                 raise ValueError(f"Unsupported Z-Image model format: {transformer_config.format}")
 
+            # Load transformer - always use base transformer, control is handled via extension
+            (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
+
+            # Prepare control extension if control is provided
+            control_extension: ZImageControlNetExtension | None = None
+
+            if self.control is not None:
+                # Load control adapter using context manager (proper GPU memory management)
+                control_model_info = context.models.load(self.control.control_model)
+                (_, control_adapter) = exit_stack.enter_context(control_model_info.model_on_device())
+                assert isinstance(control_adapter, ZImageControlAdapter)
+
+                # Get control_in_dim from adapter config (16 for V1, 33 for V2.0)
+                adapter_config = control_adapter.config
+                control_in_dim = adapter_config.get("control_in_dim", 16)
+                num_control_blocks = adapter_config.get("num_control_blocks", 6)
+
+                # Log control configuration for debugging
+                version = "V2.0" if control_in_dim > 16 else "V1"
+                context.util.signal_progress(
+                    f"Using Z-Image ControlNet {version} (Extension): control_in_dim={control_in_dim}, "
+                    f"num_blocks={num_control_blocks}, scale={self.control.control_context_scale}"
+                )
+
+                # Load and prepare control image - must be VAE-encoded!
+                if self.vae is None:
+                    raise ValueError("VAE is required when using Z-Image Control. Connect a VAE to the 'vae' input.")
+
+                control_image = context.images.get_pil(self.control.image_name)
+
+                # Resize control image to match output dimensions
+                control_image = control_image.convert("RGB")
+                control_image = control_image.resize((self.width, self.height), Image.Resampling.LANCZOS)
+
+                # Convert to tensor format for VAE encoding
+                from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
+
+                control_image_tensor = image_resized_to_grid_as_tensor(control_image)
+                if control_image_tensor.dim() == 3:
+                    control_image_tensor = einops.rearrange(control_image_tensor, "c h w -> 1 c h w")
+
+                # Encode control image through VAE to get latents
+                vae_info = context.models.load(self.vae.vae)
+                control_latents = ZImageImageToLatentsInvocation.vae_encode(
+                    vae_info=vae_info,
+                    image_tensor=control_image_tensor,
+                )
+
+                # Move to inference device/dtype
+                control_latents = control_latents.to(device=device, dtype=inference_dtype)
+
+                # Add frame dimension: [B, C, H, W] -> [C, 1, H, W] (single image)
+                control_latents = control_latents.squeeze(0).unsqueeze(1)
+
+                # Prepare control_cond based on control_in_dim
+                # V1: 16 channels (just control latents)
+                # V2.0: 33 channels = 16 control + 16 reference + 1 mask
+                #   - Channels 0-15: control image latents (from VAE encoding)
+                #   - Channels 16-31: reference/inpaint image latents (zeros for pure control)
+                #   - Channel 32: inpaint mask (1.0 = don't inpaint, 0.0 = inpaint region)
+                # For pure control (no inpainting), we set mask=1 to tell model "use control, don't inpaint"
+                c, f, h, w = control_latents.shape
+                if c < control_in_dim:
+                    padding_channels = control_in_dim - c
+                    if padding_channels == 17:
+                        # V2.0: 16 reference channels (zeros) + 1 mask channel (ones)
+                        ref_padding = torch.zeros(
+                            (16, f, h, w),
+                            device=device,
+                            dtype=inference_dtype,
+                        )
+                        # Mask channel = 1.0 means "don't inpaint this region, use control signal"
+                        mask_channel = torch.ones(
+                            (1, f, h, w),
+                            device=device,
+                            dtype=inference_dtype,
+                        )
+                        control_latents = torch.cat([control_latents, ref_padding, mask_channel], dim=0)
+                    else:
+                        # Generic padding with zeros for other cases
+                        zero_padding = torch.zeros(
+                            (padding_channels, f, h, w),
+                            device=device,
+                            dtype=inference_dtype,
+                        )
+                        control_latents = torch.cat([control_latents, zero_padding], dim=0)
+
+                # Create control extension (adapter is already on device from model_on_device)
+                control_extension = ZImageControlNetExtension(
+                    control_adapter=control_adapter,
+                    control_cond=control_latents,
+                    weight=self.control.control_context_scale,
+                    begin_step_percent=self.control.begin_step_percent,
+                    end_step_percent=self.control.end_step_percent,
+                )
+
             # Apply LoRA models to the transformer.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
             exit_stack.enter_context(
@@ -319,6 +491,15 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     dtype=inference_dtype,
                     cached_weights=cached_weights,
                     force_sidecar_patching=model_is_quantized,
+                )
+            )
+
+            # Apply regional prompting patch if we have regional masks
+            exit_stack.enter_context(
+                patch_transformer_for_regional_prompting(
+                    transformer=transformer,
+                    regional_attn_mask=regional_extension.regional_attn_mask,
+                    img_seq_len=img_seq_len,
                 )
             )
 
@@ -340,25 +521,48 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 latent_model_input = latent_model_input.unsqueeze(2)  # Add frame dimension
                 latent_model_input_list = list(latent_model_input.unbind(dim=0))
 
-                # Transformer returns (List[torch.Tensor], dict) - we only need the tensor list
-                model_output = transformer(
-                    x=latent_model_input_list,
-                    t=timestep,
-                    cap_feats=[pos_prompt_embeds],
-                )
-                model_out_list = model_output[0]  # Extract list of tensors from tuple
+                # Determine if control should be applied at this step
+                apply_control = control_extension is not None and control_extension.should_apply(step_idx, total_steps)
+
+                # Run forward pass - use custom forward with control if extension is active
+                if apply_control:
+                    model_out_list, _ = z_image_forward_with_control(
+                        transformer=transformer,
+                        x=latent_model_input_list,
+                        t=timestep,
+                        cap_feats=[pos_prompt_embeds],
+                        control_extension=control_extension,
+                    )
+                else:
+                    model_output = transformer(
+                        x=latent_model_input_list,
+                        t=timestep,
+                        cap_feats=[pos_prompt_embeds],
+                    )
+                    model_out_list = model_output[0]  # Extract list of tensors from tuple
+
                 noise_pred_cond = torch.stack([t.float() for t in model_out_list], dim=0)
                 noise_pred_cond = noise_pred_cond.squeeze(2)  # Remove frame dimension
                 noise_pred_cond = -noise_pred_cond  # Z-Image uses v-prediction with negation
 
                 # Apply CFG if enabled
                 if do_classifier_free_guidance and neg_prompt_embeds is not None:
-                    model_output_uncond = transformer(
-                        x=latent_model_input_list,
-                        t=timestep,
-                        cap_feats=[neg_prompt_embeds],
-                    )
-                    model_out_list_uncond = model_output_uncond[0]  # Extract list of tensors from tuple
+                    if apply_control:
+                        model_out_list_uncond, _ = z_image_forward_with_control(
+                            transformer=transformer,
+                            x=latent_model_input_list,
+                            t=timestep,
+                            cap_feats=[neg_prompt_embeds],
+                            control_extension=control_extension,
+                        )
+                    else:
+                        model_output_uncond = transformer(
+                            x=latent_model_input_list,
+                            t=timestep,
+                            cap_feats=[neg_prompt_embeds],
+                        )
+                        model_out_list_uncond = model_output_uncond[0]  # Extract list of tensors from tuple
+
                     noise_pred_uncond = torch.stack([t.float() for t in model_out_list_uncond], dim=0)
                     noise_pred_uncond = noise_pred_uncond.squeeze(2)
                     noise_pred_uncond = -noise_pred_uncond

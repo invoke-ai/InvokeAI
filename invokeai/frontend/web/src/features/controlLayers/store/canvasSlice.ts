@@ -70,6 +70,7 @@ import type {
   EntityRectAddedPayload,
   IPMethodV2,
   T2IAdapterConfig,
+  ZImageControlConfig,
 } from './types';
 import {
   ASPECT_RATIO_MAP,
@@ -93,6 +94,7 @@ import {
   initialIPAdapter,
   initialRegionalGuidanceIPAdapter,
   initialT2IAdapter,
+  initialZImageControl,
   makeDefaultRasterLayerAdjustments,
 } from './util';
 
@@ -591,22 +593,47 @@ const slice = createSlice({
 
         // Converting to ControlNet from...
         case 'controlnet': {
-          if (layer.controlAdapter.type === 't2i_adapter') {
-            // ControlNets have all the T2I Adapter properties, plus control mode
-            const controlNetConfig: ControlNetConfig = {
-              ...initialControlNet,
-              ...layer.controlAdapter,
-              type: 'controlnet',
-            };
-            layer.controlAdapter = controlNetConfig;
-          } else if (layer.controlAdapter.type === 'control_lora') {
-            // ControlNets have all the Control LoRA properties, plus control mode and begin/end step pct
-            const controlNetConfig: ControlNetConfig = {
-              ...initialControlNet,
-              ...layer.controlAdapter,
-              type: 'controlnet',
-            };
-            layer.controlAdapter = controlNetConfig;
+          // Check if this is a Z-Image ControlNet (base === 'z-image')
+          const isZImageControl = layer.controlAdapter.model?.base === 'z-image';
+
+          if (isZImageControl) {
+            // Convert to Z-Image Control adapter
+            if (layer.controlAdapter.type !== 'z_image_control') {
+              const zImageControlConfig: ZImageControlConfig = {
+                ...initialZImageControl,
+                model: layer.controlAdapter.model,
+                weight: layer.controlAdapter.weight,
+              };
+              layer.controlAdapter = zImageControlConfig;
+            }
+          } else {
+            // Regular SD/SDXL/Flux ControlNet
+            if (layer.controlAdapter.type === 't2i_adapter') {
+              // ControlNets have all the T2I Adapter properties, plus control mode
+              const controlNetConfig: ControlNetConfig = {
+                ...initialControlNet,
+                ...layer.controlAdapter,
+                type: 'controlnet',
+              };
+              layer.controlAdapter = controlNetConfig;
+            } else if (layer.controlAdapter.type === 'control_lora') {
+              // ControlNets have all the Control LoRA properties, plus control mode and begin/end step pct
+              const controlNetConfig: ControlNetConfig = {
+                ...initialControlNet,
+                ...layer.controlAdapter,
+                type: 'controlnet',
+              };
+              layer.controlAdapter = controlNetConfig;
+            } else if (layer.controlAdapter.type === 'z_image_control') {
+              // Converting from Z-Image Control to regular ControlNet
+              const controlNetConfig: ControlNetConfig = {
+                ...initialControlNet,
+                model: layer.controlAdapter.model,
+                weight: layer.controlAdapter.weight,
+                beginEndStepPct: layer.controlAdapter.beginEndStepPct,
+              };
+              layer.controlAdapter = controlNetConfig;
+            }
           }
           break;
         }
@@ -659,6 +686,7 @@ const slice = createSlice({
     ) => {
       const { entityIdentifier, beginEndStepPct } = action.payload;
       const layer = selectEntity(state, entityIdentifier);
+      // control_lora doesn't have beginEndStepPct
       if (!layer || !layer.controlAdapter || layer.controlAdapter.type === 'control_lora') {
         return;
       }

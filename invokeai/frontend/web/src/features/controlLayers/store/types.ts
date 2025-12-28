@@ -411,6 +411,14 @@ const zControlLoRAConfig = z.object({
 });
 export type ControlLoRAConfig = z.infer<typeof zControlLoRAConfig>;
 
+const zZImageControlConfig = z.object({
+  type: z.literal('z_image_control'),
+  model: zModelIdentifierField.nullable(),
+  weight: z.number().gte(0).lte(2), // control_context_scale, recommended 0.65-0.80
+  beginEndStepPct: zBeginEndStepPct,
+});
+export type ZImageControlConfig = z.infer<typeof zZImageControlConfig>;
+
 /**
  * All simple params normalized to `[-1, 1]` except sharpness `[0, 1]`.
  *
@@ -525,7 +533,12 @@ export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
   type: z.literal('control_layer'),
   withTransparencyEffect: z.boolean(),
-  controlAdapter: z.discriminatedUnion('type', [zControlNetConfig, zT2IAdapterConfig, zControlLoRAConfig]),
+  controlAdapter: z.discriminatedUnion('type', [
+    zControlNetConfig,
+    zT2IAdapterConfig,
+    zControlLoRAConfig,
+    zZImageControlConfig,
+  ]),
 });
 export type CanvasControlLayerState = z.infer<typeof zCanvasControlLayerState>;
 

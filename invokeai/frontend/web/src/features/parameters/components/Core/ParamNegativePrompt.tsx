@@ -8,6 +8,7 @@ import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModeP
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
+import { usePromptAttentionHotkeys } from 'features/prompt/usePromptAttentionHotkeys';
 import {
   selectStylePresetActivePresetId,
   selectStylePresetViewMode,
@@ -53,6 +54,11 @@ export const ParamNegativePrompt = memo(() => {
     onChange: _onChange,
   });
 
+  usePromptAttentionHotkeys({
+    textareaRef,
+    onPromptChange: (prompt) => dispatch(negativePromptChanged(prompt)),
+  });
+
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
       <Box pos="relative" w="full">
@@ -71,7 +77,7 @@ export const ParamNegativePrompt = memo(() => {
           paddingTop={0}
           paddingBottom={3}
           fontFamily="mono"
-          fontSize="sm"
+          fontSize="0.82rem"
         />
         <PromptOverlayButtonWrapper>
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />

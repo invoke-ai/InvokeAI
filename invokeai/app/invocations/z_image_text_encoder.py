@@ -1,11 +1,18 @@
 from contextlib import ExitStack
-from typing import Iterator, Tuple
+from typing import Iterator, Optional, Tuple
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, UIComponent
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    Input,
+    InputField,
+    TensorField,
+    UIComponent,
+    ZImageConditioningField,
+)
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import ZImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -27,11 +34,14 @@ Z_IMAGE_MAX_SEQ_LEN = 512
     title="Prompt - Z-Image",
     tags=["prompt", "conditioning", "z-image"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class ZImageTextEncoderInvocation(BaseInvocation):
-    """Encodes and preps a prompt for a Z-Image image."""
+    """Encodes and preps a prompt for a Z-Image image.
+
+    Supports regional prompting by connecting a mask input.
+    """
 
     prompt: str = InputField(description="Text prompt to encode.", ui_component=UIComponent.Textarea)
     qwen3_encoder: Qwen3EncoderField = InputField(
@@ -39,13 +49,19 @@ class ZImageTextEncoderInvocation(BaseInvocation):
         description=FieldDescriptions.qwen3_encoder,
         input=Input.Connection,
     )
+    mask: Optional[TensorField] = InputField(
+        default=None,
+        description="A mask defining the region that this conditioning prompt applies to.",
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ZImageConditioningOutput:
         prompt_embeds = self._encode_prompt(context, max_seq_len=Z_IMAGE_MAX_SEQ_LEN)
         conditioning_data = ConditioningFieldData(conditionings=[ZImageConditioningInfo(prompt_embeds=prompt_embeds)])
         conditioning_name = context.conditioning.save(conditioning_data)
-        return ZImageConditioningOutput.build(conditioning_name)
+        return ZImageConditioningOutput(
+            conditioning=ZImageConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+        )
 
     def _encode_prompt(self, context: InvocationContext, max_seq_len: int) -> torch.Tensor:
         """Encode prompt using Qwen3 text encoder.
