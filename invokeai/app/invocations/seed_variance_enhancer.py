@@ -21,15 +21,6 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 )
 
 
-class NoiseInsertMode(str, Enum):
-    """When to apply noise during the generation process."""
-
-    BEGINNING = "noise on beginning steps"
-    ENDING = "noise on ending steps"
-    ALL = "noise on all steps"
-    DISABLED = "disabled"
-
-
 class MaskStartPosition(str, Enum):
     """Which end of the prompt will be protected from noise."""
 
@@ -49,10 +40,12 @@ class SeedVarianceEnhancerInvocation(BaseInvocation):
     """Adds random noise to Z-Image conditioning embeddings to increase output diversity.
 
     This node compensates for low seed variance by adding controlled noise to the conditioning
-    embeddings during specific steps of generation. Works specifically with Z-Image models.
+    embeddings. Works specifically with Z-Image models.
 
-    The noise can be applied to beginning steps, ending steps, or all steps. Applying noise
-    only to beginning steps (default) allows the model to pivot back toward prompt adherence.
+    Typical settings for Z-Image Turbo:
+    - randomize_percent: 50%
+    - strength: 15-40
+    - Experiment with different values for your specific prompts
 
     Masking features allow protecting portions of the prompt from noise exposure.
     """
@@ -69,18 +62,7 @@ class SeedVarianceEnhancerInvocation(BaseInvocation):
     )
     strength: float = InputField(
         default=20.0,
-        description="Scale of the random noise. Typical range: 15-40 for Z-Image.",
-    )
-    noise_insert: NoiseInsertMode = InputField(
-        default=NoiseInsertMode.BEGINNING,
-        description="Which steps of generation process use the noisy embedding.",
-    )
-    steps_switchover_percent: float = InputField(
-        default=20.0,
-        ge=1.0,
-        le=99.0,
-        description="Percentage of steps before switching between noisy and original embeddings. "
-        "Formula: (100/TOTAL_STEPS) * STEPS - 1",
+        description="Scale of the random noise. Typical range: 15-40 for Z-Image Turbo.",
     )
     seed: int = InputField(
         default=0,
@@ -106,13 +88,6 @@ class SeedVarianceEnhancerInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> ZImageConditioningOutput:
         # Load the conditioning data
         conditioning_data = context.conditioning.load(self.conditioning.conditioning_name)
-
-        # Early return if disabled
-        if self.noise_insert == NoiseInsertMode.DISABLED:
-            if self.log_statistics:
-                context.logger.info("Seed Variance Enhancer is disabled. Passing conditioning through unchanged.")
-                self._log_statistics(context, conditioning_data)
-            return ZImageConditioningOutput(conditioning=self.conditioning)
 
         # Early return if strength is zero
         if self.strength == 0:
