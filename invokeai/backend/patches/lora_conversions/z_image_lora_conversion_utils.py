@@ -140,16 +140,50 @@ def _get_lora_layer_values(layer_dict: dict[str, torch.Tensor], alpha: float | N
 
 
 def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:
-    """Groups the keys in the state dict by layer."""
+    """Groups the keys in the state dict by layer.
+
+    Z-Image LoRAs have keys like:
+    - diffusion_model.layers.17.attention.to_k.alpha
+    - diffusion_model.layers.17.attention.to_k.dora_scale
+    - diffusion_model.layers.17.attention.to_k.lora_down.weight
+    - diffusion_model.layers.17.attention.to_k.lora_up.weight
+
+    We need to group these by the full layer path (e.g., diffusion_model.layers.17.attention.to_k)
+    and extract the suffix (alpha, dora_scale, lora_down.weight, lora_up.weight).
+    """
     layer_dict: dict[str, dict[str, torch.Tensor]] = {}
+
+    # Known suffixes that indicate the end of a layer name
+    known_suffixes = [
+        ".lora_A.weight",
+        ".lora_B.weight",
+        ".lora_down.weight",
+        ".lora_up.weight",
+        ".dora_scale",
+        ".alpha",
+    ]
+
     for key in state_dict:
         if not isinstance(key, str):
             continue
-        # Split the 'lora_A.weight' or 'lora_B.weight' suffix from the layer name.
-        parts = key.rsplit(".", maxsplit=2)
-        layer_name = parts[0]
-        key_name = ".".join(parts[1:])
+
+        # Try to find a known suffix
+        layer_name = None
+        key_name = None
+        for suffix in known_suffixes:
+            if key.endswith(suffix):
+                layer_name = key[: -len(suffix)]
+                key_name = suffix[1:]  # Remove leading dot
+                break
+
+        if layer_name is None:
+            # Fallback to original logic for unknown formats
+            parts = key.rsplit(".", maxsplit=2)
+            layer_name = parts[0]
+            key_name = ".".join(parts[1:])
+
         if layer_name not in layer_dict:
             layer_dict[layer_name] = {}
         layer_dict[layer_name][key_name] = state_dict[key]
+
     return layer_dict
