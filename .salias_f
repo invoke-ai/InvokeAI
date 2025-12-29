@@ -26,6 +26,8 @@ function stop
         pkill -f invokeai-web
         sleep 2  # Give it time to shut down gracefully
         echo "✅ Server stopped"
+        sleep 5
+        exit
     else
         echo "No InvokeAI server is currently running"
     end

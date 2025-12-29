@@ -1,0 +1,11 @@
+clear
+set -gx ENV_NAME '.venv'
+alias rmenv='rm -rf .envrc $ENV_NAME uv.lock; exit'
+alias mkenv='mkuv $ENV_NAME 3.12.10'
+alias stop='pkill -f "streamlit run app.py"'
+alias run='stop;streamlit run app.py > streamlit.log 2>&1 & disown'
+
+function install
+   clear
+   uv pip install -r requirements.txt
+end
