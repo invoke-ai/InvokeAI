@@ -347,7 +347,7 @@ def pixelshuffle_block(
     return sequential(conv, pixel_shuffle, n, a)
 
 
-def upconv_blcok(
+def upconv_block(
     in_nc: int,
     out_nc: int,
     upscale_factor: int = 2,
