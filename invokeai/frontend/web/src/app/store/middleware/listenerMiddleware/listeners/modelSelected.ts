@@ -23,7 +23,13 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { selectGlobalRefImageModels, selectRegionalRefImageModels } from 'services/api/hooks/modelsByType';
+import {
+  selectFluxVAEModels,
+  selectGlobalRefImageModels,
+  selectQwen3EncoderModels,
+  selectRegionalRefImageModels,
+  selectZImageDiffusersModels,
+} from 'services/api/hooks/modelsByType';
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
 import { isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
 
@@ -78,6 +84,59 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           if (zImageQwen3SourceModel) {
             dispatch(zImageQwen3SourceModelSelected(null));
             modelsUpdatedDisabledOrCleared += 1;
+          }
+        } else {
+          // Switching to Z-Image - set defaults if no valid configuration exists
+          const hasValidConfig = zImageQwen3SourceModel || (zImageVaeModel && zImageQwen3EncoderModel);
+
+          if (!hasValidConfig) {
+            // Prefer Qwen3 Source (Diffusers model) if available
+            const availableZImageDiffusers = selectZImageDiffusersModels(state);
+
+            if (availableZImageDiffusers.length > 0) {
+              const diffusersModel = availableZImageDiffusers[0];
+              if (diffusersModel) {
+                dispatch(
+                  zImageQwen3SourceModelSelected({
+                    key: diffusersModel.key,
+                    hash: diffusersModel.hash,
+                    name: diffusersModel.name,
+                    base: diffusersModel.base,
+                    type: diffusersModel.type,
+                  })
+                );
+              }
+            } else {
+              // Fallback: try to set Qwen3 Encoder + VAE
+              const availableQwen3Encoders = selectQwen3EncoderModels(state);
+              const availableFluxVAEs = selectFluxVAEModels(state);
+
+              if (availableQwen3Encoders.length > 0 && availableFluxVAEs.length > 0) {
+                const qwen3Encoder = availableQwen3Encoders[0];
+                const fluxVAE = availableFluxVAEs[0];
+
+                if (qwen3Encoder) {
+                  dispatch(
+                    zImageQwen3EncoderModelSelected({
+                      key: qwen3Encoder.key,
+                      name: qwen3Encoder.name,
+                      base: qwen3Encoder.base,
+                    })
+                  );
+                }
+                if (fluxVAE) {
+                  dispatch(
+                    zImageVaeModelSelected({
+                      key: fluxVAE.key,
+                      hash: fluxVAE.hash,
+                      name: fluxVAE.name,
+                      base: fluxVAE.base,
+                      type: fluxVAE.type,
+                    })
+                  );
+                }
+              }
+            }
           }
         }
 
