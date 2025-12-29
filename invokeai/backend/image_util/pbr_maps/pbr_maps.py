@@ -47,7 +47,11 @@ class PBRMapsGenerator:
         )
 
         model.load_state_dict(state_dict, strict=False)
+
         del state_dict
+        if torch.cuda.is_available() and device.type == "cuda":
+            torch.cuda.empty_cache()
+
         model.eval()
 
         for _, v in model.named_parameters():
