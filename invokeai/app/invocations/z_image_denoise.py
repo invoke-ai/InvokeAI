@@ -396,16 +396,6 @@ class ZImageDenoiseInvocation(BaseInvocation):
         else:
             num_scheduler_steps = total_steps
 
-        step_callback(
-            PipelineIntermediateState(
-                step=0,
-                order=1,
-                total_steps=total_steps,
-                timestep=int(sigmas[0] * 1000),
-                latents=latents,
-            ),
-        )
-
         with ExitStack() as exit_stack:
             # Get transformer config to determine if it's quantized
             transformer_config = context.models.get_config(self.transformer.transformer)
