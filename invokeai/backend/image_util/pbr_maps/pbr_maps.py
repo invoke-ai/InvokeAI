@@ -76,6 +76,34 @@ class PBRMapsGenerator:
         tile_size: int = 512,
         border_mode: Literal["none", "seamless", "mirror", "replicate"] = "none",
     ):
+        """
+        Generate PBR texture maps (normal, roughness, and displacement) from an input image.
+        The image can optionally be padded before inference to control how borders are treated,
+        which can help create seamless or edge‑consistent textures.
+
+        Args:
+            image: Source image used to generate the PBR maps.
+            tile_size: Maximum tile size used for tiled inference. If the image is larger than
+                this size in either dimension, it will be split into tiles for processing and
+                then merged.
+
+            border_mode: Strategy for padding the image before inference:
+                - "none": No padding is applied; the image is processed as‑is.
+                - "seamless": Pads the image using wrap‑around tiling
+                  (`cv2.BORDER_WRAP`) to help produce seamless textures.
+                - "mirror": Pads the image by mirroring border pixels
+                  (`cv2.BORDER_REFLECT_101`) to reduce edge artifacts.
+                - "replicate": Pads the image by replicating the edge pixels outward
+                  (`cv2.BORDER_REPLICATE`).
+
+        Returns:
+            A tuple of three PIL Images:
+                - normal_map: RGB normal map generated from the input.
+                - roughness: Single‑channel roughness map extracted from the second model output.
+                - displacement: Single‑channel displacement (height) map extracted from the
+                  second model output.
+        """
+
         models = [self.normal_map_model, self.other_map_model]
         np_image = np.array(image).astype(np.uint8)
 
