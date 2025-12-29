@@ -32,13 +32,15 @@ class PBRMapsInvocation(BaseInvocation, WithMetadata, WithBoard):
         def loader(model_path: pathlib.Path):
             return PBRMapsGenerator.load_model(model_path, TorchDevice.choose_torch_device())
 
+        torch_device = TorchDevice.choose_torch_device()
+
         with (
             context.models.load_remote_model(NORMAL_MAP_MODEL, loader) as normal_map_model,
             context.models.load_remote_model(OTHER_MAP_MODEL, loader) as other_map_model,
         ):
             assert isinstance(normal_map_model, PBR_RRDB_Net)
             assert isinstance(other_map_model, PBR_RRDB_Net)
-            pbr_pipeline = PBRMapsGenerator(normal_map_model, other_map_model, TorchDevice.choose_torch_device())
+            pbr_pipeline = PBRMapsGenerator(normal_map_model, other_map_model, torch_device)
             normal_map, roughness_map, displacement_map = pbr_pipeline.generate_maps(
                 image_pil, self.tile_size, self.border_mode
             )
