@@ -384,15 +384,19 @@ class Qwen3EncoderLoader(ModelLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer:
-                return AutoTokenizer.from_pretrained(tokenizer_path)
+                # Use local_files_only=True to prevent network requests for validation
+                # The tokenizer files should already exist locally in the model directory
+                return AutoTokenizer.from_pretrained(tokenizer_path, local_files_only=True)
             case SubModelType.TextEncoder:
                 # Determine safe dtype based on target device capabilities
                 target_device = TorchDevice.choose_torch_device()
                 model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+                # Use local_files_only=True to prevent network requests for validation
                 return Qwen3ForCausalLM.from_pretrained(
                     text_encoder_path,
                     torch_dtype=model_dtype,
                     low_cpu_mem_usage=True,
+                    local_files_only=True,
                 )
 
         raise ValueError(
