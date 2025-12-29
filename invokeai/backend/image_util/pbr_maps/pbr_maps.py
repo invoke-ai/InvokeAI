@@ -2,20 +2,24 @@
 # Adopted and optimized for Invoke AI
 
 import pathlib
-from typing import Any, Literal, OrderedDict
+from typing import Any, Literal
 
 import cv2
 import numpy as np
 import numpy.typing as npt
 import torch
 from PIL import Image
-from torch.serialization import add_safe_globals
+from safetensors.torch import load_file
 
 from invokeai.backend.image_util.pbr_maps.architecture.pbr_rrdb_net import PBR_RRDB_Net
 from invokeai.backend.image_util.pbr_maps.utils.image_ops import crop_seamless, esrgan_launcher_split_merge
 
-NORMAL_MAP_MODEL = "https://github.com/joeyballentine/Material-Map-Generator/blob/master/utils/models/1x_NormalMapGenerator-CX-Lite_200000_G.pth"
-OTHER_MAP_MODEL = "https://github.com/joeyballentine/Material-Map-Generator/blob/master/utils/models/1x_FrankenMapGenerator-CX-Lite_215000_G.pth"
+NORMAL_MAP_MODEL = (
+    "https://huggingface.co/InvokeAI/pbr-material-maps/resolve/main/normal_map_generator.safetensors?download=true"
+)
+OTHER_MAP_MODEL = (
+    "https://huggingface.co/InvokeAI/pbr-material-maps/resolve/main/franken_map_generator.safetensors?download=true"
+)
 
 
 class PBRMapsGenerator:
@@ -23,11 +27,10 @@ class PBRMapsGenerator:
         self.normal_map_model = normal_map_model
         self.other_map_model = other_map_model
         self.device = device
-        add_safe_globals([PBR_RRDB_Net, OrderedDict])
 
     @staticmethod
     def load_model(model_path: pathlib.Path, device: torch.device) -> PBR_RRDB_Net:
-        state_dict = torch.load(model_path.as_posix(), map_location="cpu")
+        state_dict = load_file(model_path.as_posix(), device=device.type)
 
         model = PBR_RRDB_Net(
             3,
