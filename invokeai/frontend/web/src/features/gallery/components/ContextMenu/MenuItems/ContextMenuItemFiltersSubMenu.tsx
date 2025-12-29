@@ -7,7 +7,7 @@ import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAr
 import { useImageDTOContext } from 'features/gallery/contexts/ImageDTOContext';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFileBold, PiShootingStarFill } from 'react-icons/pi';
+import { PiCubeBold, PiShootingStarFill } from 'react-icons/pi';
 
 export const ContextMenuItemFiltersSubMenu = memo(() => {
   const { t } = useTranslation();
@@ -32,7 +32,7 @@ export const ContextMenuItemFiltersSubMenu = memo(() => {
           <SubMenuButtonContent label={t('controlLayers.filter.filters')} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
-          <MenuItem icon={<PiFileBold />} isDisabled={isStaging || isBusy} onClick={handleClickPBRMaps}>
+          <MenuItem icon={<PiCubeBold />} isDisabled={isStaging || isBusy} onClick={handleClickPBRMaps}>
             {t('controlLayers.filter.pbr_maps.label')}
           </MenuItem>
         </MenuList>
