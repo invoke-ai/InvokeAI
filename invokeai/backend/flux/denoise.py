@@ -66,15 +66,6 @@ def denoise(
         total_steps = len(timesteps) - 1
         num_scheduler_steps = total_steps
 
-    step_callback(
-        PipelineIntermediateState(
-            step=0,
-            order=1,
-            total_steps=total_steps,
-            timestep=int(timesteps[0] * 1000) if use_scheduler else int(timesteps[0]),
-            latents=img,
-        ),
-    )
     # guidance_vec is ignored for schnell.
     guidance_vec = torch.full((img.shape[0],), guidance, device=img.device, dtype=img.dtype)
 
