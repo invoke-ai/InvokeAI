@@ -50,8 +50,8 @@ class PBRMapsInvocation(BaseInvocation, WithMetadata, WithBoard):
             roughness_map_field = ImageField(image_name=roughness_map.image_name)
 
             displacement_map = context.images.save(displacement_map)
-            displacement_map_map_field = ImageField(image_name=displacement_map.image_name)
+            displacement_map_field = ImageField(image_name=displacement_map.image_name)
 
         return PBRMapsOutput(
-            normal_map=normal_map_field, roughness_map=roughness_map_field, displacement_map=displacement_map_map_field
+            normal_map=normal_map_field, roughness_map=roughness_map_field, displacement_map=displacement_map_field
         )
