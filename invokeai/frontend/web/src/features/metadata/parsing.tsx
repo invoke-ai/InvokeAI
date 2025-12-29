@@ -32,6 +32,7 @@ import {
   vaeSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
+  zImageQwen3SourceModelSelected,
   zImageVaeModelSelected,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
@@ -741,6 +742,30 @@ const ZImageVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion ZImageVAEModel
 
+//#region ZImageQwen3SourceModel
+const ZImageQwen3SourceModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'ZImageQwen3SourceModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'qwen3_source');
+    const parsed = await parseModelIdentifier(raw, store, 'main');
+    assert(parsed.type === 'main');
+    // Only recall if the current main model is Z-Image
+    const base = selectBase(store.getState());
+    assert(base === 'z-image', 'ZImageQwen3SourceModel handler only works with Z-Image models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(zImageQwen3SourceModelSelected(value));
+  },
+  i18nKey: 'metadata.qwen3Source',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion ZImageQwen3SourceModel
+
 //#region LoRAs
 const LoRAs: CollectionMetadataHandler<LoRA[]> = {
   [CollectionMetadataKey]: true,
@@ -977,6 +1002,7 @@ export const ImageMetadataHandlers = {
   VAEModel,
   Qwen3EncoderModel,
   ZImageVAEModel,
+  ZImageQwen3SourceModel,
   LoRAs,
   CanvasLayers,
   RefImages,
