@@ -8,7 +8,7 @@ describe('text hotkey suppression', () => {
       key,
       ctrlKey: options?.ctrlKey ?? false,
       metaKey: options?.metaKey ?? false,
-    } as KeyboardEvent);
+    }) as KeyboardEvent;
 
   it('allows copy/paste/undo/redo shortcuts', () => {
     expect(isAllowedTextShortcut(buildEvent('c', { ctrlKey: true }))).toBe(true);

@@ -1,10 +1,7 @@
 export type TextSessionStatus = 'idle' | 'pending' | 'editing' | 'committed';
 export type TextSessionEvent = 'BEGIN' | 'EDIT' | 'COMMIT' | 'CANCEL';
 
-export const transitionTextSessionStatus = (
-  status: TextSessionStatus,
-  event: TextSessionEvent
-): TextSessionStatus => {
+export const transitionTextSessionStatus = (status: TextSessionStatus, event: TextSessionEvent): TextSessionStatus => {
   switch (status) {
     case 'idle':
       if (event === 'BEGIN') {

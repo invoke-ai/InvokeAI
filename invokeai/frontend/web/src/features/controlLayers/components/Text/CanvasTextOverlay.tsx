@@ -8,11 +8,7 @@ import type { CanvasTextSettingsState } from 'features/controlLayers/store/canva
 import { selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
 import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
 import { isAllowedTextShortcut } from 'features/controlLayers/text/textHotkeys';
-import {
-  hasVisibleGlyphs,
-  measureTextContent,
-  type TextMeasureConfig,
-} from 'features/controlLayers/text/textRenderer';
+import { hasVisibleGlyphs, measureTextContent, type TextMeasureConfig } from 'features/controlLayers/text/textRenderer';
 import {
   type ClipboardEvent as ReactClipboardEvent,
   type KeyboardEvent as ReactKeyboardEvent,

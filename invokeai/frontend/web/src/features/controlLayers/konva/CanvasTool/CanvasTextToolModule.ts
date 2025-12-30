@@ -3,10 +3,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { getColorAtCoordinate, getPrefixedId } from 'features/controlLayers/konva/util';
-import {
-  type CanvasTextSettingsState,
-  selectCanvasTextSlice,
-} from 'features/controlLayers/store/canvasTextSlice';
+import { type CanvasTextSettingsState, selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
 import type { CanvasImageState, Coordinate, RgbaColor, Tool } from 'features/controlLayers/store/types';
 import { RGBA_BLACK, RGBA_WHITE } from 'features/controlLayers/store/types';
 import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
@@ -313,8 +310,7 @@ export class CanvasTextToolModule extends CanvasModuleBase {
 
     const textSettings = this.manager.stateApi.runSelector(selectCanvasTextSlice);
     const canvasSettings = this.manager.stateApi.getSettings();
-    const color =
-      canvasSettings.activeColor === 'fgColor' ? canvasSettings.fgColor : canvasSettings.bgColor;
+    const color = canvasSettings.activeColor === 'fgColor' ? canvasSettings.fgColor : canvasSettings.bgColor;
 
     this.$session.set({
       ...session,
