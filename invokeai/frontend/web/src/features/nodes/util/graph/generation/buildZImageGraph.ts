@@ -14,6 +14,7 @@ import { addImageToImage } from 'features/nodes/util/graph/generation/addImageTo
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
+import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { addZImageLoRAs } from 'features/nodes/util/graph/generation/addZImageLoRAs';
@@ -75,12 +76,32 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     type: 'z_image_text_encoder',
     id: getPrefixedId('pos_prompt'),
   });
+  // Collect node for regional prompting support
+  const posCondCollect = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('pos_cond_collect'),
+  });
 
-  // Z-Image supports negative conditioning when guidance_scale > 0
-  const negCond = g.addNode({
-    type: 'z_image_text_encoder',
-    id: getPrefixedId('neg_prompt'),
-    prompt: prompts.negative,
+  // Z-Image supports negative conditioning when guidance_scale > 1
+  // Only create negative conditioning nodes if guidance is used
+  let negCond: Invocation<'z_image_text_encoder'> | null = null;
+  let negCondCollect: Invocation<'collect'> | null = null;
+  if (guidance_scale > 1) {
+    negCond = g.addNode({
+      type: 'z_image_text_encoder',
+      id: getPrefixedId('neg_prompt'),
+      prompt: prompts.negative,
+    });
+    negCondCollect = g.addNode({
+      type: 'collect',
+      id: getPrefixedId('neg_cond_collect'),
+    });
+  }
+
+  // Placeholder collect node for IP adapters (not supported for Z-Image but needed for addRegions)
+  const ipAdapterCollect = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('ip_adapter_collect'),
   });
 
   const seed = g.addNode({
@@ -100,17 +121,20 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
 
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'qwen3_encoder', posCond, 'qwen3_encoder');
-  g.addEdge(modelLoader, 'qwen3_encoder', negCond, 'qwen3_encoder');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
   // Connect VAE to denoise for control image encoding
   g.addEdge(modelLoader, 'vae', denoise, 'vae');
 
   g.addEdge(positivePrompt, 'value', posCond, 'prompt');
-  g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
+  // Connect positive conditioning through collector for regional support
+  g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
+  g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
 
-  // Only add negative conditioning edge if guidance_scale > 0
-  if (guidance_scale > 0) {
-    g.addEdge(negCond, 'conditioning', denoise, 'negative_conditioning');
+  // Connect negative conditioning if guidance_scale > 1
+  if (negCond !== null && negCondCollect !== null) {
+    g.addEdge(modelLoader, 'qwen3_encoder', negCond, 'qwen3_encoder');
+    g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
+    g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
   }
 
   g.addEdge(seed, 'value', denoise, 'seed');
@@ -119,9 +143,10 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
   // Add Z-Image LoRAs if any are enabled
   addZImageLoRAs(state, g, denoise, modelLoader, posCond, negCond);
 
-  // Add Z-Image Control layers if any are enabled
+  // Add regional guidance if canvas manager is available
+  const canvas = selectCanvasSlice(state);
   if (manager !== null) {
-    const canvas = selectCanvasSlice(state);
+    // Add Z-Image Control layers if any are enabled
     const rect = canvas.bbox.rect;
     await addZImageControl({
       manager,
@@ -130,7 +155,25 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
       rect,
       denoise,
     });
+
+    // Add regional guidance
+    await addRegions({
+      manager,
+      regions: canvas.regionalGuidance.entities,
+      g,
+      bbox: canvas.bbox.rect,
+      model,
+      posCond,
+      negCond,
+      posCondCollect,
+      negCondCollect,
+      ipAdapterCollect,
+      fluxReduxCollect: null, // Not supported for Z-Image
+    });
   }
+
+  // IP Adapters are not supported for Z-Image, so delete the unused collector
+  g.deleteNode(ipAdapterCollect.id);
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
   assert(modelConfig.base === 'z-image');
@@ -142,6 +185,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     steps,
     vae: zImageVaeModel ?? undefined,
     qwen3_encoder: zImageQwen3EncoderModel ?? undefined,
+    qwen3_source: zImageQwen3SourceModel ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');

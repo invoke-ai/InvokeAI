@@ -1,4 +1,4 @@
-# Z-Image Control Transformer support for InvokeAI
+# Z-Image backend utilities
 from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
 from invokeai.backend.z_image.z_image_control_transformer import ZImageControlTransformer2DModel
 from invokeai.backend.z_image.z_image_controlnet_extension import (

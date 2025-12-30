@@ -850,6 +850,7 @@
         "parsingFailed": "Parsing Failed",
         "positivePrompt": "Positive Prompt",
         "qwen3Encoder": "Qwen3 Encoder",
+        "qwen3Source": "Qwen3 Source",
         "recallParameters": "Recall Parameters",
         "recallParameter": "Recall {{label}}",
         "scheduler": "Scheduler",
@@ -2513,6 +2514,9 @@
                 "y": "Y (YCbCr)",
                 "cb": "Cb (YCbCr)",
                 "cr": "Cr (YCbCr)"
+            },
+            "pbr_maps": {
+                "label": "Create PBR Maps"
             }
         },
         "transform": {
