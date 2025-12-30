@@ -114,6 +114,11 @@ export class CanvasTextToolModule extends CanvasModuleBase {
   };
 
   syncCursorStyle = () => {
+    const session = this.$session.get();
+    if (session?.status === 'editing') {
+      this.manager.stage.setCursor('default');
+      return;
+    }
     this.manager.stage.setCursor('none');
   };
 

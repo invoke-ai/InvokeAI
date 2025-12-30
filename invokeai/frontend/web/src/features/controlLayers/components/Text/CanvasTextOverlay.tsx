@@ -76,10 +76,10 @@ const TextEditor = ({
   const canvasManager = useCanvasManager();
   const textSettings = useAppSelector(selectCanvasTextSlice);
   const canvasSettings = useAppSelector(selectCanvasSettingsSlice);
-  const editorRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
   const lastSessionIdRef = useRef<string | null>(null);
-  const hasFocusedRef = useRef(false);
-  const focusAttemptIdRef = useRef<number | null>(null);
+  const lastFocusedSessionIdRef = useRef<string | null>(null);
+  const focusRafIdRef = useRef<number | null>(null);
   const [isComposing, setIsComposing] = useState(false);
   const [textValue, setTextValue] = useState(initialText);
   const [contentMetrics, setContentMetrics] = useState(() =>
@@ -104,6 +104,10 @@ const TextEditor = ({
     selection.addRange(range);
   }, []);
 
+  const setEditorRef = useCallback((node: HTMLDivElement | null) => {
+    editorRef.current = node;
+  }, []);
+
   useEffect(() => {
     const node = editorRef.current;
     if (!node) {
@@ -112,7 +116,7 @@ const TextEditor = ({
     const isNewSession = lastSessionIdRef.current !== sessionId;
     if (isNewSession) {
       lastSessionIdRef.current = sessionId;
-      hasFocusedRef.current = false;
+      lastFocusedSessionIdRef.current = null;
       node.textContent = initialText;
       const syncedText = (node.innerText ?? '').replace(/\r/g, '');
       setIsEmpty(!hasVisibleGlyphs(syncedText));
@@ -120,35 +124,21 @@ const TextEditor = ({
       setContentMetrics(measureTextContent(buildMeasureConfig(syncedText, textSettings)));
       canvasManager.tool.tools.text.updateSessionText(sessionId, syncedText);
     }
-
-    if (hasFocusedRef.current) {
-      return;
+    if (lastFocusedSessionIdRef.current !== sessionId) {
+      if (focusRafIdRef.current !== null) {
+        cancelAnimationFrame(focusRafIdRef.current);
+      }
+      focusRafIdRef.current = requestAnimationFrame(() => {
+        canvasManager.tool.tools.text.markSessionEditing(sessionId);
+        focusEditor();
+        lastFocusedSessionIdRef.current = sessionId;
+        focusRafIdRef.current = null;
+      });
     }
-
-    let attempts = 0;
-    const MAX_ATTEMPTS = 5;
-    const tryFocus = () => {
-      const editorNode = editorRef.current;
-      if (!editorNode) {
-        return;
-      }
-      canvasManager.tool.tools.text.markSessionEditing(sessionId);
-      focusEditor();
-      const didFocus = document.activeElement === editorNode;
-      attempts += 1;
-      if (didFocus || attempts >= MAX_ATTEMPTS) {
-        hasFocusedRef.current = true;
-        focusAttemptIdRef.current = null;
-        return;
-      }
-      focusAttemptIdRef.current = requestAnimationFrame(tryFocus);
-    };
-
-    focusAttemptIdRef.current = requestAnimationFrame(tryFocus);
     return () => {
-      if (focusAttemptIdRef.current !== null) {
-        cancelAnimationFrame(focusAttemptIdRef.current);
-        focusAttemptIdRef.current = null;
+      if (focusRafIdRef.current !== null) {
+        cancelAnimationFrame(focusRafIdRef.current);
+        focusRafIdRef.current = null;
       }
     };
   }, [canvasManager.tool.tools.text, focusEditor, initialText, sessionId, textSettings]);
@@ -231,7 +221,7 @@ const TextEditor = ({
   const handleCompositionStart = useCallback(() => setIsComposing(true), []);
   const handleCompositionEnd = useCallback(() => setIsComposing(false), []);
 
-  const containerMetrics = useMemo(() => {
+  const textContainerData = useMemo(() => {
     const padding = TEXT_RASTER_PADDING;
     const extraRightPadding = Math.ceil(textSettings.fontSize * 0.26);
     const extraLeftPadding = Math.ceil(textSettings.fontSize * 0.12);
@@ -261,24 +251,24 @@ const TextEditor = ({
 
   useEffect(() => {
     canvasManager.tool.tools.text.updateSessionPosition(sessionId, {
-      x: containerMetrics.x,
-      y: containerMetrics.y,
+      x: textContainerData.x,
+      y: textContainerData.y,
     });
-  }, [canvasManager.tool.tools.text, containerMetrics, sessionId]);
+  }, [canvasManager.tool.tools.text, sessionId, textContainerData]);
 
   const containerStyle = useMemo(() => {
     return {
-      left: `${containerMetrics.x}px`,
-      top: `${containerMetrics.y}px`,
-      paddingTop: `${containerMetrics.padding}px`,
-      paddingBottom: `${containerMetrics.padding}px`,
-      paddingLeft: `${containerMetrics.padding + containerMetrics.extraLeftPadding}px`,
-      paddingRight: `${containerMetrics.padding + containerMetrics.extraRightPadding}px`,
-      width: `${Math.max(containerMetrics.width, textSettings.fontSize)}px`,
-      height: `${Math.max(containerMetrics.height, textSettings.fontSize)}px`,
+      left: `${textContainerData.x}px`,
+      top: `${textContainerData.y}px`,
+      paddingTop: `${textContainerData.padding}px`,
+      paddingBottom: `${textContainerData.padding}px`,
+      paddingLeft: `${textContainerData.padding + textContainerData.extraLeftPadding}px`,
+      paddingRight: `${textContainerData.padding + textContainerData.extraRightPadding}px`,
+      width: `${Math.max(textContainerData.width, textSettings.fontSize)}px`,
+      height: `${Math.max(textContainerData.height, textSettings.fontSize)}px`,
       textAlign: textSettings.alignment,
     };
-  }, [containerMetrics, textSettings.alignment, textSettings.fontSize]);
+  }, [textContainerData, textSettings.alignment, textSettings.fontSize]);
 
   const textStyle = useMemo(() => {
     const color =
@@ -307,7 +297,7 @@ const TextEditor = ({
   return (
     <Box position="absolute" pointerEvents="auto" {...containerStyle}>
       <Box
-        ref={editorRef}
+        ref={setEditorRef}
         contentEditable
         suppressContentEditableWarning
         onInput={handleInput}
