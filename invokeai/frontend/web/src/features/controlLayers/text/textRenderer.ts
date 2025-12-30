@@ -2,7 +2,7 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { Coordinate, RgbaColor } from 'features/controlLayers/store/types';
 import type { TextAlignment } from 'features/controlLayers/text/textConstants';
 
-export type TextRenderConfig = {
+type TextRenderConfig = {
   text: string;
   fontSize: number;
   fontFamily: string;
@@ -26,7 +26,7 @@ export type TextMeasureConfig = {
   lineHeight: number;
 };
 
-export type TextMetrics = {
+type TextMetrics = {
   lines: string[];
   lineWidths: number[];
   lineHeightPx: number;
@@ -37,7 +37,7 @@ export type TextMetrics = {
   baselineOffset: number;
 };
 
-export type TextRenderResult = {
+type TextRenderResult = {
   canvas: HTMLCanvasElement;
   contentWidth: number;
   contentHeight: number;
@@ -167,6 +167,6 @@ export const hasVisibleGlyphs = (text: string): boolean => {
   return text.replace(/\s+/g, '').length > 0;
 };
 
-export const snapToDpr = (value: number, dpr: number): number => {
+const snapToDpr = (value: number, dpr: number): number => {
   return Math.round(value * dpr) / dpr;
 };

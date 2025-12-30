@@ -19,7 +19,7 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 
-export type CanvasTextSessionState = {
+type CanvasTextSessionState = {
   id: string;
   anchor: Coordinate;
   position: Coordinate | null;

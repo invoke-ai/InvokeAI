@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const TEXT_FONT_IDS = [
+const TEXT_FONT_IDS = [
   'sans',
   'serif',
   'mono',
@@ -77,7 +77,7 @@ export const TEXT_MIN_LINE_HEIGHT = 1;
 export const TEXT_MAX_LINE_HEIGHT = 2;
 export const TEXT_RASTER_PADDING = 4;
 
-export const TEXT_ALIGNMENTS = ['left', 'center', 'right'] as const;
+const TEXT_ALIGNMENTS = ['left', 'center', 'right'] as const;
 export const zTextAlignment = z.enum(TEXT_ALIGNMENTS);
 export type TextAlignment = z.infer<typeof zTextAlignment>;
 export const TEXT_DEFAULT_ALIGNMENT: TextAlignment = 'left';
@@ -116,8 +116,4 @@ export const resolveAvailableFont = (stack: string): string => {
 
 export const getFontStackById = (fontId: TextFontId): string => {
   return TEXT_FONT_STACKS.find((font) => font.id === fontId)?.stack ?? TEXT_FONT_STACKS[0]?.stack ?? 'sans-serif';
-};
-
-export const getFontLabelById = (fontId: TextFontId): string => {
-  return TEXT_FONT_STACKS.find((font) => font.id === fontId)?.label ?? TEXT_FONT_STACKS[0]?.label ?? 'Sans';
 };
