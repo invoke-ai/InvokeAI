@@ -101,7 +101,15 @@ export const ToolFillColorPicker = memo(() => {
       returnFocusOnClose={true}
     >
       <PopoverTrigger>
-        <Flex role="button" aria-label={t('controlLayers.fill.fillColor')} tabIndex={-1} minW={8} w={8} h={8}>
+        <Flex
+          role="button"
+          aria-label={t('controlLayers.fill.fillColor')}
+          tabIndex={-1}
+          minW={8}
+          w={8}
+          h={8}
+          data-text-tool-safezone="true"
+        >
           <Tooltip label={tooltip}>
             <Flex alignItems="center" justifyContent="center" position="relative" w="full" h="full">
               <Box

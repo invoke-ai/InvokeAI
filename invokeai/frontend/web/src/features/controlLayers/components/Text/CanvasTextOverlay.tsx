@@ -168,6 +168,10 @@ const TextEditor = ({
         if (!(node instanceof HTMLElement)) {
           continue;
         }
+        const role = node.getAttribute('role');
+        if (role === 'listbox' || role === 'option') {
+          return true;
+        }
         if (editorRef.current && editorRef.current.contains(node)) {
           return true;
         }
