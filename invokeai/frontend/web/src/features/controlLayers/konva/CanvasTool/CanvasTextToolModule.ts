@@ -9,7 +9,9 @@ import {
   buildFontDescriptor,
   calculateLayerPosition,
   hasVisibleGlyphs,
+  measureTextContent,
   renderTextToCanvas,
+  type TextMeasureConfig,
 } from 'features/controlLayers/text/textRenderer';
 import { type TextSessionStatus, transitionTextSessionStatus } from 'features/controlLayers/text/textSessionMachine';
 import Konva from 'konva';
@@ -61,6 +63,8 @@ export class CanvasTextToolModule extends CanvasModuleBase {
 
   $session = atom<CanvasTextSessionState | null>(null);
   private subscriptions = new Set<() => void>();
+  private cursorHeight = 0;
+  private cursorMetricsKey: string | null = null;
 
   constructor(parent: CanvasToolModule) {
     super();
@@ -131,7 +135,21 @@ export class CanvasTextToolModule extends CanvasModuleBase {
   private setCursorDimensions = (settings: CanvasTextSettingsState) => {
     const onePixel = this.manager.stage.unscale(this.config.CURSOR_MIN_WIDTH_PX);
     const cursorWidth = Math.max(onePixel * 2, onePixel);
-    const height = settings.fontSize + TEXT_RASTER_PADDING * 2;
+    const metricsKey = `${settings.fontId}|${settings.fontSize}|${settings.bold}|${settings.italic}|${settings.lineHeight}`;
+    if (this.cursorMetricsKey !== metricsKey) {
+      const measureConfig: TextMeasureConfig = {
+        text: 'Mg',
+        fontSize: settings.fontSize,
+        fontFamily: getFontStackById(settings.fontId),
+        fontWeight: settings.bold ? 700 : 400,
+        fontStyle: settings.italic ? 'italic' : 'normal',
+        lineHeight: settings.lineHeight,
+      };
+      const metrics = measureTextContent(measureConfig);
+      this.cursorHeight = Math.max(metrics.lineHeightPx, settings.fontSize) + TEXT_RASTER_PADDING * 2;
+      this.cursorMetricsKey = metricsKey;
+    }
+    const height = this.cursorHeight || settings.fontSize + TEXT_RASTER_PADDING * 2;
     this.konva.cursor.setAttrs({
       width: cursorWidth,
       height,

@@ -2,10 +2,18 @@ import {
   Box,
   ButtonGroup,
   Combobox,
-  CompositeNumberInput,
   CompositeSlider,
   Flex,
   IconButton,
+  NumberInput,
+  NumberInputField,
+  Popover,
+  PopoverAnchor,
+  PopoverArrow,
+  PopoverBody,
+  PopoverContent,
+  PopoverTrigger,
+  Portal,
   Text,
   Tooltip,
 } from '@invoke-ai/ui-library';
@@ -29,9 +37,10 @@ import {
   TEXT_MIN_FONT_SIZE,
   type TextFontId,
 } from 'features/controlLayers/text/textConstants';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  PiCaretDownBold,
   PiTextAlignCenterBold,
   PiTextAlignLeftBold,
   PiTextAlignRightBold,
@@ -41,7 +50,14 @@ import {
   PiTextUnderlineBold,
 } from 'react-icons/pi';
 
-const formatPx = (value: number | string) => `${value} px`;
+const formatPx = (value: number | string) => {
+  if (isNaN(Number(value))) {
+    return '';
+  }
+  return `${value} px`;
+};
+
+const formatSliderValue = (value: number) => String(value);
 
 export const TextToolOptions = () => {
   return (
@@ -101,12 +117,39 @@ const FontSizeControl = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const fontSize = useAppSelector(selectTextFontSize);
-  const handleFontSizeChange = useCallback(
+  const [localFontSize, setLocalFontSize] = useState(fontSize);
+  const marks = useMemo(
+    () =>
+      [5, 50, 100, 200, 300, 400, 500].filter((value) => value >= TEXT_MIN_FONT_SIZE && value <= TEXT_MAX_FONT_SIZE),
+    []
+  );
+  const onChangeNumberInput = useCallback(
+    (valueAsString: string, valueAsNumber: number) => {
+      setLocalFontSize(valueAsNumber);
+      if (!isNaN(valueAsNumber)) {
+        dispatch(textFontSizeChanged(valueAsNumber));
+      }
+    },
+    [dispatch]
+  );
+  const onChangeSlider = useCallback(
     (value: number) => {
+      setLocalFontSize(value);
       dispatch(textFontSizeChanged(value));
     },
     [dispatch]
   );
+  const onBlur = useCallback(() => {
+    if (isNaN(Number(localFontSize))) {
+      setLocalFontSize(fontSize);
+      return;
+    }
+    dispatch(textFontSizeChanged(localFontSize));
+  }, [dispatch, fontSize, localFontSize]);
+
+  useEffect(() => {
+    setLocalFontSize(fontSize);
+  }, [fontSize]);
 
   return (
     <Flex w="auto" flexShrink={0} alignItems="center" gap={2}>
@@ -116,30 +159,53 @@ const FontSizeControl = () => {
       <Flex gap={2} alignItems="center">
         <Tooltip label={t('controlLayers.text.size', { defaultValue: 'Size' })}>
           <Box w="80px" minW="80px">
-            <CompositeNumberInput
-              size="sm"
-              variant="outline"
-              min={TEXT_MIN_FONT_SIZE}
-              max={TEXT_MAX_FONT_SIZE}
-              step={1}
-              value={fontSize}
-              onChange={handleFontSizeChange}
-              format={formatPx}
-            />
-          </Box>
-        </Tooltip>
-        <Tooltip label={t('controlLayers.text.size', { defaultValue: 'Size' })}>
-          <Box w="140px" minW="120px">
-            <CompositeSlider
-              size="sm"
-              variant="outline"
-              h="unset"
-              min={TEXT_MIN_FONT_SIZE}
-              max={TEXT_MAX_FONT_SIZE}
-              step={2}
-              value={fontSize}
-              onChange={handleFontSizeChange}
-            />
+            <Popover>
+              <PopoverAnchor>
+                <NumberInput
+                  variant="outline"
+                  display="flex"
+                  alignItems="center"
+                  min={TEXT_MIN_FONT_SIZE}
+                  max={TEXT_MAX_FONT_SIZE}
+                  step={1}
+                  value={localFontSize}
+                  onChange={onChangeNumberInput}
+                  onBlur={onBlur}
+                  format={formatPx}
+                  clampValueOnBlur={false}
+                >
+                  <NumberInputField _focusVisible={{ zIndex: 0 }} title="" paddingInlineEnd={7} />
+                  <PopoverTrigger>
+                    <IconButton
+                      aria-label="open-slider"
+                      icon={<PiCaretDownBold />}
+                      size="sm"
+                      variant="link"
+                      position="absolute"
+                      insetInlineEnd={0}
+                      h="full"
+                    />
+                  </PopoverTrigger>
+                </NumberInput>
+              </PopoverAnchor>
+              <Portal>
+                <PopoverContent w={200} pt={0} pb={2} px={4} data-text-tool-safezone="true">
+                  <PopoverArrow />
+                  <PopoverBody>
+                    <CompositeSlider
+                      min={TEXT_MIN_FONT_SIZE}
+                      max={TEXT_MAX_FONT_SIZE}
+                      step={2}
+                      value={localFontSize}
+                      onChange={onChangeSlider}
+                      marks={marks}
+                      formatValue={formatSliderValue}
+                      alwaysShowMarks
+                    />
+                  </PopoverBody>
+                </PopoverContent>
+              </Portal>
+            </Popover>
           </Box>
         </Tooltip>
       </Flex>
