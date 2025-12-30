@@ -43,8 +43,9 @@ export const TEXT_FONT_STACKS: Array<{ id: TextFontId; label: string; stack: str
   },
   {
     id: 'humanist',
-    label: 'Humanist',
-    stack: '"Gill Sans","Gill Sans MT","Trebuchet MS","Segoe UI",sans-serif',
+    label: 'Handwritten',
+    stack:
+      '"Savoye LET","Zapfino","Snell Roundhand","Apple Chancery","Edwardian Script ITC","Palace Script MT","URW Chancery L","Brush Script MT","Lucida Handwriting","Segoe Script","Segoe Print","Comic Sans MS","Comic Sans","Segoe UI",cursive',
   },
   {
     id: 'slab',
@@ -89,26 +90,50 @@ const splitFontStack = (stack: string) => stack.split(',').map((font) => stripQu
 const isGenericFont = (fontName: string) =>
   fontName === 'serif' || fontName === 'sans-serif' || fontName === 'monospace' || fontName === 'cursive';
 
+const FONT_PROBE_TEXT = 'abcdefghijklmnopqrstuvwxyz0123456789';
+
+const getFontProbeContext = () => {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+  const canvas = document.createElement('canvas');
+  return canvas.getContext('2d');
+};
+
+const isFontAvailable = (fontName: string): boolean => {
+  const ctx = getFontProbeContext();
+  if (!ctx) {
+    return false;
+  }
+  const fontSize = 72;
+  const fallbackFonts = ['monospace', 'serif', 'sans-serif'];
+  for (const fallback of fallbackFonts) {
+    ctx.font = `${fontSize}px ${fallback}`;
+    const baseline = ctx.measureText(FONT_PROBE_TEXT).width;
+    ctx.font = `${fontSize}px "${fontName}",${fallback}`;
+    const measured = ctx.measureText(FONT_PROBE_TEXT).width;
+    if (measured !== baseline) {
+      return true;
+    }
+  }
+  return false;
+};
+
 /**
  * Attempts to resolve the first available font in the stack. Falls back to the first entry if availability cannot be
  * determined (e.g. server-side rendering or older browsers).
  */
 export const resolveAvailableFont = (stack: string): string => {
   const fontCandidates = splitFontStack(stack);
-  if (typeof document === 'undefined' || !('fonts' in document) || typeof document.fonts.check !== 'function') {
+  if (typeof document === 'undefined') {
     return fontCandidates[0] ?? 'sans-serif';
   }
   for (const candidate of fontCandidates) {
     if (isGenericFont(candidate)) {
       return candidate;
     }
-    try {
-      if (document.fonts.check(`12px ${candidate}`)) {
-        return candidate;
-      }
-    } catch {
-      // Some browsers throw on invalid fonts; ignore and continue through the stack.
-      continue;
+    if (isFontAvailable(candidate)) {
+      return candidate;
     }
   }
   return fontCandidates[0] ?? 'sans-serif';

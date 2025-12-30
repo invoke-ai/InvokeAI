@@ -1,11 +1,9 @@
-import { throttle } from 'es-toolkit/compat';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { getColorAtCoordinate, getPrefixedId } from 'features/controlLayers/konva/util';
+import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { type CanvasTextSettingsState, selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
 import type { CanvasImageState, Coordinate, RgbaColor, Tool } from 'features/controlLayers/store/types';
-import { RGBA_BLACK, RGBA_WHITE } from 'features/controlLayers/store/types';
 import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
 import {
   buildFontDescriptor,
@@ -27,8 +25,6 @@ type CanvasTextSessionState = {
   createdAt: number;
   text: string;
 };
-
-type CursorColor = RgbaColor;
 
 type CanvasTextToolModuleConfig = {
   CURSOR_MIN_WIDTH_PX: number;
@@ -60,13 +56,10 @@ export class CanvasTextToolModule extends CanvasModuleBase {
   konva: {
     group: Konva.Group;
     cursor: Konva.Rect;
-    cursorOutline: Konva.Rect;
     label: Konva.Text;
   };
 
   $session = atom<CanvasTextSessionState | null>(null);
-  $cursorColor = atom<CursorColor>(RGBA_WHITE);
-  private lastStageCursor: Coordinate | null = null;
   private subscriptions = new Set<() => void>();
 
   constructor(parent: CanvasToolModule) {
@@ -86,13 +79,6 @@ export class CanvasTextToolModule extends CanvasModuleBase {
         listening: false,
         perfectDrawEnabled: false,
       }),
-      cursorOutline: new Konva.Rect({
-        name: `${this.type}:cursorOutline`,
-        width: 1,
-        height: 10,
-        listening: false,
-        perfectDrawEnabled: false,
-      }),
       label: new Konva.Text({
         name: `${this.type}:label`,
         text: 'T',
@@ -101,7 +87,6 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       }),
     };
 
-    this.konva.group.add(this.konva.cursorOutline);
     this.konva.group.add(this.konva.cursor);
     this.konva.group.add(this.konva.label);
     this.konva.label.visible(true);
@@ -141,46 +126,33 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     this.setVisibility(true);
     this.setCursorDimensions(textSettings);
     this.setCursorPosition(cursorPos.relative, textSettings);
-    if (this.lastStageCursor) {
-      this.sampleCursorColor(this.lastStageCursor, true);
-    }
   };
 
   private setCursorDimensions = (settings: CanvasTextSettingsState) => {
     const onePixel = this.manager.stage.unscale(this.config.CURSOR_MIN_WIDTH_PX);
+    const cursorWidth = Math.max(onePixel * 2, onePixel);
     const height = settings.fontSize + TEXT_RASTER_PADDING * 2;
     this.konva.cursor.setAttrs({
-      width: onePixel,
-      height,
-    });
-    this.konva.cursorOutline.setAttrs({
-      width: onePixel * 3,
+      width: cursorWidth,
       height,
     });
     this.konva.label.setAttrs({
       fontFamily: getFontStackById('uiSerif'),
       fontSize: Math.max(12, height * 0.35),
       fontStyle: settings.bold ? '700' : '400',
+      fill: 'rgba(0, 0, 0, 1)',
+      stroke: 'rgba(255, 255, 255, 1)',
+      strokeWidth: Math.max(1, onePixel),
     });
-    const color = this.$cursorColor.get();
-    const fill = `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`;
-    const luminance = (0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b) / 255;
-    const inverseColor = luminance > 0.5 ? RGBA_BLACK : RGBA_WHITE;
-    const inverse = `rgba(${inverseColor.r}, ${inverseColor.g}, ${inverseColor.b}, ${inverseColor.a})`;
-    this.konva.cursor.fill(fill);
-    this.konva.cursorOutline.stroke(inverse);
-    this.konva.cursorOutline.strokeWidth(onePixel);
-    this.konva.label.fill('rgba(255, 255, 255, 1)');
+    this.konva.cursor.fill('rgba(0, 0, 0, 1)');
+    this.konva.cursor.stroke('rgba(255, 255, 255, 1)');
+    this.konva.cursor.strokeWidth(onePixel);
   };
 
   private setCursorPosition = (cursor: Coordinate, _settings: CanvasTextSettingsState) => {
     const top = cursor.y - TEXT_RASTER_PADDING;
     this.konva.cursor.setAttrs({
       x: cursor.x,
-      y: top,
-    });
-    this.konva.cursorOutline.setAttrs({
-      x: cursor.x - this.konva.cursorOutline.width() / 2 + this.konva.cursor.width() / 2,
       y: top,
     });
     const labelFontSize = this.konva.label.fontSize();
@@ -203,8 +175,6 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     if (!cursorPos) {
       return;
     }
-    this.lastStageCursor = cursorPos.absolute;
-    this.sampleCursorColor(cursorPos.absolute);
   };
 
   onStagePointerEnter = (e: KonvaEventObject<PointerEvent>) => {
@@ -215,8 +185,6 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     if (!cursorPos) {
       return;
     }
-    this.lastStageCursor = cursorPos.absolute;
-    this.sampleCursorColor(cursorPos.absolute, true);
   };
 
   onStagePointerDown = (e: KonvaEventObject<PointerEvent>) => {
@@ -392,11 +360,6 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     this.clearSession();
   };
 
-  private computeCursorContrast = (color: RgbaColor): CursorColor => {
-    const luminance = (0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b) / 255;
-    return luminance > 0.6 ? RGBA_BLACK : RGBA_WHITE;
-  };
-
   private buildLayerName = (text: string) => {
     const flattened = text.replace(/\s+/g, ' ').trim();
     if (!flattened) {
@@ -405,22 +368,4 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     return flattened.length > 32 ? `${flattened.slice(0, 29)}…` : flattened;
   };
 
-  private sampleCursorColor = throttle((coordinate: Coordinate, force: boolean = false) => {
-    if (!force && !this.parent.getCanDraw()) {
-      return;
-    }
-    try {
-      const color = getColorAtCoordinate(this.manager.stage.konva.stage, coordinate);
-      if (!color) {
-        this.$cursorColor.set(RGBA_WHITE);
-        return;
-      }
-      const contrastColor = this.computeCursorContrast(color);
-      this.$cursorColor.set(contrastColor);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      this.log.error('Failed to sample cursor color: %s', message);
-      this.$cursorColor.set(RGBA_WHITE);
-    }
-  }, 100);
 }

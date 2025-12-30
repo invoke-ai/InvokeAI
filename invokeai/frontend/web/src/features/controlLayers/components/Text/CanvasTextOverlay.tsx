@@ -233,20 +233,31 @@ const TextEditor = ({
 
   const containerMetrics = useMemo(() => {
     const padding = TEXT_RASTER_PADDING;
-    let offsetX = -padding;
+    const extraRightPadding = Math.ceil(textSettings.fontSize * 0.26);
+    const extraLeftPadding = Math.ceil(textSettings.fontSize * 0.12);
+    let offsetX = -padding - extraLeftPadding;
     if (textSettings.alignment === 'center') {
-      offsetX = -(contentMetrics.contentWidth / 2) - padding;
+      offsetX = -(contentMetrics.contentWidth / 2) - padding - extraLeftPadding;
     } else if (textSettings.alignment === 'right') {
-      offsetX = -contentMetrics.contentWidth - padding;
+      offsetX = -contentMetrics.contentWidth - padding - extraLeftPadding;
     }
     return {
       x: anchor.x + offsetX,
       y: anchor.y - padding,
       padding,
-      width: contentMetrics.contentWidth + padding * 2,
+      extraLeftPadding,
+      extraRightPadding,
+      width: contentMetrics.contentWidth + padding * 2 + extraLeftPadding + extraRightPadding,
       height: contentMetrics.contentHeight + padding * 2,
     };
-  }, [anchor.x, anchor.y, contentMetrics.contentHeight, contentMetrics.contentWidth, textSettings.alignment]);
+  }, [
+    anchor.x,
+    anchor.y,
+    contentMetrics.contentHeight,
+    contentMetrics.contentWidth,
+    textSettings.alignment,
+    textSettings.fontSize,
+  ]);
 
   useEffect(() => {
     canvasManager.tool.tools.text.updateSessionPosition(sessionId, {
@@ -259,7 +270,10 @@ const TextEditor = ({
     return {
       left: `${containerMetrics.x}px`,
       top: `${containerMetrics.y}px`,
-      padding: `${containerMetrics.padding}px`,
+      paddingTop: `${containerMetrics.padding}px`,
+      paddingBottom: `${containerMetrics.padding}px`,
+      paddingLeft: `${containerMetrics.padding + containerMetrics.extraLeftPadding}px`,
+      paddingRight: `${containerMetrics.padding + containerMetrics.extraRightPadding}px`,
       width: `${Math.max(containerMetrics.width, textSettings.fontSize)}px`,
       height: `${Math.max(containerMetrics.height, textSettings.fontSize)}px`,
       textAlign: textSettings.alignment,

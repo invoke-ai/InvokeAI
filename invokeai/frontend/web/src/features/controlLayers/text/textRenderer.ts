@@ -47,7 +47,9 @@ type TextRenderResult = {
 
 export const renderTextToCanvas = (config: TextRenderConfig): TextRenderResult => {
   const measurement = measureTextContent(config);
-  const totalWidth = Math.ceil(measurement.contentWidth + config.padding * 2);
+  const extraRightPadding = Math.ceil(config.fontSize * 0.26);
+  const extraLeftPadding = Math.ceil(config.fontSize * 0.12);
+  const totalWidth = Math.ceil(measurement.contentWidth + config.padding * 2 + extraRightPadding + extraLeftPadding);
   const totalHeight = Math.ceil(measurement.contentHeight + config.padding * 2);
 
   const canvas = document.createElement('canvas');
@@ -69,17 +71,17 @@ export const renderTextToCanvas = (config: TextRenderConfig): TextRenderResult =
   measurement.lines.forEach((line, index) => {
     const text = line === '' ? ' ' : line;
     const lineWidth = measurement.lineWidths[index] ?? 0;
-    const x = computeAlignedX(lineWidth, measurement.contentWidth, config.alignment, config.padding);
+    const x = computeAlignedX(lineWidth, measurement.contentWidth, config.alignment, config.padding + extraLeftPadding);
     const y = config.padding + measurement.baselineOffset + index * measurement.lineHeightPx;
     const snappedX = snapToDpr(x, dprScale);
     const snappedY = snapToDpr(y, dprScale);
     ctx.fillText(text, snappedX, snappedY);
     if (config.underline) {
-      const underlineY = snapToDpr(snappedY + config.fontSize + 2, dprScale);
+      const underlineY = snapToDpr(snappedY + Math.max(1, measurement.descent * 0.6), dprScale);
       ctx.fillRect(snappedX, underlineY, lineWidth, Math.max(1, config.fontSize * 0.08));
     }
     if (config.strikethrough) {
-      const strikeY = snapToDpr(snappedY + config.fontSize * 0.55, dprScale);
+      const strikeY = snapToDpr(snappedY - measurement.ascent * 0.3 + measurement.descent * 0.2, dprScale);
       ctx.fillRect(snappedX, strikeY, lineWidth, Math.max(1, config.fontSize * 0.08));
     }
   });
@@ -149,13 +151,14 @@ export const calculateLayerPosition = (
   anchor: Coordinate,
   alignment: TextAlignment,
   contentWidth: number,
-  padding: number
+  padding: number,
+  extraLeftPadding: number = 0
 ) => {
-  let offsetX = -padding;
+  let offsetX = -padding - extraLeftPadding;
   if (alignment === 'center') {
-    offsetX = -(contentWidth / 2) - padding;
+    offsetX = -(contentWidth / 2) - padding - extraLeftPadding;
   } else if (alignment === 'right') {
-    offsetX = -contentWidth - padding;
+    offsetX = -contentWidth - padding - extraLeftPadding;
   }
   return {
     x: anchor.x + offsetX,
