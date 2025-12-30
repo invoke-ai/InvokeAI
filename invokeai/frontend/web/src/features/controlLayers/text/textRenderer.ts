@@ -107,8 +107,16 @@ export const measureTextContent = (config: TextMeasureConfig): TextMetrics => {
   const sampleMetrics = measureCtx.measureText('Mg');
   const fallbackAscent = config.fontSize * 0.8;
   const fallbackDescent = config.fontSize * 0.2;
-  const ascent = sampleMetrics.actualBoundingBoxAscent || fallbackAscent;
-  const descent = sampleMetrics.actualBoundingBoxDescent || fallbackDescent;
+  const ascent =
+    sampleMetrics.fontBoundingBoxAscent ||
+    sampleMetrics.actualBoundingBoxAscent ||
+    sampleMetrics.emHeightAscent ||
+    fallbackAscent;
+  const descent =
+    sampleMetrics.fontBoundingBoxDescent ||
+    sampleMetrics.actualBoundingBoxDescent ||
+    sampleMetrics.emHeightDescent ||
+    fallbackDescent;
   const lineHeightPx = (ascent + descent) * config.lineHeight;
   const extraLeading = Math.max(0, lineHeightPx - (ascent + descent));
   const baselineOffset = ascent + extraLeading / 2;

@@ -367,5 +367,4 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     }
     return flattened.length > 32 ? `${flattened.slice(0, 29)}…` : flattened;
   };
-
 }

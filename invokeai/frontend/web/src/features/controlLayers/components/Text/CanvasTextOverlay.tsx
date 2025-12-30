@@ -298,11 +298,11 @@ const TextEditor = ({
       fontStyle: textSettings.italic ? 'italic' : 'normal',
       textDecorationLine: decorations.length ? decorations.join(' ') : 'none',
       fontSize: `${textSettings.fontSize}px`,
-      lineHeight: textSettings.lineHeight,
+      lineHeight: `${contentMetrics.lineHeightPx}px`,
       color,
       textAlign: textSettings.alignment,
     } as const;
-  }, [canvasSettings, textSettings]);
+  }, [canvasSettings, contentMetrics.lineHeightPx, textSettings]);
 
   return (
     <Box position="absolute" pointerEvents="auto" {...containerStyle}>
