@@ -45,7 +45,7 @@ const formatPx = (value: number | string) => `${value} px`;
 
 export const TextToolOptions = () => {
   return (
-    <Flex alignItems="center" gap={2} minW={0} data-text-tool-safezone="true">
+    <Flex alignItems="center" gap={2} minW={0} flexShrink={1} overflow="hidden" data-text-tool-safezone="true">
       <FontSelect />
       <FontSizeControl />
       <FormatControls />
@@ -133,6 +133,7 @@ const FontSizeControl = () => {
             <CompositeSlider
               size="sm"
               variant="outline"
+              h="unset"
               min={TEXT_MIN_FONT_SIZE}
               max={TEXT_MAX_FONT_SIZE}
               step={2}

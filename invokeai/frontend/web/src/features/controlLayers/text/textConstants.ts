@@ -1,6 +1,17 @@
 import { z } from 'zod';
 
-export const TEXT_FONT_IDS = ['sans', 'serif', 'mono', 'rounded', 'script'] as const;
+export const TEXT_FONT_IDS = [
+  'sans',
+  'serif',
+  'mono',
+  'rounded',
+  'script',
+  'humanist',
+  'slab',
+  'display',
+  'narrow',
+  'uiSerif',
+] as const;
 export const zTextFontId = z.enum(TEXT_FONT_IDS);
 export type TextFontId = z.infer<typeof zTextFontId>;
 
@@ -29,6 +40,31 @@ export const TEXT_FONT_STACKS: Array<{ id: TextFontId; label: string; stack: str
     id: 'script',
     label: 'Script',
     stack: '"Comic Sans MS","Comic Sans","Segoe UI",sans-serif',
+  },
+  {
+    id: 'humanist',
+    label: 'Humanist',
+    stack: '"Gill Sans","Gill Sans MT","Trebuchet MS","Segoe UI",sans-serif',
+  },
+  {
+    id: 'slab',
+    label: 'Slab Serif',
+    stack: '"Rockwell","Cambria","Georgia","Times New Roman",serif',
+  },
+  {
+    id: 'display',
+    label: 'Display',
+    stack: '"Impact","Haettenschweiler","Franklin Gothic Medium",Arial,sans-serif',
+  },
+  {
+    id: 'narrow',
+    label: 'Narrow',
+    stack: '"Arial Narrow","Roboto Condensed","Segoe UI",Arial,sans-serif',
+  },
+  {
+    id: 'uiSerif',
+    label: 'UI Serif',
+    stack: '"Iowan Old Style","Palatino","Book Antiqua","Times New Roman",serif',
   },
 ];
 

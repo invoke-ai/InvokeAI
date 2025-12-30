@@ -10,7 +10,12 @@ import {
 import type { CanvasImageState, Coordinate, RgbaColor, Tool } from 'features/controlLayers/store/types';
 import { RGBA_BLACK, RGBA_WHITE } from 'features/controlLayers/store/types';
 import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
-import { calculateLayerPosition, hasVisibleGlyphs, renderTextToCanvas } from 'features/controlLayers/text/textRenderer';
+import {
+  buildFontDescriptor,
+  calculateLayerPosition,
+  hasVisibleGlyphs,
+  renderTextToCanvas,
+} from 'features/controlLayers/text/textRenderer';
 import { type TextSessionStatus, transitionTextSessionStatus } from 'features/controlLayers/text/textSessionMachine';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -314,6 +319,30 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       status: coerceSessionStatus(transitionTextSessionStatus(session.status, 'COMMIT')),
     });
 
+    void this.commitSession(session, rawText, textSettings, color);
+  };
+
+  private commitSession = async (
+    session: CanvasTextSessionState,
+    rawText: string,
+    textSettings: CanvasTextSettingsState,
+    color: RgbaColor
+  ) => {
+    if (typeof document !== 'undefined' && document.fonts?.load) {
+      const fontSpec = buildFontDescriptor({
+        fontFamily: getFontStackById(textSettings.fontId),
+        fontWeight: textSettings.bold ? 700 : 400,
+        fontStyle: textSettings.italic ? 'italic' : 'normal',
+        fontSize: textSettings.fontSize,
+      });
+      try {
+        await document.fonts.load(fontSpec);
+        await document.fonts.ready;
+      } catch {
+        // Ignore font load failures and proceed with available metrics.
+      }
+    }
+
     const renderResult = renderTextToCanvas({
       text: rawText,
       fontSize: textSettings.fontSize,
@@ -346,9 +375,7 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       renderResult.contentWidth,
       TEXT_RASTER_PADDING
     );
-    const position = session.position
-      ? { x: Math.round(session.position.x), y: Math.round(session.position.y) }
-      : fallbackPosition;
+    const position = session.position ? { x: session.position.x, y: session.position.y } : fallbackPosition;
 
     const selectedAdapter = this.manager.stateApi.getSelectedEntityAdapter();
     const addAfter =
