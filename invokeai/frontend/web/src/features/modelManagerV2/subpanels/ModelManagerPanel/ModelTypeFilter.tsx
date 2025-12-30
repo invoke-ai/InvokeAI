@@ -17,8 +17,8 @@ export const ModelTypeFilter = memo(() => {
   }, [dispatch]);
 
   return (
-    <Menu>
-      <MenuButton as={Button} size="sm" leftIcon={<PiFunnelBold />}>
+    <Menu placement="bottom-end">
+      <MenuButton as={Button} size="sm" rightIcon={<PiFunnelBold />}>
         {filteredModelType ? t(MODEL_CATEGORIES[filteredModelType].i18nKey) : t('modelManager.allModels')}
       </MenuButton>
       <MenuList>

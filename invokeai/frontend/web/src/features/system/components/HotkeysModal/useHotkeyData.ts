@@ -1,3 +1,5 @@
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectCustomHotkeys } from 'features/system/store/hotkeysSlice';
 import { useMemo } from 'react';
 import { type HotkeyCallback, type Options, useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
@@ -5,12 +7,24 @@ import { assert } from 'tsafe';
 
 type HotkeyCategory = 'app' | 'canvas' | 'viewer' | 'gallery' | 'workflows';
 
+// Centralized platform detection - computed once
+export const IS_MAC_OS =
+  typeof navigator !== 'undefined' &&
+  (
+    (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform ??
+    navigator.platform ??
+    ''
+  )
+    .toLowerCase()
+    .includes('mac');
+
 export type Hotkey = {
   id: string;
   category: string;
   title: string;
   desc: string;
   hotkeys: string[];
+  defaultHotkeys: string[];
   platformKeys: string[][];
   isEnabled: boolean;
 };
@@ -19,9 +33,9 @@ type HotkeyCategoryData = { title: string; hotkeys: Record<string, Hotkey> };
 
 type HotkeysData = Record<HotkeyCategory, HotkeyCategoryData>;
 
-const formatKeysForPlatform = (keys: string[], isMacOS: boolean): string[][] => {
+const formatKeysForPlatform = (keys: string[]): string[][] => {
   return keys.map((k) => {
-    if (isMacOS) {
+    if (IS_MAC_OS) {
       return k.split('+').map((i) => i.replaceAll('mod', 'cmd').replaceAll('alt', 'option'));
     } else {
       return k.split('+').map((i) => i.replaceAll('mod', 'ctrl'));
@@ -31,9 +45,7 @@ const formatKeysForPlatform = (keys: string[], isMacOS: boolean): string[][] => 
 
 export const useHotkeyData = (): HotkeysData => {
   const { t } = useTranslation();
-  const isMacOS = useMemo(() => {
-    return navigator.userAgent.toLowerCase().includes('mac');
-  }, []);
+  const customHotkeys = useAppSelector(selectCustomHotkeys);
 
   const hotkeysData = useMemo<HotkeysData>(() => {
     const data: HotkeysData = {
@@ -60,13 +72,16 @@ export const useHotkeyData = (): HotkeysData => {
     };
 
     const addHotkey = (category: HotkeyCategory, id: string, keys: string[], isEnabled: boolean = true) => {
+      const hotkeyId = `${category}.${id}`;
+      const effectiveKeys = customHotkeys[hotkeyId] ?? keys;
       data[category].hotkeys[id] = {
         id,
         category,
         title: t(`hotkeys.${category}.${id}.title`),
         desc: t(`hotkeys.${category}.${id}.desc`),
-        hotkeys: keys,
-        platformKeys: formatKeysForPlatform(keys, isMacOS),
+        hotkeys: effectiveKeys,
+        defaultHotkeys: keys,
+        platformKeys: formatKeysForPlatform(effectiveKeys),
         isEnabled,
       };
     };
@@ -83,8 +98,10 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('app', 'selectQueueTab', ['6']);
 
     // Prompt/history navigation (when prompt textarea is focused)
-    addHotkey('app', 'promptHistoryPrev', ['alt+up']);
-    addHotkey('app', 'promptHistoryNext', ['alt+down']);
+    addHotkey('app', 'promptHistoryPrev', ['alt+arrowup']);
+    addHotkey('app', 'promptHistoryNext', ['alt+arrowdown']);
+    addHotkey('app', 'promptWeightUp', ['ctrl+arrowup']);
+    addHotkey('app', 'promptWeightDown', ['ctrl+arrowdown']);
 
     addHotkey('app', 'focusPrompt', ['alt+a']);
     addHotkey('app', 'toggleLeftPanel', ['t', 'o']);
@@ -168,9 +185,30 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('gallery', 'starImage', ['.']);
 
     return data;
-  }, [isMacOS, t]);
+  }, [customHotkeys, t]);
 
   return hotkeysData;
+};
+
+export type HotkeyConflictInfo = { category: string; id: string; title: string; fullId: string };
+
+/**
+ * Returns a map of all registered hotkeys for conflict detection.
+ * Computed once and shared across all hotkey items.
+ */
+export const useHotkeyConflictMap = (): Map<string, HotkeyConflictInfo> => {
+  const hotkeysData = useHotkeyData();
+  return useMemo(() => {
+    const map = new Map<string, HotkeyConflictInfo>();
+    for (const [category, categoryData] of Object.entries(hotkeysData)) {
+      for (const [id, hotkeyData] of Object.entries(categoryData.hotkeys)) {
+        for (const hotkeyString of hotkeyData.hotkeys) {
+          map.set(hotkeyString, { category, id, title: hotkeyData.title, fullId: `${category}.${id}` });
+        }
+      }
+    }
+    return map;
+  }, [hotkeysData]);
 };
 
 type UseRegisteredHotkeysArg = {
@@ -224,4 +262,21 @@ export const useRegisteredHotkeys = ({ id, category, callback, options, dependen
   }, [data.isEnabled, options]);
 
   return useHotkeys(data.hotkeys, callback, _options, dependencies);
+};
+
+/*
+ * Returns true if any hotkeys have been modified from their default values.
+ */
+export const isHotkeysModified = (hotkeysData: HotkeysData): boolean => {
+  for (const categoryData of Object.values(hotkeysData)) {
+    for (const hotkeyData of Object.values(categoryData.hotkeys)) {
+      if (
+        hotkeyData.hotkeys.length !== hotkeyData.defaultHotkeys.length ||
+        !hotkeyData.hotkeys.every((key, index) => key === hotkeyData.defaultHotkeys[index])
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
 };

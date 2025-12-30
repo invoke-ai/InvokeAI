@@ -690,6 +690,69 @@ flux_fill = StarterModel(
 )
 # endregion
 
+# region Z-Image
+z_image_qwen3_encoder = StarterModel(
+    name="Z-Image Qwen3 Text Encoder",
+    base=BaseModelType.Any,
+    source="Tongyi-MAI/Z-Image-Turbo::text_encoder+tokenizer",
+    description="Qwen3 4B text encoder with tokenizer for Z-Image (full precision). ~8GB",
+    type=ModelType.Qwen3Encoder,
+)
+
+z_image_qwen3_encoder_quantized = StarterModel(
+    name="Z-Image Qwen3 Text Encoder (quantized)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/worstplayer/Z-Image_Qwen_3_4b_text_encoder_GGUF/resolve/main/Qwen_3_4b-Q6_K.gguf",
+    description="Qwen3 4B text encoder for Z-Image quantized to GGUF Q6_K format. ~3.3GB",
+    type=ModelType.Qwen3Encoder,
+    format=ModelFormat.GGUFQuantized,
+)
+
+z_image_turbo = StarterModel(
+    name="Z-Image Turbo",
+    base=BaseModelType.ZImage,
+    source="Tongyi-MAI/Z-Image-Turbo",
+    description="Z-Image Turbo - fast 6B parameter text-to-image model with 8 inference steps. Supports bilingual prompts (English & Chinese). ~13GB",
+    type=ModelType.Main,
+)
+
+z_image_turbo_quantized = StarterModel(
+    name="Z-Image Turbo (quantized)",
+    base=BaseModelType.ZImage,
+    source="https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q4_K.gguf",
+    description="Z-Image Turbo quantized to GGUF Q4_K format. Requires separate Qwen3 text encoder. ~4GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[z_image_qwen3_encoder_quantized],
+)
+
+z_image_turbo_q8 = StarterModel(
+    name="Z-Image Turbo (Q8)",
+    base=BaseModelType.ZImage,
+    source="https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q8_0.gguf",
+    description="Z-Image Turbo quantized to GGUF Q8_0 format. Higher quality, larger size. Requires separate Qwen3 text encoder. ~6.6GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[z_image_qwen3_encoder_quantized],
+)
+
+z_image_controlnet_union = StarterModel(
+    name="Z-Image ControlNet Union",
+    base=BaseModelType.ZImage,
+    source="https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Union-2.1-8steps.safetensors",
+    description="Unified ControlNet for Z-Image Turbo supporting Canny, HED, Depth, Pose, MLSD, and Inpainting modes.",
+    type=ModelType.ControlNet,
+)
+
+z_image_controlnet_tile = StarterModel(
+    name="Z-Image ControlNet Tile",
+    base=BaseModelType.ZImage,
+    source="https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Tile-2.1-8steps.safetensors",
+    description="Dedicated Tile ControlNet for Z-Image Turbo. Useful for upscaling and adding detail. ~6.7GB",
+    type=ModelType.ControlNet,
+)
+# endregion
+
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
@@ -766,6 +829,13 @@ STARTER_MODELS: list[StarterModel] = [
     cogview4,
     flux_krea,
     flux_krea_quantized,
+    z_image_turbo,
+    z_image_turbo_quantized,
+    z_image_turbo_q8,
+    z_image_qwen3_encoder,
+    z_image_qwen3_encoder_quantized,
+    z_image_controlnet_union,
+    z_image_controlnet_tile,
 ]
 
 sd1_bundle: list[StarterModel] = [

@@ -428,6 +428,31 @@
         "searchHotkeys": "Search Hotkeys",
         "clearSearch": "Clear Search",
         "noHotkeysFound": "No Hotkeys Found",
+        "editMode": "Edit Mode",
+        "viewMode": "View Mode",
+        "editHotkey": "Edit Hotkey",
+        "addHotkey": "Add Hotkey",
+        "resetToDefault": "Reset to Default",
+        "resetAll": "Reset All to Default",
+        "resetAllConfirmation": "Are you sure you want to reset all hotkeys to their default values? This cannot be undone.",
+        "enterHotkeys": "Enter hotkey(s), separated by commas",
+        "save": "Save",
+        "cancel": "Cancel",
+        "modifiers": "Modifiers",
+        "syntaxHelp": "Syntax Help",
+        "combineWith": "Combine with +",
+        "multipleHotkeys": "Multiple hotkeys with comma",
+        "validKeys": "Valid keys",
+        "help": "Help",
+        "noHotkeysRecorded": "No hotkeys recorded yet",
+        "pressKeys": "Press keys...",
+        "setHotkey": "SET",
+        "setAnother": "SET ANOTHER",
+        "removeLastHotkey": "Remove last hotkey",
+        "clearAll": "Clear All",
+        "duplicateWarning": "This hotkey is already recorded",
+        "conflictWarning": "is already used by \"{{hotkeyTitle}}\"",
+        "thisHotkey": "this hotkey",
         "app": {
             "title": "App",
             "invoke": {
@@ -477,6 +502,14 @@
             "promptHistoryNext": {
                 "title": "Next Prompt in History",
                 "desc": "When the prompt is focused, move to the next (newer) prompt in your history."
+            },
+            "promptWeightUp": {
+                "title": "Increase Weight of Prompt Selection",
+                "desc": "When the prompt is focused and text is selected, increase the weight of the selected prompt."
+            },
+            "promptWeightDown": {
+                "title": "Decrease Weight of Prompt Selection",
+                "desc": "When the prompt is focused and text is selected, decrease the weight of the selected prompt."
             },
             "toggleLeftPanel": {
                 "title": "Toggle Left Panel",
@@ -816,6 +849,8 @@
         "parameterSet": "Parameter {{parameter}} set",
         "parsingFailed": "Parsing Failed",
         "positivePrompt": "Positive Prompt",
+        "qwen3Encoder": "Qwen3 Encoder",
+        "qwen3Source": "Qwen3 Source",
         "recallParameters": "Recall Parameters",
         "recallParameter": "Recall {{label}}",
         "scheduler": "Scheduler",
@@ -832,6 +867,7 @@
     },
     "modelManager": {
         "active": "active",
+        "actions": "Bulk Actions",
         "addModel": "Add Model",
         "addModels": "Add Models",
         "advanced": "Advanced",
@@ -849,6 +885,15 @@
         "reidentifySuccess": "Model reidentified successfully",
         "reidentifyUnknown": "Unable to identify model",
         "reidentifyError": "Error reidentifying model",
+        "updatePath": "Update Path",
+        "updatePathTooltip": "Update the file path for this model if you have moved the model files to a new location.",
+        "updatePathDescription": "Enter the new path to the model file or directory. Use this if you have manually moved the model files on disk.",
+        "currentPath": "Current Path",
+        "newPath": "New Path",
+        "newPathPlaceholder": "Enter new path...",
+        "pathUpdated": "Model path updated successfully",
+        "pathUpdateFailed": "Failed to update model path",
+        "invalidPathFormat": "Path must be an absolute path (e.g., C:\\Models\\... or /home/user/models/...)",
         "convert": "Convert",
         "convertingModelBegin": "Converting Model. Please wait.",
         "convertToDiffusers": "Convert To Diffusers",
@@ -867,6 +912,7 @@
         "delete": "Delete",
         "deleteConfig": "Delete Config",
         "deleteModel": "Delete Model",
+        "deleteModels": "Delete Models",
         "deleteModelImage": "Delete Model Image",
         "deleteMsg1": "Are you sure you want to delete this model from InvokeAI?",
         "deleteMsg2": "This WILL delete the model from disk if it is in the InvokeAI root folder. If you are using a custom location, then the model WILL NOT be deleted from disk.",
@@ -998,8 +1044,16 @@
         "triggerPhrases": "Trigger Phrases",
         "loraTriggerPhrases": "LoRA Trigger Phrases",
         "mainModelTriggerPhrases": "Main Model Trigger Phrases",
+        "selectAll": "Select All",
         "typePhraseHere": "Type phrase here",
         "t5Encoder": "T5 Encoder",
+        "qwen3Encoder": "Qwen3 Encoder",
+        "zImageVae": "VAE (optional)",
+        "zImageVaePlaceholder": "From Qwen3 Source (leave empty)",
+        "zImageQwen3Encoder": "Qwen3 Encoder (optional)",
+        "zImageQwen3EncoderPlaceholder": "From Qwen3 Source (leave empty)",
+        "zImageQwen3Source": "Qwen3 Source (Diffusers Z-Image)",
+        "zImageQwen3SourcePlaceholder": "Required if VAE/Encoder empty",
         "upcastAttention": "Upcast Attention",
         "uploadImage": "Upload Image",
         "urlOrLocalPath": "URL or Local Path",
@@ -1281,6 +1335,8 @@
             "noT5EncoderModelSelected": "No T5 Encoder model selected for FLUX generation",
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
+            "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
+            "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox width is {{width}}",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox height is {{height}}",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), scaled bbox width is {{width}}",
@@ -1317,6 +1373,7 @@
         "scheduler": "Scheduler",
         "seamlessXAxis": "Seamless X Axis",
         "seamlessYAxis": "Seamless Y Axis",
+        "colorCompensation": "Color Compensation",
         "seed": "Seed",
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
@@ -1860,6 +1917,10 @@
             "heading": "Seamless Tiling Y Axis",
             "paragraphs": ["Seamlessly tile an image along the vertical axis."]
         },
+        "colorCompensation": {
+            "heading": "Color Compensation",
+            "paragraphs": ["Adjust the input image to reduce color shifts during inpainting or img2img (SDXL Only)."]
+        },
         "upscaleModel": {
             "heading": "Upscale Model",
             "paragraphs": [
@@ -1925,6 +1986,7 @@
         "allLoaded": "All Workflows Loaded",
         "searchPlaceholder": "Search by name, description or tags",
         "filterByTags": "Filter by Tags",
+        "tags": "Tags",
         "yourWorkflows": "Your Workflows",
         "recentlyOpened": "Recently Opened",
         "noRecentWorkflows": "No Recent Workflows",
@@ -2106,6 +2168,7 @@
         "clearCaches": "Clear Caches",
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
+        "extractRegion": "Extract Region",
         "outputOnlyMaskedRegions": "Output Only Generated Regions",
         "addLayer": "Add Layer",
         "duplicate": "Duplicate",
@@ -2439,6 +2502,9 @@
                 "y": "Y (YCbCr)",
                 "cb": "Cb (YCbCr)",
                 "cr": "Cr (YCbCr)"
+            },
+            "pbr_maps": {
+                "label": "Create PBR Maps"
             }
         },
         "transform": {
@@ -2615,7 +2681,9 @@
         "useForTemplate": "Use For Prompt Template",
         "viewList": "View Template List",
         "viewModeTooltip": "This is how your prompt will look with your currently selected template. To edit your prompt, click anywhere in the text box.",
-        "togglePromptPreviews": "Toggle Prompt Previews"
+        "togglePromptPreviews": "Toggle Prompt Previews",
+        "selectPreset": "Select Style Preset",
+        "noMatchingPresets": "No matching presets"
     },
 
     "ui": {
