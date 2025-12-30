@@ -115,9 +115,9 @@ export const resolveAvailableFont = (stack: string): string => {
 };
 
 export const getFontStackById = (fontId: TextFontId): string => {
-  return TEXT_FONT_STACKS.find((font) => font.id === fontId)?.stack ?? TEXT_FONT_STACKS[0].stack;
+  return TEXT_FONT_STACKS.find((font) => font.id === fontId)?.stack ?? TEXT_FONT_STACKS[0]?.stack ?? 'sans-serif';
 };
 
 export const getFontLabelById = (fontId: TextFontId): string => {
-  return TEXT_FONT_STACKS.find((font) => font.id === fontId)?.label ?? TEXT_FONT_STACKS[0].label;
+  return TEXT_FONT_STACKS.find((font) => font.id === fontId)?.label ?? TEXT_FONT_STACKS[0]?.label ?? 'Sans';
 };
