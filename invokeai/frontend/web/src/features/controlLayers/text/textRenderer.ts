@@ -34,6 +34,8 @@ type TextMetrics = {
   contentHeight: number;
   ascent: number;
   descent: number;
+  actualAscent: number;
+  actualDescent: number;
   baselineOffset: number;
 };
 
@@ -77,12 +79,12 @@ export const renderTextToCanvas = (config: TextRenderConfig): TextRenderResult =
     const snappedY = snapToDpr(y, dprScale);
     ctx.fillText(text, snappedX, snappedY);
     if (config.underline) {
-      const underlineY = snapToDpr(snappedY + Math.max(1, measurement.descent * 0.6), dprScale);
-      ctx.fillRect(snappedX, underlineY, lineWidth, Math.max(1, config.fontSize * 0.08));
+      const underlineY = snapToDpr(snappedY + config.fontSize * 0.08, dprScale);
+      ctx.fillRect(snappedX, underlineY, lineWidth, Math.max(1.5, config.fontSize * 0.1));
     }
     if (config.strikethrough) {
-      const strikeY = snapToDpr(snappedY - measurement.ascent * 0.3 + measurement.descent * 0.2, dprScale);
-      ctx.fillRect(snappedX, strikeY, lineWidth, Math.max(1, config.fontSize * 0.08));
+      const strikeY = snapToDpr(snappedY - measurement.actualAscent * 0.55, dprScale);
+      ctx.fillRect(snappedX, strikeY, lineWidth, Math.max(1.5, config.fontSize * 0.1));
     }
   });
 
@@ -117,6 +119,8 @@ export const measureTextContent = (config: TextMeasureConfig): TextMetrics => {
     sampleMetrics.actualBoundingBoxDescent ||
     sampleMetrics.emHeightDescent ||
     fallbackDescent;
+  const actualAscent = sampleMetrics.actualBoundingBoxAscent || ascent;
+  const actualDescent = sampleMetrics.actualBoundingBoxDescent || descent;
   const lineHeightPx = (ascent + descent) * config.lineHeight;
   const extraLeading = Math.max(0, lineHeightPx - (ascent + descent));
   const baselineOffset = ascent + extraLeading / 2;
@@ -131,6 +135,8 @@ export const measureTextContent = (config: TextMeasureConfig): TextMetrics => {
     contentHeight,
     ascent,
     descent,
+    actualAscent,
+    actualDescent,
     baselineOffset,
   };
 };
