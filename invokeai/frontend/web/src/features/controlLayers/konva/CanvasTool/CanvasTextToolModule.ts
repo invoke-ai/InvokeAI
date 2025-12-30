@@ -107,7 +107,7 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     this.konva.group.add(this.konva.cursorOutline);
     this.konva.group.add(this.konva.cursor);
     this.konva.group.add(this.konva.label);
-    this.konva.label.visible(false);
+    this.konva.label.visible(true);
 
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(selectCanvasTextSlice, () => {
@@ -161,6 +161,7 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       height,
     });
     this.konva.label.setAttrs({
+      fontFamily: getFontStackById('uiSerif'),
       fontSize: Math.max(12, height * 0.35),
       fontStyle: settings.bold ? '700' : '400',
     });
@@ -172,7 +173,7 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     this.konva.cursor.fill(fill);
     this.konva.cursorOutline.stroke(inverse);
     this.konva.cursorOutline.strokeWidth(onePixel);
-    this.konva.label.fill(fill);
+    this.konva.label.fill('rgba(255, 255, 255, 1)');
   };
 
   private setCursorPosition = (cursor: Coordinate, _settings: CanvasTextSettingsState) => {
@@ -194,6 +195,7 @@ export class CanvasTextToolModule extends CanvasModuleBase {
 
   private setVisibility = (visible: boolean) => {
     this.konva.group.visible(visible);
+    this.konva.label.visible(visible);
   };
 
   onStagePointerMove = (e: KonvaEventObject<PointerEvent>) => {
