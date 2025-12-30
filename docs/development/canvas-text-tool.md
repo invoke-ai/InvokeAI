@@ -5,7 +5,7 @@
 The canvas text workflow is split between a Konva module that owns tool state and a React overlay that handles text entry.
 
 - `invokeai/frontend/web/src/features/controlLayers/konva/CanvasTool/CanvasTextToolModule.ts`
-  - Owns the tool, cursor preview, and text session state.
+  - Owns the tool, cursor preview, and text session state (including the cursor "T" marker).
   - Manages dynamic cursor contrast, starts sessions on pointer down, and commits sessions by rasterizing the active text block into a new raster layer.
 - `invokeai/frontend/web/src/features/controlLayers/components/Text/CanvasTextOverlay.tsx`
   - Renders the on-canvas editor as a `contentEditable` overlay positioned in canvas space.
@@ -25,7 +25,7 @@ Layer placement preserves the original click location:
 
 ## Font stacks
 
-Font definitions live in `invokeai/frontend/web/src/features/controlLayers/text/textConstants.ts` as five deterministic stacks covering sans, serif, mono, rounded, and script styles. Each stack lists system-safe fallbacks so the editor can choose the first available font per platform.
+Font definitions live in `invokeai/frontend/web/src/features/controlLayers/text/textConstants.ts` as ten deterministic stacks (sans, serif, mono, rounded, script, humanist, slab serif, display, narrow, UI serif). Each stack lists system-safe fallbacks so the editor can choose the first available font per platform.
 
 To add or adjust fonts:
 
