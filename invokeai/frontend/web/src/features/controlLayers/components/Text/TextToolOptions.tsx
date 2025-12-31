@@ -177,7 +177,7 @@ const FontSizeControl = () => {
                   <NumberInputField _focusVisible={{ zIndex: 0 }} title="" paddingInlineEnd={7} />
                   <PopoverTrigger>
                     <IconButton
-                      aria-label="open-slider"
+                      aria-label={t('controlLayers.text.size', { defaultValue: 'Size' })}
                       icon={<PiCaretDownBold />}
                       size="sm"
                       variant="link"
