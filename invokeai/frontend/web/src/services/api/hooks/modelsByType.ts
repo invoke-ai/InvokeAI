@@ -80,3 +80,6 @@ export const selectGlobalRefImageModels = buildModelsSelector(
 export const selectRegionalRefImageModels = buildModelsSelector(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
 );
+export const selectQwen3EncoderModels = buildModelsSelector(isQwen3EncoderModelConfig);
+export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
+export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
