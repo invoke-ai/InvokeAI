@@ -236,111 +236,78 @@ def denoise(
 
 ---
 
-## Phase 3: Node/Invocation
+## Phase 3: Direkte Integration in FluxDenoiseInvocation
 
-### 3.1 DyPE Configuration Node
+> **Entscheidung:** DyPE wird direkt als Parameter in FluxDenoise integriert (kein separater Node).
 
-**Datei:** `invokeai/app/invocations/flux_dype.py`
+### 3.1 DyPE Preset Enum & Felder
+
+**Datei:** `invokeai/backend/flux/dype/presets.py`
 
 ```python
-from invokeai.app.invocations.baseinvocation import (
-    BaseInvocation,
-    BaseInvocationOutput,
-    invocation,
-    invocation_output,
-)
-from invokeai.app.invocations.fields import InputField, OutputField
+from enum import Enum
+from dataclasses import dataclass
 
-class DyPEMethod(str, Enum):
-    VISION_YARN = "vision_yarn"
-    YARN = "yarn"
-    NTK = "ntk"
-    BASE = "base"
+class DyPEPreset(str, Enum):
+    """Vordefinierte DyPE-Konfigurationen."""
+    OFF = "off"
+    AUTO = "auto"           # Automatisch basierend auf Auflösung
+    PRESET_4K = "4k"        # Optimiert für 3840x2160 / 4096x2160
 
-@invocation_output("dype_config_output")
-class DyPEConfigOutput(BaseInvocationOutput):
-    """Output für DyPE-Konfiguration."""
-    dype_config: DyPEConfigField = OutputField(description="DyPE configuration")
+@dataclass
+class DyPEPresetConfig:
+    """Preset-Konfigurationswerte."""
+    base_resolution: int
+    method: str
+    dype_scale: float
+    dype_exponent: float
+    dype_start_sigma: float
 
-@invocation(
-    "flux_dype",
-    title="FLUX DyPE (Dynamic Position Extrapolation)",
-    tags=["flux", "dype", "upscale", "resolution"],
-    category="flux",
-    version="1.0.0",
-)
-class FluxDyPEInvocation(BaseInvocation):
-    """Konfiguriert Dynamic Position Extrapolation für FLUX-Modelle.
+DYPE_PRESETS = {
+    DyPEPreset.PRESET_4K: DyPEPresetConfig(
+        base_resolution=1024,
+        method="vision_yarn",
+        dype_scale=2.0,
+        dype_exponent=2.0,
+        dype_start_sigma=1.0,
+    ),
+}
 
-    Ermöglicht die Generierung von Bildern über der Trainingsauflösung (z.B. 4K+)
-    ohne typische Artefakte.
+def get_dype_config_for_resolution(
+    width: int,
+    height: int,
+    base_resolution: int = 1024,
+) -> DyPEConfig | None:
+    """Ermittelt automatisch DyPE-Config basierend auf Zielauflösung.
+
+    Returns None wenn Auflösung <= Basisauflösung (DyPE nicht nötig).
     """
+    max_dim = max(width, height)
 
-    enable_dype: bool = InputField(
-        default=True,
-        description="Enable Dynamic Position Extrapolation"
+    if max_dim <= base_resolution:
+        return None  # DyPE nicht nötig
+
+    # Skalierungsfaktor berechnen
+    scale = max_dim / base_resolution
+
+    # Dynamische Parameter basierend auf Skalierung
+    return DyPEConfig(
+        enable_dype=True,
+        base_resolution=base_resolution,
+        method="vision_yarn",
+        dype_scale=min(2.0 * scale, 8.0),
+        dype_exponent=2.0,
+        dype_start_sigma=1.0,
     )
-
-    base_resolution: int = InputField(
-        default=1024,
-        ge=256,
-        le=4096,
-        description="Native training resolution of the model"
-    )
-
-    method: DyPEMethod = InputField(
-        default=DyPEMethod.VISION_YARN,
-        description="Position extrapolation method. vision_yarn recommended for images."
-    )
-
-    dype_scale: float = InputField(
-        default=2.0,
-        ge=0.0,
-        le=8.0,
-        description="DyPE magnitude (λs). Higher = stronger extrapolation."
-    )
-
-    dype_exponent: float = InputField(
-        default=2.0,
-        ge=0.0,
-        le=1000.0,
-        description="DyPE decay speed (λt). Controls transition from low to high frequency."
-    )
-
-    dype_start_sigma: float = InputField(
-        default=1.0,
-        ge=0.0,
-        le=1.0,
-        description="Sigma threshold to start DyPE decay."
-    )
-
-    def invoke(self, context: InvocationContext) -> DyPEConfigOutput:
-        config = DyPEConfig(
-            enable_dype=self.enable_dype,
-            base_resolution=self.base_resolution,
-            method=self.method.value,
-            dype_scale=self.dype_scale,
-            dype_exponent=self.dype_exponent,
-            dype_start_sigma=self.dype_start_sigma,
-        )
-
-        # Speichere Config im Context
-        config_name = context.tensors.save(config)  # oder eigener Storage
-
-        return DyPEConfigOutput(
-            dype_config=DyPEConfigField(config_name=config_name)
-        )
 ```
-
-**Aufwand:** ~100 Zeilen, 0.5 Tag
 
 ### 3.2 Integration in FluxDenoiseInvocation
 
 **Datei:** `invokeai/app/invocations/flux_denoise.py`
 
-Änderungen:
-
 ```python
+from invokeai.backend.flux.dype.presets import DyPEPreset, DYPE_PRESETS, get_dype_config_for_resolution
+
 @invocation(
     "flux_denoise",
     title="FLUX Denoise",
@@ -350,24 +317,76 @@ class FluxDyPEInvocation(BaseInvocation):
 class FluxDenoiseInvocation(BaseInvocation):
     # ... bestehende Felder ...
 
-    # NEU:
-    dype_config: DyPEConfigField | None = InputField(
-        default=None,
-        description="DyPE configuration for high-resolution generation",
-        input=Input.Connection,
+    # ===== NEU: DyPE Parameter =====
+    dype_preset: DyPEPreset = InputField(
+        default=DyPEPreset.OFF,
+        description="DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1024px.",
     )
+
+    # Erweiterte DyPE-Optionen (optional, nur wenn preset != off/auto)
+    dype_scale: float | None = InputField(
+        default=None,
+        ge=0.0,
+        le=8.0,
+        description="DyPE magnitude (λs). Only used when dype_preset is 'off' but you want custom settings.",
+    )
+
+    dype_exponent: float | None = InputField(
+        default=None,
+        ge=0.0,
+        le=1000.0,
+        description="DyPE decay speed (λt). Only used with custom DyPE settings.",
+    )
+
+    def _get_dype_config(self) -> DyPEConfig | None:
+        """Ermittelt DyPE-Konfiguration basierend auf Preset oder manuellen Werten."""
+
+        if self.dype_preset == DyPEPreset.OFF:
+            # Prüfe ob manuelle Werte gesetzt sind
+            if self.dype_scale is not None:
+                return DyPEConfig(
+                    enable_dype=True,
+                    base_resolution=1024,
+                    method="vision_yarn",
+                    dype_scale=self.dype_scale,
+                    dype_exponent=self.dype_exponent or 2.0,
+                    dype_start_sigma=1.0,
+                )
+            return None
+
+        if self.dype_preset == DyPEPreset.AUTO:
+            return get_dype_config_for_resolution(
+                self.width, self.height, base_resolution=1024
+            )
+
+        # Preset verwenden
+        preset_config = DYPE_PRESETS.get(self.dype_preset)
+        if preset_config:
+            return DyPEConfig(
+                enable_dype=True,
+                base_resolution=preset_config.base_resolution,
+                method=preset_config.method,
+                dype_scale=preset_config.dype_scale,
+                dype_exponent=preset_config.dype_exponent,
+                dype_start_sigma=preset_config.dype_start_sigma,
+            )
+
+        return None
 
     def _run_diffusion(self, context: InvocationContext):
         # ... bestehender Code ...
 
         # NEU: DyPE Extension vorbereiten
+        dype_config = self._get_dype_config()
         dype_extension = None
-        if self.dype_config is not None:
-            config = context.tensors.load(self.dype_config.config_name)
+        if dype_config is not None:
             dype_extension = DyPEExtension(
-                config=config,
+                config=dype_config,
                 target_height=self.height,
                 target_width=self.width,
+            )
+            context.logger.info(
+                f"DyPE enabled: {self.width}x{self.height}, scale={dype_config.dype_scale}"
             )
 
         # ... in denoise() Aufruf einfügen ...
@@ -378,7 +397,25 @@ class FluxDenoiseInvocation(BaseInvocation):
         )
 ```
 
-**Aufwand:** ~20 Zeilen Änderungen, 0.5 Tag
+### 3.3 FLUX Schnell Unterstützung
+
+FLUX Schnell wird unterstützt mit angepasster Basisauflösung:
+
+```python
+def _get_dype_config(self) -> DyPEConfig | None:
+    # ... bestehender Code ...
+
+    # FLUX Schnell hat gleiche Trainingsauflösung wie Dev
+    base_resolution = 1024  # Gilt für beide Varianten
+
+    if self.dype_preset == DyPEPreset.AUTO:
+        return get_dype_config_for_resolution(
+            self.width, self.height, base_resolution=base_resolution
+        )
+    # ...
+```
+
+**Aufwand:** ~80 Zeilen Änderungen, 0.5 Tag
 
 ---
 
@@ -455,8 +492,9 @@ class TestFluxDyPEIntegration:
 | 1.3 | DyPE EmbedND | 0.5 Tag | Hoch |
 | 2.1 | DyPE Extension | 0.5 Tag | Hoch |
 | 2.2 | denoise.py Integration | 0.5 Tag | Hoch |
-| 3.1 | DyPE Node | 0.5 Tag | Mittel |
+| 3.1 | DyPE Presets | 0.5 Tag | Mittel |
 | 3.2 | FluxDenoise Integration | 0.5 Tag | Mittel |
+| 3.3 | FLUX Schnell Support | 0.25 Tag | Mittel |
 | 4.1 | Unit Tests | 1 Tag | Mittel |
 | 4.2 | Integration Tests | 0.5 Tag | Niedrig |
 
@@ -466,21 +504,18 @@ class TestFluxDyPEIntegration:
 
 ## Dateien zu erstellen/ändern
 
-### Neue Dateien:
+### Neue Dateien (7):
 - `invokeai/backend/flux/dype/__init__.py`
-- `invokeai/backend/flux/dype/base.py`
-- `invokeai/backend/flux/dype/rope.py`
-- `invokeai/backend/flux/dype/embed.py`
+- `invokeai/backend/flux/dype/base.py` - DyPEConfig Dataclass
+- `invokeai/backend/flux/dype/rope.py` - rope_dype() Funktion
+- `invokeai/backend/flux/dype/embed.py` - DyPEEmbedND Klasse
+- `invokeai/backend/flux/dype/presets.py` - DyPEPreset Enum, 4K Preset
 - `invokeai/backend/flux/extensions/dype_extension.py`
-- `invokeai/app/invocations/flux_dype.py`
-- `invokeai/app/invocations/fields/dype_fields.py`
 - `tests/backend/flux/dype/test_dype.py`
-- `tests/app/invocations/test_flux_dype.py`
 
-### Zu ändernde Dateien:
+### Zu ändernde Dateien (2):
 - `invokeai/backend/flux/denoise.py` - DyPE Extension Parameter
-- `invokeai/app/invocations/flux_denoise.py` - DyPE Config Input
-- `invokeai/app/invocations/fields/__init__.py` - DyPE Field Export
+- `invokeai/app/invocations/flux_denoise.py` - DyPE Preset + Parameter direkt integriert
 
 ---
 
@@ -500,8 +535,10 @@ class TestFluxDyPEIntegration:
 
 ---
 
-## Offene Fragen
+## Entscheidungen
 
-1. Soll DyPE als separater Node oder als Parameter in FluxDenoise integriert werden?
-2. Sollen Preset-Konfigurationen (z.B. "4K optimiert") angeboten werden?
-3. Wie soll mit FLUX Schnell umgegangen werden (hat andere Trainingsauflösung)?
+| Frage | Entscheidung |
+|-------|--------------|
+| Integration | Direkt in FluxDenoise (kein separater Node) |
+| Presets | Ja - 4K Preset + "auto" Modus |
+| FLUX Schnell | Wird unterstützt (gleiche Basisauflösung wie Dev) |
