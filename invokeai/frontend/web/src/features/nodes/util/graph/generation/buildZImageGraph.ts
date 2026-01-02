@@ -186,6 +186,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     steps,
     vae: zImageVaeModel ?? undefined,
     qwen3_encoder: zImageQwen3EncoderModel ?? undefined,
+    qwen3_source: zImageQwen3SourceModel ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
