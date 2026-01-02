@@ -277,17 +277,22 @@ def get_dype_config_for_resolution(
     width: int,
     height: int,
     base_resolution: int = 1024,
+    activation_threshold: int = 1536,  # FLUX kann nativ bis ~1.5x
 ) -> DyPEConfig | None:
     """Ermittelt automatisch DyPE-Config basierend auf Zielauflösung.
 
-    Returns None wenn Auflösung <= Basisauflösung (DyPE nicht nötig).
+    Args:
+        base_resolution: Native Trainingsauflösung des Modells (für Skalierungsberechnung)
+        activation_threshold: Ab dieser Auflösung wird DyPE aktiviert (> base_resolution)
+
+    Returns None wenn Auflösung <= activation_threshold (DyPE nicht nötig).
     """
     max_dim = max(width, height)
 
-    if max_dim <= base_resolution:
-        return None  # DyPE nicht nötig
+    if max_dim <= activation_threshold:
+        return None  # FLUX kann das nativ, DyPE nicht nötig
 
-    # Skalierungsfaktor berechnen
+    # Skalierungsfaktor basierend auf base_resolution (nicht threshold)
     scale = max_dim / base_resolution
 
     # Dynamische Parameter basierend auf Skalierung
@@ -320,7 +325,7 @@ class FluxDenoiseInvocation(BaseInvocation):
     # ===== NEU: DyPE Parameter =====
     dype_preset: DyPEPreset = InputField(
         default=DyPEPreset.OFF,
-        description="DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1024px.",
+        description="DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px.",
     )
 
     # Erweiterte DyPE-Optionen (optional, nur wenn preset != off/auto)
@@ -356,7 +361,9 @@ class FluxDenoiseInvocation(BaseInvocation):
 
         if self.dype_preset == DyPEPreset.AUTO:
             return get_dype_config_for_resolution(
-                self.width, self.height, base_resolution=1024
+                self.width, self.height,
+                base_resolution=1024,
+                activation_threshold=1536,  # FLUX kann nativ bis ~1.5x
             )
 
         # Preset verwenden
