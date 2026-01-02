@@ -5,6 +5,7 @@ import torch
 from tqdm import tqdm
 
 from invokeai.backend.flux.controlnet.controlnet_flux_output import ControlNetFluxOutput, sum_controlnet_flux_outputs
+from invokeai.backend.flux.extensions.dype_extension import DyPEExtension
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
 from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
@@ -35,6 +36,8 @@ def denoise(
     # extra img tokens (sequence-wise) - for Kontext conditioning
     img_cond_seq: torch.Tensor | None = None,
     img_cond_seq_ids: torch.Tensor | None = None,
+    # DyPE extension for high-resolution generation
+    dype_extension: DyPEExtension | None = None,
 ):
     # step 0 is the initial state
     total_steps = len(timesteps) - 1
@@ -53,131 +56,152 @@ def denoise(
     # Store original sequence length for slicing predictions
     original_seq_len = img.shape[1]
 
-    for step_index, (t_curr, t_prev) in tqdm(list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True)))):
-        t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
+    # DyPE: Patch model with DyPE-aware position embedder
+    dype_embedder = None
+    original_pe_embedder = None
+    if dype_extension is not None:
+        dype_embedder, original_pe_embedder = dype_extension.patch_model(model)
 
-        # Run ControlNet models.
-        controlnet_residuals: list[ControlNetFluxOutput] = []
-        for controlnet_extension in controlnet_extensions:
-            controlnet_residuals.append(
-                controlnet_extension.run_controlnet(
+    try:
+        for step_index, (t_curr, t_prev) in tqdm(list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True)))):
+            # DyPE: Update step state for timestep-dependent scaling
+            if dype_extension is not None and dype_embedder is not None:
+                dype_extension.update_step_state(
+                    embedder=dype_embedder,
+                    timestep=t_curr,
                     timestep_index=step_index,
-                    total_num_timesteps=total_steps,
-                    img=img,
-                    img_ids=img_ids,
-                    txt=pos_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
-                    txt_ids=pos_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,
-                    y=pos_regional_prompting_extension.regional_text_conditioning.clip_embeddings,
-                    timesteps=t_vec,
-                    guidance=guidance_vec,
+                    total_steps=total_steps,
                 )
-            )
 
-        # Merge the ControlNet residuals from multiple ControlNets.
-        # TODO(ryand): We may want to calculate the sum just-in-time to keep peak memory low. Keep in mind, that the
-        # controlnet_residuals datastructure is efficient in that it likely contains multiple references to the same
-        # tensors. Calculating the sum materializes each tensor into its own instance.
-        merged_controlnet_residuals = sum_controlnet_flux_outputs(controlnet_residuals)
+            t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
 
-        # Prepare input for model - concatenate fresh each step
-        img_input = img
-        img_input_ids = img_ids
+            # Run ControlNet models.
+            controlnet_residuals: list[ControlNetFluxOutput] = []
+            for controlnet_extension in controlnet_extensions:
+                controlnet_residuals.append(
+                    controlnet_extension.run_controlnet(
+                        timestep_index=step_index,
+                        total_num_timesteps=total_steps,
+                        img=img,
+                        img_ids=img_ids,
+                        txt=pos_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
+                        txt_ids=pos_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,
+                        y=pos_regional_prompting_extension.regional_text_conditioning.clip_embeddings,
+                        timesteps=t_vec,
+                        guidance=guidance_vec,
+                    )
+                )
 
-        # Add channel-wise conditioning (for ControlNet, FLUX Fill, etc.)
-        if img_cond is not None:
-            img_input = torch.cat((img_input, img_cond), dim=-1)
+            # Merge the ControlNet residuals from multiple ControlNets.
+            # TODO(ryand): We may want to calculate the sum just-in-time to keep peak memory low. Keep in mind, that the
+            # controlnet_residuals datastructure is efficient in that it likely contains multiple references to the same
+            # tensors. Calculating the sum materializes each tensor into its own instance.
+            merged_controlnet_residuals = sum_controlnet_flux_outputs(controlnet_residuals)
 
-        # Add sequence-wise conditioning (for Kontext)
-        if img_cond_seq is not None:
-            assert img_cond_seq_ids is not None, (
-                "You need to provide either both or neither of the sequence conditioning"
-            )
-            img_input = torch.cat((img_input, img_cond_seq), dim=1)
-            img_input_ids = torch.cat((img_input_ids, img_cond_seq_ids), dim=1)
+            # Prepare input for model - concatenate fresh each step
+            img_input = img
+            img_input_ids = img_ids
 
-        pred = model(
-            img=img_input,
-            img_ids=img_input_ids,
-            txt=pos_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
-            txt_ids=pos_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,
-            y=pos_regional_prompting_extension.regional_text_conditioning.clip_embeddings,
-            timesteps=t_vec,
-            guidance=guidance_vec,
-            timestep_index=step_index,
-            total_num_timesteps=total_steps,
-            controlnet_double_block_residuals=merged_controlnet_residuals.double_block_residuals,
-            controlnet_single_block_residuals=merged_controlnet_residuals.single_block_residuals,
-            ip_adapter_extensions=pos_ip_adapter_extensions,
-            regional_prompting_extension=pos_regional_prompting_extension,
-        )
-
-        # Slice prediction to only include the main image tokens
-        if img_cond_seq is not None:
-            pred = pred[:, :original_seq_len]
-
-        step_cfg_scale = cfg_scale[step_index]
-
-        # If step_cfg_scale, is 1.0, then we don't need to run the negative prediction.
-        if not math.isclose(step_cfg_scale, 1.0):
-            # TODO(ryand): Add option to run positive and negative predictions in a single batch for better performance
-            # on systems with sufficient VRAM.
-
-            if neg_regional_prompting_extension is None:
-                raise ValueError("Negative text conditioning is required when cfg_scale is not 1.0.")
-
-            # For negative prediction with Kontext, we need to include the reference images
-            # to maintain consistency between positive and negative passes. Without this,
-            # CFG would create artifacts as the attention mechanism would see different
-            # spatial structures in each pass
-            neg_img_input = img
-            neg_img_input_ids = img_ids
-
-            # Add channel-wise conditioning for negative pass if present
+            # Add channel-wise conditioning (for ControlNet, FLUX Fill, etc.)
             if img_cond is not None:
-                neg_img_input = torch.cat((neg_img_input, img_cond), dim=-1)
+                img_input = torch.cat((img_input, img_cond), dim=-1)
 
-            # Add sequence-wise conditioning (Kontext) for negative pass
-            # This ensures reference images are processed consistently
+            # Add sequence-wise conditioning (for Kontext)
             if img_cond_seq is not None:
-                neg_img_input = torch.cat((neg_img_input, img_cond_seq), dim=1)
-                neg_img_input_ids = torch.cat((neg_img_input_ids, img_cond_seq_ids), dim=1)
+                assert img_cond_seq_ids is not None, (
+                    "You need to provide either both or neither of the sequence conditioning"
+                )
+                img_input = torch.cat((img_input, img_cond_seq), dim=1)
+                img_input_ids = torch.cat((img_input_ids, img_cond_seq_ids), dim=1)
 
-            neg_pred = model(
-                img=neg_img_input,
-                img_ids=neg_img_input_ids,
-                txt=neg_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
-                txt_ids=neg_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,
-                y=neg_regional_prompting_extension.regional_text_conditioning.clip_embeddings,
+            pred = model(
+                img=img_input,
+                img_ids=img_input_ids,
+                txt=pos_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
+                txt_ids=pos_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,
+                y=pos_regional_prompting_extension.regional_text_conditioning.clip_embeddings,
                 timesteps=t_vec,
                 guidance=guidance_vec,
                 timestep_index=step_index,
                 total_num_timesteps=total_steps,
-                controlnet_double_block_residuals=None,
-                controlnet_single_block_residuals=None,
-                ip_adapter_extensions=neg_ip_adapter_extensions,
-                regional_prompting_extension=neg_regional_prompting_extension,
+                controlnet_double_block_residuals=merged_controlnet_residuals.double_block_residuals,
+                controlnet_single_block_residuals=merged_controlnet_residuals.single_block_residuals,
+                ip_adapter_extensions=pos_ip_adapter_extensions,
+                regional_prompting_extension=pos_regional_prompting_extension,
             )
 
-            # Slice negative prediction to match main image tokens
+            # Slice prediction to only include the main image tokens
             if img_cond_seq is not None:
-                neg_pred = neg_pred[:, :original_seq_len]
-            pred = neg_pred + step_cfg_scale * (pred - neg_pred)
+                pred = pred[:, :original_seq_len]
 
-        preview_img = img - t_curr * pred
-        img = img + (t_prev - t_curr) * pred
+            step_cfg_scale = cfg_scale[step_index]
 
-        if inpaint_extension is not None:
-            img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
-            preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
+            # If step_cfg_scale, is 1.0, then we don't need to run the negative prediction.
+            if not math.isclose(step_cfg_scale, 1.0):
+                # TODO(ryand): Add option to run positive and negative predictions in a single batch for better performance
+                # on systems with sufficient VRAM.
 
-        step_callback(
-            PipelineIntermediateState(
-                step=step_index + 1,
-                order=1,
-                total_steps=total_steps,
-                timestep=int(t_curr),
-                latents=preview_img,
-            ),
-        )
+                if neg_regional_prompting_extension is None:
+                    raise ValueError("Negative text conditioning is required when cfg_scale is not 1.0.")
+
+                # For negative prediction with Kontext, we need to include the reference images
+                # to maintain consistency between positive and negative passes. Without this,
+                # CFG would create artifacts as the attention mechanism would see different
+                # spatial structures in each pass
+                neg_img_input = img
+                neg_img_input_ids = img_ids
+
+                # Add channel-wise conditioning for negative pass if present
+                if img_cond is not None:
+                    neg_img_input = torch.cat((neg_img_input, img_cond), dim=-1)
+
+                # Add sequence-wise conditioning (Kontext) for negative pass
+                # This ensures reference images are processed consistently
+                if img_cond_seq is not None:
+                    neg_img_input = torch.cat((neg_img_input, img_cond_seq), dim=1)
+                    neg_img_input_ids = torch.cat((neg_img_input_ids, img_cond_seq_ids), dim=1)
+
+                neg_pred = model(
+                    img=neg_img_input,
+                    img_ids=neg_img_input_ids,
+                    txt=neg_regional_prompting_extension.regional_text_conditioning.t5_embeddings,
+                    txt_ids=neg_regional_prompting_extension.regional_text_conditioning.t5_txt_ids,
+                    y=neg_regional_prompting_extension.regional_text_conditioning.clip_embeddings,
+                    timesteps=t_vec,
+                    guidance=guidance_vec,
+                    timestep_index=step_index,
+                    total_num_timesteps=total_steps,
+                    controlnet_double_block_residuals=None,
+                    controlnet_single_block_residuals=None,
+                    ip_adapter_extensions=neg_ip_adapter_extensions,
+                    regional_prompting_extension=neg_regional_prompting_extension,
+                )
+
+                # Slice negative prediction to match main image tokens
+                if img_cond_seq is not None:
+                    neg_pred = neg_pred[:, :original_seq_len]
+                pred = neg_pred + step_cfg_scale * (pred - neg_pred)
+
+            preview_img = img - t_curr * pred
+            img = img + (t_prev - t_curr) * pred
+
+            if inpaint_extension is not None:
+                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
+                preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
+
+            step_callback(
+                PipelineIntermediateState(
+                    step=step_index + 1,
+                    order=1,
+                    total_steps=total_steps,
+                    timestep=int(t_curr),
+                    latents=preview_img,
+                ),
+            )
+
+    finally:
+        # DyPE: Restore original position embedder
+        if original_pe_embedder is not None:
+            DyPEExtension.restore_model(model, original_pe_embedder)
 
     return img

@@ -32,6 +32,8 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
 from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
 from invokeai.backend.flux.denoise import denoise
+from invokeai.backend.flux.dype.presets import DyPEPreset, get_dype_config_from_preset
+from invokeai.backend.flux.extensions.dype_extension import DyPEExtension
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
 from invokeai.backend.flux.extensions.kontext_extension import KontextExtension
 from invokeai.backend.flux.extensions.regional_prompting_extension import RegionalPromptingExtension
@@ -63,7 +65,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="4.1.0",
+    version="4.2.0",
 )
 class FluxDenoiseInvocation(BaseInvocation):
     """Run denoising process with a FLUX transformer model."""
@@ -157,6 +159,24 @@ class FluxDenoiseInvocation(BaseInvocation):
         default=None,
         description="FLUX Kontext conditioning (reference image).",
         input=Input.Connection,
+    )
+
+    # DyPE (Dynamic Position Extrapolation) for high-resolution generation
+    dype_preset: DyPEPreset = InputField(
+        default=DyPEPreset.OFF,
+        description="DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.",
+    )
+    dype_scale: Optional[float] = InputField(
+        default=None,
+        ge=0.0,
+        le=8.0,
+        description="DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.",
+    )
+    dype_exponent: Optional[float] = InputField(
+        default=None,
+        ge=0.0,
+        le=1000.0,
+        description="DyPE decay speed (λt). Controls transition from low to high frequency detail. Only used when dype_preset is not 'off'.",
     )
 
     @torch.no_grad()
@@ -409,6 +429,26 @@ class FluxDenoiseInvocation(BaseInvocation):
                 kontext_extension.ensure_batch_size(x.shape[0])
                 img_cond_seq, img_cond_seq_ids = kontext_extension.kontext_latents, kontext_extension.kontext_ids
 
+            # Prepare DyPE extension for high-resolution generation
+            dype_extension: DyPEExtension | None = None
+            dype_config = get_dype_config_from_preset(
+                preset=self.dype_preset,
+                width=self.width,
+                height=self.height,
+                custom_scale=self.dype_scale,
+                custom_exponent=self.dype_exponent,
+            )
+            if dype_config is not None:
+                dype_extension = DyPEExtension(
+                    config=dype_config,
+                    target_height=self.height,
+                    target_width=self.width,
+                )
+                context.logger.info(
+                    f"DyPE enabled: {self.width}x{self.height}, preset={self.dype_preset.value}, "
+                    f"scale={dype_config.dype_scale:.2f}, method={dype_config.method}"
+                )
+
             x = denoise(
                 model=transformer,
                 img=x,
@@ -426,6 +466,7 @@ class FluxDenoiseInvocation(BaseInvocation):
                 img_cond=img_cond,
                 img_cond_seq=img_cond_seq,
                 img_cond_seq_ids=img_cond_seq_ids,
+                dype_extension=dype_extension,
             )
 
         x = unpack(x.float(), self.height, self.width)
