@@ -66,6 +66,11 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   renderers = new SyncableMap<string, AnyObjectRenderer>();
 
   /**
+   * Tracks the cache keys used when rasterizing this entity so they can be invalidated on demand.
+   */
+  rasterCacheKeys = new Set<string>();
+
+  /**
    * A object containing singleton Konva nodes.
    */
   konva: {
@@ -476,7 +481,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   }): Promise<ImageDTO> => {
     const rasterizingAdapter = this.manager.stateApi.$rasterizingAdapter.get();
     if (rasterizingAdapter) {
-      assert(false, `Already rasterizing an entity: ${rasterizingAdapter.id}`);
+      await this.manager.stateApi.waitForRasterizationToFinish();
     }
 
     const { rect, replaceObjects, attrs, bg, ignoreCache } = {
@@ -493,6 +498,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     if (cachedImageName && !ignoreCache) {
       imageDTO = await getImageDTOSafe(cachedImageName);
       if (imageDTO) {
+        this.rasterCacheKeys.add(hash);
         this.log.trace({ rect, cachedImageName, imageDTO }, 'Using cached rasterized image');
         return imageDTO;
       }
@@ -524,6 +530,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
         replaceObjects,
       });
       this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
+      this.rasterCacheKeys.add(hash);
       return imageDTO;
     } catch (error) {
       this.log.error({ rasterizeArgs, error: serializeError(error as Error) }, 'Failed to rasterize entity');
@@ -531,6 +538,22 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     } finally {
       this.manager.stateApi.$rasterizingAdapter.set(null);
     }
+  };
+
+  /**
+   * Invalidates all cached rasterizations for this entity by removing the cached image
+   * names from the image cache and clearing the tracked raster cache keys. This forces
+   * future rasterizations to regenerate images instead of using potentially stale
+   * cached versions.
+   */
+  invalidateRasterCache = () => {
+    if (this.rasterCacheKeys.size === 0) {
+      return;
+    }
+    for (const key of this.rasterCacheKeys) {
+      this.manager.cache.imageNameCache.delete(key);
+    }
+    this.rasterCacheKeys.clear();
   };
 
   cloneObjectGroup = (arg: { attrs?: GroupConfig } = {}): Konva.Group => {
