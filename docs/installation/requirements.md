@@ -31,6 +31,11 @@ The requirements below are rough guidelines for best performance. GPUs with less
         - Memory: At least 32GB RAM.
         - Disk: 10GB for base installation plus 200GB for models.
 
+    === "Z-Image Turbo - 1024x1024"
+        - GPU: Nvidia 20xx series or later, 8GB+ VRAM.
+        - Memory: At least 16GB RAM.
+        - Disk: 10GB for base installation plus 35GB for models.
+
 !!! info "`tmpfs` on Linux"
 
     If your temporary directory is mounted as a `tmpfs`, ensure it has sufficient space.

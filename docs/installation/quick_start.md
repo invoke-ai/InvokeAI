@@ -31,6 +31,12 @@ Hardware requirements vary significantly depending on model and image output siz
         - Memory: At least 32GB RAM.
         - Disk: 10GB for base installation plus 200GB for models.
 
+    === "Z-Image Turbo - 1024x1024"
+        - GPU: Nvidia 20xx series or later, 8GB+ VRAM.
+        - Memory: At least 16GB RAM.
+        - Disk: 10GB for base installation plus 35GB for models.
+
+
 More detail on system requirements can be found [here](./requirements.md).
 
 ## Step 2: Download and Set Up the Launcher

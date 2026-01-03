@@ -890,10 +890,18 @@ flux_bundle: list[StarterModel] = [
     flux_krea_quantized,
 ]
 
+zimage_bundle: list[StarterModel] = [
+    z_image_turbo_quantized,
+    z_image_qwen3_encoder_quantized,
+    z_image_controlnet_union,
+    z_image_controlnet_tile,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
     BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
+    BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"
