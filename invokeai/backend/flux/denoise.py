@@ -46,13 +46,15 @@ def denoise(
     if use_scheduler:
         # Initialize scheduler with timesteps
         # The timesteps list contains values in [0, 1] range (sigmas)
-        # Some schedulers (like Euler) support custom sigmas, others (like Heun) don't
+        # LCM should use num_inference_steps (it has its own sigma schedule),
+        # while other schedulers can use custom sigmas if supported
+        is_lcm = scheduler.__class__.__name__ == "FlowMatchLCMScheduler"
         set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
-        if "sigmas" in set_timesteps_sig.parameters:
+        if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
             # Scheduler supports custom sigmas - use InvokeAI's time-shifted schedule
             scheduler.set_timesteps(sigmas=timesteps, device=img.device)
         else:
-            # Scheduler doesn't support custom sigmas - use num_inference_steps
+            # LCM or scheduler doesn't support custom sigmas - use num_inference_steps
             # The schedule will be computed by the scheduler itself
             num_inference_steps = len(timesteps) - 1
             scheduler.set_timesteps(num_inference_steps=num_inference_steps, device=img.device)
@@ -77,7 +79,10 @@ def denoise(
 
     if use_scheduler:
         # Use diffusers scheduler for stepping
-        for step_index in tqdm(range(num_scheduler_steps)):
+        # Use tqdm with total_steps (user-facing steps) not num_scheduler_steps (internal steps)
+        # This ensures progress bar shows 1/8, 2/8, etc. even when scheduler uses more internal steps
+        pbar = tqdm(total=total_steps, desc="Denoising")
+        for step_index in range(num_scheduler_steps):
             timestep = scheduler.timesteps[step_index]
             # Convert scheduler timestep (0-1000) to normalized (0-1) for the model
             t_curr = timestep.item() / scheduler.config.num_train_timesteps
@@ -194,6 +199,7 @@ def denoise(
                     user_step += 1
                     # Only call step_callback if we haven't exceeded total_steps
                     if user_step <= total_steps:
+                        pbar.update(1)
                         preview_img = img - t_curr * pred
                         if inpaint_extension is not None:
                             preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(
@@ -209,11 +215,12 @@ def denoise(
                             ),
                         )
             else:
-                # For Euler, LCM and other first-order schedulers
+                # For LCM and other first-order schedulers
                 user_step += 1
                 # Only call step_callback if we haven't exceeded total_steps
                 # (LCM scheduler may have more internal steps than user-facing steps)
                 if user_step <= total_steps:
+                    pbar.update(1)
                     preview_img = img - t_curr * pred
                     if inpaint_extension is not None:
                         preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
@@ -227,6 +234,7 @@ def denoise(
                         ),
                     )
 
+        pbar.close()
         return img
 
     # Original Euler implementation (when scheduler is None)
