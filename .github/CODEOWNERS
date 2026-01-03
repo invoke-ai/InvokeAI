@@ -6,7 +6,7 @@
 /mkdocs.yml @lstein @blessedcoolant  
 
 # nodes
-/invokeai/app/ @blessedcoolant @lstein 
+/invokeai/app/ @blessedcoolant @lstein @dunkeroni
 
 # installation and configuration
 /pyproject.toml  @lstein @blessedcoolant  
@@ -18,15 +18,15 @@
 /invokeai/version @lstein @blessedcoolant  
 
 # web ui
-/invokeai/frontend @blessedcoolant  @lstein  
+/invokeai/frontend @blessedcoolant  @lstein  @dunkeroni  
 
 # generation, model management, postprocessing
-/invokeai/backend  @lstein @blessedcoolant     
+/invokeai/backend  @lstein @blessedcoolant @dunkeroni    
 
 # front ends
 /invokeai/frontend/CLI @lstein  
 /invokeai/frontend/install @lstein   
 /invokeai/frontend/merge @lstein @blessedcoolant  
 /invokeai/frontend/training @lstein @blessedcoolant  
-/invokeai/frontend/web  @blessedcoolant  @lstein
+/invokeai/frontend/web  @blessedcoolant  @lstein @dunkeroni
 
