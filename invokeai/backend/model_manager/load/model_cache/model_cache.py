@@ -54,11 +54,13 @@ def synchronized(method: Callable[..., Any]) -> Callable[..., Any]:
 
     return wrapper
 
+
 def record_activity(method: Callable[..., Any]) -> Callable[..., Any]:
     """A decorator that records activity after a method completes successfully.
 
     Note: This decorator should be applied to methods that already hold self._lock.
     """
+
     @wraps(method)
     def wrapper(self, *args, **kwargs):
         result = method(self, *args, **kwargs)
@@ -66,6 +68,7 @@ def record_activity(method: Callable[..., Any]) -> Callable[..., Any]:
         return result
 
     return wrapper
+
 
 @dataclass
 class CacheEntrySnapshot:
