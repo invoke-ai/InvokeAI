@@ -895,6 +895,7 @@ zimage_bundle: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
+    flux_vae,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
