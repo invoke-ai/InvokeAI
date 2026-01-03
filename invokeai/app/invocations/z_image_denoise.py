@@ -1,3 +1,4 @@
+import inspect
 import math
 from contextlib import ExitStack
 from typing import Callable, Iterator, Optional, Tuple
@@ -5,6 +6,7 @@ from typing import Callable, Iterator, Optional, Tuple
 import einops
 import torch
 import torchvision.transforms as tv_transforms
+from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
@@ -24,6 +26,7 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.z_image_control import ZImageControlField
 from invokeai.app.invocations.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux.schedulers import ZIMAGE_SCHEDULER_LABELS, ZIMAGE_SCHEDULER_MAP, ZIMAGE_SCHEDULER_NAME_VALUES
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.z_image_lora_constants import Z_IMAGE_LORA_TRANSFORMER_PREFIX
@@ -47,7 +50,7 @@ from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
     category="image",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class ZImageDenoiseInvocation(BaseInvocation):
@@ -99,6 +102,13 @@ class ZImageDenoiseInvocation(BaseInvocation):
         default=None,
         description=FieldDescriptions.vae + " Required for control conditioning.",
         input=Input.Connection,
+    )
+    # Scheduler selection for the denoising process
+    scheduler: ZIMAGE_SCHEDULER_NAME_VALUES = InputField(
+        default="euler",
+        description="Scheduler (sampler) for the denoising process. Euler is the default and recommended for "
+        "Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.",
+        ui_choice_labels=ZIMAGE_SCHEDULER_LABELS,
     )
 
     @torch.no_grad()
@@ -361,15 +371,32 @@ class ZImageDenoiseInvocation(BaseInvocation):
             )
 
         step_callback = self._build_step_callback(context)
-        step_callback(
-            PipelineIntermediateState(
-                step=0,
-                order=1,
-                total_steps=total_steps,
-                timestep=int(sigmas[0] * 1000),
-                latents=latents,
-            ),
-        )
+
+        # Initialize the diffusers scheduler if not using built-in Euler
+        scheduler: SchedulerMixin | None = None
+        use_scheduler = self.scheduler != "euler"
+
+        if use_scheduler:
+            scheduler_class = ZIMAGE_SCHEDULER_MAP[self.scheduler]
+            scheduler = scheduler_class(
+                num_train_timesteps=1000,
+                shift=1.0,
+            )
+            # Set timesteps - LCM should use num_inference_steps (it has its own sigma schedule),
+            # while other schedulers can use custom sigmas if supported
+            is_lcm = self.scheduler == "lcm"
+            set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
+            if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
+                # Convert sigmas list to tensor for scheduler
+                scheduler.set_timesteps(sigmas=sigmas, device=device)
+            else:
+                # LCM or scheduler doesn't support custom sigmas - use num_inference_steps
+                scheduler.set_timesteps(num_inference_steps=total_steps, device=device)
+
+            # For Heun scheduler, the number of actual steps may differ
+            num_scheduler_steps = len(scheduler.timesteps)
+        else:
+            num_scheduler_steps = total_steps
 
         with ExitStack() as exit_stack:
             # Get transformer config to determine if it's quantized
@@ -503,91 +530,219 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 )
             )
 
-            # Denoising loop
-            for step_idx in tqdm(range(total_steps)):
-                sigma_curr = sigmas[step_idx]
-                sigma_prev = sigmas[step_idx + 1]
+            # Denoising loop - supports both built-in Euler and diffusers schedulers
+            # Track user-facing step for progress (accounts for Heun's double steps)
+            user_step = 0
 
-                # Timestep tensor for Z-Image model
-                # The model expects t=0 at start (noise) and t=1 at end (clean)
-                # Sigma goes from 1 (noise) to 0 (clean), so model_t = 1 - sigma
-                model_t = 1.0 - sigma_curr
-                timestep = torch.tensor([model_t], device=device, dtype=inference_dtype).expand(latents.shape[0])
+            if use_scheduler and scheduler is not None:
+                # Use diffusers scheduler for stepping
+                # Use tqdm with total_steps (user-facing steps) not num_scheduler_steps (internal steps)
+                # This ensures progress bar shows 1/8, 2/8, etc. even when scheduler uses more internal steps
+                pbar = tqdm(total=total_steps, desc="Denoising")
+                for step_index in range(num_scheduler_steps):
+                    sched_timestep = scheduler.timesteps[step_index]
+                    # Convert scheduler timestep (0-1000) to normalized sigma (0-1)
+                    sigma_curr = sched_timestep.item() / scheduler.config.num_train_timesteps
 
-                # Run transformer for positive prediction
-                # Z-Image transformer expects: x as list of [C, 1, H, W] tensors, t, cap_feats as list
-                # Prepare latent input: [B, C, H, W] -> [B, C, 1, H, W] -> list of [C, 1, H, W]
-                latent_model_input = latents.to(transformer.dtype)
-                latent_model_input = latent_model_input.unsqueeze(2)  # Add frame dimension
-                latent_model_input_list = list(latent_model_input.unbind(dim=0))
+                    # For Heun scheduler, track if we're in first or second order step
+                    is_heun = hasattr(scheduler, "state_in_first_order")
+                    in_first_order = scheduler.state_in_first_order if is_heun else True
 
-                # Determine if control should be applied at this step
-                apply_control = control_extension is not None and control_extension.should_apply(step_idx, total_steps)
+                    # Timestep tensor for Z-Image model
+                    # The model expects t=0 at start (noise) and t=1 at end (clean)
+                    model_t = 1.0 - sigma_curr
+                    timestep = torch.tensor([model_t], device=device, dtype=inference_dtype).expand(latents.shape[0])
 
-                # Run forward pass - use custom forward with control if extension is active
-                if apply_control:
-                    model_out_list, _ = z_image_forward_with_control(
-                        transformer=transformer,
-                        x=latent_model_input_list,
-                        t=timestep,
-                        cap_feats=[pos_prompt_embeds],
-                        control_extension=control_extension,
+                    # Run transformer for positive prediction
+                    latent_model_input = latents.to(transformer.dtype)
+                    latent_model_input = latent_model_input.unsqueeze(2)  # Add frame dimension
+                    latent_model_input_list = list(latent_model_input.unbind(dim=0))
+
+                    # Determine if control should be applied at this step
+                    apply_control = control_extension is not None and control_extension.should_apply(
+                        user_step, total_steps
                     )
-                else:
-                    model_output = transformer(
-                        x=latent_model_input_list,
-                        t=timestep,
-                        cap_feats=[pos_prompt_embeds],
-                    )
-                    model_out_list = model_output[0]  # Extract list of tensors from tuple
 
-                noise_pred_cond = torch.stack([t.float() for t in model_out_list], dim=0)
-                noise_pred_cond = noise_pred_cond.squeeze(2)  # Remove frame dimension
-                noise_pred_cond = -noise_pred_cond  # Z-Image uses v-prediction with negation
-
-                # Apply CFG if enabled
-                if do_classifier_free_guidance and neg_prompt_embeds is not None:
+                    # Run forward pass
                     if apply_control:
-                        model_out_list_uncond, _ = z_image_forward_with_control(
+                        model_out_list, _ = z_image_forward_with_control(
                             transformer=transformer,
                             x=latent_model_input_list,
                             t=timestep,
-                            cap_feats=[neg_prompt_embeds],
+                            cap_feats=[pos_prompt_embeds],
                             control_extension=control_extension,
                         )
                     else:
-                        model_output_uncond = transformer(
+                        model_output = transformer(
                             x=latent_model_input_list,
                             t=timestep,
-                            cap_feats=[neg_prompt_embeds],
+                            cap_feats=[pos_prompt_embeds],
                         )
-                        model_out_list_uncond = model_output_uncond[0]  # Extract list of tensors from tuple
+                        model_out_list = model_output[0]
 
-                    noise_pred_uncond = torch.stack([t.float() for t in model_out_list_uncond], dim=0)
-                    noise_pred_uncond = noise_pred_uncond.squeeze(2)
-                    noise_pred_uncond = -noise_pred_uncond
-                    noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
-                else:
-                    noise_pred = noise_pred_cond
+                    noise_pred_cond = torch.stack([t.float() for t in model_out_list], dim=0)
+                    noise_pred_cond = noise_pred_cond.squeeze(2)
+                    noise_pred_cond = -noise_pred_cond  # Z-Image uses v-prediction with negation
 
-                # Euler step
-                latents_dtype = latents.dtype
-                latents = latents.to(dtype=torch.float32)
-                latents = latents + (sigma_prev - sigma_curr) * noise_pred
-                latents = latents.to(dtype=latents_dtype)
+                    # Apply CFG if enabled
+                    if do_classifier_free_guidance and neg_prompt_embeds is not None:
+                        if apply_control:
+                            model_out_list_uncond, _ = z_image_forward_with_control(
+                                transformer=transformer,
+                                x=latent_model_input_list,
+                                t=timestep,
+                                cap_feats=[neg_prompt_embeds],
+                                control_extension=control_extension,
+                            )
+                        else:
+                            model_output_uncond = transformer(
+                                x=latent_model_input_list,
+                                t=timestep,
+                                cap_feats=[neg_prompt_embeds],
+                            )
+                            model_out_list_uncond = model_output_uncond[0]
 
-                if inpaint_extension is not None:
-                    latents = inpaint_extension.merge_intermediate_latents_with_init_latents(latents, sigma_prev)
+                        noise_pred_uncond = torch.stack([t.float() for t in model_out_list_uncond], dim=0)
+                        noise_pred_uncond = noise_pred_uncond.squeeze(2)
+                        noise_pred_uncond = -noise_pred_uncond
+                        noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
+                    else:
+                        noise_pred = noise_pred_cond
 
-                step_callback(
-                    PipelineIntermediateState(
-                        step=step_idx + 1,
-                        order=1,
-                        total_steps=total_steps,
-                        timestep=int(sigma_curr * 1000),
-                        latents=latents,
-                    ),
-                )
+                    # Use scheduler.step() for the update
+                    step_output = scheduler.step(model_output=noise_pred, timestep=sched_timestep, sample=latents)
+                    latents = step_output.prev_sample
+
+                    # Get sigma_prev for inpainting (next sigma value)
+                    if step_index + 1 < len(scheduler.sigmas):
+                        sigma_prev = scheduler.sigmas[step_index + 1].item()
+                    else:
+                        sigma_prev = 0.0
+
+                    if inpaint_extension is not None:
+                        latents = inpaint_extension.merge_intermediate_latents_with_init_latents(latents, sigma_prev)
+
+                    # For Heun, only increment user step after second-order step completes
+                    if is_heun:
+                        if not in_first_order:
+                            user_step += 1
+                            # Only call step_callback if we haven't exceeded total_steps
+                            if user_step <= total_steps:
+                                pbar.update(1)
+                                step_callback(
+                                    PipelineIntermediateState(
+                                        step=user_step,
+                                        order=2,
+                                        total_steps=total_steps,
+                                        timestep=int(sigma_curr * 1000),
+                                        latents=latents,
+                                    ),
+                                )
+                    else:
+                        # For LCM and other first-order schedulers
+                        user_step += 1
+                        # Only call step_callback if we haven't exceeded total_steps
+                        # (LCM scheduler may have more internal steps than user-facing steps)
+                        if user_step <= total_steps:
+                            pbar.update(1)
+                            step_callback(
+                                PipelineIntermediateState(
+                                    step=user_step,
+                                    order=1,
+                                    total_steps=total_steps,
+                                    timestep=int(sigma_curr * 1000),
+                                    latents=latents,
+                                ),
+                            )
+                pbar.close()
+            else:
+                # Original Euler implementation (default, optimized for Z-Image)
+                for step_idx in tqdm(range(total_steps)):
+                    sigma_curr = sigmas[step_idx]
+                    sigma_prev = sigmas[step_idx + 1]
+
+                    # Timestep tensor for Z-Image model
+                    # The model expects t=0 at start (noise) and t=1 at end (clean)
+                    # Sigma goes from 1 (noise) to 0 (clean), so model_t = 1 - sigma
+                    model_t = 1.0 - sigma_curr
+                    timestep = torch.tensor([model_t], device=device, dtype=inference_dtype).expand(latents.shape[0])
+
+                    # Run transformer for positive prediction
+                    # Z-Image transformer expects: x as list of [C, 1, H, W] tensors, t, cap_feats as list
+                    # Prepare latent input: [B, C, H, W] -> [B, C, 1, H, W] -> list of [C, 1, H, W]
+                    latent_model_input = latents.to(transformer.dtype)
+                    latent_model_input = latent_model_input.unsqueeze(2)  # Add frame dimension
+                    latent_model_input_list = list(latent_model_input.unbind(dim=0))
+
+                    # Determine if control should be applied at this step
+                    apply_control = control_extension is not None and control_extension.should_apply(
+                        step_idx, total_steps
+                    )
+
+                    # Run forward pass - use custom forward with control if extension is active
+                    if apply_control:
+                        model_out_list, _ = z_image_forward_with_control(
+                            transformer=transformer,
+                            x=latent_model_input_list,
+                            t=timestep,
+                            cap_feats=[pos_prompt_embeds],
+                            control_extension=control_extension,
+                        )
+                    else:
+                        model_output = transformer(
+                            x=latent_model_input_list,
+                            t=timestep,
+                            cap_feats=[pos_prompt_embeds],
+                        )
+                        model_out_list = model_output[0]  # Extract list of tensors from tuple
+
+                    noise_pred_cond = torch.stack([t.float() for t in model_out_list], dim=0)
+                    noise_pred_cond = noise_pred_cond.squeeze(2)  # Remove frame dimension
+                    noise_pred_cond = -noise_pred_cond  # Z-Image uses v-prediction with negation
+
+                    # Apply CFG if enabled
+                    if do_classifier_free_guidance and neg_prompt_embeds is not None:
+                        if apply_control:
+                            model_out_list_uncond, _ = z_image_forward_with_control(
+                                transformer=transformer,
+                                x=latent_model_input_list,
+                                t=timestep,
+                                cap_feats=[neg_prompt_embeds],
+                                control_extension=control_extension,
+                            )
+                        else:
+                            model_output_uncond = transformer(
+                                x=latent_model_input_list,
+                                t=timestep,
+                                cap_feats=[neg_prompt_embeds],
+                            )
+                            model_out_list_uncond = model_output_uncond[0]  # Extract list of tensors from tuple
+
+                        noise_pred_uncond = torch.stack([t.float() for t in model_out_list_uncond], dim=0)
+                        noise_pred_uncond = noise_pred_uncond.squeeze(2)
+                        noise_pred_uncond = -noise_pred_uncond
+                        noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
+                    else:
+                        noise_pred = noise_pred_cond
+
+                    # Euler step
+                    latents_dtype = latents.dtype
+                    latents = latents.to(dtype=torch.float32)
+                    latents = latents + (sigma_prev - sigma_curr) * noise_pred
+                    latents = latents.to(dtype=latents_dtype)
+
+                    if inpaint_extension is not None:
+                        latents = inpaint_extension.merge_intermediate_latents_with_init_latents(latents, sigma_prev)
+
+                    step_callback(
+                        PipelineIntermediateState(
+                            step=step_idx + 1,
+                            order=1,
+                            total_steps=total_steps,
+                            timestep=int(sigma_curr * 1000),
+                            latents=latents,
+                        ),
+                    )
 
         return latents
 
