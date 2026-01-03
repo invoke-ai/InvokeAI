@@ -8324,6 +8324,13 @@ export type components = {
              */
             num_steps?: number;
             /**
+             * Scheduler
+             * @description Scheduler (sampler) for the denoising process. 'euler' is fast and standard. 'heun' is 2nd-order (better quality, 2x slower). 'lcm' is optimized for few steps.
+             * @default euler
+             * @enum {string}
+             */
+            scheduler?: "euler" | "heun" | "lcm";
+            /**
              * Guidance
              * @description The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images. FLUX dev only, ignored for schnell.
              * @default 4
@@ -8491,6 +8498,13 @@ export type components = {
              * @default 4
              */
             num_steps?: number;
+            /**
+             * Scheduler
+             * @description Scheduler (sampler) for the denoising process. 'euler' is fast and standard. 'heun' is 2nd-order (better quality, 2x slower). 'lcm' is optimized for few steps.
+             * @default euler
+             * @enum {string}
+             */
+            scheduler?: "euler" | "heun" | "lcm";
             /**
              * Guidance
              * @description The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images. FLUX dev only, ignored for schnell.
@@ -25630,6 +25644,13 @@ export type components = {
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
+            /**
+             * Scheduler
+             * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended for Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.
+             * @default euler
+             * @enum {string}
+             */
+            scheduler?: "euler" | "heun" | "lcm";
             /**
              * type
              * @default z_image_denoise
