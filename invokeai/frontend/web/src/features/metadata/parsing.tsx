@@ -30,6 +30,7 @@ import {
   setSeamlessYAxis,
   setSeed,
   setSteps,
+  setZImageScheduler,
   vaeSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
@@ -380,6 +381,11 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
       // Flux only supports euler, heun, lcm
       if (value === 'euler' || value === 'heun' || value === 'lcm') {
         store.dispatch(setFluxScheduler(value));
+      }
+    } else if (base === 'z-image') {
+      // Z-Image only supports euler, heun, lcm
+      if (value === 'euler' || value === 'heun' || value === 'lcm') {
+        store.dispatch(setZImageScheduler(value));
       }
     } else {
       // SD, SDXL, SD3, CogView4, etc. use the general scheduler

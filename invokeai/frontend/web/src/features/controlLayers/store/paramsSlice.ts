@@ -72,6 +72,9 @@ const slice = createSlice({
     setFluxScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
       state.fluxScheduler = action.payload;
     },
+    setZImageScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
+      state.zImageScheduler = action.payload;
+    },
     setUpscaleScheduler: (state, action: PayloadAction<ParameterScheduler>) => {
       state.upscaleScheduler = action.payload;
     },
@@ -453,6 +456,7 @@ export const {
   setGuidance,
   setScheduler,
   setFluxScheduler,
+  setZImageScheduler,
   setUpscaleScheduler,
   setUpscaleCfgScale,
   setSeed,
@@ -593,6 +597,7 @@ export const selectModelSupportsOptimizedDenoising = createSelector(
 );
 export const selectScheduler = createParamsSelector((params) => params.scheduler);
 export const selectFluxScheduler = createParamsSelector((params) => params.fluxScheduler);
+export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
 export const selectSeamlessXAxis = createParamsSelector((params) => params.seamlessXAxis);
 export const selectSeamlessYAxis = createParamsSelector((params) => params.seamlessYAxis);
 export const selectSeed = createParamsSelector((params) => params.seed);
