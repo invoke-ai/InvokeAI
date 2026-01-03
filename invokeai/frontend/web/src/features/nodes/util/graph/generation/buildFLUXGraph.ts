@@ -143,6 +143,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     guidance,
     model: Graph.getModelMetadataField(model),
     steps,
+    scheduler: fluxScheduler,
     vae: fluxVAE,
     t5_encoder: t5EncoderModel,
     clip_embed_model: clipEmbedModel,
