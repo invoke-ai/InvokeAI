@@ -382,13 +382,15 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 num_train_timesteps=1000,
                 shift=1.0,
             )
-            # Set timesteps using custom sigmas if supported, otherwise use num_inference_steps
+            # Set timesteps - LCM should use num_inference_steps (it has its own sigma schedule),
+            # while other schedulers can use custom sigmas if supported
+            is_lcm = self.scheduler == "lcm"
             set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
-            if "sigmas" in set_timesteps_sig.parameters:
+            if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
                 # Convert sigmas list to tensor for scheduler
                 scheduler.set_timesteps(sigmas=sigmas, device=device)
             else:
-                # Scheduler doesn't support custom sigmas - use num_inference_steps
+                # LCM or scheduler doesn't support custom sigmas - use num_inference_steps
                 scheduler.set_timesteps(num_inference_steps=total_steps, device=device)
 
             # For Heun scheduler, the number of actual steps may differ
@@ -534,7 +536,10 @@ class ZImageDenoiseInvocation(BaseInvocation):
 
             if use_scheduler and scheduler is not None:
                 # Use diffusers scheduler for stepping
-                for step_index in tqdm(range(num_scheduler_steps)):
+                # Use tqdm with total_steps (user-facing steps) not num_scheduler_steps (internal steps)
+                # This ensures progress bar shows 1/8, 2/8, etc. even when scheduler uses more internal steps
+                pbar = tqdm(total=total_steps, desc="Denoising")
+                for step_index in range(num_scheduler_steps):
                     sched_timestep = scheduler.timesteps[step_index]
                     # Convert scheduler timestep (0-1000) to normalized sigma (0-1)
                     sigma_curr = sched_timestep.item() / scheduler.config.num_train_timesteps
@@ -623,6 +628,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                             user_step += 1
                             # Only call step_callback if we haven't exceeded total_steps
                             if user_step <= total_steps:
+                                pbar.update(1)
                                 step_callback(
                                     PipelineIntermediateState(
                                         step=user_step,
@@ -633,11 +639,12 @@ class ZImageDenoiseInvocation(BaseInvocation):
                                     ),
                                 )
                     else:
-                        # For Euler, LCM and other first-order schedulers
+                        # For LCM and other first-order schedulers
                         user_step += 1
                         # Only call step_callback if we haven't exceeded total_steps
                         # (LCM scheduler may have more internal steps than user-facing steps)
                         if user_step <= total_steps:
+                            pbar.update(1)
                             step_callback(
                                 PipelineIntermediateState(
                                     step=user_step,
@@ -647,6 +654,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
                                     latents=latents,
                                 ),
                             )
+                pbar.close()
             else:
                 # Original Euler implementation (default, optimized for Z-Image)
                 for step_idx in tqdm(range(total_steps)):

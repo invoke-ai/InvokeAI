@@ -184,6 +184,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(modelConfig),
     steps,
+    scheduler: zImageScheduler,
     vae: zImageVaeModel ?? undefined,
     qwen3_encoder: zImageQwen3EncoderModel ?? undefined,
     qwen3_source: zImageQwen3SourceModel ?? undefined,
