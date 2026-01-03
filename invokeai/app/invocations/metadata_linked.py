@@ -27,7 +27,6 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.flux_denoise import FluxDenoiseInvocation
-from invokeai.app.invocations.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.app.invocations.ip_adapter import IPAdapterField, IPAdapterInvocation
 from invokeai.app.invocations.metadata import LoRAMetadataField, MetadataOutput
 from invokeai.app.invocations.model import (
@@ -53,6 +52,7 @@ from invokeai.app.invocations.primitives import (
 )
 from invokeai.app.invocations.scheduler import SchedulerOutput
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField, T2IAdapterInvocation
+from invokeai.app.invocations.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
