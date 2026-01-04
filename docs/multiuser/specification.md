@@ -24,6 +24,7 @@ This document provides a comprehensive specification for adding multi-user suppo
 
 ### 3.1 Administrator Role
 **Capabilities:**
+
 - Full access to all InvokeAI features
 - Model management (add, delete, configure models)
 - User management (create, edit, delete users)
@@ -33,11 +34,13 @@ This document provides a comprehensive specification for adding multi-user suppo
 - Grant/revoke administrative privileges to other users
 
 **Restrictions:**
+
 - Cannot delete their own account if they are the last administrator
 - Cannot revoke their own admin privileges if they are the last administrator
 
 ### 3.2 Regular User Role
 **Capabilities:**
+
 - Create, edit, and delete their own image boards
 - Upload and manage their own assets
 - Use all image generation tools (linear, canvas, upscale, workflow tabs)
@@ -48,6 +51,7 @@ This document provides a comprehensive specification for adding multi-user suppo
 - Access shared boards (read/write based on permissions)
 
 **Restrictions:**
+
 - Cannot add, delete, or edit models
 - Cannot access model management tab
 - Cannot view or modify other users' boards, images, or workflows
@@ -82,6 +86,7 @@ This document provides a comprehensive specification for adding multi-user suppo
 6. Proceeds to normal login screen
 
 **Reset Capability:**
+
 - Administrators can be reset by manually editing the config file
 - Requires access to server filesystem (intentional security measure)
 - Database maintains user records; config file contains root admin credentials
@@ -150,6 +155,7 @@ This document provides a comprehensive specification for adding multi-user suppo
 
 ### 5.2 User Profile Management
 **User Self-Service:**
+
 - Update display name
 - Change password (requires current password)
 - Update email address (requires verification)
@@ -157,6 +163,7 @@ This document provides a comprehensive specification for adding multi-user suppo
 - View account creation date and last login
 
 **Administrator Actions:**
+
 - Edit user information (name, email)
 - Reset user password (generates reset link)
 - Toggle administrator privileges

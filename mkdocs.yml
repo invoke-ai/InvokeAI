@@ -148,6 +148,7 @@ nav:
           - Overview: 'contributing/contribution_guides/development.md'
           - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
           - Model Manager v2: 'contributing/MODEL_MANAGER.md'
+          - Multiuser Mode: 'multiuser/specification.md'
           - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
           - Testing: 'contributing/TESTS.md'
       - Frontend:
