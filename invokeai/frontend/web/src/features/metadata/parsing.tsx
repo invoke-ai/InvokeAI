@@ -1000,7 +1000,6 @@ export const ImageMetadataHandlers = {
   CFGRescaleMultiplier,
   CLIPSkip,
   Guidance,
-  Scheduler,
   Width,
   Height,
   Seed,
@@ -1016,6 +1015,8 @@ export const ImageMetadataHandlers = {
   RefinerNegativeAestheticScore,
   RefinerDenoisingStart,
   MainModel,
+  // Scheduler must be after MainModel so that base-dependent logic (z-image scheduler) works correctly
+  Scheduler,
   VAEModel,
   Qwen3EncoderModel,
   ZImageVAEModel,
