@@ -14,6 +14,7 @@ This document provides a detailed, step-by-step implementation plan for adding m
 - **Test Coverage**: Add tests for all new functionality
 
 ### 2.2 Development Strategy
+
 1. Start with backend database and services
 2. Build authentication layer
 3. Update existing services for multi-tenancy
@@ -870,6 +871,7 @@ auth_enabled: false  # Legacy single-user mode
 ## 13. Rollout Strategy
 
 ### 13.1 Beta Testing
+
 1. Internal testing with core team (1 week)
 2. Closed beta with selected users (2 weeks)
 3. Open beta announcement (2 weeks)

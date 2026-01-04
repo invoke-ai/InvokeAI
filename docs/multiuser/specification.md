@@ -69,6 +69,7 @@ This document provides a comprehensive specification for adding multi-user suppo
 
 ### 4.2 Initial Administrator Setup
 **First-time Launch Flow:**
+
 1. Application detects no administrator account exists
 2. Displays mandatory setup dialog (cannot be skipped)
 3. Prompts for:
@@ -94,6 +95,7 @@ This document provides a comprehensive specification for adding multi-user suppo
 - Not in common password list
 
 ### 4.4 Login Flow
+
 1. User navigates to InvokeAI URL
 2. If not authenticated, redirect to login page
 3. User enters username/email and password
@@ -118,6 +120,7 @@ This document provides a comprehensive specification for adding multi-user suppo
 
 ### 5.1 User Creation (Administrator)
 **Flow:**
+
 1. Administrator navigates to user management interface
 2. Clicks "Add User" button
 3. Enters user information:
@@ -136,6 +139,7 @@ This document provides a comprehensive specification for adding multi-user suppo
    - User must change on first login
 
 **Invitation Email Flow:**
+
 1. User receives email with unique link
 2. Link contains secure token
 3. User clicks link, redirected to setup page
@@ -162,6 +166,7 @@ This document provides a comprehensive specification for adding multi-user suppo
 
 ### 5.3 Password Reset Flow
 **User-Initiated (Future Enhancement):**
+
 1. User clicks "Forgot Password" on login page
 2. Enters email address
 3. System sends password reset link (if email exists)
@@ -169,6 +174,7 @@ This document provides a comprehensive specification for adding multi-user suppo
 5. Password updated, user can login
 
 **Administrator-Initiated:**
+
 1. Administrator selects user
 2. Clicks "Send Password Reset"
 3. System generates reset token and link
@@ -318,6 +324,7 @@ CREATE INDEX idx_style_presets_is_public ON style_presets(is_public);
 ```
 
 ### 6.3 Migration Strategy
+
 1. Create new user tables (users, user_sessions, user_invitations, shared_boards)
 2. Create default 'system' user for backward compatibility
 3. Update existing data to reference 'system' user
@@ -326,8 +333,8 @@ CREATE INDEX idx_style_presets_is_public ON style_presets(is_public);
 
 ### 6.4 Migration for Existing Installations
 - Single-user installations: Prompt to create admin account on first launch after update
-- Existing data assigned to initial administrator account
-- Option to keep data as 'system' user (shared) or migrate to admin user
+- Existing data migration: Administrator can specify an arbitrary user account to hold legacy data (can be the admin account or a separate user)
+- System provides UI during migration to choose destination user for existing data
 
 ## 7. API Endpoints
 
@@ -408,6 +415,7 @@ CREATE INDEX idx_style_presets_is_public ON style_presets(is_public);
 ### 7.4 Modified Endpoints
 
 All existing endpoints will be modified to:
+
 1. Require authentication (except setup/login)
 2. Filter data by current user (unless admin viewing all)
 3. Enforce permissions (e.g., model management requires admin)
@@ -507,7 +515,14 @@ session_expiry_hours_remember: int = 168  # "Remember me" expiration (7 days)
 password_min_length: int = 8  # Minimum password length
 require_strong_passwords: bool = True  # Enforce password complexity
 
-# Email (for invitations and password reset)
+# Session tracking
+enable_server_side_sessions: bool = False  # Optional server-side session tracking
+
+# Audit logging
+audit_log_auth_events: bool = True  # Log authentication events
+audit_log_admin_actions: bool = True  # Log administrative actions
+
+# Email (optional - for invitations and password reset)
 email_enabled: bool = False
 smtp_host: str = ""
 smtp_port: int = 587
@@ -575,7 +590,9 @@ admin_password_hash: Optional[str] = None
 - Document firewall requirements
 - Recommend network isolation strategies
 
-## 11. Email Integration (Optional Enhancement)
+## 11. Email Integration (Optional)
+
+**Note**: Email/SMTP configuration is optional. Many administrators will not have ready access to an outgoing SMTP server. When email is not configured, the system provides fallback mechanisms by displaying setup links directly in the admin UI.
 
 ### 11.1 Email Templates
 
@@ -689,11 +706,10 @@ InvokeAI
 ## 14. Future Enhancements
 
 ### 14.1 Phase 2 Features
-- OAuth2/OpenID Connect integration
+- **OAuth2/OpenID Connect integration** (deferred from initial release to keep scope manageable)
 - Two-factor authentication
 - API keys for programmatic access
 - Enhanced team/group management
-- User activity logging and audit trail
 - Advanced permission system (roles and capabilities)
 
 ### 14.2 Phase 3 Features
@@ -812,25 +828,21 @@ InvokeAI
 - [ ] Performance is acceptable with multiple concurrent users
 - [ ] Backward compatibility mode works (auth disabled)
 
-## 19. Open Questions
+## 19. Design Decisions
 
-1. **OAuth2 Priority**: Should OAuth2/OpenID Connect be in initial release or future enhancement?
-   - **Recommendation**: Future enhancement to keep initial scope manageable
+The following design decisions have been approved for implementation:
 
-2. **Email Requirement**: Should email be required or optional for invitations?
-   - **Recommendation**: Optional, with fallback to showing setup links in admin UI
+1. **OAuth2 Priority**: OAuth2/OpenID Connect integration will be a **future enhancement**. The initial release will focus on username/password authentication to keep scope manageable.
 
-3. **Data Migration**: Should existing data be assigned to admin user or remain as "system"?
-   - **Recommendation**: Provide option during migration, default to admin user
+2. **Email Requirement**: Email/SMTP configuration is **optional**. Many administrators will not have ready access to an outgoing SMTP server. The system will provide fallback mechanisms (showing setup links directly in the admin UI) when email is not configured.
 
-4. **API Compatibility**: Should we maintain v1 API without auth for backward compatibility?
-   - **Recommendation**: No, require auth on all APIs but provide easy migration path
+3. **Data Migration**: During migration from single-user to multi-user mode, the administrator will be given the **option to specify an arbitrary user account** to hold legacy data. The admin account can be used for this purpose if the administrator wishes.
 
-5. **Session Storage**: JWT tokens or server-side sessions?
-   - **Recommendation**: JWT tokens for scalability, with optional server-side session tracking
+4. **API Compatibility**: Authentication will be **required on all APIs**, but authentication will not be required if multi-user support is disabled (backward compatibility mode with `auth_enabled: false`).
 
-6. **Audit Logging**: Should all operations be logged for audit purposes?
-   - **Recommendation**: Log authentication events and admin actions initially, expand later
+5. **Session Storage**: The system will use **JWT tokens with optional server-side session tracking**. This provides scalability while allowing administrators to enable server-side tracking if needed.
+
+6. **Audit Logging**: The system will **log authentication events and admin actions**. This provides accountability and security monitoring for critical operations.
 
 ## 20. Conclusion
 

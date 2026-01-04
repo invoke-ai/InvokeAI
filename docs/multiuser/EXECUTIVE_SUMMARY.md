@@ -383,14 +383,24 @@ auth_enabled: false  # Disable multi-user for legacy mode
 3. **Provide feedback** on any concerns
 4. **Approve** to begin implementation
 
-### Questions for Reviewers
-1. **OAuth2 Priority**: Should OAuth2/OpenID be in initial release?
-2. **Email Requirement**: Make email optional or required?
-3. **Data Migration**: Assign existing data to admin or keep as "system"?
-4. **Session Storage**: JWT only or hybrid with server-side tracking?
-5. **Timeline**: Is 14 weeks acceptable?
+### 🎪 Review Decisions
+
+The following design decisions have been approved:
+
+1. **OAuth2 Priority**: OAuth2/OpenID Connect will be a **future enhancement** to keep initial scope manageable.
+
+2. **Email Requirement**: Email/SMTP configuration is **optional**. Many administrators will not have ready access to an outgoing SMTP server. System will provide fallback (showing setup links in admin UI).
+
+3. **Data Migration**: During migration, administrator can **specify an arbitrary user account** to hold legacy data (can be admin account or separate user).
+
+4. **API Compatibility**: Authentication **required on all APIs**, but not required if multi-user support is disabled (`auth_enabled: false`).
+
+5. **Session Storage**: **JWT tokens with optional server-side session tracking**.
+
+6. **Audit Logging**: **Log authentication events and admin actions** for accountability and security monitoring.
 
 ### After Approval
+
 1. Begin Phase 2: Database Schema Design
 2. Create migration_25.py
 3. Implement and test schema changes
@@ -399,11 +409,10 @@ auth_enabled: false  # Disable multi-user for legacy mode
 ## 💡 Future Enhancements (Post-Initial Release)
 
 ### Phase 2 Features
-- OAuth2/OpenID Connect integration
+- **OAuth2/OpenID Connect integration** (deferred from initial release)
 - Two-factor authentication (2FA)
 - API keys for programmatic access
 - Enhanced team/group management
-- User activity audit logs
 - Advanced permission system
 
 ### Phase 3 Features
