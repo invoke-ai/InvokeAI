@@ -24,7 +24,9 @@ export const InstallModels = memo(() => {
   const { t } = useTranslation();
   const tabIndex = useStore($installModelsTabIndex);
 
-  {/* TO DO: This click target points to an out-of-date invokeai.ai URL. Reinstate when there is an updated web link. */}
+  {
+    /* TO DO: This click target points to an out-of-date invokeai.ai URL. Reinstate when there is an updated web link. */
+  }
   // const onClickLearnMore = useCallback(() => {
   //   window.open('https://support.invoke.ai/support/solutions/articles/151000170961-supported-models');
   // }, []);
