@@ -32,7 +32,7 @@ The requirements below are rough guidelines for best performance. GPUs with less
         - Disk: 10GB for base installation plus 200GB for models.
 
     === "Z-Image Turbo - 1024x1024"
-        - GPU: Nvidia 20xx series or later, 8GB+ VRAM.
+        - GPU: Nvidia 20xx series or later, 8GB+ VRAM for the Q4_K quantized model. 16GB+ needed for the Q8 or BF16 models.
         - Memory: At least 16GB RAM.
         - Disk: 10GB for base installation plus 35GB for models.
 
