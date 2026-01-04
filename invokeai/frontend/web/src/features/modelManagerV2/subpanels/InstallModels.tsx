@@ -1,11 +1,11 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Button, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@invoke-ai/ui-library';
+import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $installModelsTabIndex } from 'features/modelManagerV2/store/installModelsStore';
 import { StarterModelsForm } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterModelsForm';
-import { memo, useCallback } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCubeBold, PiFolderOpenBold, PiInfoBold, PiLinkSimpleBold, PiShootingStarBold } from 'react-icons/pi';
+import { PiCubeBold, PiFolderOpenBold, PiLinkSimpleBold, PiShootingStarBold } from 'react-icons/pi';
 import { SiHuggingface } from 'react-icons/si';
 
 import { HuggingFaceForm } from './AddModelPanel/HuggingFaceFolder/HuggingFaceForm';
@@ -24,17 +24,21 @@ export const InstallModels = memo(() => {
   const { t } = useTranslation();
   const tabIndex = useStore($installModelsTabIndex);
 
-  const onClickLearnMore = useCallback(() => {
-    window.open('https://support.invoke.ai/support/solutions/articles/151000170961-supported-models');
-  }, []);
+  {
+    /* TO DO: This click target points to an out-of-date invokeai.ai URL. Reinstate when there is an updated web link. */
+  }
+  // const onClickLearnMore = useCallback(() => {
+  //   window.open('https://support.invoke.ai/support/solutions/articles/151000170961-supported-models');
+  // }, []);
 
   return (
     <Flex layerStyle="first" borderRadius="base" w="full" h="full" flexDir="column" gap={4}>
       <Flex alignItems="center" justifyContent="space-between">
         <Heading fontSize="xl">{t('modelManager.addModel')}</Heading>
-        <Button alignItems="center" variant="link" leftIcon={<PiInfoBold />} onClick={onClickLearnMore}>
+        {/* TO DO: This button points to an out-of-date invokeai.ai URL. Reinstate when there is an updated web link. */}
+        {/* <Button alignItems="center" variant="link" leftIcon={<PiInfoBold />} onClick={onClickLearnMore}>
           <Text variant="subtext">{t('modelManager.learnMoreAboutSupportedModels')}</Text>
-        </Button>
+        </Button> */}
       </Flex>
       <Tabs
         variant="line"

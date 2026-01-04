@@ -140,6 +140,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         # Some weights of the model checkpoint were not used when initializing CLIPTextModelWithProjection:
         # ['text_model.embeddings.position_ids']
 
+        self._logger.info(f"Loading model from single file at {config.path} using {load_class.__name__}")
         with SilenceWarnings():
             pipeline = load_class.from_single_file(config.path, torch_dtype=self._torch_dtype)
 

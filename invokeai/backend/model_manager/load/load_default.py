@@ -75,6 +75,7 @@ class ModelLoader(ModelLoaderBase):
 
         config.path = str(self._get_model_path(config))
         self._ram_cache.make_room(self.get_size_fs(config, Path(config.path), submodel_type))
+        self._logger.info(f"Loading model '{stats_name}' into RAM cache..., config={config}")
         loaded_model = self._load_model(config, submodel_type)
 
         self._ram_cache.put(
