@@ -725,6 +725,8 @@ const Qwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
+    // Clear conflicting Qwen3Source when setting Encoder (mutually exclusive)
+    store.dispatch(zImageQwen3SourceModelSelected(null));
     store.dispatch(zImageQwen3EncoderModelSelected(value));
   },
   i18nKey: 'metadata.qwen3Encoder',
@@ -749,6 +751,8 @@ const ZImageVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
+    // Clear conflicting Qwen3Source when setting VAE (mutually exclusive)
+    store.dispatch(zImageQwen3SourceModelSelected(null));
     store.dispatch(zImageVaeModelSelected(value));
   },
   i18nKey: 'metadata.vae',
@@ -773,6 +777,9 @@ const ZImageQwen3SourceModel: SingleMetadataHandler<ModelIdentifierField> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
+    // Clear conflicting VAE and Encoder when setting Qwen3Source (mutually exclusive)
+    store.dispatch(zImageVaeModelSelected(null));
+    store.dispatch(zImageQwen3EncoderModelSelected(null));
     store.dispatch(zImageQwen3SourceModelSelected(value));
   },
   i18nKey: 'metadata.qwen3Source',
