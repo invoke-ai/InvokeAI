@@ -24,17 +24,19 @@ export const InstallModels = memo(() => {
   const { t } = useTranslation();
   const tabIndex = useStore($installModelsTabIndex);
 
-  const onClickLearnMore = useCallback(() => {
-    window.open('https://support.invoke.ai/support/solutions/articles/151000170961-supported-models');
-  }, []);
+  {/* TO DO: This click target points to an out-of-date invokeai.ai URL. Reinstate when there is an updated web link. */}
+  // const onClickLearnMore = useCallback(() => {
+  //   window.open('https://support.invoke.ai/support/solutions/articles/151000170961-supported-models');
+  // }, []);
 
   return (
     <Flex layerStyle="first" borderRadius="base" w="full" h="full" flexDir="column" gap={4}>
       <Flex alignItems="center" justifyContent="space-between">
         <Heading fontSize="xl">{t('modelManager.addModel')}</Heading>
-        <Button alignItems="center" variant="link" leftIcon={<PiInfoBold />} onClick={onClickLearnMore}>
+        {/* TO DO: This button points to an out-of-date invokeai.ai URL. Reinstate when there is an updated web link. */}
+        {/* <Button alignItems="center" variant="link" leftIcon={<PiInfoBold />} onClick={onClickLearnMore}>
           <Text variant="subtext">{t('modelManager.learnMoreAboutSupportedModels')}</Text>
-        </Button>
+        </Button> */}
       </Flex>
       <Tabs
         variant="line"
