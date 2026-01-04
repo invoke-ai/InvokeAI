@@ -51,7 +51,7 @@ export const PinnedFillColorPickerOverlay = memo(() => {
   }
 
   return (
-    <Flex pointerEvents="auto" direction="column" gap={2}>
+    <Flex pointerEvents="auto" direction="column" gap={2} data-text-tool-safezone="true">
       <Flex
         direction="column"
         p={3}

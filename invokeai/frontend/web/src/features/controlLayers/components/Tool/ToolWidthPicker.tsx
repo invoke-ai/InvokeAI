@@ -309,7 +309,7 @@ export const ToolWidthPicker = memo(() => {
   });
 
   return (
-    <Flex ref={ref} alignItems="center" h="full" flexGrow={1} flexShrink={1} justifyContent="flex-start" px={4}>
+    <Flex ref={ref} alignItems="center" flexGrow={1} flexShrink={1} minW={0}>
       {componentType === 'slider' && (
         <SliderToolWidthPickerComponent
           localValue={localValue}
