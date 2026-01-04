@@ -95,7 +95,7 @@ class ModelManagerService(ModelManagerServiceBase):
             storage_device="cpu",
             log_memory_usage=app_config.log_memory_usage,
             logger=logger,
-            keep_alive_minutes=app_config.model_cache_keep_alive,
+            keep_alive_minutes=app_config.model_cache_keep_alive_min,
         )
         loader = ModelLoadService(
             app_config=app_config,
