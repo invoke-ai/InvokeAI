@@ -38,5 +38,6 @@ class OnnyxDiffusersModel(GenericDiffusersLoader):
             model_path,
             torch_dtype=self._torch_dtype,
             variant=variant,
+            local_files_only=True,
         )
         return result
