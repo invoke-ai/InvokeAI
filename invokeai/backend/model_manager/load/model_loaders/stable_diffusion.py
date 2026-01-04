@@ -80,12 +80,13 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
                 model_path,
                 torch_dtype=self._torch_dtype,
                 variant=variant,
+                local_files_only=True,
             )
         except OSError as e:
             if variant and "no file named" in str(
                 e
             ):  # try without the variant, just in case user's preferences changed
-                result = load_class.from_pretrained(model_path, torch_dtype=self._torch_dtype)
+                result = load_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, local_files_only=True)
             else:
                 raise e
 
@@ -139,6 +140,7 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
         # Some weights of the model checkpoint were not used when initializing CLIPTextModelWithProjection:
         # ['text_model.embeddings.position_ids']
 
+        self._logger.info(f"Loading model from single file at {config.path} using {load_class.__name__}")
         with SilenceWarnings():
             pipeline = load_class.from_single_file(config.path, torch_dtype=self._torch_dtype)
 

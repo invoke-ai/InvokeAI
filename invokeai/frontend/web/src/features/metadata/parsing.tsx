@@ -16,6 +16,7 @@ import {
   setCfgRescaleMultiplier,
   setCfgScale,
   setClipSkip,
+  setFluxScheduler,
   setGuidance,
   setImg2imgStrength,
   setRefinerCFGScale,
@@ -29,6 +30,7 @@ import {
   setSeamlessYAxis,
   setSeed,
   setSteps,
+  setZImageScheduler,
   vaeSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
@@ -373,7 +375,22 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setScheduler(value));
+    // Dispatch to the appropriate scheduler based on the current model base
+    const base = selectBase(store.getState());
+    if (base === 'flux') {
+      // Flux only supports euler, heun, lcm
+      if (value === 'euler' || value === 'heun' || value === 'lcm') {
+        store.dispatch(setFluxScheduler(value));
+      }
+    } else if (base === 'z-image') {
+      // Z-Image only supports euler, heun, lcm
+      if (value === 'euler' || value === 'heun' || value === 'lcm') {
+        store.dispatch(setZImageScheduler(value));
+      }
+    } else {
+      // SD, SDXL, SD3, CogView4, etc. use the general scheduler
+      store.dispatch(setScheduler(value));
+    }
   },
   i18nKey: 'metadata.scheduler',
   LabelComponent: MetadataLabel,
