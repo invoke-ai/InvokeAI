@@ -307,8 +307,7 @@ invokeai-web  # Starts server on localhost:9090
 ## Important Notes
 
 - **Database Migrations:** Redux slice changes require corresponding migrations
-- **Pre-commit Hooks:** Configured for black, flake8, isort, and uv lock (Note: Project is transitioning to Ruff for Python linting/formatting)
-- **Linting:** Use Ruff for new Python code (replaces black, flake8, isort) via `make ruff` command
+- **Python Linting/Formatting:** The project uses **Ruff** for new code (via `make ruff`), which replaces black, flake8, and isort. However, pre-commit hooks still reference the older tools - this is a known transition state.
 - **Model Management:** Models are auto-registered on startup if configured
 - **External Code:** Some directories contain external code (mediapipe_face, mlsd, normal_bae, etc.) and are excluded from linting
 - **Platform Support:** Cross-platform (Linux, macOS, Windows) with GPU support (CUDA, ROCm)
