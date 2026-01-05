@@ -31,7 +31,7 @@ class TestZImageWorkingMemory:
         # Create mock vae_info
         mock_vae_info = MagicMock()
         mock_vae_info.model = mock_vae
-        
+
         # Create mock context manager return value
         mock_cm = MagicMock()
         mock_cm.__enter__ = MagicMock(return_value=(None, mock_vae))
@@ -41,7 +41,7 @@ class TestZImageWorkingMemory:
         # Mock the context
         mock_context = MagicMock()
         mock_context.models.load.return_value = mock_vae_info
-        
+
         # Mock latents
         mock_latents = torch.zeros(1, 16, 64, 64)
         mock_context.tensors.load.return_value = mock_latents
@@ -103,7 +103,7 @@ class TestZImageWorkingMemory:
         # Create mock vae_info
         mock_vae_info = MagicMock()
         mock_vae_info.model = mock_vae
-        
+
         # Create mock context manager return value
         mock_cm = MagicMock()
         mock_cm.__enter__ = MagicMock(return_value=(None, mock_vae))
