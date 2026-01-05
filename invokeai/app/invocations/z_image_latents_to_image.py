@@ -21,7 +21,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder as FluxAutoEncoder
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux, estimate_vae_working_memory_sd3
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
 # Z-Image can use either the Diffusers AutoencoderKL or the FLUX AutoEncoder
 ZImageVAE = Union[AutoencoderKL, FluxAutoEncoder]
@@ -55,18 +55,11 @@ class ZImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         is_flux_vae = isinstance(vae_info.model, FluxAutoEncoder)
 
         # Estimate working memory needed for VAE decode
-        if is_flux_vae:
-            estimated_working_memory = estimate_vae_working_memory_flux(
-                operation="decode",
-                image_tensor=latents,
-                vae=vae_info.model,
-            )
-        else:
-            estimated_working_memory = estimate_vae_working_memory_sd3(
-                operation="decode",
-                image_tensor=latents,
-                vae=vae_info.model,
-            )
+        estimated_working_memory = estimate_vae_working_memory_flux(
+            operation="decode",
+            image_tensor=latents,
+            vae=vae_info.model,
+        )
 
         # FLUX VAE doesn't support seamless, so only apply for AutoencoderKL
         seamless_context = (
