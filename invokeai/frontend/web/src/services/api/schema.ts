@@ -25715,6 +25715,12 @@ export type components = {
              */
             denoising_end?: number;
             /**
+             * Add Noise
+             * @description Add noise based on denoising start.
+             * @default true
+             */
+            add_noise?: boolean;
+            /**
              * Transformer
              * @description Z-Image model (Transformer) to load
              * @default null
