@@ -45,12 +45,13 @@ class CogView4DiffusersModel(GenericDiffusersLoader):
                 model_path,
                 torch_dtype=dtype,
                 variant=variant,
+                local_files_only=True,
             )
         except OSError as e:
             if variant and "no file named" in str(
                 e
             ):  # try without the variant, just in case user's preferences changed
-                result = load_class.from_pretrained(model_path, torch_dtype=dtype)
+                result = load_class.from_pretrained(model_path, torch_dtype=dtype, local_files_only=True)
             else:
                 raise e
 
