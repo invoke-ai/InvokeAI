@@ -495,6 +495,7 @@ class ModelsInterface(InvocationContextInterface):
         self,
         model_path: Path,
         loader: Optional[Callable[[Path], AnyModel]] = None,
+        cache_key_extra: Optional[str] = None,
     ) -> LoadedModelWithoutConfig:
         """
         Load the model file located at the indicated path
@@ -507,18 +508,25 @@ class ModelsInterface(InvocationContextInterface):
         Args:
             path: A model Path
             loader: A Callable that expects a Path and returns a dict[str|int, Any]
+            cache_key_extra: A string to append to the cache key. This is useful for
+                differentiating an instances of the same model with different parameters.
 
         Returns:
             A LoadedModelWithoutConfig object.
         """
 
         self._util.signal_progress(f"Loading model {model_path.name}")
-        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+        return self._services.model_manager.load.load_model_from_path(
+            model_path=model_path,
+            loader=loader,
+            cache_key_extra=cache_key_extra,
+        )
 
     def load_remote_model(
         self,
         source: str | AnyHttpUrl,
         loader: Optional[Callable[[Path], AnyModel]] = None,
+        cache_key_extra: Optional[str] = None,
     ) -> LoadedModelWithoutConfig:
         """
         Download, cache, and load the model file located at the indicated URL or repo_id.
@@ -533,6 +541,8 @@ class ModelsInterface(InvocationContextInterface):
         Args:
             source: A URL or huggingface repoid.
             loader: A Callable that expects a Path and returns a dict[str|int, Any]
+            cache_key_extra: A string to append to the cache key. This is useful for
+                differentiating an instances of the same model with different parameters.
 
         Returns:
             A LoadedModelWithoutConfig object.
@@ -540,7 +550,11 @@ class ModelsInterface(InvocationContextInterface):
         model_path = self._services.model_manager.install.download_and_cache_model(source=str(source))
 
         self._util.signal_progress(f"Loading model {source}")
-        return self._services.model_manager.load.load_model_from_path(model_path=model_path, loader=loader)
+        return self._services.model_manager.load.load_model_from_path(
+            model_path=model_path,
+            loader=loader,
+            cache_key_extra=cache_key_extra,
+        )
 
     def get_absolute_path(self, config_or_path: AnyModelConfig | Path | str) -> Path:
         """Gets the absolute path for a given model config or path.
