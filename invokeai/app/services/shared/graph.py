@@ -1138,12 +1138,12 @@ class GraphExecutionState(BaseModel):
 
             # Select the correct prepared parents for each iteration
             # For every iterator, the parent must either not be a child of that iterator, or must match the prepared iteration for that iterator
-            # TODO: Handle a node mapping to none
             eg = self.execution_graph.nx_graph_flat()
             prepared_parent_mappings = [
                 [(n, self._get_iteration_node(n, g, eg, it)) for n in next_node_parents]
                 for it in iterator_node_prepared_combinations
             ]  # type: ignore
+            prepared_parent_mappings = [m for m in prepared_parent_mappings if all(p[1] is not None for p in m)]
 
             # Create execution node for each iteration
             for iteration_mappings in prepared_parent_mappings:
@@ -1165,14 +1165,16 @@ class GraphExecutionState(BaseModel):
         if len(prepared_nodes) == 1:
             return next(iter(prepared_nodes))
 
-        # Check if the requested node is an iterator
-        prepared_iterator = next((n for n in prepared_nodes if n in prepared_iterator_nodes), None)
-        if prepared_iterator is not None:
-            return prepared_iterator
-
         # Filter to only iterator nodes that are a parent of the specified node, in tuple format (prepared, source)
         iterator_source_node_mapping = [(n, self.prepared_source_mapping[n]) for n in prepared_iterator_nodes]
         parent_iterators = [itn for itn in iterator_source_node_mapping if nx.has_path(graph, itn[1], source_node_id)]
+
+        # If the requested node is an iterator, only accept it if it is compatible with all parent iterators
+        prepared_iterator = next((n for n in prepared_nodes if n in prepared_iterator_nodes), None)
+        if prepared_iterator is not None:
+            if all(nx.has_path(execution_graph, pit[0], prepared_iterator) for pit in parent_iterators):
+                return prepared_iterator
+            return None
 
         return next(
             (n for n in prepared_nodes if all(nx.has_path(execution_graph, pit[0], n) for pit in parent_iterators)),
