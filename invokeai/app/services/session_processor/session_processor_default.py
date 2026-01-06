@@ -74,6 +74,8 @@ class DefaultSessionRunner(SessionRunnerBase):
 
         self._on_before_run_session(queue_item=queue_item)
 
+        transient_storage = {}
+
         # Loop over invocations until the session is complete or canceled
         while True:
             try:
@@ -95,7 +97,7 @@ class DefaultSessionRunner(SessionRunnerBase):
             if invocation is None or self._is_canceled():
                 break
 
-            self.run_node(invocation, queue_item)
+            self.run_node(transient_storage, invocation, queue_item)
 
             # The session is complete if all invocations have been run or there is an error on the session.
             # At this time, the queue item may be canceled, but the object itself here won't be updated yet. We must
@@ -109,7 +111,7 @@ class DefaultSessionRunner(SessionRunnerBase):
 
         self._on_after_run_session(queue_item=queue_item)
 
-    def run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
+    def run_node(self, transient_storage: dict, invocation: BaseInvocation, queue_item: SessionQueueItem):
         try:
             # Any unhandled exception in this scope is an invocation error & will fail the graph
             with self._services.performance_statistics.collect_stats(invocation, queue_item.session_id):
@@ -123,6 +125,7 @@ class DefaultSessionRunner(SessionRunnerBase):
                 context = build_invocation_context(
                     data=data,
                     services=self._services,
+                    transient_storage=transient_storage,
                     is_canceled=self._is_canceled,
                 )
 
