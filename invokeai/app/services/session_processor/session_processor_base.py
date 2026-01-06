@@ -36,7 +36,7 @@ class SessionRunnerBase(ABC):
         pass
 
     @abstractmethod
-    def run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem) -> None:
+    def run_node(self, transient_storage: dict, invocation: BaseInvocation, queue_item: SessionQueueItem) -> None:
         """Run a single node in the graph.
 
         Args:
