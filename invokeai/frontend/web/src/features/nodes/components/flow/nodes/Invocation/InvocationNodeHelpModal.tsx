@@ -9,11 +9,14 @@ import {
   Spinner,
   Text,
 } from '@invoke-ai/ui-library';
+import { logger } from 'app/logging/logger';
 import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
 import type { ReactElement, ReactNode } from 'react';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Markdown from 'react-markdown';
+
+const log = logger('system');
 
 interface NodeDocsContent {
   markdown: string;
@@ -74,6 +77,9 @@ export const InvocationNodeHelpModal = memo(({ isOpen, onClose }: Props): ReactE
 
   useEffect(() => {
     if (!isOpen) {
+      // Reset state when modal closes to prevent stale data
+      setDocsContent(null);
+      setError(null);
       return;
     }
 
@@ -82,16 +88,24 @@ export const InvocationNodeHelpModal = memo(({ isOpen, onClose }: Props): ReactE
       setError(null);
 
       const nodeType = nodeTemplate.type;
+      // Sanitize nodeType to prevent path traversal - only allow alphanumeric, underscore, and hyphen
+      const sanitizedNodeType = nodeType.replace(/[^a-zA-Z0-9_-]/g, '');
+      if (sanitizedNodeType !== nodeType) {
+        log.warn({ nodeType }, 'Node type contains invalid characters for docs path');
+      }
+
       const currentLanguage = i18n.language;
       const fallbackLanguage = 'en';
+      // Sanitize language code as well
+      const sanitizedLanguage = currentLanguage.replace(/[^a-zA-Z-]/g, '');
 
       // Try to load docs for current language first, then fallback to English
       const languagesToTry =
-        currentLanguage !== fallbackLanguage ? [currentLanguage, fallbackLanguage] : [fallbackLanguage];
+        sanitizedLanguage !== fallbackLanguage ? [sanitizedLanguage, fallbackLanguage] : [fallbackLanguage];
 
       for (const lang of languagesToTry) {
         try {
-          const response = await fetch(`/nodeDocs/${lang}/${nodeType}.md`);
+          const response = await fetch(`/nodeDocs/${lang}/${sanitizedNodeType}.md`);
           if (response.ok) {
             const markdown = await response.text();
             setDocsContent({ markdown });
@@ -99,7 +113,8 @@ export const InvocationNodeHelpModal = memo(({ isOpen, onClose }: Props): ReactE
             return;
           }
         } catch {
-          // Continue to next language
+          // Log error but continue to next language
+          log.debug(`Failed to fetch node docs for ${sanitizedNodeType} (${lang})`);
         }
       }
 
