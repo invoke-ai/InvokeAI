@@ -53,7 +53,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
 
   // Z-Image-Turbo uses guidance_scale (stored as cfgScale), defaults to 1.0 for no CFG
   // (1.0 means no CFG effect, matching FLUX convention)
-  const { cfgScale: guidance_scale, steps } = params;
+  const { cfgScale: guidance_scale, steps, zImageScheduler } = params;
 
   const prompts = selectPresetModifiedPrompts(state);
 
@@ -113,6 +113,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     id: getPrefixedId('denoise_latents'),
     guidance_scale,
     steps,
+    scheduler: zImageScheduler,
   });
   const l2i = g.addNode({
     type: 'z_image_l2i',
@@ -183,8 +184,10 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(modelConfig),
     steps,
+    scheduler: zImageScheduler,
     vae: zImageVaeModel ?? undefined,
     qwen3_encoder: zImageQwen3EncoderModel ?? undefined,
+    qwen3_source: zImageQwen3SourceModel ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
