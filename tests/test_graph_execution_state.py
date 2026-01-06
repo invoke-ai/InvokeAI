@@ -225,3 +225,48 @@ def test_graph_iterate_execution_order(execution_number: int):
     _ = invoke_next(g)
     assert _[1].item == "Dinosaur Sushi"
     _ = invoke_next(g)
+
+
+# Because this tests deterministic ordering, we run it multiple times
+@pytest.mark.parametrize("execution_number", range(5))
+def test_graph_nested_iterate_execution_order(execution_number: int):
+    """
+    Validates best-effort in-order execution for nodes expanded under nested iterators.
+    Expected lexicographic order by (outer_index, inner_index), subject to readiness.
+    """
+    graph = Graph()
+
+    # Outer iterator: [0, 1]
+    graph.add_node(RangeInvocation(id="outer_range", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="outer_iter"))
+
+    # Inner iterator is derived from the outer item:
+    # start = outer_item * 10
+    # stop  = start + 2  => yields 2 items per outer item
+    graph.add_node(MultiplyInvocation(id="mul10", b=10))
+    graph.add_node(AddInvocation(id="stop_plus2", b=2))
+    graph.add_node(RangeInvocation(id="inner_range", start=0, stop=1, step=1))
+    graph.add_node(IterateInvocation(id="inner_iter"))
+
+    # Observe inner items (they encode outer via start=outer*10)
+    graph.add_node(AddInvocation(id="sum", b=0))
+
+    graph.add_edge(create_edge("outer_range", "collection", "outer_iter", "collection"))
+    graph.add_edge(create_edge("outer_iter", "item", "mul10", "a"))
+    graph.add_edge(create_edge("mul10", "value", "stop_plus2", "a"))
+    graph.add_edge(create_edge("mul10", "value", "inner_range", "start"))
+    graph.add_edge(create_edge("stop_plus2", "value", "inner_range", "stop"))
+    graph.add_edge(create_edge("inner_range", "collection", "inner_iter", "collection"))
+    graph.add_edge(create_edge("inner_iter", "item", "sum", "a"))
+
+    g = GraphExecutionState(graph=graph)
+    sum_values: list[int] = []
+
+    while True:
+        n, o = invoke_next(g)
+        if n is None:
+            break
+        if g.prepared_source_mapping[n.id] == "sum":
+            sum_values.append(o.value)
+
+    assert sum_values == [0, 1, 10, 11]
