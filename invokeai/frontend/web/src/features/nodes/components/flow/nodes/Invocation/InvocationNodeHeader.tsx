@@ -7,6 +7,7 @@ import { useNodeHasErrors } from 'features/nodes/hooks/useNodeIsInvalid';
 import { memo } from 'react';
 
 import InvocationNodeCollapsedHandles from './InvocationNodeCollapsedHandles';
+import { InvocationNodeHelpButton } from './InvocationNodeHelpButton';
 import { InvocationNodeInfoIcon } from './InvocationNodeInfoIcon';
 import InvocationNodeStatusIndicator from './InvocationNodeStatusIndicator';
 
@@ -38,6 +39,7 @@ const InvocationNodeHeader = ({ nodeId, isOpen }: Props) => {
       <InvocationNodeTitle nodeId={nodeId} />
       <Flex alignItems="center">
         <InvocationNodeStatusIndicator nodeId={nodeId} />
+        <InvocationNodeHelpButton nodeId={nodeId} />
         <InvocationNodeInfoIcon nodeId={nodeId} />
       </Flex>
       {!isOpen && <InvocationNodeCollapsedHandles nodeId={nodeId} />}
