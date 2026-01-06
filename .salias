@@ -14,7 +14,7 @@ source ./.salias_f
 # stop     - Stop InvokeAI server
 # dev      - Start InvokeAI server with frontend in dev mode
 # build-ui - Build frontend
-# update   - Update dependencies
+# updateall- Update dependencies
 # clean    - Clean build artifacts
 # data     - Open data directory
 # logs     - View logs

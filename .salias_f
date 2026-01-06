@@ -64,7 +64,7 @@ function build-ui
 end
 
 # Update dependencies
-function update
+function updateall
     echo "Updating dependencies..."
     imd
     uv pip install -e ".[dev,test,docs]" --python 3.12 --torch-backend=cu128 --upgrade
