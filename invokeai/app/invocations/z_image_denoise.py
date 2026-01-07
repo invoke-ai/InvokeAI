@@ -50,7 +50,7 @@ from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
     category="image",
-    version="1.3.0",
+    version="1.4.0",
     classification=Classification.Prototype,
 )
 class ZImageDenoiseInvocation(BaseInvocation):
@@ -69,6 +69,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
     )
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
+    add_noise: bool = InputField(default=True, description="Add noise based on denoising start.")
     transformer: TransformerField = InputField(
         description=FieldDescriptions.z_image_model, input=Input.Connection, title="Transformer"
     )
@@ -347,8 +348,12 @@ class ZImageDenoiseInvocation(BaseInvocation):
 
         # Prepare input latent image
         if init_latents is not None:
-            s_0 = sigmas[0]
-            latents = s_0 * noise + (1.0 - s_0) * init_latents
+            if self.add_noise:
+                # Noise the init_latents by the appropriate amount for the first timestep.
+                s_0 = sigmas[0]
+                latents = s_0 * noise + (1.0 - s_0) * init_latents
+            else:
+                latents = init_latents
         else:
             if self.denoising_start > 1e-5:
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
