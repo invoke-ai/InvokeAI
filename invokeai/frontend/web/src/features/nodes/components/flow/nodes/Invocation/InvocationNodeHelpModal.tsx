@@ -20,6 +20,7 @@ const log = logger('system');
 
 interface NodeDocsContent {
   markdown: string;
+  basePath: string;
 }
 
 interface Props {
@@ -27,10 +28,30 @@ interface Props {
   onClose: () => void;
 }
 
-const markdownComponents = {
-  // Render images inline with the markdown
+/**
+ * Resolves a potentially relative image path to an absolute path based on the docs base path.
+ * Handles paths starting with './' or not starting with '/' or 'http'.
+ */
+const resolveImagePath = (src: string | undefined, basePath: string): string => {
+  if (!src) {
+    return '';
+  }
+  // If it's already an absolute URL or data URL, return as-is
+  if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('data:') || src.startsWith('/')) {
+    return src;
+  }
+  // Handle relative paths like './images/...' or 'images/...'
+  const relativePath = src.startsWith('./') ? src.slice(2) : src;
+  return `${basePath}/${relativePath}`;
+};
+
+/**
+ * Creates markdown components with proper image path resolution.
+ */
+const createMarkdownComponents = (basePath: string) => ({
+  // Render images inline with the markdown, resolving relative paths
   img: ({ src, alt }: { src?: string; alt?: string }) => (
-    <Image src={src} alt={alt || ''} maxW="100%" my={4} borderRadius="base" />
+    <Image src={resolveImagePath(src, basePath)} alt={alt || ''} maxW="100%" my={4} borderRadius="base" />
   ),
   // Style paragraphs
   p: ({ children }: { children?: ReactNode }) => (
@@ -66,7 +87,7 @@ const markdownComponents = {
       {children}
     </Text>
   ),
-};
+});
 
 export const InvocationNodeHelpModal = memo(({ isOpen, onClose }: Props): ReactElement => {
   const nodeTemplate = useNodeTemplateOrThrow();
@@ -105,10 +126,11 @@ export const InvocationNodeHelpModal = memo(({ isOpen, onClose }: Props): ReactE
 
       for (const lang of languagesToTry) {
         try {
-          const response = await fetch(`/nodeDocs/${lang}/${sanitizedNodeType}.md`);
+          const basePath = `/nodeDocs/${lang}`;
+          const response = await fetch(`${basePath}/${sanitizedNodeType}.md`);
           if (response.ok) {
             const markdown = await response.text();
-            setDocsContent({ markdown });
+            setDocsContent({ markdown, basePath });
             setIsLoading(false);
             return;
           }
@@ -137,7 +159,9 @@ export const InvocationNodeHelpModal = memo(({ isOpen, onClose }: Props): ReactE
         <ModalBody pb={6} overflowY="auto">
           {isLoading && <Spinner size="lg" />}
           {error && <Text color="base.400">{error}</Text>}
-          {docsContent && <Markdown components={markdownComponents}>{docsContent.markdown}</Markdown>}
+          {docsContent && (
+            <Markdown components={createMarkdownComponents(docsContent.basePath)}>{docsContent.markdown}</Markdown>
+          )}
         </ModalBody>
       </ModalContent>
     </Modal>
