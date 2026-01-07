@@ -15,13 +15,18 @@ import {
   roundRect,
 } from 'features/controlLayers/konva/util';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
+import type { TransformSmoothingMode } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { Coordinate, LifecycleCallback, Rect, RectWithRotation } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
+import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { toast } from 'features/toast/toast';
 import Konva from 'konva';
 import type { GroupConfig } from 'konva/lib/Group';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
 import { serializeError } from 'serialize-error';
+import { uploadImage } from 'services/api/endpoints/images';
+import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
 
 type CanvasEntityTransformerConfig = {
@@ -89,6 +94,8 @@ const DEFAULT_CONFIG: CanvasEntityTransformerConfig = {
   ROTATE_ANCHOR_STROKE_COLOR: 'hsl(200 76% 40% / 1)', // invokeBlue.700
   ROTATE_ANCHOR_SIZE: 12,
 };
+
+const TRANSFORM_SMOOTHING_PIXEL_RATIO = 2;
 
 export class CanvasEntityTransformer extends CanvasModuleBase {
   readonly type = 'entity_transformer';
@@ -807,21 +814,103 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.log.debug('Applying transform');
     this.$isProcessing.set(true);
     this._setInteractionMode('off');
-    const rect = this.getRelativeRect();
-    const rasterizeResult = await withResultAsync(() =>
-      this.parent.renderer.rasterize({
-        rect: roundRect(rect),
-        replaceObjects: true,
-        ignoreCache: true,
+    const rect = roundRect(this.getRelativeRect());
+    const { transformSmoothingEnabled, transformSmoothingMode } = this.manager.stateApi.getSettings();
+    if (!transformSmoothingEnabled) {
+      const rasterizeResult = await withResultAsync(() =>
+        this.parent.renderer.rasterize({
+          rect,
+          replaceObjects: true,
+          ignoreCache: true,
+          attrs: { opacity: 1, filters: [] },
+        })
+      );
+      if (rasterizeResult.isErr()) {
+        toast({ status: 'error', title: 'Failed to apply transform' });
+        this.log.error({ error: serializeError(rasterizeResult.error) }, 'Failed to rasterize entity');
+      }
+      this.requestRectCalculation();
+      this.stopTransform();
+      return;
+    }
+
+    const rasterizeResult = await withResultAsync(async () => {
+      const blob = await this.parent.renderer.getBlob({
+        rect,
         attrs: { opacity: 1, filters: [] },
-      })
-    );
+        imageSmoothingEnabled: true,
+        pixelRatio: TRANSFORM_SMOOTHING_PIXEL_RATIO,
+        cache: {
+          imageSmoothingEnabled: true,
+          pixelRatio: TRANSFORM_SMOOTHING_PIXEL_RATIO,
+        },
+      });
+
+      return await uploadImage({
+        file: new File([blob], `${this.parent.id}_transform.png`, { type: 'image/png' }),
+        image_category: 'other',
+        is_intermediate: true,
+        silent: true,
+      });
+    });
+
     if (rasterizeResult.isErr()) {
       toast({ status: 'error', title: 'Failed to apply transform' });
       this.log.error({ error: serializeError(rasterizeResult.error) }, 'Failed to rasterize entity');
+      this.requestRectCalculation();
+      this.stopTransform();
+      return;
     }
+
+    const resizeResult = await withResultAsync(() =>
+      this.manager.stateApi.runGraphAndReturnImageOutput({
+        ...CanvasEntityTransformer.buildTransformSmoothingGraph(rasterizeResult.value, rect, transformSmoothingMode),
+        options: {
+          prepend: true,
+        },
+      })
+    );
+
+    if (resizeResult.isErr()) {
+      toast({ status: 'error', title: 'Failed to apply transform' });
+      this.log.error({ error: serializeError(resizeResult.error) }, 'Failed to smooth transformed entity');
+      this.requestRectCalculation();
+      this.stopTransform();
+      return;
+    }
+
+    const imageObject = imageDTOToImageObject(resizeResult.value);
+    await this.parent.bufferRenderer.setBuffer(imageObject);
+    this.parent.bufferRenderer.commitBuffer({ pushToState: false });
+    this.manager.stateApi.rasterizeEntity({
+      entityIdentifier: this.parent.entityIdentifier,
+      imageObject,
+      position: {
+        x: rect.x,
+        y: rect.y,
+      },
+      replaceObjects: true,
+    });
     this.requestRectCalculation();
     this.stopTransform();
+  };
+
+  private static buildTransformSmoothingGraph = (
+    imageDTO: ImageDTO,
+    rect: Rect,
+    resampleMode: TransformSmoothingMode
+  ): { graph: Graph; outputNodeId: string } => {
+    const graph = new Graph(getPrefixedId('transform_smoothing'));
+    const outputNodeId = getPrefixedId('transform_smoothing_resize');
+    graph.addNode({
+      id: outputNodeId,
+      type: 'img_resize',
+      image: { image_name: imageDTO.image_name },
+      width: rect.width,
+      height: rect.height,
+      resample_mode: resampleMode,
+    });
+    return { graph, outputNodeId };
   };
 
   resetTransform = () => {
