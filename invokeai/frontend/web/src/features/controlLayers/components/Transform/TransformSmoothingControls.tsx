@@ -7,6 +7,7 @@ import {
   settingsTransformSmoothingModeChanged,
   type TransformSmoothingMode,
 } from 'features/controlLayers/store/canvasSettingsSlice';
+import type { ChangeEvent } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,7 +22,7 @@ export const TransformSmoothingControls = memo(() => {
   }, [dispatch]);
 
   const onModeChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
+    (e: ChangeEvent<HTMLSelectElement>) => {
       dispatch(settingsTransformSmoothingModeChanged(e.target.value as TransformSmoothingMode));
     },
     [dispatch]
