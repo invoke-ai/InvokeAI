@@ -65,14 +65,18 @@ dependencies = [
 
   # Auxiliary dependencies, pinned only if necessary.
   "blake3",
+  "bcrypt<4.0.0",
   "Deprecated",
   "dnspython",
   "dynamicprompts",
   "einops",
+  "email-validator>=2.0.0",
+  "passlib[bcrypt]>=1.7.4",
   "picklescan",
   "pillow",
   "prompt-toolkit",
   "pypatchmatch",
+  "python-jose[cryptography]>=3.3.0",
   "python-multipart",
   "requests",
   "semver~=3.0.1",

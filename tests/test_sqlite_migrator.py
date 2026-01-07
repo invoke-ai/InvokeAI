@@ -296,3 +296,65 @@ def test_idempotent_migrations(migrator: SqliteMigrator, migration_create_test_t
     # not throwing is sufficient
     migrator.run_migrations()
     assert migrator._get_current_version(cursor) == 1
+
+
+def test_migration_25_creates_users_table(logger: Logger) -> None:
+    """Test that migration 25 creates the users table and related tables."""
+    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_25 import Migration25Callback
+
+    db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
+    cursor = db._conn.cursor()
+
+    # Create minimal tables that migration 25 expects to exist
+    cursor.execute("CREATE TABLE IF NOT EXISTS boards (board_id TEXT PRIMARY KEY);")
+    cursor.execute("CREATE TABLE IF NOT EXISTS images (image_name TEXT PRIMARY KEY);")
+    cursor.execute("CREATE TABLE IF NOT EXISTS workflows (workflow_id TEXT PRIMARY KEY);")
+    cursor.execute("CREATE TABLE IF NOT EXISTS session_queue (item_id INTEGER PRIMARY KEY);")
+    db._conn.commit()
+
+    # Run migration callback directly (not through migrator to avoid chain validation)
+    migration_callback = Migration25Callback()
+    migration_callback(cursor)
+    db._conn.commit()
+
+    # Verify users table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users';")
+    assert cursor.fetchone() is not None
+
+    # Verify user_sessions table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_sessions';")
+    assert cursor.fetchone() is not None
+
+    # Verify user_invitations table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_invitations';")
+    assert cursor.fetchone() is not None
+
+    # Verify shared_boards table exists
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='shared_boards';")
+    assert cursor.fetchone() is not None
+
+    # Verify system user was created
+    cursor.execute("SELECT user_id, email FROM users WHERE user_id='system';")
+    system_user = cursor.fetchone()
+    assert system_user is not None
+    assert system_user[0] == "system"
+    assert system_user[1] == "system@system.invokeai"
+
+    # Verify boards table has user_id column
+    cursor.execute("PRAGMA table_info(boards);")
+    columns = [row[1] for row in cursor.fetchall()]
+    assert "user_id" in columns
+    assert "is_public" in columns
+
+    # Verify images table has user_id column
+    cursor.execute("PRAGMA table_info(images);")
+    columns = [row[1] for row in cursor.fetchall()]
+    assert "user_id" in columns
+
+    # Verify workflows table has user_id and is_public columns
+    cursor.execute("PRAGMA table_info(workflows);")
+    columns = [row[1] for row in cursor.fetchall()]
+    assert "user_id" in columns
+    assert "is_public" in columns
+
+    db._conn.close()
