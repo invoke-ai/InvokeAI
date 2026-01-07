@@ -720,20 +720,20 @@ z_image_turbo_quantized = StarterModel(
     name="Z-Image Turbo (quantized)",
     base=BaseModelType.ZImage,
     source="https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q4_K.gguf",
-    description="Z-Image Turbo quantized to GGUF Q4_K format. Requires separate Qwen3 text encoder. ~4GB",
+    description="Z-Image Turbo quantized to GGUF Q4_K format. Requires standalone Qwen3 text encoder and Flux VAE. ~4GB",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
-    dependencies=[z_image_qwen3_encoder_quantized],
+    dependencies=[z_image_qwen3_encoder_quantized, flux_vae],
 )
 
 z_image_turbo_q8 = StarterModel(
     name="Z-Image Turbo (Q8)",
     base=BaseModelType.ZImage,
     source="https://huggingface.co/leejet/Z-Image-Turbo-GGUF/resolve/main/z_image_turbo-Q8_0.gguf",
-    description="Z-Image Turbo quantized to GGUF Q8_0 format. Higher quality, larger size. Requires separate Qwen3 text encoder. ~6.6GB",
+    description="Z-Image Turbo quantized to GGUF Q8_0 format. Higher quality, larger size. Requires standalone Qwen3 text encoder and Flux VAE. ~6.6GB",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
-    dependencies=[z_image_qwen3_encoder_quantized],
+    dependencies=[z_image_qwen3_encoder_quantized, flux_vae],
 )
 
 z_image_controlnet_union = StarterModel(
@@ -890,10 +890,19 @@ flux_bundle: list[StarterModel] = [
     flux_krea_quantized,
 ]
 
+zimage_bundle: list[StarterModel] = [
+    z_image_turbo_quantized,
+    z_image_qwen3_encoder_quantized,
+    z_image_controlnet_union,
+    z_image_controlnet_tile,
+    flux_vae,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
     BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
+    BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"
