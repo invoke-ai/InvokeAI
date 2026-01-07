@@ -5,7 +5,7 @@ import { addStorageListeners } from 'app/store/enhancers/reduxRemember/driver';
 import { $store } from 'app/store/nanostores/store';
 import { createStore } from 'app/store/store';
 import Loading from 'common/components/Loading/Loading';
-import React, { lazy, memo, useEffect, useState } from 'react';
+import React, { lazy, useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 
 /*
@@ -49,14 +49,12 @@ const InvokeAIUI = () => {
   }
 
   return (
-    <React.StrictMode>
-      <Provider store={store}>
-        <React.Suspense fallback={<Loading />}>
-          <App />
-        </React.Suspense>
-      </Provider>
-    </React.StrictMode>
+    <Provider store={store}>
+      <React.Suspense fallback={<Loading />}>
+        <App />
+      </React.Suspense>
+    </Provider>
   );
 };
 
-export default memo(InvokeAIUI);
+export default InvokeAIUI;
