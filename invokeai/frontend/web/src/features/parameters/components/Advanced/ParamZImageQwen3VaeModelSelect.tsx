@@ -17,21 +17,19 @@ import type { MainModelConfig, Qwen3EncoderModelConfig, VAEModelConfig } from 's
 
 /**
  * Z-Image VAE Model Select - uses FLUX VAE models
- * Disabled when Qwen3 Source is selected (mutually exclusive)
+ * Selecting this will clear Qwen3 Source (mutually exclusive)
  */
 const ParamZImageVaeModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const zImageVaeModel = useAppSelector(selectZImageVaeModel);
-  const zImageQwen3SourceModel = useAppSelector(selectZImageQwen3SourceModel);
   const [modelConfigs, { isLoading }] = useFluxVAEModels();
-
-  // Disable when Qwen3 Source is selected
-  const isDisabled = zImageQwen3SourceModel !== null;
 
   const _onChange = useCallback(
     (model: VAEModelConfig | null) => {
       if (model) {
+        // Clear conflicting Qwen3Source when setting VAE
+        dispatch(zImageQwen3SourceModelSelected(null));
         dispatch(zImageVaeModelSelected(zModelIdentifierField.parse(model)));
       } else {
         dispatch(zImageVaeModelSelected(null));
@@ -48,7 +46,7 @@ const ParamZImageVaeModelSelect = memo(() => {
   });
 
   return (
-    <FormControl minW={0} flexGrow={1} gap={2} isDisabled={isDisabled}>
+    <FormControl minW={0} flexGrow={1} gap={2}>
       <FormLabel m={0}>{t('modelManager.zImageVae')}</FormLabel>
       <Combobox
         value={value}
@@ -56,7 +54,6 @@ const ParamZImageVaeModelSelect = memo(() => {
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}
         isClearable
-        isDisabled={isDisabled}
         placeholder={t('modelManager.zImageVaePlaceholder')}
       />
     </FormControl>
@@ -67,21 +64,19 @@ ParamZImageVaeModelSelect.displayName = 'ParamZImageVaeModelSelect';
 
 /**
  * Z-Image Qwen3 Encoder Model Select
- * Disabled when Qwen3 Source is selected (mutually exclusive)
+ * Selecting this will clear Qwen3 Source (mutually exclusive)
  */
 const ParamZImageQwen3EncoderModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const zImageQwen3EncoderModel = useAppSelector(selectZImageQwen3EncoderModel);
-  const zImageQwen3SourceModel = useAppSelector(selectZImageQwen3SourceModel);
   const [modelConfigs, { isLoading }] = useQwen3EncoderModels();
-
-  // Disable when Qwen3 Source is selected
-  const isDisabled = zImageQwen3SourceModel !== null;
 
   const _onChange = useCallback(
     (model: Qwen3EncoderModelConfig | null) => {
       if (model) {
+        // Clear conflicting Qwen3Source when setting Encoder
+        dispatch(zImageQwen3SourceModelSelected(null));
         dispatch(zImageQwen3EncoderModelSelected(zModelIdentifierField.parse(model)));
       } else {
         dispatch(zImageQwen3EncoderModelSelected(null));
@@ -98,7 +93,7 @@ const ParamZImageQwen3EncoderModelSelect = memo(() => {
   });
 
   return (
-    <FormControl minW={0} flexGrow={1} gap={2} isDisabled={isDisabled}>
+    <FormControl minW={0} flexGrow={1} gap={2}>
       <FormLabel m={0}>{t('modelManager.zImageQwen3Encoder')}</FormLabel>
       <Combobox
         value={value}
@@ -106,7 +101,6 @@ const ParamZImageQwen3EncoderModelSelect = memo(() => {
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}
         isClearable
-        isDisabled={isDisabled}
         placeholder={t('modelManager.zImageQwen3EncoderPlaceholder')}
       />
     </FormControl>
@@ -117,22 +111,20 @@ ParamZImageQwen3EncoderModelSelect.displayName = 'ParamZImageQwen3EncoderModelSe
 
 /**
  * Z-Image Qwen3 Source Model Select - Diffusers Z-Image models for fallback
- * Disabled when VAE or Qwen3 Encoder is selected (mutually exclusive)
+ * Selecting this will clear VAE and Qwen3 Encoder (mutually exclusive)
  */
 const ParamZImageQwen3SourceModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const zImageQwen3SourceModel = useAppSelector(selectZImageQwen3SourceModel);
-  const zImageVaeModel = useAppSelector(selectZImageVaeModel);
-  const zImageQwen3EncoderModel = useAppSelector(selectZImageQwen3EncoderModel);
   const [modelConfigs, { isLoading }] = useZImageDiffusersModels();
-
-  // Disable when VAE or Qwen3 Encoder is selected
-  const isDisabled = zImageVaeModel !== null || zImageQwen3EncoderModel !== null;
 
   const _onChange = useCallback(
     (model: MainModelConfig | null) => {
       if (model) {
+        // Clear conflicting VAE and Encoder when setting Qwen3Source
+        dispatch(zImageVaeModelSelected(null));
+        dispatch(zImageQwen3EncoderModelSelected(null));
         dispatch(zImageQwen3SourceModelSelected(zModelIdentifierField.parse(model)));
       } else {
         dispatch(zImageQwen3SourceModelSelected(null));
@@ -149,7 +141,7 @@ const ParamZImageQwen3SourceModelSelect = memo(() => {
   });
 
   return (
-    <FormControl minW={0} flexGrow={1} gap={2} isDisabled={isDisabled}>
+    <FormControl minW={0} flexGrow={1} gap={2}>
       <FormLabel m={0}>{t('modelManager.zImageQwen3Source')}</FormLabel>
       <Combobox
         value={value}
@@ -157,7 +149,6 @@ const ParamZImageQwen3SourceModelSelect = memo(() => {
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}
         isClearable
-        isDisabled={isDisabled}
         placeholder={t('modelManager.zImageQwen3SourcePlaceholder')}
       />
     </FormControl>

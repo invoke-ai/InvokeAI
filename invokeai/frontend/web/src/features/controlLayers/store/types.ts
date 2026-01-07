@@ -9,6 +9,7 @@ import {
   zParameterCLIPGEmbedModel,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
+  zParameterFluxScheduler,
   zParameterGuidance,
   zParameterImageDimension,
   zParameterMaskBlurMethod,
@@ -23,6 +24,7 @@ import {
   zParameterStrength,
   zParameterT5EncoderModel,
   zParameterVAEModel,
+  zParameterZImageScheduler,
 } from 'features/parameters/types/parameterSchemas';
 import type { JsonObject } from 'type-fest';
 import { z } from 'zod';
@@ -596,6 +598,8 @@ export const zParamsState = z.object({
   optimizedDenoisingEnabled: z.boolean(),
   iterations: z.number(),
   scheduler: zParameterScheduler,
+  fluxScheduler: zParameterFluxScheduler,
+  zImageScheduler: zParameterZImageScheduler,
   upscaleScheduler: zParameterScheduler,
   upscaleCfgScale: zParameterCFGScale,
   seed: zParameterSeed,
@@ -650,6 +654,8 @@ export const getInitialParamsState = (): ParamsState => ({
   optimizedDenoisingEnabled: true,
   iterations: 1,
   scheduler: 'dpmpp_3m_k',
+  fluxScheduler: 'euler',
+  zImageScheduler: 'euler',
   upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,
   seed: 0,

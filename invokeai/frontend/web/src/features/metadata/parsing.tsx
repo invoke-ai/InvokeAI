@@ -16,6 +16,7 @@ import {
   setCfgRescaleMultiplier,
   setCfgScale,
   setClipSkip,
+  setFluxScheduler,
   setGuidance,
   setImg2imgStrength,
   setRefinerCFGScale,
@@ -29,6 +30,7 @@ import {
   setSeamlessYAxis,
   setSeed,
   setSteps,
+  setZImageScheduler,
   vaeSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
@@ -373,7 +375,22 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setScheduler(value));
+    // Dispatch to the appropriate scheduler based on the current model base
+    const base = selectBase(store.getState());
+    if (base === 'flux') {
+      // Flux only supports euler, heun, lcm
+      if (value === 'euler' || value === 'heun' || value === 'lcm') {
+        store.dispatch(setFluxScheduler(value));
+      }
+    } else if (base === 'z-image') {
+      // Z-Image only supports euler, heun, lcm
+      if (value === 'euler' || value === 'heun' || value === 'lcm') {
+        store.dispatch(setZImageScheduler(value));
+      }
+    } else {
+      // SD, SDXL, SD3, CogView4, etc. use the general scheduler
+      store.dispatch(setScheduler(value));
+    }
   },
   i18nKey: 'metadata.scheduler',
   LabelComponent: MetadataLabel,
@@ -708,6 +725,8 @@ const Qwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
+    // Clear conflicting Qwen3Source when setting Encoder (mutually exclusive)
+    store.dispatch(zImageQwen3SourceModelSelected(null));
     store.dispatch(zImageQwen3EncoderModelSelected(value));
   },
   i18nKey: 'metadata.qwen3Encoder',
@@ -732,6 +751,8 @@ const ZImageVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
+    // Clear conflicting Qwen3Source when setting VAE (mutually exclusive)
+    store.dispatch(zImageQwen3SourceModelSelected(null));
     store.dispatch(zImageVaeModelSelected(value));
   },
   i18nKey: 'metadata.vae',
@@ -756,6 +777,9 @@ const ZImageQwen3SourceModel: SingleMetadataHandler<ModelIdentifierField> = {
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
+    // Clear conflicting VAE and Encoder when setting Qwen3Source (mutually exclusive)
+    store.dispatch(zImageVaeModelSelected(null));
+    store.dispatch(zImageQwen3EncoderModelSelected(null));
     store.dispatch(zImageQwen3SourceModelSelected(value));
   },
   i18nKey: 'metadata.qwen3Source',
@@ -983,7 +1007,6 @@ export const ImageMetadataHandlers = {
   CFGRescaleMultiplier,
   CLIPSkip,
   Guidance,
-  Scheduler,
   Width,
   Height,
   Seed,
@@ -999,6 +1022,8 @@ export const ImageMetadataHandlers = {
   RefinerNegativeAestheticScore,
   RefinerDenoisingStart,
   MainModel,
+  // Scheduler must be after MainModel so that base-dependent logic (z-image scheduler) works correctly
+  Scheduler,
   VAEModel,
   Qwen3EncoderModel,
   ZImageVAEModel,

@@ -384,15 +384,19 @@ class Qwen3EncoderLoader(ModelLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer:
-                return AutoTokenizer.from_pretrained(tokenizer_path)
+                # Use local_files_only=True to prevent network requests for validation
+                # The tokenizer files should already exist locally in the model directory
+                return AutoTokenizer.from_pretrained(tokenizer_path, local_files_only=True)
             case SubModelType.TextEncoder:
                 # Determine safe dtype based on target device capabilities
                 target_device = TorchDevice.choose_torch_device()
                 model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+                # Use local_files_only=True to prevent network requests for validation
                 return Qwen3ForCausalLM.from_pretrained(
                     text_encoder_path,
                     torch_dtype=model_dtype,
                     low_cpu_mem_usage=True,
+                    local_files_only=True,
                 )
 
         raise ValueError(
@@ -526,11 +530,26 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                 return self._load_from_singlefile(config)
             case SubModelType.Tokenizer:
                 # For single-file Qwen3, load tokenizer from HuggingFace
-                return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE)
+                # Try local cache first to support offline usage after initial download
+                return self._load_tokenizer_with_offline_fallback()
 
         raise ValueError(
             f"Only TextEncoder and Tokenizer submodels are supported. Received: {submodel_type.value if submodel_type else 'None'}"
         )
+
+    def _load_tokenizer_with_offline_fallback(self) -> AnyModel:
+        """Load tokenizer with local_files_only fallback for offline support.
+
+        First tries to load from local cache (offline), falling back to network download
+        if the tokenizer hasn't been cached yet. This ensures offline operation after
+        the initial download.
+        """
+        try:
+            # Try loading from local cache first (supports offline usage)
+            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE, local_files_only=True)
+        except OSError:
+            # Not in cache yet, download from HuggingFace
+            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE)
 
     def _load_from_singlefile(
         self,
@@ -686,11 +705,26 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
                 return self._load_from_gguf(config)
             case SubModelType.Tokenizer:
                 # For GGUF Qwen3, load tokenizer from HuggingFace
-                return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE)
+                # Try local cache first to support offline usage after initial download
+                return self._load_tokenizer_with_offline_fallback()
 
         raise ValueError(
             f"Only TextEncoder and Tokenizer submodels are supported. Received: {submodel_type.value if submodel_type else 'None'}"
         )
+
+    def _load_tokenizer_with_offline_fallback(self) -> AnyModel:
+        """Load tokenizer with local_files_only fallback for offline support.
+
+        First tries to load from local cache (offline), falling back to network download
+        if the tokenizer hasn't been cached yet. This ensures offline operation after
+        the initial download.
+        """
+        try:
+            # Try loading from local cache first (supports offline usage)
+            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE, local_files_only=True)
+        except OSError:
+            # Not in cache yet, download from HuggingFace
+            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE)
 
     def _load_from_gguf(
         self,
