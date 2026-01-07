@@ -42,7 +42,10 @@ const resolveImagePath = (src: string | undefined, basePath: string): string => 
   }
   // Handle relative paths like './images/...' or 'images/...'
   const relativePath = src.startsWith('./') ? src.slice(2) : src;
-  return `${basePath}/${relativePath}`;
+  // Normalize path to avoid double slashes
+  const normalizedBasePath = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+  const normalizedRelativePath = relativePath.startsWith('/') ? relativePath.slice(1) : relativePath;
+  return `${normalizedBasePath}/${normalizedRelativePath}`;
 };
 
 /**
