@@ -9,7 +9,7 @@ This folder contains developer-authored node documentation to be displayed in th
 
 - Inputs: List and describe each input port, including expected data types and any important details about how the input affects the node's behavior.
 
-- Outputs: (if applicable) List and describe each output port, including data types and any important details about the output data.
+- Outputs: (if applicable) List and describe each output port, including data types and any important details about the output data. If the node has a single output that is already explained in the description, this section can be omitted.
 
 - Examples: Provide one or more example usages of the node, including images where applicable. Each example should include a brief description of the scenario being demonstrated.
 
@@ -22,9 +22,8 @@ This folder contains developer-authored node documentation to be displayed in th
 [Use IMAGE_PLACEHOLDER for any images at this time. We will replace these with actual images later.]
 
 ## Submitting:
-- Before you submit a PR, make sure you run lint:prettier to ensure proper formatting and to pass tests.
+- Before you submit a PR, make sure you run `lint:prettier` and `pnpm build` to ensure proper formatting and to pass tests.
 - Check that your markdown renders correctly in a markdown viewer in the UI.
-- You can update docs and test them without having to rebuild or re-launch the UI each time: the server loads the markdown files on each request. Just refresh the page to see your changes.
 
 Doc Template:
 ---
