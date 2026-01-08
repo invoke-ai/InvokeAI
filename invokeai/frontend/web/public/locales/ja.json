@@ -194,8 +194,6 @@
         "assets": "アセット",
         "useForPromptGeneration": "プロンプト生成に使用する",
         "jump": "ジャンプ",
-        "deleteVideo_other": "{{count}}本の動画を削除",
-        "deleteVideoPermanent": "削除された動画は復元できません。",
         "noImagesInGallery": "ディスプレイに画像がありません",
         "unableToLoad": "ギャラリーを読み込めません",
         "selectAnImageToCompare": "比較する画像を選択",
