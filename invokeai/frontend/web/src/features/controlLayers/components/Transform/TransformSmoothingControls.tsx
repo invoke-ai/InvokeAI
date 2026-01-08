@@ -39,9 +39,9 @@ export const TransformSmoothingControls = memo(() => {
       <FormControl flex={1} minW={200} maxW={280}>
         <FormLabel m={0}>{t('controlLayers.transform.smoothingMode')}</FormLabel>
         <Select size="sm" value={smoothingMode} onChange={onModeChange} isDisabled={!smoothingEnabled}>
-          <option value="nearest">{t('controlLayers.transform.smoothingModeNearest')}</option>
           <option value="bilinear">{t('controlLayers.transform.smoothingModeBilinear')}</option>
           <option value="bicubic">{t('controlLayers.transform.smoothingModeBicubic')}</option>
+          <option value="hamming">{t('controlLayers.transform.smoothingModeHamming')}</option>
           <option value="lanczos">{t('controlLayers.transform.smoothingModeLanczos')}</option>
         </Select>
       </FormControl>

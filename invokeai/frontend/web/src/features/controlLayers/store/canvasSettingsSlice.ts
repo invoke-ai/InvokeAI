@@ -9,7 +9,7 @@ import { z } from 'zod';
 const zAutoSwitchMode = z.enum(['off', 'switch_on_start', 'switch_on_finish']);
 export type AutoSwitchMode = z.infer<typeof zAutoSwitchMode>;
 
-const zTransformSmoothingMode = z.enum(['nearest', 'bilinear', 'bicubic', 'lanczos']);
+const zTransformSmoothingMode = z.enum(['bilinear', 'bicubic', 'hamming', 'lanczos']);
 export type TransformSmoothingMode = z.infer<typeof zTransformSmoothingMode>;
 
 const zCanvasSettingsState = z.object({
