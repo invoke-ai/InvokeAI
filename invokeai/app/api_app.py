@@ -17,6 +17,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
 from invokeai.app.api.routers import (
     app_info,
+    auth,
     board_images,
     boards,
     client_state,
@@ -121,6 +122,8 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
 # Include all routers
+# Authentication router should be first so it's registered before protected routes
+app.include_router(auth.auth_router, prefix="/api")
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
 app.include_router(download_queue.download_queue_router, prefix="/api")

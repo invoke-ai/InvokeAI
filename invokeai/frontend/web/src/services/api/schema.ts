@@ -1,4 +1,127 @@
 export type paths = {
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login
+         * @description Authenticate user and return access token.
+         *
+         *     Args:
+         *         request: Login credentials (email and password)
+         *
+         *     Returns:
+         *         LoginResponse containing JWT token and user information
+         *
+         *     Raises:
+         *         HTTPException: 401 if credentials are invalid or user is inactive
+         */
+        post: operations["login_api_v1_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Logout
+         * @description Logout current user.
+         *
+         *     Currently a no-op since we use stateless JWT tokens. For token invalidation in
+         *     future implementations, consider:
+         *     - Token blacklist: Store invalidated tokens in Redis/database with expiration
+         *     - Token versioning: Add version field to user record, increment on logout
+         *     - Short-lived tokens: Use refresh token pattern with token rotation
+         *     - Session storage: Track active sessions server-side for revocation
+         *
+         *     Args:
+         *         current_user: The authenticated user (validates token)
+         *
+         *     Returns:
+         *         LogoutResponse indicating success
+         */
+        post: operations["logout_api_v1_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Current User Info
+         * @description Get current authenticated user's information.
+         *
+         *     Args:
+         *         current_user: The authenticated user's token data
+         *
+         *     Returns:
+         *         UserDTO containing user information
+         *
+         *     Raises:
+         *         HTTPException: 404 if user is not found (should not happen normally)
+         */
+        get: operations["get_current_user_info_api_v1_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Setup Admin
+         * @description Set up initial administrator account.
+         *
+         *     This endpoint can only be called once, when no admin user exists. It creates
+         *     the first admin user for the system.
+         *
+         *     Args:
+         *         request: Admin account details (email, display_name, password)
+         *
+         *     Returns:
+         *         SetupResponse containing the created admin user
+         *
+         *     Raises:
+         *         HTTPException: 400 if admin already exists or password is weak
+         */
+        post: operations["setup_admin_api_v1_auth_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/utilities/dynamicprompts": {
         parameters: {
             query?: never;
@@ -15653,6 +15776,57 @@ export type components = {
          * @enum {integer}
          */
         LogLevel: 0 | 10 | 20 | 30 | 40 | 50;
+        /**
+         * LoginRequest
+         * @description Request body for user login.
+         */
+        LoginRequest: {
+            /**
+             * Email
+             * @description User email address
+             */
+            email: string;
+            /**
+             * Password
+             * @description User password
+             */
+            password: string;
+            /**
+             * Remember Me
+             * @description Whether to extend session duration
+             * @default false
+             */
+            remember_me?: boolean;
+        };
+        /**
+         * LoginResponse
+         * @description Response from successful login.
+         */
+        LoginResponse: {
+            /**
+             * Token
+             * @description JWT access token
+             */
+            token: string;
+            /** @description User information */
+            user: components["schemas"]["UserDTO"];
+            /**
+             * Expires In
+             * @description Token expiration time in seconds
+             */
+            expires_in: number;
+        };
+        /**
+         * LogoutResponse
+         * @description Response from logout.
+         */
+        LogoutResponse: {
+            /**
+             * Success
+             * @description Whether logout was successful
+             */
+            success: boolean;
+        };
         /** LoraModelDefaultSettings */
         LoraModelDefaultSettings: {
             /**
@@ -22297,6 +22471,40 @@ export type components = {
             total: number;
         };
         /**
+         * SetupRequest
+         * @description Request body for initial admin setup.
+         */
+        SetupRequest: {
+            /**
+             * Email
+             * @description Admin email address
+             */
+            email: string;
+            /**
+             * Display Name
+             * @description Admin display name
+             */
+            display_name?: string | null;
+            /**
+             * Password
+             * @description Admin password
+             */
+            password: string;
+        };
+        /**
+         * SetupResponse
+         * @description Response from successful admin setup.
+         */
+        SetupResponse: {
+            /**
+             * Success
+             * @description Whether setup was successful
+             */
+            success: boolean;
+            /** @description Created admin user information */
+            user: components["schemas"]["UserDTO"];
+        };
+        /**
          * Show Image
          * @description Displays a provided image using the OS image viewer, and passes it forward in the pipeline.
          */
@@ -24618,6 +24826,56 @@ export type components = {
              */
             unstarred_images: string[];
         };
+        /**
+         * UserDTO
+         * @description User data transfer object.
+         */
+        UserDTO: {
+            /**
+             * User Id
+             * @description Unique user identifier
+             */
+            user_id: string;
+            /**
+             * Email
+             * @description User email address
+             */
+            email: string;
+            /**
+             * Display Name
+             * @description Display name
+             */
+            display_name?: string | null;
+            /**
+             * Is Admin
+             * @description Whether user has admin privileges
+             * @default false
+             */
+            is_admin?: boolean;
+            /**
+             * Is Active
+             * @description Whether user account is active
+             * @default true
+             */
+            is_active?: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             * @description When the user was created
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description When the user was last updated
+             */
+            updated_at: string;
+            /**
+             * Last Login At
+             * @description When user last logged in
+             */
+            last_login_at?: string | null;
+        };
         /** VAEField */
         VAEField: {
             /** @description Info to load vae submodel */
@@ -26155,6 +26413,112 @@ export type components = {
 };
 export type $defs = Record<string, never>;
 export interface operations {
+    login_api_v1_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_api_v1_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutResponse"];
+                };
+            };
+        };
+    };
+    get_current_user_info_api_v1_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+        };
+    };
+    setup_admin_api_v1_auth_setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     parse_dynamicprompts: {
         parameters: {
             query?: never;

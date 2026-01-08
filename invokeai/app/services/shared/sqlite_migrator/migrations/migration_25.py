@@ -198,10 +198,15 @@ class Migration25Callback:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_style_presets_is_public ON style_presets(is_public);")
 
     def _create_system_user(self, cursor: sqlite3.Cursor) -> None:
-        """Create system user for backward compatibility."""
+        """Create system user for backward compatibility.
+
+        The system user is NOT an admin - it's just used to own existing data
+        from before multi-user support was added. Real admin users should be
+        created through the /auth/setup endpoint.
+        """
         cursor.execute("""
             INSERT OR IGNORE INTO users (user_id, email, display_name, password_hash, is_admin, is_active)
-            VALUES ('system', 'system@system.invokeai', 'System', '', TRUE, TRUE);
+            VALUES ('system', 'system@system.invokeai', 'System', '', FALSE, TRUE);
         """)
 
 
