@@ -109,16 +109,8 @@ class TestZImageWorkingMemory:
         # Mock image tensor
         mock_image_tensor = torch.zeros(1, 3, 512, 512)
 
-<<<<<<< HEAD
-        # Mock the appropriate estimation function
-        if vae_type == FluxAutoEncoder:
-            estimation_path = "invokeai.app.invocations.z_image_image_to_latents.estimate_vae_working_memory_flux"
-        else:
-            estimation_path = "invokeai.app.invocations.z_image_image_to_latents.estimate_vae_working_memory_sd3"
-=======
         # Mock the estimation function
         estimation_path = "invokeai.app.invocations.z_image_image_to_latents.estimate_vae_working_memory_flux"
->>>>>>> main
 
         with patch(estimation_path) as mock_estimate:
             expected_memory = 1024 * 1024 * 250  # 250MB
