@@ -19,6 +19,7 @@ from invokeai.app.services.invocation_cache.invocation_cache_memory import Memor
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.users.users_default import UserService
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
@@ -62,6 +63,7 @@ def mock_services() -> InvocationServices:
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=None,  # type: ignore
+        users=UserService(db),
     )
 
 
