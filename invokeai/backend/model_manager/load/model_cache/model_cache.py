@@ -240,6 +240,9 @@ class ModelCache:
     def stats(self, stats: CacheStats) -> None:
         """Set the CacheStats object for collecting cache statistics."""
         self._stats = stats
+        # Populate the cache size in the stats object when it's set
+        if self._stats is not None:
+            self._stats.cache_size = self._ram_cache_size_bytes
 
     def _record_activity(self) -> None:
         """Record model activity and reset the timeout timer if configured.
