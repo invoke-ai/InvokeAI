@@ -13,8 +13,9 @@ class BoardServiceABC(ABC):
     def create(
         self,
         board_name: str,
+        user_id: str,
     ) -> BoardDTO:
-        """Creates a board."""
+        """Creates a board for a specific user."""
         pass
 
     @abstractmethod
@@ -45,18 +46,23 @@ class BoardServiceABC(ABC):
     @abstractmethod
     def get_many(
         self,
+        user_id: str,
         order_by: BoardRecordOrderBy,
         direction: SQLiteDirection,
         offset: int = 0,
         limit: int = 10,
         include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardDTO]:
-        """Gets many boards."""
+        """Gets many boards for a specific user, including shared boards."""
         pass
 
     @abstractmethod
     def get_all(
-        self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False
+        self,
+        user_id: str,
+        order_by: BoardRecordOrderBy,
+        direction: SQLiteDirection,
+        include_archived: bool = False,
     ) -> list[BoardDTO]:
-        """Gets all boards."""
+        """Gets all boards for a specific user, including shared boards."""
         pass

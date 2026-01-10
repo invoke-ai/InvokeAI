@@ -72,7 +72,7 @@ class InvocationContextInterface:
 
 class BoardsInterface(InvocationContextInterface):
     def create(self, board_name: str) -> BoardDTO:
-        """Creates a board.
+        """Creates a board for the current user.
 
         Args:
             board_name: The name of the board to create.
@@ -80,7 +80,8 @@ class BoardsInterface(InvocationContextInterface):
         Returns:
             The created board DTO.
         """
-        return self._services.boards.create(board_name)
+        user_id = self._data.queue_item.user_id
+        return self._services.boards.create(board_name, user_id)
 
     def get_dto(self, board_id: str) -> BoardDTO:
         """Gets a board DTO.
@@ -94,13 +95,14 @@ class BoardsInterface(InvocationContextInterface):
         return self._services.boards.get_dto(board_id)
 
     def get_all(self) -> list[BoardDTO]:
-        """Gets all boards.
+        """Gets all boards accessible to the current user.
 
         Returns:
-            A list of all boards.
+            A list of all boards accessible to the current user.
         """
+        user_id = self._data.queue_item.user_id
         return self._services.boards.get_all(
-            order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
+            user_id, order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
         )
 
     def add_image_to_board(self, board_id: str, image_name: str) -> None:

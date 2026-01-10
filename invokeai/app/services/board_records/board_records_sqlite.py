@@ -38,16 +38,17 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     def save(
         self,
         board_name: str,
+        user_id: str,
     ) -> BoardRecord:
         with self._db.transaction() as cursor:
             try:
                 board_id = uuid_string()
                 cursor.execute(
                     """--sql
-                    INSERT OR IGNORE INTO boards (board_id, board_name)
-                    VALUES (?, ?);
+                    INSERT OR IGNORE INTO boards (board_id, board_name, user_id)
+                    VALUES (?, ?, ?);
                     """,
-                    (board_id, board_name),
+                    (board_id, board_name, user_id),
                 )
             except sqlite3.Error as e:
                 raise BoardRecordSaveException from e
@@ -121,6 +122,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
 
     def get_many(
         self,
+        user_id: str,
         order_by: BoardRecordOrderBy,
         direction: SQLiteDirection,
         offset: int = 0,
@@ -128,74 +130,88 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardRecord]:
         with self._db.transaction() as cursor:
-            # Build base query
+            # Build base query - include boards owned by user, shared with user, or public
             base_query = """
-                    SELECT *
+                    SELECT DISTINCT boards.*
                     FROM boards
+                    LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
+                    WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.is_public = 1)
                     {archived_filter}
                     ORDER BY {order_by} {direction}
                     LIMIT ? OFFSET ?;
                 """
 
             # Determine archived filter condition
-            archived_filter = "" if include_archived else "WHERE archived = 0"
+            archived_filter = "" if include_archived else "AND boards.archived = 0"
 
             final_query = base_query.format(
                 archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
             )
 
             # Execute query to fetch boards
-            cursor.execute(final_query, (limit, offset))
+            cursor.execute(final_query, (user_id, user_id, limit, offset))
 
             result = cast(list[sqlite3.Row], cursor.fetchall())
             boards = [deserialize_board_record(dict(r)) for r in result]
 
-            # Determine count query
+            # Determine count query - count boards accessible to user
             if include_archived:
                 count_query = """
-                        SELECT COUNT(*)
-                        FROM boards;
+                        SELECT COUNT(DISTINCT boards.board_id)
+                        FROM boards
+                        LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
+                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.is_public = 1);
                     """
             else:
                 count_query = """
-                        SELECT COUNT(*)
+                        SELECT COUNT(DISTINCT boards.board_id)
                         FROM boards
-                        WHERE archived = 0;
+                        LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
+                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.is_public = 1)
+                        AND boards.archived = 0;
                     """
 
             # Execute count query
-            cursor.execute(count_query)
+            cursor.execute(count_query, (user_id, user_id))
 
             count = cast(int, cursor.fetchone()[0])
 
         return OffsetPaginatedResults[BoardRecord](items=boards, offset=offset, limit=limit, total=count)
 
     def get_all(
-        self, order_by: BoardRecordOrderBy, direction: SQLiteDirection, include_archived: bool = False
+        self,
+        user_id: str,
+        order_by: BoardRecordOrderBy,
+        direction: SQLiteDirection,
+        include_archived: bool = False,
     ) -> list[BoardRecord]:
         with self._db.transaction() as cursor:
             if order_by == BoardRecordOrderBy.Name:
                 base_query = """
-                        SELECT *
+                        SELECT DISTINCT boards.*
                         FROM boards
+                        LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
+                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.is_public = 1)
                         {archived_filter}
-                        ORDER BY LOWER(board_name) {direction}
+                        ORDER BY LOWER(boards.board_name) {direction}
                     """
             else:
                 base_query = """
-                        SELECT *
+                        SELECT DISTINCT boards.*
                         FROM boards
+                        LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
+                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.is_public = 1)
                         {archived_filter}
                         ORDER BY {order_by} {direction}
                     """
 
-            archived_filter = "" if include_archived else "WHERE archived = 0"
+            archived_filter = "" if include_archived else "AND boards.archived = 0"
 
             final_query = base_query.format(
                 archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
             )
 
-            cursor.execute(final_query)
+            cursor.execute(final_query, (user_id, user_id))
 
             result = cast(list[sqlite3.Row], cursor.fetchall())
         boards = [deserialize_board_record(dict(r)) for r in result]

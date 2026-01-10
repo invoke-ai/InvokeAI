@@ -625,7 +625,7 @@ export type paths = {
         put?: never;
         /**
          * Upload Image
-         * @description Uploads an image
+         * @description Uploads an image for the current user
          */
         post: operations["upload_image"];
         delete?: never;
@@ -968,13 +968,13 @@ export type paths = {
         };
         /**
          * List Boards
-         * @description Gets a list of boards
+         * @description Gets a list of boards for the current user, including shared boards
          */
         get: operations["list_boards"];
         put?: never;
         /**
          * Create Board
-         * @description Creates a board
+         * @description Creates a board for the current user
          */
         post: operations["create_board"];
         delete?: never;
@@ -992,21 +992,21 @@ export type paths = {
         };
         /**
          * Get Board
-         * @description Gets a board
+         * @description Gets a board (user must have access to it)
          */
         get: operations["get_board"];
         put?: never;
         post?: never;
         /**
          * Delete Board
-         * @description Deletes a board
+         * @description Deletes a board (user must have access to it)
          */
         delete: operations["delete_board"];
         options?: never;
         head?: never;
         /**
          * Update Board
-         * @description Updates a board
+         * @description Updates a board (user must have access to it)
          */
         patch: operations["update_board"];
         trace?: never;
@@ -1342,7 +1342,7 @@ export type paths = {
         put?: never;
         /**
          * Enqueue Batch
-         * @description Processes a batch and enqueues the output graphs for execution.
+         * @description Processes a batch and enqueues the output graphs for execution for the current user.
          */
         post: operations["enqueue_batch"];
         delete?: never;
@@ -22402,6 +22402,12 @@ export type components = {
              * @description The id of the queue with which this item is associated
              */
             queue_id: string;
+            /**
+             * User Id
+             * @description The id of the user who created this queue item
+             * @default system
+             */
+            user_id?: string;
             /**
              * Field Values
              * @description The field values that were used for this queue item

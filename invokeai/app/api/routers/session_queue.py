@@ -4,6 +4,7 @@ from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
+from invokeai.app.api.auth_dependencies import CurrentUser
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -44,14 +45,15 @@ class SessionQueueAndProcessorStatus(BaseModel):
     },
 )
 async def enqueue_batch(
+    current_user: CurrentUser,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch: Batch = Body(description="Batch to process"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:
-    """Processes a batch and enqueues the output graphs for execution."""
+    """Processes a batch and enqueues the output graphs for execution for the current user."""
     try:
         return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
-            queue_id=queue_id, batch=batch, prepend=prepend
+            queue_id=queue_id, batch=batch, prepend=prepend, user_id=current_user.user_id
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while enqueuing batch: {e}")

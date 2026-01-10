@@ -4,6 +4,7 @@ from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
+from invokeai.app.api.auth_dependencies import CurrentUser
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
@@ -32,11 +33,12 @@ class DeleteBoardResult(BaseModel):
     response_model=BoardDTO,
 )
 async def create_board(
+    current_user: CurrentUser,
     board_name: str = Query(description="The name of the board to create", max_length=300),
 ) -> BoardDTO:
-    """Creates a board"""
+    """Creates a board for the current user"""
     try:
-        result = ApiDependencies.invoker.services.boards.create(board_name=board_name)
+        result = ApiDependencies.invoker.services.boards.create(board_name=board_name, user_id=current_user.user_id)
         return result
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to create board")
@@ -44,9 +46,10 @@ async def create_board(
 
 @boards_router.get("/{board_id}", operation_id="get_board", response_model=BoardDTO)
 async def get_board(
+    current_user: CurrentUser,
     board_id: str = Path(description="The id of board to get"),
 ) -> BoardDTO:
-    """Gets a board"""
+    """Gets a board (user must have access to it)"""
 
     try:
         result = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
@@ -67,10 +70,11 @@ async def get_board(
     response_model=BoardDTO,
 )
 async def update_board(
+    current_user: CurrentUser,
     board_id: str = Path(description="The id of board to update"),
     changes: BoardChanges = Body(description="The changes to apply to the board"),
 ) -> BoardDTO:
-    """Updates a board"""
+    """Updates a board (user must have access to it)"""
     try:
         result = ApiDependencies.invoker.services.boards.update(board_id=board_id, changes=changes)
         return result
@@ -80,10 +84,11 @@ async def update_board(
 
 @boards_router.delete("/{board_id}", operation_id="delete_board", response_model=DeleteBoardResult)
 async def delete_board(
+    current_user: CurrentUser,
     board_id: str = Path(description="The id of board to delete"),
     include_images: Optional[bool] = Query(description="Permanently delete all images on the board", default=False),
 ) -> DeleteBoardResult:
-    """Deletes a board"""
+    """Deletes a board (user must have access to it)"""
     try:
         if include_images is True:
             deleted_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
@@ -120,6 +125,7 @@ async def delete_board(
     response_model=Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]],
 )
 async def list_boards(
+    current_user: CurrentUser,
     order_by: BoardRecordOrderBy = Query(default=BoardRecordOrderBy.CreatedAt, description="The attribute to order by"),
     direction: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The direction to order by"),
     all: Optional[bool] = Query(default=None, description="Whether to list all boards"),
@@ -127,11 +133,15 @@ async def list_boards(
     limit: Optional[int] = Query(default=None, description="The number of boards per page"),
     include_archived: bool = Query(default=False, description="Whether or not to include archived boards in list"),
 ) -> Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]]:
-    """Gets a list of boards"""
+    """Gets a list of boards for the current user, including shared boards"""
     if all:
-        return ApiDependencies.invoker.services.boards.get_all(order_by, direction, include_archived)
+        return ApiDependencies.invoker.services.boards.get_all(
+            current_user.user_id, order_by, direction, include_archived
+        )
     elif offset is not None and limit is not None:
-        return ApiDependencies.invoker.services.boards.get_many(order_by, direction, offset, limit, include_archived)
+        return ApiDependencies.invoker.services.boards.get_many(
+            current_user.user_id, order_by, direction, offset, limit, include_archived
+        )
     else:
         raise HTTPException(
             status_code=400,

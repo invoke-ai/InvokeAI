@@ -100,7 +100,9 @@ class SqliteSessionQueue(SessionQueueBase):
             priority = cast(Union[int, None], cursor.fetchone()[0]) or 0
         return priority
 
-    async def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> EnqueueBatchResult:
+    async def enqueue_batch(
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+    ) -> EnqueueBatchResult:
         current_queue_size = self._get_current_queue_size(queue_id)
         max_queue_size = self.__invoker.services.configuration.max_queue_size
         max_new_queue_items = max_queue_size - current_queue_size
@@ -119,14 +121,15 @@ class SqliteSessionQueue(SessionQueueBase):
             batch=batch,
             priority=priority,
             max_new_queue_items=max_new_queue_items,
+            user_id=user_id,
         )
         enqueued_count = len(values_to_insert)
 
         with self._db.transaction() as cursor:
             cursor.executemany(
                 """--sql
-                    INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                 values_to_insert,
             )
@@ -822,6 +825,7 @@ class SqliteSessionQueue(SessionQueueBase):
                     queue_item.origin,
                     queue_item.destination,
                     retried_from_item_id,
+                    queue_item.user_id,
                 )
                 values_to_insert.append(value_to_insert)
 
@@ -829,8 +833,8 @@ class SqliteSessionQueue(SessionQueueBase):
 
             cursor.executemany(
                 """--sql
-                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 values_to_insert,
             )

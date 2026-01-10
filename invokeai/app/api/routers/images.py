@@ -9,6 +9,7 @@ from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, model_validator
 
+from invokeai.app.api.auth_dependencies import CurrentUser
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
 from invokeai.app.invocations.fields import MetadataField
@@ -61,6 +62,7 @@ class ResizeToDimensions(BaseModel):
     response_model=ImageDTO,
 )
 async def upload_image(
+    current_user: CurrentUser,
     file: UploadFile,
     request: Request,
     response: Response,
@@ -80,7 +82,7 @@ async def upload_image(
         embed=True,
     ),
 ) -> ImageDTO:
-    """Uploads an image"""
+    """Uploads an image for the current user"""
     if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 

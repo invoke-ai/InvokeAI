@@ -12,8 +12,10 @@ import pytest
 
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_services import InvocationServices
@@ -37,12 +39,12 @@ def mock_services() -> InvocationServices:
         board_image_records=SqliteBoardImageRecordStorage(db=db),
         board_images=None,  # type: ignore
         board_records=SqliteBoardRecordStorage(db=db),
-        boards=None,  # type: ignore
+        boards=BoardService(),
         bulk_download=BulkDownloadService(),
         configuration=configuration,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=None,  # type: ignore
+        image_records=SqliteImageRecordStorage(db=db),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
