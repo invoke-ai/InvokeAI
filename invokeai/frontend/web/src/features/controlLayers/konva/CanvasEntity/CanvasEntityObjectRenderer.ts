@@ -556,7 +556,9 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     this.rasterCacheKeys.clear();
   };
 
-  cloneObjectGroup = (arg: { attrs?: GroupConfig; cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean } } = {}): Konva.Group => {
+  cloneObjectGroup = (
+    arg: { attrs?: GroupConfig; cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean } } = {}
+  ): Konva.Group => {
     const { attrs, cache } = arg;
     const clone = this.konva.objectGroup.clone();
     if (attrs) {
@@ -569,14 +571,16 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     return clone;
   };
 
-  getCanvas = (arg: {
-    rect?: Rect;
-    attrs?: GroupConfig;
-    bg?: string;
-    imageSmoothingEnabled?: boolean;
-    pixelRatio?: number;
-    cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
-  } = {}): HTMLCanvasElement => {
+  getCanvas = (
+    arg: {
+      rect?: Rect;
+      attrs?: GroupConfig;
+      bg?: string;
+      imageSmoothingEnabled?: boolean;
+      pixelRatio?: number;
+      cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
+    } = {}
+  ): HTMLCanvasElement => {
     const { rect, attrs, bg, imageSmoothingEnabled, pixelRatio, cache } = arg;
     const clone = this.cloneObjectGroup({ attrs, cache });
     const canvas = konvaNodeToCanvas({ node: clone, rect, bg, imageSmoothingEnabled, pixelRatio });
@@ -584,28 +588,32 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     return canvas;
   };
 
-  getBlob = async (arg: {
-    rect?: Rect;
-    attrs?: GroupConfig;
-    bg?: string;
-    imageSmoothingEnabled?: boolean;
-    pixelRatio?: number;
-    cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
-  } = {}): Promise<Blob> => {
+  getBlob = async (
+    arg: {
+      rect?: Rect;
+      attrs?: GroupConfig;
+      bg?: string;
+      imageSmoothingEnabled?: boolean;
+      pixelRatio?: number;
+      cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
+    } = {}
+  ): Promise<Blob> => {
     const { rect, attrs, bg, imageSmoothingEnabled, pixelRatio, cache } = arg;
     const clone = this.cloneObjectGroup({ attrs, cache });
     const blob = await konvaNodeToBlob({ node: clone, rect, bg, imageSmoothingEnabled, pixelRatio });
     return blob;
   };
 
-  getImageData = (arg: {
-    rect?: Rect;
-    attrs?: GroupConfig;
-    bg?: string;
-    imageSmoothingEnabled?: boolean;
-    pixelRatio?: number;
-    cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
-  } = {}): ImageData => {
+  getImageData = (
+    arg: {
+      rect?: Rect;
+      attrs?: GroupConfig;
+      bg?: string;
+      imageSmoothingEnabled?: boolean;
+      pixelRatio?: number;
+      cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
+    } = {}
+  ): ImageData => {
     const { rect, attrs, bg, imageSmoothingEnabled, pixelRatio, cache } = arg;
     const clone = this.cloneObjectGroup({ attrs, cache });
     const imageData = konvaNodeToImageData({ node: clone, rect, bg, imageSmoothingEnabled, pixelRatio });
