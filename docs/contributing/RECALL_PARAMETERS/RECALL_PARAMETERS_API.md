@@ -42,6 +42,8 @@ Content-Type: application/json
 }
 ```
 
+The queue id is usually "default".
+
 ### Parameters
 
 All parameters are optional. Only provide the parameters you want to update:
@@ -117,7 +119,7 @@ GET /api/v1/recall/{queue_id}
 
 ```bash
 # Update prompts and model
-curl -X POST http://localhost:9090/api/v1/recall/queue_123 \
+curl -X POST http://localhost:9090/api/v1/recall/default \
   -H "Content-Type: application/json" \
   -d '{
     "positive_prompt": "a cyberpunk city at night",
@@ -127,7 +129,7 @@ curl -X POST http://localhost:9090/api/v1/recall/queue_123 \
   }'
 
 # Update just the seed
-curl -X POST http://localhost:9090/api/v1/recall/queue_123 \
+curl -X POST http://localhost:9090/api/v1/recall/default \
   -H "Content-Type: application/json" \
   -d '{"seed": 99999}'
 ```
@@ -139,7 +141,7 @@ import requests
 import json
 
 # Configuration
-API_URL = "http://localhost:9090/api/v1/recall/queue_123"
+API_URL = "http://localhost:9090/api/v1/recall/default"
 
 # Update multiple parameters
 params = {
@@ -161,7 +163,7 @@ print(json.dumps(result['parameters'], indent=2))
 ### Using Node.js/JavaScript
 
 ```javascript
-const API_URL = 'http://localhost:9090/api/v1/recall/queue_123';
+const API_URL = 'http://localhost:9090/api/v1/recall/default';
 
 const params = {
   positive_prompt: 'a beautiful sunset',
@@ -188,10 +190,15 @@ fetch(API_URL, {
 - Only non-null parameters are processed and stored
 - The endpoint provides validation for numeric ranges (e.g., steps ≥ 1, dimensions ≥ 64)
 - All parameter values are JSON-serialized for storage
+- When parameter values are changed, the backend generates a web sockets event that the frontend listens to.
 
 ## Integration with Frontend
 
-The stored parameters can be accessed by the frontend through the existing client state API or by implementing hooks that read from the recall parameter storage. This allows external applications to pre-populate generation parameters before the user initiates image generation.
+The stored parameters can be accessed by the frontend through the
+existing client state API or by implementing hooks that read from the
+recall parameter storage. This allows external applications to
+pre-populate generation parameters before the user initiates image
+generation.
 
 ## Error Handling
 
