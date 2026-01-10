@@ -33,7 +33,7 @@ export const BeginEndStepPct = memo(({ beginEndStepPct, onChange }: Props) => {
         fineStep={0.01}
         minStepsBetweenThumbs={1}
         formatValue={formatPct}
-        marks
+        marks={[0, 0.25, 0.5, 0.75, 1]}
         withThumbTooltip
       />
     </FormControl>

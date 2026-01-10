@@ -646,3 +646,16 @@ class BulkDownloadErrorEvent(BulkDownloadEventBase):
             bulk_download_item_name=bulk_download_item_name,
             error=error,
         )
+
+
+@payload_schema.register
+class RecallParametersUpdatedEvent(QueueEventBase):
+    """Event model for recall_parameters_updated"""
+
+    __event_name__ = "recall_parameters_updated"
+
+    parameters: dict[str, Any] = Field(description="The recall parameters that were updated")
+
+    @classmethod
+    def build(cls, queue_id: str, parameters: dict[str, Any]) -> "RecallParametersUpdatedEvent":
+        return cls(queue_id=queue_id, parameters=parameters)
