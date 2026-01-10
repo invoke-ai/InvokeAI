@@ -14,8 +14,8 @@ import {
   offsetCoord,
   roundRect,
 } from 'features/controlLayers/konva/util';
-import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { TransformSmoothingMode } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { Coordinate, LifecycleCallback, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
