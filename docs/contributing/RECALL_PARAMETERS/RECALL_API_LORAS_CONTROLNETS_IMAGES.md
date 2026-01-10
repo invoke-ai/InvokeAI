@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Recall Parameters API now supports recalling LoRAs, ControlNets (including T2I Adapters and Control LoRAs), and IP Adapters along with their associated weights and settings. Control Layers and IP Adapters can now include image references from the `INVOKEAI_ROOT/outputs/images` directory for fully functional control and image prompt functionality.
+The Recall Parameters API supports recalling LoRAs, ControlNets (including T2I Adapters and Control LoRAs), and IP Adapters along with their associated weights and settings. Control Layers and IP Adapters can now include image references from the `INVOKEAI_ROOT/outputs/images` directory for fully functional control and image prompt functionality.
 
 ## Key Features
 
@@ -63,6 +63,7 @@ All fields are optional. Include only the parameters you want to update.
     begin_step_percent?: number;   // Default: 0.0, Range: 0 to 1
     end_step_percent?: number;     // Default: 1.0, Range: 0 to 1
     method?: "full" | "style" | "composition";  // Default: "full"
+    influence?: "Lowest" | "Low" | "Medium" | "High" | "Highest";  // Flux Redux only; default: "highest"
   }>;
 }
 ```
