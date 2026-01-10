@@ -81,7 +81,9 @@ class ZImageSeedVarianceEnhancerInvocation(BaseInvocation):
         # Generate deterministic noise using the seed
         generator = torch.Generator(device=prompt_embeds.device)
         generator.manual_seed(self.seed)
-        noise = torch.rand(prompt_embeds.shape, generator=generator, device=prompt_embeds.device, dtype=prompt_embeds.dtype)
+        noise = torch.rand(
+            prompt_embeds.shape, generator=generator, device=prompt_embeds.device, dtype=prompt_embeds.dtype
+        )
         noise = noise * 2 - 1  # Scale to [-1, 1]
         noise = noise * actual_strength
 
