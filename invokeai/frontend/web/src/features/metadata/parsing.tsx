@@ -31,6 +31,9 @@ import {
   setSeed,
   setSteps,
   setZImageScheduler,
+  setZImageSeedVarianceEnabled,
+  setZImageSeedVarianceRandomizePercent,
+  setZImageSeedVarianceStrength,
   vaeSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
@@ -534,6 +537,60 @@ const SeamlessY: SingleMetadataHandler<ParameterSeamlessY> = {
 };
 //#endregion SeamlessY
 
+//#region ZImageSeedVarianceEnabled
+const ZImageSeedVarianceEnabled: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'ZImageSeedVarianceEnabled',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'z_image_seed_variance_enabled');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setZImageSeedVarianceEnabled(value));
+  },
+  i18nKey: 'metadata.seedVarianceEnabled',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion ZImageSeedVarianceEnabled
+
+//#region ZImageSeedVarianceStrength
+const ZImageSeedVarianceStrength: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'ZImageSeedVarianceStrength',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'z_image_seed_variance_strength');
+    const parsed = z.number().min(0).max(2).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setZImageSeedVarianceStrength(value));
+  },
+  i18nKey: 'metadata.seedVarianceStrength',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion ZImageSeedVarianceStrength
+
+//#region ZImageSeedVarianceRandomizePercent
+const ZImageSeedVarianceRandomizePercent: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'ZImageSeedVarianceRandomizePercent',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'z_image_seed_variance_randomize_percent');
+    const parsed = z.number().min(1).max(100).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setZImageSeedVarianceRandomizePercent(value));
+  },
+  i18nKey: 'metadata.seedVarianceRandomizePercent',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion ZImageSeedVarianceRandomizePercent
+
 //#region RefinerModel
 const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
   [SingleMetadataKey]: true,
@@ -1020,6 +1077,9 @@ export const ImageMetadataHandlers = {
   Qwen3EncoderModel,
   ZImageVAEModel,
   ZImageQwen3SourceModel,
+  ZImageSeedVarianceEnabled,
+  ZImageSeedVarianceStrength,
+  ZImageSeedVarianceRandomizePercent,
   LoRAs,
   CanvasLayers,
   RefImages,
