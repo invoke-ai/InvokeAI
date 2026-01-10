@@ -14,19 +14,43 @@ def _get_processor_invocation_class(processor_type: str):
     """Get the invocation class for a processor type."""
     # Import processor invocation classes on demand
     processor_class_map = {
-        "canny_image_processor": lambda: __import__('invokeai.app.invocations.canny', fromlist=['CannyEdgeDetectionInvocation']).CannyEdgeDetectionInvocation,
-        "hed_image_processor": lambda: __import__('invokeai.app.invocations.hed', fromlist=['HEDEdgeDetectionInvocation']).HEDEdgeDetectionInvocation,
-        "mlsd_image_processor": lambda: __import__('invokeai.app.invocations.mlsd', fromlist=['MLSDDetectionInvocation']).MLSDDetectionInvocation,
-        "depth_anything_image_processor": lambda: __import__('invokeai.app.invocations.depth_anything', fromlist=['DepthAnythingDepthEstimationInvocation']).DepthAnythingDepthEstimationInvocation,
-        "normalbae_image_processor": lambda: __import__('invokeai.app.invocations.normal_bae', fromlist=['NormalMapInvocation']).NormalMapInvocation,
-        "pidi_image_processor": lambda: __import__('invokeai.app.invocations.pidi', fromlist=['PiDiNetEdgeDetectionInvocation']).PiDiNetEdgeDetectionInvocation,
-        "lineart_image_processor": lambda: __import__('invokeai.app.invocations.lineart', fromlist=['LineartEdgeDetectionInvocation']).LineartEdgeDetectionInvocation,
-        "lineart_anime_image_processor": lambda: __import__('invokeai.app.invocations.lineart_anime', fromlist=['LineartAnimeEdgeDetectionInvocation']).LineartAnimeEdgeDetectionInvocation,
-        "content_shuffle_image_processor": lambda: __import__('invokeai.app.invocations.content_shuffle', fromlist=['ContentShuffleInvocation']).ContentShuffleInvocation,
-        "dw_openpose_image_processor": lambda: __import__('invokeai.app.invocations.dw_openpose', fromlist=['DWOpenposeDetectionInvocation']).DWOpenposeDetectionInvocation,
-        "mediapipe_face_processor": lambda: __import__('invokeai.app.invocations.mediapipe_face', fromlist=['MediaPipeFaceDetectionInvocation']).MediaPipeFaceDetectionInvocation,
+        "canny_image_processor": lambda: __import__(
+            "invokeai.app.invocations.canny", fromlist=["CannyEdgeDetectionInvocation"]
+        ).CannyEdgeDetectionInvocation,
+        "hed_image_processor": lambda: __import__(
+            "invokeai.app.invocations.hed", fromlist=["HEDEdgeDetectionInvocation"]
+        ).HEDEdgeDetectionInvocation,
+        "mlsd_image_processor": lambda: __import__(
+            "invokeai.app.invocations.mlsd", fromlist=["MLSDDetectionInvocation"]
+        ).MLSDDetectionInvocation,
+        "depth_anything_image_processor": lambda: __import__(
+            "invokeai.app.invocations.depth_anything", fromlist=["DepthAnythingDepthEstimationInvocation"]
+        ).DepthAnythingDepthEstimationInvocation,
+        "normalbae_image_processor": lambda: __import__(
+            "invokeai.app.invocations.normal_bae", fromlist=["NormalMapInvocation"]
+        ).NormalMapInvocation,
+        "pidi_image_processor": lambda: __import__(
+            "invokeai.app.invocations.pidi", fromlist=["PiDiNetEdgeDetectionInvocation"]
+        ).PiDiNetEdgeDetectionInvocation,
+        "lineart_image_processor": lambda: __import__(
+            "invokeai.app.invocations.lineart", fromlist=["LineartEdgeDetectionInvocation"]
+        ).LineartEdgeDetectionInvocation,
+        "lineart_anime_image_processor": lambda: __import__(
+            "invokeai.app.invocations.lineart_anime", fromlist=["LineartAnimeEdgeDetectionInvocation"]
+        ).LineartAnimeEdgeDetectionInvocation,
+        "content_shuffle_image_processor": lambda: __import__(
+            "invokeai.app.invocations.content_shuffle", fromlist=["ContentShuffleInvocation"]
+        ).ContentShuffleInvocation,
+        "dw_openpose_image_processor": lambda: __import__(
+            "invokeai.app.invocations.dw_openpose", fromlist=["DWOpenposeDetectionInvocation"]
+        ).DWOpenposeDetectionInvocation,
+        "mediapipe_face_processor": lambda: __import__(
+            "invokeai.app.invocations.mediapipe_face", fromlist=["MediaPipeFaceDetectionInvocation"]
+        ).MediaPipeFaceDetectionInvocation,
         # Note: zoe_depth_image_processor doesn't have a processor invocation implementation
-        "color_map_image_processor": lambda: __import__('invokeai.app.invocations.color_map', fromlist=['ColorMapInvocation']).ColorMapInvocation,
+        "color_map_image_processor": lambda: __import__(
+            "invokeai.app.invocations.color_map", fromlist=["ColorMapInvocation"]
+        ).ColorMapInvocation,
     }
 
     if processor_type in processor_class_map:
@@ -88,19 +112,13 @@ def process_controlnet_image(image_name: str, model_key: str, services: Invocati
         default_params = PROCESSOR_DEFAULT_PARAMS.get(preprocessor, {})
         logger.info(f"Processing image {image_name} with processor {preprocessor}")
 
-        # Load the source image to verify it exists
-        source_image_dto = services.images.get_dto(image_name)
-
         # Create a minimal context to run the invocation
         # We need a fake queue item and session for the context
         fake_session = GraphExecutionState(graph=Graph())
         now = datetime.now()
 
         # Create invocation instance first so we have its ID
-        invocation_params = {
-            "image": ImageField(image_name=image_name),
-            **default_params
-        }
+        invocation_params = {"image": ImageField(image_name=image_name), **default_params}
         invocation = invocation_class(**invocation_params)
 
         # Add the invocation ID to the session's prepared_source_mapping
@@ -144,7 +162,7 @@ def process_controlnet_image(image_name: str, model_key: str, services: Invocati
         return {
             "image_name": processed_image_dto.image_name,
             "width": processed_image_dto.width,
-            "height": processed_image_dto.height
+            "height": processed_image_dto.height,
         }
 
     except Exception as e:

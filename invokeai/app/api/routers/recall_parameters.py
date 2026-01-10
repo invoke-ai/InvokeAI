@@ -16,6 +16,7 @@ recall_parameters_router = APIRouter(prefix="/v1/recall", tags=["recall"])
 
 class LoRARecallParameter(BaseModel):
     """LoRA configuration for recall"""
+
     model_name: str = Field(description="The name of the LoRA model")
     weight: float = Field(default=0.75, ge=-10, le=10, description="The weight for the LoRA")
     is_enabled: bool = Field(default=True, description="Whether the LoRA is enabled")
@@ -23,10 +24,9 @@ class LoRARecallParameter(BaseModel):
 
 class ControlNetRecallParameter(BaseModel):
     """ControlNet configuration for recall"""
+
     model_name: str = Field(description="The name of the ControlNet/T2I Adapter/Control LoRA model")
-    image_name: Optional[str] = Field(
-        default=None, description="The filename of the control image in outputs/images"
-    )
+    image_name: Optional[str] = Field(default=None, description="The filename of the control image in outputs/images")
     weight: float = Field(default=1.0, ge=-1, le=2, description="The weight for the control adapter")
     begin_step_percent: Optional[float] = Field(
         default=None, ge=0, le=1, description="When the control adapter is first applied (% of total steps)"
@@ -41,10 +41,9 @@ class ControlNetRecallParameter(BaseModel):
 
 class IPAdapterRecallParameter(BaseModel):
     """IP Adapter configuration for recall"""
+
     model_name: str = Field(description="The name of the IP Adapter model")
-    image_name: Optional[str] = Field(
-        default=None, description="The filename of the reference image in outputs/images"
-    )
+    image_name: Optional[str] = Field(default=None, description="The filename of the reference image in outputs/images")
     weight: float = Field(default=1.0, ge=-1, le=2, description="The weight for the IP Adapter")
     begin_step_percent: Optional[float] = Field(
         default=None, ge=0, le=1, description="When the IP Adapter is first applied (% of total steps)"
@@ -52,9 +51,7 @@ class IPAdapterRecallParameter(BaseModel):
     end_step_percent: Optional[float] = Field(
         default=None, ge=0, le=1, description="When the IP Adapter is last applied (% of total steps)"
     )
-    method: Optional[Literal["full", "style", "composition"]] = Field(
-        default=None, description="The IP Adapter method"
-    )
+    method: Optional[Literal["full", "style", "composition"]] = Field(default=None, description="The IP Adapter method")
     image_influence: Optional[Literal["lowest", "low", "medium", "high", "highest"]] = Field(
         default=None, description="FLUX Redux image influence (if model is flux_redux)"
     )
@@ -100,9 +97,7 @@ class RecallParameter(BaseModel):
     refiner_negative_aesthetic_score: Optional[float] = Field(None, description="Refiner negative aesthetic score")
 
     # LoRAs, ControlNets, and IP Adapters
-    loras: Optional[list[LoRARecallParameter]] = Field(
-        None, description="List of LoRAs with their weights"
-    )
+    loras: Optional[list[LoRARecallParameter]] = Field(None, description="List of LoRAs with their weights")
     control_layers: Optional[list[ControlNetRecallParameter]] = Field(
         None, description="List of control adapters (ControlNet, T2I Adapter, Control LoRA) with their settings"
     )
@@ -114,25 +109,24 @@ class RecallParameter(BaseModel):
 def resolve_model_name_to_key(model_name: str, model_type: ModelType = ModelType.Main) -> Optional[str]:
     """
     Look up a model by name and return its key.
-    
+
     Args:
         model_name: The name of the model to look up
         model_type: The type of model to search for (default: Main)
-    
+
     Returns:
         The key of the first matching model, or None if not found.
     """
     logger = ApiDependencies.invoker.services.logger
     try:
         models = ApiDependencies.invoker.services.model_manager.store.search_by_attr(
-            model_name=model_name,
-            model_type=model_type
+            model_name=model_name, model_type=model_type
         )
-        
+
         if models:
             logger.info(f"Resolved {model_type.value} model name '{model_name}' to key '{models[0].key}'")
             return models[0].key
-        
+
         logger.warning(f"Could not find {model_type.value} model with name '{model_name}'")
         return None
     except Exception as e:
@@ -174,49 +168,45 @@ def load_image_file(image_name: str) -> Optional[dict[str, Any]]:
 def resolve_lora_models(loras: list[LoRARecallParameter]) -> list[dict[str, Any]]:
     """
     Resolve LoRA model names to keys and build configuration list.
-    
+
     Args:
         loras: List of LoRA recall parameters
-    
+
     Returns:
         List of resolved LoRA configurations with model keys
     """
     logger = ApiDependencies.invoker.services.logger
     resolved_loras = []
-    
+
     for lora in loras:
         model_key = resolve_model_name_to_key(lora.model_name, ModelType.LoRA)
         if model_key:
-            resolved_loras.append({
-                "model_key": model_key,
-                "weight": lora.weight,
-                "is_enabled": lora.is_enabled
-            })
+            resolved_loras.append({"model_key": model_key, "weight": lora.weight, "is_enabled": lora.is_enabled})
         else:
             logger.warning(f"Skipping LoRA '{lora.model_name}' - model not found")
-    
+
     return resolved_loras
 
 
 def resolve_control_models(control_layers: list[ControlNetRecallParameter]) -> list[dict[str, Any]]:
     """
     Resolve control adapter model names to keys and build configuration list.
-    
+
     Tries to resolve as ControlNet, T2I Adapter, or Control LoRA in that order.
-    
+
     Args:
         control_layers: List of control adapter recall parameters
-    
+
     Returns:
         List of resolved control adapter configurations with model keys
     """
     logger = ApiDependencies.invoker.services.logger
     services = ApiDependencies.invoker.services
     resolved_controls = []
-    
+
     for control in control_layers:
         model_key = None
-        
+
         # Try ControlNet first
         model_key = resolve_model_name_to_key(control.model_name, ModelType.ControlNet)
         if not model_key:
@@ -225,17 +215,14 @@ def resolve_control_models(control_layers: list[ControlNetRecallParameter]) -> l
         if not model_key:
             # Try Control LoRA (also uses LoRA type)
             model_key = resolve_model_name_to_key(control.model_name, ModelType.LoRA)
-        
+
         if model_key:
-            config: dict[str, Any] = {
-                "model_key": model_key,
-                "weight": control.weight
-            }
+            config: dict[str, Any] = {"model_key": model_key, "weight": control.weight}
             if control.image_name is not None:
                 image_data = load_image_file(control.image_name)
                 if image_data:
                     config["image"] = image_data
-                    
+
                     # Try to process the image using the model's default processor
                     processed_image_data = process_controlnet_image(control.image_name, model_key, services)
                     if processed_image_data:
@@ -249,27 +236,27 @@ def resolve_control_models(control_layers: list[ControlNetRecallParameter]) -> l
                 config["end_step_percent"] = control.end_step_percent
             if control.control_mode is not None:
                 config["control_mode"] = control.control_mode
-            
+
             resolved_controls.append(config)
         else:
             logger.warning(f"Skipping control adapter '{control.model_name}' - model not found")
-    
+
     return resolved_controls
 
 
 def resolve_ip_adapter_models(ip_adapters: list[IPAdapterRecallParameter]) -> list[dict[str, Any]]:
     """
     Resolve IP Adapter model names to keys and build configuration list.
-    
+
     Args:
         ip_adapters: List of IP Adapter recall parameters
-    
+
     Returns:
         List of resolved IP Adapter configurations with model keys
     """
     logger = ApiDependencies.invoker.services.logger
     resolved_adapters = []
-    
+
     for adapter in ip_adapters:
         # Try resolving as IP Adapter; if not found, try FLUX Redux
         model_key = resolve_model_name_to_key(adapter.model_name, ModelType.IPAdapter)
@@ -296,11 +283,11 @@ def resolve_ip_adapter_models(ip_adapters: list[IPAdapterRecallParameter]) -> li
             # Include FLUX Redux image influence when provided
             if adapter.image_influence is not None:
                 config["image_influence"] = adapter.image_influence
-            
+
             resolved_adapters.append(config)
         else:
             logger.warning(f"Skipping IP Adapter '{adapter.model_name}' - model not found")
-    
+
     return resolved_adapters
 
 
@@ -342,7 +329,6 @@ async def update_recall_parameters(
     logger = ApiDependencies.invoker.services.logger
 
     try:
-
         # Get only the parameters that were actually provided (non-None values)
         provided_params = {k: v for k, v in parameters.model_dump().items() if v is not None}
 
@@ -372,7 +358,7 @@ async def update_recall_parameters(
         if "model" in provided_params and isinstance(provided_params["model"], str):
             model_name = provided_params["model"]
             model_key = resolve_model_name_to_key(model_name, ModelType.Main)
-            
+
             if model_key:
                 logger.info(f"Resolved model name '{model_name}' to key '{model_key}'")
                 provided_params["model"] = model_key
@@ -380,7 +366,7 @@ async def update_recall_parameters(
                 logger.warning(f"Could not resolve model name '{model_name}' to a model key")
                 # Remove model from parameters if we couldn't resolve it
                 del provided_params["model"]
-        
+
         # Process LoRAs if provided
         if "loras" in provided_params:
             loras_param = parameters.loras
@@ -388,7 +374,7 @@ async def update_recall_parameters(
                 resolved_loras = resolve_lora_models(loras_param)
                 provided_params["loras"] = resolved_loras
                 logger.info(f"Resolved {len(resolved_loras)} LoRA(s)")
-        
+
         # Process control layers if provided
         if "control_layers" in provided_params:
             control_layers_param = parameters.control_layers
@@ -396,7 +382,7 @@ async def update_recall_parameters(
                 resolved_controls = resolve_control_models(control_layers_param)
                 provided_params["control_layers"] = resolved_controls
                 logger.info(f"Resolved {len(resolved_controls)} control layer(s)")
-        
+
         # Process IP adapters if provided
         if "ip_adapters" in provided_params:
             ip_adapters_param = parameters.ip_adapters
@@ -407,9 +393,11 @@ async def update_recall_parameters(
 
         # Emit event to notify frontend of parameter updates
         try:
-            logger.info(f"Emitting recall_parameters_updated event for queue {queue_id} with {len(provided_params)} parameters")
+            logger.info(
+                f"Emitting recall_parameters_updated event for queue {queue_id} with {len(provided_params)} parameters"
+            )
             ApiDependencies.invoker.services.events.emit_recall_parameters_updated(queue_id, provided_params)
-            logger.info(f"Successfully emitted recall_parameters_updated event")
+            logger.info("Successfully emitted recall_parameters_updated event")
         except Exception as e:
             logger.error(f"Error emitting recall parameters event: {e}", exc_info=True)
             # Don't fail the request if event emission fails, just log it
