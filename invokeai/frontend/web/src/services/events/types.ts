@@ -29,6 +29,7 @@ export type ServerToClientEvents = {
   queue_cleared: (payload: S['QueueClearedEvent']) => void;
   batch_enqueued: (payload: S['BatchEnqueuedEvent']) => void;
   queue_items_retried: (payload: S['QueueItemsRetriedEvent']) => void;
+  recall_parameters_updated: (payload: S['RecallParametersUpdatedEvent']) => void;
   bulk_download_started: (payload: S['BulkDownloadStartedEvent']) => void;
   bulk_download_complete: (payload: S['BulkDownloadCompleteEvent']) => void;
   bulk_download_error: (payload: S['BulkDownloadErrorEvent']) => void;
