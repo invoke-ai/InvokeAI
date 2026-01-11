@@ -2517,6 +2517,13 @@
             "fitModeContain": "Contain",
             "fitModeCover": "Cover",
             "fitModeFill": "Fill",
+            "smoothing": "Smoothing",
+            "smoothingDesc": "Apply a high-quality backend resample when committing transforms.",
+            "smoothingMode": "Resample Mode",
+            "smoothingModeBilinear": "Bilinear",
+            "smoothingModeBicubic": "Bicubic",
+            "smoothingModeHamming": "Hamming",
+            "smoothingModeLanczos": "Lanczos",
             "reset": "Reset",
             "apply": "Apply",
             "cancel": "Cancel"
