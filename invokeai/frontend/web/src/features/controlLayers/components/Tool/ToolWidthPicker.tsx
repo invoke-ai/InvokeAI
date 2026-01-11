@@ -23,7 +23,7 @@ import {
   settingsEraserWidthChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, PointerEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiCaretDownBold } from 'react-icons/pi';
 
@@ -78,10 +78,22 @@ interface ToolWidthPickerComponentProps {
   onChangeInput: (value: number) => void;
   onBlur: () => void;
   onKeyDown: (value: KeyboardEvent<HTMLInputElement>) => void;
+  onKeyUp: (value: KeyboardEvent<HTMLInputElement>) => void;
+  onPointerDownCapture: (value: PointerEvent<HTMLDivElement>) => void;
+  onPointerUpCapture: (value: PointerEvent<HTMLDivElement>) => void;
 }
 
 const DropDownToolWidthPickerComponent = memo(
-  ({ localValue, onChangeSlider, onChangeInput, onKeyDown, onBlur }: ToolWidthPickerComponentProps) => {
+  ({
+    localValue,
+    onChangeSlider,
+    onChangeInput,
+    onKeyDown,
+    onKeyUp,
+    onPointerDownCapture,
+    onPointerUpCapture,
+    onBlur,
+  }: ToolWidthPickerComponentProps) => {
     const onChangeNumberInput = useCallback(
       (valueAsString: string, valueAsNumber: number) => {
         onChangeInput(valueAsNumber);
@@ -106,6 +118,9 @@ const DropDownToolWidthPickerComponent = memo(
               format={formatPx}
               defaultValue={50}
               onKeyDown={onKeyDown}
+              onKeyUp={onKeyUp}
+              onPointerDownCapture={onPointerDownCapture}
+              onPointerUpCapture={onPointerUpCapture}
               clampValueOnBlur={false}
             >
               <NumberInputField _focusVisible={{ zIndex: 0 }} title="" paddingInlineEnd={7} />
@@ -147,7 +162,16 @@ const DropDownToolWidthPickerComponent = memo(
 DropDownToolWidthPickerComponent.displayName = 'DropDownToolWidthPickerComponent';
 
 const SliderToolWidthPickerComponent = memo(
-  ({ localValue, onChangeSlider, onChangeInput, onKeyDown, onBlur }: ToolWidthPickerComponentProps) => {
+  ({
+    localValue,
+    onChangeSlider,
+    onChangeInput,
+    onKeyDown,
+    onKeyUp,
+    onPointerDownCapture,
+    onPointerUpCapture,
+    onBlur,
+  }: ToolWidthPickerComponentProps) => {
     return (
       <Flex w={SLIDER_VS_DROPDOWN_CONTAINER_WIDTH_THRESHOLD} gap={4}>
         <CompositeSlider
@@ -171,6 +195,9 @@ const SliderToolWidthPickerComponent = memo(
           onChange={onChangeInput}
           onBlur={onBlur}
           onKeyDown={onKeyDown}
+          onKeyUp={onKeyUp}
+          onPointerDownCapture={onPointerDownCapture}
+          onPointerUpCapture={onPointerUpCapture}
           format={formatPx}
           defaultValue={50}
         />
@@ -204,6 +231,7 @@ export const ToolWidthPicker = memo(() => {
   }, [isBrushSelected, isEraserSelected, brushWidth, eraserWidth]);
   const [localValue, setLocalValue] = useState(width);
   const [componentType, setComponentType] = useState<'slider' | 'dropdown' | null>(null);
+  const shouldCommitOnChangeRef = useRef(false);
 
   useEffect(() => {
     const el = ref.current;
@@ -267,9 +295,15 @@ export const ToolWidthPicker = memo(() => {
     [onChange]
   );
 
-  const onChangeInput = useCallback((value: number) => {
-    setLocalValue(value);
-  }, []);
+  const onChangeInput = useCallback(
+    (value: number) => {
+      setLocalValue(value);
+      if (!isNaN(value) && shouldCommitOnChangeRef.current) {
+        onChange(value);
+      }
+    },
+    [onChange]
+  );
 
   const onBlur = useCallback(() => {
     if (isNaN(Number(localValue))) {
@@ -284,10 +318,32 @@ export const ToolWidthPicker = memo(() => {
     (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter') {
         onBlur();
+        shouldCommitOnChangeRef.current = false;
+        return;
+      }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        shouldCommitOnChangeRef.current = true;
+      } else {
+        shouldCommitOnChangeRef.current = false;
       }
     },
     [onBlur]
   );
+
+  const onKeyUp = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      shouldCommitOnChangeRef.current = false;
+    }
+  }, []);
+
+  const onPointerDownCapture = useCallback((e: PointerEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement | null;
+    shouldCommitOnChangeRef.current = Boolean(target && target.tagName !== 'INPUT');
+  }, []);
+
+  const onPointerUpCapture = useCallback(() => {
+    shouldCommitOnChangeRef.current = false;
+  }, []);
 
   useEffect(() => {
     setLocalValue(width);
@@ -317,6 +373,9 @@ export const ToolWidthPicker = memo(() => {
           onChangeInput={onChangeInput}
           onBlur={onBlur}
           onKeyDown={onKeyDown}
+          onKeyUp={onKeyUp}
+          onPointerDownCapture={onPointerDownCapture}
+          onPointerUpCapture={onPointerUpCapture}
         />
       )}
       {componentType === 'dropdown' && (
@@ -326,6 +385,9 @@ export const ToolWidthPicker = memo(() => {
           onChangeInput={onChangeInput}
           onBlur={onBlur}
           onKeyDown={onKeyDown}
+          onKeyUp={onKeyUp}
+          onPointerDownCapture={onPointerDownCapture}
+          onPointerUpCapture={onPointerUpCapture}
         />
       )}
     </Flex>
