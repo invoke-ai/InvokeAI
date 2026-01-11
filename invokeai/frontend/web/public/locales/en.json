@@ -1621,7 +1621,7 @@
             "heading": "Variance Strength",
             "paragraphs": [
                 "Controls the intensity of the noise added to embeddings. The strength is automatically calibrated relative to the embedding's standard deviation.",
-                "0 = off, 0.1 = subtle variation, 0.5 = strong variation. Values above 1.0 may produce unexpected results."
+                "At the default randomize percentage of 50%, values above 0.5 may lead to expected results."
             ]
         },
         "seedVarianceRandomizePercent": {
