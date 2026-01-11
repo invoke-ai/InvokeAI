@@ -13,6 +13,7 @@ import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamZImageScheduler from 'features/parameters/components/Core/ParamZImageScheduler';
+import ParamZImageSeedVarianceSettings from 'features/parameters/components/SeedVariance/ParamZImageSeedVarianceSettings';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
@@ -76,6 +77,7 @@ export const GenerationSettingsAccordion = memo(() => {
               {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
               {!isFLUX && <ParamCFGScale />}
             </FormControlGroup>
+            {isZImage && <ParamZImageSeedVarianceSettings />}
           </Flex>
         </Expander>
       </Box>
