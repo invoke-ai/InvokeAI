@@ -23,7 +23,7 @@ import {
   settingsEraserWidthChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import type { KeyboardEvent, PointerEvent } from 'react';
+import type { FocusEvent, KeyboardEvent, PointerEvent } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiCaretDownBold } from 'react-icons/pi';
 
@@ -71,14 +71,26 @@ const marks = [
 const sliderDefaultValue = mapRawValueToSliderValue(50);
 
 const SLIDER_VS_DROPDOWN_CONTAINER_WIDTH_THRESHOLD = 280;
+const DEFAULT_TOOL_WIDTH = 50;
+const parseInputValue = (value: string) => Number.parseFloat(value);
+const getInputValueFromEvent = (
+  event?: Pick<FocusEvent<HTMLElement> | KeyboardEvent<HTMLElement>, 'target' | 'currentTarget'>
+) => {
+  const target = event?.target as HTMLInputElement | null;
+  if (target?.tagName === 'INPUT') {
+    return { input: target, parsed: parseInputValue(target.value) };
+  }
+  const currentTarget = event?.currentTarget as HTMLElement | null;
+  const input = currentTarget?.querySelector('input') ?? null;
+  return { input, parsed: input ? parseInputValue(input.value) : NaN };
+};
 
 interface ToolWidthPickerComponentProps {
   localValue: number;
   onChangeSlider: (value: number) => void;
   onChangeInput: (value: number) => void;
-  onBlur: () => void;
+  onBlur: (event?: FocusEvent<HTMLElement>) => void;
   onKeyDown: (value: KeyboardEvent<HTMLInputElement>) => void;
-  onKeyUp: (value: KeyboardEvent<HTMLInputElement>) => void;
   onPointerDownCapture: (value: PointerEvent<HTMLDivElement>) => void;
   onPointerUpCapture: (value: PointerEvent<HTMLDivElement>) => void;
 }
@@ -89,7 +101,6 @@ const DropDownToolWidthPickerComponent = memo(
     onChangeSlider,
     onChangeInput,
     onKeyDown,
-    onKeyUp,
     onPointerDownCapture,
     onPointerUpCapture,
     onBlur,
@@ -118,7 +129,6 @@ const DropDownToolWidthPickerComponent = memo(
               format={formatPx}
               defaultValue={50}
               onKeyDown={onKeyDown}
-              onKeyUp={onKeyUp}
               onPointerDownCapture={onPointerDownCapture}
               onPointerUpCapture={onPointerUpCapture}
               clampValueOnBlur={false}
@@ -167,7 +177,6 @@ const SliderToolWidthPickerComponent = memo(
     onChangeSlider,
     onChangeInput,
     onKeyDown,
-    onKeyUp,
     onPointerDownCapture,
     onPointerUpCapture,
     onBlur,
@@ -195,7 +204,6 @@ const SliderToolWidthPickerComponent = memo(
           onChange={onChangeInput}
           onBlur={onBlur}
           onKeyDown={onKeyDown}
-          onKeyUp={onKeyUp}
           onPointerDownCapture={onPointerDownCapture}
           onPointerUpCapture={onPointerUpCapture}
           format={formatPx}
@@ -231,7 +239,8 @@ export const ToolWidthPicker = memo(() => {
   }, [isBrushSelected, isEraserSelected, brushWidth, eraserWidth]);
   const [localValue, setLocalValue] = useState(width);
   const [componentType, setComponentType] = useState<'slider' | 'dropdown' | null>(null);
-  const shouldCommitOnChangeRef = useRef(false);
+  const isTypingRef = useRef(false);
+  const inputPollRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -272,6 +281,65 @@ export const ToolWidthPicker = memo(() => {
     [onValueChange]
   );
 
+  const syncFromInputElement = useCallback(
+    (input: HTMLInputElement | null) => {
+      if (!input) {
+        return;
+      }
+      const parsed = parseInputValue(input.value);
+      if (Number.isNaN(parsed)) {
+        return;
+      }
+      setLocalValue(parsed);
+      onChange(parsed);
+    },
+    [onChange]
+  );
+
+  const stopPollingInput = useCallback(() => {
+    if (inputPollRef.current !== null) {
+      window.clearInterval(inputPollRef.current);
+      inputPollRef.current = null;
+    }
+  }, []);
+
+  const startPollingInput = useCallback(
+    (container: HTMLElement | null) => {
+      stopPollingInput();
+      if (!container) {
+        return;
+      }
+      inputPollRef.current = window.setInterval(() => {
+        const input = container.querySelector('input');
+        if (!input) {
+          return;
+        }
+        const parsed = parseInputValue(input.value);
+        if (Number.isNaN(parsed)) {
+          return;
+        }
+        setLocalValue(parsed);
+        if (!isTypingRef.current) {
+          onChange(parsed);
+        }
+      }, 50);
+    },
+    [onChange, stopPollingInput]
+  );
+
+  const commitValue = useCallback(
+    (value: number) => {
+      if (isNaN(Number(value))) {
+        onChange(DEFAULT_TOOL_WIDTH);
+        setLocalValue(DEFAULT_TOOL_WIDTH);
+      } else {
+        onChange(value);
+        setLocalValue(value);
+      }
+    },
+    [onChange]
+  );
+
   const increment = useCallback(() => {
     let newWidth = Math.round(width * 1.15);
     if (newWidth === width) {
@@ -298,56 +366,71 @@ export const ToolWidthPicker = memo(() => {
   const onChangeInput = useCallback(
     (value: number) => {
       setLocalValue(value);
-      if (!isNaN(value) && shouldCommitOnChangeRef.current) {
+      if (!isNaN(value) && !isTypingRef.current) {
         onChange(value);
       }
     },
     [onChange]
   );
 
-  const onBlur = useCallback(() => {
-    if (isNaN(Number(localValue))) {
-      onChange(50);
-      setLocalValue(50);
-    } else {
-      onChange(localValue);
-    }
-  }, [localValue, onChange]);
+  const onBlur = useCallback(
+    (event?: FocusEvent<HTMLElement>) => {
+      const { parsed } = getInputValueFromEvent(event);
+      commitValue(Number.isNaN(parsed) ? localValue : parsed);
+      isTypingRef.current = false;
+    },
+    [commitValue, localValue]
+  );
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter') {
-        onBlur();
-        shouldCommitOnChangeRef.current = false;
+        const { parsed } = getInputValueFromEvent(e);
+        commitValue(Number.isNaN(parsed) ? localValue : parsed);
+        isTypingRef.current = false;
         return;
       }
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        shouldCommitOnChangeRef.current = true;
-      } else {
-        shouldCommitOnChangeRef.current = false;
+        isTypingRef.current = false;
+        const { input } = getInputValueFromEvent(e);
+        window.requestAnimationFrame(() => {
+          syncFromInputElement(input);
+        });
+        return;
+      }
+      if (e.key === 'Backspace' || e.key === 'Delete' || e.key.length === 1) {
+        isTypingRef.current = true;
       }
     },
-    [onBlur]
+    [commitValue, localValue, syncFromInputElement]
   );
 
-  const onKeyUp = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-      shouldCommitOnChangeRef.current = false;
-    }
-  }, []);
-
-  const onPointerDownCapture = useCallback((e: PointerEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement | null;
-    shouldCommitOnChangeRef.current = Boolean(target && target.tagName !== 'INPUT');
-  }, []);
+  const onPointerDownCapture = useCallback(
+    (_e: PointerEvent<HTMLDivElement>) => {
+      isTypingRef.current = false;
+      const target = _e.target as HTMLElement | null;
+      if (target && target.tagName !== 'INPUT') {
+        startPollingInput(_e.currentTarget);
+      } else {
+        stopPollingInput();
+      }
+    },
+    [startPollingInput, stopPollingInput]
+  );
 
   const onPointerUpCapture = useCallback(() => {
-    shouldCommitOnChangeRef.current = false;
-  }, []);
+    stopPollingInput();
+  }, [stopPollingInput]);
 
   useEffect(() => {
     setLocalValue(width);
   }, [width]);
+
+  useEffect(() => {
+    return () => {
+      stopPollingInput();
+    };
+  }, [stopPollingInput]);
 
   useRegisteredHotkeys({
     id: 'decrementToolWidth',
@@ -373,7 +456,6 @@ export const ToolWidthPicker = memo(() => {
           onChangeInput={onChangeInput}
           onBlur={onBlur}
           onKeyDown={onKeyDown}
-          onKeyUp={onKeyUp}
           onPointerDownCapture={onPointerDownCapture}
           onPointerUpCapture={onPointerUpCapture}
         />
@@ -385,7 +467,6 @@ export const ToolWidthPicker = memo(() => {
           onChangeInput={onChangeInput}
           onBlur={onBlur}
           onKeyDown={onKeyDown}
-          onKeyUp={onKeyUp}
           onPointerDownCapture={onPointerDownCapture}
           onPointerUpCapture={onPointerUpCapture}
         />
