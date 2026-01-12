@@ -1621,7 +1621,7 @@
             "heading": "Variance Strength",
             "paragraphs": [
                 "Controls the intensity of the noise added to embeddings. The strength is automatically calibrated relative to the embedding's standard deviation.",
-                "0 = off, 0.1 = subtle variation, 0.5 = strong variation. Values above 1.0 may produce unexpected results."
+                "Values less than 0.1 will produce subtle variations, increasing to stronger ones at 0.5. Values above 0.5 may lead to unexpected results."
             ]
         },
         "seedVarianceRandomizePercent": {
@@ -2212,6 +2212,9 @@
         "showHUD": "Show HUD",
         "rectangle": "Rectangle",
         "maskFill": "Mask Fill",
+        "maskLayerEmpty": "Mask layer is empty",
+        "extractMaskedAreaFailed": "Unable to extract masked area.",
+        "extractMaskedAreaMissingData": "Cannot extract: image or mask data is missing.",
         "addPositivePrompt": "Add $t(controlLayers.prompt)",
         "addNegativePrompt": "Add $t(controlLayers.negativePrompt)",
         "addReferenceImage": "Add $t(controlLayers.referenceImage)",
@@ -2541,6 +2544,13 @@
             "fitModeContain": "Contain",
             "fitModeCover": "Cover",
             "fitModeFill": "Fill",
+            "smoothing": "Smoothing",
+            "smoothingDesc": "Apply a high-quality backend resample when committing transforms.",
+            "smoothingMode": "Resample Mode",
+            "smoothingModeBilinear": "Bilinear",
+            "smoothingModeBicubic": "Bicubic",
+            "smoothingModeHamming": "Hamming",
+            "smoothingModeLanczos": "Lanczos",
             "reset": "Reset",
             "apply": "Apply",
             "cancel": "Cancel"
