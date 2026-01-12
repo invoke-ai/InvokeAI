@@ -47,7 +47,11 @@
             "createAccount": "Create Administrator Account",
             "creatingAccount": "Setting up...",
             "setupFailed": "Setup failed. Please try again."
-        }
+        },
+        "userMenu": "User Menu",
+        "admin": "Admin",
+        "logout": "Logout",
+        "adminOnlyFeature": "This feature is only available to administrators."
     },
     "boards": {
         "addBoard": "Add Board",
