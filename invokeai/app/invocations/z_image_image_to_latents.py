@@ -20,6 +20,7 @@ from invokeai.backend.flux.modules.autoencoder import AutoEncoder as FluxAutoEnc
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
 # Z-Image can use either the Diffusers AutoencoderKL or the FLUX AutoEncoder
 ZImageVAE = Union[AutoencoderKL, FluxAutoEncoder]
@@ -47,7 +48,14 @@ class ZImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
                 "Ensure you are using a compatible VAE model."
             )
 
-        with vae_info.model_on_device() as (_, vae):
+        # Estimate working memory needed for VAE encode
+        estimated_working_memory = estimate_vae_working_memory_flux(
+            operation="encode",
+            image_tensor=image_tensor,
+            vae=vae_info.model,
+        )
+
+        with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             if not isinstance(vae, (AutoencoderKL, FluxAutoEncoder)):
                 raise TypeError(
                     f"Expected AutoencoderKL or FluxAutoEncoder, got {type(vae).__name__}. "
