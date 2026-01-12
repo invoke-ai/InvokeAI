@@ -18,6 +18,41 @@ This document provides comprehensive testing instructions for Phase 6 of the mul
 
 2. Backend should be accessible at: `http://localhost:9090`
 
+### Test User Setup
+
+You'll need at least one admin user and one regular (non-admin) user for testing.
+
+**Option 1: Use the provided script (Recommended)**
+
+Add a regular user:
+```bash
+cd /path/to/InvokeAI
+python scripts/add_user.py --email testuser@test.local --password TestPass123 --name "Test User"
+```
+
+Add an admin user:
+```bash
+python scripts/add_user.py --email admin@test.local --password AdminPass123 --name "Admin User" --admin
+```
+
+Interactive mode (prompts for details):
+```bash
+python scripts/add_user.py
+```
+
+**Option 2: Direct SQL (Advanced)**
+
+If you need to add a user directly to the database:
+```bash
+# Find your database file
+python -c "from invokeai.app.services.config import InvokeAIAppConfig; print(InvokeAIAppConfig.get_config().db_path)"
+
+# Use sqlite3 to add a user (requires password hash)
+sqlite3 /path/to/invokeai.db
+```
+
+Note: The script in Option 1 handles password hashing and validation automatically.
+
 ### Frontend Setup
 1. Install dependencies:
    ```bash
