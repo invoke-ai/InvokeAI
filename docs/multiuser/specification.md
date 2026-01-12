@@ -49,11 +49,17 @@ This document provides a comprehensive specification for adding multi-user suppo
 - View and manage their own queue sessions
 - Adjust personal UI preferences (theme, hotkeys, etc.)
 - Access shared boards (read/write based on permissions)
+- **View model configurations** (read-only access to model manager)
+- **View model details, default settings, and metadata**
 
 **Restrictions:**
 
 - Cannot add, delete, or edit models
-- Cannot access model management tab
+- **Can view but cannot modify model manager settings** (read-only access)
+- Cannot reidentify, convert, or update model paths
+- Cannot upload or change model thumbnail images
+- Cannot save changes to model default settings
+- Cannot perform bulk delete operations on models
 - Cannot view or modify other users' boards, images, or workflows
 - Cannot cancel or modify other users' queue sessions
 - Cannot access system configuration

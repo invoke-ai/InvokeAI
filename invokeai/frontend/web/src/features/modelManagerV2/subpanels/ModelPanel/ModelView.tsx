@@ -1,4 +1,6 @@
 import { Box, Divider, Flex, SimpleGrid } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { ControlAdapterModelDefaultSettings } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/ControlAdapterModelDefaultSettings';
 import { LoRAModelDefaultSettings } from 'features/modelManagerV2/subpanels/ModelPanel/LoRAModelDefaultSettings/LoRAModelDefaultSettings';
 import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelConvertButton';
@@ -24,6 +26,10 @@ type Props = {
 
 export const ModelView = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
+  const user = useAppSelector(selectCurrentUser);
+
+  // Only admins can edit, delete, or reidentify models
+  const isAdmin = user?.is_admin ?? false;
 
   // Only allow path updates for external models (not Invoke-controlled)
   const canUpdatePath = useMemo(() => isExternalModel(modelConfig.path), [modelConfig.path]);
@@ -49,13 +55,13 @@ export const ModelView = memo(({ modelConfig }: Props) => {
   return (
     <Flex flexDir="column" gap={4} h="full">
       <ModelHeader modelConfig={modelConfig}>
-        {canUpdatePath && <ModelUpdatePathButton modelConfig={modelConfig} />}
-        <ModelReidentifyButton modelConfig={modelConfig} />
-        {modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
+        {isAdmin && canUpdatePath && <ModelUpdatePathButton modelConfig={modelConfig} />}
+        {isAdmin && <ModelReidentifyButton modelConfig={modelConfig} />}
+        {isAdmin && modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />
         )}
-        <ModelEditButton />
-        <ModelDeleteButton modelConfig={modelConfig} />
+        {isAdmin && <ModelEditButton />}
+        {isAdmin && <ModelDeleteButton modelConfig={modelConfig} />}
       </ModelHeader>
       <Divider />
       <Flex flexDir="column" gap={4}>

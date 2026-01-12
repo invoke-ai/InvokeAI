@@ -11,14 +11,14 @@ Usage:
 
     # Command line mode
     python scripts/add_user.py --email user@example.com --password securepass123 --name "Test User"
-    
+
     # Add admin user
     python scripts/add_user.py --email admin@example.com --password adminpass123 --admin
 
 Examples:
     # Add a regular user
     python scripts/add_user.py --email alice@test.local --password Password123 --name "Alice Smith"
-    
+
     # Add an admin user
     python scripts/add_user.py --email admin@test.local --password AdminPass123 --name "Admin User" --admin
 """
@@ -78,13 +78,11 @@ def add_user_interactive():
         db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger())
         user_service = UserService(db)
 
-        user_data = UserCreateRequest(
-            email=email, display_name=display_name, password=password, is_admin=is_admin
-        )
+        user_data = UserCreateRequest(email=email, display_name=display_name, password=password, is_admin=is_admin)
 
         user = user_service.create(user_data)
 
-        print(f"\n✅ User created successfully!")
+        print("\n✅ User created successfully!")
         print(f"   User ID: {user.user_id}")
         print(f"   Email: {user.email}")
         print(f"   Display Name: {user.display_name or '(not set)'}")
@@ -124,13 +122,11 @@ def add_user_cli(email: str, password: str, display_name: str | None = None, is_
         db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger())
         user_service = UserService(db)
 
-        user_data = UserCreateRequest(
-            email=email, display_name=display_name, password=password, is_admin=is_admin
-        )
+        user_data = UserCreateRequest(email=email, display_name=display_name, password=password, is_admin=is_admin)
 
         user = user_service.create(user_data)
 
-        print(f"✅ User created successfully!")
+        print("✅ User created successfully!")
         print(f"   User ID: {user.user_id}")
         print(f"   Email: {user.email}")
         print(f"   Display Name: {user.display_name or '(not set)'}")

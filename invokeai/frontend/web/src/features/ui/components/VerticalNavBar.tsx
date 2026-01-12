@@ -1,7 +1,5 @@
 import { Divider, Flex, Spacer } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
 import { UserMenu } from 'features/auth/components/UserMenu';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import SettingsMenu from 'features/system/components/SettingsModal/SettingsMenu';
 import StatusIndicator from 'features/system/components/StatusIndicator';
@@ -22,7 +20,6 @@ import { TabButton } from './TabButton';
 
 export const VerticalNavBar = memo(() => {
   const { t } = useTranslation();
-  const user = useAppSelector(selectCurrentUser);
 
   return (
     <Flex flexDir="column" alignItems="center" py={6} ps={4} pe={2} gap={4} minW={0} flexShrink={0}>
@@ -38,7 +35,7 @@ export const VerticalNavBar = memo(() => {
       <Spacer />
 
       <StatusIndicator />
-      {user?.is_admin && <TabButton tab="models" icon={<PiCubeBold />} label={t('ui.tabs.models')} />}
+      <TabButton tab="models" icon={<PiCubeBold />} label={t('ui.tabs.models')} />
       <TabButton tab="queue" icon={<PiQueueBold />} label={t('ui.tabs.queue')} />
 
       <Divider />

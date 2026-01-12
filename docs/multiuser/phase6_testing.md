@@ -161,14 +161,15 @@ console.log(localStorage.getItem('auth_token')); // Should be null
 
 ### Test 5: Model Manager Tab - Admin Access
 
-**Objective:** Verify admin users can access the Model Manager tab
+**Objective:** Verify admin users can access and fully manage models in the Model Manager tab
 
 **Steps:**
 1. Log in as an administrator user
 2. Look at the vertical navigation bar
 3. Locate the cube icon (Model Manager tab button)
 4. Click the cube icon
-5. Observe the content area
+5. Select a model from the list
+6. Observe all available actions and UI elements
 
 **Expected Results:**
 - ✅ Model Manager tab button (cube icon) is visible in the navigation bar
@@ -178,46 +179,85 @@ console.log(localStorage.getItem('auth_token')); // Should be null
   - Model list panel on the left
   - Model details panel on the right
   - "Add Models" button when a model is selected
+  - Edit, Delete, Reidentify, Convert buttons visible
+  - Model image upload icon visible
+  - Save button visible for default settings
+  - Bulk delete action available in actions menu
 
 **Screenshot Location:** `docs/multiuser/screenshots/phase6_models_admin.png`
 
 ---
 
-### Test 6: Model Manager Tab - Non-Admin Restriction (Hidden Button)
+### Test 6: Model Manager Tab - Non-Admin Read-Only Access
 
-**Objective:** Verify non-admin users do not see the Model Manager tab button
+**Objective:** Verify non-admin users have read-only access to browse and view models
 
 **Steps:**
 1. Log in as a regular (non-admin) user
 2. Look at the vertical navigation bar
-3. Search for the cube icon (Model Manager tab button)
+3. Locate the cube icon (Model Manager tab button)
+4. Click the cube icon
+5. Browse through the model list
+6. Select various models
+7. Observe the UI elements and try to find any edit/delete actions
 
 **Expected Results:**
-- ✅ Model Manager tab button (cube icon) is NOT visible
-- ✅ Navigation shows: Generate, Canvas, Upscaling, Workflows tabs
-- ✅ Navigation shows Queue tab but NOT Models tab
-- ✅ User can access all other tabs normally
+- ✅ Model Manager tab button (cube icon) IS visible
+- ✅ Navigation shows Models tab for all users
+- ✅ Model list is accessible and browsable
+- ✅ Model details are viewable (name, description, path, settings)
+- ✅ When a model is selected:
+  - Model metadata displayed correctly
+  - Default settings displayed (read-only)
+  - "Add Models" button is NOT visible
+  - Edit, Delete, Reidentify, Convert buttons are NOT visible
+  - Model image upload is NOT visible
+  - Save button for default settings is NOT visible
+  - Bulk actions menu is NOT visible (or shows no delete option)
+- ✅ When no model is selected:
+  - Empty state message: "Select a model to view its details"
+  - Install Models panel is NOT shown
 
-**Screenshot Location:** `docs/multiuser/screenshots/phase6_navbar_regular.png`
+**Screenshot Location:** `docs/multiuser/screenshots/phase6_models_readonly.png`
 
 ---
 
-### Test 7: Model Manager Tab - Non-Admin Direct URL Access
+### Test 7: Model Manager API - Backend Authorization
 
-**Objective:** Verify non-admin users see access denied message if they navigate directly to Model Manager
+**Objective:** Verify backend enforces admin-only access for model write operations
 
 **Steps:**
 1. Log in as a regular (non-admin) user
-2. In the browser address bar, manually navigate to: `http://localhost:5173/models`
-   (or click on the Models tab if it somehow appears)
+2. Open browser DevTools → Network tab
+3. Try to interact with model management features (if buttons were somehow visible)
+4. Or manually craft API requests to test backend authorization:
+   ```bash
+   # Get the auth token from localStorage
+   TOKEN=$(grep -o '"auth_token":"[^"]*"' ~/.cache/... | cut -d'"' -f4)
+   
+   # Try to update a model (should fail with 403)
+   curl -X PATCH http://localhost:9090/api/v1/model_manager/i/{model_key} \
+     -H "Authorization: ******" \
+     -H "Content-Type: application/json" \
+     -d '{"name": "Modified Name"}'
+   
+   # Try to delete a model (should fail with 403)
+   curl -X DELETE http://localhost:9090/api/v1/model_manager/i/{model_key} \
+     -H "Authorization: ******"
+   
+   # Try to read model details (should succeed with 200)
+   curl -X GET http://localhost:9090/api/v1/model_manager/i/{model_key} \
+     -H "Authorization: ******"
+   ```
 
 **Expected Results:**
-- ✅ Page displays "Model Manager" heading
-- ✅ Page displays access denied message: "This feature is only available to administrators."
-- ✅ No model list or management interface is shown
-- ✅ User cannot perform any model management actions
+- ✅ All write operations (PATCH, POST, PUT, DELETE) return 403 Forbidden
+- ✅ Error message: "Admin privileges required"
+- ✅ Read operations (GET) succeed with 200 OK
+- ✅ Models are not modified despite API attempts
+- ✅ Backend logs show authorization failures for non-admin write attempts
 
-**Screenshot Location:** `docs/multiuser/screenshots/phase6_models_denied.png`
+**Note:** This verifies defense-in-depth security - even if frontend is bypassed, backend prevents unauthorized changes.
 
 ---
 

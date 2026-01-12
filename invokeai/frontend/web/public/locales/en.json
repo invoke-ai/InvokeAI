@@ -1083,6 +1083,7 @@
         "loraTriggerPhrases": "LoRA Trigger Phrases",
         "mainModelTriggerPhrases": "Main Model Trigger Phrases",
         "selectAll": "Select All",
+        "selectModelToView": "Select a model to view its details",
         "typePhraseHere": "Type phrase here",
         "t5Encoder": "T5 Encoder",
         "qwen3Encoder": "Qwen3 Encoder",

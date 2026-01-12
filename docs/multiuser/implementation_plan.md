@@ -766,28 +766,70 @@ export const UserMenu = () => {
 };
 ```
 
-### 9.3 Hide Model Manager for Non-Admin
+### 9.3 Read-Only Model Manager for Non-Admin
 
-**File**: `invokeai/frontend/web/src/features/modelManager/ModelManager.tsx` (modify)
+**Updated Design**: Non-admin users now have read-only access to the Model Manager instead of no access.
 
-```typescript
-import { useAppSelector } from '@/app/store';
+**Files Modified**:
+- `invokeai/frontend/web/src/features/ui/components/tabs/ModelManagerTab.tsx`
+- `invokeai/frontend/web/src/features/ui/components/VerticalNavBar.tsx`
+- `invokeai/frontend/web/src/features/modelManagerV2/subpanels/ModelManager.tsx`
+- `invokeai/frontend/web/src/features/modelManagerV2/subpanels/ModelPane.tsx`
+- `invokeai/frontend/web/src/features/modelManagerV2/subpanels/ModelPanel/ModelView.tsx`
+- `invokeai/frontend/web/src/features/modelManagerV2/subpanels/ModelPanel/ModelHeader.tsx`
+- `invokeai/frontend/web/src/features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings.tsx`
+- `invokeai/frontend/web/src/features/modelManagerV2/subpanels/ModelPanel/LoRAModelDefaultSettings/LoRAModelDefaultSettings.tsx`
+- `invokeai/frontend/web/src/features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/ControlAdapterModelDefaultSettings.tsx`
+- `invokeai/frontend/web/src/features/modelManagerV2/subpanels/ModelManagerPanel/ModelListBulkActions.tsx`
+- `invokeai/app/api/routers/model_manager.py`
 
-export const ModelManager = () => {
-  const user = useAppSelector((state) => state.auth.user);
+**Frontend Changes**:
 
-  if (!user?.is_admin) {
-    return (
-      <div className="access-denied">
-        <h2>Model Management</h2>
-        <p>This feature is only available to administrators.</p>
-      </div>
-    );
-  }
+1. **Model Tab Visibility**: Models tab is visible to all users (not just admins)
+2. **Add Models Button**: Hidden for non-admin users
+3. **Model Details View**: Non-admin users can view but not modify:
+   - Edit, Delete, Reidentify, Convert buttons hidden
+   - Model image upload hidden
+   - Default settings Save button hidden
+   - All model metadata and settings displayed (read-only)
+4. **Bulk Actions**: Delete action in bulk menu hidden for non-admin users
+5. **Install Panel**: Hidden for non-admin users (empty state shown instead)
 
-  // ... existing model manager code ...
-};
-```
+**Backend Authorization** (`invokeai/app/api/routers/model_manager.py`):
+
+All write operations now require `AdminUser` dependency:
+- `reidentify_model` - POST `/i/{key}/reidentify`
+- `update_model_record` - PATCH `/i/{key}`
+- `update_model_image` - PATCH `/i/{key}/image`
+- `delete_model` - DELETE `/i/{key}`
+- `bulk_delete_models` - POST `/i/bulk_delete`
+- `delete_model_image` - DELETE `/i/{key}/image`
+- `install_model` - POST `/install`
+- `install_hugging_face_model` - GET `/i/huggingface`
+- `cancel_model_install_job` - DELETE `/install/{id}`
+- `prune_model_install_jobs` - DELETE `/install`
+- `convert_model` - PUT `/convert/{key}`
+- `empty_model_cache` - POST `/empty_model_cache`
+- `do_hf_login` - POST `/hf_login`
+- `reset_hf_token` - DELETE `/hf_login`
+
+**Read Operations** (remain accessible to all authenticated users):
+- `list_model_records` - GET `/i/`
+- `get_model_record` - GET `/i/{key}`
+- `get_model_image` - GET `/i/{key}/image`
+- `scan_folder` - GET `/scan_folder`
+- `get_model_metadata` - POST `/get_metadata`
+- `get_model_install_jobs` - GET `/install`
+- `get_model_install_job` - GET `/install/{id}`
+- `get_starter_models` - GET `/starter_models`
+- `get_hf_login_status` - GET `/hf_login`
+
+**Benefits**:
+- Non-admin users can browse available models
+- Users can see model configurations and default settings
+- Better transparency about what models are available
+- Reduces admin burden for answering "what models do we have?" questions
+- Maintains security through backend authorization
 
 ## 10. Phase 7: Testing & Security (Weeks 8-9)
 

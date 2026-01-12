@@ -1,4 +1,6 @@
 import { Flex, Heading, Spacer, Text } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import ModelImageUpload from 'features/modelManagerV2/subpanels/ModelPanel/Fields/ModelImageUpload';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
@@ -11,9 +13,12 @@ type Props = PropsWithChildren<{
 
 export const ModelHeader = memo(({ modelConfig, children }: Props) => {
   const { t } = useTranslation();
+  const user = useAppSelector(selectCurrentUser);
+  const isAdmin = user?.is_admin ?? false;
+
   return (
     <Flex alignItems="flex-start" gap={4}>
-      <ModelImageUpload model_key={modelConfig.key} model_image={modelConfig.cover_image} />
+      {isAdmin && <ModelImageUpload model_key={modelConfig.key} model_image={modelConfig.cover_image} />}
       <Flex flexDir="column" gap={1} flexGrow={1} minW={0}>
         <Flex gap={2}>
           <Heading as="h2" fontSize="lg" noOfLines={1} wordBreak="break-all">

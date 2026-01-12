@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Checkbox, Flex, Menu, MenuButton, MenuItem, MenuList, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import type { FilterableModelType } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import {
   modelSelectionChanged,
@@ -28,11 +29,15 @@ type ModelListBulkActionsProps = {
 
 export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => {
   const dispatch = useAppDispatch();
+  const user = useAppSelector(selectCurrentUser);
   const filteredModelType = useAppSelector(selectFilteredModelType);
   const selectedModelKeys = useAppSelector(selectSelectedModelKeys);
   const searchTerm = useAppSelector(selectSearchTerm);
   const { data } = useGetModelConfigsQuery();
   const bulkDeleteModal = useBulkDeleteModal();
+
+  // Only admins can bulk delete models
+  const isAdmin = user?.is_admin ?? false;
 
   const handleBulkDelete = useCallback(() => {
     bulkDeleteModal.open();
@@ -91,23 +96,25 @@ export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => 
         <Text variant="subtext" color="base.400">
           {selectionCount} {t('common.selected')}
         </Text>
-        <Menu placement="bottom-end">
-          <MenuButton
-            as={Button}
-            disabled={selectionCount === 0}
-            size="sm"
-            rightIcon={<PiCaretDownBold />}
-            flexShrink={0}
-            variant="outline"
-          >
-            {t('modelManager.actions')}
-          </MenuButton>
-          <MenuList>
-            <MenuItem icon={<PiTrashSimpleBold />} onClick={handleBulkDelete} color="error.300">
-              {t('modelManager.deleteModels', { count: selectionCount })}
-            </MenuItem>
-          </MenuList>
-        </Menu>
+        {isAdmin && (
+          <Menu placement="bottom-end">
+            <MenuButton
+              as={Button}
+              disabled={selectionCount === 0}
+              size="sm"
+              rightIcon={<PiCaretDownBold />}
+              flexShrink={0}
+              variant="outline"
+            >
+              {t('modelManager.actions')}
+            </MenuButton>
+            <MenuList>
+              <MenuItem icon={<PiTrashSimpleBold />} onClick={handleBulkDelete} color="error.300">
+                {t('modelManager.deleteModels', { count: selectionCount })}
+              </MenuItem>
+            </MenuList>
+          </Menu>
+        )}
       </Flex>
     </Flex>
   );
