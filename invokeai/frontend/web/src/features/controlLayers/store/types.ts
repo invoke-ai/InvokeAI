@@ -9,6 +9,7 @@ import {
   zParameterCLIPGEmbedModel,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
+  zParameterFluxScheduler,
   zParameterGuidance,
   zParameterImageDimension,
   zParameterMaskBlurMethod,
@@ -23,6 +24,7 @@ import {
   zParameterStrength,
   zParameterT5EncoderModel,
   zParameterVAEModel,
+  zParameterZImageScheduler,
 } from 'features/parameters/types/parameterSchemas';
 import type { JsonObject } from 'type-fest';
 import { z } from 'zod';
@@ -596,6 +598,8 @@ export const zParamsState = z.object({
   optimizedDenoisingEnabled: z.boolean(),
   iterations: z.number(),
   scheduler: zParameterScheduler,
+  fluxScheduler: zParameterFluxScheduler,
+  zImageScheduler: zParameterZImageScheduler,
   upscaleScheduler: zParameterScheduler,
   upscaleCfgScale: zParameterCFGScale,
   seed: zParameterSeed,
@@ -629,6 +633,10 @@ export const zParamsState = z.object({
   zImageVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX VAE
   zImageQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder
   zImageQwen3SourceModel: zParameterModel.nullable(), // Diffusers Z-Image model (fallback for VAE/Encoder)
+  // Z-Image Seed Variance Enhancer settings
+  zImageSeedVarianceEnabled: z.boolean(),
+  zImageSeedVarianceStrength: z.number().min(0).max(2),
+  zImageSeedVarianceRandomizePercent: z.number().min(1).max(100),
   dimensions: zDimensionsState,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
@@ -650,6 +658,8 @@ export const getInitialParamsState = (): ParamsState => ({
   optimizedDenoisingEnabled: true,
   iterations: 1,
   scheduler: 'dpmpp_3m_k',
+  fluxScheduler: 'euler',
+  zImageScheduler: 'euler',
   upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,
   seed: 0,
@@ -682,6 +692,9 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageVaeModel: null,
   zImageQwen3EncoderModel: null,
   zImageQwen3SourceModel: null,
+  zImageSeedVarianceEnabled: false,
+  zImageSeedVarianceStrength: 0.1,
+  zImageSeedVarianceRandomizePercent: 50,
   dimensions: {
     width: 512,
     height: 512,

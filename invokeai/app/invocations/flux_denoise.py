@@ -49,6 +49,7 @@ from invokeai.backend.flux.sampling_utils import (
     pack,
     unpack,
 )
+from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
 from invokeai.backend.flux.text_conditioning import FluxReduxConditioning, FluxTextConditioning
 from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelFormat, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
@@ -133,6 +134,12 @@ class FluxDenoiseInvocation(BaseInvocation):
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
     num_steps: int = InputField(
         default=4, description="Number of diffusion steps. Recommended values are schnell: 4, dev: 50."
+    )
+    scheduler: FLUX_SCHEDULER_NAME_VALUES = InputField(
+        default="euler",
+        description="Scheduler (sampler) for the denoising process. 'euler' is fast and standard. "
+        "'heun' is 2nd-order (better quality, 2x slower). 'lcm' is optimized for few steps.",
+        ui_choice_labels=FLUX_SCHEDULER_LABELS,
     )
     guidance: float = InputField(
         default=4.0,
@@ -261,6 +268,12 @@ class FluxDenoiseInvocation(BaseInvocation):
             image_seq_len=packed_h * packed_w,
             shift=not is_schnell,
         )
+
+        # Create scheduler if not using default euler
+        scheduler = None
+        if self.scheduler in FLUX_SCHEDULER_MAP:
+            scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
+            scheduler = scheduler_class(num_train_timesteps=1000)
 
         # Clip the timesteps schedule based on denoising_start and denoising_end.
         timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
@@ -467,6 +480,7 @@ class FluxDenoiseInvocation(BaseInvocation):
                 img_cond_seq=img_cond_seq,
                 img_cond_seq_ids=img_cond_seq_ids,
                 dype_extension=dype_extension,
+                scheduler=scheduler,
             )
 
         x = unpack(x.float(), self.height, self.width)
