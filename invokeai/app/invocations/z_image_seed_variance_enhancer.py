@@ -84,7 +84,7 @@ class ZImageSeedVarianceEnhancerInvocation(BaseInvocation):
         noise = torch.rand(
             prompt_embeds.shape, generator=generator, device=prompt_embeds.device, dtype=prompt_embeds.dtype
         )
-        noise = noise * 2 - 1  # Scale to [-1, 1]
+        noise = noise * 2 - 1  # Scale to [-1, 1)
         noise = noise * actual_strength
 
         # Create selective mask for noise application
