@@ -856,6 +856,9 @@
         "scheduler": "Scheduler",
         "seamlessXAxis": "Seamless X Axis",
         "seamlessYAxis": "Seamless Y Axis",
+        "seedVarianceEnabled": "Seed Variance Enabled",
+        "seedVarianceStrength": "Seed Variance Strength",
+        "seedVarianceRandomizePercent": "Seed Variance Randomize %",
         "seed": "Seed",
         "steps": "Steps",
         "strength": "Image to image strength",
@@ -1375,6 +1378,9 @@
         "seamlessYAxis": "Seamless Y Axis",
         "colorCompensation": "Color Compensation",
         "seed": "Seed",
+        "seedVarianceEnabled": "Seed Variance Enhancer",
+        "seedVarianceStrength": "Variance Strength",
+        "seedVarianceRandomizePercent": "Randomize Percent",
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",
@@ -1602,6 +1608,27 @@
             "paragraphs": [
                 "Scheduler used during the generation process.",
                 "Each scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
+            ]
+        },
+        "seedVarianceEnhancer": {
+            "heading": "Seed Variance Enhancer",
+            "paragraphs": [
+                "Z-Image-Turbo can produce relatively similar images with different seeds. This feature adds seed-based noise to the text embeddings to increase visual variation while maintaining reproducibility.",
+                "Enable this to get more diverse results when exploring different seeds."
+            ]
+        },
+        "seedVarianceStrength": {
+            "heading": "Variance Strength",
+            "paragraphs": [
+                "Controls the intensity of the noise added to embeddings. The strength is automatically calibrated relative to the embedding's standard deviation.",
+                "Values less than 0.1 will produce subtle variations, increasing to stronger ones at 0.5. Values above 0.5 may lead to unexpected results."
+            ]
+        },
+        "seedVarianceRandomizePercent": {
+            "heading": "Randomize Percent",
+            "paragraphs": [
+                "Percentage of embedding values that receive noise (1-100%).",
+                "Lower values create more selective noise patterns, while 100% affects all values equally."
             ]
         },
         "compositingMaskBlur": {
@@ -2517,6 +2544,13 @@
             "fitModeContain": "Contain",
             "fitModeCover": "Cover",
             "fitModeFill": "Fill",
+            "smoothing": "Smoothing",
+            "smoothingDesc": "Apply a high-quality backend resample when committing transforms.",
+            "smoothingMode": "Resample Mode",
+            "smoothingModeBilinear": "Bilinear",
+            "smoothingModeBicubic": "Bicubic",
+            "smoothingModeHamming": "Hamming",
+            "smoothingModeLanczos": "Lanczos",
             "reset": "Reset",
             "apply": "Apply",
             "cancel": "Cancel"
