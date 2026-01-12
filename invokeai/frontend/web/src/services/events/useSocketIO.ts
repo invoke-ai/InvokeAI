@@ -30,11 +30,18 @@ export const useSocketIO = () => {
   }, []);
 
   const socketOptions = useMemo(() => {
+    const token = localStorage.getItem('auth_token');
     const options: Partial<ManagerOptions & SocketOptions> = {
       timeout: 60000,
-      path: `${window.location.pathname}ws/socket.io`,
+      path: '/ws/socket.io',
       autoConnect: false, // achtung! removing this breaks the dynamic middleware
       forceNew: true,
+      auth: token ? { token } : undefined,
+      extraHeaders: token
+        ? {
+            Authorization: `Bearer ${token}`,
+          }
+        : undefined,
     };
 
     return options;

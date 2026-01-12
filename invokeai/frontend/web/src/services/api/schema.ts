@@ -1,4 +1,27 @@
 export type paths = {
+    "/api/v1/auth/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Setup Status
+         * @description Check if initial administrator setup is required.
+         *
+         *     Returns:
+         *         SetupStatusResponse indicating whether setup is needed
+         */
+        get: operations["get_setup_status_api_v1_auth_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -22511,6 +22534,17 @@ export type components = {
             user: components["schemas"]["UserDTO"];
         };
         /**
+         * SetupStatusResponse
+         * @description Response for setup status check.
+         */
+        SetupStatusResponse: {
+            /**
+             * Setup Required
+             * @description Whether initial setup is required
+             */
+            setup_required: boolean;
+        };
+        /**
          * Show Image
          * @description Displays a provided image using the OS image viewer, and passes it forward in the pipeline.
          */
@@ -26419,6 +26453,26 @@ export type components = {
 };
 export type $defs = Record<string, never>;
 export interface operations {
+    get_setup_status_api_v1_auth_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupStatusResponse"];
+                };
+            };
+        };
+    };
     login_api_v1_auth_login_post: {
         parameters: {
             query?: never;

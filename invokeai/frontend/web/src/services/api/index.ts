@@ -63,7 +63,7 @@ export const LIST_TAG = 'LIST';
 export const LIST_ALL_TAG = 'LIST_ALL';
 
 export const getBaseUrl = (): string => {
-  return window.location.href.replace(/\/$/, '');
+  return window.location.origin;
 };
 
 const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extraOptions) => {
@@ -73,6 +73,20 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
 
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
     baseUrl: getBaseUrl(),
+    prepareHeaders: (headers) => {
+      // Add auth token to all requests except setup and login
+      const token = localStorage.getItem('auth_token');
+      const isAuthEndpoint =
+        (args instanceof Object &&
+          typeof args.url === 'string' &&
+          (args.url.includes('/auth/login') || args.url.includes('/auth/setup'))) ||
+        (typeof args === 'string' && (args.includes('/auth/login') || args.includes('/auth/setup')));
+
+      if (token && !isAuthEndpoint) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+      return headers;
+    },
   };
 
   // When fetching the openapi.json, we need to remove circular references from the JSON.

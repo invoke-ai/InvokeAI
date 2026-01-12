@@ -103,7 +103,7 @@ mkdocs serve           # Alternative command
 ### Python (Backend)
 
 **Style Guidelines:**
-- Use **Ruff** for linting and formatting (replaces Black, isort, flake8)
+- Use **uv tool run ruff@0.11.2 check** for linting and formatting (replaces Black, isort, flake8)
 - Line length: 120 characters
 - Type hints are required (mypy strict mode with Pydantic plugin)
 - Use absolute imports (no relative imports allowed)
@@ -153,6 +153,7 @@ class MyInvocation(BaseInvocation):
 - Use functional components with hooks
 - Use Redux Toolkit for state management
 - Colocate tests with source files using `.test.ts` suffix
+- If pydantic schema has changed run `cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen`
 
 **Key Conventions:**
 - Tests should use Vitest

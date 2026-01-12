@@ -15,6 +15,40 @@
         "uploadImage": "Upload Image",
         "uploadImages": "Upload Image(s)"
     },
+    "auth": {
+        "login": {
+            "title": "Sign In to InvokeAI",
+            "email": "Email",
+            "emailPlaceholder": "Email",
+            "password": "Password",
+            "passwordPlaceholder": "Password",
+            "rememberMe": "Remember me for 7 days",
+            "signIn": "Sign In",
+            "signingIn": "Signing in...",
+            "loginFailed": "Login failed. Please check your credentials."
+        },
+        "setup": {
+            "title": "Welcome to InvokeAI",
+            "subtitle": "Set up your administrator account to get started",
+            "email": "Email",
+            "emailPlaceholder": "admin@example.com",
+            "emailHelper": "This will be your username for signing in",
+            "displayName": "Display Name",
+            "displayNamePlaceholder": "Administrator",
+            "displayNameHelper": "Your name as it will appear in the application",
+            "password": "Password",
+            "passwordPlaceholder": "Password",
+            "passwordHelper": "Must be at least 8 characters with uppercase, lowercase, and numbers",
+            "passwordTooShort": "Password must be at least 8 characters long",
+            "passwordMissingRequirements": "Password must contain uppercase, lowercase, and numbers",
+            "confirmPassword": "Confirm Password",
+            "confirmPasswordPlaceholder": "Confirm Password",
+            "passwordsDoNotMatch": "Passwords do not match",
+            "createAccount": "Create Administrator Account",
+            "creatingAccount": "Setting up...",
+            "setupFailed": "Setup failed. Please try again."
+        }
+    },
     "boards": {
         "addBoard": "Add Board",
         "addPrivateBoard": "Add Private Board",

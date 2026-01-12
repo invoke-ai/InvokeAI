@@ -67,6 +67,25 @@ class LogoutResponse(BaseModel):
     success: bool = Field(description="Whether logout was successful")
 
 
+class SetupStatusResponse(BaseModel):
+    """Response for setup status check."""
+
+    setup_required: bool = Field(description="Whether initial setup is required")
+
+
+@auth_router.get("/status", response_model=SetupStatusResponse)
+async def get_setup_status() -> SetupStatusResponse:
+    """Check if initial administrator setup is required.
+
+    Returns:
+        SetupStatusResponse indicating whether setup is needed
+    """
+    user_service = ApiDependencies.invoker.services.users
+    setup_required = not user_service.has_admin()
+
+    return SetupStatusResponse(setup_required=setup_required)
+
+
 @auth_router.post("/login", response_model=LoginResponse)
 async def login(
     request: Annotated[LoginRequest, Body(description="Login credentials")],

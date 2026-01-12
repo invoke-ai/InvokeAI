@@ -19,6 +19,7 @@ import { addSocketConnectedEventListener } from 'app/store/middleware/listenerMi
 import { deepClone } from 'common/util/deepClone';
 import { merge } from 'es-toolkit';
 import { omit, pick } from 'es-toolkit/compat';
+import { authSliceConfig } from 'features/auth/store/authSlice';
 import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/slice';
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
@@ -60,6 +61,7 @@ const log = logger('system');
 
 // When adding a slice, add the config to the SLICE_CONFIGS object below, then add the reducer to ALL_REDUCERS.
 const SLICE_CONFIGS = {
+  [authSliceConfig.slice.reducerPath]: authSliceConfig,
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig,
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig,
   [canvasSliceConfig.slice.reducerPath]: canvasSliceConfig,
@@ -85,6 +87,7 @@ const SLICE_CONFIGS = {
 // Remember to wrap undoable reducers in `undoable()`!
 const ALL_REDUCERS = {
   [api.reducerPath]: api.reducer,
+  [authSliceConfig.slice.reducerPath]: authSliceConfig.slice.reducer,
   [canvasSessionSliceConfig.slice.reducerPath]: canvasSessionSliceConfig.slice.reducer,
   [canvasSettingsSliceConfig.slice.reducerPath]: canvasSettingsSliceConfig.slice.reducer,
   // Undoable!
