@@ -17,7 +17,7 @@ help:
 	@echo "frontend-dev             Run the frontend in developer mode on localhost:5173"
 	@echo "frontend-typegen         Generate types for the frontend from the OpenAPI schema"
 	@echo "frontend-prettier        Format the frontend using lint:prettier"
-	@echo "wheel            	Build the wheel for the current version"
+	@echo "wheel                    Build the wheel for the current version"
 	@echo "tag-release              Tag the GitHub repository with the current version (use at release time only!)"
 	@echo "openapi                  Generate the OpenAPI schema for the app, outputting to stdout"
 	@echo "docs                     Serve the mkdocs site with live reload"
