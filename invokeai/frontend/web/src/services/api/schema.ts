@@ -10008,6 +10008,11 @@ export type components = {
              * @description The IP Adapter method
              */
             method?: ("full" | "style" | "composition") | null;
+            /**
+             * Image Influence
+             * @description FLUX Redux image influence (if model is flux_redux)
+             */
+            image_influence?: ("lowest" | "low" | "medium" | "high" | "highest") | null;
         };
         /** IPAdapter_Checkpoint_FLUX_Config */
         IPAdapter_Checkpoint_FLUX_Config: {
