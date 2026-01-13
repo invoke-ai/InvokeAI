@@ -92,6 +92,7 @@ class TestBoardDataIsolation:
         # User1 should only see their board
         user1_boards = board_service.get_many(
             user_id=user1_id,
+            is_admin=False,
             order_by=BoardRecordOrderBy.CreatedAt,
             direction=SQLiteDirection.Ascending,
         )
@@ -103,6 +104,7 @@ class TestBoardDataIsolation:
         # User2 should only see their board
         user2_boards = board_service.get_many(
             user_id=user2_id,
+            is_admin=False,
             order_by=BoardRecordOrderBy.CreatedAt,
             direction=SQLiteDirection.Ascending,
         )
@@ -377,11 +379,13 @@ class TestDataIntegrity:
         # Verify isolation is maintained
         user1_boards = board_service.get_many(
             user_id=user1.user_id,
+            is_admin=False,
             order_by=BoardRecordOrderBy.CreatedAt,
             direction=SQLiteDirection.Ascending,
         )
         user2_boards = board_service.get_many(
             user_id=user2.user_id,
+            is_admin=False,
             order_by=BoardRecordOrderBy.CreatedAt,
             direction=SQLiteDirection.Ascending,
         )

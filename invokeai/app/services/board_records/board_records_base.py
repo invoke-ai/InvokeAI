@@ -43,22 +43,24 @@ class BoardRecordStorageBase(ABC):
     def get_many(
         self,
         user_id: str,
+        is_admin: bool,
         order_by: BoardRecordOrderBy,
         direction: SQLiteDirection,
         offset: int = 0,
         limit: int = 10,
         include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardRecord]:
-        """Gets many board records for a specific user, including shared boards."""
+        """Gets many board records for a specific user, including shared boards. Admin users see all boards."""
         pass
 
     @abstractmethod
     def get_all(
         self,
         user_id: str,
+        is_admin: bool,
         order_by: BoardRecordOrderBy,
         direction: SQLiteDirection,
         include_archived: bool = False,
     ) -> list[BoardRecord]:
-        """Gets all board records for a specific user, including shared boards."""
+        """Gets all board records for a specific user, including shared boards. Admin users see all boards."""
         pass

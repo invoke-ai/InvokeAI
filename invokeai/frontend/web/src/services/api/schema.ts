@@ -666,7 +666,7 @@ export type paths = {
         };
         /**
          * List Image Dtos
-         * @description Gets a list of image DTOs
+         * @description Gets a list of image DTOs for the current user
          */
         get: operations["list_image_dtos"];
         put?: never;
@@ -991,7 +991,7 @@ export type paths = {
         };
         /**
          * List Boards
-         * @description Gets a list of boards for the current user, including shared boards
+         * @description Gets a list of boards for the current user, including shared boards. Admin users see all boards.
          */
         get: operations["list_boards"];
         put?: never;
@@ -2654,6 +2654,11 @@ export type components = {
              */
             board_name: string;
             /**
+             * User Id
+             * @description The user ID of the board owner.
+             */
+            user_id: string;
+            /**
              * Created At
              * @description The created timestamp of the board.
              */
@@ -2688,6 +2693,11 @@ export type components = {
              * @description The number of assets in the board.
              */
             asset_count: number;
+            /**
+             * Owner Username
+             * @description The username of the board owner (for admin view).
+             */
+            owner_username?: string | null;
         };
         /**
          * BoardField

@@ -47,22 +47,24 @@ class BoardServiceABC(ABC):
     def get_many(
         self,
         user_id: str,
+        is_admin: bool,
         order_by: BoardRecordOrderBy,
         direction: SQLiteDirection,
         offset: int = 0,
         limit: int = 10,
         include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardDTO]:
-        """Gets many boards for a specific user, including shared boards."""
+        """Gets many boards for a specific user, including shared boards. Admin users see all boards."""
         pass
 
     @abstractmethod
     def get_all(
         self,
         user_id: str,
+        is_admin: bool,
         order_by: BoardRecordOrderBy,
         direction: SQLiteDirection,
         include_archived: bool = False,
     ) -> list[BoardDTO]:
-        """Gets all boards for a specific user, including shared boards."""
+        """Gets all boards for a specific user, including shared boards. Admin users see all boards."""
         pass

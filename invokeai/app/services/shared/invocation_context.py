@@ -230,6 +230,7 @@ class ImagesInterface(InvocationContextInterface):
             graph=graph_,
             session_id=self._data.queue_item.session_id,
             node_id=self._data.invocation.id,
+            user_id=self._data.queue_item.user_id,
         )
 
     def get_pil(self, image_name: str, mode: IMAGE_MODES | None = None) -> Image:

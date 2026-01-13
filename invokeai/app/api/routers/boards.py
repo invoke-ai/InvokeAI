@@ -133,14 +133,14 @@ async def list_boards(
     limit: Optional[int] = Query(default=None, description="The number of boards per page"),
     include_archived: bool = Query(default=False, description="Whether or not to include archived boards in list"),
 ) -> Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]]:
-    """Gets a list of boards for the current user, including shared boards"""
+    """Gets a list of boards for the current user, including shared boards. Admin users see all boards."""
     if all:
         return ApiDependencies.invoker.services.boards.get_all(
-            current_user.user_id, order_by, direction, include_archived
+            current_user.user_id, current_user.is_admin, order_by, direction, include_archived
         )
     elif offset is not None and limit is not None:
         return ApiDependencies.invoker.services.boards.get_many(
-            current_user.user_id, order_by, direction, offset, limit, include_archived
+            current_user.user_id, current_user.is_admin, order_by, direction, offset, limit, include_archived
         )
     else:
         raise HTTPException(

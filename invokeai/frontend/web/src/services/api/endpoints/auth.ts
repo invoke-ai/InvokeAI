@@ -42,12 +42,16 @@ export const authApi = api.injectEndpoints({
         method: 'POST',
         body: credentials,
       }),
+      // Invalidate boards and images cache on successful login to refresh data for new user
+      invalidatesTags: ['Board', 'Image', 'ImageList', 'ImageNameList', 'ImageCollection', 'ImageMetadata'],
     }),
     logout: build.mutation<LogoutResponse, void>({
       query: () => ({
         url: 'api/v1/auth/logout',
         method: 'POST',
       }),
+      // Invalidate boards and images cache on logout to clear stale data
+      invalidatesTags: ['Board', 'Image', 'ImageList', 'ImageNameList', 'ImageCollection', 'ImageMetadata'],
     }),
     getCurrentUser: build.query<MeResponse, void>({
       query: () => 'api/v1/auth/me',

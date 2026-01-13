@@ -123,6 +123,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     def get_many(
         self,
         user_id: str,
+        is_admin: bool,
         order_by: BoardRecordOrderBy,
         direction: SQLiteDirection,
         offset: int = 0,
@@ -130,8 +131,27 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
         include_archived: bool = False,
     ) -> OffsetPaginatedResults[BoardRecord]:
         with self._db.transaction() as cursor:
-            # Build base query - include boards owned by user, shared with user, or public
-            base_query = """
+            # Build base query - admins see all boards, regular users see owned, shared, or public boards
+            if is_admin:
+                base_query = """
+                    SELECT DISTINCT boards.*
+                    FROM boards
+                    {archived_filter}
+                    ORDER BY {order_by} {direction}
+                    LIMIT ? OFFSET ?;
+                """
+
+                # Determine archived filter condition
+                archived_filter = "WHERE 1=1" if include_archived else "WHERE boards.archived = 0"
+
+                final_query = base_query.format(
+                    archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
+                )
+
+                # Execute query to fetch boards
+                cursor.execute(final_query, (limit, offset))
+            else:
+                base_query = """
                     SELECT DISTINCT boards.*
                     FROM boards
                     LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
@@ -141,29 +161,43 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                     LIMIT ? OFFSET ?;
                 """
 
-            # Determine archived filter condition
-            archived_filter = "" if include_archived else "AND boards.archived = 0"
+                # Determine archived filter condition
+                archived_filter = "" if include_archived else "AND boards.archived = 0"
 
-            final_query = base_query.format(
-                archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
-            )
+                final_query = base_query.format(
+                    archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
+                )
 
-            # Execute query to fetch boards
-            cursor.execute(final_query, (user_id, user_id, limit, offset))
+                # Execute query to fetch boards
+                cursor.execute(final_query, (user_id, user_id, limit, offset))
 
             result = cast(list[sqlite3.Row], cursor.fetchall())
             boards = [deserialize_board_record(dict(r)) for r in result]
 
-            # Determine count query - count boards accessible to user
-            if include_archived:
-                count_query = """
+            # Determine count query - admins count all boards, regular users count accessible boards
+            if is_admin:
+                if include_archived:
+                    count_query = """
+                        SELECT COUNT(DISTINCT boards.board_id)
+                        FROM boards;
+                    """
+                else:
+                    count_query = """
+                        SELECT COUNT(DISTINCT boards.board_id)
+                        FROM boards
+                        WHERE boards.archived = 0;
+                    """
+                cursor.execute(count_query)
+            else:
+                if include_archived:
+                    count_query = """
                         SELECT COUNT(DISTINCT boards.board_id)
                         FROM boards
                         LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
                         WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.is_public = 1);
                     """
-            else:
-                count_query = """
+                else:
+                    count_query = """
                         SELECT COUNT(DISTINCT boards.board_id)
                         FROM boards
                         LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
@@ -171,8 +205,8 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                         AND boards.archived = 0;
                     """
 
-            # Execute count query
-            cursor.execute(count_query, (user_id, user_id))
+                # Execute count query
+                cursor.execute(count_query, (user_id, user_id))
 
             count = cast(int, cursor.fetchone()[0])
 
@@ -181,13 +215,39 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
     def get_all(
         self,
         user_id: str,
+        is_admin: bool,
         order_by: BoardRecordOrderBy,
         direction: SQLiteDirection,
         include_archived: bool = False,
     ) -> list[BoardRecord]:
         with self._db.transaction() as cursor:
-            if order_by == BoardRecordOrderBy.Name:
-                base_query = """
+            # Build query - admins see all boards, regular users see owned, shared, or public boards
+            if is_admin:
+                if order_by == BoardRecordOrderBy.Name:
+                    base_query = """
+                        SELECT DISTINCT boards.*
+                        FROM boards
+                        {archived_filter}
+                        ORDER BY LOWER(boards.board_name) {direction}
+                    """
+                else:
+                    base_query = """
+                        SELECT DISTINCT boards.*
+                        FROM boards
+                        {archived_filter}
+                        ORDER BY {order_by} {direction}
+                    """
+
+                archived_filter = "WHERE 1=1" if include_archived else "WHERE boards.archived = 0"
+
+                final_query = base_query.format(
+                    archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
+                )
+
+                cursor.execute(final_query)
+            else:
+                if order_by == BoardRecordOrderBy.Name:
+                    base_query = """
                         SELECT DISTINCT boards.*
                         FROM boards
                         LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
@@ -195,8 +255,8 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                         {archived_filter}
                         ORDER BY LOWER(boards.board_name) {direction}
                     """
-            else:
-                base_query = """
+                else:
+                    base_query = """
                         SELECT DISTINCT boards.*
                         FROM boards
                         LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
@@ -205,13 +265,13 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                         ORDER BY {order_by} {direction}
                     """
 
-            archived_filter = "" if include_archived else "AND boards.archived = 0"
+                archived_filter = "" if include_archived else "AND boards.archived = 0"
 
-            final_query = base_query.format(
-                archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
-            )
+                final_query = base_query.format(
+                    archived_filter=archived_filter, order_by=order_by.value, direction=direction.value
+                )
 
-            cursor.execute(final_query, (user_id, user_id))
+                cursor.execute(final_query, (user_id, user_id))
 
             result = cast(list[sqlite3.Row], cursor.fetchall())
         boards = [deserialize_board_record(dict(r)) for r in result]
