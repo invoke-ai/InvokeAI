@@ -46,12 +46,16 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Returns:
         True if the password matches the hash, False otherwise
     """
-    # bcrypt has a 72 byte limit - encode and truncate if necessary to match hash_password
-    password_bytes = plain_password.encode("utf-8")
-    if len(password_bytes) > 72:
-        # Truncate to 72 bytes and decode back, dropping incomplete UTF-8 sequences
-        plain_password = password_bytes[:72].decode("utf-8", errors="ignore")
-    return cast(bool, pwd_context.verify(plain_password, hashed_password))
+    try:
+        # bcrypt has a 72 byte limit - encode and truncate if necessary to match hash_password
+        password_bytes = plain_password.encode("utf-8")
+        if len(password_bytes) > 72:
+            # Truncate to 72 bytes and decode back, dropping incomplete UTF-8 sequences
+            plain_password = password_bytes[:72].decode("utf-8", errors="ignore")
+        return cast(bool, pwd_context.verify(plain_password, hashed_password))
+    except Exception:
+        # Invalid hash format or other error - return False
+        return False
 
 
 def validate_password_strength(password: str) -> tuple[bool, str]:

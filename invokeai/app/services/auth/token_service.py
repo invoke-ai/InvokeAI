@@ -52,7 +52,30 @@ def verify_token(token: str) -> TokenData | None:
         TokenData if valid, None if invalid or expired
     """
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        # python-jose 3.5.0 has a bug where exp verification doesn't work properly
+        # We need to manually check expiration, but MUST verify signature first
+        # to prevent accepting tokens with valid payloads but invalid signatures
+
+        # First, verify the signature - this will raise JWTError if signature is invalid
+        # Note: python-jose won't reject expired tokens here due to the bug
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+        )
+
+        # Now manually check expiration (because python-jose 3.5.0 doesn't do this properly)
+        if "exp" in payload:
+            exp_timestamp = payload["exp"]
+            current_timestamp = datetime.now(timezone.utc).timestamp()
+            if current_timestamp >= exp_timestamp:
+                # Token is expired
+                return None
+
         return TokenData(**payload)
     except JWTError:
+        # Token is invalid (bad signature, malformed, etc.)
+        return None
+    except Exception:
+        # Catch any other exceptions (e.g., Pydantic validation errors)
         return None
