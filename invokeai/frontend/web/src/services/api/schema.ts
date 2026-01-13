@@ -6991,6 +6991,12 @@ export type components = {
             download_path: string;
         };
         /**
+         * DyPEPreset
+         * @description Predefined DyPE configurations.
+         * @enum {string}
+         */
+        DyPEPreset: "off" | "auto" | "4k";
+        /**
          * Dynamic Prompt
          * @description Parses a prompt using adieyal/dynamicprompts' random or combinatorial generator
          */
@@ -8366,6 +8372,23 @@ export type components = {
              */
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
+             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
+             * @default off
+             */
+            dype_preset?: components["schemas"]["DyPEPreset"];
+            /**
+             * Dype Scale
+             * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
+             * @default null
+             */
+            dype_scale?: number | null;
+            /**
+             * Dype Exponent
+             * @description DyPE decay speed (λt). Controls transition from low to high frequency detail. Only used when dype_preset is not 'off'.
+             * @default null
+             */
+            dype_exponent?: number | null;
+            /**
              * type
              * @default flux_denoise
              * @constant
@@ -8540,6 +8563,23 @@ export type components = {
              * @default null
              */
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
+            /**
+             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
+             * @default off
+             */
+            dype_preset?: components["schemas"]["DyPEPreset"];
+            /**
+             * Dype Scale
+             * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
+             * @default null
+             */
+            dype_scale?: number | null;
+            /**
+             * Dype Exponent
+             * @description DyPE decay speed (λt). Controls transition from low to high frequency detail. Only used when dype_preset is not 'off'.
+             * @default null
+             */
+            dype_exponent?: number | null;
             /**
              * type
              * @default flux_denoise_meta

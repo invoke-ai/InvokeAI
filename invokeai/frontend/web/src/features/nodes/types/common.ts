@@ -70,6 +70,9 @@ export const zFluxSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 
 // Z-Image scheduler options (Flow Matching schedulers, same as Flux)
 export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
+
+// Flux DyPE (Dynamic Position Extrapolation) preset options for high-resolution generation
+export const zFluxDypePresetField = z.enum(['off', 'auto', '4k']);
 // #endregion
 
 // #region Model-related schemas

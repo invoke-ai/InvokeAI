@@ -1374,6 +1374,7 @@
         "scaledHeight": "Scaled H",
         "scaledWidth": "Scaled W",
         "scheduler": "Scheduler",
+        "dypePreset": "DyPE (High-Res)",
         "seamlessXAxis": "Seamless X Axis",
         "seamlessYAxis": "Seamless Y Axis",
         "colorCompensation": "Color Compensation",
@@ -1608,6 +1609,13 @@
             "paragraphs": [
                 "Scheduler used during the generation process.",
                 "Each scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
+            ]
+        },
+        "fluxDypePreset": {
+            "heading": "DyPE (High-Resolution)",
+            "paragraphs": [
+                "Dynamic Position Extrapolation (DyPE) improves FLUX generation quality at resolutions above the training size (1024px).",
+                "Off: Standard generation. Auto: Automatically enables for images > 1536px. 4K: Optimized settings for 4K resolution output."
             ]
         },
         "seedVarianceEnhancer": {

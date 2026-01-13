@@ -91,10 +91,13 @@ def compute_vision_yarn_freqs(
     current_sigma: float,
     dype_config: DyPEConfig,
 ) -> tuple[Tensor, Tensor]:
-    """Compute RoPE frequencies using Vision-YARN method.
+    """Compute RoPE frequencies using NTK-aware scaling for high-resolution.
 
-    Vision-YARN is optimized for image models with separate H/W axes.
-    It applies different scaling to height and width dimensions.
+    This method extends FLUX's position encoding to handle resolutions beyond
+    the 1024px training resolution by scaling the base frequency (theta).
+
+    The NTK-aware approach smoothly interpolates frequencies to cover larger
+    position ranges without breaking the attention patterns.
 
     Args:
         pos: Position tensor
@@ -102,7 +105,7 @@ def compute_vision_yarn_freqs(
         theta: RoPE base frequency
         scale_h: Height scaling factor
         scale_w: Width scaling factor
-        current_sigma: Current noise level
+        current_sigma: Current noise level (reserved for future timestep-aware scaling)
         dype_config: DyPE configuration
 
     Returns:
@@ -110,33 +113,26 @@ def compute_vision_yarn_freqs(
     """
     assert dim % 2 == 0
 
-    # Use the larger scale for mscale calculation
+    # Use the larger scale for NTK calculation
     scale = max(scale_h, scale_w)
 
-    # Get timestep-dependent mscale
-    mscale = get_timestep_mscale(
-        scale=scale,
-        current_sigma=current_sigma,
-        dype_scale=dype_config.dype_scale,
-        dype_exponent=dype_config.dype_exponent,
-        dype_start_sigma=dype_config.dype_start_sigma,
-    )
-
-    # Compute base frequencies with scaling
     device = pos.device
     dtype = torch.float64 if device.type != "mps" else torch.float32
 
-    # Scale theta based on resolution scaling (NTK-aware)
-    scaled_theta = theta * (scale ** (dim / (dim - 2)))
+    # NTK-aware theta scaling: extends position coverage for high-res
+    # Formula: theta_scaled = theta * scale^(dim/(dim-2))
+    # This increases the wavelength of position encodings proportionally
+    if scale > 1.0:
+        ntk_alpha = scale ** (dim / (dim - 2))
+        scaled_theta = theta * ntk_alpha
+    else:
+        scaled_theta = theta
 
+    # Standard RoPE frequency computation
     freq_seq = torch.arange(0, dim, 2, dtype=dtype, device=device) / dim
     freqs = 1.0 / (scaled_theta**freq_seq)
 
-    # Apply mscale to frequencies
-    freqs = freqs * mscale
-
-    # Compute position * frequency
-    # pos shape: (..., ) -> expand for broadcasting
+    # Compute angles = position * frequency
     angles = torch.einsum("...n,d->...nd", pos.to(dtype), freqs)
 
     cos = torch.cos(angles)
@@ -153,16 +149,16 @@ def compute_yarn_freqs(
     current_sigma: float,
     dype_config: DyPEConfig,
 ) -> tuple[Tensor, Tensor]:
-    """Compute RoPE frequencies using YARN method.
+    """Compute RoPE frequencies using YARN/NTK method.
 
-    Standard YARN with isotropic scaling.
+    Uses NTK-aware theta scaling for high-resolution support.
 
     Args:
         pos: Position tensor
         dim: Embedding dimension
         theta: RoPE base frequency
         scale: Uniform scaling factor
-        current_sigma: Current noise level
+        current_sigma: Current noise level (reserved for future use)
         dype_config: DyPE configuration
 
     Returns:
@@ -170,22 +166,18 @@ def compute_yarn_freqs(
     """
     assert dim % 2 == 0
 
-    mscale = get_timestep_mscale(
-        scale=scale,
-        current_sigma=current_sigma,
-        dype_scale=dype_config.dype_scale,
-        dype_exponent=dype_config.dype_exponent,
-        dype_start_sigma=dype_config.dype_start_sigma,
-    )
-
     device = pos.device
     dtype = torch.float64 if device.type != "mps" else torch.float32
 
-    # YARN scaling with aggressive mscale
-    scaled_theta = theta * (scale ** (dim / (dim - 2)))
+    # NTK-aware theta scaling
+    if scale > 1.0:
+        ntk_alpha = scale ** (dim / (dim - 2))
+        scaled_theta = theta * ntk_alpha
+    else:
+        scaled_theta = theta
 
     freq_seq = torch.arange(0, dim, 2, dtype=dtype, device=device) / dim
-    freqs = 1.0 / (scaled_theta**freq_seq) * mscale
+    freqs = 1.0 / (scaled_theta**freq_seq)
 
     angles = torch.einsum("...n,d->...nd", pos.to(dtype), freqs)
 

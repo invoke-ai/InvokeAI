@@ -8,6 +8,7 @@ import { selectIsCogView4, selectIsFLUX, selectIsSD3, selectIsZImage } from 'fea
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
+import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDypePreset';
 import ParamFluxScheduler from 'features/parameters/components/Core/ParamFluxScheduler';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
@@ -72,6 +73,7 @@ export const GenerationSettingsAccordion = memo(() => {
             <FormControlGroup formLabelProps={formLabelProps}>
               {!isFLUX && !isSD3 && !isCogView4 && !isZImage && <ParamScheduler />}
               {isFLUX && <ParamFluxScheduler />}
+              {isFLUX && <ParamFluxDypePreset />}
               {isZImage && <ParamZImageScheduler />}
               <ParamSteps />
               {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}

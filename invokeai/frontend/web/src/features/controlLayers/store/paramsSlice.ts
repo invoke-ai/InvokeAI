@@ -72,6 +72,9 @@ const slice = createSlice({
     setFluxScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
       state.fluxScheduler = action.payload;
     },
+    setFluxDypePreset: (state, action: PayloadAction<'off' | 'auto' | '4k'>) => {
+      state.fluxDypePreset = action.payload;
+    },
     setZImageScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
       state.zImageScheduler = action.payload;
     },
@@ -465,6 +468,7 @@ export const {
   setGuidance,
   setScheduler,
   setFluxScheduler,
+  setFluxDypePreset,
   setZImageScheduler,
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
@@ -609,6 +613,7 @@ export const selectModelSupportsOptimizedDenoising = createSelector(
 );
 export const selectScheduler = createParamsSelector((params) => params.scheduler);
 export const selectFluxScheduler = createParamsSelector((params) => params.fluxScheduler);
+export const selectFluxDypePreset = createParamsSelector((params) => params.fluxDypePreset);
 export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
 export const selectZImageSeedVarianceEnabled = createParamsSelector((params) => params.zImageSeedVarianceEnabled);
 export const selectZImageSeedVarianceStrength = createParamsSelector((params) => params.zImageSeedVarianceStrength);
