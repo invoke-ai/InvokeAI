@@ -835,6 +835,7 @@
         "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "clipSkip": "$t(parameters.clipSkip)",
         "createdBy": "Created By",
+        "dypePreset": "DyPE Preset",
         "generationMode": "Generation Mode",
         "guidance": "Guidance",
         "height": "Height",
