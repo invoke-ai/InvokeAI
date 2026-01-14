@@ -135,7 +135,6 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
         ".dora_scale",
     )
 
-    has_z_image_keys = False
     for key in state_dict.keys():
         if isinstance(key, int):
             continue
@@ -150,10 +149,9 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
         key_parts = key.split(".")
         for part in key_parts:
             if part in z_image_specific_keys:
-                has_z_image_keys = True
-                break
+                return True
 
-    return has_z_image_keys
+    return False
 
 
 class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
