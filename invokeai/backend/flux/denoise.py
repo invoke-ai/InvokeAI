@@ -242,7 +242,9 @@ def denoise(
                         pbar.update(1)
                         preview_img = img - t_curr * pred
                         if inpaint_extension is not None:
-                            preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
+                            preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(
+                                preview_img, 0.0
+                            )
                         step_callback(
                             PipelineIntermediateState(
                                 step=user_step,
