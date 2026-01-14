@@ -11,7 +11,11 @@ from transformers import AutoTokenizer, Qwen3ForCausalLM
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_ZImage_Config
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.configs.main import Main_Checkpoint_ZImage_Config, Main_GGUF_ZImage_Config
+from invokeai.backend.model_manager.configs.main import (
+    Main_Checkpoint_ZImage_Config,
+    Main_GGUF_ZImage_Config,
+    Main_SDNQ_ZImage_Config,
+)
 from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_GGUF_Config,
@@ -28,6 +32,7 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -352,6 +357,91 @@ class ZImageGGUFCheckpointModel(ModelLoader):
 
         # Create an empty model with the default Z-Image config
         # Z-Image-Turbo uses these default parameters from diffusers
+        with accelerate.init_empty_weights():
+            model = ZImageTransformer2DModel(
+                all_patch_size=(2,),
+                all_f_patch_size=(1,),
+                in_channels=16,
+                dim=3840,
+                n_layers=30,
+                n_refiner_layers=2,
+                n_heads=30,
+                n_kv_heads=30,
+                norm_eps=1e-05,
+                qk_norm=True,
+                cap_feat_dim=2560,
+                rope_theta=256.0,
+                t_scale=1000.0,
+                axes_dims=[32, 48, 48],
+                axes_lens=[1024, 512, 512],
+            )
+
+        model.load_state_dict(sd, assign=True)
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.ZImage, type=ModelType.Main, format=ModelFormat.SDNQQuantized)
+class ZImageSDNQCheckpointModel(ModelLoader):
+    """Class to load SDNQ-quantized Z-Image transformer models."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Checkpoint_Config_Base):
+            raise ValueError("Only CheckpointConfigBase models are currently supported here.")
+
+        match submodel_type:
+            case SubModelType.Transformer:
+                return self._load_from_singlefile(config)
+
+        raise ValueError(
+            f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_from_singlefile(
+        self,
+        config: AnyModelConfig,
+    ) -> AnyModel:
+        from diffusers import ZImageTransformer2DModel
+
+        if not isinstance(config, Main_SDNQ_ZImage_Config):
+            raise TypeError(
+                f"Expected Main_SDNQ_ZImage_Config, got {type(config).__name__}. Model configuration type mismatch."
+            )
+        model_path = Path(config.path)
+
+        # Determine safe dtype based on target device capabilities
+        target_device = TorchDevice.choose_torch_device()
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        # Load the SDNQ state dict
+        sd = sdnq_sd_loader(model_path, compute_dtype=compute_dtype)
+
+        # Some Z-Image SDNQ models may have keys prefixed with "diffusion_model." or
+        # "model.diffusion_model." (ComfyUI-style format). Check if we need to strip this prefix.
+        prefix_to_strip = None
+        for prefix in ["model.diffusion_model.", "diffusion_model."]:
+            if any(k.startswith(prefix) for k in sd.keys() if isinstance(k, str)):
+                prefix_to_strip = prefix
+                break
+
+        if prefix_to_strip:
+            stripped_sd = {}
+            for key, value in sd.items():
+                if isinstance(key, str) and key.startswith(prefix_to_strip):
+                    stripped_sd[key[len(prefix_to_strip) :]] = value
+                else:
+                    stripped_sd[key] = value
+            sd = stripped_sd
+
+        # Check if conversion is needed (original format vs diffusers format)
+        needs_conversion = any(k.startswith("x_embedder.") for k in sd.keys() if isinstance(k, str))
+        if needs_conversion:
+            sd = _convert_z_image_gguf_to_diffusers(sd)
+
+        # Create an empty model with the default Z-Image config
         with accelerate.init_empty_weights():
             model = ZImageTransformer2DModel(
                 all_patch_size=(2,),

@@ -34,6 +34,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ZImageVariantType,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 
 DEFAULTS_PRECISION = Literal["fp16", "fp32"]
@@ -120,6 +121,25 @@ def _has_bnb_nf4_keys(state_dict: dict[str | int, Any]) -> bool:
 
 def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(v, GGMLTensor) for v in state_dict.values())
+
+
+def _has_sdnq_tensors(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains SDNQTensor instances."""
+    return any(isinstance(v, SDNQTensor) for v in state_dict.values())
+
+
+def _has_sdnq_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict has SDNQ-style keys (weight + scale pairs).
+
+    SDNQ quantized models store weights with associated scale tensors.
+    """
+    keys = {k for k in state_dict.keys() if isinstance(k, str)}
+    for key in keys:
+        if key.endswith(".weight"):
+            base = key[:-7]
+            if f"{base}.scale" in keys:
+                return True
+    return False
 
 
 def _has_main_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -1408,3 +1428,79 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         has_anima_keys = _has_anima_keys(mod.load_state_dict())
         if not has_anima_keys:
             raise NotAMatchError("state dict does not look like an Anima model")
+
+
+class Main_SDNQ_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized FLUX transformer models."""
+
+    base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+
+    variant: FluxVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_looks_like_sdnq_quantized(mod)
+
+        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> FluxVariantType:
+        state_dict = mod.load_state_dict()
+        variant = _get_flux_variant(state_dict)
+
+        if variant is None:
+            raise NotAMatchError("unable to determine model variant from state dict")
+
+        return variant
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        has_main_model_keys = _has_main_keys(mod.load_state_dict())
+        if not has_main_model_keys:
+            raise NotAMatchError("state dict does not look like a main model")
+
+    @classmethod
+    def _validate_looks_like_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not _has_sdnq_keys(state_dict) and not _has_sdnq_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like SDNQ quantized")
+
+
+class Main_SDNQ_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized Z-Image transformer models."""
+
+    base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_z_image_model(mod)
+
+        cls._validate_looks_like_sdnq_quantized(mod)
+
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_z_image_model(cls, mod: ModelOnDisk) -> None:
+        has_z_image_keys = _has_z_image_keys(mod.load_state_dict())
+        if not has_z_image_keys:
+            raise NotAMatchError("state dict does not look like a Z-Image model")
+
+    @classmethod
+    def _validate_looks_like_sdnq_quantized(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        if not _has_sdnq_keys(state_dict) and not _has_sdnq_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like SDNQ quantized")

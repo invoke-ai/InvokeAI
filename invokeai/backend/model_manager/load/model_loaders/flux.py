@@ -49,6 +49,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_FLUX_Config,
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
+    Main_SDNQ_FLUX_Config,
 )
 from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
 from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Config_Base, VAE_Checkpoint_Flux2_Config
@@ -68,6 +69,7 @@ from invokeai.backend.model_manager.util.model_util import (
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
+from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 
 try:
@@ -1382,6 +1384,46 @@ class Flux2GGUFCheckpointModel(ModelLoader):
             weight = weight.get_dequantized_tensor()
         shift, scale = weight.chunk(2, dim=0)
         return torch.cat([scale, shift], dim=0)
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.Main, format=ModelFormat.SDNQQuantized)
+class FluxSDNQCheckpointModel(ModelLoader):
+    """Class to load SDNQ-quantized FLUX main models."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Checkpoint_Config_Base):
+            raise ValueError("Only CheckpointConfigBase models are currently supported here.")
+
+        match submodel_type:
+            case SubModelType.Transformer:
+                return self._load_from_singlefile(config)
+
+        raise ValueError(
+            f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_from_singlefile(
+        self,
+        config: AnyModelConfig,
+    ) -> AnyModel:
+        assert isinstance(config, Main_SDNQ_FLUX_Config)
+        model_path = Path(config.path)
+
+        with accelerate.init_empty_weights():
+            model = Flux(get_flux_transformers_params(config.variant))
+
+        sd = sdnq_sd_loader(model_path, compute_dtype=torch.bfloat16)
+
+        # Handle ComfyUI bundle format
+        if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
+            sd = convert_bundle_to_flux_transformer_checkpoint(sd)
+
+        model.load_state_dict(sd, assign=True)
+        return model
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
