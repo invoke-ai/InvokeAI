@@ -66,7 +66,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="4.2.0",
+    version="4.3.0",
 )
 class FluxDenoiseInvocation(BaseInvocation):
     """Run denoising process with a FLUX transformer model."""
