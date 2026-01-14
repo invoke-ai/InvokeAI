@@ -1,9 +1,9 @@
 """DyPE base configuration and utilities."""
 
+import math
 from dataclasses import dataclass
 from typing import Literal
 
-import math
 import torch
 from torch import Tensor
 

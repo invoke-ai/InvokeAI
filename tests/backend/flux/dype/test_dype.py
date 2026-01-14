@@ -1,6 +1,5 @@
 """Tests for DyPE (Dynamic Position Extrapolation) module."""
 
-import pytest
 import torch
 
 from invokeai.backend.flux.dype.base import (
