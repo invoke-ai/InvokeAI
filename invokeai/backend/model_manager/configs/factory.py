@@ -83,6 +83,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_FLUX_Config,
     Main_GGUF_QwenImage_Config,
     Main_GGUF_ZImage_Config,
+    Main_SDNQ_Diffusers_FLUX_Config,
     Main_SDNQ_FLUX_Config,
     Main_SDNQ_ZImage_Config,
     MainModelDefaultSettings,
@@ -91,6 +92,8 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_GGUF_Config,
     Qwen3Encoder_Qwen3Encoder_Config,
+    Qwen3Encoder_SDNQ_Config,
+    Qwen3Encoder_SDNQ_Folder_Config,
 )
 from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
     QwenVLEncoder_Checkpoint_Config,
@@ -196,6 +199,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_QwenImage_Config, Main_GGUF_QwenImage_Config.get_tag()],
         Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
         Annotated[Main_SDNQ_FLUX_Config, Main_SDNQ_FLUX_Config.get_tag()],
+        Annotated[Main_SDNQ_Diffusers_FLUX_Config, Main_SDNQ_Diffusers_FLUX_Config.get_tag()],
         Annotated[Main_SDNQ_ZImage_Config, Main_SDNQ_ZImage_Config.get_tag()],
         # VAE - checkpoint format
         Annotated[VAE_Checkpoint_SD1_Config, VAE_Checkpoint_SD1_Config.get_tag()],
@@ -252,6 +256,8 @@ AnyModelConfig = Annotated[
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],
         Annotated[Qwen3Encoder_GGUF_Config, Qwen3Encoder_GGUF_Config.get_tag()],
+        Annotated[Qwen3Encoder_SDNQ_Config, Qwen3Encoder_SDNQ_Config.get_tag()],
+        Annotated[Qwen3Encoder_SDNQ_Folder_Config, Qwen3Encoder_SDNQ_Folder_Config.get_tag()],
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
         Annotated[QwenVLEncoder_Checkpoint_Config, QwenVLEncoder_Checkpoint_Config.get_tag()],

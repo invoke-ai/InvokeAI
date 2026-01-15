@@ -1,4 +1,5 @@
 from abc import ABC
+from pathlib import Path
 from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -26,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import (
     Flux2VariantType,
     FluxVariantType,
     ModelFormat,
+    ModelRepoVariant,
     ModelType,
     ModelVariantType,
     QwenImageVariantType,
@@ -1504,3 +1506,164 @@ class Main_SDNQ_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
         state_dict = mod.load_state_dict()
         if not _has_sdnq_keys(state_dict) and not _has_sdnq_tensors(state_dict):
             raise NotAMatchError("state dict does not look like SDNQ quantized")
+
+
+def _is_sdnq_folder(folder_path: Path) -> bool:
+    """Check if a folder contains SDNQ-quantized model weights by checking quantization_config.json."""
+    import json
+
+    quant_config_path = folder_path / "quantization_config.json"
+    if quant_config_path.exists():
+        try:
+            with open(quant_config_path, "r", encoding="utf-8") as f:
+                quant_config = json.load(f)
+            if quant_config.get("quant_method") == "sdnq":
+                return True
+        except (json.JSONDecodeError, OSError):
+            pass
+    return False
+
+
+class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
+    """Model config for SDNQ-quantized FLUX models in diffusers format (folder with transformer, text_encoder, etc.)."""
+
+    base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+    format: Literal[ModelFormat.SDNQQuantized] = Field(default=ModelFormat.SDNQQuantized)
+
+    variant: FluxVariantType = Field()
+    repo_variant: ModelRepoVariant = Field(default=ModelRepoVariant.Default)
+    submodels: dict[SubModelType, SubmodelDefinition] | None = Field(
+        description="Loadable submodels in this model",
+        default=None,
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_flux_diffusers(mod)
+
+        cls._validate_has_sdnq_transformer(mod)
+
+        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant(mod)
+
+        submodels = override_fields.get("submodels") or cls._get_submodels(mod)
+
+        return cls(**override_fields, variant=variant, repo_variant=repo_variant, submodels=submodels)
+
+    @classmethod
+    def _validate_looks_like_flux_diffusers(cls, mod: ModelOnDisk) -> None:
+        """Check if this looks like a Flux diffusers model by checking for FluxPipeline or FluxTransformer2DModel."""
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "FluxPipeline",
+                "FluxTransformer2DModel",
+            },
+        )
+
+    @classmethod
+    def _validate_has_sdnq_transformer(cls, mod: ModelOnDisk) -> None:
+        """Check if the transformer subfolder contains SDNQ quantization."""
+        transformer_path = mod.path / "transformer"
+        if not transformer_path.is_dir():
+            raise NotAMatchError("no transformer subfolder found")
+
+        if not _is_sdnq_folder(transformer_path):
+            raise NotAMatchError("transformer is not SDNQ quantized")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> FluxVariantType:
+        """Determine the Flux variant from the transformer config."""
+        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+
+        # Check for guidance_embeds to determine if it's Dev or Schnell
+        guidance_embeds = transformer_config.get("guidance_embeds", False)
+        in_channels = transformer_config.get("in_channels", 64)
+
+        if guidance_embeds and in_channels == 384:
+            return FluxVariantType.DevFill
+        elif guidance_embeds:
+            return FluxVariantType.Dev
+        else:
+            return FluxVariantType.Schnell
+
+    @classmethod
+    def _get_repo_variant(cls, mod: ModelOnDisk) -> ModelRepoVariant:
+        """Determine the repo variant from the model files."""
+        weight_files = list(mod.path.glob("**/*.safetensors"))
+        weight_files.extend(list(mod.path.glob("**/*.bin")))
+        for x in weight_files:
+            if ".fp16" in x.suffixes:
+                return ModelRepoVariant.FP16
+            if "openvino_model" in x.name:
+                return ModelRepoVariant.OpenVINO
+            if "flax_model" in x.name:
+                return ModelRepoVariant.Flax
+            if x.suffix == ".onnx":
+                return ModelRepoVariant.ONNX
+        return ModelRepoVariant.Default
+
+    @classmethod
+    def _get_submodels(cls, mod: ModelOnDisk) -> dict[SubModelType, SubmodelDefinition]:
+        """Extract submodels from model_index.json for Flux SDNQ diffusers format."""
+        config = get_config_dict_or_raise(common_config_paths(mod.path))
+
+        submodels: dict[SubModelType, SubmodelDefinition] = {}
+
+        for key, value in config.items():
+            # Skip metadata fields and invalid entries
+            if key.startswith("_") or not (isinstance(value, list) and len(value) == 2):
+                continue
+
+            _library_name, class_name = value
+
+            # Skip null entries
+            if class_name is None:
+                continue
+
+            match class_name:
+                case "FluxTransformer2DModel":
+                    submodels[SubModelType.Transformer] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.Main,
+                        variant=None,
+                    )
+                case "CLIPTextModel":
+                    submodels[SubModelType.TextEncoder] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.CLIPEmbed,
+                        variant=None,
+                    )
+                case "T5EncoderModel":
+                    submodels[SubModelType.TextEncoder2] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.T5Encoder,
+                        variant=None,
+                    )
+                case "AutoencoderKL":
+                    submodels[SubModelType.VAE] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.VAE,
+                        variant=None,
+                    )
+                case "CLIPTokenizer":
+                    submodels[SubModelType.Tokenizer] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.CLIPEmbed,
+                        variant=None,
+                    )
+                case "T5TokenizerFast":
+                    submodels[SubModelType.Tokenizer2] = SubmodelDefinition(
+                        path_or_prefix=(mod.path / key).resolve().as_posix(),
+                        model_type=ModelType.T5Encoder,
+                        variant=None,
+                    )
+                case _:
+                    pass
+
+        return submodels

@@ -2,6 +2,7 @@
 
 import gc
 import json
+import logging
 from pathlib import Path
 from typing import Any, Union
 
@@ -10,6 +11,8 @@ from safetensors.torch import load_file
 
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 from invokeai.backend.quantization.sdnq.utils import SDNQQuantizationType
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_quantization_config(config_path: Path) -> dict[str, Any]:
@@ -25,11 +28,42 @@ def _infer_quantization_type(
     weight_dtype: torch.dtype,
     has_zero_point: bool,
     config: dict[str, Any],
+    weight: torch.Tensor | None = None,
+    scale: torch.Tensor | None = None,
 ) -> SDNQQuantizationType:
     """Infer quantization type from weight dtype and config."""
-    # Check config first
+    # Check config for weights_dtype (SDNQ style)
+    weights_dtype = config.get("weights_dtype", "")
+    if weights_dtype == "uint4":
+        return SDNQQuantizationType.UINT4_ASYM
+
+    # Check config for quant_type
     if "quant_type" in config:
         return SDNQQuantizationType(config["quant_type"])
+
+    # Try to detect uint4 from shapes:
+    # uint4 is packed as 2 values per uint8, so if scale suggests a shape that's
+    # 2x the weight's last dimension, it's likely uint4
+    if weight is not None and scale is not None and weight_dtype == torch.uint8:
+        if len(weight.shape) == 2 and len(scale.shape) >= 2:
+            # For per-group quantization: scale shape [out, num_groups, 1] or [out, num_groups]
+            # weight shape [out, in/2] for uint4
+            # Check if scale's out_features matches weight's out_features
+            # and if num_groups * group_size would be 2x weight's in_features
+            out_features = weight.shape[0]
+            packed_in = weight.shape[1]
+            scale_out = scale.shape[0]
+            num_groups = scale.shape[1]
+
+            if scale_out == out_features and num_groups > 0:
+                # If we can infer that unpacked shape would be 2x packed, it's uint4
+                # For typical group sizes (32, 64, 128), num_groups * group_size = in_features
+                # If packed_in * 2 can be divided by num_groups, it's likely uint4
+                unpacked_in = packed_in * 2
+                if unpacked_in % num_groups == 0:
+                    inferred_group_size = unpacked_in // num_groups
+                    if inferred_group_size in (32, 64, 128, 256):
+                        return SDNQQuantizationType.UINT4_ASYM
 
     # Infer from dtype
     if weight_dtype == torch.int8:
@@ -49,11 +83,43 @@ def _get_original_shape(
     weight: torch.Tensor,
     config: dict[str, Any],
     tensor_name: str,
+    quant_type: SDNQQuantizationType,
+    scale: torch.Tensor | None = None,
+    group_size: int = 128,
 ) -> torch.Size:
     """Determine the original tensor shape before quantization."""
     # Check if shape is stored in config
     if "shapes" in config and tensor_name in config["shapes"]:
         return torch.Size(config["shapes"][tensor_name])
+
+    # For uint4 packed weights with per-group quantization
+    if quant_type == SDNQQuantizationType.UINT4_ASYM:
+        # For 1D flattened weights, infer shape from scale tensor
+        # Scale can have shape [out_features, num_groups, 1] or [out_features, num_groups]
+        if scale is not None and len(scale.shape) >= 2:
+            out_features = scale.shape[0]
+            num_groups = scale.shape[1]
+            in_features = num_groups * group_size
+            if in_features > 0:
+                return torch.Size([out_features, in_features])
+
+        # For 2D packed weights, multiply last dim by 2
+        if len(weight.shape) == 2:
+            return torch.Size([weight.shape[0], weight.shape[1] * 2])
+
+        # For 1D, infer from packed size and scale's out_features
+        if len(weight.shape) == 1 and scale is not None:
+            # uint4 packs 2 values per byte
+            total_elements = weight.numel() * 2
+            out_features = scale.shape[0]
+            if out_features > 0 and total_elements % out_features == 0:
+                in_features = total_elements // out_features
+                return torch.Size([out_features, in_features])
+
+        # Final fallback for 1D
+        if len(weight.shape) == 1:
+            total_elements = weight.numel() * 2
+            return torch.Size([total_elements])
 
     # Quantized tensors usually keep the same shape
     return weight.shape
@@ -92,6 +158,10 @@ def sdnq_sd_loader(
     # Load quantization config if available
     quant_config = _parse_quantization_config(config_path)
 
+    # Get group_size from config (default: 128 for SDNQ)
+    # Note: group_size=0 in config means per-tensor quantization or it needs to be inferred
+    config_group_size = quant_config.get("group_size", 128)
+
     # Load safetensors file
     raw_sd = load_file(model_file)
 
@@ -125,10 +195,41 @@ def sdnq_sd_loader(
                     weight.dtype,
                     zero_point is not None,
                     quant_config,
+                    weight=weight,
+                    scale=scale,
                 )
 
-                # Determine original shape
-                original_shape = _get_original_shape(weight, quant_config, key)
+                # Determine group_size for this tensor
+                # If config has group_size=0, infer from scale tensor shape
+                if config_group_size > 0:
+                    tensor_group_size = config_group_size
+                elif len(scale.shape) >= 2 and scale.shape[1] > 0:
+                    # Scale shape is [out_features, num_groups, ...] or [out_features, num_groups]
+                    # We'll compute group_size after determining original_shape
+                    tensor_group_size = None  # Will be computed below
+                else:
+                    tensor_group_size = 128  # Default fallback
+
+                # Determine original shape (need quant_type and scale to handle uint4 packing)
+                original_shape = _get_original_shape(
+                    weight, quant_config, key, quant_type, scale=scale, group_size=tensor_group_size or 128
+                )
+
+                # Compute group_size from original_shape and scale if not set
+                if tensor_group_size is None and len(original_shape) == 2 and len(scale.shape) >= 2:
+                    out_features, in_features = original_shape
+                    num_groups = scale.shape[1]
+                    if num_groups > 0:
+                        tensor_group_size = in_features // num_groups
+                    else:
+                        tensor_group_size = 128  # Fallback
+
+                # Log quantization info for debugging
+                logger.debug(
+                    f"SDNQ: {key} - type={quant_type.value}, weight_shape={weight.shape}, "
+                    f"weight_dtype={weight.dtype}, scale_shape={scale.shape}, "
+                    f"original_shape={original_shape}, group_size={tensor_group_size}"
+                )
 
                 # Create SDNQTensor
                 sd[key] = SDNQTensor(
@@ -140,6 +241,7 @@ def sdnq_sd_loader(
                     zero_point=zero_point,
                     svd_up=svd_up,
                     svd_down=svd_down,
+                    group_size=tensor_group_size if quant_type == SDNQQuantizationType.UINT4_ASYM else None,
                 )
 
                 # Mark related keys as processed
@@ -164,6 +266,12 @@ def sdnq_sd_loader(
             # Other tensors (biases, norms, etc.) - copy as-is
             sd[key] = raw_sd[key]
             processed_keys.add(key)
+
+    # Log summary
+    sdnq_count = sum(1 for v in sd.values() if isinstance(v, SDNQTensor))
+    regular_count = len(sd) - sdnq_count
+    print(f"[SDNQ] Loaded {sdnq_count} quantized tensors, {regular_count} regular tensors from {model_file}")
+    logger.info(f"SDNQ loader: {sdnq_count} quantized tensors, {regular_count} regular tensors from {model_file}")
 
     gc.collect()
     return sd

@@ -6,6 +6,7 @@ from typing import Optional
 
 import accelerate
 import torch
+from diffusers import AutoencoderKL
 from safetensors.torch import load_file
 from transformers import (
     AutoConfig,
@@ -49,6 +50,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_FLUX_Config,
     Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
+    Main_SDNQ_Diffusers_FLUX_Config,
     Main_SDNQ_FLUX_Config,
 )
 from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
@@ -1386,46 +1388,6 @@ class Flux2GGUFCheckpointModel(ModelLoader):
         return torch.cat([scale, shift], dim=0)
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.Main, format=ModelFormat.SDNQQuantized)
-class FluxSDNQCheckpointModel(ModelLoader):
-    """Class to load SDNQ-quantized FLUX main models."""
-
-    def _load_model(
-        self,
-        config: AnyModelConfig,
-        submodel_type: Optional[SubModelType] = None,
-    ) -> AnyModel:
-        if not isinstance(config, Checkpoint_Config_Base):
-            raise ValueError("Only CheckpointConfigBase models are currently supported here.")
-
-        match submodel_type:
-            case SubModelType.Transformer:
-                return self._load_from_singlefile(config)
-
-        raise ValueError(
-            f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
-        )
-
-    def _load_from_singlefile(
-        self,
-        config: AnyModelConfig,
-    ) -> AnyModel:
-        assert isinstance(config, Main_SDNQ_FLUX_Config)
-        model_path = Path(config.path)
-
-        with accelerate.init_empty_weights():
-            model = Flux(get_flux_transformers_params(config.variant))
-
-        sd = sdnq_sd_loader(model_path, compute_dtype=torch.bfloat16)
-
-        # Handle ComfyUI bundle format
-        if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
-            sd = convert_bundle_to_flux_transformer_checkpoint(sd)
-
-        model.load_state_dict(sd, assign=True)
-        return model
-
-
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Diffusers)
 class FluxControlnetModel(ModelLoader):
@@ -1516,4 +1478,355 @@ class FluxReduxModelLoader(ModelLoader):
 
         model.load_state_dict(sd, assign=True)
         model.to(dtype=torch.bfloat16)
+        return model
+
+
+def _is_sdnq_folder(folder_path: Path) -> bool:
+    """Check if a folder contains SDNQ-quantized model weights."""
+    import json
+
+    quant_config_path = folder_path / "quantization_config.json"
+    if quant_config_path.exists():
+        try:
+            with open(quant_config_path, "r", encoding="utf-8") as f:
+                quant_config = json.load(f)
+            if quant_config.get("quant_method") == "sdnq":
+                return True
+        except (json.JSONDecodeError, OSError):
+            pass
+    return False
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.Main, format=ModelFormat.SDNQQuantized)
+class FluxSDNQDiffusersModel(ModelLoader):
+    """Class to load SDNQ-quantized Flux models in diffusers format."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        print(f"[SDNQ] FluxSDNQDiffusersModel._load_model called with config={type(config).__name__}, submodel={submodel_type}")
+        # Handle single-file SDNQ checkpoint (Main_SDNQ_FLUX_Config)
+        if isinstance(config, Main_SDNQ_FLUX_Config):
+            if submodel_type == SubModelType.Transformer:
+                return self._load_sdnq_transformer_checkpoint(config)
+            raise ValueError(
+                f"Only Transformer submodels are supported for checkpoint format. Received: {submodel_type}"
+            )
+
+        # Handle diffusers-format SDNQ model (Main_SDNQ_Diffusers_FLUX_Config)
+        if not isinstance(config, Main_SDNQ_Diffusers_FLUX_Config):
+            raise ValueError(f"Expected Main_SDNQ_Diffusers_FLUX_Config, got {type(config).__name__}")
+
+        if submodel_type is None:
+            raise ValueError("A submodel type must be provided when loading main pipelines.")
+
+        model_path = Path(config.path)
+        submodel_path = model_path / submodel_type.value
+
+        match submodel_type:
+            case SubModelType.Transformer:
+                return self._load_sdnq_transformer(submodel_path, config)
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder(submodel_path)
+            case SubModelType.TextEncoder2:
+                return self._load_text_encoder_2(submodel_path)
+            case SubModelType.Tokenizer:
+                return CLIPTokenizer.from_pretrained(submodel_path, local_files_only=True)
+            case SubModelType.Tokenizer2:
+                return T5TokenizerFast.from_pretrained(submodel_path, max_length=512, local_files_only=True)
+            case SubModelType.VAE:
+                return self._load_vae(submodel_path)
+            case _:
+                raise ValueError(f"Unsupported submodel type: {submodel_type}")
+
+    def _load_sdnq_transformer_checkpoint(self, config: Main_SDNQ_FLUX_Config) -> AnyModel:
+        """Load SDNQ transformer from single-file checkpoint."""
+        model_path = Path(config.path)
+
+        with accelerate.init_empty_weights():
+            model = Flux(get_flux_transformers_params(config.variant))
+
+        sd = sdnq_sd_loader(model_path, compute_dtype=torch.bfloat16)
+
+        # Handle ComfyUI bundle format
+        if "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale" in sd:
+            sd = convert_bundle_to_flux_transformer_checkpoint(sd)
+
+        model.load_state_dict(sd, assign=True)
+        return model
+
+    def _load_sdnq_transformer(self, transformer_path: Path, config: Main_SDNQ_Diffusers_FLUX_Config) -> AnyModel:
+        """Load SDNQ-quantized transformer from diffusers folder."""
+        print(f"[SDNQ] _load_sdnq_transformer called for {transformer_path}")
+        with accelerate.init_empty_weights():
+            model = Flux(get_flux_transformers_params(config.variant))
+
+        sd = sdnq_sd_loader(transformer_path, compute_dtype=torch.bfloat16)
+
+        # Convert from diffusers format to BFL format
+        sd = self._convert_diffusers_sd_to_bfl(sd)
+
+        model.load_state_dict(sd, assign=True)
+        return model
+
+    def _convert_diffusers_sd_to_bfl(self, sd: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        """Convert a Flux transformer state dict from diffusers format to BFL format.
+
+        Note: For SDNQTensor objects, Q/K/V tensors are dequantized before fusion since
+        torch.cat doesn't work with quantized tensors. Other layers retain quantization.
+        """
+        from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+
+        # Helper to dequantize SDNQTensor or return as-is
+        def maybe_dequantize(t: torch.Tensor) -> torch.Tensor:
+            if isinstance(t, SDNQTensor):
+                return t.get_dequantized_tensor()
+            return t
+
+        # Helper to fuse weights, handling SDNQTensor
+        def fuse_weights(*tensors: torch.Tensor) -> torch.Tensor:
+            dequantized = [maybe_dequantize(t) for t in tensors]
+            return torch.cat(dequantized, dim=0)
+
+        # Make a shallow copy so we can pop keys
+        sd = sd.copy()
+        new_sd: dict[str, torch.Tensor] = {}
+
+        # Basic 1-to-1 key conversions
+        basic_key_map = {
+            # txt_in keys
+            "context_embedder.bias": "txt_in.bias",
+            "context_embedder.weight": "txt_in.weight",
+            # guidance_in MLPEmbedder keys
+            "time_text_embed.guidance_embedder.linear_1.bias": "guidance_in.in_layer.bias",
+            "time_text_embed.guidance_embedder.linear_1.weight": "guidance_in.in_layer.weight",
+            "time_text_embed.guidance_embedder.linear_2.bias": "guidance_in.out_layer.bias",
+            "time_text_embed.guidance_embedder.linear_2.weight": "guidance_in.out_layer.weight",
+            # vector_in MLPEmbedder keys
+            "time_text_embed.text_embedder.linear_1.bias": "vector_in.in_layer.bias",
+            "time_text_embed.text_embedder.linear_1.weight": "vector_in.in_layer.weight",
+            "time_text_embed.text_embedder.linear_2.bias": "vector_in.out_layer.bias",
+            "time_text_embed.text_embedder.linear_2.weight": "vector_in.out_layer.weight",
+            # time_in MLPEmbedder keys
+            "time_text_embed.timestep_embedder.linear_1.bias": "time_in.in_layer.bias",
+            "time_text_embed.timestep_embedder.linear_1.weight": "time_in.in_layer.weight",
+            "time_text_embed.timestep_embedder.linear_2.bias": "time_in.out_layer.bias",
+            "time_text_embed.timestep_embedder.linear_2.weight": "time_in.out_layer.weight",
+            # img_in keys
+            "x_embedder.bias": "img_in.bias",
+            "x_embedder.weight": "img_in.weight",
+            # final_layer keys
+            "proj_out.bias": "final_layer.linear.bias",
+            "proj_out.weight": "final_layer.linear.weight",
+            "norm_out.linear.bias": "final_layer.adaLN_modulation.1.bias",
+            "norm_out.linear.weight": "final_layer.adaLN_modulation.1.weight",
+        }
+        for old_key, new_key in basic_key_map.items():
+            v = sd.pop(old_key, None)
+            if v is not None:
+                new_sd[new_key] = v
+
+        # Handle the double_blocks (19 blocks for FLUX)
+        block_index = 0
+        while f"transformer_blocks.{block_index}.attn.add_q_proj.bias" in sd:
+            from_prefix = f"transformer_blocks.{block_index}"
+            to_prefix = f"double_blocks.{block_index}"
+
+            # txt_attn.qkv (fuse add_q, add_k, add_v)
+            new_sd[f"{to_prefix}.txt_attn.qkv.bias"] = fuse_weights(
+                sd.pop(f"{from_prefix}.attn.add_q_proj.bias"),
+                sd.pop(f"{from_prefix}.attn.add_k_proj.bias"),
+                sd.pop(f"{from_prefix}.attn.add_v_proj.bias"),
+            )
+            new_sd[f"{to_prefix}.txt_attn.qkv.weight"] = fuse_weights(
+                sd.pop(f"{from_prefix}.attn.add_q_proj.weight"),
+                sd.pop(f"{from_prefix}.attn.add_k_proj.weight"),
+                sd.pop(f"{from_prefix}.attn.add_v_proj.weight"),
+            )
+
+            # img_attn.qkv (fuse to_q, to_k, to_v)
+            new_sd[f"{to_prefix}.img_attn.qkv.bias"] = fuse_weights(
+                sd.pop(f"{from_prefix}.attn.to_q.bias"),
+                sd.pop(f"{from_prefix}.attn.to_k.bias"),
+                sd.pop(f"{from_prefix}.attn.to_v.bias"),
+            )
+            new_sd[f"{to_prefix}.img_attn.qkv.weight"] = fuse_weights(
+                sd.pop(f"{from_prefix}.attn.to_q.weight"),
+                sd.pop(f"{from_prefix}.attn.to_k.weight"),
+                sd.pop(f"{from_prefix}.attn.to_v.weight"),
+            )
+
+            # 1-to-1 key mappings for double block
+            double_block_key_map = {
+                # img_attn
+                "attn.norm_k.weight": "img_attn.norm.key_norm.scale",
+                "attn.norm_q.weight": "img_attn.norm.query_norm.scale",
+                "attn.to_out.0.weight": "img_attn.proj.weight",
+                "attn.to_out.0.bias": "img_attn.proj.bias",
+                # img_mlp
+                "ff.net.0.proj.weight": "img_mlp.0.weight",
+                "ff.net.0.proj.bias": "img_mlp.0.bias",
+                "ff.net.2.weight": "img_mlp.2.weight",
+                "ff.net.2.bias": "img_mlp.2.bias",
+                # img_mod
+                "norm1.linear.weight": "img_mod.lin.weight",
+                "norm1.linear.bias": "img_mod.lin.bias",
+                # txt_attn
+                "attn.norm_added_q.weight": "txt_attn.norm.query_norm.scale",
+                "attn.norm_added_k.weight": "txt_attn.norm.key_norm.scale",
+                "attn.to_add_out.weight": "txt_attn.proj.weight",
+                "attn.to_add_out.bias": "txt_attn.proj.bias",
+                # txt_mlp
+                "ff_context.net.0.proj.weight": "txt_mlp.0.weight",
+                "ff_context.net.0.proj.bias": "txt_mlp.0.bias",
+                "ff_context.net.2.weight": "txt_mlp.2.weight",
+                "ff_context.net.2.bias": "txt_mlp.2.bias",
+                # txt_mod
+                "norm1_context.linear.weight": "txt_mod.lin.weight",
+                "norm1_context.linear.bias": "txt_mod.lin.bias",
+            }
+            for from_key, to_key in double_block_key_map.items():
+                v = sd.pop(f"{from_prefix}.{from_key}", None)
+                if v is not None:
+                    new_sd[f"{to_prefix}.{to_key}"] = v
+
+            block_index += 1
+
+        # Handle the single_blocks (38 blocks for FLUX)
+        block_index = 0
+        while f"single_transformer_blocks.{block_index}.attn.to_q.bias" in sd:
+            from_prefix = f"single_transformer_blocks.{block_index}"
+            to_prefix = f"single_blocks.{block_index}"
+
+            # linear1 (fuse to_q, to_k, to_v, proj_mlp)
+            new_sd[f"{to_prefix}.linear1.bias"] = fuse_weights(
+                sd.pop(f"{from_prefix}.attn.to_q.bias"),
+                sd.pop(f"{from_prefix}.attn.to_k.bias"),
+                sd.pop(f"{from_prefix}.attn.to_v.bias"),
+                sd.pop(f"{from_prefix}.proj_mlp.bias"),
+            )
+            new_sd[f"{to_prefix}.linear1.weight"] = fuse_weights(
+                sd.pop(f"{from_prefix}.attn.to_q.weight"),
+                sd.pop(f"{from_prefix}.attn.to_k.weight"),
+                sd.pop(f"{from_prefix}.attn.to_v.weight"),
+                sd.pop(f"{from_prefix}.proj_mlp.weight"),
+            )
+
+            # 1-to-1 key mappings for single block
+            single_block_key_map = {
+                # linear2
+                "proj_out.weight": "linear2.weight",
+                "proj_out.bias": "linear2.bias",
+                # modulation
+                "norm.linear.weight": "modulation.lin.weight",
+                "norm.linear.bias": "modulation.lin.bias",
+                # norm
+                "attn.norm_k.weight": "norm.key_norm.scale",
+                "attn.norm_q.weight": "norm.query_norm.scale",
+            }
+            for from_key, to_key in single_block_key_map.items():
+                v = sd.pop(f"{from_prefix}.{from_key}", None)
+                if v is not None:
+                    new_sd[f"{to_prefix}.{to_key}"] = v
+
+            block_index += 1
+
+        # Any remaining keys that weren't converted - just pass through
+        for k, v in sd.items():
+            if k not in new_sd:
+                new_sd[k] = v
+
+        return new_sd
+
+    def _load_text_encoder(self, text_encoder_path: Path) -> AnyModel:
+        """Load text encoder (CLIP) - SDNQ or normal."""
+        if _is_sdnq_folder(text_encoder_path):
+            # SDNQ CLIP - need custom loading
+            return self._load_sdnq_clip(text_encoder_path)
+        # Normal CLIP
+        return CLIPTextModel.from_pretrained(text_encoder_path, local_files_only=True)
+
+    def _load_text_encoder_2(self, text_encoder_path: Path) -> AnyModel:
+        """Load text encoder 2 (T5) - SDNQ or normal."""
+        if _is_sdnq_folder(text_encoder_path):
+            # SDNQ T5 - need custom loading
+            return self._load_sdnq_t5(text_encoder_path)
+        # Normal T5
+        return T5EncoderModel.from_pretrained(
+            text_encoder_path,
+            torch_dtype="auto",
+            low_cpu_mem_usage=True,
+            local_files_only=True,
+        )
+
+    def _load_sdnq_clip(self, clip_path: Path) -> AnyModel:
+        """Load SDNQ-quantized CLIP text encoder."""
+        from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+
+        # Load SDNQ state dict
+        sd = sdnq_sd_loader(clip_path, compute_dtype=torch.bfloat16)
+
+        # Load config and create model
+        model_config = AutoConfig.from_pretrained(clip_path, local_files_only=True)
+        with accelerate.init_empty_weights():
+            model = CLIPTextModel(model_config)
+
+        model.load_state_dict(sd, strict=False, assign=True)
+
+        # Dequantize embedding layer
+        if hasattr(model, "text_model") and hasattr(model.text_model, "embeddings"):
+            embed_weight = model.text_model.embeddings.token_embedding.weight
+            if isinstance(embed_weight, SDNQTensor):
+                dequantized = embed_weight.get_dequantized_tensor()
+                model.text_model.embeddings.token_embedding.weight = torch.nn.Parameter(
+                    dequantized, requires_grad=False
+                )
+
+        return model
+
+    def _load_sdnq_t5(self, t5_path: Path) -> AnyModel:
+        """Load SDNQ-quantized T5 text encoder."""
+        from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+
+        # Load SDNQ state dict
+        sd = sdnq_sd_loader(t5_path, compute_dtype=torch.bfloat16)
+
+        # Load config and create model
+        model_config = AutoConfig.from_pretrained(t5_path, local_files_only=True)
+        with accelerate.init_empty_weights():
+            model = AutoModelForTextEncoding.from_config(model_config)
+
+        model.load_state_dict(sd, strict=False, assign=True)
+
+        # Dequantize shared embedding
+        if hasattr(model, "shared") and isinstance(model.shared.weight, SDNQTensor):
+            dequantized = model.shared.weight.get_dequantized_tensor()
+            model.shared.weight = torch.nn.Parameter(dequantized, requires_grad=False)
+
+        # Re-tie weights after dequantization
+        if hasattr(model, "encoder") and hasattr(model.encoder, "embed_tokens"):
+            if model.encoder.embed_tokens.weight is not model.shared.weight:
+                model.encoder.embed_tokens.weight = model.shared.weight
+
+        return model
+
+    def _load_vae(self, vae_path: Path) -> AnyModel:
+        """Load VAE - SDNQ or normal."""
+        if _is_sdnq_folder(vae_path):
+            return self._load_sdnq_vae(vae_path)
+        # Normal VAE
+        return AutoencoderKL.from_pretrained(vae_path, local_files_only=True)
+
+    def _load_sdnq_vae(self, vae_path: Path) -> AnyModel:
+        """Load SDNQ-quantized VAE."""
+        # Load SDNQ state dict
+        sd = sdnq_sd_loader(vae_path, compute_dtype=torch.bfloat16)
+
+        # Load config and create model
+        with accelerate.init_empty_weights():
+            model = AutoencoderKL.from_config(AutoencoderKL.load_config(vae_path, local_files_only=True))
+
+        model.load_state_dict(sd, strict=False, assign=True)
         return model

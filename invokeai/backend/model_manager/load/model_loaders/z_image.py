@@ -20,6 +20,8 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_GGUF_Config,
     Qwen3Encoder_Qwen3Encoder_Config,
+    Qwen3Encoder_SDNQ_Config,
+    Qwen3Encoder_SDNQ_Folder_Config,
 )
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -146,17 +148,25 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
             raise Exception("A submodel type must be provided when loading main pipelines.")
 
         model_path = Path(config.path)
+        submodel_path = model_path / submodel_type.value
+
+        # Check if submodel folder has SDNQ quantization - if so, use SDNQ loader
+        if self._is_sdnq_folder(submodel_path):
+            if submodel_type == SubModelType.TextEncoder:
+                return self._load_sdnq_text_encoder(submodel_path)
+            elif submodel_type == SubModelType.Transformer:
+                return self._load_sdnq_transformer(submodel_path)
+
         load_class = self.get_hf_load_class(model_path, submodel_type)
         repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
-        model_path = model_path / submodel_type.value
 
         # Z-Image prefers bfloat16, but use safe dtype based on target device capabilities.
         target_device = TorchDevice.choose_torch_device()
         dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
         try:
             result: AnyModel = load_class.from_pretrained(
-                model_path,
+                submodel_path,
                 torch_dtype=dtype,
                 variant=variant,
             )
@@ -164,12 +174,183 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
             if variant and "no file named" in str(
                 e
             ):  # try without the variant, just in case user's preferences changed
-                result = load_class.from_pretrained(model_path, torch_dtype=dtype)
+                result = load_class.from_pretrained(submodel_path, torch_dtype=dtype)
             else:
                 raise e
 
         result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result
+
+    def _is_sdnq_folder(self, folder_path: Path) -> bool:
+        """Check if a folder contains SDNQ-quantized model weights."""
+        import json
+
+        quant_config_path = folder_path / "quantization_config.json"
+        if quant_config_path.exists():
+            with open(quant_config_path, "r", encoding="utf-8") as f:
+                quant_config = json.load(f)
+            if quant_config.get("quant_method") == "sdnq":
+                return True
+        return False
+
+    def _load_sdnq_text_encoder(self, text_encoder_path: Path) -> AnyModel:
+        """Load SDNQ-quantized text encoder from folder."""
+        from transformers import Qwen3Config, Qwen3ForCausalLM
+
+        from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
+        from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+        from invokeai.backend.util.logging import InvokeAILogger
+
+        logger = InvokeAILogger.get_logger(self.__class__.__name__)
+        logger.info(f"Loading SDNQ-quantized text encoder from {text_encoder_path}")
+
+        target_device = TorchDevice.choose_torch_device()
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        # Load the SDNQ state dict
+        sd = sdnq_sd_loader(text_encoder_path, compute_dtype=compute_dtype)
+
+        # Determine Qwen model configuration from state dict
+        layer_count = 0
+        for key in sd.keys():
+            if isinstance(key, str) and key.startswith("model.layers."):
+                parts = key.split(".")
+                if len(parts) > 2:
+                    try:
+                        layer_idx = int(parts[2])
+                        layer_count = max(layer_count, layer_idx + 1)
+                    except ValueError:
+                        pass
+
+        # Get hidden size from embed_tokens weight shape
+        embed_weight = sd.get("model.embed_tokens.weight")
+        if embed_weight is None:
+            raise ValueError("Could not find model.embed_tokens.weight in state dict")
+
+        embed_shape = embed_weight.shape if hasattr(embed_weight, "shape") else embed_weight.tensor_shape
+        hidden_size = embed_shape[1]
+        vocab_size = embed_shape[0]
+
+        # Detect attention configuration from layer 0 weights
+        q_proj_weight = sd.get("model.layers.0.self_attn.q_proj.weight")
+        k_proj_weight = sd.get("model.layers.0.self_attn.k_proj.weight")
+        gate_proj_weight = sd.get("model.layers.0.mlp.gate_proj.weight")
+
+        if q_proj_weight is None or k_proj_weight is None or gate_proj_weight is None:
+            raise ValueError("Could not find attention/mlp weights in state dict")
+
+        q_shape = q_proj_weight.shape if hasattr(q_proj_weight, "shape") else q_proj_weight.tensor_shape
+        k_shape = k_proj_weight.shape if hasattr(k_proj_weight, "shape") else k_proj_weight.tensor_shape
+        gate_shape = gate_proj_weight.shape if hasattr(gate_proj_weight, "shape") else gate_proj_weight.tensor_shape
+
+        head_dim = 128
+        num_attention_heads = q_shape[0] // head_dim
+        num_kv_heads = k_shape[0] // head_dim
+        intermediate_size = gate_shape[0]
+
+        logger.info(
+            f"Qwen3 SDNQ config: layers={layer_count}, hidden={hidden_size}, "
+            f"heads={num_attention_heads}, kv_heads={num_kv_heads}"
+        )
+
+        qwen_config = Qwen3Config(
+            vocab_size=vocab_size,
+            hidden_size=hidden_size,
+            intermediate_size=intermediate_size,
+            num_hidden_layers=layer_count,
+            num_attention_heads=num_attention_heads,
+            num_key_value_heads=num_kv_heads,
+            head_dim=head_dim,
+            max_position_embeddings=40960,
+            rms_norm_eps=1e-6,
+            tie_word_embeddings=True,
+            rope_theta=1000000.0,
+            use_sliding_window=False,
+            attention_bias=False,
+            attention_dropout=0.0,
+            torch_dtype=compute_dtype,
+        )
+
+        with accelerate.init_empty_weights():
+            model = Qwen3ForCausalLM(qwen_config)
+
+        model.load_state_dict(sd, strict=False, assign=True)
+
+        # Dequantize embed_tokens weight for embedding lookups
+        embed_tokens_weight = model.model.embed_tokens.weight
+        if isinstance(embed_tokens_weight, SDNQTensor):
+            dequantized = embed_tokens_weight.get_dequantized_tensor()
+            model.model.embed_tokens.weight = torch.nn.Parameter(dequantized, requires_grad=False)
+            logger.info("Dequantized embed_tokens weight for embedding lookups")
+
+        # Handle tied weights
+        if qwen_config.tie_word_embeddings:
+            if model.lm_head.weight.is_meta:
+                model.lm_head.weight = model.model.embed_tokens.weight
+            else:
+                model.tie_weights()
+
+        # Re-initialize meta tensor buffers
+        for name, buffer in list(model.named_buffers()):
+            if buffer.is_meta:
+                parts = name.rsplit(".", 1)
+                if len(parts) == 2:
+                    parent = model.get_submodule(parts[0])
+                    buffer_name = parts[1]
+                else:
+                    parent = model
+                    buffer_name = name
+
+                if buffer_name == "inv_freq":
+                    base = qwen_config.rope_theta
+                    inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim))
+                    parent.register_buffer(buffer_name, inv_freq.to(dtype=compute_dtype), persistent=False)
+
+        return model
+
+    def _load_sdnq_transformer(self, transformer_path: Path) -> AnyModel:
+        """Load SDNQ-quantized transformer from folder."""
+        from diffusers import ZImageTransformer2DModel
+
+        from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
+        from invokeai.backend.util.logging import InvokeAILogger
+
+        logger = InvokeAILogger.get_logger(self.__class__.__name__)
+        logger.info(f"Loading SDNQ-quantized transformer from {transformer_path}")
+
+        target_device = TorchDevice.choose_torch_device()
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        # Load the SDNQ state dict
+        sd = sdnq_sd_loader(transformer_path, compute_dtype=compute_dtype)
+
+        # Check if conversion is needed (original format vs diffusers format)
+        needs_conversion = any(k.startswith("x_embedder.") for k in sd.keys() if isinstance(k, str))
+        if needs_conversion:
+            sd = _convert_z_image_gguf_to_diffusers(sd)
+
+        # Create an empty model with the default Z-Image config
+        with accelerate.init_empty_weights():
+            model = ZImageTransformer2DModel(
+                all_patch_size=(2,),
+                all_f_patch_size=(1,),
+                in_channels=16,
+                dim=3840,
+                n_layers=30,
+                n_refiner_layers=2,
+                n_heads=30,
+                n_kv_heads=30,
+                norm_eps=1e-05,
+                qk_norm=True,
+                cap_feat_dim=2560,
+                rope_theta=256.0,
+                t_scale=1000.0,
+                axes_dims=[32, 48, 48],
+                axes_lens=[1024, 512, 512],
+            )
+
+        model.load_state_dict(sd, assign=True)
+        return model
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.ZImage, type=ModelType.Main, format=ModelFormat.Checkpoint)
@@ -1170,3 +1351,176 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
                 new_sd[key] = value
 
         return new_sd
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Qwen3Encoder, format=ModelFormat.SDNQQuantized)
+class Qwen3EncoderSDNQLoader(ModelLoader):
+    """Class to load SDNQ-quantized Qwen3 Encoder models for Z-Image."""
+
+    # Default HuggingFace model to load tokenizer from when using SDNQ Qwen3 encoder
+    DEFAULT_TOKENIZER_SOURCE = "Qwen/Qwen3-4B"
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, (Qwen3Encoder_SDNQ_Config, Qwen3Encoder_SDNQ_Folder_Config)):
+            raise ValueError(
+                "Only Qwen3Encoder_SDNQ_Config or Qwen3Encoder_SDNQ_Folder_Config models are supported here."
+            )
+
+        match submodel_type:
+            case SubModelType.TextEncoder:
+                return self._load_from_sdnq(config)
+            case SubModelType.Tokenizer:
+                return self._load_tokenizer_with_offline_fallback()
+
+        submodel_str = submodel_type.value if submodel_type else "None"
+        raise ValueError(f"Only TextEncoder and Tokenizer submodels are supported. Received: {submodel_str}")
+
+    def _load_tokenizer_with_offline_fallback(self) -> AnyModel:
+        """Load tokenizer with local_files_only fallback for offline support."""
+        try:
+            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE, local_files_only=True)
+        except OSError:
+            return AutoTokenizer.from_pretrained(self.DEFAULT_TOKENIZER_SOURCE)
+
+    def _load_from_sdnq(
+        self,
+        config: AnyModelConfig,
+    ) -> AnyModel:
+        from transformers import Qwen3Config, Qwen3ForCausalLM
+
+        from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+        from invokeai.backend.util.logging import InvokeAILogger
+
+        logger = InvokeAILogger.get_logger(self.__class__.__name__)
+
+        if not isinstance(config, (Qwen3Encoder_SDNQ_Config, Qwen3Encoder_SDNQ_Folder_Config)):
+            raise TypeError(
+                f"Expected Qwen3Encoder_SDNQ_Config or Qwen3Encoder_SDNQ_Folder_Config, got {type(config).__name__}."
+            )
+        model_path = Path(config.path)
+
+        # Determine safe dtype based on target device capabilities
+        target_device = TorchDevice.choose_torch_device()
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        # Load the SDNQ state dict - this returns SDNQTensor wrappers (on CPU)
+        sd = sdnq_sd_loader(model_path, compute_dtype=compute_dtype)
+
+        # Determine Qwen model configuration from state dict
+        layer_count = 0
+        for key in sd.keys():
+            if isinstance(key, str) and key.startswith("model.layers."):
+                parts = key.split(".")
+                if len(parts) > 2:
+                    try:
+                        layer_idx = int(parts[2])
+                        layer_count = max(layer_count, layer_idx + 1)
+                    except ValueError:
+                        pass
+
+        # Get hidden size from embed_tokens weight shape
+        embed_weight = sd.get("model.embed_tokens.weight")
+        if embed_weight is None:
+            raise ValueError("Could not find model.embed_tokens.weight in state dict")
+
+        embed_shape = embed_weight.shape if hasattr(embed_weight, "shape") else embed_weight.tensor_shape
+        if len(embed_shape) != 2:
+            raise ValueError(f"Expected 2D embed_tokens weight tensor, got shape {embed_shape}.")
+        hidden_size = embed_shape[1]
+        vocab_size = embed_shape[0]
+
+        # Detect attention configuration from layer 0 weights
+        q_proj_weight = sd.get("model.layers.0.self_attn.q_proj.weight")
+        k_proj_weight = sd.get("model.layers.0.self_attn.k_proj.weight")
+        gate_proj_weight = sd.get("model.layers.0.mlp.gate_proj.weight")
+
+        if q_proj_weight is None or k_proj_weight is None or gate_proj_weight is None:
+            raise ValueError("Could not find attention/mlp weights in state dict to determine configuration")
+
+        q_shape = q_proj_weight.shape if hasattr(q_proj_weight, "shape") else q_proj_weight.tensor_shape
+        k_shape = k_proj_weight.shape if hasattr(k_proj_weight, "shape") else k_proj_weight.tensor_shape
+        gate_shape = gate_proj_weight.shape if hasattr(gate_proj_weight, "shape") else gate_proj_weight.tensor_shape
+
+        head_dim = 128  # Standard head dimension for Qwen3 models
+        num_attention_heads = q_shape[0] // head_dim
+        num_kv_heads = k_shape[0] // head_dim
+        intermediate_size = gate_shape[0]
+
+        logger.info(
+            f"Qwen3 SDNQ Encoder config detected: layers={layer_count}, hidden={hidden_size}, "
+            f"heads={num_attention_heads}, kv_heads={num_kv_heads}, intermediate={intermediate_size}, "
+            f"head_dim={head_dim}"
+        )
+
+        # Create Qwen3 config
+        qwen_config = Qwen3Config(
+            vocab_size=vocab_size,
+            hidden_size=hidden_size,
+            intermediate_size=intermediate_size,
+            num_hidden_layers=layer_count,
+            num_attention_heads=num_attention_heads,
+            num_key_value_heads=num_kv_heads,
+            head_dim=head_dim,
+            max_position_embeddings=40960,
+            rms_norm_eps=1e-6,
+            tie_word_embeddings=True,
+            rope_theta=1000000.0,
+            use_sliding_window=False,
+            attention_bias=False,
+            attention_dropout=0.0,
+            torch_dtype=compute_dtype,
+        )
+
+        # Use Qwen3ForCausalLM with empty weights, then load SDNQ tensors
+        with accelerate.init_empty_weights():
+            model = Qwen3ForCausalLM(qwen_config)
+
+        # Load the SDNQ weights with assign=True
+        model.load_state_dict(sd, strict=False, assign=True)
+
+        # Dequantize embed_tokens weight - embedding lookups require indexed access
+        embed_tokens_weight = model.model.embed_tokens.weight
+        if isinstance(embed_tokens_weight, SDNQTensor):
+            dequantized = embed_tokens_weight.get_dequantized_tensor()
+            model.model.embed_tokens.weight = torch.nn.Parameter(dequantized, requires_grad=False)
+            logger.info("Dequantized embed_tokens weight for embedding lookups")
+
+        # Handle tied weights
+        if qwen_config.tie_word_embeddings:
+            if model.lm_head.weight.is_meta:
+                model.lm_head.weight = model.model.embed_tokens.weight
+                logger.info("Tied lm_head.weight to embed_tokens.weight")
+            else:
+                model.tie_weights()
+
+        # Re-initialize any remaining meta tensor buffers
+        for name, buffer in list(model.named_buffers()):
+            if buffer.is_meta:
+                parts = name.rsplit(".", 1)
+                if len(parts) == 2:
+                    parent = model.get_submodule(parts[0])
+                    buffer_name = parts[1]
+                else:
+                    parent = model
+                    buffer_name = name
+
+                if buffer_name == "inv_freq":
+                    base = qwen_config.rope_theta
+                    inv_freq = 1.0 / (base ** (torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim))
+                    parent.register_buffer(buffer_name, inv_freq.to(dtype=compute_dtype), persistent=False)
+                else:
+                    logger.warning(f"Re-initializing unknown meta buffer: {name}")
+
+        # Final check: ensure no meta tensors remain in parameters
+        meta_params = [(name, p) for name, p in model.named_parameters() if p.is_meta]
+        if meta_params:
+            meta_names = [name for name, _ in meta_params]
+            raise RuntimeError(
+                f"Failed to load all parameters from SDNQ. The following remain as meta tensors: {meta_names}."
+            )
+
+        return model

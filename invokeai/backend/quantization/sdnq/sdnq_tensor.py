@@ -1,5 +1,6 @@
 """SDNQTensor - A torch.Tensor subclass for SDNQ quantized weights with on-the-fly dequantization."""
 
+import logging
 from typing import Optional, overload
 
 import torch
@@ -9,7 +10,10 @@ from invokeai.backend.quantization.sdnq.utils import (
     apply_svd_correction,
     dequantize_asymmetric,
     dequantize_symmetric,
+    dequantize_uint4_per_group,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def dequantize_and_run(func, args, kwargs):
@@ -77,6 +81,7 @@ def apply_to_quantized_tensor(func, args, kwargs):
         zero_point=sdnq_tensor._zero_point,
         svd_up=sdnq_tensor._svd_up,
         svd_down=sdnq_tensor._svd_down,
+        group_size=sdnq_tensor._group_size,
     )
 
 
@@ -87,19 +92,71 @@ SDNQ_TENSOR_OP_TABLE = {
     torch.ops.aten.clone.default: apply_to_quantized_tensor,  # pyright: ignore
     # Ops to run on dequantized tensors.
     torch.ops.aten.t.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.linear.default: dequantize_and_run,  # pyright: ignore - needed for F.linear
     torch.ops.aten.addmm.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.mm.default: dequantize_and_run,  # pyright: ignore - matrix multiply
+    torch.ops.aten.bmm.default: dequantize_and_run,  # pyright: ignore - batch matrix multiply
+    torch.ops.aten.baddbmm.default: dequantize_and_run,  # pyright: ignore - batch add batch mm
+    torch.ops.aten.matmul.default: dequantize_and_run,  # pyright: ignore - general matmul
+    # Element-wise ops
     torch.ops.aten.mul.Tensor: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.mul.Scalar: dequantize_and_run,  # pyright: ignore
     torch.ops.aten.add.Tensor: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.add.Scalar: dequantize_and_run,  # pyright: ignore
     torch.ops.aten.sub.Tensor: dequantize_and_run,  # pyright: ignore
-    torch.ops.aten.allclose.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.sub.Scalar: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.div.Tensor: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.div.Scalar: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.neg.default: dequantize_and_run,  # pyright: ignore
+    # Shape manipulation ops
     torch.ops.aten.slice.Tensor: dequantize_and_run,  # pyright: ignore
     torch.ops.aten.view.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.reshape.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten._unsafe_view.default: dequantize_and_run,  # pyright: ignore
     torch.ops.aten.expand.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.permute.default: dequantize_and_run,  # pyright: ignore - attention reshaping
+    torch.ops.aten.transpose.int: dequantize_and_run,  # pyright: ignore - attention
+    torch.ops.aten.contiguous.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.squeeze.dim: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.squeeze.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.unsqueeze.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.select.int: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.split.Tensor: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.split_with_sizes.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.chunk.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.cat.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.stack.default: dequantize_and_run,  # pyright: ignore
+    # Attention ops
+    torch.ops.aten.scaled_dot_product_attention.default: dequantize_and_run,  # pyright: ignore - SDPA
+    torch.ops.aten._scaled_dot_product_flash_attention.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten._scaled_dot_product_efficient_attention.default: dequantize_and_run,  # pyright: ignore
+    # Normalization and activation ops
+    torch.ops.aten.layer_norm.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.group_norm.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.native_layer_norm.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.native_group_norm.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.silu.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.gelu.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.relu.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.softmax.int: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten._softmax.default: dequantize_and_run,  # pyright: ignore
+    # Reduction ops
+    torch.ops.aten.mean.dim: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.sum.dim_IntList: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.var.correction: dequantize_and_run,  # pyright: ignore - for RMSNorm
+    torch.ops.aten.std.correction: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.pow.Tensor_Scalar: dequantize_and_run,  # pyright: ignore - for RMSNorm
+    torch.ops.aten.rsqrt.default: dequantize_and_run,  # pyright: ignore - for RMSNorm
+    torch.ops.aten.sqrt.default: dequantize_and_run,  # pyright: ignore
+    # Misc ops
+    torch.ops.aten.allclose.default: dequantize_and_run,  # pyright: ignore
     torch.ops.aten.index_put_.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.embedding.default: dequantize_and_run,  # pyright: ignore
+    torch.ops.aten.copy_.default: dequantize_and_run,  # pyright: ignore
+    # Conv ops - needed for VAE
+    torch.ops.aten.convolution.default: dequantize_and_run,  # pyright: ignore - Conv2d uses this
+    torch.ops.aten.conv2d.default: dequantize_and_run,  # pyright: ignore
 }
-
-if torch.backends.mps.is_available():
-    SDNQ_TENSOR_OP_TABLE.update({torch.ops.aten.linear.default: dequantize_and_run})  # pyright: ignore
 
 
 class SDNQTensor(torch.Tensor):
@@ -120,15 +177,26 @@ class SDNQTensor(torch.Tensor):
         zero_point: Optional[torch.Tensor] = None,
         svd_up: Optional[torch.Tensor] = None,
         svd_down: Optional[torch.Tensor] = None,
+        group_size: Optional[int] = None,
     ):
+        # Use tensor_shape (the dequantized shape) for the wrapper, not data.shape (packed shape)
+        # This ensures PyTorch's load_state_dict sees the correct shape for assignment
+        # Compute strides for row-major (C-contiguous) layout
+        strides = []
+        stride = 1
+        for dim in reversed(tensor_shape):
+            strides.append(stride)
+            stride *= dim
+        strides = tuple(reversed(strides))
+
         return torch.Tensor._make_wrapper_subclass(  # pyright: ignore
             cls,
-            data.shape,
+            tensor_shape,
             dtype=data.dtype,
             layout=data.layout,
             device=data.device,
-            strides=data.stride(),
-            storage_offset=data.storage_offset(),
+            strides=strides,
+            storage_offset=0,
         )
 
     def __init__(
@@ -141,6 +209,7 @@ class SDNQTensor(torch.Tensor):
         zero_point: Optional[torch.Tensor] = None,
         svd_up: Optional[torch.Tensor] = None,
         svd_down: Optional[torch.Tensor] = None,
+        group_size: Optional[int] = None,
     ):
         self.quantized_data = data
         self._quantization_type = quantization_type
@@ -150,6 +219,7 @@ class SDNQTensor(torch.Tensor):
         self._zero_point = zero_point
         self._svd_up = svd_up
         self._svd_down = svd_down
+        self._group_size = group_size
 
     def __repr__(self, *, tensor_contents=None):
         return (
@@ -194,14 +264,52 @@ class SDNQTensor(torch.Tensor):
         """SDNQTensor is only for inference, not training. This is a no-op."""
         return self
 
+    # Track which tensors we've logged (to avoid spam)
+    _logged_tensors: set = set()
+
     def get_dequantized_tensor(self) -> torch.Tensor:
         """Return the dequantized tensor.
 
         Returns:
             Dequantized tensor with compute_dtype.
         """
+        # Debug logging for first few tensors
+        tensor_id = id(self)
+        should_log = tensor_id not in SDNQTensor._logged_tensors and len(SDNQTensor._logged_tensors) < 5
+        if should_log:
+            SDNQTensor._logged_tensors.add(tensor_id)
+            print(
+                f"[SDNQ] dequantize: type={self._quantization_type.value}, "
+                f"weight_shape={self.quantized_data.shape}, weight_dtype={self.quantized_data.dtype}, "
+                f"scale_shape={self._scale.shape}, zp={self._zero_point is not None}, "
+                f"svd={self.has_svd}, group_size={self._group_size}"
+            )
+            logger.info(
+                f"SDNQ dequantize: type={self._quantization_type.value}, "
+                f"weight_shape={self.quantized_data.shape}, weight_dtype={self.quantized_data.dtype}, "
+                f"scale_shape={self._scale.shape}, scale_range=[{self._scale.min():.6f}, {self._scale.max():.6f}], "
+                f"zp={self._zero_point is not None}, svd={self.has_svd}, group_size={self._group_size}"
+            )
+            if self._zero_point is not None:
+                logger.info(
+                    f"  zero_point_shape={self._zero_point.shape}, "
+                    f"zp_range=[{self._zero_point.min():.6f}, {self._zero_point.max():.6f}]"
+                )
+
         # Perform dequantization based on quantization type
-        if self.is_asymmetric:
+        if self._quantization_type == SDNQQuantizationType.UINT4_ASYM:
+            # uint4 with per-group quantization
+            assert self._zero_point is not None
+            assert self._group_size is not None
+            dequantized = dequantize_uint4_per_group(
+                self.quantized_data,
+                self._scale,
+                self._zero_point,
+                self.tensor_shape,
+                self._group_size,
+                dtype=self.compute_dtype,
+            )
+        elif self.is_asymmetric:
             assert self._zero_point is not None
             dequantized = dequantize_asymmetric(
                 self.quantized_data,
@@ -229,10 +337,30 @@ class SDNQTensor(torch.Tensor):
         if dequantized.shape != self.tensor_shape:
             dequantized = dequantized.view(self.tensor_shape)
 
-        return dequantized.to(self.compute_dtype)
+        result = dequantized.to(self.compute_dtype)
+
+        # Log output range for debugging
+        if should_log:
+            logger.info(
+                f"  -> output_shape={result.shape}, output_range=[{result.min():.6f}, {result.max():.6f}]"
+            )
+
+        return result
+
+    # Track unknown ops to avoid spamming warnings
+    _warned_ops: set = set()
 
     @classmethod
     def __torch_dispatch__(cls, func, types, args, kwargs):
         if func in SDNQ_TENSOR_OP_TABLE:
             return SDNQ_TENSOR_OP_TABLE[func](func, args, kwargs)
-        return NotImplemented
+
+        # Fallback: dequantize and run for unknown operations
+        # This ensures computation works, but may indicate missing ops
+        if func not in cls._warned_ops:
+            cls._warned_ops.add(func)
+            import logging
+
+            logging.getLogger(__name__).warning(f"SDNQTensor: unknown op {func}, dequantizing (add to op table for efficiency)")
+
+        return dequantize_and_run(func, args, kwargs)
