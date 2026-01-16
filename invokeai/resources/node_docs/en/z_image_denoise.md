@@ -1,38 +1,17 @@
-# Z Image Denoise Node
+# Z Image Denoise
 
-The Z Image Denoise node performs diffusion-based denoising on an image using the Z-Image model architecture. It can be used in either Text-to-Image or Image-to-Image workflows.
+The Z Image Denoise node performs diffusion-based denoising on a latent image using the Z-Image model architecture. It can be used in either Text-to-Image or Image-to-Image workflows.
 
 ## Inputs
 
-### Required Inputs
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
 
-- **Model**: The Z-Image main model to use for denoising
-- **Positive Prompt**: Text description of what you want to see in the output
-- **Negative Prompt**: Text description of what you want to avoid in the output
-- **Image**: The source image to be processed
+## Example Usage
 
-### Optional Inputs
+### Text-to-Image
 
-- **Denoising Strength**: Controls how much of the original image is preserved (0.0 = no change, 1.0 = full regeneration)
-- **Steps**: Number of denoising steps (more steps = higher quality but slower)
-- **CFG Scale**: How strongly the model should follow your prompt
-- **Scheduler**: The noise scheduling algorithm to use
-- **Seed**: Random seed for reproducible results
+![Z Image Denoise Text-to-Image Example](./images/z_image_example_t2i.png)
 
-## Outputs
+## Notes:
 
-- **Image**: The denoised/transformed output image
-
-## Tips
-
-1. **Lower denoising strength** (0.2-0.5) preserves more of the original image structure
-2. **Higher denoising strength** (0.7-1.0) allows for more creative reinterpretation
-3. Use **negative prompts** to steer the model away from unwanted artifacts or styles
-4. If results are too noisy, try increasing the number of steps
-
-## Example Use Cases
-
-- Image-to-image style transfer
-- Photo restoration and enhancement
-- Creative image modifications
-- Consistent character regeneration with slight variations
+- For Z-Image Turbo models, the indended Guidance Scale (CFG) is 1.0, which disables the negative prompt influence and doubles the generation speed.
