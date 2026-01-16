@@ -1,6 +1,5 @@
-import 'github-markdown-css/github-markdown.css';
-
 import {
+  Box,
   Image,
   Modal,
   ModalBody,
@@ -12,6 +11,7 @@ import {
   Text,
 } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
+import DOMPurify from 'dompurify';
 import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
 import { marked } from 'marked';
 import { memo, type ReactElement, useEffect, useState } from 'react';
@@ -50,6 +50,17 @@ const resolveImagePath = (src: string | undefined, basePath: string): string => 
 };
 
 /**
+ * Rewrite relative image paths in markdown to be absolute based on basePath
+ */
+const rewriteRelativeImagePaths = (markdown: string, basePath: string): string => {
+  return markdown.replace(/!\[([^\]]*)\]\((?!\s*(?:https?:\/\/|\/|data:))([^)]+)\)/g, (_match, alt, src) => {
+    const cleaned = src.startsWith('./') ? src.slice(2) : src;
+    const normalized = cleaned.startsWith('/') ? cleaned.slice(1) : cleaned;
+    return `![${alt}](${basePath}/${normalized})`;
+  });
+};
+
+/**
  * Creates markdown components with proper image path resolution.
  */
 // We will not use react-markdown components anymore; keep resolveImagePath for potential future work
@@ -65,6 +76,7 @@ export const InvocationNodeHelpModal = memo(({ isOpen, onClose }: Props): ReactE
   const [docsContent, setDocsContent] = useState<NodeDocsContent | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sanitizedHtml, setSanitizedHtml] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
@@ -118,6 +130,27 @@ export const InvocationNodeHelpModal = memo(({ isOpen, onClose }: Props): ReactE
     loadDocs();
   }, [isOpen, nodeTemplate.type, i18n.language, t]);
 
+  useEffect(() => {
+    if (!docsContent) {
+      setSanitizedHtml(null);
+      return;
+    }
+
+    let mounted = true;
+    (async () => {
+      const htmlOrPromise = marked.parse(rewriteRelativeImagePaths(docsContent.markdown, docsContent.basePath));
+      const html = typeof htmlOrPromise === 'string' ? htmlOrPromise : await htmlOrPromise;
+      if (!mounted) {
+        return;
+      }
+      setSanitizedHtml(DOMPurify.sanitize(html));
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [docsContent]);
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} isCentered size="2xl" useInert={false}>
       <ModalOverlay />
@@ -129,12 +162,85 @@ export const InvocationNodeHelpModal = memo(({ isOpen, onClose }: Props): ReactE
         <ModalBody pb={6} overflowY="auto">
           {isLoading && <Spinner size="lg" />}
           {error && <Text color="base.400">{error}</Text>}
-          {docsContent && (
-            <div
+          {sanitizedHtml && (
+            <Box
               className="markdown-body"
               style={{ maxWidth: '100%' }}
-              // We sanitize by stripping any raw HTML tags from the markdown before rendering
-              dangerouslySetInnerHTML={{ __html: marked.parse(docsContent.markdown.replace(/<[^>]+>/g, '')) }}
+              bg="transparent"
+              color="base.100"
+              sx={{
+                // Headings
+                h1: { color: 'base.100', fontSize: '2xl', mt: 2, mb: 2, fontWeight: 'semibold' },
+                h2: { color: 'base.100', fontSize: 'xl', mt: 2, mb: 2, fontWeight: 'semibold' },
+                h3: { color: 'base.100', fontSize: 'lg', mt: 2, mb: 1.5, fontWeight: 'semibold' },
+                h4: { color: 'base.100', fontSize: 'md', mt: 1.5, mb: 1, fontWeight: 'semibold' },
+
+                // Paragraphs
+                p: { color: 'base.100', mt: 1, mb: 1 },
+
+                // Links
+                a: { color: 'blue.200', _hover: { textDecoration: 'underline', color: 'blue.300' } },
+
+                // Lists
+                ul: { pl: 6, mt: 1, mb: 1 },
+                ol: { pl: 6, mt: 1, mb: 1 },
+                li: { mt: 1, mb: 1 },
+
+                // Code
+                pre: {
+                  bg: 'base.800',
+                  color: 'base.100',
+                  borderRadius: '6px',
+                  px: 4,
+                  py: 3,
+                  overflowX: 'auto',
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace",
+                  fontSize: 'sm',
+                },
+                code: {
+                  bg: 'rgba(255,255,255,0.02)',
+                  color: 'base.100',
+                  px: '0.25rem',
+                  py: '0.125rem',
+                  borderRadius: '4px',
+                  fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, 'Roboto Mono', 'Courier New', monospace",
+                  fontSize: '0.85em',
+                },
+
+                // Blockquote
+                blockquote: {
+                  borderLeft: '4px solid rgba(255,255,255,0.06)',
+                  background: 'rgba(255,255,255,0.02)',
+                  color: 'base.200',
+                  py: 2,
+                  px: 4,
+                  my: 3,
+                },
+
+                // Tables
+                table: { width: '100%', borderCollapse: 'collapse', my: 2 },
+                th: {
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  px: 3,
+                  py: 2,
+                  textAlign: 'left',
+                  color: 'base.100',
+                },
+                td: {
+                  border: '1px solid rgba(255,255,255,0.06)',
+                  px: 3,
+                  py: 2,
+                  color: 'base.100',
+                },
+
+                // Images
+                img: { maxW: '100%', borderRadius: '6px', display: 'block', my: 3 },
+
+                // Horizontal rule
+                hr: { border: 'none', h: '1px', bg: 'base.700', my: 4 },
+              }}
+              // Render sanitized HTML
+              dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
             />
           )}
         </ModalBody>
