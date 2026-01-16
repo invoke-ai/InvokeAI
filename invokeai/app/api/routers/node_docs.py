@@ -24,8 +24,8 @@ IMAGE_SEGMENT = re.compile(r"^[A-Za-z0-9_.-]+$")
 def get_node_doc(lang: str, name: str) -> PlainTextResponse:
     """Return packaged markdown for a node.
 
-    This endpoint only reads packaged resources from the installed `invokeai.resources`
-    package via `importlib.resources`. There are no filesystem fallbacks.
+    This endpoint reads packaged resources from the installed `invokeai.resources`
+    package via importlib.
     """
     # Basic validation
     if not VALID_SEGMENT.match(lang) or not VALID_SEGMENT.match(name):
