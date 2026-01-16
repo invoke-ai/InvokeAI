@@ -1213,10 +1213,12 @@ class GraphExecutionState(BaseModel):
         # Inputs must be deep-copied, else if a node mutates the object, other nodes that get the same input
         # will see the mutation.
         if isinstance(node, CollectInvocation):
+            item_edges = [e for e in input_edges if e.destination.field == ITEM_FIELD]
+            item_edges.sort(key=lambda e: (self._get_iteration_path(e.source.node_id), e.source.node_id))
+
             output_collection = [
-                copydeep(getattr(self.results[edge.source.node_id], edge.source.field))
-                for edge in input_edges
-                if edge.destination.field == ITEM_FIELD
+                copydeep(getattr(self.results[e.source.node_id], e.source.field))
+                for e in item_edges
             ]
             node.collection = output_collection
         else:
