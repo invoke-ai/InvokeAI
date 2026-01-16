@@ -14,7 +14,7 @@ import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrTh
 import type { ReactElement, ReactNode } from 'react';
 import { memo, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Markdown from 'react-markdown';
+import { marked } from 'marked';
 
 const log = logger('system');
 
@@ -51,44 +51,10 @@ const resolveImagePath = (src: string | undefined, basePath: string): string => 
 /**
  * Creates markdown components with proper image path resolution.
  */
+// We will not use react-markdown components anymore; keep resolveImagePath for potential future work
 const createMarkdownComponents = (basePath: string) => ({
-  // Render images inline with the markdown, resolving relative paths
   img: ({ src, alt }: { src?: string; alt?: string }) => (
     <Image src={resolveImagePath(src, basePath)} alt={alt || ''} maxW="100%" my={4} borderRadius="base" />
-  ),
-  // Style paragraphs
-  p: ({ children }: { children?: ReactNode }) => (
-    <Text mb={3} lineHeight="tall">
-      {children}
-    </Text>
-  ),
-  // Style headings
-  h1: ({ children }: { children?: ReactNode }) => (
-    <Text as="h1" fontSize="xl" fontWeight="bold" mt={4} mb={2}>
-      {children}
-    </Text>
-  ),
-  h2: ({ children }: { children?: ReactNode }) => (
-    <Text as="h2" fontSize="lg" fontWeight="semibold" mt={3} mb={2}>
-      {children}
-    </Text>
-  ),
-  h3: ({ children }: { children?: ReactNode }) => (
-    <Text as="h3" fontSize="md" fontWeight="semibold" mt={2} mb={1}>
-      {children}
-    </Text>
-  ),
-  // Style code blocks
-  code: ({ children }: { children?: ReactNode }) => (
-    <Text as="code" fontFamily="mono" bg="base.700" px={1} borderRadius="sm">
-      {children}
-    </Text>
-  ),
-  // Style list items
-  li: ({ children }: { children?: ReactNode }) => (
-    <Text as="li" ml={4} mb={1}>
-      {children}
-    </Text>
   ),
 });
 
@@ -163,7 +129,10 @@ export const InvocationNodeHelpModal = memo(({ isOpen, onClose }: Props): ReactE
           {isLoading && <Spinner size="lg" />}
           {error && <Text color="base.400">{error}</Text>}
           {docsContent && (
-            <Markdown components={createMarkdownComponents(docsContent.basePath)}>{docsContent.markdown}</Markdown>
+            <div
+              // We sanitize by stripping any raw HTML tags from the markdown before rendering
+              dangerouslySetInnerHTML={{ __html: marked.parse(docsContent.markdown.replace(/<[^>]+>/g, '')) }}
+            />
           )}
         </ModalBody>
       </ModalContent>
