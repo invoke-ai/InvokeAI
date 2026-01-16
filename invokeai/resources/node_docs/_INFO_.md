@@ -17,7 +17,7 @@ This folder contains developer-authored node documentation to be displayed in th
 
 ## Images:
 
-- Place image files in the images/ subfolder next to the markdown file. Reference them using relative paths in the markdown.
+- Place image files in the `images/` subfolder next to the markdown file. Reference them using relative paths in the markdown.
 - Ensure image names are unique and descriptive. Images can be reused across multiple docs if applicable, e.g., SD1.5 denoise and prompt nodes can all be shown in a single image since their usage is tied together.
 - Images can be screenshots of the node in use, example outputs, or diagrams illustrating concepts.
 - When displaying node usage examples, keep the example focused on the node and its immediate upstream/downstream connections. For best readability, keep the image width approximately two nodes wide.
@@ -26,7 +26,7 @@ This folder contains developer-authored node documentation to be displayed in th
 
 ## Submitting:
 
-- Before you submit a PR, make sure you run `lint:prettier` and `pnpm build` to ensure proper formatting and to pass tests.
+- Because these docs are included as an installed module and served through API, new files will only be included after a `uv pip install`. This ensures parity between dev and user installs.
 - Check that your markdown renders correctly in a markdown viewer in the UI.
 
 ## Doc Template:
