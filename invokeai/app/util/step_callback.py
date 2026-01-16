@@ -93,6 +93,46 @@ COGVIEW4_LATENT_RGB_FACTORS = [
     [-0.00955853, -0.00980067, -0.00977842],
 ]
 
+# FLUX.2 uses 32 latent channels. Since we don't have proper factors yet,
+# we extend FLUX factors with zeros for preview approximation.
+FLUX2_LATENT_RGB_FACTORS = [
+    #   R        G        B
+    # First 16 channels (from FLUX)
+    [0.0118, 0.0024, 0.0017],
+    [-0.0074, -0.0108, -0.0003],
+    [0.0056, 0.0291, 0.0768],
+    [0.0342, -0.0681, -0.0427],
+    [-0.0258, 0.0092, 0.0463],
+    [0.0863, 0.0784, 0.0547],
+    [-0.0017, 0.0402, 0.0158],
+    [0.0501, 0.1058, 0.1152],
+    [-0.0209, -0.0218, -0.0329],
+    [-0.0314, 0.0083, 0.0896],
+    [0.0851, 0.0665, -0.0472],
+    [-0.0534, 0.0238, -0.0024],
+    [0.0452, -0.0026, 0.0048],
+    [0.0892, 0.0831, 0.0881],
+    [-0.1117, -0.0304, -0.0789],
+    [0.0027, -0.0479, -0.0043],
+    # Additional 16 channels (zeros as placeholder)
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0],
+]
+
 
 def sample_to_lowres_estimated_image(
     samples: torch.Tensor, latent_rgb_factors: torch.Tensor, smooth_matrix: Optional[torch.Tensor] = None
@@ -164,6 +204,8 @@ def diffusion_step_callback(
         latent_rgb_factors = COGVIEW4_LATENT_RGB_FACTORS
     elif base_model == BaseModelType.Flux:
         latent_rgb_factors = FLUX_LATENT_RGB_FACTORS
+    elif base_model == BaseModelType.Flux2:
+        latent_rgb_factors = FLUX2_LATENT_RGB_FACTORS
     elif base_model == BaseModelType.ZImage:
         # Z-Image uses FLUX-compatible VAE with 16 latent channels
         latent_rgb_factors = FLUX_LATENT_RGB_FACTORS

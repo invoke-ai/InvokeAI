@@ -34,7 +34,7 @@ from invokeai.backend.flux.model import Flux
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.flux.redux.flux_redux_model import FluxReduxModel
 from invokeai.backend.flux.util import get_flux_ae_params, get_flux_transformers_params
-from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.clip_embed import CLIPEmbed_Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.controlnet import (
     ControlNet_Checkpoint_Config_Base,
@@ -52,6 +52,7 @@ from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMin
 from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Config_Base
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -338,6 +339,105 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
                 sd = convert_bundle_to_flux_transformer_checkpoint(sd)
             model.load_state_dict(sd, assign=True)
         return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.Main, format=ModelFormat.Diffusers)
+class FluxDiffusersModel(GenericDiffusersLoader):
+    """Class to load FLUX.1 main models in diffusers format."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if isinstance(config, Checkpoint_Config_Base):
+            raise NotImplementedError("CheckpointConfigBase is not implemented for FLUX diffusers models.")
+
+        if submodel_type is None:
+            raise Exception("A submodel type must be provided when loading main pipelines.")
+
+        model_path = Path(config.path)
+        load_class = self.get_hf_load_class(model_path, submodel_type)
+        repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
+        variant = repo_variant.value if repo_variant else None
+        model_path = model_path / submodel_type.value
+
+        # We force bfloat16 for FLUX models. This is required for correct inference.
+        dtype = torch.bfloat16
+        try:
+            result: AnyModel = load_class.from_pretrained(
+                model_path,
+                torch_dtype=dtype,
+                variant=variant,
+                local_files_only=True,
+            )
+        except OSError as e:
+            if variant and "no file named" in str(
+                e
+            ):  # try without the variant, just in case user's preferences changed
+                result = load_class.from_pretrained(model_path, torch_dtype=dtype, local_files_only=True)
+            else:
+                raise e
+
+        return result
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux2, type=ModelType.Main, format=ModelFormat.Diffusers)
+class Flux2DiffusersModel(GenericDiffusersLoader):
+    """Class to load FLUX.2 main models in diffusers format (e.g. FLUX.2 Klein)."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if isinstance(config, Checkpoint_Config_Base):
+            raise NotImplementedError("CheckpointConfigBase is not implemented for FLUX.2 diffusers models.")
+
+        if submodel_type is None:
+            raise Exception("A submodel type must be provided when loading main pipelines.")
+
+        model_path = Path(config.path)
+        load_class = self.get_hf_load_class(model_path, submodel_type)
+        repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
+        variant = repo_variant.value if repo_variant else None
+        model_path = model_path / submodel_type.value
+
+        # Debug: Log which model is being loaded
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(
+            f"Flux2DiffusersModel loading: submodel={submodel_type.value}, path={model_path}, class={load_class.__name__}"
+        )
+
+        # We force bfloat16 for FLUX.2 models. This is required for correct inference.
+        # We use low_cpu_mem_usage=False to avoid meta tensors for weights not in checkpoint.
+        # FLUX.2 Klein models may have guidance_embeds=False, so the guidance_embed layers
+        # won't be in the checkpoint but the model class still creates them.
+        dtype = torch.bfloat16
+        try:
+            result: AnyModel = load_class.from_pretrained(
+                model_path,
+                torch_dtype=dtype,
+                variant=variant,
+                local_files_only=True,
+                low_cpu_mem_usage=False,
+            )
+        except OSError as e:
+            if variant and "no file named" in str(
+                e
+            ):  # try without the variant, just in case user's preferences changed
+                result = load_class.from_pretrained(
+                    model_path,
+                    torch_dtype=dtype,
+                    local_files_only=True,
+                    low_cpu_mem_usage=False,
+                )
+            else:
+                raise e
+
+        return result
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)

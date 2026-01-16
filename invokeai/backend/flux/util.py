@@ -5,7 +5,7 @@ from typing import Literal
 
 from invokeai.backend.flux.model import FluxParams
 from invokeai.backend.flux.modules.autoencoder import AutoEncoderParams
-from invokeai.backend.model_manager.taxonomy import AnyVariant, FluxVariantType
+from invokeai.backend.model_manager.taxonomy import AnyVariant, Flux2VariantType, FluxVariantType
 
 
 @dataclass
@@ -46,6 +46,7 @@ _flux_max_seq_lengths: dict[AnyVariant, Literal[256, 512]] = {
     FluxVariantType.Dev: 512,
     FluxVariantType.DevFill: 512,
     FluxVariantType.Schnell: 256,
+    Flux2VariantType.Klein: 512,
 }
 
 
@@ -107,6 +108,23 @@ _flux_transformer_params: dict[AnyVariant, FluxParams] = {
         out_channels=64,
         vec_in_dim=768,
         context_in_dim=4096,
+        hidden_size=3072,
+        mlp_ratio=4.0,
+        num_heads=24,
+        depth=19,
+        depth_single_blocks=38,
+        axes_dim=[16, 56, 56],
+        theta=10_000,
+        qkv_bias=True,
+        guidance_embed=True,
+    ),
+    # Flux2 Klein uses Qwen3 text encoder with stacked embeddings from layers [9, 18, 27]
+    # The context_in_dim is 3 * hidden_size of Qwen3 (3 * 2560 = 7680 for 4B, 3 * 4096 = 12288 for 8B)
+    # Using 4B variant dimensions as default
+    Flux2VariantType.Klein: FluxParams(
+        in_channels=64,
+        vec_in_dim=2560,  # Qwen3 hidden size (used for pooled output)
+        context_in_dim=7680,  # 3 layers * 2560 = 7680 for Qwen3-4B
         hidden_size=3072,
         mlp_ratio=4.0,
         num_heads=24,

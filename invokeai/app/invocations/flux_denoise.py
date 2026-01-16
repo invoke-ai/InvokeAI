@@ -239,8 +239,14 @@ class FluxDenoiseInvocation(BaseInvocation):
         )
 
         transformer_config = context.models.get_config(self.transformer.transformer)
-        assert transformer_config.base is BaseModelType.Flux and transformer_config.type is ModelType.Main
-        is_schnell = transformer_config.variant is FluxVariantType.Schnell
+        assert (
+            transformer_config.base in (BaseModelType.Flux, BaseModelType.Flux2)
+            and transformer_config.type is ModelType.Main
+        )
+        # Schnell is only for FLUX.1, FLUX.2 Klein behaves like Dev (with guidance)
+        is_schnell = (
+            transformer_config.base is BaseModelType.Flux and transformer_config.variant is FluxVariantType.Schnell
+        )
 
         # Calculate the timestep schedule.
         timesteps = get_schedule(

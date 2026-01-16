@@ -633,6 +633,8 @@ export const zParamsState = z.object({
   zImageVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX VAE
   zImageQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder
   zImageQwen3SourceModel: zParameterModel.nullable(), // Diffusers Z-Image model (fallback for VAE/Encoder)
+  // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
+  kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
   // Z-Image Seed Variance Enhancer settings
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
@@ -692,6 +694,7 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageVaeModel: null,
   zImageQwen3EncoderModel: null,
   zImageQwen3SourceModel: null,
+  kleinQwen3EncoderModel: null,
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,

@@ -5,7 +5,7 @@ import type { CanvasControlLayerState, Rect } from 'features/controlLayers/store
 import { getControlLayerWarnings } from 'features/controlLayers/store/validators';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { serializeError } from 'serialize-error';
-import type { FLUXModelConfig, ImageDTO, Invocation, MainModelConfig } from 'services/api/types';
+import type { AnyFLUXModelConfig, ImageDTO, Invocation, MainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const log = logger('system');
@@ -113,7 +113,7 @@ type AddControlLoRAArg = {
   entities: CanvasControlLayerState[];
   g: Graph;
   rect: Rect;
-  model: FLUXModelConfig;
+  model: AnyFLUXModelConfig;
   denoise: Invocation<'flux_denoise'>;
 };
 

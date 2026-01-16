@@ -63,6 +63,8 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXLRefiner_Config,
     Main_Checkpoint_ZImage_Config,
     Main_Diffusers_CogView4_Config,
+    Main_Diffusers_Flux2_Config,
+    Main_Diffusers_FLUX_Config,
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
     Main_Diffusers_SD3_Config,
@@ -148,6 +150,8 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_SDXL_Config, Main_Diffusers_SDXL_Config.get_tag()],
         Annotated[Main_Diffusers_SDXLRefiner_Config, Main_Diffusers_SDXLRefiner_Config.get_tag()],
         Annotated[Main_Diffusers_SD3_Config, Main_Diffusers_SD3_Config.get_tag()],
+        Annotated[Main_Diffusers_FLUX_Config, Main_Diffusers_FLUX_Config.get_tag()],
+        Annotated[Main_Diffusers_Flux2_Config, Main_Diffusers_Flux2_Config.get_tag()],
         Annotated[Main_Diffusers_CogView4_Config, Main_Diffusers_CogView4_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
         # Main (Pipeline) - checkpoint format

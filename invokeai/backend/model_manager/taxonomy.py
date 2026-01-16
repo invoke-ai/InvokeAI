@@ -46,6 +46,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with the Stable Diffusion XL Refiner model architecture."""
     Flux = "flux"
     """Indicates the model is associated with FLUX.1 model architecture, including FLUX Dev, Schnell and Fill."""
+    Flux2 = "flux2"
+    """Indicates the model is associated with FLUX.2 model architecture, including FLUX2 Klein."""
     CogView4 = "cogview4"
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
@@ -111,9 +113,18 @@ class ModelVariantType(str, Enum):
 
 
 class FluxVariantType(str, Enum):
+    """FLUX.1 model variants."""
+
     Schnell = "schnell"
     Dev = "dev"
     DevFill = "dev_fill"
+
+
+class Flux2VariantType(str, Enum):
+    """FLUX.2 model variants."""
+
+    Klein = "klein"
+    """Flux2 Klein variant using Qwen3 text encoder instead of CLIP+T5."""
 
 
 class ModelFormat(str, Enum):
@@ -174,7 +185,7 @@ class FluxLoRAFormat(str, Enum):
     XLabs = "flux.xlabs"
 
 
-AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, FluxVariantType]
-variant_type_adapter = TypeAdapter[ModelVariantType | ClipVariantType | FluxVariantType](
-    ModelVariantType | ClipVariantType | FluxVariantType
+AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, FluxVariantType, Flux2VariantType]
+variant_type_adapter = TypeAdapter[ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType](
+    ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType
 )

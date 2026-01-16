@@ -32,8 +32,12 @@ type AddRegionsArg = {
   g: Graph;
   bbox: Rect;
   model: MainModelConfig;
-  posCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder'>;
-  negCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder'> | null;
+  posCond: Invocation<
+    'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'flux2_klein_text_encoder' | 'z_image_text_encoder'
+  >;
+  negCond: Invocation<
+    'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'flux2_klein_text_encoder' | 'z_image_text_encoder'
+  > | null;
   posCondCollect: Invocation<'collect'>;
   negCondCollect: Invocation<'collect'> | null;
   ipAdapterCollect: Invocation<'collect'>;

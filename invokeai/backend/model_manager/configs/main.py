@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
+    Flux2VariantType,
     FluxVariantType,
     ModelFormat,
     ModelType,
@@ -479,6 +480,112 @@ class Main_GGUF_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
         has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
         if not has_ggml_tensors:
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
+class Main_Diffusers_FLUX_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for FLUX.1 models in diffusers format."""
+
+    base: Literal[BaseModelType.Flux] = Field(BaseModelType.Flux)
+    variant: FluxVariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # Check for FLUX-specific pipeline or transformer class names
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "FluxPipeline",
+                "FluxFillPipeline",
+                "FluxTransformer2DModel",
+            },
+        )
+
+        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> FluxVariantType:
+        """Determine the FLUX variant from the transformer config.
+
+        FLUX variants are distinguished by:
+        - in_channels: 64 for Dev/Schnell, 384 for DevFill
+        - guidance_embeds: True for Dev, False for Schnell
+        """
+        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+
+        in_channels = transformer_config.get("in_channels", 64)
+        guidance_embeds = transformer_config.get("guidance_embeds", False)
+
+        # DevFill has 384 input channels
+        if in_channels == 384:
+            return FluxVariantType.DevFill
+
+        # Dev has guidance_embeds=True, Schnell has guidance_embeds=False
+        if guidance_embeds:
+            return FluxVariantType.Dev
+        else:
+            return FluxVariantType.Schnell
+
+
+class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."""
+
+    base: Literal[BaseModelType.Flux2] = Field(BaseModelType.Flux2)
+    variant: Flux2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # Check for FLUX.2-specific pipeline class names
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "Flux2KleinPipeline",
+            },
+        )
+
+        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+        )
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
+        """Determine the FLUX.2 variant from the transformer config.
+
+        FLUX.2 Klein uses Qwen3 text encoder with larger joint_attention_dim:
+        - Klein 4B: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
+        - Klein 8B: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
+        """
+        transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+
+        joint_attention_dim = transformer_config.get("joint_attention_dim", 4096)
+
+        # Klein models have larger joint_attention_dim due to Qwen3 encoder
+        if joint_attention_dim > 4096:
+            return Flux2VariantType.Klein
+
+        # Default to Klein as it's the only FLUX.2 variant currently
+        return Flux2VariantType.Klein
 
 
 class Main_SD_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):

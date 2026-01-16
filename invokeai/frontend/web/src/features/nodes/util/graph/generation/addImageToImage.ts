@@ -37,7 +37,7 @@ export const addImageToImage = async ({
   denoise,
   vaeSource,
 }: AddImageToImageArg): Promise<
-  Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'sd3_l2i' | 'cogview4_l2i' | 'z_image_l2i'>
+  Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'flux2_vae_decode' | 'sd3_l2i' | 'cogview4_l2i' | 'z_image_l2i'>
 > => {
   const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
   denoise.denoising_start = denoising_start;

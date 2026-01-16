@@ -210,6 +210,7 @@ const CANVAS_OUTPUT_PREFIX = 'canvas_output';
 export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNodes>) => {
   return (
     modelLoader.type === 'flux_model_loader' ||
+    modelLoader.type === 'flux2_klein_model_loader' ||
     modelLoader.type === 'sd3_model_loader' ||
     modelLoader.type === 'cogview4_model_loader' ||
     modelLoader.type === 'z_image_model_loader'
@@ -236,8 +237,9 @@ export const getDenoisingStartAndEnd = (state: RootState): { denoising_start: nu
         denoising_end: 1,
       };
     }
-    case 'flux': {
-      if (model.variant === 'dev_fill') {
+    case 'flux':
+    case 'flux2': {
+      if (model.base === 'flux' && model.variant === 'dev_fill') {
         // This is a FLUX Fill model - we always denoise fully
         return {
           denoising_start: 0,
