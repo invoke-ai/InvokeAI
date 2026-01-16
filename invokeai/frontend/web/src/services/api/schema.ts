@@ -1958,6 +1958,52 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/nodeDocs/{lang}/{name}.md": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Node Doc
+         * @description Return packaged markdown for a node.
+         *
+         *     This endpoint reads packaged resources from the installed `invokeai.resources`
+         *     package via importlib.
+         */
+        get: operations["get_node_doc_nodeDocs__lang___name__md_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/nodeDocs/{lang}/images/{image_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Node Doc Image
+         * @description Return packaged image resource for node docs.
+         *
+         *     Only reads from `invokeai.resources` packaged data. Adds `X-Content-Type-Options`
+         *     and a conservative Cache-Control header.
+         */
+        get: operations["get_node_doc_image_nodeDocs__lang__images__image_name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -30417,6 +30463,70 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_node_doc_nodeDocs__lang___name__md_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lang: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_node_doc_image_nodeDocs__lang__images__image_name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lang: string;
+                image_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
             };
             /** @description Validation Error */
             422: {
