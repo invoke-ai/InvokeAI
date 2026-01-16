@@ -2861,10 +2861,10 @@
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
             "Support for Z-Image-Turbo: InvokeAI now supports the fast and accurate Z-Image-Turbo model. See 'Starter Models' to get started.",
-            "Workflow Editor: You can now organize your custom workflows with tags to facilitate search and retrieval.",
             "Hotkeys: Add and edit keyboard shortcuts for any of Invoke's major functions.",
             "Model Manager: The Model Manager user interface now supports bulk tagging and deletion."
         ],
+        "takeUserSurvey": "📣 Let us know how you like InvokeAI. Take our User Experience Survey!",
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
         "watchUiUpdatesOverview": "Watch UI Updates Overview"
