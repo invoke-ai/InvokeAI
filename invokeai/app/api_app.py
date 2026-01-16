@@ -28,6 +28,8 @@ from invokeai.app.api.routers import (
     style_presets,
     utilities,
     workflows,
+    # node_docs router serves packaged node documentation
+    node_docs,
 )
 from invokeai.app.api.sockets import SocketIO
 from invokeai.app.services.config.config_default import get_config
@@ -133,6 +135,8 @@ app.include_router(session_queue.session_queue_router, prefix="/api")
 app.include_router(workflows.workflows_router, prefix="/api")
 app.include_router(style_presets.style_presets_router, prefix="/api")
 app.include_router(client_state.client_state_router, prefix="/api")
+# Include node docs router (serves packaged node docs)
+app.include_router(node_docs.node_docs_router, prefix="")
 
 app.openapi = get_openapi_func(app)
 
