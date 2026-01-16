@@ -32,7 +32,7 @@ export const WhatsNew = () => {
           fontSize="sm"
           fontWeight="semibold"
           label={t('whatsNew.takeUserSurvey')}
-          href={`https://forms.gle/rCE5KuQ7Wfrd1UnS7`}
+          href="https://forms.gle/rCE5KuQ7Wfrd1UnS7"
         />
         <ExternalLink
           fontSize="sm"
