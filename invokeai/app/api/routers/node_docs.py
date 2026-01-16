@@ -1,14 +1,13 @@
 from __future__ import annotations
 
+import importlib.resources as pkg_resources
 import mimetypes
 import re
 from importlib import import_module
-from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse, Response
 
-import importlib.resources as pkg_resources
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger(__name__)

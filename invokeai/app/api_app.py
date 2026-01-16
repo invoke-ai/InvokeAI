@@ -24,12 +24,12 @@ from invokeai.app.api.routers import (
     images,
     model_manager,
     model_relationships,
+    # node_docs router serves packaged node documentation
+    node_docs,
     session_queue,
     style_presets,
     utilities,
     workflows,
-    # node_docs router serves packaged node documentation
-    node_docs,
 )
 from invokeai.app.api.sockets import SocketIO
 from invokeai.app.services.config.config_default import get_config
