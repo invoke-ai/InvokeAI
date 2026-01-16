@@ -183,6 +183,7 @@ version = { attr = "invokeai.version.__version__" }
   "invokeai.configs*",
   "invokeai.app*",
   "invokeai.invocation_api*",
+  "invokeai.resources*",
 ]
 
 [tool.setuptools.package-data]
@@ -198,6 +199,7 @@ version = { attr = "invokeai.version.__version__" }
 "invokeai.frontend.web.dist" = ["**"]
 "invokeai.frontend.web.static" = ["**"]
 "invokeai.app.invocations" = ["**"]
+"invokeai.resources" = ["node_docs/**"]
 
 #=== Begin: PyTest and Coverage
 [tool.pytest.ini_options]

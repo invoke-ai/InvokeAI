@@ -11,10 +11,9 @@ import {
 } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
-import type { ReactElement, ReactNode } from 'react';
-import { memo, useEffect, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { marked } from 'marked';
+import { memo, type ReactElement, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const log = logger('system');
 
@@ -52,7 +51,7 @@ const resolveImagePath = (src: string | undefined, basePath: string): string => 
  * Creates markdown components with proper image path resolution.
  */
 // We will not use react-markdown components anymore; keep resolveImagePath for potential future work
-const createMarkdownComponents = (basePath: string) => ({
+const _createMarkdownComponents = (basePath: string) => ({
   img: ({ src, alt }: { src?: string; alt?: string }) => (
     <Image src={resolveImagePath(src, basePath)} alt={alt || ''} maxW="100%" my={4} borderRadius="base" />
   ),
