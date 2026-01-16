@@ -785,7 +785,7 @@ def test_collector_different_incomers():
     run_session_with_mock_context(session)
     output = get_single_output_from_session(session, n3.id)
     assert isinstance(output, CollectInvocationOutput)
-    assert output.collection == ["Banana", "Sushi"]  # Both inputs should be collected
+    assert set(output.collection) == {"Banana", "Sushi"}  # Both inputs should be collected, no order guarantee
 
 
 def test_iterator_collector_iterator_chain():
