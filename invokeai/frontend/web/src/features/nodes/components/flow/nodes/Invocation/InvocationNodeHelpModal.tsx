@@ -1,3 +1,5 @@
+import 'github-markdown-css/github-markdown.css';
+
 import {
   Image,
   Modal,
@@ -129,6 +131,8 @@ export const InvocationNodeHelpModal = memo(({ isOpen, onClose }: Props): ReactE
           {error && <Text color="base.400">{error}</Text>}
           {docsContent && (
             <div
+              className="markdown-body"
+              style={{ maxWidth: '100%' }}
               // We sanitize by stripping any raw HTML tags from the markdown before rendering
               dangerouslySetInnerHTML={{ __html: marked.parse(docsContent.markdown.replace(/<[^>]+>/g, '')) }}
             />
