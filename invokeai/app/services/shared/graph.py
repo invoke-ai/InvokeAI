@@ -1216,10 +1216,7 @@ class GraphExecutionState(BaseModel):
             item_edges = [e for e in input_edges if e.destination.field == ITEM_FIELD]
             item_edges.sort(key=lambda e: (self._get_iteration_path(e.source.node_id), e.source.node_id))
 
-            output_collection = [
-                copydeep(getattr(self.results[e.source.node_id], e.source.field))
-                for e in item_edges
-            ]
+            output_collection = [copydeep(getattr(self.results[e.source.node_id], e.source.field)) for e in item_edges]
             node.collection = output_collection
         else:
             for edge in input_edges:
