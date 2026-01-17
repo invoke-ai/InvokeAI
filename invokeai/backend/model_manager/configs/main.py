@@ -114,7 +114,11 @@ def _has_main_keys(state_dict: dict[str | int, Any]) -> bool:
 
 
 def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
-    """Check if state dict contains Z-Image S3-DiT transformer keys."""
+    """Check if state dict contains Z-Image S3-DiT transformer keys.
+
+    This function returns True only for Z-Image main models, not LoRAs.
+    LoRAs are excluded by checking for LoRA-specific weight suffixes.
+    """
     # Z-Image specific keys that distinguish it from other models
     z_image_specific_keys = {
         "cap_embedder",  # Caption embedder - unique to Z-Image
@@ -122,9 +126,23 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
         "cap_pad_token",  # Caption padding token
     }
 
+    # LoRA-specific suffixes - if present, this is a LoRA not a main model
+    lora_suffixes = (
+        ".lora_down.weight",
+        ".lora_up.weight",
+        ".lora_A.weight",
+        ".lora_B.weight",
+        ".dora_scale",
+    )
+
     for key in state_dict.keys():
         if isinstance(key, int):
             continue
+
+        # If we find any LoRA-specific keys, this is not a main model
+        if key.endswith(lora_suffixes):
+            return False
+
         # Check for Z-Image specific key prefixes
         # Handle both direct keys (cap_embedder.0.weight) and
         # ComfyUI-style keys (model.diffusion_model.cap_embedder.0.weight)
@@ -132,6 +150,7 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
         for part in key_parts:
             if part in z_image_specific_keys:
                 return True
+
     return False
 
 

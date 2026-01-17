@@ -1,9 +1,9 @@
 # continuous integration
 /.github/workflows/  @lstein @blessedcoolant  
 
-# documentation
-/docs/ @lstein @blessedcoolant  
-/mkdocs.yml @lstein @blessedcoolant  
+# documentation - anyone with write privileges can review
+/docs/
+/mkdocs.yml
 
 # nodes
 /invokeai/app/ @blessedcoolant @lstein @dunkeroni @JPPhoto
