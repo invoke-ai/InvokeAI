@@ -20,7 +20,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
 )
-from invokeai.app.invocations.model import TransformerField
+from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import (
@@ -115,6 +115,78 @@ class Flux2DenoiseInvocation(BaseInvocation):
         ui_choice_labels=FLUX_SCHEDULER_LABELS,
     )
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
+    vae: VAEField = InputField(
+        description="FLUX.2 VAE model (required for BN statistics).",
+        input=Input.Connection,
+    )
+
+    def _get_bn_stats(
+        self, context: InvocationContext
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Extract BN statistics from the FLUX.2 VAE.
+
+        The FLUX.2 VAE uses batch normalization on the patchified 128-channel representation.
+        IMPORTANT: BFL FLUX.2 VAE uses affine=False, so there are NO learnable weight/bias.
+
+        BN formula (affine=False): y = (x - mean) / std
+        Inverse: x = y * std + mean
+
+        Returns:
+            Tuple of (bn_mean, bn_std) tensors of shape (128,).
+        """
+        with context.models.load(self.vae.vae).model_on_device() as (_, vae):
+            # Get BN running statistics from VAE
+            bn_mean = vae.bn.running_mean.clone()  # Shape: (128,)
+            bn_var = vae.bn.running_var.clone()  # Shape: (128,)
+            bn_eps = vae.bn.eps if hasattr(vae.bn, 'eps') else 1e-4  # BFL uses 1e-4
+            bn_std = torch.sqrt(bn_var + bn_eps)
+        return bn_mean, bn_std
+
+    def _bn_normalize(
+        self,
+        x: torch.Tensor,
+        bn_mean: torch.Tensor,
+        bn_std: torch.Tensor,
+    ) -> torch.Tensor:
+        """Apply BN normalization to packed latents.
+
+        BN formula (affine=False): y = (x - mean) / std
+
+        Args:
+            x: Packed latents of shape (B, seq, 128).
+            bn_mean: BN running mean of shape (128,).
+            bn_std: BN running std of shape (128,).
+
+        Returns:
+            Normalized latents of same shape.
+        """
+        # x: (B, seq, 128), params: (128,) -> broadcast over batch and sequence dims
+        bn_mean = bn_mean.to(x.device, x.dtype)
+        bn_std = bn_std.to(x.device, x.dtype)
+        return (x - bn_mean) / bn_std
+
+    def _bn_denormalize(
+        self,
+        x: torch.Tensor,
+        bn_mean: torch.Tensor,
+        bn_std: torch.Tensor,
+    ) -> torch.Tensor:
+        """Apply BN denormalization to packed latents (inverse of normalization).
+
+        Inverse BN (affine=False): x = y * std + mean
+
+        Args:
+            x: Packed latents of shape (B, seq, 128).
+            bn_mean: BN running mean of shape (128,).
+            bn_std: BN running std of shape (128,).
+
+        Returns:
+            Denormalized latents of same shape.
+        """
+        # x: (B, seq, 128), params: (128,) -> broadcast over batch and sequence dims
+        bn_mean = bn_mean.to(x.device, x.dtype)
+        bn_std = bn_std.to(x.device, x.dtype)
+        return x * bn_std + bn_mean
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
@@ -127,6 +199,10 @@ class Flux2DenoiseInvocation(BaseInvocation):
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         inference_dtype = torch.bfloat16
         device = TorchDevice.choose_torch_device()
+
+        # Get BN statistics from VAE for latent denormalization
+        # BFL FLUX.2 VAE uses affine=False, so only mean/std are needed
+        bn_mean, bn_std = self._get_bn_stats(context)
 
         # Load the input latents, if provided
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
@@ -213,6 +289,10 @@ class Flux2DenoiseInvocation(BaseInvocation):
         noise_packed = pack_flux2(noise)
         x = pack_flux2(x)
 
+        # Note: We do NOT apply BN normalization here.
+        # Testing if the denoiser operates in raw latent space like FLUX.1.
+        # The VAE internally handles BN during encode/decode.
+
         # Verify packed dimensions
         assert packed_h * packed_w == x.shape[1]
 
@@ -284,6 +364,11 @@ class Flux2DenoiseInvocation(BaseInvocation):
             # Apply inpainting if enabled
             if inpaint_extension is not None:
                 x = inpaint_extension.merge_intermediate_latents_with_init_latents(x, 0.0)
+
+        # Apply BN denormalization to convert denoiser output to VAE-compatible space
+        # The denoiser operates in normalized space, VAE decode expects denormalized latents
+        # BFL formula: x = y * std + mean
+        x = self._bn_denormalize(x, bn_mean, bn_std)
 
         x = unpack_flux2(x.float(), self.height, self.width)
         return x

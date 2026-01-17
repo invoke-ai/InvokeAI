@@ -16,6 +16,7 @@ import ParamCLIPEmbedModelSelect from 'features/parameters/components/Advanced/P
 import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPGEmbedModelSelect';
 import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
+import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
@@ -124,7 +125,11 @@ export const AdvancedSettingsAccordion = memo(() => {
             <ParamCLIPEmbedModelSelect />
           </FormControlGroup>
         )}
-        {/* FLUX.2 Klein: VAE and Qwen3 encoder are extracted from the main model - no selectors needed */}
+        {isFlux2 && (
+          <FormControlGroup>
+            <ParamFlux2KleinModelSelect />
+          </FormControlGroup>
+        )}
         {isSD3 && (
           <FormControlGroup>
             <ParamT5EncoderModelSelect />

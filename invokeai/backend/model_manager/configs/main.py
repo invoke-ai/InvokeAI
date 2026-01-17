@@ -269,6 +269,64 @@ class Main_Checkpoint_SDXLRefiner_Config(Main_SD_Checkpoint_Config_Base, Config_
     base: Literal[BaseModelType.StableDiffusionXLRefiner] = Field(default=BaseModelType.StableDiffusionXLRefiner)
 
 
+def _is_flux2_model(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict is a FLUX.2 model by examining context_embedder dimensions.
+
+    FLUX.2 Klein uses Qwen3 encoder with larger context dimension:
+    - FLUX.1: context_in_dim = 4096 (T5)
+    - FLUX.2 Klein 4B: context_in_dim = 7680 (3×Qwen3-4B hidden size)
+    - FLUX.2 Klein 8B: context_in_dim = 12288 (3×Qwen3-8B hidden size)
+
+    Also checks for FLUX.2-specific 32-channel latent space (in_channels=128 after packing).
+    """
+    # Check context_embedder input dimension (most reliable)
+    # Weight shape: [hidden_size, context_in_dim]
+    for key in {"context_embedder.weight", "model.diffusion_model.context_embedder.weight"}:
+        if key in state_dict:
+            weight = state_dict[key]
+            if hasattr(weight, "shape") and len(weight.shape) >= 2:
+                context_in_dim = weight.shape[1]
+                # FLUX.2 has context_in_dim > 4096 (Qwen3 vs T5)
+                if context_in_dim > 4096:
+                    return True
+
+    # Also check in_channels - FLUX.2 uses 128 (32 latent channels × 4 packing)
+    for key in {"img_in.weight", "model.diffusion_model.img_in.weight"}:
+        if key in state_dict:
+            in_channels = state_dict[key].shape[1]
+            # FLUX.2 uses 128 in_channels (32 latent channels × 4)
+            # FLUX.1 uses 64 in_channels (16 latent channels × 4)
+            if in_channels == 128:
+                return True
+
+    return False
+
+
+def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
+    """Determine FLUX.2 variant from state dict.
+
+    Currently only Klein variant exists.
+    """
+    # Check context_embedder to confirm this is a FLUX.2 model
+    for key in {"context_embedder.weight", "model.diffusion_model.context_embedder.weight"}:
+        if key in state_dict:
+            weight = state_dict[key]
+            if hasattr(weight, "shape") and len(weight.shape) >= 2:
+                context_in_dim = weight.shape[1]
+                # Klein uses Qwen3 with larger context dimension
+                if context_in_dim > 4096:
+                    return Flux2VariantType.Klein
+
+    # Check in_channels as backup
+    for key in {"img_in.weight", "model.diffusion_model.img_in.weight"}:
+        if key in state_dict:
+            in_channels = state_dict[key].shape[1]
+            if in_channels == 128:
+                return Flux2VariantType.Klein
+
+    return None
+
+
 def _get_flux_variant(state_dict: dict[str | int, Any]) -> FluxVariantType | None:
     # FLUX Model variant types are distinguished by input channels and the presence of certain keys.
 
@@ -342,14 +400,19 @@ class Main_Checkpoint_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
 
     @classmethod
     def _validate_is_flux(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
         if not state_dict_has_any_keys_exact(
-            mod.load_state_dict(),
+            state_dict,
             {
                 "double_blocks.0.img_attn.norm.key_norm.scale",
                 "model.diffusion_model.double_blocks.0.img_attn.norm.key_norm.scale",
             },
         ):
             raise NotAMatchError("state dict does not look like a FLUX checkpoint")
+
+        # Exclude FLUX.2 models - they have their own config class
+        if _is_flux2_model(state_dict):
+            raise NotAMatchError("model is a FLUX.2 model, not FLUX.1")
 
     @classmethod
     def _get_variant_or_raise(cls, mod: ModelOnDisk) -> FluxVariantType:
@@ -362,6 +425,68 @@ class Main_Checkpoint_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
             # but this variant is no longer used for FLUX models. If we get here, but the model is definitely a FLUX
             # model, we should figure out a good fallback value.
             raise NotAMatchError("unable to determine model variant from state dict")
+
+        return variant
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        has_main_model_keys = _has_main_keys(mod.load_state_dict())
+        if not has_main_model_keys:
+            raise NotAMatchError("state dict does not look like a main model")
+
+    @classmethod
+    def _validate_does_not_look_like_bnb_quantized(cls, mod: ModelOnDisk) -> None:
+        has_bnb_nf4_keys = _has_bnb_nf4_keys(mod.load_state_dict())
+        if has_bnb_nf4_keys:
+            raise NotAMatchError("state dict looks like bnb quantized nf4")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk):
+        has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
+        if has_ggml_tensors:
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+
+class Main_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for FLUX.2 checkpoint models (e.g. Klein)."""
+
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+
+    variant: Flux2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_is_flux2(mod)
+
+        cls._validate_does_not_look_like_bnb_quantized(mod)
+
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_is_flux2(cls, mod: ModelOnDisk) -> None:
+        """Validate that this is a FLUX.2 model, not FLUX.1."""
+        state_dict = mod.load_state_dict()
+        if not _is_flux2_model(state_dict):
+            raise NotAMatchError("state dict does not look like a FLUX.2 model")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
+        state_dict = mod.load_state_dict()
+        variant = _get_flux2_variant(state_dict)
+
+        if variant is None:
+            raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
 
         return variant
 

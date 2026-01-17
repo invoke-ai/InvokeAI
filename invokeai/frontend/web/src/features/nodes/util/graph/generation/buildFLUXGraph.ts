@@ -1,6 +1,11 @@
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectKleinQwen3EncoderModel,
+  selectKleinVaeModel,
+  selectMainModelConfig,
+  selectParamsSlice,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
@@ -46,8 +51,10 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const { guidance: baseGuidance, steps, fluxScheduler, fluxVAE, t5EncoderModel, clipEmbedModel } = params;
 
   // Flux2 (Klein) uses Qwen3 instead of CLIP+T5
-  // Both VAE and Qwen3 encoder are extracted from the main Diffusers model
+  // VAE and Qwen3 encoder can be extracted from the main Diffusers model or selected separately
   const isFlux2 = model.base === 'flux2';
+  const kleinVaeModel = selectKleinVaeModel(state);
+  const kleinQwen3EncoderModel = selectKleinQwen3EncoderModel(state);
 
   if (!isFlux2) {
     assert(t5EncoderModel, 'No T5 Encoder model found in state');
@@ -122,12 +129,14 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   if (isFlux2) {
     // Flux2 Klein: Use Qwen3-based model loader, text encoder, and dedicated denoise node
-    // Both VAE and Qwen3 encoder are extracted from the main Diffusers model automatically
+    // VAE and Qwen3 encoder can be extracted from the main Diffusers model or selected separately
     modelLoader = g.addNode({
       type: 'flux2_klein_model_loader',
       id: getPrefixedId('flux2_klein_model_loader'),
       model,
-      // vae_model and qwen3_encoder_model intentionally not passed - extracted from main model
+      // Optional: Use separately selected VAE and Qwen3 encoder models
+      vae_model: kleinVaeModel ?? undefined,
+      qwen3_encoder_model: kleinQwen3EncoderModel ?? undefined,
     });
 
     posCond = g.addNode({
@@ -148,6 +157,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     g.addEdge(kleinLoader, 'qwen3_encoder', kleinCond, 'qwen3_encoder');
     g.addEdge(kleinLoader, 'max_seq_len', kleinCond, 'max_seq_len');
     g.addEdge(kleinLoader, 'transformer', denoise, 'transformer');
+    g.addEdge(kleinLoader, 'vae', denoise, 'vae'); // VAE needed for BN statistics
     g.addEdge(kleinLoader, 'vae', l2i, 'vae');
     g.addEdge(positivePrompt, 'value', kleinCond, 'prompt');
     g.addEdge(kleinCond, 'conditioning', denoise, 'positive_text_conditioning');
@@ -199,12 +209,19 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   // Metadata
   if (isFlux2) {
-    // VAE and Qwen3 encoder come from the main model, not separate models
-    g.upsertMetadata({
+    // VAE and Qwen3 encoder can come from the main model or be selected separately
+    const flux2Metadata: Record<string, unknown> = {
       model: Graph.getModelMetadataField(model),
       steps,
       scheduler: fluxScheduler,
-    });
+    };
+    if (kleinVaeModel) {
+      flux2Metadata.vae = kleinVaeModel;
+    }
+    if (kleinQwen3EncoderModel) {
+      flux2Metadata.qwen3_encoder = kleinQwen3EncoderModel;
+    }
+    g.upsertMetadata(flux2Metadata);
   } else {
     g.upsertMetadata({
       guidance,

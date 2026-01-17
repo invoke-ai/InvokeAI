@@ -576,7 +576,51 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
         # Load the state dict from safetensors file
         sd = load_file(model_path)
 
-        # Determine Qwen model configuration from state dict
+        # Handle ComfyUI quantized checkpoints
+        # ComfyUI stores quantized weights with accompanying scale factors:
+        # - layer.weight: quantized data (FP8)
+        # - layer.weight_scale: scale factor (FP32 scalar)
+        # Dequantization formula: dequantized = weight.to(dtype) * weight_scale
+        # Reference: https://github.com/Comfy-Org/ComfyUI/blob/master/QUANTIZATION.md
+        original_key_count = len(sd)
+        weight_scale_keys = [k for k in sd.keys() if k.endswith(".weight_scale")]
+        dequantized_count = 0
+
+        for scale_key in weight_scale_keys:
+            # Get the corresponding weight key (remove "_scale" suffix)
+            weight_key = scale_key.replace(".weight_scale", ".weight")
+            if weight_key in sd:
+                weight = sd[weight_key]
+                scale = sd[scale_key]
+                # Dequantize: convert to float and multiply by scale
+                # Handle block-wise quantization (e.g., FP4 with block_size=8)
+                # where scale has shape [weight_dim / block_size, ...]
+                weight_float = weight.to(torch.float32)
+                if scale.shape != weight_float.shape and scale.numel() > 1:
+                    # Block-wise quantization: need to expand scale to match weight shape
+                    # Find which dimension differs and repeat scale along that dimension
+                    for dim in range(len(weight_float.shape)):
+                        if dim < len(scale.shape) and scale.shape[dim] != weight_float.shape[dim]:
+                            block_size = weight_float.shape[dim] // scale.shape[dim]
+                            if block_size > 1:
+                                # Repeat scale along this dimension to match weight shape
+                                scale = scale.repeat_interleave(block_size, dim=dim)
+                sd[weight_key] = weight_float * scale
+                dequantized_count += 1
+
+        if dequantized_count > 0:
+            logger.info(f"Dequantized {dequantized_count} ComfyUI quantized weights")
+
+        # Filter out ComfyUI quantization metadata keys (comfy_quant, weight_scale)
+        # These are no longer needed after dequantization
+        comfy_metadata_keys = [k for k in sd.keys() if "comfy_quant" in k or "weight_scale" in k]
+        for k in comfy_metadata_keys:
+            del sd[k]
+        if comfy_metadata_keys:
+            logger.info(f"Filtered out {len(comfy_metadata_keys)} ComfyUI quantization metadata keys")
+
+        logger.info(f"Loaded state dict with {len(sd)} keys (originally {original_key_count})")
+
         # Count the number of layers by looking at layer keys
         layer_count = 0
         for key in sd.keys():
@@ -589,34 +633,63 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                     except ValueError:
                         pass
 
-        # Get hidden size from embed_tokens weight shape
+        # Get vocab size from embed_tokens weight shape
         embed_weight = sd.get("model.embed_tokens.weight")
         if embed_weight is None:
             raise ValueError("Could not find model.embed_tokens.weight in state dict")
-        if embed_weight.ndim != 2:
-            raise ValueError(
-                f"Expected 2D embed_tokens weight tensor, got shape {embed_weight.shape}. "
-                "The model file may be corrupted or incompatible."
-            )
-        hidden_size = embed_weight.shape[1]
+
         vocab_size = embed_weight.shape[0]
+        embed_hidden_size = embed_weight.shape[1]
 
-        # Detect attention configuration from layer 0 weights
-        q_proj_weight = sd.get("model.layers.0.self_attn.q_proj.weight")
-        k_proj_weight = sd.get("model.layers.0.self_attn.k_proj.weight")
-        gate_proj_weight = sd.get("model.layers.0.mlp.gate_proj.weight")
+        # Detect model variant based on embed_tokens hidden size and layer count
+        # FLUX 2 Klein / Z-Image uses Qwen3 configurations from ComfyUI:
+        # Reference: https://github.com/comfyanonymous/ComfyUI/blob/master/comfy/text_encoders/llama.py
+        # - Qwen3-4B: hidden_size=2560, 36 layers, 32 heads, 8 KV heads, intermediate=9728
+        # - Qwen3-8B: hidden_size=4096, 36 layers, 32 heads, 8 KV heads, intermediate=12288
+        if embed_hidden_size == 2560 and layer_count == 36:
+            # Qwen3-4B variant (FLUX 2 Klein / Z-Image)
+            logger.info("Detected Qwen3-4B variant (FLUX 2 Klein / Z-Image)")
+            hidden_size = 2560
+            num_attention_heads = 32
+            num_kv_heads = 8
+            intermediate_size = 9728
+            head_dim = 128
+            max_position_embeddings = 40960
+        elif embed_hidden_size == 4096 and layer_count == 36:
+            # Qwen3-8B variant
+            logger.info("Detected Qwen3-8B variant")
+            hidden_size = 4096
+            num_attention_heads = 32
+            num_kv_heads = 8
+            intermediate_size = 12288
+            head_dim = 128
+            max_position_embeddings = 40960
+        else:
+            # Unknown variant - try to detect from weights
+            logger.warning(
+                f"Unknown Qwen3 variant: embed_hidden_size={embed_hidden_size}, layers={layer_count}. "
+                "Attempting to detect configuration from weights..."
+            )
+            q_proj_weight = sd.get("model.layers.0.self_attn.q_proj.weight")
+            k_proj_weight = sd.get("model.layers.0.self_attn.k_proj.weight")
+            gate_proj_weight = sd.get("model.layers.0.mlp.gate_proj.weight")
 
-        if q_proj_weight is None or k_proj_weight is None or gate_proj_weight is None:
-            raise ValueError("Could not find attention/mlp weights in state dict to determine configuration")
+            if q_proj_weight is None or k_proj_weight is None or gate_proj_weight is None:
+                raise ValueError("Could not find attention/mlp weights to determine configuration")
 
-        # Calculate dimensions from actual weights
-        # Qwen3 uses head_dim separately from hidden_size
-        head_dim = 128  # Standard head dimension for Qwen3 models
-        num_attention_heads = q_proj_weight.shape[0] // head_dim
-        num_kv_heads = k_proj_weight.shape[0] // head_dim
-        intermediate_size = gate_proj_weight.shape[0]
+            hidden_size = embed_hidden_size
+            head_dim = 128
+            num_attention_heads = q_proj_weight.shape[0] // head_dim
+            num_kv_heads = k_proj_weight.shape[0] // head_dim
+            intermediate_size = gate_proj_weight.shape[0]
+            max_position_embeddings = 40960
 
-        # Create Qwen3 config - matches the diffusers text_encoder/config.json
+        logger.info(
+            f"Qwen3 config: hidden_size={hidden_size}, layers={layer_count}, "
+            f"heads={num_attention_heads}, kv_heads={num_kv_heads}, intermediate={intermediate_size}"
+        )
+
+        # Create Qwen3 config
         qwen_config = Qwen3Config(
             vocab_size=vocab_size,
             hidden_size=hidden_size,
@@ -625,7 +698,7 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             num_attention_heads=num_attention_heads,
             num_key_value_heads=num_kv_heads,
             head_dim=head_dim,
-            max_position_embeddings=40960,
+            max_position_embeddings=max_position_embeddings,
             rms_norm_eps=1e-6,
             tie_word_embeddings=True,
             rope_theta=1000000.0,
@@ -771,7 +844,7 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
                     except ValueError:
                         pass
 
-        # Get hidden size from embed_tokens weight shape
+        # Get vocab size from embed_tokens weight shape
         embed_weight = sd.get("model.embed_tokens.weight")
         if embed_weight is None:
             raise ValueError("Could not find model.embed_tokens.weight in state dict")
@@ -783,13 +856,23 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
                 f"Expected 2D embed_tokens weight tensor, got shape {embed_shape}. "
                 "The model file may be corrupted or incompatible."
             )
-        hidden_size = embed_shape[1]
         vocab_size = embed_shape[0]
 
-        # Detect attention configuration from layer 0 weights
-        q_proj_weight = sd.get("model.layers.0.self_attn.q_proj.weight")
-        k_proj_weight = sd.get("model.layers.0.self_attn.k_proj.weight")
-        gate_proj_weight = sd.get("model.layers.0.mlp.gate_proj.weight")
+        # Detect attention configuration from layer weights
+        # IMPORTANT: Use layer 1 (not layer 0) because some models like FLUX 2 Klein have a special
+        # first layer with different dimensions (input projection layer) while the rest of the
+        # transformer layers have a different hidden_size. Using a middle layer ensures we get
+        # the representative hidden_size for the bulk of the model.
+        # Fall back to layer 0 if layer 1 doesn't exist.
+        q_proj_weight = sd.get("model.layers.1.self_attn.q_proj.weight")
+        k_proj_weight = sd.get("model.layers.1.self_attn.k_proj.weight")
+        gate_proj_weight = sd.get("model.layers.1.mlp.gate_proj.weight")
+
+        # Fall back to layer 0 if layer 1 doesn't exist (single-layer model edge case)
+        if q_proj_weight is None:
+            q_proj_weight = sd.get("model.layers.0.self_attn.q_proj.weight")
+            k_proj_weight = sd.get("model.layers.0.self_attn.k_proj.weight")
+            gate_proj_weight = sd.get("model.layers.0.mlp.gate_proj.weight")
 
         if q_proj_weight is None or k_proj_weight is None or gate_proj_weight is None:
             raise ValueError("Could not find attention/mlp weights in state dict to determine configuration")
@@ -800,7 +883,14 @@ class Qwen3EncoderGGUFLoader(ModelLoader):
         gate_shape = gate_proj_weight.shape if hasattr(gate_proj_weight, "shape") else gate_proj_weight.tensor_shape
 
         # Calculate dimensions from actual weights
+        # IMPORTANT: Use hidden_size from k_proj input dimension (not q_proj or embed_tokens).
+        # Some models (like FLUX 2 Klein) have unusual architectures where:
+        # - embed_tokens has a larger dimension (e.g., 2560)
+        # - q_proj may have a larger input dimension for query expansion
+        # - k_proj/v_proj have the actual transformer hidden_size (e.g., 1280)
+        # Using k_proj ensures we get the correct internal hidden_size.
         head_dim = 128  # Standard head dimension for Qwen3 models
+        hidden_size = k_shape[1]  # Use k_proj input dim as the hidden_size
         num_attention_heads = q_shape[0] // head_dim
         num_kv_heads = k_shape[0] // head_dim
         intermediate_size = gate_shape[0]
