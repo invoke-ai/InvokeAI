@@ -1995,7 +1995,7 @@
         "fluxDevLicense": {
             "heading": "Non-Commercial License",
             "paragraphs": [
-                "FLUX.1 [dev] models are licensed under the FLUX [dev] non-commercial license. To use this model type for commercial purposes in Invoke, visit our website to learn more."
+                "This model is licensed for non-commercial use only. FLUX.1 [dev] models use the FLUX.1 [dev] Non-Commercial License, and FLUX.2 Klein 9B uses the FLUX.2 Non-Commercial License."
             ]
         },
         "optimizedDenoising": {
