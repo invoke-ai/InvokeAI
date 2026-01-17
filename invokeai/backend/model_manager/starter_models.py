@@ -690,6 +690,23 @@ flux_fill = StarterModel(
 )
 # endregion
 
+# region FLUX.2 Klein
+flux2_klein_4b = StarterModel(
+    name="FLUX.2 Klein 4B",
+    base=BaseModelType.Flux2,
+    source="black-forest-labs/FLUX.2-klein-4B",
+    description="FLUX.2 Klein 4B - fast and efficient model with Qwen3 text encoder. ~10GB",
+    type=ModelType.Main,
+)
+flux2_klein_9b = StarterModel(
+    name="FLUX.2 Klein 9B",
+    base=BaseModelType.Flux2,
+    source="black-forest-labs/FLUX.2-klein-9B",
+    description="FLUX.2 Klein 9B - higher quality model with Qwen3 text encoder. ~20GB",
+    type=ModelType.Main,
+)
+# endregion
+
 # region Z-Image
 z_image_qwen3_encoder = StarterModel(
     name="Z-Image Qwen3 Text Encoder",
@@ -826,6 +843,8 @@ STARTER_MODELS: list[StarterModel] = [
     flux_redux,
     llava_onevision,
     flux_fill,
+    flux2_klein_4b,
+    flux2_klein_9b,
     cogview4,
     flux_krea,
     flux_krea_quantized,
