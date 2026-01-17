@@ -36,24 +36,13 @@ REGEX_TO_BASE: dict[str, BaseModelType] = {
 def _is_flux2_vae(state_dict: dict[str | int, Any]) -> bool:
     """Check if state dict is a FLUX.2 VAE (AutoencoderKLFlux2).
 
-    FLUX.2 VAE has:
-    - Batch Normalization layer (bn.running_mean, bn.running_var)
-    - 32 latent channels (different encoder/decoder dimensions)
+    FLUX.2 VAE has a Batch Normalization layer (bn.running_mean, bn.running_var)
+    which is unique to FLUX.2 and not present in FLUX.1 VAE.
     """
     # Check for BN layer which is unique to FLUX.2 VAE
-    if "bn.running_mean" in state_dict or "bn.running_var" in state_dict:
-        return True
-
-    # Also check for FLUX.2 VAE-specific dimension in encoder
-    # FLUX.2 VAE has 32 latent channels, FLUX.1 has 16
-    # The encoder output dimension would reflect this
-    encoder_conv_out = state_dict.get("encoder.conv_out.weight")
-    if encoder_conv_out is not None and hasattr(encoder_conv_out, "shape"):
-        # FLUX.2 VAE has 32 output channels in encoder
-        if encoder_conv_out.shape[0] == 32:
-            return True
-
-    return False
+    # Note: We cannot use encoder.conv_out channel count because both FLUX.1 and FLUX.2
+    # have 32 output channels (FLUX.1: 16 latent × 2, FLUX.2: 32 latent × 2 but patchified)
+    return "bn.running_mean" in state_dict or "bn.running_var" in state_dict
 
 
 class VAE_Checkpoint_Config_Base(Checkpoint_Config_Base):
