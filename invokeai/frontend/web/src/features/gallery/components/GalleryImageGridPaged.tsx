@@ -90,6 +90,17 @@ export const GalleryImageGridPaged = memo(() => {
   }, [galleryImageMinimumWidth, imageNames.length, isLoading, pageIndex, pageSize]);
 
   useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+    const timeout = setTimeout(() => {
+      recalculatePageSize();
+      requestAnimationFrame(recalculatePageSize);
+    }, 350);
+    return () => clearTimeout(timeout);
+  }, [galleryImageMinimumWidth, isLoading, recalculatePageSize]);
+
+  useEffect(() => {
     const rootEl = gridRootRef.current;
     if (!rootEl || typeof ResizeObserver === 'undefined') {
       return;

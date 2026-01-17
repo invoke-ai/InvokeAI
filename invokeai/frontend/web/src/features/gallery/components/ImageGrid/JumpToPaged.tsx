@@ -11,6 +11,7 @@ import {
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { memo, useCallback, useEffect, useState } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
 type JumpToPagedProps = {
@@ -44,6 +45,25 @@ export const JumpToPaged = memo(({ pageIndex, pageCount, onChange }: JumpToPaged
     onChange(String(newPage), newPage);
     disclosure.onClose();
   }, [disclosure, newPage, onChange]);
+
+  useHotkeys(
+    'enter',
+    () => {
+      onClickGo();
+    },
+    { enabled: disclosure.isOpen, enableOnFormTags: ['input'] },
+    [disclosure.isOpen, onClickGo]
+  );
+
+  useHotkeys(
+    'esc',
+    () => {
+      setNewPage(pageIndex + 1);
+      disclosure.onClose();
+    },
+    { enabled: disclosure.isOpen, enableOnFormTags: ['input'] },
+    [disclosure.isOpen, pageIndex, disclosure.onClose]
+  );
 
   return (
     <Popover isOpen={disclosure.isOpen} onClose={disclosure.onClose} isLazy lazyBehavior="unmount">
