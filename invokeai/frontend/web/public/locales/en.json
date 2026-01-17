@@ -389,6 +389,7 @@
         "oldestFirst": "Oldest First",
         "sortDirection": "Sort Direction",
         "showStarredImagesFirst": "Show Starred Images First",
+        "usePagedGalleryView": "Use Paged Gallery View",
         "noImageSelected": "No Image Selected",
         "noImagesInGallery": "No Images to Display",
         "starImage": "Star",

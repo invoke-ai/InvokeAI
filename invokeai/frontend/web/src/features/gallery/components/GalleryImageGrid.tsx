@@ -273,6 +273,10 @@ const useKeepSelectedImageInView = (
       return;
     }
 
+    if (!imageNames.includes(targetImageName)) {
+      return;
+    }
+
     setTimeout(() => {
       scrollIntoView(targetImageName, imageNames, rootEl, virtuosoGridHandle, range);
     }, 0);
@@ -310,13 +314,19 @@ const useStarImageHotkey = () => {
   });
 };
 
-export const GalleryImageGrid = memo(() => {
+type GalleryImageGridContentProps = {
+  imageNames: string[];
+  isLoading: boolean;
+  queryArgs: ListImageNamesQueryArgs;
+  rootRef?: React.RefObject<HTMLDivElement>;
+};
+
+export const GalleryImageGridContent = memo(
+  ({ imageNames, isLoading, queryArgs, rootRef: rootRefProp }: GalleryImageGridContentProps) => {
   const virtuosoRef = useRef<VirtuosoGridHandle>(null);
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  // Get the ordered list of image names - this is our primary data source for virtualization
-  const { queryArgs, imageNames, isLoading } = useGalleryImageNames();
+  const internalRootRef = useRef<HTMLDivElement>(null);
+  const rootRef = rootRefProp ?? internalRootRef;
 
   // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
   const { onRangeChanged } = useRangeBasedImageFetching({
@@ -376,9 +386,16 @@ export const GalleryImageGrid = memo(() => {
         scrollSeekConfiguration={scrollSeekConfiguration}
         rangeChanged={handleRangeChanged}
       />
-      <GallerySelectionCountTag />
+      <GallerySelectionCountTag imageNames={imageNames} />
     </Box>
   );
+});
+
+GalleryImageGridContent.displayName = 'GalleryImageGridContent';
+
+export const GalleryImageGrid = memo(() => {
+  const { queryArgs, imageNames, isLoading } = useGalleryImageNames();
+  return <GalleryImageGridContent imageNames={imageNames} isLoading={isLoading} queryArgs={queryArgs} />;
 });
 
 GalleryImageGrid.displayName = 'GalleryImageGrid';
