@@ -45,8 +45,8 @@ from invokeai.backend.model_manager.configs.flux_redux import FLUXRedux_Checkpoi
 from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.main import (
     Main_BnBNF4_FLUX_Config,
-    Main_Checkpoint_FLUX_Config,
     Main_Checkpoint_Flux2_Config,
+    Main_Checkpoint_FLUX_Config,
     Main_GGUF_FLUX_Config,
 )
 from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
@@ -133,14 +133,14 @@ class Flux2VAELoader(ModelLoader):
         # BFL format uses: encoder.down., decoder.up., decoder.mid.block_1, decoder.mid.attn_1, decoder.norm_out
         # Diffusers uses: encoder.down_blocks., decoder.up_blocks., decoder.mid_block.resnets., decoder.conv_norm_out
         is_bfl_format = any(
-            k.startswith("encoder.down.") or
-            k.startswith("decoder.up.") or
-            k.startswith("decoder.mid.block_") or
-            k.startswith("decoder.mid.attn_") or
-            k.startswith("decoder.norm_out") or
-            k.startswith("encoder.mid.block_") or
-            k.startswith("encoder.mid.attn_") or
-            k.startswith("encoder.norm_out")
+            k.startswith("encoder.down.")
+            or k.startswith("decoder.up.")
+            or k.startswith("decoder.mid.block_")
+            or k.startswith("decoder.mid.attn_")
+            or k.startswith("decoder.norm_out")
+            or k.startswith("encoder.mid.block_")
+            or k.startswith("encoder.mid.attn_")
+            or k.startswith("encoder.norm_out")
             for k in sd.keys()
         )
         if is_bfl_format:
@@ -717,10 +717,14 @@ class Flux2CheckpointModel(ModelLoader):
 
         # Detect architecture from checkpoint keys
         double_block_indices = [
-            int(k.split(".")[1]) for k in converted_sd.keys() if isinstance(k, str) and k.startswith("transformer_blocks.")
+            int(k.split(".")[1])
+            for k in converted_sd.keys()
+            if isinstance(k, str) and k.startswith("transformer_blocks.")
         ]
         single_block_indices = [
-            int(k.split(".")[1]) for k in converted_sd.keys() if isinstance(k, str) and k.startswith("single_transformer_blocks.")
+            int(k.split(".")[1])
+            for k in converted_sd.keys()
+            if isinstance(k, str) and k.startswith("single_transformer_blocks.")
         ]
 
         num_layers = max(double_block_indices) + 1 if double_block_indices else 5
@@ -783,7 +787,6 @@ class Flux2CheckpointModel(ModelLoader):
         model.load_state_dict(converted_sd, assign=True)
 
         return model
-
 
     def _convert_flux2_bfl_to_diffusers(self, sd: dict) -> dict:
         """Convert FLUX.2 BFL format state dict to diffusers format.

@@ -120,9 +120,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         input=Input.Connection,
     )
 
-    def _get_bn_stats(
-        self, context: InvocationContext
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _get_bn_stats(self, context: InvocationContext) -> Tuple[torch.Tensor, torch.Tensor]:
         """Extract BN statistics from the FLUX.2 VAE.
 
         The FLUX.2 VAE uses batch normalization on the patchified 128-channel representation.
@@ -138,7 +136,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
             # Get BN running statistics from VAE
             bn_mean = vae.bn.running_mean.clone()  # Shape: (128,)
             bn_var = vae.bn.running_var.clone()  # Shape: (128,)
-            bn_eps = vae.bn.eps if hasattr(vae.bn, 'eps') else 1e-4  # BFL uses 1e-4
+            bn_eps = vae.bn.eps if hasattr(vae.bn, "eps") else 1e-4  # BFL uses 1e-4
             bn_std = torch.sqrt(bn_var + bn_eps)
         return bn_mean, bn_std
 
