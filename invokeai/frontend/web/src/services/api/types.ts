@@ -293,6 +293,14 @@ export const isFluxDevMainModelConfig = (config: AnyModelConfig): config is Main
   return config.type === 'main' && config.base === 'flux' && config.variant === 'dev';
 };
 
+export const isFlux2Klein9BMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'flux2' && config.name.toLowerCase().includes('9b');
+};
+
+export const isNonCommercialMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return isFluxDevMainModelConfig(config) || isFlux2Klein9BMainModelConfig(config);
+};
+
 export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'flux' && config.variant === 'dev_fill';
 };
