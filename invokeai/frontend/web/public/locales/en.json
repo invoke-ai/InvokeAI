@@ -2858,9 +2858,8 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Support for Z-Image-Turbo: InvokeAI now supports the fast and accurate Z-Image-Turbo model. See 'Starter Models' to get started.",
-            "Hotkeys: Add and edit keyboard shortcuts for any of Invoke's major functions.",
-            "Model Manager: The Model Manager user interface now supports bulk tagging and deletion."
+            "Models: InvokeAI adds preliminary support for the fast Flux.2 Klein models. See 'Starter Models' to get going.",
+            "Z-Image Turbo diversity: Active 'Seed Variance Enhancer' under 'Advanced Options' to add diversitiy to your ZiT gens."
         ],
         "takeUserSurvey": "📣 Let us know how you like InvokeAI. Take our User Experience Survey!",
         "readReleaseNotes": "Read Release Notes",
