@@ -202,11 +202,11 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
         flux2_variant = main_config.variant
 
         # Validate the variants match
-        # Klein4B requires Qwen3_4B, Klein9B requires Qwen3_8B
+        # Klein4B requires Qwen3_4B, Klein9B/Klein9BBase requires Qwen3_8B
         expected_qwen3_variant = None
         if flux2_variant == Flux2VariantType.Klein4B:
             expected_qwen3_variant = Qwen3VariantType.Qwen3_4B
-        elif flux2_variant == Flux2VariantType.Klein9B:
+        elif flux2_variant in (Flux2VariantType.Klein9B, Flux2VariantType.Klein9BBase):
             expected_qwen3_variant = Qwen3VariantType.Qwen3_8B
 
         if expected_qwen3_variant is not None and qwen3_variant != expected_qwen3_variant:

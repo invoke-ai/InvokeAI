@@ -305,13 +305,21 @@ def _is_flux2_model(state_dict: dict[str | int, Any]) -> bool:
 def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
     """Determine FLUX.2 variant from state dict.
 
-    Distinguishes between Klein 4B and Klein 9B based on context_in_dim:
+    Distinguishes between Klein 4B, Klein 9B, and Klein 9B Base:
     - Klein 4B: context_in_dim = 7680 (3 × Qwen3-4B hidden_size 2560)
-    - Klein 9B: context_in_dim = 12288 (3 × Qwen3-8B hidden_size 4096)
+    - Klein 9B: context_in_dim = 12288 (3 × Qwen3-8B hidden_size 4096), has guidance_in
+    - Klein 9B Base: context_in_dim = 12288, no guidance_in (undistilled)
     """
     # Context dimensions for each variant
     KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
     KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
+
+    # Check for guidance_in keys to distinguish distilled from undistilled
+    # Klein 9B (distilled) has guidance embeddings, Klein 9B Base (undistilled) does not
+    has_guidance_embeds = (
+        "guidance_in.out_layer.weight" in state_dict
+        or "model.diffusion_model.guidance_in.out_layer.weight" in state_dict
+    )
 
     # Check context_embedder to determine variant
     for key in {"context_embedder.weight", "model.diffusion_model.context_embedder.weight"}:
@@ -321,7 +329,11 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
                 context_in_dim = weight.shape[1]
                 # Determine variant based on context dimension
                 if context_in_dim == KLEIN_9B_CONTEXT_DIM:
-                    return Flux2VariantType.Klein9B
+                    # Distinguish Klein 9B (distilled) from Klein 9B Base (undistilled)
+                    if has_guidance_embeds:
+                        return Flux2VariantType.Klein9B
+                    else:
+                        return Flux2VariantType.Klein9BBase
                 elif context_in_dim == KLEIN_4B_CONTEXT_DIM:
                     return Flux2VariantType.Klein4B
                 elif context_in_dim > 4096:
@@ -711,7 +723,12 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
 
         FLUX.2 Klein uses Qwen3 text encoder with larger joint_attention_dim:
         - Klein 4B: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
-        - Klein 9B: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
+        - Klein 9B/9B Base: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
+
+        To distinguish Klein 9B (distilled) from Klein 9B Base (undistilled),
+        we check guidance_embeds:
+        - Klein 9B (distilled): guidance_embeds = True
+        - Klein 9B Base (undistilled): guidance_embeds = False
         """
         KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
         KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
@@ -719,10 +736,17 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
 
         joint_attention_dim = transformer_config.get("joint_attention_dim", 4096)
+        guidance_embeds = transformer_config.get("guidance_embeds", True)
 
         # Determine variant based on joint_attention_dim
         if joint_attention_dim == KLEIN_9B_CONTEXT_DIM:
-            return Flux2VariantType.Klein9B
+            # Check guidance_embeds to distinguish distilled from undistilled
+            # Klein 9B (distilled): guidance_embeds = True
+            # Klein 9B Base (undistilled): guidance_embeds = False
+            if guidance_embeds:
+                return Flux2VariantType.Klein9B
+            else:
+                return Flux2VariantType.Klein9BBase
         elif joint_attention_dim == KLEIN_4B_CONTEXT_DIM:
             return Flux2VariantType.Klein4B
         elif joint_attention_dim > 4096:

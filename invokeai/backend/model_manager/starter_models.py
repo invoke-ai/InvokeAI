@@ -702,7 +702,14 @@ flux2_klein_9b = StarterModel(
     name="FLUX.2 Klein 9B",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-9B",
-    description="FLUX.2 Klein 9B - higher quality model with Qwen3 text encoder. ~20GB",
+    description="FLUX.2 Klein 9B - higher quality model with Qwen3 text encoder (distilled). ~20GB",
+    type=ModelType.Main,
+)
+flux2_klein_9b_base = StarterModel(
+    name="FLUX.2 Klein 9B Base",
+    base=BaseModelType.Flux2,
+    source="black-forest-labs/FLUX.2-klein-base-9B",
+    description="FLUX.2 Klein 9B Base - undistilled foundation model with Qwen3 8B encoder. Higher quality, requires more steps. ~29GB VRAM. Non-commercial license.",
     type=ModelType.Main,
 )
 # endregion
@@ -845,6 +852,7 @@ STARTER_MODELS: list[StarterModel] = [
     flux_fill,
     flux2_klein_4b,
     flux2_klein_9b,
+    flux2_klein_9b_base,
     cogview4,
     flux_krea,
     flux_krea_quantized,

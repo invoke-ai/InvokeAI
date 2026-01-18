@@ -213,6 +213,7 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   schnell: 'FLUX Schnell',
   klein_4b: 'FLUX.2 Klein 4B',
   klein_9b: 'FLUX.2 Klein 9B',
+  klein_9b_base: 'FLUX.2 Klein 9B Base',
   large: 'CLIP L',
   gigantic: 'CLIP G',
   qwen3_4b: 'Qwen3 4B',
