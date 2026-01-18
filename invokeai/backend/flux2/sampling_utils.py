@@ -107,33 +107,39 @@ def unpack_flux2(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
     )
 
 
-def generate_img_ids_flux2(h: int, w: int, batch_size: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+def generate_img_ids_flux2(h: int, w: int, batch_size: int, device: torch.device) -> torch.Tensor:
     """Generate tensor of image position ids for FLUX.2.
 
-    FLUX.2 uses 4D position coordinates (T, H, W, L) instead of 3D.
+    FLUX.2 uses 4D position coordinates (T, H, W, L) for its rotary position embeddings.
+    This is different from FLUX.1 which uses 3D coordinates.
+
+    IMPORTANT: Position IDs must use int64 (long) dtype like diffusers, not bfloat16.
+    Using floating point dtype for position IDs can cause NaN in rotary embeddings.
 
     Args:
         h: Height of image in latent space.
         w: Width of image in latent space.
         batch_size: Batch size.
         device: Device.
-        dtype: dtype.
 
     Returns:
-        Image position ids tensor of shape (batch_size, h*w, 4).
+        Image position ids tensor of shape (batch_size, h/2*w/2, 4) with int64 dtype.
     """
     # After packing, spatial dims are h/2 x w/2
     packed_h = h // 2
     packed_w = w // 2
 
-    # Create coordinate grids
-    # T (time/batch), H, W, L (layer/channel)
-    img_ids = torch.zeros(packed_h, packed_w, 4, device=device, dtype=dtype)
+    # Create coordinate grids - 4D: (T, H, W, L)
+    # T = time/batch index, H = height, W = width, L = layer/channel
+    # Use int64 (long) dtype like diffusers
+    img_ids = torch.zeros(packed_h, packed_w, 4, device=device, dtype=torch.long)
 
+    # T (time/batch) coordinate - set to 0 (already initialized)
     # H coordinates
-    img_ids[:, :, 1] = torch.arange(packed_h, device=device, dtype=dtype)[:, None]
+    img_ids[..., 1] = torch.arange(packed_h, device=device, dtype=torch.long)[:, None]
     # W coordinates
-    img_ids[:, :, 2] = torch.arange(packed_w, device=device, dtype=dtype)[None, :]
+    img_ids[..., 2] = torch.arange(packed_w, device=device, dtype=torch.long)[None, :]
+    # L (layer) coordinate - set to 0 (already initialized)
 
     # Flatten and expand for batch
     img_ids = img_ids.reshape(1, packed_h * packed_w, 4)

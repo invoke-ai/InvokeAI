@@ -30,6 +30,8 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 from invokeai.backend.util.devices import TorchDevice
 
 # Flux2 Klein extracts hidden states from these specific layers
+# ComfyUI uses [9, 18, 27] (0-indexed layer numbers)
+# hidden_states[0] is embedding layer, so layer N is at index N
 KLEIN_EXTRACTION_LAYERS = [9, 18, 27]
 
 # Default max sequence length for Klein models
@@ -136,17 +138,9 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
                     "The Qwen3 tokenizer may be corrupted or incompatible."
                 )
 
-            # Apply chat template similar to diffusers Flux2KleinPipeline
-            try:
-                prompt_formatted = tokenizer.apply_chat_template(
-                    [{"role": "user", "content": prompt}],
-                    tokenize=False,
-                    add_generation_prompt=True,
-                    enable_thinking=True,
-                )
-            except (AttributeError, TypeError) as e:
-                context.logger.warning(f"Chat template failed ({e}), using raw prompt.")
-                prompt_formatted = prompt
+            # Apply chat template matching ComfyUI's FLUX.2 Klein implementation
+            # Format: <|im_start|>user\n{prompt}\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n
+            prompt_formatted = f"<|im_start|>user\n{prompt}\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
 
             # Tokenize the formatted prompt
             text_inputs = tokenizer(
@@ -212,10 +206,11 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
             # After stacking along last dim: (batch_size, seq_len, hidden_size * 3)
             stacked_embeds = torch.cat(extracted_hidden_states, dim=-1)
 
-            # Debug: Log shapes to verify dimensions
+            # Debug: Log shapes, dtype and value ranges (no normalization - matching diffusers)
             context.logger.info(
                 f"Qwen3 hidden state shapes: per_layer={extracted_hidden_states[0].shape}, "
-                f"stacked={stacked_embeds.shape}"
+                f"stacked={stacked_embeds.shape}, dtype={stacked_embeds.dtype}, "
+                f"value_range=[{stacked_embeds.min().item():.4f}, {stacked_embeds.max().item():.4f}]"
             )
 
             # Create pooled embedding for global conditioning

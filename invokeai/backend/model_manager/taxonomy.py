@@ -123,8 +123,21 @@ class FluxVariantType(str, Enum):
 class Flux2VariantType(str, Enum):
     """FLUX.2 model variants."""
 
-    Klein = "klein"
-    """Flux2 Klein variant using Qwen3 text encoder instead of CLIP+T5."""
+    Klein4B = "klein_4b"
+    """Flux2 Klein 4B variant using Qwen3 4B text encoder."""
+
+    Klein9B = "klein_9b"
+    """Flux2 Klein 9B variant using Qwen3 8B text encoder."""
+
+
+class Qwen3VariantType(str, Enum):
+    """Qwen3 text encoder variants based on model size."""
+
+    Qwen3_4B = "qwen3_4b"
+    """Qwen3 4B text encoder (hidden_size=2560). Used by FLUX.2 Klein 4B and Z-Image."""
+
+    Qwen3_8B = "qwen3_8b"
+    """Qwen3 8B text encoder (hidden_size=4096). Used by FLUX.2 Klein 9B."""
 
 
 class ModelFormat(str, Enum):
@@ -185,7 +198,7 @@ class FluxLoRAFormat(str, Enum):
     XLabs = "flux.xlabs"
 
 
-AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, FluxVariantType, Flux2VariantType]
-variant_type_adapter = TypeAdapter[ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType](
-    ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType
+AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, FluxVariantType, Flux2VariantType, Qwen3VariantType]
+variant_type_adapter = TypeAdapter[ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | Qwen3VariantType](
+    ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | Qwen3VariantType
 )

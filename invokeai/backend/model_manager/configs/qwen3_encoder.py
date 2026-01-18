@@ -1,4 +1,5 @@
-from typing import Any, Literal, Self
+import json
+from typing import Any, Literal, Optional, Self
 
 from pydantic import Field
 
@@ -11,7 +12,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_file,
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 
@@ -45,12 +46,67 @@ def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(v, GGMLTensor) for v in state_dict.values())
 
 
+def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Optional[Qwen3VariantType]:
+    """Determine Qwen3 variant (4B vs 8B) from state dict based on hidden_size.
+
+    The hidden_size can be determined from the embed_tokens.weight tensor shape:
+    - Qwen3 4B: hidden_size = 2560
+    - Qwen3 8B: hidden_size = 4096
+
+    For GGUF format, the key is 'token_embd.weight'.
+    For PyTorch format, the key is 'model.embed_tokens.weight'.
+    """
+    # Hidden size thresholds
+    QWEN3_4B_HIDDEN_SIZE = 2560
+    QWEN3_8B_HIDDEN_SIZE = 4096
+
+    # Try to find embed_tokens weight
+    embed_key = None
+    for key in state_dict.keys():
+        if isinstance(key, str):
+            if key == "model.embed_tokens.weight" or key == "token_embd.weight":
+                embed_key = key
+                break
+
+    if embed_key is None:
+        return None
+
+    tensor = state_dict[embed_key]
+
+    # Get hidden_size from tensor shape
+    # Shape is [vocab_size, hidden_size]
+    if isinstance(tensor, GGMLTensor):
+        # GGUF tensor
+        if hasattr(tensor, "shape") and len(tensor.shape) >= 2:
+            hidden_size = tensor.shape[1]
+        else:
+            return None
+    elif hasattr(tensor, "shape"):
+        # PyTorch tensor
+        if len(tensor.shape) >= 2:
+            hidden_size = tensor.shape[1]
+        else:
+            return None
+    else:
+        return None
+
+    # Determine variant based on hidden_size
+    if hidden_size == QWEN3_4B_HIDDEN_SIZE:
+        return Qwen3VariantType.Qwen3_4B
+    elif hidden_size == QWEN3_8B_HIDDEN_SIZE:
+        return Qwen3VariantType.Qwen3_8B
+    else:
+        # Unknown size, default to 4B (more common)
+        return Qwen3VariantType.Qwen3_4B
+
+
 class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
     """Configuration for single-file Qwen3 Encoder models (safetensors)."""
 
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
     type: Literal[ModelType.Qwen3Encoder] = Field(default=ModelType.Qwen3Encoder)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: Qwen3VariantType = Field(description="Qwen3 model size variant (4B or 8B)")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -62,7 +118,17 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
 
         cls._validate_does_not_look_like_gguf_quantized(mod)
 
-        return cls(**override_fields)
+        # Determine variant from state dict
+        variant = cls._get_variant_or_default(mod)
+
+        return cls(variant=variant, **override_fields)
+
+    @classmethod
+    def _get_variant_or_default(cls, mod: ModelOnDisk) -> Qwen3VariantType:
+        """Get variant from state dict, defaulting to 4B if unknown."""
+        state_dict = mod.load_state_dict()
+        variant = _get_qwen3_variant_from_state_dict(state_dict)
+        return variant if variant is not None else Qwen3VariantType.Qwen3_4B
 
     @classmethod
     def _validate_looks_like_qwen3_model(cls, mod: ModelOnDisk) -> None:
@@ -87,6 +153,7 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
     type: Literal[ModelType.Qwen3Encoder] = Field(default=ModelType.Qwen3Encoder)
     format: Literal[ModelFormat.Qwen3Encoder] = Field(default=ModelFormat.Qwen3Encoder)
+    variant: Qwen3VariantType = Field(description="Qwen3 model size variant (4B or 8B)")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -129,7 +196,30 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
             },
         )
 
-        return cls(**override_fields)
+        # Determine variant from config.json hidden_size
+        variant = cls._get_variant_from_config(expected_config_path)
+
+        return cls(variant=variant, **override_fields)
+
+    @classmethod
+    def _get_variant_from_config(cls, config_path) -> Qwen3VariantType:
+        """Get variant from config.json based on hidden_size."""
+        QWEN3_4B_HIDDEN_SIZE = 2560
+        QWEN3_8B_HIDDEN_SIZE = 4096
+
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                config = json.load(f)
+            hidden_size = config.get("hidden_size")
+            if hidden_size == QWEN3_8B_HIDDEN_SIZE:
+                return Qwen3VariantType.Qwen3_8B
+            elif hidden_size == QWEN3_4B_HIDDEN_SIZE:
+                return Qwen3VariantType.Qwen3_4B
+            else:
+                # Default to 4B for unknown sizes
+                return Qwen3VariantType.Qwen3_4B
+        except (json.JSONDecodeError, OSError):
+            return Qwen3VariantType.Qwen3_4B
 
 
 class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
@@ -138,6 +228,7 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
     type: Literal[ModelType.Qwen3Encoder] = Field(default=ModelType.Qwen3Encoder)
     format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: Qwen3VariantType = Field(description="Qwen3 model size variant (4B or 8B)")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -149,7 +240,17 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
 
         cls._validate_looks_like_gguf_quantized(mod)
 
-        return cls(**override_fields)
+        # Determine variant from state dict
+        variant = cls._get_variant_or_default(mod)
+
+        return cls(variant=variant, **override_fields)
+
+    @classmethod
+    def _get_variant_or_default(cls, mod: ModelOnDisk) -> Qwen3VariantType:
+        """Get variant from state dict, defaulting to 4B if unknown."""
+        state_dict = mod.load_state_dict()
+        variant = _get_qwen3_variant_from_state_dict(state_dict)
+        return variant if variant is not None else Qwen3VariantType.Qwen3_4B
 
     @classmethod
     def _validate_looks_like_qwen3_model(cls, mod: ModelOnDisk) -> None:

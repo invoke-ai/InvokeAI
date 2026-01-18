@@ -299,11 +299,11 @@ export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is
   return config.type === 'main' && config.base === 'sdxl-refiner';
 };
 
-export const isFluxDevMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+const isFluxDevMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'flux' && config.variant === 'dev';
 };
 
-export const isFlux2Klein9BMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+const isFlux2Klein9BMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'flux2' && config.name.toLowerCase().includes('9b');
 };
 

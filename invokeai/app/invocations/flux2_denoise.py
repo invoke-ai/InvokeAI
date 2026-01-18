@@ -120,7 +120,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         input=Input.Connection,
     )
 
-    def _get_bn_stats(self, context: InvocationContext) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _get_bn_stats(self, context: InvocationContext) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
         """Extract BN statistics from the FLUX.2 VAE.
 
         The FLUX.2 VAE uses batch normalization on the patchified 128-channel representation.
@@ -130,14 +130,62 @@ class Flux2DenoiseInvocation(BaseInvocation):
         Inverse: x = y * std + mean
 
         Returns:
-            Tuple of (bn_mean, bn_std) tensors of shape (128,).
+            Tuple of (bn_mean, bn_std) tensors of shape (128,), or None if BN layer not found.
         """
         with context.models.load(self.vae.vae).model_on_device() as (_, vae):
+            # Ensure VAE is in eval mode to prevent BN stats from being updated
+            vae.eval()
+
+            # Log VAE type for debugging
+            context.logger.debug(f"FLUX.2 VAE type: {type(vae).__name__}")
+
+            # Try to find the BN layer - it may be at different locations depending on model format
+            bn_layer = None
+            if hasattr(vae, "bn"):
+                bn_layer = vae.bn
+                context.logger.info(f"Found BN layer at vae.bn: {type(bn_layer).__name__}")
+            elif hasattr(vae, "batch_norm"):
+                bn_layer = vae.batch_norm
+                context.logger.info(f"Found BN layer at vae.batch_norm: {type(bn_layer).__name__}")
+            elif hasattr(vae, "encoder") and hasattr(vae.encoder, "bn"):
+                bn_layer = vae.encoder.bn
+                context.logger.info(f"Found BN layer at vae.encoder.bn: {type(bn_layer).__name__}")
+
+            if bn_layer is None:
+                context.logger.warning(
+                    "FLUX.2 VAE does not have a BatchNorm layer at expected location. "
+                    "Skipping BN denormalization - the VAE may handle this internally."
+                )
+                # Log available attributes for debugging
+                vae_attrs = [attr for attr in dir(vae) if not attr.startswith("_")]
+                context.logger.info(f"VAE class: {type(vae).__name__}, attributes: {vae_attrs[:30]}")
+                return None
+
+            # Verify running statistics are initialized
+            if bn_layer.running_mean is None or bn_layer.running_var is None:
+                context.logger.warning(
+                    "FLUX.2 VAE BN layer has uninitialized running statistics. "
+                    "This may indicate the model wasn't properly loaded with pretrained weights."
+                )
+                return None
+
             # Get BN running statistics from VAE
-            bn_mean = vae.bn.running_mean.clone()  # Shape: (128,)
-            bn_var = vae.bn.running_var.clone()  # Shape: (128,)
-            bn_eps = vae.bn.eps if hasattr(vae.bn, "eps") else 1e-4  # BFL uses 1e-4
+            bn_mean = bn_layer.running_mean.clone()  # Shape: (128,)
+            bn_var = bn_layer.running_var.clone()  # Shape: (128,)
+            bn_eps = bn_layer.eps if hasattr(bn_layer, "eps") else 1e-4  # BFL uses 1e-4
             bn_std = torch.sqrt(bn_var + bn_eps)
+
+            # Validate BN statistics are not corrupted
+            if bn_mean.isnan().any() or bn_std.isnan().any():
+                context.logger.warning("FLUX.2 BN statistics contain NaN values!")
+            if bn_std.min() < 1e-6:
+                context.logger.warning(f"FLUX.2 BN std contains very small values: min={bn_std.min().item():.6f}")
+
+            context.logger.debug(
+                f"FLUX.2 BN stats: mean=[{bn_mean.min().item():.4f}, {bn_mean.max().item():.4f}], "
+                f"std=[{bn_std.min().item():.4f}, {bn_std.max().item():.4f}]"
+            )
+
         return bn_mean, bn_std
 
     def _bn_normalize(
@@ -198,9 +246,11 @@ class Flux2DenoiseInvocation(BaseInvocation):
         inference_dtype = torch.bfloat16
         device = TorchDevice.choose_torch_device()
 
-        # Get BN statistics from VAE for latent denormalization
+        # Get BN statistics from VAE for latent denormalization (optional)
         # BFL FLUX.2 VAE uses affine=False, so only mean/std are needed
-        bn_mean, bn_std = self._get_bn_stats(context)
+        # Some VAE formats (e.g. diffusers) may not expose BN stats directly
+        bn_stats = self._get_bn_stats(context)
+        bn_mean, bn_std = bn_stats if bn_stats is not None else (None, None)
 
         # Load the input latents, if provided
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
@@ -229,8 +279,23 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         # Qwen3 stacked embeddings (stored in t5_embeds field for compatibility)
         txt = pos_flux_conditioning.t5_embeds
-        # Generate text position IDs (FLUX.2 uses 4D coordinates: T, H, W, L)
-        txt_ids = torch.zeros(1, txt.shape[1], 4, device=device, dtype=inference_dtype)
+
+        # Debug: Check for NaN in conditioning
+        if txt.isnan().any():
+            context.logger.warning(f"FLUX.2: NaN detected in text conditioning! Shape: {txt.shape}")
+        else:
+            context.logger.info(
+                f"FLUX.2 conditioning (raw): shape={txt.shape}, dtype={txt.dtype}, "
+                f"min={txt.min().item():.4f}, max={txt.max().item():.4f}, mean={txt.mean().item():.4f}"
+            )
+
+        # Generate text position IDs (4D format for FLUX.2: T, H, W, L)
+        # FLUX.2 uses 4D position coordinates for its rotary position embeddings
+        # IMPORTANT: Position IDs must be int64 (long) like diffusers, not bfloat16
+        # For text tokens: T=1, H=1, W=1, L=0..seq_len-1 (L varies per token)
+        seq_len = txt.shape[1]
+        txt_ids = torch.ones(1, seq_len, 4, device=device, dtype=torch.long)
+        txt_ids[..., 3] = torch.arange(seq_len, device=device, dtype=torch.long)  # L coordinate varies
 
         # Load negative conditioning if provided
         neg_txt = None
@@ -242,7 +307,10 @@ class Flux2DenoiseInvocation(BaseInvocation):
             assert isinstance(neg_flux_conditioning, FLUXConditioningInfo)
             neg_flux_conditioning = neg_flux_conditioning.to(dtype=inference_dtype, device=device)
             neg_txt = neg_flux_conditioning.t5_embeds
-            neg_txt_ids = torch.zeros(1, neg_txt.shape[1], 4, device=device, dtype=inference_dtype)
+            # For text tokens: T=1, H=1, W=1, L=0..seq_len-1 (L varies per token)
+            neg_seq_len = neg_txt.shape[1]
+            neg_txt_ids = torch.ones(1, neg_seq_len, 4, device=device, dtype=torch.long)
+            neg_txt_ids[..., 3] = torch.arange(neg_seq_len, device=device, dtype=torch.long)
 
         # Validate transformer config
         transformer_config = context.models.get_config(self.transformer.transformer)
@@ -276,7 +344,8 @@ class Flux2DenoiseInvocation(BaseInvocation):
             return x
 
         # Generate image position IDs (FLUX.2 uses 4D coordinates)
-        img_ids = generate_img_ids_flux2(h=latent_h, w=latent_w, batch_size=b, device=device, dtype=inference_dtype)
+        # Position IDs use int64 dtype like diffusers
+        img_ids = generate_img_ids_flux2(h=latent_h, w=latent_w, batch_size=b, device=device)
 
         # Prepare inpaint mask
         inpaint_mask = self._prep_inpaint_mask(context, x)
@@ -287,9 +356,42 @@ class Flux2DenoiseInvocation(BaseInvocation):
         noise_packed = pack_flux2(noise)
         x = pack_flux2(x)
 
-        # Note: We do NOT apply BN normalization here.
-        # Testing if the denoiser operates in raw latent space like FLUX.1.
-        # The VAE internally handles BN during encode/decode.
+        # Debug: Check for NaN in packed inputs before denoising
+        if x.isnan().any():
+            context.logger.warning(f"FLUX.2: NaN in packed latents BEFORE denoising! Shape: {x.shape}")
+        else:
+            context.logger.debug(
+                f"FLUX.2 packed latents: shape={x.shape}, min={x.min().item():.4f}, "
+                f"max={x.max().item():.4f}, mean={x.mean().item():.4f}"
+            )
+
+        # Debug: Verify position IDs dtype and values
+        context.logger.info(
+            f"FLUX.2 position IDs: img_ids dtype={img_ids.dtype}, txt_ids dtype={txt_ids.dtype}, "
+            f"img_ids shape={img_ids.shape}, txt_ids shape={txt_ids.shape}"
+        )
+        context.logger.info(
+            f"FLUX.2 txt_ids sample (first 3 tokens): {txt_ids[0, :3, :].tolist()}, "
+            f"last token: {txt_ids[0, -1, :].tolist()}"
+        )
+        context.logger.info(
+            f"FLUX.2 img_ids sample (first 3 patches): {img_ids[0, :3, :].tolist()}, "
+            f"last patch: {img_ids[0, -1, :].tolist()}"
+        )
+
+        # Apply BN normalization BEFORE denoising (as per diffusers Flux2KleinPipeline)
+        # BN normalization: y = (x - mean) / std
+        # This transforms latents to normalized space for the transformer
+        if bn_mean is not None and bn_std is not None:
+            context.logger.debug(
+                f"FLUX.2 packed latents before BN norm: min={x.min().item():.4f}, max={x.max().item():.4f}, "
+                f"mean={x.mean().item():.4f}"
+            )
+            x = self._bn_normalize(x, bn_mean, bn_std)
+            context.logger.info(
+                f"FLUX.2 packed latents after BN norm: min={x.min().item():.4f}, max={x.max().item():.4f}, "
+                f"mean={x.mean().item():.4f}"
+            )
 
         # Verify packed dimensions
         assert packed_h * packed_w == x.shape[1]
@@ -320,6 +422,87 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 context.models.load(self.transformer.transformer).model_on_device()
             )
             config = transformer_config
+
+            # Debug: Check context_embedder dimensions vs Qwen3 embeddings
+            if hasattr(transformer, "context_embedder"):
+                ctx_emb = transformer.context_embedder
+                if hasattr(ctx_emb, "weight"):
+                    ctx_in_dim = ctx_emb.weight.shape[1]
+                    ctx_out_dim = ctx_emb.weight.shape[0]
+                    txt_dim = txt.shape[-1]
+                    ctx_weight_dtype = ctx_emb.weight.dtype
+                    context.logger.info(
+                        f"FLUX.2 transformer context_embedder: in_dim={ctx_in_dim}, out_dim={ctx_out_dim}, "
+                        f"weight_dtype={ctx_weight_dtype}, Qwen3 txt_dim={txt_dim}, txt_dtype={txt.dtype}"
+                    )
+                    if ctx_in_dim != txt_dim:
+                        context.logger.error(
+                            f"DIMENSION MISMATCH! Transformer expects {ctx_in_dim}-dim input but got {txt_dim}-dim Qwen3 embeddings!"
+                        )
+
+                    # Debug: Check if context_embedder weights contain NaN
+                    if ctx_emb.weight.isnan().any():
+                        context.logger.error("context_embedder.weight contains NaN!")
+                    if hasattr(ctx_emb, "bias") and ctx_emb.bias is not None and ctx_emb.bias.isnan().any():
+                        context.logger.error("context_embedder.bias contains NaN!")
+
+                    # Log context_embedder weight statistics
+                    context.logger.info(
+                        f"context_embedder.weight stats: min={ctx_emb.weight.min().item():.6f}, "
+                        f"max={ctx_emb.weight.max().item():.6f}, std={ctx_emb.weight.std().item():.6f}"
+                    )
+
+                    # Debug: Test context_embedder forward pass
+                    with torch.no_grad():
+                        # Ensure matching dtype for the matmul
+                        txt_for_ctx = txt.to(dtype=ctx_weight_dtype)
+                        test_ctx_out = ctx_emb(txt_for_ctx)
+                        if test_ctx_out.isnan().any():
+                            context.logger.error(
+                                f"context_embedder produces NaN! Input: min={txt_for_ctx.min().item():.4f}, max={txt_for_ctx.max().item():.4f}, "
+                                f"Output: nan_count={test_ctx_out.isnan().sum().item()}"
+                            )
+                        else:
+                            context.logger.info(
+                                f"context_embedder output: min={test_ctx_out.min().item():.4f}, "
+                                f"max={test_ctx_out.max().item():.4f}, mean={test_ctx_out.mean().item():.4f}"
+                            )
+
+            # Debug: Check x_embedder
+            if hasattr(transformer, "x_embedder"):
+                x_emb = transformer.x_embedder
+                if hasattr(x_emb, "weight"):
+                    if x_emb.weight.isnan().any():
+                        context.logger.error("x_embedder.weight contains NaN!")
+                    with torch.no_grad():
+                        test_x_out = x_emb(x)
+                        if test_x_out.isnan().any():
+                            context.logger.error(f"x_embedder produces NaN!")
+                        else:
+                            context.logger.info(
+                                f"x_embedder output OK: min={test_x_out.min().item():.4f}, "
+                                f"max={test_x_out.max().item():.4f}"
+                            )
+
+            # Debug: Check pos_embed (position embeddings)
+            # Note: pos_embed expects 2D input (seq_len, 4), not 3D (batch, seq_len, 4)
+            if hasattr(transformer, "pos_embed"):
+                pos_emb = transformer.pos_embed
+                with torch.no_grad():
+                    try:
+                        # Extract first batch element for testing (pos_embed expects 2D)
+                        test_img_ids = img_ids[0] if img_ids.ndim == 3 else img_ids
+                        test_pos_out = pos_emb(test_img_ids)
+                        if isinstance(test_pos_out, tuple):
+                            for i, t in enumerate(test_pos_out):
+                                if t.isnan().any():
+                                    context.logger.error(f"pos_embed output[{i}] contains NaN!")
+                        elif test_pos_out.isnan().any():
+                            context.logger.error(f"pos_embed produces NaN!")
+                        else:
+                            context.logger.info("pos_embed output OK")
+                    except Exception as e:
+                        context.logger.error(f"pos_embed error: {e}")
 
             # Determine if the model is quantized
             if config.format in [ModelFormat.Diffusers]:
@@ -359,14 +542,42 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 scheduler=scheduler,
             )
 
+            # Debug: Check for NaN immediately after denoising
+            if x.isnan().any():
+                nan_count = x.isnan().sum().item()
+                total_elements = x.numel()
+                context.logger.error(
+                    f"FLUX.2: NaN detected AFTER denoising! "
+                    f"{nan_count}/{total_elements} elements are NaN ({100*nan_count/total_elements:.1f}%)"
+                )
+            else:
+                context.logger.debug(
+                    f"FLUX.2 after denoise: min={x.min().item():.4f}, max={x.max().item():.4f}, "
+                    f"mean={x.mean().item():.4f}"
+                )
+
             # Apply inpainting if enabled
             if inpaint_extension is not None:
                 x = inpaint_extension.merge_intermediate_latents_with_init_latents(x, 0.0)
 
-        # Apply BN denormalization to convert denoiser output to VAE-compatible space
-        # The denoiser operates in normalized space, VAE decode expects denormalized latents
-        # BFL formula: x = y * std + mean
-        x = self._bn_denormalize(x, bn_mean, bn_std)
+        # Apply BN denormalization if BN stats are available
+        # The diffusers Flux2KleinPipeline applies: latents = latents * bn_std + bn_mean
+        # This transforms latents from normalized space to VAE's expected input space
+        if bn_mean is not None and bn_std is not None:
+            context.logger.debug(
+                f"FLUX.2 latents before BN denorm: min={x.min().item():.4f}, max={x.max().item():.4f}, "
+                f"mean={x.mean().item():.4f}"
+            )
+            x = self._bn_denormalize(x, bn_mean, bn_std)
+            context.logger.info(
+                f"FLUX.2 latents after BN denorm: min={x.min().item():.4f}, max={x.max().item():.4f}, "
+                f"mean={x.mean().item():.4f}"
+            )
+        else:
+            context.logger.info(
+                f"FLUX.2 latents (no BN stats): min={x.min().item():.4f}, max={x.max().item():.4f}, "
+                f"mean={x.mean().item():.4f}"
+            )
 
         x = unpack_flux2(x.float(), self.height, self.width)
         return x

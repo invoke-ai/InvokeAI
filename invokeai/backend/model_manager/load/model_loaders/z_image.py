@@ -595,7 +595,10 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
                 # Dequantize: convert to float and multiply by scale
                 # Handle block-wise quantization (e.g., FP4 with block_size=8)
                 # where scale has shape [weight_dim / block_size, ...]
-                weight_float = weight.to(torch.float32)
+                # Note: Float8 types (e.g., float8_e4m3fn) require .float() instead of .to(torch.float32)
+                # as PyTorch doesn't support direct type promotion for Float8 types
+                weight_float = weight.float()
+                scale = scale.float()
                 if scale.shape != weight_float.shape and scale.numel() > 1:
                     # Block-wise quantization: need to expand scale to match weight shape
                     # Find which dimension differs and repeat scale along that dimension

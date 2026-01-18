@@ -57,15 +57,42 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             # Decode using diffusers API
             decoded = vae.decode(latents, return_dict=False)[0]
 
+        # Debug: Log decoded output statistics
+        print(f"[FLUX.2 VAE] Decoded output: shape={decoded.shape}, "
+              f"min={decoded.min().item():.4f}, max={decoded.max().item():.4f}, "
+              f"mean={decoded.mean().item():.4f}")
+        # Check per-channel statistics to diagnose color issues
+        for c in range(min(3, decoded.shape[1])):
+            ch = decoded[0, c]
+            print(f"[FLUX.2 VAE] Channel {c}: min={ch.min().item():.4f}, "
+                  f"max={ch.max().item():.4f}, mean={ch.mean().item():.4f}")
+
         # Convert from [-1, 1] to [0, 1] then to [0, 255] PIL image
         img = (decoded / 2 + 0.5).clamp(0, 1)
         img = rearrange(img[0], "c h w -> h w c")
-        img_pil = Image.fromarray((img * 255).byte().cpu().numpy())
+        img_np = (img * 255).byte().cpu().numpy()
+        # Explicitly create RGB image (not grayscale)
+        img_pil = Image.fromarray(img_np, mode="RGB")
         return img_pil
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
+
+        # Log latent statistics for debugging black image issues
+        context.logger.debug(
+            f"FLUX.2 VAE decode input: shape={latents.shape}, "
+            f"min={latents.min().item():.4f}, max={latents.max().item():.4f}, "
+            f"mean={latents.mean().item():.4f}"
+        )
+
+        # Warn if input latents are all zeros or very small (would cause black images)
+        if latents.abs().max() < 1e-6:
+            context.logger.warning(
+                "FLUX.2 VAE decode received near-zero latents! This will cause black images. "
+                "The latent cache may be corrupted - try clearing the cache."
+            )
+
         vae_info = context.models.load(self.vae.vae)
         context.util.signal_progress("Running VAE")
         image = self._vae_decode(vae_info=vae_info, latents=latents)

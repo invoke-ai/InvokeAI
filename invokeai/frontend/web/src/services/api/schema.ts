@@ -8298,7 +8298,7 @@ export type components = {
          * @description FLUX.2 model variants.
          * @enum {string}
          */
-        Flux2VariantType: "klein";
+        Flux2VariantType: "klein_4b" | "klein_9b";
         /**
          * FluxConditioningCollectionOutput
          * @description Base class for nodes that output a collection of conditioning tensors
@@ -13483,14 +13483,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models/.convert_cache
+             * @default models\.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models/.download_cache
+             * @default models\.download_cache
              */
             download_cache_dir?: string;
             /**
@@ -19931,7 +19931,7 @@ export type components = {
              * Variant
              * @description The variant of the model.
              */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["Qwen3VariantType"] | null;
             /** @description The prediction type of the model. */
             prediction_type?: components["schemas"]["SchedulerPredictionType"] | null;
             /**
@@ -20915,6 +20915,8 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /** @description Qwen3 model size variant (4B or 8B) */
+            variant: components["schemas"]["Qwen3VariantType"];
         };
         /**
          * Qwen3Encoder_GGUF_Config
@@ -20991,6 +20993,8 @@ export type components = {
              * @constant
              */
             format: "gguf_quantized";
+            /** @description Qwen3 model size variant (4B or 8B) */
+            variant: components["schemas"]["Qwen3VariantType"];
         };
         /**
          * Qwen3Encoder_Qwen3Encoder_Config
@@ -21065,7 +21069,15 @@ export type components = {
              * @constant
              */
             format: "qwen3_encoder";
+            /** @description Qwen3 model size variant (4B or 8B) */
+            variant: components["schemas"]["Qwen3VariantType"];
         };
+        /**
+         * Qwen3VariantType
+         * @description Qwen3 text encoder variants based on model size.
+         * @enum {string}
+         */
+        Qwen3VariantType: "qwen3_4b" | "qwen3_8b";
         /**
          * Random Float
          * @description Outputs a single random float
@@ -23760,7 +23772,7 @@ export type components = {
             path_or_prefix: string;
             model_type: components["schemas"]["ModelType"];
             /** Variant */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["Qwen3VariantType"] | null;
         };
         /**
          * Subtract Integers

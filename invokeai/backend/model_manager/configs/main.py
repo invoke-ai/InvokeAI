@@ -305,24 +305,36 @@ def _is_flux2_model(state_dict: dict[str | int, Any]) -> bool:
 def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
     """Determine FLUX.2 variant from state dict.
 
-    Currently only Klein variant exists.
+    Distinguishes between Klein 4B and Klein 9B based on context_in_dim:
+    - Klein 4B: context_in_dim = 7680 (3 × Qwen3-4B hidden_size 2560)
+    - Klein 9B: context_in_dim = 12288 (3 × Qwen3-8B hidden_size 4096)
     """
-    # Check context_embedder to confirm this is a FLUX.2 model
+    # Context dimensions for each variant
+    KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
+    KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
+
+    # Check context_embedder to determine variant
     for key in {"context_embedder.weight", "model.diffusion_model.context_embedder.weight"}:
         if key in state_dict:
             weight = state_dict[key]
             if hasattr(weight, "shape") and len(weight.shape) >= 2:
                 context_in_dim = weight.shape[1]
-                # Klein uses Qwen3 with larger context dimension
-                if context_in_dim > 4096:
-                    return Flux2VariantType.Klein
+                # Determine variant based on context dimension
+                if context_in_dim == KLEIN_9B_CONTEXT_DIM:
+                    return Flux2VariantType.Klein9B
+                elif context_in_dim == KLEIN_4B_CONTEXT_DIM:
+                    return Flux2VariantType.Klein4B
+                elif context_in_dim > 4096:
+                    # Unknown FLUX.2 variant, default to 4B
+                    return Flux2VariantType.Klein4B
 
-    # Check in_channels as backup
+    # Check in_channels as backup - can only confirm it's FLUX.2, not which variant
     for key in {"img_in.weight", "model.diffusion_model.img_in.weight"}:
         if key in state_dict:
             in_channels = state_dict[key].shape[1]
             if in_channels == 128:
-                return Flux2VariantType.Klein
+                # It's FLUX.2 but we can't determine which Klein variant, default to 4B
+                return Flux2VariantType.Klein4B
 
     return None
 
@@ -699,18 +711,26 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
 
         FLUX.2 Klein uses Qwen3 text encoder with larger joint_attention_dim:
         - Klein 4B: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
-        - Klein 8B: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
+        - Klein 9B: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
         """
+        KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
+        KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
+
         transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
 
         joint_attention_dim = transformer_config.get("joint_attention_dim", 4096)
 
-        # Klein models have larger joint_attention_dim due to Qwen3 encoder
-        if joint_attention_dim > 4096:
-            return Flux2VariantType.Klein
+        # Determine variant based on joint_attention_dim
+        if joint_attention_dim == KLEIN_9B_CONTEXT_DIM:
+            return Flux2VariantType.Klein9B
+        elif joint_attention_dim == KLEIN_4B_CONTEXT_DIM:
+            return Flux2VariantType.Klein4B
+        elif joint_attention_dim > 4096:
+            # Unknown FLUX.2 variant, default to 4B
+            return Flux2VariantType.Klein4B
 
-        # Default to Klein as it's the only FLUX.2 variant currently
-        return Flux2VariantType.Klein
+        # Default to 4B
+        return Flux2VariantType.Klein4B
 
 
 class Main_SD_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):

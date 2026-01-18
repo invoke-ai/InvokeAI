@@ -6,9 +6,10 @@ import {
   kleinVaeModelSelected,
   selectKleinQwen3EncoderModel,
   selectKleinVaeModel,
+  selectMainModelConfig,
 } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFlux2VAEModels, useQwen3EncoderModels } from 'services/api/hooks/modelsByType';
 import type { Qwen3EncoderModelConfig, VAEModelConfig } from 'services/api/types';
@@ -59,14 +60,38 @@ const ParamFlux2KleinVaeModelSelect = memo(() => {
 ParamFlux2KleinVaeModelSelect.displayName = 'ParamFlux2KleinVaeModelSelect';
 
 /**
+ * Maps FLUX.2 Klein variants to compatible Qwen3 encoder variants
+ */
+const KLEIN_TO_QWEN3_VARIANT_MAP: Record<string, string> = {
+  klein_4b: 'qwen3_4b',
+  klein_9b: 'qwen3_8b',
+};
+
+/**
  * FLUX.2 Klein Qwen3 Encoder Model Select
  * Selects a Qwen3 text encoder model for FLUX.2 Klein
+ * Only shows encoders compatible with the selected Klein model variant
  */
 const ParamFlux2KleinQwen3EncoderModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const kleinQwen3EncoderModel = useAppSelector(selectKleinQwen3EncoderModel);
-  const [modelConfigs, { isLoading }] = useQwen3EncoderModels();
+  const mainModelConfig = useAppSelector(selectMainModelConfig);
+  const [allModelConfigs, { isLoading }] = useQwen3EncoderModels();
+
+  // Filter Qwen3 encoders based on the main model's variant
+  const modelConfigs = useMemo(() => {
+    if (!mainModelConfig || !('variant' in mainModelConfig) || !mainModelConfig.variant) {
+      return allModelConfigs;
+    }
+
+    const requiredQwen3Variant = KLEIN_TO_QWEN3_VARIANT_MAP[mainModelConfig.variant];
+    if (!requiredQwen3Variant) {
+      return allModelConfigs;
+    }
+
+    return allModelConfigs.filter((config) => config.variant === requiredQwen3Variant);
+  }, [allModelConfigs, mainModelConfig]);
 
   const _onChange = useCallback(
     (model: Qwen3EncoderModelConfig | null) => {
