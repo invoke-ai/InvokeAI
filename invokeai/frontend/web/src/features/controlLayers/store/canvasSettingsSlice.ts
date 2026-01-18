@@ -13,7 +13,6 @@ const zTransformSmoothingMode = z.enum(['bilinear', 'bicubic', 'hamming', 'lancz
 export type TransformSmoothingMode = z.infer<typeof zTransformSmoothingMode>;
 
 const zGradientType = z.enum(['linear', 'radial']);
-export type GradientType = z.infer<typeof zGradientType>;
 
 const zCanvasSettingsState = z.object({
   /**

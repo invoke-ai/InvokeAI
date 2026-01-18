@@ -273,8 +273,6 @@ const zCanvasLinearGradientState = z.object({
   fgColor: zRgbaColor,
   bgColor: zRgbaColor,
 });
-export type CanvasLinearGradientState = z.infer<typeof zCanvasLinearGradientState>;
-
 const zCanvasRadialGradientState = z.object({
   id: zId,
   type: z.literal('gradient'),
@@ -289,8 +287,6 @@ const zCanvasRadialGradientState = z.object({
   fgColor: zRgbaColor,
   bgColor: zRgbaColor,
 });
-export type CanvasRadialGradientState = z.infer<typeof zCanvasRadialGradientState>;
-
 const zCanvasGradientState = z.discriminatedUnion('gradientType', [
   zCanvasLinearGradientState,
   zCanvasRadialGradientState,
