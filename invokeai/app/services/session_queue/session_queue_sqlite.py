@@ -158,12 +158,16 @@ class SqliteSessionQueue(SessionQueueBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT *
-                FROM session_queue
-                WHERE status = 'pending'
+                SELECT
+                    sq.*,
+                    u.display_name as user_display_name,
+                    u.email as user_email
+                FROM session_queue sq
+                LEFT JOIN users u ON sq.user_id = u.user_id
+                WHERE sq.status = 'pending'
                 ORDER BY
-                    priority DESC,
-                    item_id ASC
+                    sq.priority DESC,
+                    sq.item_id ASC
                 LIMIT 1
                 """
             )
@@ -178,14 +182,18 @@ class SqliteSessionQueue(SessionQueueBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT *
-                FROM session_queue
+                SELECT
+                    sq.*,
+                    u.display_name as user_display_name,
+                    u.email as user_email
+                FROM session_queue sq
+                LEFT JOIN users u ON sq.user_id = u.user_id
                 WHERE
-                    queue_id = ?
-                    AND status = 'pending'
+                    sq.queue_id = ?
+                    AND sq.status = 'pending'
                 ORDER BY
-                    priority DESC,
-                    created_at ASC
+                    sq.priority DESC,
+                    sq.created_at ASC
                 LIMIT 1
                 """,
                 (queue_id,),
@@ -199,11 +207,15 @@ class SqliteSessionQueue(SessionQueueBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT *
-                FROM session_queue
+                SELECT
+                    sq.*,
+                    u.display_name as user_display_name,
+                    u.email as user_email
+                FROM session_queue sq
+                LEFT JOIN users u ON sq.user_id = u.user_id
                 WHERE
-                    queue_id = ?
-                    AND status = 'in_progress'
+                    sq.queue_id = ?
+                    AND sq.status = 'in_progress'
                 LIMIT 1
                 """,
                 (queue_id,),
@@ -565,9 +577,13 @@ class SqliteSessionQueue(SessionQueueBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT * FROM session_queue
-                WHERE
-                    item_id = ?
+                SELECT
+                    sq.*,
+                    u.display_name as user_display_name,
+                    u.email as user_email
+                FROM session_queue sq
+                LEFT JOIN users u ON sq.user_id = u.user_id
+                WHERE sq.item_id = ?
                 """,
                 (item_id,),
             )
@@ -653,22 +669,26 @@ class SqliteSessionQueue(SessionQueueBase):
         """Gets all queue items that match the given parameters"""
         with self._db.transaction() as cursor:
             query = """--sql
-                SELECT *
-                FROM session_queue
-                WHERE queue_id = ?
+                SELECT
+                    sq.*,
+                    u.display_name as user_display_name,
+                    u.email as user_email
+                FROM session_queue sq
+                LEFT JOIN users u ON sq.user_id = u.user_id
+                WHERE sq.queue_id = ?
             """
             params: list[Union[str, int]] = [queue_id]
 
             if destination is not None:
                 query += """---sql
-                    AND destination = ?
+                    AND sq.destination = ?
                 """
                 params.append(destination)
 
             query += """--sql
                 ORDER BY
-                    priority DESC,
-                    item_id ASC
+                    sq.priority DESC,
+                    sq.item_id ASC
                 ;
                 """
             cursor.execute(query, params)

@@ -12719,6 +12719,12 @@ export type components = {
              */
             destination: string | null;
             /**
+             * User Id
+             * @description The ID of the user who created the queue item
+             * @default system
+             */
+            user_id: string;
+            /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
              */
@@ -12776,6 +12782,12 @@ export type components = {
              * @default null
              */
             destination: string | null;
+            /**
+             * User Id
+             * @description The ID of the user who created the queue item
+             * @default system
+             */
+            user_id: string;
             /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
@@ -13070,6 +13082,12 @@ export type components = {
              */
             destination: string | null;
             /**
+             * User Id
+             * @description The ID of the user who created the queue item
+             * @default system
+             */
+            user_id: string;
+            /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
              */
@@ -13138,6 +13156,12 @@ export type components = {
              * @default null
              */
             destination: string | null;
+            /**
+             * User Id
+             * @description The ID of the user who created the queue item
+             * @default system
+             */
+            user_id: string;
             /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
@@ -20375,6 +20399,12 @@ export type components = {
              */
             destination: string | null;
             /**
+             * User Id
+             * @description The ID of the user who created the queue item
+             * @default system
+             */
+            user_id: string;
+            /**
              * Status
              * @description The new status of the queue item
              * @enum {string}
@@ -22442,6 +22472,16 @@ export type components = {
              * @default system
              */
             user_id?: string;
+            /**
+             * User Display Name
+             * @description The display name of the user who created this queue item, if available
+             */
+            user_display_name?: string | null;
+            /**
+             * User Email
+             * @description The email of the user who created this queue item, if available
+             */
+            user_email?: string | null;
             /**
              * Field Values
              * @description The field values that were used for this queue item

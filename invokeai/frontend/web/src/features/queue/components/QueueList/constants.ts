@@ -6,6 +6,7 @@ export const COLUMN_WIDTHS = {
   credits: '4rem',
   origin_destination: '7rem',
   batchId: '5rem',
+  user: '8rem',
   fieldValues: 'auto',
   createdAt: '9.5rem',
   completedAt: '9.5rem',

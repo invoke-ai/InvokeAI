@@ -244,6 +244,12 @@ class SessionQueueItem(BaseModel):
     completed_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was completed")
     queue_id: str = Field(description="The id of the queue with which this item is associated")
     user_id: str = Field(default="system", description="The id of the user who created this queue item")
+    user_display_name: Optional[str] = Field(
+        default=None, description="The display name of the user who created this queue item, if available"
+    )
+    user_email: Optional[str] = Field(
+        default=None, description="The email of the user who created this queue item, if available"
+    )
     field_values: Optional[list[NodeFieldValue]] = Field(
         default=None, description="The field values that were used for this queue item"
     )

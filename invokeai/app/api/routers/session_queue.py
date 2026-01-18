@@ -37,6 +37,31 @@ class SessionQueueAndProcessorStatus(BaseModel):
     processor: SessionProcessorStatus
 
 
+def sanitize_queue_item_for_user(
+    queue_item: SessionQueueItem, current_user_id: str, is_admin: bool
+) -> SessionQueueItem:
+    """Sanitize queue item for non-admin users viewing other users' items.
+
+    For non-admin users viewing queue items belonging to other users,
+    the field_values should be hidden/cleared to protect privacy.
+
+    Args:
+        queue_item: The queue item to sanitize
+        current_user_id: The ID of the current user viewing the item
+        is_admin: Whether the current user is an admin
+
+    Returns:
+        The sanitized queue item (field_values cleared if necessary)
+    """
+    # Admins and item owners can see everything
+    if is_admin or queue_item.user_id == current_user_id:
+        return queue_item
+
+    # For non-admins viewing other users' items, clear field_values
+    queue_item.field_values = None
+    return queue_item
+
+
 @session_queue_router.post(
     "/{queue_id}/enqueue_batch",
     operation_id="enqueue_batch",
@@ -67,15 +92,18 @@ async def enqueue_batch(
     },
 )
 async def list_all_queue_items(
+    current_user: CurrentUser,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     destination: Optional[str] = Query(default=None, description="The destination of queue items to fetch"),
 ) -> list[SessionQueueItem]:
     """Gets all queue items"""
     try:
-        return ApiDependencies.invoker.services.session_queue.list_all_queue_items(
+        items = ApiDependencies.invoker.services.session_queue.list_all_queue_items(
             queue_id=queue_id,
             destination=destination,
         )
+        # Sanitize items for non-admin users
+        return [sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin) for item in items]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue items: {e}")
 
@@ -104,6 +132,7 @@ async def get_queue_item_ids(
     responses={200: {"model": list[SessionQueueItem]}},
 )
 async def get_queue_items_by_item_ids(
+    current_user: CurrentUser,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(
         embed=True, description="Object containing list of queue item ids to fetch queue items for"
@@ -120,7 +149,9 @@ async def get_queue_items_by_item_ids(
                 queue_item = session_queue_service.get_queue_item(item_id=item_id)
                 if queue_item.queue_id != queue_id:  # Auth protection for items from other queues
                     continue
-                queue_items.append(queue_item)
+                # Sanitize item for non-admin users
+                sanitized_item = sanitize_queue_item_for_user(queue_item, current_user.user_id, current_user.is_admin)
+                queue_items.append(sanitized_item)
             except Exception:
                 # Skip missing queue items - they may have been deleted between item id fetch and queue item fetch
                 continue
@@ -360,6 +391,7 @@ async def get_batch_status(
     response_model_exclude_none=True,
 )
 async def get_queue_item(
+    current_user: CurrentUser,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_id: int = Path(description="The queue item to get"),
 ) -> SessionQueueItem:
@@ -368,7 +400,8 @@ async def get_queue_item(
         queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id=item_id)
         if queue_item.queue_id != queue_id:
             raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
-        return queue_item
+        # Sanitize item for non-admin users
+        return sanitize_queue_item_for_user(queue_item, current_user.user_id, current_user.is_admin)
     except SessionQueueItemNotFoundError:
         raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
     except Exception as e:
