@@ -2394,10 +2394,16 @@
             "horizontal": "Horizontal",
             "diagonal": "Diagonal"
         },
+        "gradient": {
+            "linear": "Linear",
+            "circular": "Circular",
+            "clip": "Clip Gradient"
+        },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
             "rectangle": "Rectangle",
+            "gradient": "Gradient",
             "bbox": "Bbox",
             "move": "Move",
             "view": "View",
