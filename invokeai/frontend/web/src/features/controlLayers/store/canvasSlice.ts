@@ -1875,12 +1875,7 @@ export const canvasSliceConfig: SliceConfig<typeof slice> = {
   },
 };
 
-const doNotGroupMatcher = isAnyOf(
-  entityBrushLineAdded,
-  entityEraserLineAdded,
-  entityRectAdded,
-  entityGradientAdded
-);
+const doNotGroupMatcher = isAnyOf(entityBrushLineAdded, entityEraserLineAdded, entityRectAdded, entityGradientAdded);
 
 // Store rapid actions of the same type at most once every x time.
 // See: https://github.com/omnidan/redux-undo/blob/master/examples/throttled-drag/util/undoFilter.js
