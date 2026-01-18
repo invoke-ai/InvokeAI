@@ -261,6 +261,7 @@ const zCanvasImageState = z.object({
   id: zId,
   type: z.literal('image'),
   image: z.union([zImageWithDims, zImageWithDimsDataURL]),
+  usePixelBbox: z.boolean().optional(),
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
 

@@ -10,7 +10,7 @@ import { addCoords, getKonvaNodeDebugAttrs, getPrefixedId } from 'features/contr
 import { selectAutoProcess } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { FilterConfig } from 'features/controlLayers/store/filters';
 import { getFilterForModel, IMAGE_FILTERS } from 'features/controlLayers/store/filters';
-import type { CanvasEntityType, CanvasImageState } from 'features/controlLayers/store/types';
+import type { CanvasEntityType, CanvasImageState, Rect } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { toast } from 'features/toast/toast';
 import Konva from 'konva';
@@ -79,6 +79,11 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
    * The ephemeral image state of the filtered image.
    */
   $imageState = atom<CanvasImageState | null>(null);
+
+  /**
+   * The rect used to rasterize and place the filtered image.
+   */
+  $lastProcessedRect = atom<Rect | null>(null);
 
   /**
    * Whether the module has an image state. This is a computed value based on $imageState.
@@ -249,7 +254,8 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     }
 
     this.log.trace({ config }, 'Processing filter');
-    const rect = this.parent.transformer.getRelativeRect();
+    const baseRect = this.parent.transformer.getRelativeRect();
+    const rect = baseRect;
 
     const rasterizeResult = await withResultAsync(() =>
       this.parent.renderer.rasterize({ rect, attrs: { filters: [], opacity: 1 } })
@@ -304,8 +310,15 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     this.log.trace({ imageDTO: filterResult.value }, 'Filtered');
 
     // Prepare the ephemeral image state
-    const imageState = imageDTOToImageObject(filterResult.value);
+    // Blur padding expands the output image; keep a stable placement rect to avoid shifts.
+    const placementRect = this.getPlacementRect(baseRect, config);
+    const disablePixelBbox = this.getFilterPadding(config) > 0;
+    const imageState = imageDTOToImageObject(
+      filterResult.value,
+      disablePixelBbox ? { usePixelBbox: false } : undefined
+    );
     this.$imageState.set(imageState);
+    this.$lastProcessedRect.set(placementRect);
 
     // Stash the existing image module - we will destroy it after the new image is rendered to prevent a flash
     // of an empty layer
@@ -317,6 +330,9 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     await this.imageModule.update(imageState, true);
 
     this.konva.group.add(this.imageModule.konva.group);
+    // Keep the preview image at (0,0) within the filterer group and move the group instead.
+    this.konva.group.setAttrs({ x: placementRect.x, y: placementRect.y });
+    this.imageModule.konva.group.setAttrs({ x: 0, y: 0 });
 
     // The filtered image have some transparency, so we need to hide the objects of the parent entity to prevent the
     // two images from blending. We will show the objects again in the teardown method, which is always called after
@@ -360,11 +376,13 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     // Have the parent adopt the image module - this prevents a flash of the original layer content before the filtered
     // image is rendered
     if (this.imageModule) {
+      // Reset any preview offset before adopting into the main object group.
+      this.imageModule.konva.group.setAttrs({ x: 0, y: 0 });
       this.parent.renderer.adoptObjectRenderer(this.imageModule);
     }
 
     // Rasterize the entity, replacing the objects with the masked image
-    const rect = this.parent.transformer.getRelativeRect();
+    const rect = this.$lastProcessedRect.get() ?? this.parent.transformer.getRelativeRect();
     this.manager.stateApi.rasterizeEntity({
       entityIdentifier: this.parent.entityIdentifier,
       imageObject: filteredImageObjectState,
@@ -391,7 +409,7 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
     }
     this.log.trace(`Saving as ${type}`);
 
-    const rect = this.parent.transformer.getRelativeRect();
+    const rect = this.$lastProcessedRect.get() ?? this.parent.transformer.getRelativeRect();
     const arg = {
       overrides: {
         objects: [imageState],
@@ -443,8 +461,32 @@ export class CanvasEntityFilterer extends CanvasModuleBase {
 
     this.$filterConfig.set(initialFilterConfig);
     this.$imageState.set(null);
+    this.$lastProcessedRect.set(null);
     this.$lastProcessedHash.set('');
     this.$isProcessing.set(false);
+  };
+
+  // Keep blur padding logic in sync with filter graph expansion to avoid bbox drift.
+  getFilterPadding = (config: FilterConfig): number => {
+    if (config.type === 'img_blur') {
+      const multiplier = config.blur_type === 'gaussian' ? 3 : 1;
+      return Math.max(0, Math.ceil(config.radius * multiplier));
+    }
+    return 0;
+  };
+
+  getPlacementRect = (baseRect: Rect, config: FilterConfig): Rect => {
+    const padding = this.getFilterPadding(config);
+    if (padding <= 0) {
+      return baseRect;
+    }
+    // The placement rect is used for preview and apply/save bounds to keep the layer stable.
+    return {
+      x: Math.round(baseRect.x - padding),
+      y: Math.round(baseRect.y - padding),
+      width: Math.max(1, Math.round(baseRect.width + padding * 2)),
+      height: Math.max(1, Math.round(baseRect.height + padding * 2)),
+    };
   };
 
   teardown = () => {
