@@ -97,7 +97,9 @@ def denoise(
             # Debug: Check for NaN in model output (scheduler path)
             if pred.isnan().any():
                 print(f"[FLUX.2 DEBUG] Scheduler step {step_index}: NaN in transformer output!")
-                print(f"  Input img: nan={img.isnan().any().item()}, min={img.min().item():.4f}, max={img.max().item():.4f}")
+                print(
+                    f"  Input img: nan={img.isnan().any().item()}, min={img.min().item():.4f}, max={img.max().item():.4f}"
+                )
                 print(f"  t_curr={t_curr}, timestep={timestep.item()}")
 
             step_cfg_scale = cfg_scale[min(user_step, len(cfg_scale) - 1)]
@@ -184,7 +186,9 @@ def denoise(
             # Debug: Check for NaN in model output
             if pred.isnan().any():
                 print(f"[FLUX.2 DEBUG] Step {step_index}: NaN in transformer output!")
-                print(f"  Input img: nan={img.isnan().any().item()}, min={img.min().item():.4f}, max={img.max().item():.4f}")
+                print(
+                    f"  Input img: nan={img.isnan().any().item()}, min={img.min().item():.4f}, max={img.max().item():.4f}"
+                )
                 print(f"  t_curr={t_curr}, t_vec={t_vec[0].item():.4f}")
 
             step_cfg_scale = cfg_scale[step_index]

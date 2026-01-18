@@ -477,7 +477,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     with torch.no_grad():
                         test_x_out = x_emb(x)
                         if test_x_out.isnan().any():
-                            context.logger.error(f"x_embedder produces NaN!")
+                            context.logger.error("x_embedder produces NaN!")
                         else:
                             context.logger.info(
                                 f"x_embedder output OK: min={test_x_out.min().item():.4f}, "
@@ -498,7 +498,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                                 if t.isnan().any():
                                     context.logger.error(f"pos_embed output[{i}] contains NaN!")
                         elif test_pos_out.isnan().any():
-                            context.logger.error(f"pos_embed produces NaN!")
+                            context.logger.error("pos_embed produces NaN!")
                         else:
                             context.logger.info("pos_embed output OK")
                     except Exception as e:
@@ -548,7 +548,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 total_elements = x.numel()
                 context.logger.error(
                     f"FLUX.2: NaN detected AFTER denoising! "
-                    f"{nan_count}/{total_elements} elements are NaN ({100*nan_count/total_elements:.1f}%)"
+                    f"{nan_count}/{total_elements} elements are NaN ({100 * nan_count / total_elements:.1f}%)"
                 )
             else:
                 context.logger.debug(

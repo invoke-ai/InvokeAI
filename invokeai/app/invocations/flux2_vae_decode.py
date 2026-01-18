@@ -58,14 +58,18 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             decoded = vae.decode(latents, return_dict=False)[0]
 
         # Debug: Log decoded output statistics
-        print(f"[FLUX.2 VAE] Decoded output: shape={decoded.shape}, "
-              f"min={decoded.min().item():.4f}, max={decoded.max().item():.4f}, "
-              f"mean={decoded.mean().item():.4f}")
+        print(
+            f"[FLUX.2 VAE] Decoded output: shape={decoded.shape}, "
+            f"min={decoded.min().item():.4f}, max={decoded.max().item():.4f}, "
+            f"mean={decoded.mean().item():.4f}"
+        )
         # Check per-channel statistics to diagnose color issues
         for c in range(min(3, decoded.shape[1])):
             ch = decoded[0, c]
-            print(f"[FLUX.2 VAE] Channel {c}: min={ch.min().item():.4f}, "
-                  f"max={ch.max().item():.4f}, mean={ch.mean().item():.4f}")
+            print(
+                f"[FLUX.2 VAE] Channel {c}: min={ch.min().item():.4f}, "
+                f"max={ch.max().item():.4f}, mean={ch.mean().item():.4f}"
+            )
 
         # Convert from [-1, 1] to [0, 1] then to [0, 255] PIL image
         img = (decoded / 2 + 0.5).clamp(0, 1)
