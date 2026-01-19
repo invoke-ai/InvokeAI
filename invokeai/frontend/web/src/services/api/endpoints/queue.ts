@@ -278,9 +278,12 @@ export const queueApi = api.injectEndpoints({
           return [];
         }
         return [
+          'SessionQueueStatus',
+          'BatchStatus',
           'CurrentSessionQueueItem',
           'NextSessionQueueItem',
           'QueueCountsByDestination',
+          'SessionQueueItemIdList',
           { type: 'SessionQueueItem', id: LIST_TAG },
           { type: 'SessionQueueItem', id: LIST_ALL_TAG },
           ...item_ids.map((id) => ({ type: 'SessionQueueItem', id }) satisfies ApiTagDescription),

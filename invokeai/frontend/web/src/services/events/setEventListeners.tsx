@@ -391,6 +391,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       'CurrentSessionQueueItem',
       'NextSessionQueueItem',
       'InvocationCacheStatus',
+      'SessionQueueItemIdList',
       { type: 'SessionQueueItem', id: item_id },
       { type: 'SessionQueueItem', id: LIST_TAG },
       { type: 'SessionQueueItem', id: LIST_ALL_TAG },
@@ -443,14 +444,54 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('queue_cleared', (data) => {
     log.debug({ data }, 'Queue cleared');
+    dispatch(
+      queueApi.util.invalidateTags([
+        'SessionQueueStatus',
+        'SessionProcessorStatus',
+        'BatchStatus',
+        'CurrentSessionQueueItem',
+        'NextSessionQueueItem',
+        'QueueCountsByDestination',
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ])
+    );
   });
 
   socket.on('batch_enqueued', (data) => {
     log.debug({ data }, 'Batch enqueued');
+    dispatch(
+      queueApi.util.invalidateTags([
+        'CurrentSessionQueueItem',
+        'NextSessionQueueItem',
+        'QueueCountsByDestination',
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ])
+    );
   });
 
   socket.on('queue_items_retried', (data) => {
     log.debug({ data }, 'Queue items retried');
+    const tagsToInvalidate: ApiTagDescription[] = [
+      'SessionQueueStatus',
+      'BatchStatus',
+      'CurrentSessionQueueItem',
+      'NextSessionQueueItem',
+      'QueueCountsByDestination',
+      'SessionQueueItemIdList',
+      { type: 'SessionQueueItem', id: LIST_TAG },
+      { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+    ];
+    // Invalidate each retried item specifically
+    if (data.retried_item_ids) {
+      for (const itemId of data.retried_item_ids) {
+        tagsToInvalidate.push({ type: 'SessionQueueItem', id: itemId });
+      }
+    }
+    dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
   });
 
   socket.on('bulk_download_started', (data) => {
