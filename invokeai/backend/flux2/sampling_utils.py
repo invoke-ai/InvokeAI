@@ -107,6 +107,89 @@ def unpack_flux2(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
     )
 
 
+def compute_empirical_mu(image_seq_len: int, num_steps: int) -> float:
+    """Compute empirical mu for FLUX.2 schedule shifting.
+
+    This matches the diffusers Flux2Pipeline implementation.
+    The mu value controls how much the schedule is shifted towards higher timesteps.
+
+    Args:
+        image_seq_len: Number of image tokens (packed_h * packed_w).
+        num_steps: Number of denoising steps.
+
+    Returns:
+        The empirical mu value.
+    """
+    a1, b1 = 8.73809524e-05, 1.89833333
+    a2, b2 = 0.00016927, 0.45666666
+
+    if image_seq_len > 4300:
+        mu = a2 * image_seq_len + b2
+        return float(mu)
+
+    m_200 = a2 * image_seq_len + b2
+    m_10 = a1 * image_seq_len + b1
+
+    a = (m_200 - m_10) / 190.0
+    b = m_200 - 200.0 * a
+    mu = a * num_steps + b
+
+    return float(mu)
+
+
+def get_schedule_flux2(
+    num_steps: int,
+    image_seq_len: int,
+    shift: bool = True,
+) -> list[float]:
+    """Get timestep schedule for FLUX.2 matching diffusers implementation.
+
+    Key differences from FLUX.1 schedule:
+    1. Ends at 1/num_steps instead of 0.0
+    2. Uses empirical mu computation specific to FLUX.2
+
+    Args:
+        num_steps: Number of denoising steps.
+        image_seq_len: Number of image tokens (packed_h * packed_w).
+        shift: Whether to apply schedule shifting. Set to False for distilled models.
+
+    Returns:
+        List of timesteps from ~1.0 to ~1/num_steps.
+    """
+    import numpy as np
+
+    # Create sigmas from 1.0 to 1/num_steps (NOT including 0.0)
+    sigmas = np.linspace(1.0, 1 / num_steps, num_steps)
+
+    if shift:
+        # Compute mu for schedule shifting
+        mu = compute_empirical_mu(image_seq_len=image_seq_len, num_steps=num_steps)
+
+        # Apply time shift
+        # Formula: exp(mu) / (exp(mu) + (1/t - 1))
+        shifted_sigmas = []
+        for sigma in sigmas:
+            if sigma > 0:
+                shifted = math.exp(mu) / (math.exp(mu) + (1 / sigma - 1))
+                shifted_sigmas.append(float(shifted))
+            else:
+                shifted_sigmas.append(0.0)
+
+        print(f"[FLUX.2] Schedule (shifted): mu={mu:.4f}, num_steps={num_steps}")
+    else:
+        # Linear schedule for distilled models
+        shifted_sigmas = [float(s) for s in sigmas]
+        print(f"[FLUX.2] Schedule (linear, no shift): num_steps={num_steps}")
+
+    # Add final 0.0 for the last step (scheduler needs n+1 timesteps for n steps)
+    shifted_sigmas.append(0.0)
+
+    print(f"[FLUX.2] Schedule (first 5): {shifted_sigmas[:5]}")
+    print(f"[FLUX.2] Schedule (last 5): {shifted_sigmas[-5:]}")
+
+    return shifted_sigmas
+
+
 def generate_img_ids_flux2(h: int, w: int, batch_size: int, device: torch.device) -> torch.Tensor:
     """Generate tensor of image position ids for FLUX.2.
 

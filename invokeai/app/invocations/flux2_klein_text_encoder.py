@@ -1,12 +1,14 @@
 """Flux2 Klein Text Encoder Invocation.
 
 Flux2 Klein uses Qwen3 as the text encoder instead of CLIP+T5.
-The key difference is that it extracts hidden states from layers [9, 18, 27]
+The key difference is that it extracts hidden states from layers [10, 20, 30]
 and stacks them together for richer text representations.
+
+This implementation matches the diffusers Flux2Pipeline exactly.
 """
 
 from contextlib import ExitStack
-from typing import Iterator, Literal, Optional, Tuple
+from typing import Iterator, List, Literal, Optional, Tuple
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
@@ -29,13 +31,43 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 
-# Flux2 Klein extracts hidden states from these specific layers
-# ComfyUI uses [9, 18, 27] (0-indexed layer numbers)
+# FLUX.2 Klein extracts hidden states from these specific layers
+# Matching diffusers Flux2Pipeline: (10, 20, 30)
 # hidden_states[0] is embedding layer, so layer N is at index N
-KLEIN_EXTRACTION_LAYERS = [9, 18, 27]
+KLEIN_EXTRACTION_LAYERS = (10, 20, 30)
 
 # Default max sequence length for Klein models
 KLEIN_MAX_SEQ_LEN = 512
+
+# System message for FLUX.2 Klein - from diffusers system_messages.py
+# https://github.com/black-forest-labs/flux2/blob/5a5d316b1b42f6b59a8c9194b77c8256be848432/src/flux2/system_messages.py
+KLEIN_SYSTEM_MESSAGE = """You are an AI that reasons about image descriptions. You give structured responses focusing on object relationships, object
+attribution and actions without speculation."""
+
+
+def format_input(prompts: List[str], system_message: str = KLEIN_SYSTEM_MESSAGE) -> List[List[dict]]:
+    """Format prompts into conversation format expected by apply_chat_template.
+
+    Note: Diffusers uses list format for content (for multimodal Pixtral/Mistral),
+    but Qwen3 tokenizer expects simple string content.
+
+    Args:
+        prompts: List of text prompts.
+        system_message: System message to use.
+
+    Returns:
+        List of conversations, where each conversation is a list of message dicts.
+    """
+    return [
+        [
+            {
+                "role": "system",
+                "content": system_message,  # Qwen3 expects string, not list
+            },
+            {"role": "user", "content": prompt},  # Qwen3 expects string, not list
+        ]
+        for prompt in prompts
+    ]
 
 
 @invocation(
@@ -50,7 +82,7 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for Flux2 Klein image generation.
 
     Flux2 Klein uses Qwen3 as the text encoder, extracting hidden states from
-    layers [9, 18, 27] and stacking them for richer text representations.
+    layers [10, 20, 30] and stacking them for richer text representations.
     """
 
     prompt: str = InputField(description="Text prompt to encode.", ui_component=UIComponent.Textarea)
@@ -87,9 +119,11 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
     def _encode_prompt(self, context: InvocationContext) -> Tuple[torch.Tensor, torch.Tensor]:
         """Encode prompt using Qwen3 text encoder with Klein-style layer extraction.
 
+        This matches the diffusers Flux2Pipeline._get_mistral_3_small_prompt_embeds() exactly.
+
         Returns:
             Tuple of (stacked_embeddings, pooled_embedding):
-            - stacked_embeddings: Hidden states from layers [9, 18, 27] stacked together.
+            - stacked_embeddings: Hidden states from layers (10, 20, 30) stacked together.
               Shape: (1, seq_len, hidden_size * 3)
             - pooled_embedding: Pooled representation for global conditioning.
               Shape: (1, hidden_size)
@@ -138,45 +172,61 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
                     "The Qwen3 tokenizer may be corrupted or incompatible."
                 )
 
-            # Apply chat template matching ComfyUI's FLUX.2 Klein implementation
-            # Format: <|im_start|>user\n{prompt}\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n
-            prompt_formatted = f"<|im_start|>user\n{prompt}\n<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+            # Format input messages - exactly like diffusers format_input()
+            messages_batch = format_input(prompts=[prompt], system_message=KLEIN_SYSTEM_MESSAGE)
 
-            # Tokenize the formatted prompt
-            text_inputs = tokenizer(
-                prompt_formatted,
-                padding="max_length",
-                max_length=self.max_seq_len,
-                truncation=True,
-                return_attention_mask=True,
+            context.logger.info(f"Using chat template with system message, prompt: {prompt[:80]}...")
+
+            # Use apply_chat_template like diffusers does
+            # This renders the jinja chat template properly
+            text_inputs = tokenizer.apply_chat_template(
+                messages_batch,
+                add_generation_prompt=False,  # NO assistant prefix - matching diffusers
+                tokenize=True,
+                return_dict=True,
                 return_tensors="pt",
+                padding="max_length",
+                truncation=True,
+                max_length=self.max_seq_len,
             )
 
-            text_input_ids = text_inputs.input_ids
-            attention_mask = text_inputs.attention_mask
+            input_ids = text_inputs["input_ids"]
+            attention_mask = text_inputs["attention_mask"]
 
-            if not isinstance(text_input_ids, torch.Tensor):
-                raise TypeError(f"Expected torch.Tensor for input_ids, got {type(text_input_ids).__name__}.")
+            if not isinstance(input_ids, torch.Tensor):
+                raise TypeError(f"Expected torch.Tensor for input_ids, got {type(input_ids).__name__}.")
             if not isinstance(attention_mask, torch.Tensor):
                 raise TypeError(f"Expected torch.Tensor for attention_mask, got {type(attention_mask).__name__}.")
 
-            # Check for truncation
-            untruncated_ids = tokenizer(prompt_formatted, padding="longest", return_tensors="pt").input_ids
-            if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not torch.equal(
-                text_input_ids, untruncated_ids
-            ):
-                removed_text = tokenizer.batch_decode(untruncated_ids[:, self.max_seq_len - 1 : -1])
-                context.logger.warning(
-                    f"The following part of your input was truncated because `max_sequence_length` is set to "
-                    f"{self.max_seq_len} tokens: {removed_text}"
-                )
+            # Debug: decode and log the full tokenized input
+            try:
+                decoded = tokenizer.decode(input_ids[0], skip_special_tokens=False)
+                # Find actual content (not padding)
+                actual_tokens = (attention_mask[0] == 1).sum().item()
+                context.logger.info(f"Tokenized prompt ({actual_tokens} tokens, showing first 500 chars):")
+                context.logger.info(f"{decoded[:500]}")
+                # Also log the user part specifically
+                if "<|im_start|>user" in decoded:
+                    user_start = decoded.find("<|im_start|>user")
+                    user_end = decoded.find("<|im_end|>", user_start + 1)
+                    if user_end > user_start:
+                        user_content = decoded[user_start:user_end + 10]
+                        context.logger.info(f"User message part: {user_content}")
+            except Exception as e:
+                context.logger.warning(f"Could not decode tokenized input: {e}")
 
-            # Get hidden states from specific layers [9, 18, 27]
-            prompt_mask = attention_mask.to(device).bool()
+            context.logger.info(f"Tokenized input: {input_ids.shape}, attention_mask: {attention_mask.shape}")
+
+            # Move to device
+            input_ids = input_ids.to(device)
+            attention_mask = attention_mask.to(device)
+
+            # Forward pass through the model - matching diffusers exactly
             outputs = text_encoder(
-                text_input_ids.to(device),
-                attention_mask=prompt_mask,
+                input_ids=input_ids,
+                attention_mask=attention_mask,
                 output_hidden_states=True,
+                use_cache=False,
             )
 
             # Validate hidden_states output
@@ -189,9 +239,10 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
             num_hidden_layers = len(outputs.hidden_states)
             context.logger.debug(f"Qwen3 encoder has {num_hidden_layers} hidden states available.")
 
-            # Extract hidden states from Klein layers [9, 18, 27]
-            # Note: hidden_states[0] is the embedding layer output, so layer N is at index N
-            extracted_hidden_states = []
+            # Extract and stack hidden states - EXACTLY like diffusers:
+            # out = torch.stack([output.hidden_states[k] for k in hidden_states_layers], dim=1)
+            # prompt_embeds = out.permute(0, 2, 1, 3).reshape(batch_size, seq_len, num_channels * hidden_dim)
+            hidden_states_list = []
             for layer_idx in KLEIN_EXTRACTION_LAYERS:
                 if layer_idx >= num_hidden_layers:
                     context.logger.warning(
@@ -199,18 +250,20 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
                         f"Using last available layer instead."
                     )
                     layer_idx = num_hidden_layers - 1
-                extracted_hidden_states.append(outputs.hidden_states[layer_idx])
+                hidden_states_list.append(outputs.hidden_states[layer_idx])
 
-            # Stack the hidden states from the 3 layers
-            # Each hidden state has shape (batch_size, seq_len, hidden_size)
-            # After stacking along last dim: (batch_size, seq_len, hidden_size * 3)
-            stacked_embeds = torch.cat(extracted_hidden_states, dim=-1)
+            # Stack along dim=1, then permute and reshape - exactly like diffusers
+            out = torch.stack(hidden_states_list, dim=1)
+            out = out.to(dtype=text_encoder.dtype, device=device)
 
-            # Debug: Log shapes, dtype and value ranges (no normalization - matching diffusers)
+            batch_size, num_channels, seq_len, hidden_dim = out.shape
+            prompt_embeds = out.permute(0, 2, 1, 3).reshape(batch_size, seq_len, num_channels * hidden_dim)
+
+            # Debug: Log shapes, dtype and value ranges
             context.logger.info(
-                f"Qwen3 hidden state shapes: per_layer={extracted_hidden_states[0].shape}, "
-                f"stacked={stacked_embeds.shape}, dtype={stacked_embeds.dtype}, "
-                f"value_range=[{stacked_embeds.min().item():.4f}, {stacked_embeds.max().item():.4f}]"
+                f"Qwen3 hidden state shapes: per_layer={hidden_states_list[0].shape}, "
+                f"stacked={prompt_embeds.shape}, dtype={prompt_embeds.dtype}, "
+                f"value_range=[{prompt_embeds.min().item():.4f}, {prompt_embeds.max().item():.4f}]"
             )
 
             # Create pooled embedding for global conditioning
@@ -218,12 +271,12 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
             # This serves a similar role to CLIP's pooled output in standard FLUX
             last_hidden_state = outputs.hidden_states[-1]  # Use last layer for pooling
             # Expand mask to match hidden state dimensions
-            expanded_mask = prompt_mask.unsqueeze(-1).expand_as(last_hidden_state).float()
+            expanded_mask = attention_mask.unsqueeze(-1).expand_as(last_hidden_state).float()
             sum_embeds = (last_hidden_state * expanded_mask).sum(dim=1)
             num_tokens = expanded_mask.sum(dim=1).clamp(min=1)
             pooled_embeds = sum_embeds / num_tokens
 
-        return stacked_embeds, pooled_embeds
+        return prompt_embeds, pooled_embeds
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
         """Iterate over LoRA models to apply to the Qwen3 text encoder."""

@@ -1491,6 +1491,8 @@
         "baseModelChanged": "Base Model Changed",
         "baseModelChangedCleared_one": "Updated, cleared or disabled {{count}} incompatible submodel",
         "baseModelChangedCleared_other": "Updated, cleared or disabled {{count}} incompatible submodels",
+        "kleinEncoderCleared": "Qwen3 Encoder Cleared",
+        "kleinEncoderClearedDescription": "Please select a compatible Qwen3 encoder for the new Klein model variant",
         "canceled": "Processing Canceled",
         "connected": "Connected to Server",
         "imageCopied": "Image Copied",

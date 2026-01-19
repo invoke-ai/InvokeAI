@@ -4,6 +4,8 @@ import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/c
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
 import {
+  kleinQwen3EncoderModelSelected,
+  kleinVaeModelSelected,
   modelChanged,
   syncedToOptimalDimension,
   vaeSelected,
@@ -140,6 +142,19 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
         }
 
+        // handle incompatible FLUX.2 Klein models - clear if switching away from flux2
+        const { kleinVaeModel, kleinQwen3EncoderModel } = state.params;
+        if (newBase !== 'flux2') {
+          if (kleinVaeModel) {
+            dispatch(kleinVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (kleinQwen3EncoderModel) {
+            dispatch(kleinQwen3EncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+        }
+
         if (SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
           // Handle incompatible reference image models - switch to first compatible model, with some smart logic
           // to choose the best available model based on the new main model.
@@ -218,6 +233,22 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
               count: modelsUpdatedDisabledOrCleared,
             }),
             status: 'warning',
+          });
+        }
+      }
+
+      // Handle FLUX.2 Klein model changes within the same base (different variants need different encoders)
+      // Clear the Qwen3 encoder when switching between different Klein models, as variants require matching encoders
+      // (e.g., klein_4b needs qwen3_4b, klein_9b needs qwen3_8b)
+      if (newBase === 'flux2' && state.params.model?.base === 'flux2' && newModel.key !== state.params.model?.key) {
+        const { kleinQwen3EncoderModel } = state.params;
+        if (kleinQwen3EncoderModel) {
+          dispatch(kleinQwen3EncoderModelSelected(null));
+          toast({
+            id: 'KLEIN_ENCODER_CLEARED',
+            title: t('toast.kleinEncoderCleared'),
+            description: t('toast.kleinEncoderClearedDescription'),
+            status: 'info',
           });
         }
       }

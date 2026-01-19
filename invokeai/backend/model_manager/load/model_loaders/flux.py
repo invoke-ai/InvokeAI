@@ -660,6 +660,29 @@ class Flux2DiffusersModel(GenericDiffusersLoader):
                 else:
                     raise e
 
+        # For Klein models without guidance_embeds, zero out the guidance_embedder weights
+        # that were randomly initialized by diffusers. This prevents noise from affecting
+        # the time embeddings.
+        if submodel_type == SubModelType.Transformer and hasattr(result, "time_guidance_embed"):
+            # Check if this is a Klein model without guidance (guidance_embeds=False in config)
+            transformer_config_path = model_path / "config.json"
+            if transformer_config_path.exists():
+                import json
+
+                with open(transformer_config_path, "r") as f:
+                    transformer_config = json.load(f)
+                if not transformer_config.get("guidance_embeds", True):
+                    # Zero out the guidance embedder weights
+                    guidance_emb = result.time_guidance_embed.guidance_embedder
+                    if hasattr(guidance_emb, "linear_1"):
+                        guidance_emb.linear_1.weight.data.zero_()
+                        if guidance_emb.linear_1.bias is not None:
+                            guidance_emb.linear_1.bias.data.zero_()
+                    if hasattr(guidance_emb, "linear_2"):
+                        guidance_emb.linear_2.weight.data.zero_()
+                        if guidance_emb.linear_2.bias is not None:
+                            guidance_emb.linear_2.bias.data.zero_()
+
         return result
 
 

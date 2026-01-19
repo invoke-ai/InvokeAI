@@ -23,15 +23,13 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.sampling_utils import (
-    clip_timestep_schedule_fractional,
-    get_schedule,
-)
+from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
 from invokeai.backend.flux2.denoise import denoise
 from invokeai.backend.flux2.sampling_utils import (
     generate_img_ids_flux2,
     get_noise_flux2,
+    get_schedule_flux2,
     pack_flux2,
     unpack_flux2,
 )
@@ -50,7 +48,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class Flux2DenoiseInvocation(BaseInvocation):
@@ -105,8 +103,12 @@ class Flux2DenoiseInvocation(BaseInvocation):
     width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
     height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
     num_steps: int = InputField(
-        default=28,
-        description="Number of diffusion steps. Recommended: 28 for Klein.",
+        default=4,
+        description="Number of diffusion steps. Use 4 for distilled models, 28+ for base models.",
+    )
+    shift_schedule: bool = InputField(
+        default=False,
+        description="Apply schedule shifting. Enable for base models (28+ steps), disable for distilled (4-step) models.",
     )
     scheduler: FLUX_SCHEDULER_NAME_VALUES = InputField(
         default="euler",
@@ -115,6 +117,15 @@ class Flux2DenoiseInvocation(BaseInvocation):
         ui_choice_labels=FLUX_SCHEDULER_LABELS,
     )
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
+    txt_embed_scale: float = InputField(
+        default=1.0,
+        ge=-1.0,
+        le=1.0,
+        description="Scale factor for Qwen3 text embeddings. "
+        "Set to 1.0 to use embeddings as-is (like diffusers). "
+        "Set to -1 for automatic scaling. "
+        "Set to 0 to disable text conditioning (for debugging).",
+    )
     vae: VAEField = InputField(
         description="FLUX.2 VAE model (required for BN statistics).",
         input=Input.Connection,
@@ -291,10 +302,10 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         # Generate text position IDs (4D format for FLUX.2: T, H, W, L)
         # FLUX.2 uses 4D position coordinates for its rotary position embeddings
-        # IMPORTANT: Position IDs must be int64 (long) like diffusers, not bfloat16
-        # For text tokens: T=1, H=1, W=1, L=0..seq_len-1 (L varies per token)
+        # IMPORTANT: Position IDs must be int64 (long) dtype
+        # Diffusers uses: T=0, H=0, W=0, L=0..seq_len-1
         seq_len = txt.shape[1]
-        txt_ids = torch.ones(1, seq_len, 4, device=device, dtype=torch.long)
+        txt_ids = torch.zeros(1, seq_len, 4, device=device, dtype=torch.long)
         txt_ids[..., 3] = torch.arange(seq_len, device=device, dtype=torch.long)  # L coordinate varies
 
         # Load negative conditioning if provided
@@ -307,21 +318,22 @@ class Flux2DenoiseInvocation(BaseInvocation):
             assert isinstance(neg_flux_conditioning, FLUXConditioningInfo)
             neg_flux_conditioning = neg_flux_conditioning.to(dtype=inference_dtype, device=device)
             neg_txt = neg_flux_conditioning.t5_embeds
-            # For text tokens: T=1, H=1, W=1, L=0..seq_len-1 (L varies per token)
+            # For text tokens: T=0, H=0, W=0, L=0..seq_len-1 (only L varies per token)
             neg_seq_len = neg_txt.shape[1]
-            neg_txt_ids = torch.ones(1, neg_seq_len, 4, device=device, dtype=torch.long)
+            neg_txt_ids = torch.zeros(1, neg_seq_len, 4, device=device, dtype=torch.long)
             neg_txt_ids[..., 3] = torch.arange(neg_seq_len, device=device, dtype=torch.long)
 
         # Validate transformer config
         transformer_config = context.models.get_config(self.transformer.transformer)
         assert transformer_config.base == BaseModelType.Flux2 and transformer_config.type == ModelType.Main
 
-        # Calculate the timestep schedule
-        # Klein uses shifted schedule like Dev
-        timesteps = get_schedule(
+        # Calculate the timestep schedule using FLUX.2 specific schedule
+        # This matches diffusers' Flux2Pipeline implementation
+        # For distilled models (4-step), disable schedule shifting
+        timesteps = get_schedule_flux2(
             num_steps=self.num_steps,
             image_seq_len=packed_h * packed_w,
-            shift=True,  # Klein uses shifted schedule
+            shift=self.shift_schedule,
         )
 
         # Clip the timesteps schedule based on denoising_start and denoising_end
@@ -540,6 +552,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 neg_txt=neg_txt,
                 neg_txt_ids=neg_txt_ids,
                 scheduler=scheduler,
+                txt_embed_scale=self.txt_embed_scale,
             )
 
             # Debug: Check for NaN immediately after denoising
