@@ -48,7 +48,7 @@ export const CanvasToolbar = memo(() => {
       <Flex alignItems="center" h="full" flexGrow={1}>
         <ToolFillColorPicker />
         {isGradientSelected && (
-          <Box ms={2}>
+          <Box ms={2} mt="-2px">
             <ToolGradientClipToggle />
           </Box>
         )}

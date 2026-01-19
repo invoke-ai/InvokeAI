@@ -164,8 +164,8 @@ export const ToolGradientButton = memo(() => {
                   icon={<GradientLinearIcon />}
                   colorScheme={gradientType === 'linear' ? 'invokeBlue' : 'base'}
                   variant="solid"
-                  w="34px"
-                  h="34px"
+                  w="30px"
+                  h="30px"
                   onClick={setLinear}
                 />
               </Tooltip>
@@ -175,8 +175,8 @@ export const ToolGradientButton = memo(() => {
                   icon={<GradientRadialIcon />}
                   colorScheme={gradientType === 'radial' ? 'invokeBlue' : 'base'}
                   variant="solid"
-                  w="34px"
-                  h="34px"
+                  w="30px"
+                  h="30px"
                   onClick={setRadial}
                 />
               </Tooltip>

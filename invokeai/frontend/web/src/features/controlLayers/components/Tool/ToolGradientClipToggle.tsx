@@ -23,7 +23,7 @@ export const ToolGradientClipToggle = memo(() => {
     <Tooltip label={label}>
       <IconButton
         aria-label={label}
-        icon={<PiCropBold />}
+        icon={<PiCropBold size={16} />}
         size="sm"
         variant="solid"
         colorScheme={isEnabled ? 'invokeBlue' : 'base'}
