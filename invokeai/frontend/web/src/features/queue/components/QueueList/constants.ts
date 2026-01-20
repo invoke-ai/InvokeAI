@@ -12,3 +12,6 @@ export const COLUMN_WIDTHS = {
   completedAt: '9.5rem',
   actions: 'auto',
 } as const;
+
+// System user ID constant - matches backend SYSTEM_USER_ID
+export const SYSTEM_USER_ID = 'system';

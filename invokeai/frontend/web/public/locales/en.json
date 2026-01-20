@@ -346,6 +346,7 @@
         "gallery": "Gallery",
         "batchFieldValues": "Batch Field Values",
         "fieldValuesHidden": "Hidden for privacy",
+        "cannotViewDetails": "You do not have permission to view the details of this queue item",
         "item": "Item",
         "session": "Session",
         "notReady": "Unable to Queue",

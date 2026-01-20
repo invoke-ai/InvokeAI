@@ -25,6 +25,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemNotFoundError,
     SessionQueueStatus,
 )
+from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
@@ -43,7 +44,7 @@ def sanitize_queue_item_for_user(
     """Sanitize queue item for non-admin users viewing other users' items.
 
     For non-admin users viewing queue items belonging to other users,
-    the field_values should be hidden/cleared to protect privacy.
+    the field_values, session graph, and workflow should be hidden/cleared to protect privacy.
 
     Args:
         queue_item: The queue item to sanitize
@@ -51,15 +52,24 @@ def sanitize_queue_item_for_user(
         is_admin: Whether the current user is an admin
 
     Returns:
-        The sanitized queue item (field_values cleared if necessary)
+        The sanitized queue item (sensitive fields cleared if necessary)
     """
     # Admins and item owners can see everything
     if is_admin or queue_item.user_id == current_user_id:
         return queue_item
 
-    # For non-admins viewing other users' items, clear field_values
-    queue_item.field_values = None
-    return queue_item
+    # For non-admins viewing other users' items, clear sensitive fields
+    # Create a shallow copy to avoid mutating the original
+    sanitized_item = queue_item.model_copy(deep=False)
+    sanitized_item.field_values = None
+    sanitized_item.workflow = None
+    # Clear the session graph by replacing it with an empty graph execution state
+    # This prevents information leakage through the generation graph
+    sanitized_item.session = GraphExecutionState(
+        id=queue_item.session.id,
+        graph=Graph(),
+    )
+    return sanitized_item
 
 
 @session_queue_router.post(

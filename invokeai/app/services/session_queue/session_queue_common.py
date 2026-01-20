@@ -170,6 +170,7 @@ class Batch(BaseModel):
 # region Queue Items
 
 DEFAULT_QUEUE_ID = "default"
+SYSTEM_USER_ID = "system"  # Default user_id for system-generated queue items
 
 QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "completed", "failed", "canceled"]
 
