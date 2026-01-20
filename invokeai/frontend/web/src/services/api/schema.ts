@@ -8063,12 +8063,6 @@ export type components = {
              */
             num_steps?: number;
             /**
-             * Shift Schedule
-             * @description Apply schedule shifting. Enable for base models (28+ steps), disable for distilled (4-step) models.
-             * @default false
-             */
-            shift_schedule?: boolean;
-            /**
              * Scheduler
              * @description Scheduler (sampler) for the denoising process. 'euler' is fast and standard. 'heun' is 2nd-order (better quality, 2x slower). 'lcm' is optimized for few steps.
              * @default euler
@@ -8081,12 +8075,6 @@ export type components = {
              * @default 0
              */
             seed?: number;
-            /**
-             * Txt Embed Scale
-             * @description Scale factor for Qwen3 text embeddings. Set to 1.0 to use embeddings as-is (like diffusers). Set to -1 for automatic scaling. Set to 0 to disable text conditioning (for debugging).
-             * @default 1
-             */
-            txt_embed_scale?: number;
             /**
              * @description FLUX.2 VAE model (required for BN statistics).
              * @default null
@@ -8205,7 +8193,8 @@ export type components = {
          * @description Encodes and preps a prompt for Flux2 Klein image generation.
          *
          *     Flux2 Klein uses Qwen3 as the text encoder, extracting hidden states from
-         *     layers [10, 20, 30] and stacking them for richer text representations.
+         *     layers (9, 18, 27) and stacking them for richer text representations.
+         *     This matches the diffusers Flux2KleinPipeline implementation exactly.
          */
         Flux2KleinTextEncoderInvocation: {
             /**
@@ -13495,14 +13484,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models\.convert_cache
+             * @default models/.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models\.download_cache
+             * @default models/.download_cache
              */
             download_cache_dir?: string;
             /**

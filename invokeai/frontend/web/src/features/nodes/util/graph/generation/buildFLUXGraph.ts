@@ -101,6 +101,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   let modelLoader: Invocation<'flux_model_loader'> | Invocation<'flux2_klein_model_loader'>;
   let posCond: Invocation<'flux_text_encoder'> | Invocation<'flux2_klein_text_encoder'>;
   let denoise: Invocation<'flux_denoise'> | Invocation<'flux2_denoise'>;
+  let posCondCollect: Invocation<'collect'> | null = null;
 
   const positivePrompt = g.addNode({
     id: getPrefixedId('positive_prompt'),
@@ -185,7 +186,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       scheduler: fluxScheduler,
     });
 
-    const posCondCollect = g.addNode({
+    posCondCollect = g.addNode({
       type: 'collect',
       id: getPrefixedId('pos_cond_collect'),
     });
@@ -417,9 +418,8 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     });
     let totalReduxesAdded = fluxReduxResult.addedFLUXReduxes;
 
-    // Get the posCondCollect from the else block scope
-    const posCondCollectNode = g.getNode('pos_cond_collect') as Invocation<'collect'>;
-    if (manager !== null && posCondCollectNode) {
+    // Use posCondCollect from the else block (only exists for standard FLUX, not FLUX.2 Klein)
+    if (manager !== null && posCondCollect !== null) {
       const regionsResult = await addRegions({
         manager,
         regions: canvas.regionalGuidance.entities,
@@ -428,7 +428,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         model,
         posCond: fluxPosCond,
         negCond: null,
-        posCondCollect: posCondCollectNode,
+        posCondCollect: posCondCollect,
         negCondCollect: null,
         ipAdapterCollect,
         fluxReduxCollect,
