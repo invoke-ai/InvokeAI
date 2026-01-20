@@ -7,6 +7,7 @@ which use Qwen3 as the text encoder instead of CLIP+T5.
 import math
 from typing import Any, Callable
 
+import numpy as np
 import torch
 from tqdm import tqdm
 
@@ -29,8 +30,8 @@ def denoise(
     neg_txt_ids: torch.Tensor | None = None,
     # Scheduler for stepping (e.g., FlowMatchEulerDiscreteScheduler, FlowMatchHeunDiscreteScheduler)
     scheduler: Any = None,
-    # Embedding scale factor for Klein models (Qwen3 embeddings need scaling)
-    txt_embed_scale: float = 1.0,
+    # Dynamic shifting parameter for FLUX.2 Klein (computed from image resolution)
+    mu: float | None = None,
 ) -> torch.Tensor:
     """Denoise latents using a FLUX.2 Klein transformer model.
 
@@ -46,14 +47,14 @@ def denoise(
         img_ids: Image position IDs tensor.
         txt: Text encoder hidden states (Qwen3 embeddings).
         txt_ids: Text position IDs tensor.
-        timesteps: List of timesteps for denoising schedule.
+        timesteps: List of timesteps for denoising schedule (linear sigmas from 1.0 to 1/n).
         step_callback: Callback function for progress updates.
         cfg_scale: List of CFG scale values per step.
         neg_txt: Negative text embeddings for CFG (optional).
         neg_txt_ids: Negative text position IDs (optional).
         scheduler: Optional diffusers scheduler (Euler, Heun, LCM). If None, uses manual Euler.
-        txt_embed_scale: Scale factor for text embeddings. Qwen3 embeddings need ~0.001 scaling
-            to match expected magnitudes for the transformer.
+        mu: Dynamic shifting parameter computed from image resolution. Required when scheduler
+            has use_dynamic_shifting=True.
 
     Returns:
         Denoised latent tensor.
@@ -64,62 +65,18 @@ def denoise(
     # We pass a dummy value (1.0) since it won't affect the output when guidance_embeds=False
     guidance = torch.full((img.shape[0],), 1.0, device=img.device, dtype=img.dtype)
 
-    # Scale text embeddings for Klein models
-    # Qwen3 embeddings have much larger magnitudes than expected by the transformer
-    # The context_embedder produces outputs ~1000x larger than x_embedder outputs
-    #
-    # If txt_embed_scale < 0, use automatic scaling to match x_embedder magnitude
-    if txt_embed_scale < 0:
-        # Automatic scaling: compute scale to match x_embedder output magnitude
-        with torch.no_grad():
-            if hasattr(model, "context_embedder") and hasattr(model, "x_embedder"):
-                ctx_out = model.context_embedder(txt)
-                x_out = model.x_embedder(img)
-                ctx_mag = ctx_out.abs().max().item()
-                x_mag = x_out.abs().max().item()
-                if ctx_mag > 0:
-                    auto_scale = x_mag / ctx_mag
-                    print(f"[FLUX.2] Auto-scaling: ctx_mag={ctx_mag:.2f}, x_mag={x_mag:.2f}, scale={auto_scale:.6f}")
-                    txt = txt * auto_scale
-                    if neg_txt is not None:
-                        neg_txt = neg_txt * auto_scale
-    elif txt_embed_scale != 1.0:
-        print(f"[FLUX.2] Scaling text embeddings by {txt_embed_scale}")
-        print(f"  Before: txt min={txt.min().item():.4f}, max={txt.max().item():.4f}")
-        txt = txt * txt_embed_scale
-        print(f"  After: txt min={txt.min().item():.4f}, max={txt.max().item():.4f}")
-        if neg_txt is not None:
-            neg_txt = neg_txt * txt_embed_scale
-    else:
-        print(f"[FLUX.2] No text embedding scaling (scale=1.0)")
-
-    # Debug: Test context_embedder output with scaled embeddings
-    if hasattr(model, "context_embedder"):
-        with torch.no_grad():
-            scaled_ctx_out = model.context_embedder(txt)
-            print(
-                f"[FLUX.2] context_embedder output (after scaling): "
-                f"min={scaled_ctx_out.min().item():.4f}, max={scaled_ctx_out.max().item():.4f}"
-            )
-            # Also check x_embedder for comparison
-            if hasattr(model, "x_embedder"):
-                x_emb_out = model.x_embedder(img)
-                print(
-                    f"[FLUX.2] x_embedder output: "
-                    f"min={x_emb_out.min().item():.4f}, max={x_emb_out.max().item():.4f}"
-                )
-
-    # Debug: Print first few timesteps
-    print(f"[FLUX.2] Timesteps (first 5): {timesteps[:5]}")
-    print(f"[FLUX.2] Timesteps (last 5): {timesteps[-5:]}")
-
     # Use scheduler if provided
     use_scheduler = scheduler is not None
     if use_scheduler:
-        # Set up scheduler timesteps (convert 0-1 range to 0-1000)
-        scheduler_timesteps = [int(t * 1000) for t in timesteps[:-1]]
-        print(f"[FLUX.2] Scheduler timesteps (first 5): {scheduler_timesteps[:5]}")
-        scheduler.set_timesteps(timesteps=scheduler_timesteps, device=img.device)
+        # Set up scheduler with sigmas and mu for dynamic shifting
+        # Convert timesteps (0-1 range) to sigmas for the scheduler
+        # The scheduler will apply dynamic shifting internally using mu
+        sigmas = np.array(timesteps[:-1], dtype=np.float32)  # Exclude final 0.0
+        print(f"[FLUX.2] Setting up scheduler with {len(sigmas)} sigmas, mu={mu}")
+        print(f"[FLUX.2] Sigmas (first 5): {sigmas[:5].tolist()}")
+
+        # Let the scheduler handle timestep shifting via mu parameter
+        scheduler.set_timesteps(sigmas=sigmas.tolist(), mu=mu, device=img.device)
         num_scheduler_steps = len(scheduler.timesteps)
         is_heun = hasattr(scheduler, "state_in_first_order")
         user_step = 0

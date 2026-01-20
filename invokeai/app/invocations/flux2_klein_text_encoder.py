@@ -1,14 +1,14 @@
 """Flux2 Klein Text Encoder Invocation.
 
 Flux2 Klein uses Qwen3 as the text encoder instead of CLIP+T5.
-The key difference is that it extracts hidden states from layers [10, 20, 30]
+The key difference is that it extracts hidden states from layers (9, 18, 27)
 and stacks them together for richer text representations.
 
-This implementation matches the diffusers Flux2Pipeline exactly.
+This implementation matches the diffusers Flux2KleinPipeline exactly.
 """
 
 from contextlib import ExitStack
-from typing import Iterator, List, Literal, Optional, Tuple
+from typing import Iterator, Literal, Optional, Tuple
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
@@ -32,42 +32,12 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Condit
 from invokeai.backend.util.devices import TorchDevice
 
 # FLUX.2 Klein extracts hidden states from these specific layers
-# Matching diffusers Flux2Pipeline: (10, 20, 30)
+# Matching diffusers Flux2KleinPipeline: (9, 18, 27)
 # hidden_states[0] is embedding layer, so layer N is at index N
-KLEIN_EXTRACTION_LAYERS = (10, 20, 30)
+KLEIN_EXTRACTION_LAYERS = (9, 18, 27)
 
 # Default max sequence length for Klein models
 KLEIN_MAX_SEQ_LEN = 512
-
-# System message for FLUX.2 Klein - from diffusers system_messages.py
-# https://github.com/black-forest-labs/flux2/blob/5a5d316b1b42f6b59a8c9194b77c8256be848432/src/flux2/system_messages.py
-KLEIN_SYSTEM_MESSAGE = """You are an AI that reasons about image descriptions. You give structured responses focusing on object relationships, object
-attribution and actions without speculation."""
-
-
-def format_input(prompts: List[str], system_message: str = KLEIN_SYSTEM_MESSAGE) -> List[List[dict]]:
-    """Format prompts into conversation format expected by apply_chat_template.
-
-    Note: Diffusers uses list format for content (for multimodal Pixtral/Mistral),
-    but Qwen3 tokenizer expects simple string content.
-
-    Args:
-        prompts: List of text prompts.
-        system_message: System message to use.
-
-    Returns:
-        List of conversations, where each conversation is a list of message dicts.
-    """
-    return [
-        [
-            {
-                "role": "system",
-                "content": system_message,  # Qwen3 expects string, not list
-            },
-            {"role": "user", "content": prompt},  # Qwen3 expects string, not list
-        ]
-        for prompt in prompts
-    ]
 
 
 @invocation(
@@ -75,14 +45,15 @@ def format_input(prompts: List[str], system_message: str = KLEIN_SYSTEM_MESSAGE)
     title="Prompt - Flux2 Klein",
     tags=["prompt", "conditioning", "flux", "klein", "qwen3"],
     category="conditioning",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class Flux2KleinTextEncoderInvocation(BaseInvocation):
     """Encodes and preps a prompt for Flux2 Klein image generation.
 
     Flux2 Klein uses Qwen3 as the text encoder, extracting hidden states from
-    layers [10, 20, 30] and stacking them for richer text representations.
+    layers (9, 18, 27) and stacking them for richer text representations.
+    This matches the diffusers Flux2KleinPipeline implementation exactly.
     """
 
     prompt: str = InputField(description="Text prompt to encode.", ui_component=UIComponent.Textarea)
@@ -119,11 +90,11 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
     def _encode_prompt(self, context: InvocationContext) -> Tuple[torch.Tensor, torch.Tensor]:
         """Encode prompt using Qwen3 text encoder with Klein-style layer extraction.
 
-        This matches the diffusers Flux2Pipeline._get_mistral_3_small_prompt_embeds() exactly.
+        This matches the diffusers Flux2KleinPipeline._get_qwen3_prompt_embeds() exactly.
 
         Returns:
             Tuple of (stacked_embeddings, pooled_embedding):
-            - stacked_embeddings: Hidden states from layers (10, 20, 30) stacked together.
+            - stacked_embeddings: Hidden states from layers (9, 18, 27) stacked together.
               Shape: (1, seq_len, hidden_size * 3)
             - pooled_embedding: Pooled representation for global conditioning.
               Shape: (1, hidden_size)
@@ -152,15 +123,6 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
 
             context.util.signal_progress("Running Qwen3 text encoder (Klein)")
 
-            # Debug: Log model config to verify hidden_size
-            if hasattr(text_encoder, "config"):
-                te_config = text_encoder.config
-                context.logger.info(
-                    f"Qwen3 encoder config: hidden_size={getattr(te_config, 'hidden_size', 'N/A')}, "
-                    f"num_hidden_layers={getattr(te_config, 'num_hidden_layers', 'N/A')}, "
-                    f"model_type={getattr(te_config, 'model_type', 'N/A')}"
-                )
-
             if not isinstance(text_encoder, PreTrainedModel):
                 raise TypeError(
                     f"Expected PreTrainedModel for text encoder, got {type(text_encoder).__name__}. "
@@ -172,50 +134,37 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
                     "The Qwen3 tokenizer may be corrupted or incompatible."
                 )
 
-            # Format input messages - exactly like diffusers format_input()
-            messages_batch = format_input(prompts=[prompt], system_message=KLEIN_SYSTEM_MESSAGE)
+            # Format messages exactly like diffusers Flux2KleinPipeline:
+            # - Only user message, NO system message
+            # - add_generation_prompt=True (adds assistant prefix)
+            # - enable_thinking=False
+            messages = [{"role": "user", "content": prompt}]
 
-            context.logger.info(f"Using chat template with system message, prompt: {prompt[:80]}...")
+            # Step 1: Apply chat template to get formatted text (tokenize=False)
+            text: str = tokenizer.apply_chat_template(  # type: ignore[assignment]
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,  # Adds assistant prefix like diffusers
+                enable_thinking=False,  # Disable thinking mode
+            )
 
-            # Use apply_chat_template like diffusers does
-            # This renders the jinja chat template properly
-            text_inputs = tokenizer.apply_chat_template(
-                messages_batch,
-                add_generation_prompt=False,  # NO assistant prefix - matching diffusers
-                tokenize=True,
-                return_dict=True,
+            context.logger.info(f"Chat template output (first 200 chars): {text[:200]}...")
+
+            # Step 2: Tokenize the formatted text
+            inputs = tokenizer(
+                text,
                 return_tensors="pt",
                 padding="max_length",
                 truncation=True,
                 max_length=self.max_seq_len,
             )
 
-            input_ids = text_inputs["input_ids"]
-            attention_mask = text_inputs["attention_mask"]
+            input_ids = inputs["input_ids"]
+            attention_mask = inputs["attention_mask"]
 
-            if not isinstance(input_ids, torch.Tensor):
-                raise TypeError(f"Expected torch.Tensor for input_ids, got {type(input_ids).__name__}.")
-            if not isinstance(attention_mask, torch.Tensor):
-                raise TypeError(f"Expected torch.Tensor for attention_mask, got {type(attention_mask).__name__}.")
-
-            # Debug: decode and log the full tokenized input
-            try:
-                decoded = tokenizer.decode(input_ids[0], skip_special_tokens=False)
-                # Find actual content (not padding)
-                actual_tokens = (attention_mask[0] == 1).sum().item()
-                context.logger.info(f"Tokenized prompt ({actual_tokens} tokens, showing first 500 chars):")
-                context.logger.info(f"{decoded[:500]}")
-                # Also log the user part specifically
-                if "<|im_start|>user" in decoded:
-                    user_start = decoded.find("<|im_start|>user")
-                    user_end = decoded.find("<|im_end|>", user_start + 1)
-                    if user_end > user_start:
-                        user_content = decoded[user_start:user_end + 10]
-                        context.logger.info(f"User message part: {user_content}")
-            except Exception as e:
-                context.logger.warning(f"Could not decode tokenized input: {e}")
-
-            context.logger.info(f"Tokenized input: {input_ids.shape}, attention_mask: {attention_mask.shape}")
+            # Debug: Log tokenized input
+            actual_tokens = (attention_mask[0] == 1).sum().item()
+            context.logger.info(f"Tokenized input: {input_ids.shape}, {actual_tokens} non-padding tokens")
 
             # Move to device
             input_ids = input_ids.to(device)

@@ -27,6 +27,7 @@ from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fraction
 from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
 from invokeai.backend.flux2.denoise import denoise
 from invokeai.backend.flux2.sampling_utils import (
+    compute_empirical_mu,
     generate_img_ids_flux2,
     get_noise_flux2,
     get_schedule_flux2,
@@ -48,7 +49,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
     category="image",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class Flux2DenoiseInvocation(BaseInvocation):
@@ -106,10 +107,6 @@ class Flux2DenoiseInvocation(BaseInvocation):
         default=4,
         description="Number of diffusion steps. Use 4 for distilled models, 28+ for base models.",
     )
-    shift_schedule: bool = InputField(
-        default=False,
-        description="Apply schedule shifting. Enable for base models (28+ steps), disable for distilled (4-step) models.",
-    )
     scheduler: FLUX_SCHEDULER_NAME_VALUES = InputField(
         default="euler",
         description="Scheduler (sampler) for the denoising process. 'euler' is fast and standard. "
@@ -117,15 +114,6 @@ class Flux2DenoiseInvocation(BaseInvocation):
         ui_choice_labels=FLUX_SCHEDULER_LABELS,
     )
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
-    txt_embed_scale: float = InputField(
-        default=1.0,
-        ge=-1.0,
-        le=1.0,
-        description="Scale factor for Qwen3 text embeddings. "
-        "Set to 1.0 to use embeddings as-is (like diffusers). "
-        "Set to -1 for automatic scaling. "
-        "Set to 0 to disable text conditioning (for debugging).",
-    )
     vae: VAEField = InputField(
         description="FLUX.2 VAE model (required for BN statistics).",
         input=Input.Connection,
@@ -329,12 +317,14 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         # Calculate the timestep schedule using FLUX.2 specific schedule
         # This matches diffusers' Flux2Pipeline implementation
-        # For distilled models (4-step), disable schedule shifting
+        # Note: Schedule shifting is handled by the scheduler via mu parameter
+        image_seq_len = packed_h * packed_w
         timesteps = get_schedule_flux2(
             num_steps=self.num_steps,
-            image_seq_len=packed_h * packed_w,
-            shift=self.shift_schedule,
+            image_seq_len=image_seq_len,
         )
+        # Compute mu for dynamic schedule shifting (used by FlowMatchEulerDiscreteScheduler)
+        mu = compute_empirical_mu(image_seq_len=image_seq_len, num_steps=self.num_steps)
 
         # Clip the timesteps schedule based on denoising_start and denoising_end
         timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
@@ -422,11 +412,21 @@ class Flux2DenoiseInvocation(BaseInvocation):
         num_steps = len(timesteps) - 1
         cfg_scale_list = [self.cfg_scale] * num_steps
 
-        # Create scheduler if not using default euler
+        # Create scheduler with FLUX.2 Klein configuration
+        # From scheduler_config.json: use_dynamic_shifting=True, shift=3.0, time_shift_type="exponential"
         scheduler = None
         if self.scheduler in FLUX_SCHEDULER_MAP:
             scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
-            scheduler = scheduler_class(num_train_timesteps=1000)
+            scheduler = scheduler_class(
+                num_train_timesteps=1000,
+                shift=3.0,
+                use_dynamic_shifting=True,
+                base_shift=0.5,
+                max_shift=1.15,
+                base_image_seq_len=256,
+                max_image_seq_len=4096,
+                time_shift_type="exponential",
+            )
 
         with ExitStack() as exit_stack:
             # Load the transformer model
@@ -552,7 +552,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 neg_txt=neg_txt,
                 neg_txt_ids=neg_txt_ids,
                 scheduler=scheduler,
-                txt_embed_scale=self.txt_embed_scale,
+                mu=mu,
             )
 
             # Debug: Check for NaN immediately after denoising
