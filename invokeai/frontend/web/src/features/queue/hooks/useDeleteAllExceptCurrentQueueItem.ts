@@ -25,10 +25,12 @@ export const useDeleteAllExceptCurrentQueueItem = () => {
         title: t('queue.cancelSucceeded'),
         status: 'success',
       });
-    } catch {
+    } catch (error) {
+      // Check if this is a 403 access denied error
+      const isAccessDenied = error instanceof Object && 'status' in error && error.status === 403;
       toast({
         id: 'QUEUE_CANCEL_FAILED',
-        title: t('queue.cancelFailed'),
+        title: isAccessDenied ? t('queue.cancelFailedAccessDenied') : t('queue.cancelFailed'),
         status: 'error',
       });
     }

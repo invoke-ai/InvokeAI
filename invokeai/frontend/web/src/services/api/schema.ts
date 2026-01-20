@@ -1444,7 +1444,7 @@ export type paths = {
         get?: never;
         /**
          * Resume
-         * @description Resumes session processor
+         * @description Resumes session processor. Admin only.
          */
         put: operations["resume"];
         post?: never;
@@ -1464,7 +1464,7 @@ export type paths = {
         get?: never;
         /**
          * Pause
-         * @description Pauses session processor
+         * @description Pauses session processor. Admin only.
          */
         put: operations["pause"];
         post?: never;
@@ -1484,7 +1484,7 @@ export type paths = {
         get?: never;
         /**
          * Cancel All Except Current
-         * @description Immediately cancels all queue items except in-processing items
+         * @description Immediately cancels all queue items except in-processing items. Non-admin users can only cancel their own items.
          */
         put: operations["cancel_all_except_current"];
         post?: never;
@@ -1504,7 +1504,7 @@ export type paths = {
         get?: never;
         /**
          * Delete All Except Current
-         * @description Immediately deletes all queue items except in-processing items
+         * @description Immediately deletes all queue items except in-processing items. Non-admin users can only delete their own items.
          */
         put: operations["delete_all_except_current"];
         post?: never;
@@ -1524,7 +1524,7 @@ export type paths = {
         get?: never;
         /**
          * Cancel By Batch Ids
-         * @description Immediately cancels all queue items from the given batch ids
+         * @description Immediately cancels all queue items from the given batch ids. Non-admin users can only cancel their own items.
          */
         put: operations["cancel_by_batch_ids"];
         post?: never;
@@ -1544,7 +1544,7 @@ export type paths = {
         get?: never;
         /**
          * Cancel By Destination
-         * @description Immediately cancels all queue items with the given origin
+         * @description Immediately cancels all queue items with the given destination. Non-admin users can only cancel their own items.
          */
         put: operations["cancel_by_destination"];
         post?: never;
@@ -1564,7 +1564,7 @@ export type paths = {
         get?: never;
         /**
          * Retry Items By Id
-         * @description Immediately cancels all queue items with the given origin
+         * @description Retries the given queue items. Users can only retry their own items unless they are an admin.
          */
         put: operations["retry_items_by_id"];
         post?: never;
@@ -1584,7 +1584,7 @@ export type paths = {
         get?: never;
         /**
          * Clear
-         * @description Clears the queue entirely, immediately canceling the currently-executing session
+         * @description Clears the queue entirely. If there's a currently-executing item, users can only cancel it if they own it or are an admin.
          */
         put: operations["clear"];
         post?: never;
@@ -1604,7 +1604,7 @@ export type paths = {
         get?: never;
         /**
          * Prune
-         * @description Prunes all completed or errored queue items
+         * @description Prunes all completed or errored queue items. Non-admin users can only prune their own items.
          */
         put: operations["prune"];
         post?: never;
@@ -1710,7 +1710,7 @@ export type paths = {
         post?: never;
         /**
          * Delete Queue Item
-         * @description Deletes a queue item
+         * @description Deletes a queue item. Users can only delete their own items unless they are an admin.
          */
         delete: operations["delete_queue_item"];
         options?: never;
@@ -1728,7 +1728,7 @@ export type paths = {
         get?: never;
         /**
          * Cancel Queue Item
-         * @description Deletes a queue item
+         * @description Cancels a queue item. Users can only cancel their own items unless they are an admin.
          */
         put: operations["cancel_queue_item"];
         post?: never;
@@ -1770,7 +1770,7 @@ export type paths = {
         post?: never;
         /**
          * Delete By Destination
-         * @description Deletes all items with the given destination
+         * @description Deletes all items with the given destination. Non-admin users can only delete their own items.
          */
         delete: operations["delete_by_destination"];
         options?: never;

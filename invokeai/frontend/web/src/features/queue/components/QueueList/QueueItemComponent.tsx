@@ -34,6 +34,19 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const currentUser = useAppSelector(selectCurrentUser);
 
+  // Check if current user can manage this queue item
+  const canManageItem = useMemo(() => {
+    if (!currentUser) {
+      return false;
+    }
+    // Admin users can manage all items
+    if (currentUser.is_admin) {
+      return true;
+    }
+    // Non-admin users can only manage their own items
+    return item.user_id === currentUser.user_id;
+  }, [currentUser, item.user_id]);
+
   // Check if the current user can view this queue item's details
   const canViewDetails = useMemo(() => {
     // Admins can view all items
@@ -173,7 +186,7 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
             {!isFailed && (
               <IconButton
                 onClick={onClickCancelQueueItem}
-                isDisabled={isCanceled}
+                isDisabled={isCanceled || !canManageItem}
                 isLoading={cancelQueueItem.isLoading}
                 aria-label={t('queue.cancelItem')}
                 icon={<PiXBold />}
@@ -182,6 +195,7 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
             {isFailed && (
               <IconButton
                 onClick={onClickRetryQueueItem}
+                isDisabled={!canManageItem}
                 isLoading={retryQueueItem.isLoading}
                 aria-label={t('queue.retryItem')}
                 icon={<PiArrowCounterClockwiseBold />}

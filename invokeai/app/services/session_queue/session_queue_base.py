@@ -58,8 +58,8 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def prune(self, queue_id: str) -> PruneResult:
-        """Deletes all completed and errored session queue items"""
+    def prune(self, queue_id: str, user_id: Optional[str] = None) -> PruneResult:
+        """Deletes all completed and errored session queue items. If user_id is provided, only prunes items owned by that user."""
         pass
 
     @abstractmethod
@@ -110,18 +110,24 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_by_batch_ids(self, queue_id: str, batch_ids: list[str]) -> CancelByBatchIDsResult:
-        """Cancels all queue items with matching batch IDs"""
+    def cancel_by_batch_ids(
+        self, queue_id: str, batch_ids: list[str], user_id: Optional[str] = None
+    ) -> CancelByBatchIDsResult:
+        """Cancels all queue items with matching batch IDs. If user_id is provided, only cancels items owned by that user."""
         pass
 
     @abstractmethod
-    def cancel_by_destination(self, queue_id: str, destination: str) -> CancelByDestinationResult:
-        """Cancels all queue items with the given batch destination"""
+    def cancel_by_destination(
+        self, queue_id: str, destination: str, user_id: Optional[str] = None
+    ) -> CancelByDestinationResult:
+        """Cancels all queue items with the given batch destination. If user_id is provided, only cancels items owned by that user."""
         pass
 
     @abstractmethod
-    def delete_by_destination(self, queue_id: str, destination: str) -> DeleteByDestinationResult:
-        """Deletes all queue items with the given batch destination"""
+    def delete_by_destination(
+        self, queue_id: str, destination: str, user_id: Optional[str] = None
+    ) -> DeleteByDestinationResult:
+        """Deletes all queue items with the given batch destination. If user_id is provided, only deletes items owned by that user."""
         pass
 
     @abstractmethod
@@ -130,13 +136,13 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_all_except_current(self, queue_id: str) -> CancelAllExceptCurrentResult:
-        """Cancels all queue items except in-progress items"""
+    def cancel_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> CancelAllExceptCurrentResult:
+        """Cancels all queue items except in-progress items. If user_id is provided, only cancels items owned by that user."""
         pass
 
     @abstractmethod
-    def delete_all_except_current(self, queue_id: str) -> DeleteAllExceptCurrentResult:
-        """Deletes all queue items except in-progress items"""
+    def delete_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> DeleteAllExceptCurrentResult:
+        """Deletes all queue items except in-progress items. If user_id is provided, only deletes items owned by that user."""
         pass
 
     @abstractmethod
