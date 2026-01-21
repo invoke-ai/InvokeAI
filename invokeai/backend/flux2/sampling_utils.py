@@ -165,8 +165,6 @@ def get_schedule_flux2(
     # Add final 0.0 for the last step (scheduler needs n+1 timesteps for n steps)
     sigmas_list.append(0.0)
 
-    print(f"[FLUX.2] Linear schedule: num_steps={num_steps}, sigmas={sigmas_list}")
-
     return sigmas_list
 
 

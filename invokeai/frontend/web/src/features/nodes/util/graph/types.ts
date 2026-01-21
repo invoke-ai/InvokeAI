@@ -25,7 +25,13 @@ export type LatentToImageNodes =
   | 'cogview4_l2i'
   | 'z_image_l2i';
 
-export type ImageToLatentsNodes = 'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l' | 'z_image_i2l';
+export type ImageToLatentsNodes =
+  | 'i2l'
+  | 'flux_vae_encode'
+  | 'flux2_vae_encode'
+  | 'sd3_i2l'
+  | 'cogview4_i2l'
+  | 'z_image_i2l';
 
 export type DenoiseLatentsNodes =
   | 'denoise_latents'

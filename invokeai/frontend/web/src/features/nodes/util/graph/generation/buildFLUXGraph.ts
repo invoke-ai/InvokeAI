@@ -239,18 +239,75 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
-  // Flux2 Klein only supports txt2img for now
+  // Flux2 Klein path
   if (isFlux2) {
-    if (generationMode !== 'txt2img') {
-      throw new UnsupportedGenerationModeError(t('toast.flux2OnlySupportsT2I'));
+    const flux2Denoise = denoise as Invocation<'flux2_denoise'>;
+    const flux2ModelLoader = modelLoader as Invocation<'flux2_klein_model_loader'>;
+    const flux2L2i = l2i as Invocation<'flux2_vae_decode'>;
+
+    if (generationMode === 'txt2img') {
+      canvasOutput = addTextToImage({
+        g,
+        state,
+        denoise: flux2Denoise,
+        l2i: flux2L2i,
+      });
+      g.upsertMetadata({ generation_mode: 'flux2_txt2img' });
+    } else if (generationMode === 'img2img') {
+      assert(manager !== null);
+      const i2l = g.addNode({
+        type: 'flux2_vae_encode',
+        id: getPrefixedId('flux2_vae_encode'),
+      });
+      canvasOutput = await addImageToImage({
+        g,
+        state,
+        manager,
+        l2i: flux2L2i,
+        i2l,
+        denoise: flux2Denoise,
+        vaeSource: flux2ModelLoader,
+      });
+      g.upsertMetadata({ generation_mode: 'flux2_img2img' });
+    } else if (generationMode === 'inpaint') {
+      assert(manager !== null);
+      const i2l = g.addNode({
+        type: 'flux2_vae_encode',
+        id: getPrefixedId('flux2_vae_encode'),
+      });
+      canvasOutput = await addInpaint({
+        g,
+        state,
+        manager,
+        l2i: flux2L2i,
+        i2l,
+        denoise: flux2Denoise,
+        vaeSource: flux2ModelLoader,
+        modelLoader: flux2ModelLoader,
+        seed,
+      });
+      g.upsertMetadata({ generation_mode: 'flux2_inpaint' });
+    } else if (generationMode === 'outpaint') {
+      assert(manager !== null);
+      const i2l = g.addNode({
+        type: 'flux2_vae_encode',
+        id: getPrefixedId('flux2_vae_encode'),
+      });
+      canvasOutput = await addOutpaint({
+        g,
+        state,
+        manager,
+        l2i: flux2L2i,
+        i2l,
+        denoise: flux2Denoise,
+        vaeSource: flux2ModelLoader,
+        modelLoader: flux2ModelLoader,
+        seed,
+      });
+      g.upsertMetadata({ generation_mode: 'flux2_outpaint' });
+    } else {
+      assert<Equals<typeof generationMode, never>>(false);
     }
-    canvasOutput = addTextToImage({
-      g,
-      state,
-      denoise,
-      l2i,
-    });
-    g.upsertMetadata({ generation_mode: 'flux2_txt2img' });
   } else {
     // Standard FLUX path with all features
     const fluxDenoise = denoise as Invocation<'flux_denoise'>;

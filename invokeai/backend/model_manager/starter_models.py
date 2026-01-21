@@ -691,19 +691,71 @@ flux_fill = StarterModel(
 # endregion
 
 # region FLUX.2 Klein
+flux2_vae = StarterModel(
+    name="FLUX.2 VAE",
+    base=BaseModelType.Flux2,
+    source="black-forest-labs/FLUX.2-klein-4B::vae",
+    description="FLUX.2 VAE (16-channel, same architecture as FLUX.1 VAE). ~335MB",
+    type=ModelType.VAE,
+)
+
+flux2_klein_qwen3_4b_encoder = StarterModel(
+    name="FLUX.2 Klein Qwen3 4B Encoder",
+    base=BaseModelType.Any,
+    source="black-forest-labs/FLUX.2-klein-4B::text_encoder+tokenizer",
+    description="Qwen3 4B text encoder for FLUX.2 Klein 4B (also compatible with Z-Image). ~8GB",
+    type=ModelType.Qwen3Encoder,
+)
+
+flux2_klein_qwen3_8b_encoder = StarterModel(
+    name="FLUX.2 Klein Qwen3 8B Encoder",
+    base=BaseModelType.Any,
+    source="black-forest-labs/FLUX.2-klein-9B::text_encoder+tokenizer",
+    description="Qwen3 8B text encoder for FLUX.2 Klein 9B models. ~16GB",
+    type=ModelType.Qwen3Encoder,
+)
+
 flux2_klein_4b = StarterModel(
-    name="FLUX.2 Klein 4B",
+    name="FLUX.2 Klein 4B (Diffusers)",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-4B",
-    description="FLUX.2 Klein 4B - fast and efficient model with Qwen3 text encoder. ~10GB",
+    description="FLUX.2 Klein 4B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~10GB",
     type=ModelType.Main,
 )
+
+flux2_klein_4b_single = StarterModel(
+    name="FLUX.2 Klein 4B",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/resolve/main/flux-2-klein-4b.safetensors",
+    description="FLUX.2 Klein 4B standalone transformer. Requires separate VAE and Qwen3 4B encoder. ~8GB",
+    type=ModelType.Main,
+    dependencies=[flux2_vae, flux2_klein_qwen3_4b_encoder],
+)
+
+flux2_klein_4b_fp8 = StarterModel(
+    name="FLUX.2 Klein 4B (FP8)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8/resolve/main/flux-2-klein-4b-fp8.safetensors",
+    description="FLUX.2 Klein 4B FP8 quantized - smaller and faster. Requires separate VAE and Qwen3 4B encoder. ~4GB",
+    type=ModelType.Main,
+    dependencies=[flux2_vae, flux2_klein_qwen3_4b_encoder],
+)
+
 flux2_klein_9b = StarterModel(
-    name="FLUX.2 Klein 9B",
+    name="FLUX.2 Klein 9B (Diffusers)",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-9B",
-    description="FLUX.2 Klein 9B - higher quality model with Qwen3 text encoder (distilled). ~20GB",
+    description="FLUX.2 Klein 9B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~20GB",
     type=ModelType.Main,
+)
+
+flux2_klein_9b_fp8 = StarterModel(
+    name="FLUX.2 Klein 9B (FP8)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/black-forest-labs/FLUX.2-klein-9b-fp8/resolve/main/flux-2-klein-9b-fp8.safetensors",
+    description="FLUX.2 Klein 9B FP8 quantized - more efficient than full precision. Requires separate VAE and Qwen3 8B encoder. ~9.5GB",
+    type=ModelType.Main,
+    dependencies=[flux2_vae, flux2_klein_qwen3_8b_encoder],
 )
 # endregion
 
@@ -843,8 +895,14 @@ STARTER_MODELS: list[StarterModel] = [
     flux_redux,
     llava_onevision,
     flux_fill,
+    flux2_vae,
     flux2_klein_4b,
+    flux2_klein_4b_single,
+    flux2_klein_4b_fp8,
     flux2_klein_9b,
+    flux2_klein_9b_fp8,
+    flux2_klein_qwen3_4b_encoder,
+    flux2_klein_qwen3_8b_encoder,
     cogview4,
     flux_krea,
     flux_krea_quantized,

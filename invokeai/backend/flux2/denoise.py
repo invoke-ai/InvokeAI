@@ -11,6 +11,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
 
@@ -32,6 +33,8 @@ def denoise(
     scheduler: Any = None,
     # Dynamic shifting parameter for FLUX.2 Klein (computed from image resolution)
     mu: float | None = None,
+    # Inpainting extension for merging latents during denoising
+    inpaint_extension: RectifiedFlowInpaintExtension | None = None,
 ) -> torch.Tensor:
     """Denoise latents using a FLUX.2 Klein transformer model.
 
@@ -70,11 +73,14 @@ def denoise(
     if use_scheduler:
         # Set up scheduler with sigmas and mu for dynamic shifting
         # Convert timesteps (0-1 range) to sigmas for the scheduler
-        # The scheduler will apply dynamic shifting internally using mu
+        # The scheduler will apply dynamic shifting internally using mu (if enabled in scheduler config)
         sigmas = np.array(timesteps[:-1], dtype=np.float32)  # Exclude final 0.0
 
-        # Let the scheduler handle timestep shifting via mu parameter
-        scheduler.set_timesteps(sigmas=sigmas.tolist(), mu=mu, device=img.device)
+        # Pass mu if provided - it will only be used if scheduler has use_dynamic_shifting=True
+        if mu is not None:
+            scheduler.set_timesteps(sigmas=sigmas.tolist(), mu=mu, device=img.device)
+        else:
+            scheduler.set_timesteps(sigmas=sigmas.tolist(), device=img.device)
         num_scheduler_steps = len(scheduler.timesteps)
         is_heun = hasattr(scheduler, "state_in_first_order")
         user_step = 0
@@ -127,6 +133,16 @@ def denoise(
             step_output = scheduler.step(model_output=pred, timestep=timestep, sample=img)
             img = step_output.prev_sample
 
+            # Get t_prev for inpainting (next sigma value)
+            if step_index + 1 < len(scheduler.sigmas):
+                t_prev = scheduler.sigmas[step_index + 1].item()
+            else:
+                t_prev = 0.0
+
+            # Apply inpainting merge at each step
+            if inpaint_extension is not None:
+                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
+
             # For Heun, only increment user step after second-order step completes
             if is_heun:
                 if not in_first_order:
@@ -134,6 +150,10 @@ def denoise(
                     if user_step <= total_steps:
                         pbar.update(1)
                         preview_img = img - t_curr * pred
+                        if inpaint_extension is not None:
+                            preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(
+                                preview_img, 0.0
+                            )
                         step_callback(
                             PipelineIntermediateState(
                                 step=user_step,
@@ -148,6 +168,8 @@ def denoise(
                 if user_step <= total_steps:
                     pbar.update(1)
                     preview_img = img - t_curr * pred
+                    if inpaint_extension is not None:
+                        preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
                     step_callback(
                         PipelineIntermediateState(
                             step=user_step,
@@ -201,6 +223,11 @@ def denoise(
             # Euler step
             preview_img = img - t_curr * pred
             img = img + (t_prev - t_curr) * pred
+
+            # Apply inpainting merge at each step
+            if inpaint_extension is not None:
+                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
+                preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
 
             step_callback(
                 PipelineIntermediateState(

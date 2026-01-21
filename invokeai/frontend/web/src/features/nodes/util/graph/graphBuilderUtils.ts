@@ -245,9 +245,16 @@ export const getDenoisingStartAndEnd = (state: RootState): { denoising_start: nu
           denoising_start: 0,
           denoising_end: 1,
         };
+      } else if (model.base === 'flux2') {
+        // FLUX.2 Klein: Use linear scaling for more predictable inpainting behavior
+        // The optimized denoising with exponent 0.2 causes unexpected results for low strength values
+        return {
+          denoising_start: 1 - denoisingStrength,
+          denoising_end: 1,
+        };
       } else {
-        // We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
-        // more user-friendly for SD3.5. Without this, most of the 'change' is concentrated in the high denoise strength
+        // FLUX.1: We rescale the img2imgStrength (with exponent 0.2) to effectively use the entire range [0, 1] and make the scale
+        // more user-friendly for FLUX. Without this, most of the 'change' is concentrated in the high denoise strength
         // range (>0.9).
         const exponent = optimizedDenoisingEnabled ? 0.2 : 1;
         return {

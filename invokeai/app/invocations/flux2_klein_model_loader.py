@@ -133,8 +133,10 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
             vae = self.qwen3_source_model.model_copy(update={"submodel_type": SubModelType.VAE})
         else:
             raise ValueError(
-                "No VAE source provided. For FLUX.2 Klein, the VAE should come from the Diffusers model. "
-                "Either use a Diffusers format main model, or set 'Qwen3 Source' to a Diffusers Flux2 Klein model."
+                "No VAE source provided. Standalone safetensors/GGUF models require a separate VAE. "
+                "Options:\n"
+                "  1. Set 'VAE' to a standalone FLUX VAE model\n"
+                "  2. Set 'Qwen3 Source' to a Diffusers Flux2 Klein model to extract the VAE from"
             )
 
         # Determine Qwen3 Encoder source
@@ -154,8 +156,11 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
             qwen3_encoder = self.qwen3_source_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         else:
             raise ValueError(
-                "No Qwen3 Encoder source provided. For FLUX.2 Klein, the Qwen3 encoder should come from the Diffusers model. "
-                "Either use a Diffusers format main model, or set 'Qwen3 Source' to a Diffusers Flux2 Klein model."
+                "No Qwen3 Encoder source provided. Standalone safetensors/GGUF models require a separate text encoder. "
+                "Options:\n"
+                "  1. Set 'Qwen3 Encoder' to a standalone Qwen3 text encoder model "
+                "(Klein 4B needs Qwen3 4B, Klein 9B needs Qwen3 8B)\n"
+                "  2. Set 'Qwen3 Source' to a Diffusers Flux2 Klein model to extract the encoder from"
             )
 
         return Flux2KleinModelLoaderOutput(

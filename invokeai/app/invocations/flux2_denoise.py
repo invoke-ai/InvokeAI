@@ -324,8 +324,12 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Apply BN normalization BEFORE denoising (as per diffusers Flux2KleinPipeline)
         # BN normalization: y = (x - mean) / std
         # This transforms latents to normalized space for the transformer
+        # IMPORTANT: Also normalize init_latents and noise for inpainting to maintain consistency
         if bn_mean is not None and bn_std is not None:
             x = self._bn_normalize(x, bn_mean, bn_std)
+            if init_latents_packed is not None:
+                init_latents_packed = self._bn_normalize(init_latents_packed, bn_mean, bn_std)
+            noise_packed = self._bn_normalize(noise_packed, bn_mean, bn_std)
 
         # Verify packed dimensions
         assert packed_h * packed_w == x.shape[1]
@@ -344,10 +348,15 @@ class Flux2DenoiseInvocation(BaseInvocation):
         num_steps = len(timesteps) - 1
         cfg_scale_list = [self.cfg_scale] * num_steps
 
+        # Check if we're doing inpainting (have a mask or a clipped schedule)
+        is_inpainting = self.denoise_mask is not None or self.denoising_start > 1e-5
+
         # Create scheduler with FLUX.2 Klein configuration
-        # From scheduler_config.json: use_dynamic_shifting=True, shift=3.0, time_shift_type="exponential"
+        # For inpainting/img2img, use manual Euler stepping to preserve the exact timestep schedule
+        # For txt2img, use the scheduler with dynamic shifting for optimal results
         scheduler = None
-        if self.scheduler in FLUX_SCHEDULER_MAP:
+        if self.scheduler in FLUX_SCHEDULER_MAP and not is_inpainting:
+            # Only use scheduler for txt2img - use manual Euler for inpainting to preserve exact timesteps
             scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
             scheduler = scheduler_class(
                 num_train_timesteps=1000,
@@ -404,11 +413,8 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 neg_txt_ids=neg_txt_ids,
                 scheduler=scheduler,
                 mu=mu,
+                inpaint_extension=inpaint_extension,
             )
-
-            # Apply inpainting if enabled
-            if inpaint_extension is not None:
-                x = inpaint_extension.merge_intermediate_latents_with_init_latents(x, 0.0)
 
         # Apply BN denormalization if BN stats are available
         # The diffusers Flux2KleinPipeline applies: latents = latents * bn_std + bn_mean
