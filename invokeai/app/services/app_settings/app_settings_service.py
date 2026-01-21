@@ -1,6 +1,5 @@
 """Service for managing application-level settings stored in the database."""
 
-import sqlite3
 from typing import Optional
 
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
@@ -31,9 +30,7 @@ class AppSettingsService:
             The setting value if found, None otherwise
         """
         try:
-            with self._db.lock:
-                conn = sqlite3.connect(self._db.conn, uri=True)
-                cursor = conn.cursor()
+            with self._db.transaction() as cursor:
                 cursor.execute("SELECT value FROM app_settings WHERE key = ?;", (key,))
                 row = cursor.fetchone()
                 return row[0] if row else None
@@ -47,9 +44,7 @@ class AppSettingsService:
             key: The setting key
             value: The setting value
         """
-        with self._db.lock:
-            conn = sqlite3.connect(self._db.conn, uri=True)
-            cursor = conn.cursor()
+        with self._db.transaction() as cursor:
             cursor.execute(
                 """
                 INSERT INTO app_settings (key, value)
@@ -60,7 +55,6 @@ class AppSettingsService:
                 """,
                 (key, value),
             )
-            conn.commit()
 
     def get_jwt_secret(self) -> str:
         """Get the JWT secret key from the database.
