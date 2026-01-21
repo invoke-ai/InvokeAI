@@ -70,16 +70,26 @@ async def get_current_user_or_default(
     """Get current authenticated user from Bearer token, or return a default system user if not authenticated.
 
     This dependency is useful for endpoints that should work in both authenticated and non-authenticated contexts.
-    In single-user mode or when authentication is not provided, it returns a TokenData for the 'system' user.
+    
+    When multiuser mode is disabled (default), this always returns a system user with admin privileges.
+    When multiuser mode is enabled, it validates the token and returns authenticated user data or falls back to system user.
 
     Args:
         credentials: The HTTP authorization credentials containing the Bearer token
 
     Returns:
-        TokenData containing user information from the token, or system user if no credentials
+        TokenData containing user information from the token, or system user if no credentials or multiuser disabled
     """
+    # Get configuration to check if multiuser is enabled
+    config = ApiDependencies.invoker.services.configuration
+    
+    # In single-user mode (multiuser=False), always return system user with admin privileges
+    if not config.multiuser:
+        return TokenData(user_id="system", email="system@system.invokeai", is_admin=True)
+    
+    # Multiuser mode is enabled - validate credentials
     if credentials is None:
-        # Return system user for unauthenticated requests (single-user mode or backwards compatibility)
+        # Return system user for unauthenticated requests (backwards compatibility)
         logger.debug("No authentication credentials provided, using system user")
         return TokenData(user_id="system", email="system@system.invokeai", is_admin=False)
 

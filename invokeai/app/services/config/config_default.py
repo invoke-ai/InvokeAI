@@ -203,6 +203,9 @@ class InvokeAIAppConfig(BaseSettings):
     unsafe_disable_picklescan:     bool = Field(default=False,              description="UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.")
     allow_unknown_models:          bool = Field(default=True,              description="Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.")
 
+    # MULTIUSER
+    multiuser:                     bool = Field(default=False,              description="Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.")
+
     # fmt: on
 
     model_config = SettingsConfigDict(env_prefix="INVOKEAI_", env_ignore_empty=True)
