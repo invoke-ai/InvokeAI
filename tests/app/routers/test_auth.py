@@ -9,8 +9,16 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
+from invokeai.app.services.auth.token_service import set_jwt_secret
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.users.users_common import UserCreateRequest
+
+
+@pytest.fixture(autouse=True, scope="module")
+def setup_jwt_secret():
+    """Set up JWT secret for all tests in this module."""
+    # Use a test secret key
+    set_jwt_secret("test-secret-key-for-unit-tests-only-do-not-use-in-production")
 
 
 @pytest.fixture(autouse=True, scope="module")
