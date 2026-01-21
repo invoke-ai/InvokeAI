@@ -53,7 +53,11 @@ class MainModelDefaultSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     @classmethod
-    def from_base(cls, base: BaseModelType) -> Self | None:
+    def from_base(
+        cls,
+        base: BaseModelType,
+        variant: Flux2VariantType | FluxVariantType | ModelVariantType | None = None,
+    ) -> Self | None:
         match base:
             case BaseModelType.StableDiffusion1:
                 return cls(width=512, height=512)
@@ -63,6 +67,14 @@ class MainModelDefaultSettings(BaseModel):
                 return cls(width=1024, height=1024)
             case BaseModelType.ZImage:
                 return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
+            case BaseModelType.Flux2:
+                # Different defaults based on variant
+                if variant == Flux2VariantType.Klein9BBase:
+                    # Undistilled base model needs more steps
+                    return cls(steps=28, cfg_scale=1.0, width=1024, height=1024)
+                else:
+                    # Distilled models (Klein 4B, Klein 9B) use fewer steps
+                    return cls(steps=4, cfg_scale=1.0, width=1024, height=1024)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
                 return None

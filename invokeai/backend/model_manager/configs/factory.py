@@ -506,7 +506,9 @@ class ModelConfigFactory:
         # Now do any post-processing needed for specific model types/bases/etc.
         match config.type:
             case ModelType.Main:
-                config.default_settings = MainModelDefaultSettings.from_base(config.base)
+                # Pass variant if available (e.g., for Flux2 models)
+                variant = getattr(config, "variant", None)
+                config.default_settings = MainModelDefaultSettings.from_base(config.base, variant)
             case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
                 config.default_settings = ControlAdapterDefaultSettings.from_model_name(config.name)
             case ModelType.LoRA:
