@@ -81,11 +81,11 @@ async def get_setup_status() -> SetupStatusResponse:
         SetupStatusResponse indicating whether setup is needed
     """
     config = ApiDependencies.invoker.services.configuration
-    
+
     # If multiuser is disabled, setup is never required
     if not config.multiuser:
         return SetupStatusResponse(setup_required=False)
-    
+
     # In multiuser mode, check if an admin exists
     user_service = ApiDependencies.invoker.services.users
     setup_required = not user_service.has_admin()
@@ -110,14 +110,14 @@ async def login(
         HTTPException: 403 if multiuser mode is disabled
     """
     config = ApiDependencies.invoker.services.configuration
-    
+
     # Check if multiuser is enabled
     if not config.multiuser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Multiuser mode is disabled. Authentication is not required in single-user mode.",
         )
-    
+
     user_service = ApiDependencies.invoker.services.users
     user = user_service.authenticate(request.email, request.password)
 
@@ -215,14 +215,14 @@ async def setup_admin(
         HTTPException: 403 if multiuser mode is disabled
     """
     config = ApiDependencies.invoker.services.configuration
-    
+
     # Check if multiuser is enabled
     if not config.multiuser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Multiuser mode is disabled. Admin setup is not required in single-user mode.",
         )
-    
+
     user_service = ApiDependencies.invoker.services.users
 
     # Check if any admin exists

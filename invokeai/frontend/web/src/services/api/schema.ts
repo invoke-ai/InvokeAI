@@ -43,6 +43,7 @@ export type paths = {
          *
          *     Raises:
          *         HTTPException: 401 if credentials are invalid or user is inactive
+         *         HTTPException: 403 if multiuser mode is disabled
          */
         post: operations["login_api_v1_auth_login_post"];
         delete?: never;
@@ -137,6 +138,7 @@ export type paths = {
          *
          *     Raises:
          *         HTTPException: 400 if admin already exists or password is weak
+         *         HTTPException: 403 if multiuser mode is disabled
          */
         post: operations["setup_admin_api_v1_auth_setup_post"];
         delete?: never;
@@ -13609,6 +13611,12 @@ export type components = {
              * @default true
              */
             allow_unknown_models?: boolean;
+            /**
+             * Multiuser
+             * @description Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
+             * @default false
+             */
+            multiuser?: boolean;
         };
         /**
          * InvokeAIAppConfigWithSetFields

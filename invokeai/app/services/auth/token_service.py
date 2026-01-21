@@ -46,9 +46,7 @@ def get_jwt_secret() -> str:
         RuntimeError: If the secret has not been initialized
     """
     if _jwt_secret is None:
-        raise RuntimeError(
-            "JWT secret has not been initialized. Call set_jwt_secret() during application startup."
-        )
+        raise RuntimeError("JWT secret has not been initialized. Call set_jwt_secret() during application startup.")
     return _jwt_secret
 
 
