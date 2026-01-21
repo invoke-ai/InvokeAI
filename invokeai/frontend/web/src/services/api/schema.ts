@@ -22549,6 +22549,16 @@ export type components = {
              * @description Total number of queue items
              */
             total: number;
+            /**
+             * User Pending
+             * @description Number of queue items with status 'pending' for the current user
+             */
+            user_pending?: number | null;
+            /**
+             * User In Progress
+             * @description Number of queue items with status 'in_progress' for the current user
+             */
+            user_in_progress?: number | null;
         };
         /**
          * SetupRequest

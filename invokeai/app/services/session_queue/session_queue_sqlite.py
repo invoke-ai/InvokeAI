@@ -773,8 +773,9 @@ class SqliteSessionQueue(SessionQueueBase):
 
         return ItemIdsResult(item_ids=item_ids, total_count=len(item_ids))
 
-    def get_queue_status(self, queue_id: str) -> SessionQueueStatus:
+    def get_queue_status(self, queue_id: str, user_id: Optional[str] = None) -> SessionQueueStatus:
         with self._db.transaction() as cursor:
+            # Get total counts
             cursor.execute(
                 """--sql
                 SELECT status, count(*)
@@ -786,9 +787,32 @@ class SqliteSessionQueue(SessionQueueBase):
             )
             counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
+            # Get user-specific counts if user_id is provided (using a single query with CASE)
+            user_counts_result = []
+            if user_id is not None:
+                cursor.execute(
+                    """--sql
+                    SELECT status, count(*)
+                    FROM session_queue
+                    WHERE queue_id = ? AND user_id = ?
+                    GROUP BY status
+                    """,
+                    (queue_id, user_id),
+                )
+                user_counts_result = cast(list[sqlite3.Row], cursor.fetchall())
+
         current_item = self.get_current(queue_id=queue_id)
         total = sum(row[1] or 0 for row in counts_result)
         counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
+
+        # Process user-specific counts if available
+        user_pending = None
+        user_in_progress = None
+        if user_id is not None:
+            user_counts: dict[str, int] = {row[0]: row[1] for row in user_counts_result}
+            user_pending = user_counts.get("pending", 0)
+            user_in_progress = user_counts.get("in_progress", 0)
+
         return SessionQueueStatus(
             queue_id=queue_id,
             item_id=current_item.item_id if current_item else None,
@@ -800,6 +824,8 @@ class SqliteSessionQueue(SessionQueueBase):
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
             total=total,
+            user_pending=user_pending,
+            user_in_progress=user_in_progress,
         )
 
     def get_batch_status(self, queue_id: str, batch_id: str) -> BatchStatus:

@@ -387,10 +387,12 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     );
 
     // Invalidate caches for things we cannot easily update
+    // Invalidate SessionQueueStatus to refetch with user-specific counts
     const tagsToInvalidate: ApiTagDescription[] = [
       'CurrentSessionQueueItem',
       'NextSessionQueueItem',
       'InvocationCacheStatus',
+      'SessionQueueStatus',
       'SessionQueueItemIdList',
       { type: 'SessionQueueItem', id: item_id },
       { type: 'SessionQueueItem', id: LIST_TAG },
@@ -401,16 +403,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       tagsToInvalidate.push({ type: 'QueueCountsByDestination', id: destination });
     }
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
-    dispatch(
-      queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
-        draft.queue = data.queue_status;
-      })
-    );
-    dispatch(
-      queueApi.util.updateQueryData('getBatchStatus', { batch_id: data.batch_id }, (draft) => {
-        Object.assign(draft, data.batch_status);
-      })
-    );
 
     if (status === 'in_progress') {
       forEach($nodeExecutionStates.get(), (nes) => {
@@ -463,6 +455,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug({ data }, 'Batch enqueued');
     dispatch(
       queueApi.util.invalidateTags([
+        'SessionQueueStatus',
         'CurrentSessionQueueItem',
         'NextSessionQueueItem',
         'QueueCountsByDestination',

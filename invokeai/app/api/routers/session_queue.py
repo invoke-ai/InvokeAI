@@ -408,11 +408,12 @@ async def get_next_queue_item(
     },
 )
 async def get_queue_status(
+    current_user: CurrentUser,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionQueueAndProcessorStatus:
     """Gets the status of the session queue"""
     try:
-        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id)
+        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id, user_id=current_user.user_id)
         processor = ApiDependencies.invoker.services.session_processor.get_status()
         return SessionQueueAndProcessorStatus(queue=queue, processor=processor)
     except Exception as e:

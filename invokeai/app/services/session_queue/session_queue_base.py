@@ -73,8 +73,8 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def get_queue_status(self, queue_id: str) -> SessionQueueStatus:
-        """Gets the status of the queue"""
+    def get_queue_status(self, queue_id: str, user_id: Optional[str] = None) -> SessionQueueStatus:
+        """Gets the status of the queue. If user_id is provided, also includes user-specific counts."""
         pass
 
     @abstractmethod
