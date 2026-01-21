@@ -6,16 +6,13 @@ from typing import cast
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
-# SECURITY WARNING: This is a placeholder secret key for development only.
-# In production, this MUST be:
-# 1. Generated using a cryptographically secure random generator
-# 2. Stored in environment variables or secure configuration
-# 3. Never committed to source control
-# 4. Rotated periodically
-# TODO: Move to config system - see invokeai.app.services.config.config_default
-SECRET_KEY = "your-secret-key-should-be-in-config-change-this-in-production"
 ALGORITHM = "HS256"
 DEFAULT_EXPIRATION_HOURS = 24
+
+# Module-level variable to store the JWT secret. This is set during application initialization
+# by calling set_jwt_secret(). The secret is loaded from the database where it is stored
+# securely after being generated during database migration.
+_jwt_secret: str | None = None
 
 
 class TokenData(BaseModel):
@@ -24,6 +21,35 @@ class TokenData(BaseModel):
     user_id: str
     email: str
     is_admin: bool
+
+
+def set_jwt_secret(secret: str) -> None:
+    """Set the JWT secret key for token signing and verification.
+
+    This should be called once during application initialization with the secret
+    loaded from the database.
+
+    Args:
+        secret: The JWT secret key
+    """
+    global _jwt_secret
+    _jwt_secret = secret
+
+
+def get_jwt_secret() -> str:
+    """Get the JWT secret key.
+
+    Returns:
+        The JWT secret key
+
+    Raises:
+        RuntimeError: If the secret has not been initialized
+    """
+    if _jwt_secret is None:
+        raise RuntimeError(
+            "JWT secret has not been initialized. Call set_jwt_secret() during application startup."
+        )
+    return _jwt_secret
 
 
 def create_access_token(data: TokenData, expires_delta: timedelta | None = None) -> str:
@@ -39,7 +65,7 @@ def create_access_token(data: TokenData, expires_delta: timedelta | None = None)
     to_encode = data.model_dump()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(hours=DEFAULT_EXPIRATION_HOURS))
     to_encode.update({"exp": expire})
-    return cast(str, jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM))
+    return cast(str, jwt.encode(to_encode, get_jwt_secret(), algorithm=ALGORITHM))
 
 
 def verify_token(token: str) -> TokenData | None:
@@ -60,7 +86,7 @@ def verify_token(token: str) -> TokenData | None:
         # Note: python-jose won't reject expired tokens here due to the bug
         payload = jwt.decode(
             token,
-            SECRET_KEY,
+            get_jwt_secret(),
             algorithms=[ALGORITHM],
         )
 

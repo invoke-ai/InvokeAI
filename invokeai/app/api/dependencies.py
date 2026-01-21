@@ -5,6 +5,8 @@ from logging import Logger
 
 import torch
 
+from invokeai.app.services.app_settings import AppSettingsService
+from invokeai.app.services.auth.token_service import set_jwt_secret
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_images.board_images_default import BoardImagesService
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
@@ -101,6 +103,12 @@ class ApiDependencies:
         workflow_thumbnails_folder = config.workflow_thumbnails_path
 
         db = init_db(config=config, logger=logger, image_files=image_files)
+
+        # Initialize JWT secret from database
+        app_settings = AppSettingsService(db=db)
+        jwt_secret = app_settings.get_jwt_secret()
+        set_jwt_secret(jwt_secret)
+        logger.info("JWT secret loaded from database")
 
         configuration = config
         logger = logger
