@@ -4,7 +4,7 @@ from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
-from invokeai.app.api.auth_dependencies import AdminUser, CurrentUser
+from invokeai.app.api.auth_dependencies import AdminUser, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -80,7 +80,7 @@ def sanitize_queue_item_for_user(
     },
 )
 async def enqueue_batch(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch: Batch = Body(description="Batch to process"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
@@ -102,7 +102,7 @@ async def enqueue_batch(
     },
 )
 async def list_all_queue_items(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     destination: Optional[str] = Query(default=None, description="The destination of queue items to fetch"),
 ) -> list[SessionQueueItem]:
@@ -142,7 +142,7 @@ async def get_queue_item_ids(
     responses={200: {"model": list[SessionQueueItem]}},
 )
 async def get_queue_items_by_item_ids(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(
         embed=True, description="Object containing list of queue item ids to fetch queue items for"
@@ -209,7 +209,7 @@ async def Pause(
     responses={200: {"model": CancelAllExceptCurrentResult}},
 )
 async def cancel_all_except_current(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> CancelAllExceptCurrentResult:
     """Immediately cancels all queue items except in-processing items. Non-admin users can only cancel their own items."""
@@ -229,7 +229,7 @@ async def cancel_all_except_current(
     responses={200: {"model": DeleteAllExceptCurrentResult}},
 )
 async def delete_all_except_current(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> DeleteAllExceptCurrentResult:
     """Immediately deletes all queue items except in-processing items. Non-admin users can only delete their own items."""
@@ -249,7 +249,7 @@ async def delete_all_except_current(
     responses={200: {"model": CancelByBatchIDsResult}},
 )
 async def cancel_by_batch_ids(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch_ids: list[str] = Body(description="The list of batch_ids to cancel all queue items for", embed=True),
 ) -> CancelByBatchIDsResult:
@@ -270,7 +270,7 @@ async def cancel_by_batch_ids(
     responses={200: {"model": CancelByDestinationResult}},
 )
 async def cancel_by_destination(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     destination: str = Query(description="The destination to cancel all queue items for"),
 ) -> CancelByDestinationResult:
@@ -291,7 +291,7 @@ async def cancel_by_destination(
     responses={200: {"model": RetryItemsResult}},
 )
 async def retry_items_by_id(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(description="The queue item ids to retry"),
 ) -> RetryItemsResult:
@@ -325,7 +325,7 @@ async def retry_items_by_id(
     },
 )
 async def clear(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> ClearResult:
     """Clears the queue entirely. If there's a currently-executing item, users can only cancel it if they own it or are an admin."""
@@ -354,7 +354,7 @@ async def clear(
     },
 )
 async def prune(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> PruneResult:
     """Prunes all completed or errored queue items. Non-admin users can only prune their own items."""
@@ -408,7 +408,7 @@ async def get_next_queue_item(
     },
 )
 async def get_queue_status(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionQueueAndProcessorStatus:
     """Gets the status of the session queue"""
@@ -447,7 +447,7 @@ async def get_batch_status(
     response_model_exclude_none=True,
 )
 async def get_queue_item(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_id: int = Path(description="The queue item to get"),
 ) -> SessionQueueItem:
@@ -469,7 +469,7 @@ async def get_queue_item(
     operation_id="delete_queue_item",
 )
 async def delete_queue_item(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_id: int = Path(description="The queue item to delete"),
 ) -> None:
@@ -499,7 +499,7 @@ async def delete_queue_item(
     },
 )
 async def cancel_queue_item(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_id: int = Path(description="The queue item to cancel"),
 ) -> SessionQueueItem:
@@ -545,7 +545,7 @@ async def counts_by_destination(
     responses={200: {"model": DeleteByDestinationResult}},
 )
 async def delete_by_destination(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to query"),
     destination: str = Path(description="The destination to query"),
 ) -> DeleteByDestinationResult:

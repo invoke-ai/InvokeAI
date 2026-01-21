@@ -4,7 +4,7 @@ from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
-from invokeai.app.api.auth_dependencies import CurrentUser
+from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_common import BoardDTO
@@ -33,7 +33,7 @@ class DeleteBoardResult(BaseModel):
     response_model=BoardDTO,
 )
 async def create_board(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     board_name: str = Query(description="The name of the board to create", max_length=300),
 ) -> BoardDTO:
     """Creates a board for the current user"""
@@ -46,7 +46,7 @@ async def create_board(
 
 @boards_router.get("/{board_id}", operation_id="get_board", response_model=BoardDTO)
 async def get_board(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of board to get"),
 ) -> BoardDTO:
     """Gets a board (user must have access to it)"""
@@ -70,7 +70,7 @@ async def get_board(
     response_model=BoardDTO,
 )
 async def update_board(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of board to update"),
     changes: BoardChanges = Body(description="The changes to apply to the board"),
 ) -> BoardDTO:
@@ -84,7 +84,7 @@ async def update_board(
 
 @boards_router.delete("/{board_id}", operation_id="delete_board", response_model=DeleteBoardResult)
 async def delete_board(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of board to delete"),
     include_images: Optional[bool] = Query(description="Permanently delete all images on the board", default=False),
 ) -> DeleteBoardResult:
@@ -125,7 +125,7 @@ async def delete_board(
     response_model=Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]],
 )
 async def list_boards(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     order_by: BoardRecordOrderBy = Query(default=BoardRecordOrderBy.CreatedAt, description="The attribute to order by"),
     direction: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The direction to order by"),
     all: Optional[bool] = Query(default=None, description="Whether to list all boards"),

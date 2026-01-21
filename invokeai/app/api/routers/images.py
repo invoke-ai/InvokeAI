@@ -9,7 +9,7 @@ from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, model_validator
 
-from invokeai.app.api.auth_dependencies import CurrentUser
+from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
 from invokeai.app.invocations.fields import MetadataField
@@ -62,7 +62,7 @@ class ResizeToDimensions(BaseModel):
     response_model=ImageDTO,
 )
 async def upload_image(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     file: UploadFile,
     request: Request,
     response: Response,
@@ -376,7 +376,7 @@ async def get_image_urls(
     response_model=OffsetPaginatedResults[ImageDTO],
 )
 async def list_image_dtos(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
     categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
@@ -580,7 +580,7 @@ async def get_bulk_download_item(
 
 @images_router.get("/names", operation_id="get_image_names")
 async def get_image_names(
-    current_user: CurrentUser,
+    current_user: CurrentUserOrDefault,
     image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
     categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
