@@ -87,8 +87,17 @@ export const LoginPage = memo(() => {
       : t('auth.login.loginFailed')
     : null;
 
-  // Show loading spinner while checking setup status
-  if (isLoadingSetup) {
+  // Show loading spinner while checking setup status or redirecting
+  if (isLoadingSetup || (setupStatus && !setupStatus.multiuser_enabled)) {
+    return (
+      <Center w="100dvw" h="100dvh">
+        <Spinner size="xl" />
+      </Center>
+    );
+  }
+
+  // Show loading spinner if setup is required (redirecting to setup)
+  if (setupStatus?.setup_required) {
     return (
       <Center w="100dvw" h="100dvh">
         <Spinner size="xl" />

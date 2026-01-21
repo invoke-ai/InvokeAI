@@ -111,8 +111,8 @@ export const AdministratorSetup = memo(() => {
       : t('auth.setup.setupFailed')
     : null;
 
-  // Show loading spinner while checking setup status
-  if (isLoadingSetup) {
+  // Show loading spinner while checking setup status or redirecting
+  if (isLoadingSetup || (setupStatus && !setupStatus.multiuser_enabled)) {
     return (
       <Center w="100dvw" h="100dvh">
         <Spinner size="xl" />
