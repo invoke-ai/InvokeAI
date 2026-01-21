@@ -61,7 +61,7 @@ def admin_token(monkeypatch: Any, mock_invoker: Invoker, client: TestClient):
     """Get an admin token for testing."""
     # Enable multiuser mode for auth endpoints
     mock_invoker.services.configuration.multiuser = True
-    
+
     # Mock ApiDependencies for auth and client_state routers
     monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
