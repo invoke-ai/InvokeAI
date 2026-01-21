@@ -32,6 +32,7 @@ type LogoutResponse = {
 
 type SetupStatusResponse = {
   setup_required: boolean;
+  multiuser_enabled: boolean;
 };
 
 export const authApi = api.injectEndpoints({

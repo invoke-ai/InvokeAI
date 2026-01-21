@@ -50,9 +50,6 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const canManageModels = useIsModelManagerEnabled();
   const { t } = useTranslation();
 
-  // Only admins can save model default settings
-  const isAdmin = user?.is_admin ?? false;
-
   const isFlux = useMemo(() => {
     return modelConfig.base === 'flux';
   }, [modelConfig]);
