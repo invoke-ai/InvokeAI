@@ -1,6 +1,6 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { useMainModelDefaultSettings } from 'features/modelManagerV2/hooks/useMainModelDefaultSettings';
 import { selectSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { DefaultHeight } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultHeight';
@@ -47,7 +47,7 @@ type Props = {
 
 export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const selectedModelKey = useAppSelector(selectSelectedModelKey);
-  const user = useAppSelector(selectCurrentUser);
+  const canManageModels = useIsModelManagerEnabled();
   const { t } = useTranslation();
 
   // Only admins can save model default settings
@@ -116,7 +116,7 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
     <>
       <Flex gap="4" justifyContent="space-between" w="full" pb={4}>
         <Heading fontSize="md">{t('modelManager.defaultSettings')}</Heading>
-        {isAdmin && (
+        {canManageModels && (
           <Button
             size="sm"
             leftIcon={<PiCheckBold />}

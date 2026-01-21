@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Checkbox, Flex, Menu, MenuButton, MenuItem, MenuList, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import type { FilterableModelType } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import {
   modelSelectionChanged,
@@ -29,15 +29,12 @@ type ModelListBulkActionsProps = {
 
 export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => {
   const dispatch = useAppDispatch();
-  const user = useAppSelector(selectCurrentUser);
+  const canManageModels = useIsModelManagerEnabled();
   const filteredModelType = useAppSelector(selectFilteredModelType);
   const selectedModelKeys = useAppSelector(selectSelectedModelKeys);
   const searchTerm = useAppSelector(selectSearchTerm);
   const { data } = useGetModelConfigsQuery();
   const bulkDeleteModal = useBulkDeleteModal();
-
-  // Only admins can bulk delete models
-  const isAdmin = user?.is_admin ?? false;
 
   const handleBulkDelete = useCallback(() => {
     bulkDeleteModal.open();
@@ -96,7 +93,7 @@ export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => 
         <Text variant="subtext" color="base.400">
           {selectionCount} {t('common.selected')}
         </Text>
-        {isAdmin && (
+        {canManageModels && (
           <Menu placement="bottom-end">
             <MenuButton
               as={Button}

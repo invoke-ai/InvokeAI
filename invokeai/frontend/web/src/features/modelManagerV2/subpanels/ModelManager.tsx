@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Flex, Heading } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { selectSelectedModelKey, setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,14 +23,11 @@ const modelManagerSx: SystemStyleObject = {
 export const ModelManager = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
-  const user = useAppSelector(selectCurrentUser);
+  const canManageModels = useIsModelManagerEnabled();
   const handleClickAddModel = useCallback(() => {
     dispatch(setSelectedModelKey(null));
   }, [dispatch]);
   const selectedModelKey = useAppSelector(selectSelectedModelKey);
-
-  // Hide "Add Models" button for non-admin users
-  const canAddModels = user?.is_admin ?? false;
 
   return (
     <Flex sx={modelManagerSx}>
@@ -38,7 +35,7 @@ export const ModelManager = memo(() => {
         <Heading fontSize="xl" py={1}>
           {t('common.modelManager')}
         </Heading>
-        {!!selectedModelKey && canAddModels && (
+        {!!selectedModelKey && canManageModels && (
           <Button size="sm" colorScheme="invokeYellow" leftIcon={<PiPlusBold />} onClick={handleClickAddModel}>
             {t('modelManager.addModels')}
           </Button>

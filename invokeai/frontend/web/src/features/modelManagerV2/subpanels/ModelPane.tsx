@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Center, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { selectSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,9 +25,8 @@ const modelPaneSx: SystemStyleObject = {
 
 export const ModelPane = memo(() => {
   const selectedModelKey = useAppSelector(selectSelectedModelKey);
-  const user = useAppSelector(selectCurrentUser);
+  const canManageModels = useIsModelManagerEnabled();
   const { t } = useTranslation();
-  const isAdmin = user?.is_admin ?? false;
 
   // Show model details if a model is selected
   if (selectedModelKey) {
@@ -38,8 +37,8 @@ export const ModelPane = memo(() => {
     );
   }
 
-  // Show install panel for admin users, empty state for regular users
-  if (isAdmin) {
+  // Show install panel for users with model management permissions, empty state for others
+  if (canManageModels) {
     return (
       <Box sx={modelPaneSx}>
         <InstallModels />
@@ -47,7 +46,7 @@ export const ModelPane = memo(() => {
     );
   }
 
-  // Empty state for non-admin users
+  // Empty state for users without model management permissions
   return (
     <Box sx={modelPaneSx}>
       <Center h="full">

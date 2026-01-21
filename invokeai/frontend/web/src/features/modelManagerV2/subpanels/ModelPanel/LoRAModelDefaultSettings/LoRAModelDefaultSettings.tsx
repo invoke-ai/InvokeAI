@@ -1,6 +1,6 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { useLoRAModelDefaultSettings } from 'features/modelManagerV2/hooks/useLoRAModelDefaultSettings';
 import { DefaultWeight } from 'features/modelManagerV2/subpanels/ModelPanel/LoRAModelDefaultSettings/DefaultWeight';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
@@ -23,10 +23,7 @@ type Props = {
 
 export const LoRAModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
-  const user = useAppSelector(selectCurrentUser);
-
-  // Only admins can save model default settings
-  const isAdmin = user?.is_admin ?? false;
+  const canManageModels = useIsModelManagerEnabled();
 
   const defaultSettingsDefaults = useLoRAModelDefaultSettings(modelConfig);
 
@@ -72,7 +69,7 @@ export const LoRAModelDefaultSettings = memo(({ modelConfig }: Props) => {
     <>
       <Flex gap="4" justifyContent="space-between" w="full" pb={4}>
         <Heading fontSize="md">{t('modelManager.defaultSettings')}</Heading>
-        {isAdmin && (
+        {canManageModels && (
           <Button
             size="sm"
             leftIcon={<PiCheckBold />}
