@@ -48,6 +48,7 @@ class MainModelDefaultSettings(BaseModel):
     width: int | None = Field(default=None, multiple_of=8, ge=64, description="Default width for this model")
     height: int | None = Field(default=None, multiple_of=8, ge=64, description="Default height for this model")
     guidance: float | None = Field(default=None, ge=1, description="Default Guidance for this model")
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     model_config = ConfigDict(extra="forbid")
 

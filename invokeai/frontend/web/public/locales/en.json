@@ -906,6 +906,8 @@
         "convertToDiffusersHelpText4": "This is a one time process only. It might take around 30s-60s depending on the specifications of your computer.",
         "convertToDiffusersHelpText5": "Please make sure you have enough disk space. Models generally vary between 2GB-7GB in size.",
         "convertToDiffusersHelpText6": "Do you wish to convert this model?",
+        "cpuOnly": "CPU Only",
+        "runOnCpu": "Run text encoder model on CPU only",
         "noDefaultSettings": "No default settings configured for this model. Visit the Model Manager to add default settings.",
         "defaultSettings": "Default Settings",
         "defaultSettingsSaved": "Default Settings Saved",
@@ -1567,8 +1569,6 @@
         "problemUnpublishingWorkflow": "Problem Unpublishing Workflow",
         "problemUnpublishingWorkflowDescription": "There was a problem unpublishing the workflow. Please try again.",
         "workflowUnpublished": "Workflow Unpublished",
-        "sentToCanvas": "Sent to Canvas",
-        "sentToUpscale": "Sent to Upscale",
         "promptGenerationStarted": "Prompt generation started",
         "uploadAndPromptGenerationFailed": "Failed to upload image and generate prompt",
         "promptExpansionFailed": "We ran into an issue. Please try prompt expansion again.",
@@ -1996,6 +1996,13 @@
             "heading": "Optimized Image-to-Image",
             "paragraphs": [
                 "Enable 'Optimized Image-to-Image' for a more gradual Denoise Strength scale for image-to-image and inpainting transformations with Flux models. This setting improves the ability to control the amount of change applied to an image, but may be turned off if you prefer to use the standard Denoise Strength scale. This setting is still being tuned and is in beta status."
+            ]
+        },
+        "cpuOnly": {
+            "heading": "CPU Only",
+            "paragraphs": [
+                "When enabled, only the text encoder component will run on CPU instead of GPU.",
+                "This saves VRAM for the denoiser while only slightly impacting performance. The conditioning outputs are automatically moved to GPU for the denoiser."
             ]
         }
     },
@@ -2722,7 +2729,6 @@
         "selectPreset": "Select Style Preset",
         "noMatchingPresets": "No matching presets"
     },
-
     "ui": {
         "tabs": {
             "generate": "Generate",

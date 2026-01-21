@@ -86,6 +86,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
     default_settings: Optional[MainModelDefaultSettings | LoraModelDefaultSettings | ControlAdapterDefaultSettings] = (
         Field(description="Default settings for this model", default=None)
     )
+    cpu_only: Optional[bool] = Field(description="Whether this model should run on CPU only", default=None)
 
     # Checkpoint-specific changes
     # TODO(MM2): Should we expose these? Feels footgun-y...
