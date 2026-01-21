@@ -148,8 +148,6 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
                 enable_thinking=False,  # Disable thinking mode
             )
 
-            context.logger.info(f"Chat template output (first 200 chars): {text[:200]}...")
-
             # Step 2: Tokenize the formatted text
             inputs = tokenizer(
                 text,
@@ -161,10 +159,6 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
 
             input_ids = inputs["input_ids"]
             attention_mask = inputs["attention_mask"]
-
-            # Debug: Log tokenized input
-            actual_tokens = (attention_mask[0] == 1).sum().item()
-            context.logger.info(f"Tokenized input: {input_ids.shape}, {actual_tokens} non-padding tokens")
 
             # Move to device
             input_ids = input_ids.to(device)
@@ -186,7 +180,6 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
                 )
 
             num_hidden_layers = len(outputs.hidden_states)
-            context.logger.debug(f"Qwen3 encoder has {num_hidden_layers} hidden states available.")
 
             # Extract and stack hidden states - EXACTLY like diffusers:
             # out = torch.stack([output.hidden_states[k] for k in hidden_states_layers], dim=1)
@@ -194,10 +187,6 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
             hidden_states_list = []
             for layer_idx in KLEIN_EXTRACTION_LAYERS:
                 if layer_idx >= num_hidden_layers:
-                    context.logger.warning(
-                        f"Layer {layer_idx} not available (model has {num_hidden_layers} layers). "
-                        f"Using last available layer instead."
-                    )
                     layer_idx = num_hidden_layers - 1
                 hidden_states_list.append(outputs.hidden_states[layer_idx])
 
@@ -207,13 +196,6 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
 
             batch_size, num_channels, seq_len, hidden_dim = out.shape
             prompt_embeds = out.permute(0, 2, 1, 3).reshape(batch_size, seq_len, num_channels * hidden_dim)
-
-            # Debug: Log shapes, dtype and value ranges
-            context.logger.info(
-                f"Qwen3 hidden state shapes: per_layer={hidden_states_list[0].shape}, "
-                f"stacked={prompt_embeds.shape}, dtype={prompt_embeds.dtype}, "
-                f"value_range=[{prompt_embeds.min().item():.4f}, {prompt_embeds.max().item():.4f}]"
-            )
 
             # Create pooled embedding for global conditioning
             # Use mean pooling over the sequence (excluding padding)

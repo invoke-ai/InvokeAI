@@ -72,8 +72,6 @@ def denoise(
         # Convert timesteps (0-1 range) to sigmas for the scheduler
         # The scheduler will apply dynamic shifting internally using mu
         sigmas = np.array(timesteps[:-1], dtype=np.float32)  # Exclude final 0.0
-        print(f"[FLUX.2] Setting up scheduler with {len(sigmas)} sigmas, mu={mu}")
-        print(f"[FLUX.2] Sigmas (first 5): {sigmas[:5].tolist()}")
 
         # Let the scheduler handle timestep shifting via mu parameter
         scheduler.set_timesteps(sigmas=sigmas.tolist(), mu=mu, device=img.device)
@@ -105,22 +103,6 @@ def denoise(
             # Extract the sample from the output (return_dict=False returns tuple)
             pred = output[0] if isinstance(output, tuple) else output
 
-            # Debug: Log first step prediction
-            if step_index == 0:
-                print(
-                    f"[FLUX.2] Step 0 prediction: min={pred.min().item():.4f}, max={pred.max().item():.4f}, "
-                    f"mean={pred.mean().item():.4f}, std={pred.std().item():.4f}"
-                )
-                print(f"[FLUX.2] Step 0 img input: min={img.min().item():.4f}, max={img.max().item():.4f}")
-
-            # Debug: Check for NaN in model output (scheduler path)
-            if pred.isnan().any():
-                print(f"[FLUX.2 DEBUG] Scheduler step {step_index}: NaN in transformer output!")
-                print(
-                    f"  Input img: nan={img.isnan().any().item()}, min={img.min().item():.4f}, max={img.max().item():.4f}"
-                )
-                print(f"  t_curr={t_curr}, timestep={timestep.item()}")
-
             step_cfg_scale = cfg_scale[min(user_step, len(cfg_scale) - 1)]
 
             # Apply CFG if scale is not 1.0
@@ -144,12 +126,6 @@ def denoise(
             # Use scheduler.step() for the update
             step_output = scheduler.step(model_output=pred, timestep=timestep, sample=img)
             img = step_output.prev_sample
-
-            # Debug: Check for NaN after scheduler step
-            if img.isnan().any():
-                print(f"[FLUX.2 DEBUG] Scheduler step {step_index}: NaN after scheduler.step()!")
-                print(f"  pred nan={pred.isnan().any().item()}")
-                print(f"  timestep={timestep.item()}")
 
             # For Heun, only increment user step after second-order step completes
             if is_heun:
@@ -202,14 +178,6 @@ def denoise(
             # Extract the sample from the output (return_dict=False returns tuple)
             pred = output[0] if isinstance(output, tuple) else output
 
-            # Debug: Check for NaN in model output
-            if pred.isnan().any():
-                print(f"[FLUX.2 DEBUG] Step {step_index}: NaN in transformer output!")
-                print(
-                    f"  Input img: nan={img.isnan().any().item()}, min={img.min().item():.4f}, max={img.max().item():.4f}"
-                )
-                print(f"  t_curr={t_curr}, t_vec={t_vec[0].item():.4f}")
-
             step_cfg_scale = cfg_scale[step_index]
 
             # Apply CFG if scale is not 1.0
@@ -233,12 +201,6 @@ def denoise(
             # Euler step
             preview_img = img - t_curr * pred
             img = img + (t_prev - t_curr) * pred
-
-            # Debug: Check for NaN after Euler step
-            if img.isnan().any():
-                print(f"[FLUX.2 DEBUG] Step {step_index}: NaN after Euler step!")
-                print(f"  pred nan={pred.isnan().any().item()}")
-                print(f"  t_curr={t_curr}, t_prev={t_prev}")
 
             step_callback(
                 PipelineIntermediateState(
