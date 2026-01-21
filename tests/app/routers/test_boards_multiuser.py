@@ -43,6 +43,9 @@ def setup_test_admin(mock_invoker: Invoker, email: str = "admin@test.com", passw
 @pytest.fixture
 def admin_token(monkeypatch: Any, mock_invoker: Invoker, client: TestClient):
     """Get an admin token for testing."""
+    # Enable multiuser mode for auth endpoints
+    mock_invoker.services.configuration.multiuser = True
+    
     # Mock ApiDependencies for both auth and boards routers
     monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
     monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
