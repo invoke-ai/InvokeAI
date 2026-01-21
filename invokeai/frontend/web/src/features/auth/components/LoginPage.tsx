@@ -52,13 +52,14 @@ export const LoginPage = memo(() => {
           is_active: result.user.is_active || true,
         };
         dispatch(setCredentials({ token: result.token, user }));
-        // Navigate to main app after successful login
-        navigate('/app', { replace: true });
+        // Force a page reload to ensure all user-specific state is loaded from server
+        // This is important for multiuser isolation to prevent state leakage
+        window.location.href = '/app';
       } catch {
         // Error is handled by RTK Query and displayed via error state
       }
     },
-    [email, password, rememberMe, login, dispatch, navigate]
+    [email, password, rememberMe, login, dispatch]
   );
 
   const handleEmailChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {

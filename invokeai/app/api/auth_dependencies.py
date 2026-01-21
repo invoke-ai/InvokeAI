@@ -7,6 +7,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.auth.token_service import TokenData, verify_token
+from invokeai.backend.util.logging import logging
+
+logger = logging.getLogger(__name__)
 
 # HTTP Bearer token security scheme
 security = HTTPBearer(auto_error=False)
@@ -61,6 +64,45 @@ async def get_current_user(
     return token_data
 
 
+async def get_current_user_or_default(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
+) -> TokenData:
+    """Get current authenticated user from Bearer token, or return a default system user if not authenticated.
+
+    This dependency is useful for endpoints that should work in both authenticated and non-authenticated contexts.
+    In single-user mode or when authentication is not provided, it returns a TokenData for the 'system' user.
+
+    Args:
+        credentials: The HTTP authorization credentials containing the Bearer token
+
+    Returns:
+        TokenData containing user information from the token, or system user if no credentials
+    """
+    if credentials is None:
+        # Return system user for unauthenticated requests (single-user mode or backwards compatibility)
+        logger.debug("No authentication credentials provided, using system user")
+        return TokenData(user_id="system", email="system@system.invokeai", is_admin=False)
+
+    token = credentials.credentials
+    token_data = verify_token(token)
+
+    if token_data is None:
+        # Invalid token - still fall back to system user for backwards compatibility
+        logger.warning("Invalid or expired token provided, falling back to system user")
+        return TokenData(user_id="system", email="system@system.invokeai", is_admin=False)
+
+    # Verify user still exists and is active
+    user_service = ApiDependencies.invoker.services.users
+    user = user_service.get(token_data.user_id)
+
+    if user is None or not user.is_active:
+        # User doesn't exist or is inactive - fall back to system user
+        logger.warning(f"User {token_data.user_id} does not exist or is inactive, falling back to system user")
+        return TokenData(user_id="system", email="system@system.invokeai", is_admin=False)
+
+    return token_data
+
+
 async def require_admin(
     current_user: Annotated[TokenData, Depends(get_current_user)],
 ) -> TokenData:
@@ -82,4 +124,5 @@ async def require_admin(
 
 # Type aliases for convenient use in route dependencies
 CurrentUser = Annotated[TokenData, Depends(get_current_user)]
+CurrentUserOrDefault = Annotated[TokenData, Depends(get_current_user_or_default)]
 AdminUser = Annotated[TokenData, Depends(require_admin)]

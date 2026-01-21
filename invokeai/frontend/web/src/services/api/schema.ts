@@ -2053,7 +2053,7 @@ export type paths = {
         };
         /**
          * Get Client State By Key
-         * @description Gets the client state
+         * @description Gets the client state for the current user (or system user if not authenticated)
          */
         get: operations["get_client_state_by_key"];
         put?: never;
@@ -2075,7 +2075,7 @@ export type paths = {
         put?: never;
         /**
          * Set Client State
-         * @description Sets the client state
+         * @description Sets the client state for the current user (or system user if not authenticated)
          */
         post: operations["set_client_state"];
         delete?: never;
@@ -2095,7 +2095,7 @@ export type paths = {
         put?: never;
         /**
          * Delete Client State
-         * @description Deletes the client state
+         * @description Deletes the client state for the current user (or system user if not authenticated)
          */
         post: operations["delete_client_state"];
         delete?: never;
@@ -30860,7 +30860,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The queue id to perform this operation on */
+                /** @description The queue id (ignored, kept for backwards compatibility) */
                 queue_id: string;
             };
             cookie?: never;
@@ -30895,7 +30895,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The queue id to perform this operation on */
+                /** @description The queue id (ignored, kept for backwards compatibility) */
                 queue_id: string;
             };
             cookie?: never;
@@ -30931,7 +30931,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description The queue id to perform this operation on */
+                /** @description The queue id (ignored, kept for backwards compatibility) */
                 queue_id: string;
             };
             cookie?: never;

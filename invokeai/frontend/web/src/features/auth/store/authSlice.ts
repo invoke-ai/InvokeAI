@@ -21,9 +21,17 @@ const zAuthState = z.object({
 type User = z.infer<typeof zUser>;
 type AuthState = z.infer<typeof zAuthState>;
 
+// Helper to safely access localStorage (not available in test environment)
+const getStoredAuthToken = (): string | null => {
+  if (typeof window !== 'undefined' && window.localStorage) {
+    return localStorage.getItem('auth_token');
+  }
+  return null;
+};
+
 const initialState: AuthState = {
-  isAuthenticated: !!localStorage.getItem('auth_token'),
-  token: localStorage.getItem('auth_token'),
+  isAuthenticated: !!getStoredAuthToken(),
+  token: getStoredAuthToken(),
   user: null,
   isLoading: false,
 };
@@ -38,13 +46,17 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.user = action.payload.user;
       state.isAuthenticated = true;
-      localStorage.setItem('auth_token', action.payload.token);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem('auth_token', action.payload.token);
+      }
     },
     logout: (state) => {
       state.token = null;
       state.user = null;
       state.isAuthenticated = false;
-      localStorage.removeItem('auth_token');
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('auth_token');
+      }
     },
     setLoading: (state, action: PayloadAction<boolean>) => {
       state.isLoading = action.payload;
