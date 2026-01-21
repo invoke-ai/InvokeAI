@@ -3,7 +3,17 @@
 import time
 from datetime import timedelta
 
-from invokeai.app.services.auth.token_service import TokenData, create_access_token, verify_token
+import pytest
+
+from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret, verify_token
+
+
+@pytest.fixture(scope="module", autouse=True)
+def setup_jwt_secret():
+    """Set up JWT secret for all tests in this module."""
+    # Use a test secret key
+    set_jwt_secret("test-secret-key-for-unit-tests-only-do-not-use-in-production")
+
 
 # Minimum token length to safely modify middle characters for testing
 # JWT tokens have format header.payload.signature and are typically >180 characters
