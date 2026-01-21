@@ -5,7 +5,7 @@ import { logout, setCredentials } from 'features/auth/store/authSlice';
 import type { PropsWithChildren } from 'react';
 import { memo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGetCurrentUserQuery } from 'services/api/endpoints/auth';
+import { useGetCurrentUserQuery, useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 
 interface ProtectedRouteProps {
   requireAdmin?: boolean;
@@ -17,6 +17,10 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
   const user = useAppSelector((state: RootState) => state.auth?.user);
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+
+  // Check if multiuser mode is enabled
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const multiuserEnabled = setupStatus?.multiuser_enabled ?? true; // Default to true for safety
 
   // Only fetch user if we have a token but no user data
   const shouldFetchUser = isAuthenticated && token && !user;
@@ -51,12 +55,23 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
   }, [currentUser, token, user, dispatch]);
 
   useEffect(() => {
+    // If multiuser is disabled, allow access without authentication
+    if (!multiuserEnabled) {
+      return;
+    }
+    
+    // In multiuser mode, check authentication
     if (!isLoadingUser && !isAuthenticated) {
       navigate('/login', { replace: true });
     } else if (!isLoadingUser && isAuthenticated && user && requireAdmin && !user.is_admin) {
       navigate('/', { replace: true });
     }
-  }, [isAuthenticated, isLoadingUser, requireAdmin, user, navigate]);
+  }, [isAuthenticated, isLoadingUser, requireAdmin, user, navigate, multiuserEnabled]);
+
+  // In single-user mode, always allow access
+  if (!multiuserEnabled) {
+    return <>{children}</>;
+  }
 
   // Show loading while fetching user data
   if (isLoadingUser || (isAuthenticated && !user)) {

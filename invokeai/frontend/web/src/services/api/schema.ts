@@ -22612,6 +22612,11 @@ export type components = {
              * @description Whether initial setup is required
              */
             setup_required: boolean;
+            /**
+             * Multiuser Enabled
+             * @description Whether multiuser mode is enabled
+             */
+            multiuser_enabled: boolean;
         };
         /**
          * Show Image

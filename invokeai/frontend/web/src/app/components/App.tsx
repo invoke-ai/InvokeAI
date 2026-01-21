@@ -42,8 +42,12 @@ const SetupChecker = () => {
 
   useEffect(() => {
     if (!isLoading && data) {
-      // If user is already authenticated, redirect to main app
-      if (isAuthenticated) {
+      // If multiuser mode is disabled, go directly to the app
+      if (!data.multiuser_enabled) {
+        navigate('/app', { replace: true });
+      }
+      // In multiuser mode, check authentication
+      else if (isAuthenticated) {
         navigate('/app', { replace: true });
       } else if (data.setup_required) {
         navigate('/setup', { replace: true });
