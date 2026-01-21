@@ -150,7 +150,7 @@ class SocketIO:
             "user_id": "system",
             "is_admin": False,
         }
-        logger.info(f"Socket {sid} connected as system user (no valid token)")
+        logger.debug(f"Socket {sid} connected as system user (no valid token)")
         return True
 
     async def _handle_disconnect(self, sid: str) -> None:
@@ -188,7 +188,7 @@ class SocketIO:
         if is_admin:
             await self._sio.enter_room(sid, "admin")
 
-        logger.info(
+        logger.debug(
             f"Socket {sid} (user_id: {user_id}, is_admin: {is_admin}) subscribed to queue {queue_id} and user room {user_room}"
         )
 
@@ -228,7 +228,7 @@ class SocketIO:
                 # Also emit to admin room so admins can see all events
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
 
-                logger.info(f"Emitted private invocation event {event_name} to user room {user_room} and admin room")
+                logger.debug(f"Emitted private invocation event {event_name} to user room {user_room} and admin room")
 
             # Queue item status events are visible to all users (field values masked via API)
             # This catches QueueItemStatusChangedEvent but NOT InvocationEvents (already handled above)
