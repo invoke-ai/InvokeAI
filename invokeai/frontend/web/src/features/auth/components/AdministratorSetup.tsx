@@ -11,13 +11,15 @@ import {
   GridItem,
   Heading,
   Input,
+  Spinner,
   Text,
   VStack,
 } from '@invoke-ai/ui-library';
 import type { ChangeEvent, FormEvent } from 'react';
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSetupMutation } from 'services/api/endpoints/auth';
+import { useNavigate } from 'react-router-dom';
+import { useGetSetupStatusQuery, useSetupMutation } from 'services/api/endpoints/auth';
 
 const validatePasswordStrength = (
   password: string,
@@ -43,11 +45,20 @@ const validatePasswordStrength = (
 
 export const AdministratorSetup = memo(() => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [setup, { isLoading, error }] = useSetupMutation();
+  const { data: setupStatus, isLoading: isLoadingSetup } = useGetSetupStatusQuery();
+
+  // Redirect to app if multiuser mode is disabled
+  useEffect(() => {
+    if (!isLoadingSetup && setupStatus && !setupStatus.multiuser_enabled) {
+      navigate('/app', { replace: true });
+    }
+  }, [setupStatus, isLoadingSetup, navigate]);
 
   const passwordValidation = validatePasswordStrength(password, t);
   const passwordsMatch = password === confirmPassword;
@@ -99,6 +110,15 @@ export const AdministratorSetup = memo(() => {
       ? String(error.data.detail)
       : t('auth.setup.setupFailed')
     : null;
+
+  // Show loading spinner while checking setup status
+  if (isLoadingSetup) {
+    return (
+      <Center w="100dvw" h="100dvh">
+        <Spinner size="xl" />
+      </Center>
+    );
+  }
 
   return (
     <Center w="100dvw" h="100dvh" bg="base.900">

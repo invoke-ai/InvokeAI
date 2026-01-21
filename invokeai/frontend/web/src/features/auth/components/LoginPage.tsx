@@ -31,6 +31,13 @@ export const LoginPage = memo(() => {
   const dispatch = useAppDispatch();
   const { data: setupStatus, isLoading: isLoadingSetup } = useGetSetupStatusQuery();
 
+  // Redirect to app if multiuser mode is disabled
+  useEffect(() => {
+    if (!isLoadingSetup && setupStatus && !setupStatus.multiuser_enabled) {
+      navigate('/app', { replace: true });
+    }
+  }, [setupStatus, isLoadingSetup, navigate]);
+
   // Redirect to setup page if setup is required
   useEffect(() => {
     if (!isLoadingSetup && setupStatus?.setup_required) {
