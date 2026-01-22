@@ -69,7 +69,7 @@ def modify_user_interactive():
             print(f"\n❌ Error: No user found with email '{email}'")
             return False
 
-        print(f"\nCurrent user details:")
+        print("\nCurrent user details:")
         print(f"   User ID: {user.user_id}")
         print(f"   Email: {user.email}")
         print(f"   Display Name: {user.display_name or '(not set)'}")

@@ -57,13 +57,13 @@ def list_users_table():
 
         # Print each user
         for user in users:
-            user_id = user.id
+            user_id = user.user_id
             email = user.email[:29] if len(user.email) > 29 else user.email
-            name = user.name[:19] if len(user.name) > 19 else user.name
+            name = user.display_name[:19] if len(user.display_name) > 19 else user.display_name
             is_admin = "Yes" if user.is_admin else "No"
             is_active = "Yes" if user.is_active else "No"
 
-            print(f"{user_id} {email:<30} {name:<20} {is_admin:<8} {is_active:<8}")
+            print(f"{user_id:<36} {email:<30} {name:<20} {is_admin:<8} {is_active:<8}")
 
         print(f"\nTotal users: {len(users)}")
         return True
@@ -71,8 +71,6 @@ def list_users_table():
     except Exception as e:
         print(f"Error listing users: {e}")
         return False
-    finally:
-        db.close()
 
 
 def list_users_json():
@@ -94,9 +92,9 @@ def list_users_json():
         # Convert to JSON-serializable format
         users_data = [
             {
-                "id": user.id,
+                "id": user.user_id,
                 "email": user.email,
-                "name": user.name,
+                "name": user.display_name,
                 "is_admin": user.is_admin,
                 "is_active": user.is_active,
             }
@@ -110,9 +108,6 @@ def list_users_json():
     except Exception as e:
         print(f'{{"error": "{e}"}}', file=sys.stderr)
         return False
-    finally:
-        db.close()
-
 
 def main():
     """Main entry point for the script."""

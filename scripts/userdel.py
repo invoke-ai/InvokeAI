@@ -57,7 +57,7 @@ def delete_user_interactive():
             print(f"\n❌ Error: No user found with email '{email}'")
             return False
 
-        print(f"\nUser to delete:")
+        print("\nUser to delete:")
         print(f"   User ID: {user.user_id}")
         print(f"   Email: {user.email}")
         print(f"   Display Name: {user.display_name or '(not set)'}")
@@ -105,7 +105,7 @@ def delete_user_cli(email: str, force: bool = False):
             return False
 
         if not force:
-            print(f"User to delete:")
+            print("User to delete:")
             print(f"   User ID: {user.user_id}")
             print(f"   Email: {user.email}")
             print(f"   Display Name: {user.display_name or '(not set)'}")
