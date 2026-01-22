@@ -516,7 +516,7 @@ async def bulk_delete_models(
     status_code=204,
 )
 async def delete_model_image(
-    key: str = Path(description="Unique key of model image to remove from model_images directory."),
+    key: Annotated[str, Path(description="Unique key of model image to remove from model_images directory.")],
     _ = Depends(AdminUserOrDefault),
 ) -> None:
     logger = ApiDependencies.invoker.services.logger
@@ -542,13 +542,13 @@ async def delete_model_image(
     status_code=201,
 )
 async def install_model(
-    source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
-    inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
-    access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
+    source: Annotated[str, Query(description="Model source to install, can be a local path, repo_id, or remote URL")],
     config: ModelRecordChanges = Body(
         description="Object containing fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         examples=[{"name": "string", "description": "string"}],
     ),
+    inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
+    access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
     _ = Depends(AdminUserOrDefault),
 ) -> ModelInstallJob:
     """Install a model using a string identifier.
@@ -613,7 +613,7 @@ async def install_model(
     response_class=HTMLResponse,
 )
 async def install_hugging_face_model(
-    source: str = Query(description="HuggingFace repo_id to install"),
+    source: Annotated[str, Query(description="HuggingFace repo_id to install")],
     _ = Depends(AdminUserOrDefault),
 ) -> HTMLResponse:
     """Install a Hugging Face model using a string identifier."""
@@ -826,7 +826,7 @@ async def prune_model_install_jobs(_ = Depends(AdminUserOrDefault)) -> Response:
     },
 )
 async def convert_model(
-    key: str = Path(description="Unique key of the safetensors main model to convert to diffusers format."),
+    key: Annotated[str, Path(description="Unique key of the safetensors main model to convert to diffusers format.")],
     _ = Depends(AdminUserOrDefault),
 ) -> AnyModelConfig:
     """
