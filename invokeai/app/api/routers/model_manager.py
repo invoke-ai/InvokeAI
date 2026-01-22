@@ -432,7 +432,7 @@ async def update_model_image(
 )
 async def delete_model(
     key: str = Path(description="Unique key of model to remove from model registry."),
-    _: AdminUser = None,
+    _: AdminUserOrDefault,
 ) -> Response:
     """
     Delete model record from database.
@@ -475,7 +475,7 @@ class BulkDeleteModelsResponse(BaseModel):
 )
 async def bulk_delete_models(
     request: BulkDeleteModelsRequest = Body(description="List of model keys to delete"),
-    _: AdminUser = None,
+    _: AdminUserOrDefault,
 ) -> BulkDeleteModelsResponse:
     """
     Delete multiple model records from database.
@@ -517,7 +517,7 @@ async def bulk_delete_models(
 )
 async def delete_model_image(
     key: str = Path(description="Unique key of model image to remove from model_images directory."),
-    _: AdminUser = None,
+    _: AdminUserOrDefault,
 ) -> None:
     logger = ApiDependencies.invoker.services.logger
     model_images = ApiDependencies.invoker.services.model_images
@@ -549,7 +549,7 @@ async def install_model(
         description="Object containing fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         examples=[{"name": "string", "description": "string"}],
     ),
-    _: AdminUser = None,
+    _: AdminUserOrDefault,
 ) -> ModelInstallJob:
     """Install a model using a string identifier.
 
@@ -614,7 +614,7 @@ async def install_model(
 )
 async def install_hugging_face_model(
     source: str = Query(description="HuggingFace repo_id to install"),
-    _: AdminUser = None,
+    _: AdminUserOrDefault,
 ) -> HTMLResponse:
     """Install a Hugging Face model using a string identifier."""
 
@@ -787,7 +787,7 @@ async def get_model_install_job(id: int = Path(description="Model install id")) 
 )
 async def cancel_model_install_job(
     id: int = Path(description="Model install job ID"),
-    _: AdminUser = None,
+    _: AdminUserOrDefault,
 ) -> None:
     """Cancel the model install job(s) corresponding to the given job ID."""
     installer = ApiDependencies.invoker.services.model_manager.install
@@ -806,7 +806,7 @@ async def cancel_model_install_job(
         400: {"description": "Bad request"},
     },
 )
-async def prune_model_install_jobs(_: AdminUser = None) -> Response:
+async def prune_model_install_jobs(_: AdminUserOrDefault) -> Response:
     """Prune all completed and errored jobs from the install job list."""
     ApiDependencies.invoker.services.model_manager.install.prune_jobs()
     return Response(status_code=204)
@@ -827,7 +827,7 @@ async def prune_model_install_jobs(_: AdminUser = None) -> Response:
 )
 async def convert_model(
     key: str = Path(description="Unique key of the safetensors main model to convert to diffusers format."),
-    _: AdminUser = None,
+    _: AdminUserOrDefault,
 ) -> AnyModelConfig:
     """
     Permanently convert a model into diffusers format, replacing the safetensors version.
@@ -975,7 +975,7 @@ async def get_stats() -> Optional[CacheStats]:
     operation_id="empty_model_cache",
     status_code=200,
 )
-async def empty_model_cache(_: AdminUser = None) -> None:
+async def empty_model_cache(_: AdminUserOrDefault) -> None:
     """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
     # Request 1000GB of room in order to force the cache to drop all models.
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
@@ -1026,7 +1026,7 @@ async def get_hf_login_status() -> HFTokenStatus:
 @model_manager_router.post("/hf_login", operation_id="do_hf_login", response_model=HFTokenStatus)
 async def do_hf_login(
     token: str = Body(description="Hugging Face token to use for login", embed=True),
-    _: AdminUser = None,
+    _: AdminUserOrDefault,
 ) -> HFTokenStatus:
     HFTokenHelper.set_token(token)
     token_status = HFTokenHelper.get_status()
@@ -1038,5 +1038,5 @@ async def do_hf_login(
 
 
 @model_manager_router.delete("/hf_login", operation_id="reset_hf_token", response_model=HFTokenStatus)
-async def reset_hf_token(_: AdminUser = None) -> HFTokenStatus:
+async def reset_hf_token(_: AdminUserOrDefault) -> HFTokenStatus:
     return HFTokenHelper.reset_token()
