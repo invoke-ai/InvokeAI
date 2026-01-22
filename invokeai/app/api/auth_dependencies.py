@@ -69,16 +69,22 @@ async def get_current_user_or_default(
 ) -> TokenData:
     """Get current authenticated user from Bearer token, or return a default system user if not authenticated.
 
-    This dependency is useful for endpoints that should work in both authenticated and non-authenticated contexts.
+    This dependency is useful for endpoints that should work in both single-user and multiuser modes.
 
-    When multiuser mode is disabled (default), this always returns a system user with admin privileges.
-    When multiuser mode is enabled, it validates the token and returns authenticated user data or falls back to system user.
+    When multiuser mode is disabled (default), this always returns a system user with admin privileges,
+    allowing unrestricted access to all operations.
+    
+    When multiuser mode is enabled, authentication is required and this function validates the token,
+    returning authenticated user data or raising 401 Unauthorized if no valid credentials are provided.
 
     Args:
         credentials: The HTTP authorization credentials containing the Bearer token
 
     Returns:
-        TokenData containing user information from the token, or system user if no credentials or multiuser disabled
+        TokenData containing user information from the token, or system user in single-user mode
+        
+    Raises:
+        HTTPException: 401 Unauthorized if in multiuser mode and credentials are missing, invalid, or user is inactive
     """
     # Get configuration to check if multiuser is enabled
     config = ApiDependencies.invoker.services.configuration
@@ -89,26 +95,23 @@ async def get_current_user_or_default(
 
     # Multiuser mode is enabled - validate credentials
     if credentials is None:
-        # Return system user for unauthenticated requests (backwards compatibility)
-        logger.debug("No authentication credentials provided, using system user")
-        return TokenData(user_id="system", email="system@system.invokeai", is_admin=False)
+        # In multiuser mode, authentication is required
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
 
     token = credentials.credentials
     token_data = verify_token(token)
 
     if token_data is None:
-        # Invalid token - still fall back to system user for backwards compatibility
-        logger.warning("Invalid or expired token provided, falling back to system user")
-        return TokenData(user_id="system", email="system@system.invokeai", is_admin=False)
+        # Invalid token in multiuser mode - reject
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
 
     # Verify user still exists and is active
     user_service = ApiDependencies.invoker.services.users
     user = user_service.get(token_data.user_id)
 
     if user is None or not user.is_active:
-        # User doesn't exist or is inactive - fall back to system user
-        logger.warning(f"User {token_data.user_id} does not exist or is inactive, falling back to system user")
-        return TokenData(user_id="system", email="system@system.invokeai", is_admin=False)
+        # User doesn't exist or is inactive in multiuser mode - reject
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
 
     return token_data
 
