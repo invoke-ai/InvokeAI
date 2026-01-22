@@ -45,9 +45,8 @@ const SetupChecker = () => {
       // If multiuser mode is disabled, go directly to the app
       if (!data.multiuser_enabled) {
         navigate('/app', { replace: true });
-      }
-      // In multiuser mode, check authentication
-      else if (isAuthenticated) {
+      } else if (isAuthenticated) {
+        // In multiuser mode, check authentication
         navigate('/app', { replace: true });
       } else if (data.setup_required) {
         navigate('/setup', { replace: true });

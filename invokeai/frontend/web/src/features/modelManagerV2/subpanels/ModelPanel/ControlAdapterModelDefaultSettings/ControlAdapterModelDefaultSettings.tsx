@@ -1,13 +1,13 @@
+import { memo, useCallback } from 'react';
+import type { SubmitHandler } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+
 import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { useControlAdapterModelDefaultSettings } from 'features/modelManagerV2/hooks/useControlAdapterModelDefaultSettings';
 import { DefaultPreprocessor } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/DefaultPreprocessor';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback } from 'react';
-import type { SubmitHandler } from 'react-hook-form';
-import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';

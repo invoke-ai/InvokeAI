@@ -1,5 +1,5 @@
 import { Flex, Heading, Spacer, Text } from '@invoke-ai/ui-library';
-import { useAppSelector } from 'app/store/storeHooks';
+
 import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import ModelImageUpload from 'features/modelManagerV2/subpanels/ModelPanel/Fields/ModelImageUpload';
 import type { PropsWithChildren } from 'react';
