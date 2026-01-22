@@ -431,7 +431,7 @@ async def update_model_image(
     status_code=204,
 )
 async def delete_model(
-    key: str = Path(description="Unique key of model to remove from model registry."),
+    key: Annotated[str, Path(description="Unique key of model to remove from model registry.")],
     _ = Depends(AdminUserOrDefault),
 ) -> Response:
     """
