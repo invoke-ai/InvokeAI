@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 
-from invokeai.app.services.app_settings.app_settings_service import AppSettingsService
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
@@ -38,7 +37,6 @@ def mock_services() -> InvocationServices:
 
     # NOTE: none of these are actually called by the test invocations
     return InvocationServices(
-        app_settings=AppSettingsService(db=db),
         board_image_records=SqliteBoardImageRecordStorage(db=db),
         board_images=None,  # type: ignore
         board_records=SqliteBoardRecordStorage(db=db),

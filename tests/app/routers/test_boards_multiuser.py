@@ -13,19 +13,12 @@ from invokeai.app.services.users.users_common import UserCreateRequest
 
 
 @pytest.fixture
-def setup_jwt_secret(mock_invoker: Invoker):
+def setup_jwt_secret():
     """Initialize JWT secret for token generation."""
-    from invokeai.app.services.auth import token_service
+    from invokeai.app.services.auth.token_service import set_jwt_secret
 
-    # Get or initialize JWT secret
-    jwt_secret = mock_invoker.services.app_settings.get_setting("jwt_secret")
-    if not jwt_secret:
-        import secrets
-
-        jwt_secret = secrets.token_hex(32)
-        mock_invoker.services.app_settings.set_setting("jwt_secret", jwt_secret)
-    token_service.set_jwt_secret(jwt_secret)
-    return jwt_secret
+    # Use a test secret key
+    set_jwt_secret("test-secret-key-for-unit-tests-only-do-not-use-in-production")
 
 
 @pytest.fixture
