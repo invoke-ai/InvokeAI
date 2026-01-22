@@ -13,18 +13,25 @@ from invokeai.app.services.users.users_common import UserCreateRequest
 
 
 @pytest.fixture
+def setup_jwt_secret(mock_invoker: Invoker):
+    """Initialize JWT secret for token generation."""
+    from invokeai.app.services.auth import token_service
+
+    # Get or initialize JWT secret
+    jwt_secret = mock_invoker.services.app_settings.get_setting("jwt_secret")
+    if not jwt_secret:
+        import secrets
+
+        jwt_secret = secrets.token_hex(32)
+        mock_invoker.services.app_settings.set_setting("jwt_secret", jwt_secret)
+    token_service.set_jwt_secret(jwt_secret)
+    return jwt_secret
+
+
+@pytest.fixture
 def client():
     """Create a test client."""
     return TestClient(app)
-
-
-class MockApiDependencies(ApiDependencies):
-    """Mock API dependencies for testing."""
-
-    invoker: Invoker
-
-    def __init__(self, invoker: Invoker) -> None:
-        self.invoker = invoker
 
 
 def setup_test_admin(mock_invoker: Invoker, email: str = "admin@test.com", password: str = "TestPass123") -> str:
@@ -41,16 +48,24 @@ def setup_test_admin(mock_invoker: Invoker, email: str = "admin@test.com", passw
 
 
 @pytest.fixture
-def admin_token(monkeypatch: Any, mock_invoker: Invoker, client: TestClient):
-    """Get an admin token for testing."""
-    # Enable multiuser mode for auth endpoints
+def enable_multiuser_for_tests(monkeypatch: Any, mock_invoker: Invoker):
+    """Enable multiuser mode and set up ApiDependencies for testing."""
+    # Enable multiuser mode
     mock_invoker.services.configuration.multiuser = True
+    
+    # Set ApiDependencies.invoker as a class attribute
+    ApiDependencies.invoker = mock_invoker
+    
+    yield
+    
+    # Cleanup
+    if hasattr(ApiDependencies, 'invoker'):
+        delattr(ApiDependencies, 'invoker')
 
-    # Mock ApiDependencies for both auth and boards routers
-    monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
-    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(mock_invoker))
-    monkeypatch.setattr("invokeai.app.api.routers.boards.ApiDependencies", MockApiDependencies(mock_invoker))
 
+@pytest.fixture
+def admin_token(setup_jwt_secret: str, enable_multiuser_for_tests: Any, mock_invoker: Invoker, client: TestClient):
+    """Get an admin token for testing."""
     # Create admin user
     setup_test_admin(mock_invoker, "admin@test.com", "TestPass123")
 
@@ -75,13 +90,13 @@ def user1_token(admin_token):
     return admin_token
 
 
-def test_create_board_requires_auth(client):
+def test_create_board_requires_auth(enable_multiuser_for_tests: Any, client: TestClient):
     """Test that creating a board requires authentication."""
     response = client.post("/api/v1/boards/?board_name=Test+Board")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_list_boards_requires_auth(client):
+def test_list_boards_requires_auth(enable_multiuser_for_tests: Any, client: TestClient):
     """Test that listing boards requires authentication."""
     response = client.get("/api/v1/boards/?all=true")
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
@@ -141,7 +156,7 @@ def test_user_boards_are_isolated(client: TestClient, admin_token: str, user1_to
     assert "Admin Board" in board_names
 
 
-def test_enqueue_batch_requires_auth(client):
+def test_enqueue_batch_requires_auth(enable_multiuser_for_tests: Any, client: TestClient):
     """Test that enqueuing a batch requires authentication."""
     response = client.post(
         "/api/v1/queue/default/enqueue_batch",
