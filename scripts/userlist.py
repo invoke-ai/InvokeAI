@@ -37,7 +37,7 @@ def list_users_table():
 
     config = get_config()
     logger = InvokeAILogger.get_logger(config=config)
-    db = SqliteDatabase(config, logger)
+    db = SqliteDatabase(config.db_path, logger)
     user_service = UserService(db)
 
     try:
@@ -84,7 +84,7 @@ def list_users_json():
 
     config = get_config()
     logger = InvokeAILogger.get_logger(config=config)
-    db = SqliteDatabase(config, logger)
+    db = SqliteDatabase(config.db_path, logger)
     user_service = UserService(db)
 
     try:
