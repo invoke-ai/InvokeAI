@@ -1035,13 +1035,10 @@ class Flux2CheckpointModel(ModelLoader):
 
         # Filter out scale metadata keys and other FP8 metadata
         keys_to_remove = [
-            k for k in sd.keys()
-            if isinstance(k, str) and (
-                k.endswith(".weight_scale")
-                or k.endswith(".scale_weight")
-                or "comfy_quant" in k
-                or k == "scaled_fp8"
-            )
+            k
+            for k in sd.keys()
+            if isinstance(k, str)
+            and (k.endswith(".weight_scale") or k.endswith(".scale_weight") or "comfy_quant" in k or k == "scaled_fp8")
         ]
         for k in keys_to_remove:
             del sd[k]
