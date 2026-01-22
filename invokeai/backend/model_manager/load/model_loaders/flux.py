@@ -754,6 +754,10 @@ class Flux2CheckpointModel(ModelLoader):
         # Load state dict
         sd = load_file(model_path)
 
+        # Handle FP8 quantized weights (ComfyUI-style or scaled FP8)
+        # These store weights as: layer.weight (FP8) + layer.weight_scale (FP32 scalar)
+        sd = self._dequantize_fp8_weights(sd)
+
         # Check if keys have ComfyUI-style prefix and strip if needed
         prefix_to_strip = None
         for prefix in ["model.diffusion_model.", "diffusion_model."]:
@@ -905,12 +909,19 @@ class Flux2CheckpointModel(ModelLoader):
         # Attention QKV conversion - BFL uses fused qkv, diffusers uses separate
         if "img_attn.qkv.weight" in rest:
             # Split fused QKV into separate Q, K, V
+            # Defensive check: ensure tensor has at least 1 dimension and can be split into 3
+            if tensor.dim() < 1 or tensor.shape[0] % 3 != 0:
+                # Skip malformed tensors (might be metadata or corrupted)
+                return key
             q, k, v = tensor.chunk(3, dim=0)
             converted[f"{prefix}.attn.to_q.weight"] = q
             converted[f"{prefix}.attn.to_k.weight"] = k
             converted[f"{prefix}.attn.to_v.weight"] = v
             return None
         elif "txt_attn.qkv.weight" in rest:
+            # Defensive check
+            if tensor.dim() < 1 or tensor.shape[0] % 3 != 0:
+                return key
             q, k, v = tensor.chunk(3, dim=0)
             converted[f"{prefix}.attn.add_q_proj.weight"] = q
             converted[f"{prefix}.attn.add_k_proj.weight"] = k
@@ -979,9 +990,84 @@ class Flux2CheckpointModel(ModelLoader):
         Returns:
             Weight tensor with scale and shift swapped.
         """
+        # Defensive check: ensure tensor can be split
+        if weight.dim() < 1 or weight.shape[0] % 2 != 0:
+            return weight
         # Split in half along the first dimension and swap
         shift, scale = weight.chunk(2, dim=0)
         return torch.cat([scale, shift], dim=0)
+
+    def _dequantize_fp8_weights(self, sd: dict) -> dict:
+        """Dequantize FP8 quantized weights in the state dict.
+
+        ComfyUI and some FLUX.2 models store quantized weights as:
+        - layer.weight: quantized FP8 data
+        - layer.weight_scale: scale factor (FP32 scalar or per-channel)
+
+        Dequantization formula: dequantized = weight.to(float) * weight_scale
+
+        Also handles FP8 tensors stored with float8_e4m3fn dtype by converting to float.
+        """
+        # Check for ComfyUI-style scale factors
+        weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(".weight_scale")]
+
+        for scale_key in weight_scale_keys:
+            # Get the corresponding weight key
+            weight_key = scale_key.replace(".weight_scale", ".weight")
+            if weight_key in sd:
+                weight = sd[weight_key]
+                scale = sd[scale_key]
+
+                # Dequantize: convert FP8 to float and multiply by scale
+                # Note: Float8 types require .float() instead of .to(torch.float32)
+                weight_float = weight.float()
+                scale = scale.float()
+
+                # Handle block-wise quantization where scale may have different shape
+                if scale.dim() > 0 and scale.shape != weight_float.shape and scale.numel() > 1:
+                    for dim in range(len(weight_float.shape)):
+                        if dim < len(scale.shape) and scale.shape[dim] != weight_float.shape[dim]:
+                            block_size = weight_float.shape[dim] // scale.shape[dim]
+                            if block_size > 1:
+                                scale = scale.repeat_interleave(block_size, dim=dim)
+
+                sd[weight_key] = weight_float * scale
+
+        # Filter out scale metadata keys and other FP8 metadata
+        keys_to_remove = [
+            k for k in sd.keys()
+            if isinstance(k, str) and (
+                k.endswith(".weight_scale")
+                or k.endswith(".scale_weight")
+                or "comfy_quant" in k
+                or k == "scaled_fp8"
+            )
+        ]
+        for k in keys_to_remove:
+            del sd[k]
+
+        # Handle native FP8 tensors (float8_e4m3fn dtype) that aren't already dequantized
+        # Also filter out 0-dimensional tensors (scalars) which are typically metadata
+        keys_to_convert = []
+        keys_to_remove_scalars = []
+        for key in list(sd.keys()):
+            tensor = sd[key]
+            if hasattr(tensor, "dim"):
+                if tensor.dim() == 0:
+                    # 0-dimensional tensor (scalar) - likely metadata, remove it
+                    keys_to_remove_scalars.append(key)
+                elif hasattr(tensor, "dtype") and "float8" in str(tensor.dtype):
+                    # Native FP8 tensor - mark for conversion
+                    keys_to_convert.append(key)
+
+        for k in keys_to_remove_scalars:
+            del sd[k]
+
+        for key in keys_to_convert:
+            # Convert FP8 tensor to float32
+            sd[key] = sd[key].float()
+
+        return sd
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux2, type=ModelType.Main, format=ModelFormat.GGUFQuantized)
