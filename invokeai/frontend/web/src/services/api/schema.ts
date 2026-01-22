@@ -26888,7 +26888,10 @@ export interface operations {
     };
     delete_model: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path: {
                 /** @description Unique key of model to remove from model registry. */
@@ -26925,7 +26928,10 @@ export interface operations {
     };
     update_model_record: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path: {
                 /** @description Unique key of model */
@@ -27000,7 +27006,10 @@ export interface operations {
     };
     reidentify_model: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path: {
                 /** @description Key of the model to reidentify. */
@@ -27188,7 +27197,10 @@ export interface operations {
     };
     delete_model_image: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path: {
                 /** @description Unique key of model image to remove from model_images directory. */
@@ -27225,7 +27237,10 @@ export interface operations {
     };
     update_model_image: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path: {
                 /** @description Unique key of model */
@@ -27268,7 +27283,10 @@ export interface operations {
     };
     bulk_delete_models: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -27328,6 +27346,8 @@ export interface operations {
                 inplace?: boolean | null;
                 /** @description access token for the remote resource */
                 access_token?: string | null;
+                args: unknown;
+                kwargs: unknown;
             };
             header?: never;
             path?: never;
@@ -27382,7 +27402,10 @@ export interface operations {
     };
     prune_model_install_jobs: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -27412,6 +27435,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     install_hugging_face_model: {
@@ -27419,6 +27451,8 @@ export interface operations {
             query: {
                 /** @description HuggingFace repo_id to install */
                 source: string;
+                args: unknown;
+                kwargs: unknown;
             };
             header?: never;
             path?: never;
@@ -27501,7 +27535,10 @@ export interface operations {
     };
     cancel_model_install_job: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path: {
                 /** @description Model install job ID */
@@ -27540,7 +27577,10 @@ export interface operations {
     };
     convert_model: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path: {
                 /** @description Unique key of the safetensors main model to convert to diffusers format. */
@@ -27651,7 +27691,10 @@ export interface operations {
     };
     empty_model_cache: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -27665,6 +27708,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -27691,7 +27743,10 @@ export interface operations {
     };
     do_hf_login: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -27724,7 +27779,10 @@ export interface operations {
     };
     reset_hf_token: {
         parameters: {
-            query?: never;
+            query: {
+                args: unknown;
+                kwargs: unknown;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -27738,6 +27796,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HFTokenStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
