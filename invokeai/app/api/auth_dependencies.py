@@ -135,7 +135,32 @@ async def require_admin(
     return current_user
 
 
+async def require_admin_or_default(
+    current_user: Annotated[TokenData, Depends(get_current_user_or_default)],
+) -> TokenData:
+    """Require admin role for the current user, or return default system admin in single-user mode.
+
+    This dependency is useful for admin-only endpoints that should work in both single-user and multiuser modes.
+
+    When multiuser mode is disabled (default), this always returns a system user with admin privileges.
+    When multiuser mode is enabled, this validates that the authenticated user has admin privileges.
+
+    Args:
+        current_user: The current authenticated user's token data (or default system user)
+
+    Returns:
+        The token data if user is an admin (or system user in single-user mode)
+
+    Raises:
+        HTTPException: If user does not have admin privileges (403 Forbidden) in multiuser mode
+    """
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
+    return current_user
+
+
 # Type aliases for convenient use in route dependencies
 CurrentUser = Annotated[TokenData, Depends(get_current_user)]
 CurrentUserOrDefault = Annotated[TokenData, Depends(get_current_user_or_default)]
 AdminUser = Annotated[TokenData, Depends(require_admin)]
+AdminUserOrDefault = Annotated[TokenData, Depends(require_admin_or_default)]

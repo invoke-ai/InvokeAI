@@ -19,7 +19,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
-from invokeai.app.api.auth_dependencies import AdminUser
+from invokeai.app.api.auth_dependencies import AdminUser, AdminUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
@@ -207,7 +207,7 @@ async def get_model_record(
 )
 async def reidentify_model(
     key: Annotated[str, Path(description="Key of the model to reidentify.")],
-    _: AdminUser,
+    _: AdminUserOrDefault,
 ) -> AnyModelConfig:
     """Attempt to reidentify a model by re-probing its weights file."""
     try:
@@ -334,7 +334,7 @@ async def get_hugging_face_models(
 async def update_model_record(
     key: Annotated[str, Path(description="Unique key of model")],
     changes: Annotated[ModelRecordChanges, Body(description="Model config", examples=[example_model_input])],
-    _: AdminUser,
+    _: AdminUserOrDefault,
 ) -> AnyModelConfig:
     """Update a model's config."""
     logger = ApiDependencies.invoker.services.logger
@@ -397,7 +397,7 @@ async def get_model_image(
 async def update_model_image(
     key: Annotated[str, Path(description="Unique key of model")],
     image: UploadFile,
-    _: AdminUser,
+    _: AdminUserOrDefault,
 ) -> None:
     if not image.content_type or not image.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
