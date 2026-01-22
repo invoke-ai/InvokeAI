@@ -790,10 +790,14 @@ class Flux2CheckpointModel(ModelLoader):
         num_single_layers = max(single_block_indices) + 1 if single_block_indices else 20
 
         # Get dimensions from weights
+        # context_embedder.weight shape: [hidden_size, joint_attention_dim]
         context_embedder_weight = converted_sd.get("context_embedder.weight")
         if context_embedder_weight is not None:
+            hidden_size = context_embedder_weight.shape[0]
             joint_attention_dim = context_embedder_weight.shape[1]
         else:
+            # Default to Klein 4B dimensions
+            hidden_size = 3072
             joint_attention_dim = 7680
 
         x_embedder_weight = converted_sd.get("x_embedder.weight")
@@ -801,6 +805,12 @@ class Flux2CheckpointModel(ModelLoader):
             in_channels = x_embedder_weight.shape[1]
         else:
             in_channels = 128
+
+        # Calculate num_attention_heads from hidden_size
+        # Klein 4B: hidden_size=3072, num_attention_heads=24 (3072/128=24)
+        # Klein 9B: hidden_size=4096, num_attention_heads=32 (4096/128=32)
+        attention_head_dim = 128
+        num_attention_heads = hidden_size // attention_head_dim
 
         # Klein models don't have guidance embeddings - check if they're in the checkpoint
         has_guidance = "time_guidance_embed.guidance_embedder.linear_1.weight" in converted_sd
@@ -813,8 +823,8 @@ class Flux2CheckpointModel(ModelLoader):
                     out_channels=in_channels,
                     num_layers=num_layers,
                     num_single_layers=num_single_layers,
-                    attention_head_dim=128,
-                    num_attention_heads=24,
+                    attention_head_dim=attention_head_dim,
+                    num_attention_heads=num_attention_heads,
                     joint_attention_dim=joint_attention_dim,
                     patch_size=1,
                 )
@@ -1130,14 +1140,18 @@ class Flux2GGUFCheckpointModel(ModelLoader):
         num_single_layers = max(single_block_indices) + 1 if single_block_indices else 20
 
         # Get dimensions from weights
+        # context_embedder.weight shape: [hidden_size, joint_attention_dim]
         context_embedder_weight = converted_sd.get("context_embedder.weight")
         if context_embedder_weight is not None:
-            joint_attention_dim = (
-                context_embedder_weight.tensor_shape[1]
-                if hasattr(context_embedder_weight, "tensor_shape")
-                else context_embedder_weight.shape[1]
-            )
+            if hasattr(context_embedder_weight, "tensor_shape"):
+                hidden_size = context_embedder_weight.tensor_shape[0]
+                joint_attention_dim = context_embedder_weight.tensor_shape[1]
+            else:
+                hidden_size = context_embedder_weight.shape[0]
+                joint_attention_dim = context_embedder_weight.shape[1]
         else:
+            # Default to Klein 4B dimensions
+            hidden_size = 3072
             joint_attention_dim = 7680
 
         x_embedder_weight = converted_sd.get("x_embedder.weight")
@@ -1150,6 +1164,12 @@ class Flux2GGUFCheckpointModel(ModelLoader):
         else:
             in_channels = 128
 
+        # Calculate num_attention_heads from hidden_size
+        # Klein 4B: hidden_size=3072, num_attention_heads=24 (3072/128=24)
+        # Klein 9B: hidden_size=4096, num_attention_heads=32 (4096/128=32)
+        attention_head_dim = 128
+        num_attention_heads = hidden_size // attention_head_dim
+
         # Klein models don't have guidance embeddings - check if they're in the checkpoint
         has_guidance = "time_guidance_embed.guidance_embedder.linear_1.weight" in converted_sd
 
@@ -1161,8 +1181,8 @@ class Flux2GGUFCheckpointModel(ModelLoader):
                     out_channels=in_channels,
                     num_layers=num_layers,
                     num_single_layers=num_single_layers,
-                    attention_head_dim=128,
-                    num_attention_heads=24,
+                    attention_head_dim=attention_head_dim,
+                    num_attention_heads=num_attention_heads,
                     joint_attention_dim=joint_attention_dim,
                     patch_size=1,
                 )
