@@ -29,7 +29,7 @@ def client(invokeai_root_dir: Path) -> TestClient:
 @pytest.fixture(autouse=True)
 def enable_multiuser_for_auth_tests(mock_invoker: Invoker) -> None:
     """Enable multiuser mode for auth tests.
-    
+
     Auth tests need multiuser mode enabled since the login/setup endpoints
     return 403 when multiuser is disabled.
     """

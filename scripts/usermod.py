@@ -111,7 +111,9 @@ def modify_user_interactive():
         change_admin = input("Change admin status? (y/N): ").strip().lower()
         is_admin = None
         if change_admin in ("y", "yes"):
-            is_admin_input = input(f"Make administrator? [current: {'Yes' if user.is_admin else 'No'}] (y/N): ").strip().lower()
+            is_admin_input = (
+                input(f"Make administrator? [current: {'Yes' if user.is_admin else 'No'}] (y/N): ").strip().lower()
+            )
             is_admin = is_admin_input in ("y", "yes")
 
         # Check if any changes were made
