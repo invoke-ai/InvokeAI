@@ -431,8 +431,8 @@ async def update_model_image(
     status_code=204,
 )
 async def delete_model(
-    key: str = Path(description="Unique key of model to remove from model registry."),
     current_admin: AdminUserOrDefault,
+    key: str = Path(description="Unique key of model to remove from model registry."),
 ) -> Response:
     """
     Delete model record from database.
@@ -474,8 +474,8 @@ class BulkDeleteModelsResponse(BaseModel):
     status_code=200,
 )
 async def bulk_delete_models(
-    request: BulkDeleteModelsRequest = Body(description="List of model keys to delete"),
     current_admin: AdminUserOrDefault,
+    request: BulkDeleteModelsRequest = Body(description="List of model keys to delete"),
 ) -> BulkDeleteModelsResponse:
     """
     Delete multiple model records from database.
@@ -516,8 +516,8 @@ async def bulk_delete_models(
     status_code=204,
 )
 async def delete_model_image(
-    key: str = Path(description="Unique key of model image to remove from model_images directory."),
     current_admin: AdminUserOrDefault,
+    key: str = Path(description="Unique key of model image to remove from model_images directory."),
 ) -> None:
     logger = ApiDependencies.invoker.services.logger
     model_images = ApiDependencies.invoker.services.model_images
@@ -542,6 +542,7 @@ async def delete_model_image(
     status_code=201,
 )
 async def install_model(
+    current_admin: AdminUserOrDefault,
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
     inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
     access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
@@ -549,7 +550,6 @@ async def install_model(
         description="Object containing fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         examples=[{"name": "string", "description": "string"}],
     ),
-    current_admin: AdminUserOrDefault,
 ) -> ModelInstallJob:
     """Install a model using a string identifier.
 
@@ -613,8 +613,8 @@ async def install_model(
     response_class=HTMLResponse,
 )
 async def install_hugging_face_model(
-    source: str = Query(description="HuggingFace repo_id to install"),
     current_admin: AdminUserOrDefault,
+    source: str = Query(description="HuggingFace repo_id to install"),
 ) -> HTMLResponse:
     """Install a Hugging Face model using a string identifier."""
 
@@ -786,8 +786,8 @@ async def get_model_install_job(id: int = Path(description="Model install id")) 
     status_code=201,
 )
 async def cancel_model_install_job(
-    id: int = Path(description="Model install job ID"),
     current_admin: AdminUserOrDefault,
+    id: int = Path(description="Model install job ID"),
 ) -> None:
     """Cancel the model install job(s) corresponding to the given job ID."""
     installer = ApiDependencies.invoker.services.model_manager.install
@@ -826,8 +826,8 @@ async def prune_model_install_jobs(current_admin: AdminUserOrDefault) -> Respons
     },
 )
 async def convert_model(
-    key: str = Path(description="Unique key of the safetensors main model to convert to diffusers format."),
     current_admin: AdminUserOrDefault,
+    key: str = Path(description="Unique key of the safetensors main model to convert to diffusers format."),
 ) -> AnyModelConfig:
     """
     Permanently convert a model into diffusers format, replacing the safetensors version.
@@ -1025,8 +1025,8 @@ async def get_hf_login_status() -> HFTokenStatus:
 
 @model_manager_router.post("/hf_login", operation_id="do_hf_login", response_model=HFTokenStatus)
 async def do_hf_login(
-    token: str = Body(description="Hugging Face token to use for login", embed=True),
     current_admin: AdminUserOrDefault,
+    token: str = Body(description="Hugging Face token to use for login", embed=True),
 ) -> HFTokenStatus:
     HFTokenHelper.set_token(token)
     token_status = HFTokenHelper.get_status()
