@@ -47,6 +47,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_BnBNF4_FLUX_Config,
     Main_Checkpoint_Flux2_Config,
     Main_Checkpoint_FLUX_Config,
+    Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
 )
 from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
@@ -106,6 +107,37 @@ class FluxVAELoader(ModelLoader):
         else:
             vae_dtype = self._torch_dtype
         model.to(vae_dtype)
+
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux2, type=ModelType.VAE, format=ModelFormat.Diffusers)
+class Flux2VAEDiffusersLoader(ModelLoader):
+    """Class to load FLUX.2 VAE models in diffusers format (AutoencoderKLFlux2 with 32 latent channels)."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        from diffusers import AutoencoderKLFlux2
+
+        model_path = Path(config.path)
+
+        # VAE is broken in float16, which mps defaults to
+        if self._torch_dtype == torch.float16:
+            try:
+                vae_dtype = torch.tensor([1.0], dtype=torch.bfloat16, device=self._torch_device).dtype
+            except TypeError:
+                vae_dtype = torch.float32
+        else:
+            vae_dtype = self._torch_dtype
+
+        model = AutoencoderKLFlux2.from_pretrained(
+            model_path,
+            torch_dtype=vae_dtype,
+            local_files_only=True,
+        )
 
         return model
 
@@ -948,6 +980,264 @@ class Flux2CheckpointModel(ModelLoader):
             Weight tensor with scale and shift swapped.
         """
         # Split in half along the first dimension and swap
+        shift, scale = weight.chunk(2, dim=0)
+        return torch.cat([scale, shift], dim=0)
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Flux2, type=ModelType.Main, format=ModelFormat.GGUFQuantized)
+class Flux2GGUFCheckpointModel(ModelLoader):
+    """Class to load GGUF-quantized FLUX.2 transformer models."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Main_GGUF_Flux2_Config):
+            raise ValueError("Only Main_GGUF_Flux2_Config models are currently supported here.")
+
+        match submodel_type:
+            case SubModelType.Transformer:
+                return self._load_from_singlefile(config)
+
+        raise ValueError(
+            f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_from_singlefile(
+        self,
+        config: Main_GGUF_Flux2_Config,
+    ) -> AnyModel:
+        from diffusers import Flux2Transformer2DModel
+
+        model_path = Path(config.path)
+
+        # Load GGUF state dict
+        sd = gguf_sd_loader(model_path, compute_dtype=torch.bfloat16)
+
+        # Check if keys have ComfyUI-style prefix and strip if needed
+        prefix_to_strip = None
+        for prefix in ["model.diffusion_model.", "diffusion_model."]:
+            if any(k.startswith(prefix) for k in sd.keys() if isinstance(k, str)):
+                prefix_to_strip = prefix
+                break
+
+        if prefix_to_strip:
+            sd = {
+                (k[len(prefix_to_strip) :] if isinstance(k, str) and k.startswith(prefix_to_strip) else k): v
+                for k, v in sd.items()
+            }
+
+        # Convert BFL format state dict to diffusers format
+        converted_sd = self._convert_flux2_bfl_to_diffusers(sd)
+
+        # Detect architecture from checkpoint keys
+        double_block_indices = [
+            int(k.split(".")[1])
+            for k in converted_sd.keys()
+            if isinstance(k, str) and k.startswith("transformer_blocks.")
+        ]
+        single_block_indices = [
+            int(k.split(".")[1])
+            for k in converted_sd.keys()
+            if isinstance(k, str) and k.startswith("single_transformer_blocks.")
+        ]
+
+        num_layers = max(double_block_indices) + 1 if double_block_indices else 5
+        num_single_layers = max(single_block_indices) + 1 if single_block_indices else 20
+
+        # Get dimensions from weights
+        context_embedder_weight = converted_sd.get("context_embedder.weight")
+        if context_embedder_weight is not None:
+            joint_attention_dim = (
+                context_embedder_weight.tensor_shape[1]
+                if hasattr(context_embedder_weight, "tensor_shape")
+                else context_embedder_weight.shape[1]
+            )
+        else:
+            joint_attention_dim = 7680
+
+        x_embedder_weight = converted_sd.get("x_embedder.weight")
+        if x_embedder_weight is not None:
+            in_channels = (
+                x_embedder_weight.tensor_shape[1]
+                if hasattr(x_embedder_weight, "tensor_shape")
+                else x_embedder_weight.shape[1]
+            )
+        else:
+            in_channels = 128
+
+        # Klein models don't have guidance embeddings - check if they're in the checkpoint
+        has_guidance = "time_guidance_embed.guidance_embedder.linear_1.weight" in converted_sd
+
+        # Create model with detected configuration
+        with SilenceWarnings():
+            with accelerate.init_empty_weights():
+                model = Flux2Transformer2DModel(
+                    in_channels=in_channels,
+                    out_channels=in_channels,
+                    num_layers=num_layers,
+                    num_single_layers=num_single_layers,
+                    attention_head_dim=128,
+                    num_attention_heads=24,
+                    joint_attention_dim=joint_attention_dim,
+                    patch_size=1,
+                )
+
+        # If Klein model without guidance, initialize guidance embedder with zeros
+        if not has_guidance:
+            timestep_linear1 = converted_sd.get("time_guidance_embed.timestep_embedder.linear_1.weight")
+            if timestep_linear1 is not None:
+                in_features = (
+                    timestep_linear1.tensor_shape[1]
+                    if hasattr(timestep_linear1, "tensor_shape")
+                    else timestep_linear1.shape[1]
+                )
+                out_features = (
+                    timestep_linear1.tensor_shape[0]
+                    if hasattr(timestep_linear1, "tensor_shape")
+                    else timestep_linear1.shape[0]
+                )
+                converted_sd["time_guidance_embed.guidance_embedder.linear_1.weight"] = torch.zeros(
+                    out_features, in_features, dtype=torch.bfloat16
+                )
+                timestep_linear2 = converted_sd.get("time_guidance_embed.timestep_embedder.linear_2.weight")
+                if timestep_linear2 is not None:
+                    in_features2 = (
+                        timestep_linear2.tensor_shape[1]
+                        if hasattr(timestep_linear2, "tensor_shape")
+                        else timestep_linear2.shape[1]
+                    )
+                    out_features2 = (
+                        timestep_linear2.tensor_shape[0]
+                        if hasattr(timestep_linear2, "tensor_shape")
+                        else timestep_linear2.shape[0]
+                    )
+                    converted_sd["time_guidance_embed.guidance_embedder.linear_2.weight"] = torch.zeros(
+                        out_features2, in_features2, dtype=torch.bfloat16
+                    )
+
+        model.load_state_dict(converted_sd, assign=True)
+        return model
+
+    def _convert_flux2_bfl_to_diffusers(self, sd: dict) -> dict:
+        """Convert FLUX.2 BFL format state dict to diffusers format."""
+        converted = {}
+
+        key_renames = {
+            "img_in.weight": "x_embedder.weight",
+            "txt_in.weight": "context_embedder.weight",
+            "time_in.in_layer.weight": "time_guidance_embed.timestep_embedder.linear_1.weight",
+            "time_in.out_layer.weight": "time_guidance_embed.timestep_embedder.linear_2.weight",
+            "guidance_in.in_layer.weight": "time_guidance_embed.guidance_embedder.linear_1.weight",
+            "guidance_in.out_layer.weight": "time_guidance_embed.guidance_embedder.linear_2.weight",
+            "double_stream_modulation_img.lin.weight": "double_stream_modulation_img.linear.weight",
+            "double_stream_modulation_txt.lin.weight": "double_stream_modulation_txt.linear.weight",
+            "single_stream_modulation.lin.weight": "single_stream_modulation.linear.weight",
+            "final_layer.linear.weight": "proj_out.weight",
+            "final_layer.adaLN_modulation.1.weight": "norm_out.linear.weight",
+        }
+
+        for old_key, tensor in sd.items():
+            new_key = old_key
+
+            if old_key in key_renames:
+                new_key = key_renames[old_key]
+                if old_key == "final_layer.adaLN_modulation.1.weight":
+                    tensor = self._swap_scale_shift(tensor)
+                converted[new_key] = tensor
+                continue
+
+            if old_key.startswith("double_blocks."):
+                new_key = self._convert_double_block_key(old_key, tensor, converted)
+                if new_key is None:
+                    continue
+            elif old_key.startswith("single_blocks."):
+                new_key = self._convert_single_block_key(old_key, tensor, converted)
+                if new_key is None:
+                    continue
+
+            if new_key != old_key or new_key not in converted:
+                converted[new_key] = tensor
+
+        return converted
+
+    def _convert_double_block_key(self, key: str, tensor, converted: dict) -> str | None:
+        parts = key.split(".")
+        block_idx = parts[1]
+        rest = ".".join(parts[2:])
+        prefix = f"transformer_blocks.{block_idx}"
+
+        if "img_attn.qkv.weight" in rest:
+            q, k, v = self._chunk_tensor(tensor, 3)
+            converted[f"{prefix}.attn.to_q.weight"] = q
+            converted[f"{prefix}.attn.to_k.weight"] = k
+            converted[f"{prefix}.attn.to_v.weight"] = v
+            return None
+        elif "txt_attn.qkv.weight" in rest:
+            q, k, v = self._chunk_tensor(tensor, 3)
+            converted[f"{prefix}.attn.add_q_proj.weight"] = q
+            converted[f"{prefix}.attn.add_k_proj.weight"] = k
+            converted[f"{prefix}.attn.add_v_proj.weight"] = v
+            return None
+
+        if "img_attn.proj.weight" in rest:
+            return f"{prefix}.attn.to_out.0.weight"
+        elif "txt_attn.proj.weight" in rest:
+            return f"{prefix}.attn.to_add_out.weight"
+
+        if "img_attn.norm.query_norm.scale" in rest:
+            return f"{prefix}.attn.norm_q.weight"
+        elif "img_attn.norm.key_norm.scale" in rest:
+            return f"{prefix}.attn.norm_k.weight"
+        elif "txt_attn.norm.query_norm.scale" in rest:
+            return f"{prefix}.attn.norm_added_q.weight"
+        elif "txt_attn.norm.key_norm.scale" in rest:
+            return f"{prefix}.attn.norm_added_k.weight"
+
+        if "img_mlp.0.weight" in rest:
+            return f"{prefix}.ff.linear_in.weight"
+        elif "img_mlp.2.weight" in rest:
+            return f"{prefix}.ff.linear_out.weight"
+        elif "txt_mlp.0.weight" in rest:
+            return f"{prefix}.ff_context.linear_in.weight"
+        elif "txt_mlp.2.weight" in rest:
+            return f"{prefix}.ff_context.linear_out.weight"
+
+        return key
+
+    def _convert_single_block_key(self, key: str, tensor, converted: dict) -> str | None:
+        parts = key.split(".")
+        block_idx = parts[1]
+        rest = ".".join(parts[2:])
+        prefix = f"single_transformer_blocks.{block_idx}"
+
+        if "linear1.weight" in rest:
+            return f"{prefix}.attn.to_qkv_mlp_proj.weight"
+        elif "linear2.weight" in rest:
+            return f"{prefix}.attn.to_out.weight"
+
+        if "norm.query_norm.scale" in rest:
+            return f"{prefix}.attn.norm_q.weight"
+        elif "norm.key_norm.scale" in rest:
+            return f"{prefix}.attn.norm_k.weight"
+
+        return key
+
+    def _chunk_tensor(self, tensor, chunks: int):
+        """Chunk a tensor, handling both regular tensors and GGUF quantized tensors."""
+        if hasattr(tensor, "get_dequantized_tensor"):
+            # GGUF quantized tensor - dequantize first, then chunk
+            # This loses quantization for the split weights, but is necessary
+            # because diffusers uses separate Q/K/V projections
+            tensor = tensor.get_dequantized_tensor()
+        return tensor.chunk(chunks, dim=0)
+
+    def _swap_scale_shift(self, weight) -> torch.Tensor:
+        """Swap scale and shift in AdaLayerNorm weights."""
+        if hasattr(weight, "get_dequantized_tensor"):
+            # For GGUF, dequantize first
+            weight = weight.get_dequantized_tensor()
         shift, scale = weight.chunk(2, dim=0)
         return torch.cat([scale, shift], dim=0)
 

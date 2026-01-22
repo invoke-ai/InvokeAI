@@ -727,7 +727,7 @@ flux2_klein_4b_single = StarterModel(
     name="FLUX.2 Klein 4B",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/black-forest-labs/FLUX.2-klein-4B/resolve/main/flux-2-klein-4b.safetensors",
-    description="FLUX.2 Klein 4B standalone transformer. Requires separate VAE and Qwen3 4B encoder. ~8GB",
+    description="FLUX.2 Klein 4B standalone transformer. Installs with VAE and Qwen3 4B encoder. ~8GB",
     type=ModelType.Main,
     dependencies=[flux2_vae, flux2_klein_qwen3_4b_encoder],
 )
@@ -736,7 +736,7 @@ flux2_klein_4b_fp8 = StarterModel(
     name="FLUX.2 Klein 4B (FP8)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8/resolve/main/flux-2-klein-4b-fp8.safetensors",
-    description="FLUX.2 Klein 4B FP8 quantized - smaller and faster. Requires separate VAE and Qwen3 4B encoder. ~4GB",
+    description="FLUX.2 Klein 4B FP8 quantized - smaller and faster. Installs with VAE and Qwen3 4B encoder. ~4GB",
     type=ModelType.Main,
     dependencies=[flux2_vae, flux2_klein_qwen3_4b_encoder],
 )
@@ -753,8 +753,48 @@ flux2_klein_9b_fp8 = StarterModel(
     name="FLUX.2 Klein 9B (FP8)",
     base=BaseModelType.Flux2,
     source="https://huggingface.co/black-forest-labs/FLUX.2-klein-9b-fp8/resolve/main/flux-2-klein-9b-fp8.safetensors",
-    description="FLUX.2 Klein 9B FP8 quantized - more efficient than full precision. Requires separate VAE and Qwen3 8B encoder. ~9.5GB",
+    description="FLUX.2 Klein 9B FP8 quantized - more efficient than full precision. Installs with VAE and Qwen3 8B encoder. ~9.5GB",
     type=ModelType.Main,
+    dependencies=[flux2_vae, flux2_klein_qwen3_8b_encoder],
+)
+
+flux2_klein_4b_gguf_q4 = StarterModel(
+    name="FLUX.2 Klein 4B (GGUF Q4)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF/resolve/main/flux-2-klein-4b-Q4_K_M.gguf",
+    description="FLUX.2 Klein 4B GGUF Q4_K_M quantized - runs on 6-8GB VRAM. Installs with VAE and Qwen3 4B encoder. ~2.6GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_klein_qwen3_4b_encoder],
+)
+
+flux2_klein_4b_gguf_q8 = StarterModel(
+    name="FLUX.2 Klein 4B (GGUF Q8)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/unsloth/FLUX.2-klein-4B-GGUF/resolve/main/flux-2-klein-4b-Q8_0.gguf",
+    description="FLUX.2 Klein 4B GGUF Q8_0 quantized - higher quality than Q4. Installs with VAE and Qwen3 4B encoder. ~4.3GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_klein_qwen3_4b_encoder],
+)
+
+flux2_klein_9b_gguf_q4 = StarterModel(
+    name="FLUX.2 Klein 9B (GGUF Q4)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF/resolve/main/flux-2-klein-9b-Q4_K_M.gguf",
+    description="FLUX.2 Klein 9B GGUF Q4_K_M quantized - runs on 12GB+ VRAM. Installs with VAE and Qwen3 8B encoder. ~5.8GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_klein_qwen3_8b_encoder],
+)
+
+flux2_klein_9b_gguf_q8 = StarterModel(
+    name="FLUX.2 Klein 9B (GGUF Q8)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/unsloth/FLUX.2-klein-9B-GGUF/resolve/main/flux-2-klein-9b-Q8_0.gguf",
+    description="FLUX.2 Klein 9B GGUF Q8_0 quantized - higher quality than Q4. Installs with VAE and Qwen3 8B encoder. ~10GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
     dependencies=[flux2_vae, flux2_klein_qwen3_8b_encoder],
 )
 # endregion
@@ -901,6 +941,10 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_4b_fp8,
     flux2_klein_9b,
     flux2_klein_9b_fp8,
+    flux2_klein_4b_gguf_q4,
+    flux2_klein_4b_gguf_q8,
+    flux2_klein_9b_gguf_q4,
+    flux2_klein_9b_gguf_q8,
     flux2_klein_qwen3_4b_encoder,
     flux2_klein_qwen3_8b_encoder,
     cogview4,

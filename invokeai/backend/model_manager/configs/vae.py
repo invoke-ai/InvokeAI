@@ -216,3 +216,26 @@ class VAE_Diffusers_SD1_Config(VAE_Diffusers_Config_Base, Config_Base):
 
 class VAE_Diffusers_SDXL_Config(VAE_Diffusers_Config_Base, Config_Base):
     base: Literal[BaseModelType.StableDiffusionXL] = Field(default=BaseModelType.StableDiffusionXL)
+
+
+class VAE_Diffusers_Flux2_Config(Diffusers_Config_Base, Config_Base):
+    """Model config for FLUX.2 VAE models in diffusers format (AutoencoderKLFlux2)."""
+
+    type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
+    format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "AutoencoderKLFlux2",
+            },
+        )
+
+        return cls(**override_fields)

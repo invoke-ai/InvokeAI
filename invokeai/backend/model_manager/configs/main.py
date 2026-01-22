@@ -643,6 +643,60 @@ class Main_GGUF_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
             raise NotAMatchError("state dict does not look like GGUF quantized")
 
 
+class Main_GGUF_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized FLUX.2 checkpoint models (e.g. Klein)."""
+
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    variant: Flux2VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_main_model(mod)
+
+        cls._validate_looks_like_gguf_quantized(mod)
+
+        cls._validate_is_flux2(mod)
+
+        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _validate_is_flux2(cls, mod: ModelOnDisk) -> None:
+        """Validate that this is a FLUX.2 model, not FLUX.1."""
+        state_dict = mod.load_state_dict()
+        if not _is_flux2_model(state_dict):
+            raise NotAMatchError("state dict does not look like a FLUX.2 model")
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> Flux2VariantType:
+        state_dict = mod.load_state_dict()
+        variant = _get_flux2_variant(state_dict)
+
+        if variant is None:
+            raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
+
+        return variant
+
+    @classmethod
+    def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
+        has_main_model_keys = _has_main_keys(mod.load_state_dict())
+        if not has_main_model_keys:
+            raise NotAMatchError("state dict does not look like a main model")
+
+    @classmethod
+    def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
+        if not has_ggml_tensors:
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
 class Main_Diffusers_FLUX_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
     """Model config for FLUX.1 models in diffusers format."""
 
