@@ -50,9 +50,7 @@ def list_users_table():
 
         # Print header
         print("\n=== InvokeAI Users ===\n")
-        print(
-            f"{'User ID':<36} {'Email':<30} {'Display Name':<20} {'Admin':<8} {'Active':<8}"
-        )
+        print(f"{'User ID':<36} {'Email':<30} {'Display Name':<20} {'Admin':<8} {'Active':<8}")
         print("-" * 108)
 
         # Print each user
@@ -108,6 +106,7 @@ def list_users_json():
     except Exception as e:
         print(f'{{"error": "{e}"}}', file=sys.stderr)
         return False
+
 
 def main():
     """Main entry point for the script."""

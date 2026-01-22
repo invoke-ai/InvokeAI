@@ -45,15 +45,15 @@ def enable_multiuser_for_tests(monkeypatch: Any, mock_invoker: Invoker):
     """Enable multiuser mode and set up ApiDependencies for testing."""
     # Enable multiuser mode
     mock_invoker.services.configuration.multiuser = True
-    
+
     # Set ApiDependencies.invoker as a class attribute
     ApiDependencies.invoker = mock_invoker
-    
+
     yield
-    
+
     # Cleanup
-    if hasattr(ApiDependencies, 'invoker'):
-        delattr(ApiDependencies, 'invoker')
+    if hasattr(ApiDependencies, "invoker"):
+        delattr(ApiDependencies, "invoker")
 
 
 @pytest.fixture

@@ -5,11 +5,11 @@ import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 
 /**
  * Hook to determine if model manager features should be enabled for the current user.
- * 
+ *
  * Returns true if:
  * - Multiuser mode is disabled (single-user mode = always admin)
  * - Multiuser mode is enabled AND user is an admin
- * 
+ *
  * Returns false if:
  * - Multiuser mode is enabled AND user is not an admin
  */

@@ -59,7 +59,7 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
     if (!multiuserEnabled) {
       return;
     }
-    
+
     // In multiuser mode, check authentication
     if (!isLoadingUser && !isAuthenticated) {
       navigate('/login', { replace: true });

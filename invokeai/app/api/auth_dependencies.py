@@ -73,7 +73,7 @@ async def get_current_user_or_default(
 
     When multiuser mode is disabled (default), this always returns a system user with admin privileges,
     allowing unrestricted access to all operations.
-    
+
     When multiuser mode is enabled, authentication is required and this function validates the token,
     returning authenticated user data or raising 401 Unauthorized if no valid credentials are provided.
 
@@ -82,7 +82,7 @@ async def get_current_user_or_default(
 
     Returns:
         TokenData containing user information from the token, or system user in single-user mode
-        
+
     Raises:
         HTTPException: 401 Unauthorized if in multiuser mode and credentials are missing, invalid, or user is inactive
     """

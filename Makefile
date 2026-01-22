@@ -24,12 +24,12 @@ help:
 
 # Runs ruff, fixing any safely-fixable errors and formatting
 ruff:
-	cd invokeai && uv tool run ruff@0.11.2 format .
+	cd invokeai && uv tool run ruff@0.11.2 format
 
 # Runs ruff, fixing all errors it can fix and formatting
 ruff-unsafe:
 	ruff check . --fix --unsafe-fixes
-	ruff format .
+	ruff format
 
 # Runs mypy, using the config in pyproject.toml
 mypy:
@@ -64,8 +64,12 @@ frontend-dev:
 frontend-typegen:
 	cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 
-frontend-prettier:
-	cd invokeai/frontend/web/src && pnpm lint:prettier --write
+frontend-lint:
+	cd invokeai/frontend/web/src && \
+	pnpm lint:tsc && \
+	pnpm lint:dpdm && \
+	pnpm lint:eslint --fix && \
+	pnpm lint:prettier --write 
 
 # Tag the release
 wheel:
