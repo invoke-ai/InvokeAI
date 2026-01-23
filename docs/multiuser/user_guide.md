@@ -2,7 +2,10 @@
 
 ## Overview
 
-InvokeAI supports both single-user and multi-user modes. In single-user mode, no login is required and you have access to all features. In multi-user mode, multiple people can use the same InvokeAI instance while keeping their work private and organized.
+InvokeAI supports both single-user and multi-user modes. In
+single-user mode, no login is required and you have access to all
+features. In multi-user mode, multiple people can use the same
+InvokeAI instance while keeping their work private and organized.
 
 ### Single-User vs Multi-User Mode
 
@@ -23,9 +26,30 @@ InvokeAI supports both single-user and multi-user modes. In single-user mode, no
 - Enabled when `multiuser: true` in config
 
 !!! note "Mode Switching"
-    If you switch from multi-user mode to single-user mode, all boards and images from different users will be combined into a single unified view. When switching back to multi-user mode, they will be separated again by user ownership.
+    
+	If you switch from multi-user mode to single-user mode, 
+	all boards and images from different users will be combined 
+	into a single unified view. When switching back to multi-user
+	mode, they will be separated again by user ownership.
 
 ## Getting Started
+
+### Initial Setup (First Time in Multi-User Mode)
+
+If you're the first person to access a fresh InvokeAI installation in multi-user mode, you'll see the **Administrator Setup** dialog:
+
+1. Enter your email address (this will be your username)
+2. Create a display name
+3. Choose a strong password that meets the requirements:
+   - At least 8 characters long
+   - Contains uppercase letters
+   - Contains lowercase letters
+   - Contains numbers
+4. Confirm your password
+5. Click **Create Administrator Account**
+
+You'll now be taken to a login screen and can enter the credentials
+you just created.
 
 ### Accessing InvokeAI
 
@@ -45,22 +69,6 @@ InvokeAI supports both single-user and multi-user modes. In single-user mode, no
 !!! tip "Remember Me"
     In multi-user mode, check the "Remember me" box to stay logged in for 7 days. Otherwise, your session will expire after 24 hours.
 
-### Initial Setup (First Time in Multi-User Mode)
-
-If you're the first person to access a fresh InvokeAI installation in multi-user mode, you'll see the **Administrator Setup** dialog:
-
-1. Enter your email address (this will be your username)
-2. Create a display name
-3. Choose a strong password that meets the requirements:
-   - At least 8 characters long
-   - Contains uppercase letters
-   - Contains lowercase letters
-   - Contains numbers
-4. Confirm your password
-5. Click **Create Administrator Account**
-
-You'll be automatically logged in as the administrator.
-
 ## Understanding User Roles (Multi-User Mode Only)
 
 In single-user mode, you have access to all features without restrictions. In multi-user mode, InvokeAI has two user roles:
@@ -75,7 +83,7 @@ As a regular user, you can:
 - ✅ Access workflows marked as public
 - ✅ View your own generation queue
 - ✅ Customize your UI preferences (theme, hotkeys, etc.)
-- ✅ Access shared boards (based on permissions granted to you) This is a FUTURE FEATURE
+- ✅ Access shared boards (based on permissions granted to you) (FUTURE FEATURE)
 - ✅ **View available models** (read-only access to Model Manager)
 
 You cannot:
@@ -85,6 +93,22 @@ You cannot:
 - ❌ Manage user accounts
 - ❌ Access system configuration
 - ❌ View or cancel other users' generation tasks
+
+!!! tip "The generation queue"
+
+	When two or more users are accessing InvokeAI at the same time,
+	their image generation jobs will be placed on the session queue on
+	a first-come, first-serve basis. This means that you will have to
+	wait for other users' image rendering jobs to complete before
+	yours will start.
+	
+	When another user's job is running, you will see the image
+	generation progress bar and a queue badge that reads `X/Y`, where
+	"X" is the number of jobs you have queued and "Y" is the total
+	number of jobs queued, including your own and others.
+	
+	You can also pull up the Queue tab in order to see where your job
+	is in relationship to other queued tasks.
 
 ### Administrator
 
@@ -159,7 +183,7 @@ The queue shows your pending and running generation tasks.
 - Administrators can view all queues for troubleshooting
 - Your generations won't interfere with other users' tasks
 
-## Using Shared Boards (FUTURE)
+## Using Shared Boards (FUTURE FEATURE)
 
 Shared boards are a feature that will be added in a future
 release. Administrators will able to designate certain boards as being
@@ -184,7 +208,8 @@ Shared boards have three permission levels:
 | **Write** | ✅ | ✅ | ✅ | ❌ |
 | **Admin** | ✅ | ✅ | ✅ | ✅ |
 
-!!! note Only administrators will be able to create shared boards and
+!!! note "Shared boards"
+    Only administrators will be able to create shared boards and
     assign initial permissions.
 
 ## Viewing Models (Read-Only)

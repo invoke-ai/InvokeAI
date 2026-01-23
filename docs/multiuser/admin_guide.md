@@ -15,6 +15,33 @@ Before enabling multi-user support, ensure you have:
 
 ## Initial Setup
 
+### Activating Multiuser Mode
+
+To put InvokeAI into multiuser mode, you will need to add the option
+`multiuser: true` to its configuration file. This file is located at
+`INVOKEAI_ROOT/invokeai.yaml` With the InvokeAI backend halted, add
+the new configuration option to the end of the file with a text editor
+so that it looks like this:
+
+```yaml
+# Internal metadata - do not edit:
+schema_version: 4.0.2
+
+# Enable/disable multi-user mode
+multiuser: true
+```
+
+Then restart the InvokeAI server backend from the command line or
+using the launcher.
+
+!!! note "Reverting to single-user mode"
+	If at any time you wish to revert to single-user mode, simply comment
+    out the `multiuser` line, or change "true" to "false". Then
+	restart the server. Because of the way that browsers cache pages,
+	users with open InvokeAI sessions may need to force-refresh their
+	browsers.
+	
+
 ### First Administrator Account
 
 When InvokeAI starts for the first time in multi-user mode, you'll see the **Administrator Setup** dialog.
@@ -22,33 +49,42 @@ When InvokeAI starts for the first time in multi-user mode, you'll see the **Adm
 **Setup Steps:**
 
 1. **Email Address**: Enter a valid email address (this becomes your username)
-   - Example: `admin@example.com` or `admin@localhost` for testing
-   - Must be a valid email format
-   - Cannot be changed later without database access
+
+    * Example: `admin@example.com` or `admin@localhost` for testing
+    * Must be a valid email format
+    * Cannot be changed later without database access
 
 2. **Display Name**: Enter a friendly name
-   - Example: "System Administrator" or your real name
-   - Can be changed later in your profile
-   - Visible to other users in shared contexts
+
+    * Example: "System Administrator" or your real name
+    * Can be changed later in your profile
+    * Visible to other users in shared contexts
 
 3. **Password**: Create a strong administrator password
-   - **Minimum requirements:**
-     - At least 8 characters long
-     - Contains uppercase letters (A-Z)
-     - Contains lowercase letters (a-z)
-     - Contains numbers (0-9)
-   - **Recommended:**
-     - Use 12+ characters
-     - Include special characters (!@#$%^&*)
-     - Use a password manager to generate and store
-     - Don't reuse passwords from other services
+
+    * **Minimum requirements:**
+
+        * At least 8 characters long
+        * Contains uppercase letters (A-Z)
+        * Contains lowercase letters (a-z)
+        * Contains numbers (0-9)
+
+    * **Recommended:**
+
+        * Use 12+ characters
+        * Include special characters (!@#$%^&*)
+        * Use a password manager to generate and store
+        * Don't reuse passwords from other services
 
 4. **Confirm Password**: Re-enter the password
 
 5. Click **Create Administrator Account**
 
-!!! warning "Important"
-    Store these credentials securely! The first administrator account has full system access.
+!!! warning "Important" 
+    Store these credentials securely! The
+    first administrator account can reset 
+	the password to something new, but cannot 
+	retrieve a lost one.
 
 ### Configuration
 
@@ -344,6 +380,9 @@ Set default parameters that users will start with:
 
 Shared boards enable collaboration between users while maintaining control.
 
+!!! note "Future Feature"
+	Board sharing will be implemented in a future release.
+
 ### Creating Shared Boards
 
 1. Log in as administrator
@@ -419,40 +458,32 @@ Shared boards enable collaboration between users while maintaining control.
 
 ### Session Management
 
-**Session Configuration:**
+**Session Security and Token Management:**
 
-```yaml
-# invokeai.yaml
-jwt_token_expiry_hours: 24  # Default session duration
-jwt_remember_me_days: 7  # Extended session with "remember me"
-```
+This system uses stateless JWT tokens with HMAC signatures to
+identify users after they provide their initial credentials. The
+tokens will persist for 24 hours by default, or for 7 days if the user
+clicks the "Remember me" checkbox at login. Expired tokens are
+automatically rejected and the user will have to log in again.
 
-**Session Security:**
+At the client side, tokens are stored in browser localStorage. Logging
+out clears them. No server-side session storage is required.
 
-- Sessions use JWT tokens with HMAC signatures
-- Tokens are stateless (validated by signature)
-- Expired tokens are automatically rejected
-- Deactivating a user invalidates their token
-
-**Token Management:**
-
-- Tokens are stored in browser localStorage
-- Logging out clears the token
-- No server-side session storage required
-- Tokens include user ID, email, and admin status
+The tokens include the user's ID, email, and admin status, along with
+an HMAC signature.
 
 ### Secret Key Management
 
 **Important:** The JWT secret key must be kept confidential.
 
-**Setting Custom Secret Key:**
+To generate tokens, each InvokeAI instance has a distinct secret JWT key that must be
+kept confidential. The key is stored in the `app_settings` table of
+the InvokeAI database with in a field value named `jwt_secret`.
 
-```yaml
-# invokeai.yaml
-jwt_secret_key: "your-very-long-random-secret-key-here"
-```
+The secret key is automatically generated during database creation or
+migration. If you wish to change the key, you may generate a
+replacement using either of these commands:
 
-**Generating a Secure Key:**
 
 ```bash
 # Python
@@ -462,28 +493,64 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 openssl rand -base64 32
 ```
 
-**Key Rotation:**
+Then cut and paste the printed secret into this Sqlite3 command:
 
-If you need to rotate the secret key:
+```bash
+sqlite3 INVOKE_ROOT/databases/invokeai.db 'update app_settings set value="THE_SECRET" where key="jwt_secret"'
+```
 
-1. All users will be logged out
-2. Update `jwt_secret_key` in configuration
-3. Restart InvokeAI
-4. Notify users to log in again
+(replace INVOKE_ROOT with your InvokeAI root directory and THE_SECRET
+with the new secret).
 
-### Access Control Best Practices
+After this, restart the server. All logged in users will be logged out
+and will need to provide their usernames and passwords again.
 
-1. **Principle of Least Privilege**: Give users minimum necessary permissions
-2. **Regular Audits**: Review user list and permissions quarterly
-3. **Deactivate Unused Accounts**: Disable accounts for users who no longer need access
-4. **Monitor Access**: Review administrator action logs
-5. **Separate Duties**: Don't use admin account for regular work
+### Hosting a Shared InvokeAI Instance
 
-### Network Security
+The multiuser feature allows you to run an InvokeAI backend that can
+be accessed by your friends and family across your home network. It is
+also possible to host a backend that is accessible over the Internet.
+
+By default, InvokeAI runs on `localhost`, IP address `127.0.0.1`,
+which is only accessible to browsers running on the same machine as
+the backend. To make the backend accessible to any machine on your
+home or work LAN, add the line `host: 0.0.0.0` to the InvokeAI
+configuration file, usually stored at `INVOKE_ROOT/invokeai.yaml`.
+
+Here is a minimal example.
+
+```yaml
+# Internal metadata - do not edit:
+schema_version: 4.0.2
+
+# Put user settings here - see https://invoke-ai.github.io/InvokeAI/configuration/:
+multiuser: true
+host: 0.0.0.0
+```
+
+After relaunching the backend you will be able to reach the server
+from other machines on the LAN using the server machine's IP address
+or hostname and port 9090.
+
+#### Connecting to the Internet
+
+!!! warning "Use at your own risk"
+	The InvokeAI team has done its best to make the software free of
+	exploitable bugs, but the software has not undergone a rigorous security
+	audit or intrusion testing. Use at your own risk
+
+It is also possible to create a (semi) public server accessible from
+the Internet. The details of how to do this depend very much on your
+home or corporate router/firewall system and are beyond the scope of
+this document. 
+
+If you expose InvokeAI to the Internet, there are a number of
+precautions to take. Here is a brief list of recommended network
+security practices.
 
 **HTTPS Configuration:**
 
-For production deployments, always use HTTPS:
+For internet deployments, always use HTTPS:
 
 ```yaml
 # Use a reverse proxy like nginx or Traefik
@@ -513,20 +580,23 @@ server {
 
 **Firewall Rules:**
 
-- Restrict access to trusted networks
-- Use VPN for remote access
-- Rate limit authentication endpoints
-- Block repeated failed login attempts
+It is best to restrict access to trusted networks and remote IP
+addresses, or use a VPN to connect to your home network. Rate limit
+connections to InvokeAI's authentication endpoint
+`http://your.host:9090/login`.
 
-## Backup and Recovery
+**Backup and Recovery:**
 
-### Database Backup
+It is a good idea to periodically backup your InvokeAI database,
+images, and possibly models in the event of unauthorized use of a
+publicly-accessible server.
 
 **Manual Backup:**
 
 ```bash
 # Stop InvokeAI
 # Copy database file
+cd INVOKE_ROOT
 cp databases/invokeai.db databases/invokeai.db.$(date +%Y%m%d)
 
 # Or create compressed backup
@@ -539,8 +609,9 @@ tar -czf invokeai_backup_$(date +%Y%m%d).tar.gz databases/
 #!/bin/bash
 # backup_invokeai.sh
 
+INVOKE_ROOT="/path/to/invoke_root"
 BACKUP_DIR="/path/to/backups"
-DB_PATH="databases/invokeai.db"
+DB_PATH="$INVOKE_ROOT/databases/invokeai.db"
 DATE=$(date +%Y%m%d_%H%M%S)
 
 # Create backup directory
@@ -565,13 +636,12 @@ crontab -e
 0 2 * * * /path/to/backup_invokeai.sh
 ```
 
-### Restoring from Backup
 
-**To restore a backup:**
 
 ```bash
 # Stop InvokeAI
 # Replace current database with backup
+cd INVOKE_ROOT
 cp databases/invokeai.db databases/invokeai.db.old  # Save current
 cp databases/invokeai_backup.db databases/invokeai.db
 
@@ -579,9 +649,7 @@ cp databases/invokeai_backup.db databases/invokeai.db
 invokeai-web
 ```
 
-### Disaster Recovery
-
-**Complete System Backup:**
+**Disaster Recover - Complete System Backup:**
 
 Include these directories/files:
 
@@ -599,54 +667,6 @@ Include these directories/files:
 4. Restore models and outputs
 5. Verify file permissions
 6. Start InvokeAI and test
-
-## System Monitoring
-
-### Health Checks
-
-**Regular Checks:**
-
-- Database size and growth
-- Available disk space
-- User count and active sessions
-- Generation queue length
-- Model storage usage
-- Error logs
-
-**Monitoring Commands:**
-
-```bash
-# Check database size
-du -h databases/invokeai.db
-
-# Check disk space
-df -h
-
-# View recent logs
-tail -f logs/invokeai.log
-
-# Count active users (if session tracking enabled)
-sqlite3 databases/invokeai.db "SELECT COUNT(*) FROM users WHERE is_active = 1;"
-```
-
-### Performance Optimization
-
-**Database Maintenance:**
-
-```bash
-# Compact database (reduces file size)
-sqlite3 databases/invokeai.db "VACUUM;"
-
-# Analyze query performance
-sqlite3 databases/invokeai.db "ANALYZE;"
-```
-
-**Resource Allocation:**
-
-- Monitor GPU memory usage
-- Adjust concurrent generation limits
-- Configure queue priorities if needed
-- Consider dedicated hardware for multi-user loads
 
 ## Troubleshooting
 
@@ -761,93 +781,39 @@ invokeai-web --log-level DEBUG
 
 ## Configuration Reference
 
-### Complete Configuration Example
+### Complete Configuration Example for a Public Site
 
 ```yaml
 # invokeai.yaml - Multi-user configuration
 
-# Authentication
-auth_enabled: true
-jwt_secret_key: "your-secret-key-here"
-jwt_token_expiry_hours: 24
-jwt_remember_me_days: 7
+# Internal metadata - do not edit:
+schema_version: 4.0.2
 
-# Database
-use_memory_db: false
-db_path: databases/invokeai.db
+# Put user settings here
+multiuser: true
 
 # Server
 host: "0.0.0.0"
 port: 9090
 
-# Paths
-models_dir: models/
-outputs_dir: outputs/
-
 # Performance
-ram: 16
-vram: 8
-allow_model_caching: true
-
-# Features
-scan_models_on_startup: true
+enable_partial_loading: true
+precision: float16
+pytorch_cuda_alloc_conf: "backend:cudaMallocAsync"
+hashing_algorithm: blake3_multi
 ```
-
-### Environment Variables
-
-```bash
-# Override configuration with environment variables
-export INVOKEAI_AUTH_ENABLED=true
-export INVOKEAI_JWT_SECRET_KEY="your-secret"
-export INVOKEAI_DB_PATH="databases/invokeai.db"
-export INVOKEAI_HOST="0.0.0.0"
-export INVOKEAI_PORT=9090
-```
-
-## Best Practices Summary
-
-### User Management
-
-- ✅ Create users with temporary passwords
-- ✅ Require password changes on first login
-- ✅ Deactivate instead of deleting when possible
-- ✅ Regular audit of user accounts
-- ✅ Document user roles and responsibilities
-
-### Security
-
-- ✅ Use strong, unique JWT secret key
-- ✅ Enable HTTPS in production
-- ✅ Regular password rotation
-- ✅ Monitor failed login attempts
-- ✅ Keep InvokeAI updated
-
-### Operations
-
-- ✅ Daily automated backups
-- ✅ Test restore procedures regularly
-- ✅ Monitor disk space and performance
-- ✅ Keep database optimized (VACUUM)
-- ✅ Review logs for errors
-
-### Support
-
-- ✅ Document procedures for common tasks
-- ✅ Provide user guide to all users
-- ✅ Establish support channels
-- ✅ Track and resolve issues promptly
-- ✅ Communicate maintenance windows
-
 ## Frequently Asked Questions
 
 ### How many users can InvokeAI support?
 
-The SQLite-based system can handle dozens of concurrent users comfortably. For very large deployments (100+ users), consider:
+The backend will support dozens of concurrent users. However, because
+the image generation queue is single-threaded, image generation tasks
+are processed on a first-come, first-serve basis. This means that a
+user may have to wait for all the other users' image generation jobs
+to complete before their generation job starts to execute.
 
-- Dedicated server hardware
-- SSD storage
-- Database optimization
-- Load balancing (future feature)
+A future version of InvokeAI may support concurrent execution on
+systems with multiple GPUs/graphics cards.
 
 ### Can I integrate with existing authentication systems?
 
@@ -863,7 +829,7 @@ Full audit logging is planned for a future release. Currently, you can:
 
 ### Can users have different model access?
 
-Not in the current release. All users can view and use all installed models. Per-user model access is a planned enhancement.
+Not in the current release. All users can view and use all installed models. Per-user model access is a possible enhancement.
 
 ### How do I handle user data when they leave?
 
