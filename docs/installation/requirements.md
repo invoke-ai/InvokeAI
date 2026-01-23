@@ -6,7 +6,9 @@ Invoke runs on Windows 10+, macOS 14+ and Linux (Ubuntu 20.04+ is well-tested).
 
 Hardware requirements vary significantly depending on model and image output size.
 
-The requirements below are rough guidelines for best performance. GPUs with less VRAM typically still work, if a bit slower. Follow the [Low-VRAM mode guide](./features/low-vram.md) to optimize performance.
+The requirements below are rough guidelines for best performance. GPUs
+with less VRAM typically still work, if a bit slower. Follow the
+[Low-VRAM mode guide](../features/low-vram.md) to optimize performance.
 
 - All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
 - AMD GPUs are supported on Linux only. The VRAM requirements are the same as Nvidia GPUs.
