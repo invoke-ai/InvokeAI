@@ -129,7 +129,7 @@ export const ToolGradientButton = memo(() => {
 
   const gradientLabel = t('controlLayers.tool.gradient', { defaultValue: 'Gradient' });
   const linearLabel = t('controlLayers.gradient.linear', { defaultValue: t('common.linear', 'Linear') });
-  const circularLabel = t('controlLayers.gradient.circular', { defaultValue: 'Circular' });
+  const radialLabel = t('controlLayers.gradient.radial', { defaultValue: 'Radial' });
 
   return (
     <Popover
@@ -169,9 +169,9 @@ export const ToolGradientButton = memo(() => {
                   onClick={setLinear}
                 />
               </Tooltip>
-              <Tooltip label={circularLabel}>
+              <Tooltip label={radialLabel}>
                 <IconButton
-                  aria-label={circularLabel}
+                  aria-label={radialLabel}
                   icon={<GradientRadialIcon />}
                   colorScheme={gradientType === 'radial' ? 'invokeBlue' : 'base'}
                   variant="solid"
