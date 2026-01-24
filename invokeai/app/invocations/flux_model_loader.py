@@ -6,7 +6,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
+from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField
 from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, T5EncoderField, TransformerField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.t5_model_identifier import (
