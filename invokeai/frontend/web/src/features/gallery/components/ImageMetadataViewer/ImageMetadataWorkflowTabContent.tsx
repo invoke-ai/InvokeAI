@@ -8,9 +8,11 @@ import DataViewer from './DataViewer';
 
 type Props = {
   image: ImageDTO;
+  searchTerm?: string;
+  showSearchInput?: boolean;
 };
 
-const ImageMetadataWorkflowTabContent = ({ image }: Props) => {
+const ImageMetadataWorkflowTabContent = ({ image, searchTerm, showSearchInput }: Props) => {
   const { t } = useTranslation();
   const { currentData } = useDebouncedImageWorkflow(image);
   const workflow = useMemo(() => {
@@ -34,6 +36,8 @@ const ImageMetadataWorkflowTabContent = ({ image }: Props) => {
       data={workflow}
       label={t('metadata.workflow')}
       withSearch
+      searchTerm={searchTerm}
+      showSearchInput={showSearchInput}
     />
   );
 };

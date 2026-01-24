@@ -33,6 +33,9 @@ type Props = {
   extraCopyActions?: { label: string; getData: (data: unknown) => unknown }[];
   wrapData?: boolean;
   withSearch?: boolean;
+  searchTerm?: string;
+  onSearchTermChange?: (value: string) => void;
+  showSearchInput?: boolean;
 } & FlexProps;
 
 const overlayscrollbarsOptions = getOverlayScrollbarsParams({
@@ -52,12 +55,17 @@ const DataViewer = (props: Props) => {
     extraCopyActions,
     wrapData = true,
     withSearch = false,
+    searchTerm: searchTermProp,
+    onSearchTermChange,
+    showSearchInput = true,
     ...rest
   } = props;
   const dataString = useMemo(() => (isString(data) ? data : formatter.Serialize(data)) ?? '', [data]);
   const shift = useShiftModifier();
   const clipboard = useClipboard();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [internalSearchTerm, setInternalSearchTerm] = useState('');
+  const isControlledSearch = searchTermProp !== undefined;
+  const searchTerm = isControlledSearch ? searchTermProp : internalSearchTerm;
   const handleCopy = useCallback(() => {
     clipboard.writeText(dataString);
   }, [clipboard, dataString]);
@@ -95,13 +103,27 @@ const DataViewer = (props: Props) => {
     });
   }, [dataString, searchTerm]);
 
-  const handleChangeSearch = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  }, []);
+  const setSearchTerm = useCallback(
+    (value: string) => {
+      if (isControlledSearch) {
+        onSearchTermChange?.(value);
+        return;
+      }
+      setInternalSearchTerm(value);
+    },
+    [isControlledSearch, onSearchTermChange]
+  );
+
+  const handleChangeSearch = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      setSearchTerm(e.target.value);
+    },
+    [setSearchTerm]
+  );
 
   const handleClearSearch = useCallback(() => {
     setSearchTerm('');
-  }, []);
+  }, [setSearchTerm]);
 
   return (
     <Flex bg="base.800" borderRadius="base" flexGrow={1} w="full" h="full" position="relative" {...rest}>
@@ -111,7 +133,7 @@ const DataViewer = (props: Props) => {
         </OverlayScrollbarsComponent>
       </Box>
       <Flex position="absolute" top={0} insetInlineEnd={0} p={2} gap={2} alignItems="center">
-        {withSearch && (
+        {withSearch && showSearchInput && (
           <InputGroup size="sm" w={48}>
             <Input placeholder={t('common.search')} value={searchTerm} onChange={handleChangeSearch} />
             {searchTerm && (
