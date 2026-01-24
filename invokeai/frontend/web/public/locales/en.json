@@ -431,8 +431,10 @@
         "editMode": "Edit Mode",
         "viewMode": "View Mode",
         "editHotkey": "Edit Hotkey",
+        "addHotkey": "Add Hotkey",
         "resetToDefault": "Reset to Default",
         "resetAll": "Reset All to Default",
+        "resetAllConfirmation": "Are you sure you want to reset all hotkeys to their default values? This cannot be undone.",
         "enterHotkeys": "Enter hotkey(s), separated by commas",
         "save": "Save",
         "cancel": "Cancel",
@@ -500,6 +502,14 @@
             "promptHistoryNext": {
                 "title": "Next Prompt in History",
                 "desc": "When the prompt is focused, move to the next (newer) prompt in your history."
+            },
+            "promptWeightUp": {
+                "title": "Increase Weight of Prompt Selection",
+                "desc": "When the prompt is focused and text is selected, increase the weight of the selected prompt."
+            },
+            "promptWeightDown": {
+                "title": "Decrease Weight of Prompt Selection",
+                "desc": "When the prompt is focused and text is selected, decrease the weight of the selected prompt."
             },
             "toggleLeftPanel": {
                 "title": "Toggle Left Panel",
@@ -839,11 +849,16 @@
         "parameterSet": "Parameter {{parameter}} set",
         "parsingFailed": "Parsing Failed",
         "positivePrompt": "Positive Prompt",
+        "qwen3Encoder": "Qwen3 Encoder",
+        "qwen3Source": "Qwen3 Source",
         "recallParameters": "Recall Parameters",
         "recallParameter": "Recall {{label}}",
         "scheduler": "Scheduler",
         "seamlessXAxis": "Seamless X Axis",
         "seamlessYAxis": "Seamless Y Axis",
+        "seedVarianceEnabled": "Seed Variance Enabled",
+        "seedVarianceStrength": "Seed Variance Strength",
+        "seedVarianceRandomizePercent": "Seed Variance Randomize %",
         "seed": "Seed",
         "steps": "Steps",
         "strength": "Image to image strength",
@@ -855,6 +870,7 @@
     },
     "modelManager": {
         "active": "active",
+        "actions": "Bulk Actions",
         "addModel": "Add Model",
         "addModels": "Add Models",
         "advanced": "Advanced",
@@ -872,6 +888,15 @@
         "reidentifySuccess": "Model reidentified successfully",
         "reidentifyUnknown": "Unable to identify model",
         "reidentifyError": "Error reidentifying model",
+        "updatePath": "Update Path",
+        "updatePathTooltip": "Update the file path for this model if you have moved the model files to a new location.",
+        "updatePathDescription": "Enter the new path to the model file or directory. Use this if you have manually moved the model files on disk.",
+        "currentPath": "Current Path",
+        "newPath": "New Path",
+        "newPathPlaceholder": "Enter new path...",
+        "pathUpdated": "Model path updated successfully",
+        "pathUpdateFailed": "Failed to update model path",
+        "invalidPathFormat": "Path must be an absolute path (e.g., C:\\Models\\... or /home/user/models/...)",
         "convert": "Convert",
         "convertingModelBegin": "Converting Model. Please wait.",
         "convertToDiffusers": "Convert To Diffusers",
@@ -890,6 +915,7 @@
         "delete": "Delete",
         "deleteConfig": "Delete Config",
         "deleteModel": "Delete Model",
+        "deleteModels": "Delete Models",
         "deleteModelImage": "Delete Model Image",
         "deleteMsg1": "Are you sure you want to delete this model from InvokeAI?",
         "deleteMsg2": "This WILL delete the model from disk if it is in the InvokeAI root folder. If you are using a custom location, then the model WILL NOT be deleted from disk.",
@@ -1021,8 +1047,16 @@
         "triggerPhrases": "Trigger Phrases",
         "loraTriggerPhrases": "LoRA Trigger Phrases",
         "mainModelTriggerPhrases": "Main Model Trigger Phrases",
+        "selectAll": "Select All",
         "typePhraseHere": "Type phrase here",
         "t5Encoder": "T5 Encoder",
+        "qwen3Encoder": "Qwen3 Encoder",
+        "zImageVae": "VAE (optional)",
+        "zImageVaePlaceholder": "From VAE source model",
+        "zImageQwen3Encoder": "Qwen3 Encoder (optional)",
+        "zImageQwen3EncoderPlaceholder": "From Qwen3 source model",
+        "zImageQwen3Source": "Qwen3 & VAE Source Model",
+        "zImageQwen3SourcePlaceholder": "Required if VAE/Encoder empty",
         "upcastAttention": "Upcast Attention",
         "uploadImage": "Upload Image",
         "urlOrLocalPath": "URL or Local Path",
@@ -1304,6 +1338,8 @@
             "noT5EncoderModelSelected": "No T5 Encoder model selected for FLUX generation",
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
+            "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
+            "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox width is {{width}}",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox height is {{height}}",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), scaled bbox width is {{width}}",
@@ -1342,6 +1378,9 @@
         "seamlessYAxis": "Seamless Y Axis",
         "colorCompensation": "Color Compensation",
         "seed": "Seed",
+        "seedVarianceEnabled": "Seed Variance Enhancer",
+        "seedVarianceStrength": "Variance Strength",
+        "seedVarianceRandomizePercent": "Randomize Percent",
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",
@@ -1569,6 +1608,27 @@
             "paragraphs": [
                 "Scheduler used during the generation process.",
                 "Each scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
+            ]
+        },
+        "seedVarianceEnhancer": {
+            "heading": "Seed Variance Enhancer",
+            "paragraphs": [
+                "Z-Image-Turbo can produce relatively similar images with different seeds. This feature adds seed-based noise to the text embeddings to increase visual variation while maintaining reproducibility.",
+                "Enable this to get more diverse results when exploring different seeds."
+            ]
+        },
+        "seedVarianceStrength": {
+            "heading": "Variance Strength",
+            "paragraphs": [
+                "Controls the intensity of the noise added to embeddings. The strength is automatically calibrated relative to the embedding's standard deviation.",
+                "Values less than 0.1 will produce subtle variations, increasing to stronger ones at 0.5. Values above 0.5 may lead to unexpected results."
+            ]
+        },
+        "seedVarianceRandomizePercent": {
+            "heading": "Randomize Percent",
+            "paragraphs": [
+                "Percentage of embedding values that receive noise (1-100%).",
+                "Lower values create more selective noise patterns, while 100% affects all values equally."
             ]
         },
         "compositingMaskBlur": {
@@ -1953,6 +2013,7 @@
         "allLoaded": "All Workflows Loaded",
         "searchPlaceholder": "Search by name, description or tags",
         "filterByTags": "Filter by Tags",
+        "tags": "Tags",
         "yourWorkflows": "Your Workflows",
         "recentlyOpened": "Recently Opened",
         "noRecentWorkflows": "No Recent Workflows",
@@ -2134,6 +2195,7 @@
         "clearCaches": "Clear Caches",
         "recalculateRects": "Recalculate Rects",
         "clipToBbox": "Clip Strokes to Bbox",
+        "extractRegion": "Extract Region",
         "outputOnlyMaskedRegions": "Output Only Generated Regions",
         "addLayer": "Add Layer",
         "duplicate": "Duplicate",
@@ -2150,6 +2212,9 @@
         "showHUD": "Show HUD",
         "rectangle": "Rectangle",
         "maskFill": "Mask Fill",
+        "maskLayerEmpty": "Mask layer is empty",
+        "extractMaskedAreaFailed": "Unable to extract masked area.",
+        "extractMaskedAreaMissingData": "Cannot extract: image or mask data is missing.",
         "addPositivePrompt": "Add $t(controlLayers.prompt)",
         "addNegativePrompt": "Add $t(controlLayers.negativePrompt)",
         "addReferenceImage": "Add $t(controlLayers.referenceImage)",
@@ -2467,6 +2532,9 @@
                 "y": "Y (YCbCr)",
                 "cb": "Cb (YCbCr)",
                 "cr": "Cr (YCbCr)"
+            },
+            "pbr_maps": {
+                "label": "Create PBR Maps"
             }
         },
         "transform": {
@@ -2476,6 +2544,13 @@
             "fitModeContain": "Contain",
             "fitModeCover": "Cover",
             "fitModeFill": "Fill",
+            "smoothing": "Smoothing",
+            "smoothingDesc": "Apply a high-quality backend resample when committing transforms.",
+            "smoothingMode": "Resample Mode",
+            "smoothingModeBilinear": "Bilinear",
+            "smoothingModeBicubic": "Bicubic",
+            "smoothingModeHamming": "Hamming",
+            "smoothingModeLanczos": "Lanczos",
             "reset": "Reset",
             "apply": "Apply",
             "cancel": "Cancel"
@@ -2643,7 +2718,9 @@
         "useForTemplate": "Use For Prompt Template",
         "viewList": "View Template List",
         "viewModeTooltip": "This is how your prompt will look with your currently selected template. To edit your prompt, click anywhere in the text box.",
-        "togglePromptPreviews": "Toggle Prompt Previews"
+        "togglePromptPreviews": "Toggle Prompt Previews",
+        "selectPreset": "Select Style Preset",
+        "noMatchingPresets": "No matching presets"
     },
 
     "ui": {
@@ -2781,9 +2858,11 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Model Manager: If a model cannot be identified during installation, you can now manually select the model type and architecture.",
-            "Internal: Improved model identification system, making it easier for contributors to add support for new models."
+            "Support for Z-Image-Turbo: InvokeAI now supports the fast and accurate Z-Image-Turbo model. See 'Starter Models' to get started.",
+            "Hotkeys: Add and edit keyboard shortcuts for any of Invoke's major functions.",
+            "Model Manager: The Model Manager user interface now supports bulk tagging and deletion."
         ],
+        "takeUserSurvey": "📣 Let us know how you like InvokeAI. Take our User Experience Survey!",
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
         "watchUiUpdatesOverview": "Watch UI Updates Overview"

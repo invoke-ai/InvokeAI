@@ -220,3 +220,64 @@ const addControlLoRAToGraph = (
 
   g.addEdge(controlLoRA, 'control_lora', denoise, 'control_lora');
 };
+
+type AddZImageControlArg = {
+  manager: CanvasManager;
+  entities: CanvasControlLayerState[];
+  g: Graph;
+  rect: Rect;
+  denoise: Invocation<'z_image_denoise'>;
+};
+
+export const addZImageControl = async ({ manager, entities, g, rect, denoise }: AddZImageControlArg) => {
+  const validControlLayers = entities
+    .filter((entity) => entity.isEnabled)
+    .filter((entity) => entity.controlAdapter.type === 'z_image_control')
+    .filter((entity) => entity.controlAdapter.model !== null);
+
+  // Z-Image supports only one control at a time (control input is not a collection)
+  const validControlLayer = validControlLayers[0];
+  if (validControlLayer === undefined) {
+    return;
+  }
+
+  assert(validControlLayers.length <= 1, 'Cannot add more than one Z-Image control.');
+
+  const getImageDTOResult = await withResultAsync(() => {
+    const adapter = manager.adapters.controlLayers.get(validControlLayer.id);
+    assert(adapter, 'Adapter not found');
+    return adapter.renderer.rasterize({ rect, attrs: { opacity: 1, filters: [] }, bg: 'black' });
+  });
+  if (getImageDTOResult.isErr()) {
+    log.warn({ error: serializeError(getImageDTOResult.error) }, 'Error rasterizing Z-Image control layer');
+    return;
+  }
+
+  const imageDTO = getImageDTOResult.value;
+  addZImageControlToGraph(g, validControlLayer, imageDTO, denoise);
+};
+
+const addZImageControlToGraph = (
+  g: Graph,
+  layer: CanvasControlLayerState,
+  imageDTO: ImageDTO,
+  denoise: Invocation<'z_image_denoise'>
+) => {
+  const { id, controlAdapter } = layer;
+  assert(controlAdapter.type === 'z_image_control');
+  const { model, weight, beginEndStepPct } = controlAdapter;
+  assert(model !== null);
+  const { image_name } = imageDTO;
+
+  const zImageControl = g.addNode({
+    id: `z_image_control_${id}`,
+    type: 'z_image_control',
+    control_model: model,
+    control_context_scale: weight,
+    begin_step_percent: beginEndStepPct[0],
+    end_step_percent: beginEndStepPct[1],
+    image: { image_name },
+  });
+
+  g.addEdge(zImageControl, 'control', denoise, 'control');
+};

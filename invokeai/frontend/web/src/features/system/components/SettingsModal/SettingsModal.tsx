@@ -171,7 +171,7 @@ const SettingsModal = (props: { children: ReactElement }) => {
         <ModalOverlay />
         <ModalContent maxH="80vh" h="68rem">
           <ModalHeader bg="none">{t('common.settingsLabel')}</ModalHeader>
-          <ModalCloseButton />
+          <ModalCloseButton tabIndex={1} />
           <ModalBody display="flex" flexDir="column" gap={4}>
             <ScrollableContent>
               <Flex flexDir="column" gap={4}>

@@ -55,6 +55,8 @@ import {
   isStringFieldInputTemplate,
   isStringGeneratorFieldInputInstance,
   isStringGeneratorFieldInputTemplate,
+  isStylePresetFieldInputInstance,
+  isStylePresetFieldInputTemplate,
 } from 'features/nodes/types/field';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
 import { memo } from 'react';
@@ -67,6 +69,7 @@ import ColorFieldInputComponent from './inputs/ColorFieldInputComponent';
 import EnumFieldInputComponent from './inputs/EnumFieldInputComponent';
 import ImageFieldInputComponent from './inputs/ImageFieldInputComponent';
 import SchedulerFieldInputComponent from './inputs/SchedulerFieldInputComponent';
+import StylePresetFieldInputComponent from './inputs/StylePresetFieldInputComponent';
 
 type Props = {
   nodeId: string;
@@ -204,6 +207,13 @@ export const InputFieldRenderer = memo(({ nodeId, fieldName, settings }: Props) 
       return null;
     }
     return <BoardFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
+  }
+
+  if (isStylePresetFieldInputTemplate(template)) {
+    if (!isStylePresetFieldInputInstance(field)) {
+      return null;
+    }
+    return <StylePresetFieldInputComponent nodeId={nodeId} field={field} fieldTemplate={template} />;
   }
 
   if (isModelIdentifierFieldInputTemplate(template)) {

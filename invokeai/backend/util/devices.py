@@ -112,3 +112,28 @@ class TorchDevice:
     @classmethod
     def _to_dtype(cls, precision_name: TorchPrecisionNames) -> torch.dtype:
         return NAME_TO_PRECISION[precision_name]
+
+    @classmethod
+    def choose_bfloat16_safe_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:
+        """Return bfloat16 if supported on the device, else fallback to float16/float32.
+
+        This is useful for models that require bfloat16 precision (e.g., Z-Image, Flux)
+        but need to run on hardware that may not support bfloat16.
+
+        Args:
+            device: The target device. If None, uses choose_torch_device().
+
+        Returns:
+            torch.bfloat16 if supported, torch.float16 for CUDA without bfloat16 support,
+            or torch.float32 for CPU/MPS.
+        """
+        device = device or cls.choose_torch_device()
+        try:
+            # Test if bfloat16 is supported on this device
+            torch.tensor([1.0], dtype=torch.bfloat16, device=device)
+            return torch.bfloat16
+        except TypeError:
+            # bfloat16 not supported - fallback based on device type
+            if device.type == "cuda":
+                return torch.float16
+            return torch.float32

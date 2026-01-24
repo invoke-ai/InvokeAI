@@ -19,6 +19,7 @@ import type {
   RegionalGuidanceIPAdapterConfig,
   RgbColor,
   T2IAdapterConfig,
+  ZImageControlConfig,
 } from 'features/controlLayers/store/types';
 import type { ImageDTO } from 'services/api/types';
 import { assert } from 'tsafe';
@@ -128,6 +129,12 @@ export const initialControlLoRA: ControlLoRAConfig = {
   type: 'control_lora',
   model: null,
   weight: 0.75,
+};
+export const initialZImageControl: ZImageControlConfig = {
+  type: 'z_image_control',
+  model: null,
+  weight: 0.75, // control_context_scale, recommended 0.65-0.80
+  beginEndStepPct: [0, 1],
 };
 
 export const makeDefaultRasterLayerAdjustments = (mode: 'simple' | 'curves' = 'simple'): RasterLayerAdjustments => ({

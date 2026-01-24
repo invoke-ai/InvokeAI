@@ -66,6 +66,11 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   renderers = new SyncableMap<string, AnyObjectRenderer>();
 
   /**
+   * Tracks the cache keys used when rasterizing this entity so they can be invalidated on demand.
+   */
+  rasterCacheKeys = new Set<string>();
+
+  /**
    * A object containing singleton Konva nodes.
    */
   konva: {
@@ -476,7 +481,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   }): Promise<ImageDTO> => {
     const rasterizingAdapter = this.manager.stateApi.$rasterizingAdapter.get();
     if (rasterizingAdapter) {
-      assert(false, `Already rasterizing an entity: ${rasterizingAdapter.id}`);
+      await this.manager.stateApi.waitForRasterizationToFinish();
     }
 
     const { rect, replaceObjects, attrs, bg, ignoreCache } = {
@@ -493,6 +498,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     if (cachedImageName && !ignoreCache) {
       imageDTO = await getImageDTOSafe(cachedImageName);
       if (imageDTO) {
+        this.rasterCacheKeys.add(hash);
         this.log.trace({ rect, cachedImageName, imageDTO }, 'Using cached rasterized image');
         return imageDTO;
       }
@@ -524,6 +530,7 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
         replaceObjects,
       });
       this.manager.cache.imageNameCache.set(hash, imageDTO.image_name);
+      this.rasterCacheKeys.add(hash);
       return imageDTO;
     } catch (error) {
       this.log.error({ rasterizeArgs, error: serializeError(error as Error) }, 'Failed to rasterize entity');
@@ -533,37 +540,83 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     }
   };
 
-  cloneObjectGroup = (arg: { attrs?: GroupConfig } = {}): Konva.Group => {
-    const { attrs } = arg;
+  /**
+   * Invalidates all cached rasterizations for this entity by removing the cached image
+   * names from the image cache and clearing the tracked raster cache keys. This forces
+   * future rasterizations to regenerate images instead of using potentially stale
+   * cached versions.
+   */
+  invalidateRasterCache = () => {
+    if (this.rasterCacheKeys.size === 0) {
+      return;
+    }
+    for (const key of this.rasterCacheKeys) {
+      this.manager.cache.imageNameCache.delete(key);
+    }
+    this.rasterCacheKeys.clear();
+  };
+
+  cloneObjectGroup = (
+    arg: { attrs?: GroupConfig; cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean } } = {}
+  ): Konva.Group => {
+    const { attrs, cache } = arg;
     const clone = this.konva.objectGroup.clone();
     if (attrs) {
       clone.setAttrs(attrs);
     }
     if (clone.hasChildren()) {
-      clone.cache({ pixelRatio: 1, imageSmoothingEnabled: false });
+      const { pixelRatio = 1, imageSmoothingEnabled = false } = cache ?? {};
+      clone.cache({ pixelRatio, imageSmoothingEnabled });
     }
     return clone;
   };
 
-  getCanvas = (arg: { rect?: Rect; attrs?: GroupConfig; bg?: string } = {}): HTMLCanvasElement => {
-    const { rect, attrs, bg } = arg;
-    const clone = this.cloneObjectGroup({ attrs });
-    const canvas = konvaNodeToCanvas({ node: clone, rect, bg });
+  getCanvas = (
+    arg: {
+      rect?: Rect;
+      attrs?: GroupConfig;
+      bg?: string;
+      imageSmoothingEnabled?: boolean;
+      pixelRatio?: number;
+      cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
+    } = {}
+  ): HTMLCanvasElement => {
+    const { rect, attrs, bg, imageSmoothingEnabled, pixelRatio, cache } = arg;
+    const clone = this.cloneObjectGroup({ attrs, cache });
+    const canvas = konvaNodeToCanvas({ node: clone, rect, bg, imageSmoothingEnabled, pixelRatio });
     clone.destroy();
     return canvas;
   };
 
-  getBlob = async (arg: { rect?: Rect; attrs?: GroupConfig; bg?: string } = {}): Promise<Blob> => {
-    const { rect, attrs, bg } = arg;
-    const clone = this.cloneObjectGroup({ attrs });
-    const blob = await konvaNodeToBlob({ node: clone, rect, bg });
+  getBlob = async (
+    arg: {
+      rect?: Rect;
+      attrs?: GroupConfig;
+      bg?: string;
+      imageSmoothingEnabled?: boolean;
+      pixelRatio?: number;
+      cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
+    } = {}
+  ): Promise<Blob> => {
+    const { rect, attrs, bg, imageSmoothingEnabled, pixelRatio, cache } = arg;
+    const clone = this.cloneObjectGroup({ attrs, cache });
+    const blob = await konvaNodeToBlob({ node: clone, rect, bg, imageSmoothingEnabled, pixelRatio });
     return blob;
   };
 
-  getImageData = (arg: { rect?: Rect; attrs?: GroupConfig; bg?: string } = {}): ImageData => {
-    const { rect, attrs, bg } = arg;
-    const clone = this.cloneObjectGroup({ attrs });
-    const imageData = konvaNodeToImageData({ node: clone, rect, bg });
+  getImageData = (
+    arg: {
+      rect?: Rect;
+      attrs?: GroupConfig;
+      bg?: string;
+      imageSmoothingEnabled?: boolean;
+      pixelRatio?: number;
+      cache?: { pixelRatio?: number; imageSmoothingEnabled?: boolean };
+    } = {}
+  ): ImageData => {
+    const { rect, attrs, bg, imageSmoothingEnabled, pixelRatio, cache } = arg;
+    const clone = this.cloneObjectGroup({ attrs, cache });
+    const imageData = konvaNodeToImageData({ node: clone, rect, bg, imageSmoothingEnabled, pixelRatio });
     clone.destroy();
     return imageData;
   };

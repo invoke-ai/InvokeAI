@@ -15,6 +15,7 @@ import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModeP
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
+import { usePromptAttentionHotkeys } from 'features/prompt/usePromptAttentionHotkeys';
 import {
   selectStylePresetActivePresetId,
   selectStylePresetViewMode,
@@ -192,6 +193,11 @@ export const ParamPositivePrompt = memo(() => {
     dependencies: [promptHistoryApi.next, isPromptFocused],
   });
 
+  usePromptAttentionHotkeys({
+    textareaRef,
+    onPromptChange: (prompt) => dispatch(positivePromptChanged(prompt)),
+  });
+
   return (
     <Box pos="relative">
       <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
@@ -211,6 +217,8 @@ export const ParamPositivePrompt = memo(() => {
             paddingBottom={3}
             resize="vertical"
             minH={32}
+            fontFamily="mono"
+            fontSize="0.82rem"
           />
           <PromptOverlayButtonWrapper>
             <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">

@@ -10,6 +10,7 @@ import {
   isLLaVAModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
+  isQwen3EncoderModelConfig,
   isRefinerMainModelModelConfig,
   isSigLipModelConfig,
   isSpandrelImageToImageModelConfig,
@@ -69,6 +70,11 @@ export const MODEL_CATEGORIES: Record<FilterableModelType, ModelCategoryData> = 
     category: 't5_encoder',
     i18nKey: 'modelManager.t5Encoder',
     filter: isT5EncoderModelConfig,
+  },
+  qwen3_encoder: {
+    category: 'qwen3_encoder',
+    i18nKey: 'modelManager.qwen3Encoder',
+    filter: isQwen3EncoderModelConfig,
   },
   control_lora: {
     category: 'control_lora',
@@ -135,6 +141,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   'sdxl-refiner': 'invokeBlue',
   flux: 'gold',
   cogview4: 'red',
+  'z-image': 'cyan',
   unknown: 'red',
 };
 
@@ -155,6 +162,7 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   clip_vision: 'CLIP Vision',
   spandrel_image_to_image: 'Spandrel (Image to Image)',
   t5_encoder: 'T5 Encoder',
+  qwen3_encoder: 'Qwen3 Encoder',
   clip_embed: 'CLIP Embed',
   siglip: 'SigLIP',
   flux_redux: 'FLUX Redux',
@@ -173,6 +181,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   'sdxl-refiner': 'Stable Diffusion XL Refiner',
   flux: 'FLUX',
   cogview4: 'CogView4',
+  'z-image': 'Z-Image',
   unknown: 'Unknown',
 };
 
@@ -188,6 +197,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   'sdxl-refiner': 'SDXLR',
   flux: 'FLUX',
   cogview4: 'CogView4',
+  'z-image': 'Z-Image',
   unknown: 'Unknown',
 };
 
@@ -213,14 +223,22 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   embedding_folder: 'Embedding (folder)',
   invokeai: 'InvokeAI',
   t5_encoder: 'T5 Encoder',
+  qwen3_encoder: 'Qwen3 Encoder',
   bnb_quantized_int8b: 'BNB Quantized (int8b)',
   bnb_quantized_nf4b: 'BNB Quantized (nf4b)',
   gguf_quantized: 'GGUF Quantized',
   unknown: 'Unknown',
 };
 
-export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3'];
+export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3', 'z-image'];
 
 export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux'];
 
-export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = ['sd-1', 'sd-2', 'sdxl', 'cogview4', 'sd-3'];
+export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
+  'sd-1',
+  'sd-2',
+  'sdxl',
+  'cogview4',
+  'sd-3',
+  'z-image',
+];

@@ -60,7 +60,7 @@ const useInfiniteQueryAry = () => {
       direction,
       categories: getCategories(view),
       query: debouncedSearchTerm,
-      tags: view === 'defaults' ? selectedTags : [],
+      tags: view === 'defaults' || view === 'yours' ? selectedTags : [],
       has_been_opened: getHasBeenOpened(view),
     } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[0];
   }, [orderBy, direction, view, debouncedSearchTerm, selectedTags]);

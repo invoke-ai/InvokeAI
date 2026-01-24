@@ -86,7 +86,8 @@ class LayerPatcher:
         # submodules. If the layer keys do not contain a dot, then they are flattened, meaning that all '.' have been
         # replaced with '_'. Non-flattened keys are preferred, because they allow submodules to be accessed directly
         # without searching, but some legacy code still uses flattened keys.
-        layer_keys_are_flattened = "." not in next(iter(patch.layers.keys()))
+        first_key = next(iter(patch.layers.keys()))
+        layer_keys_are_flattened = "." not in first_key
 
         prefix_len = len(prefix)
 
@@ -174,28 +175,45 @@ class LayerPatcher:
 
         # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
         # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
-        for param_name, param_weight in patch.get_parameters(
-            dict(module_to_patch.named_parameters(recurse=False)), weight=patch_weight
-        ).items():
+        params_dict = patch.get_parameters(dict(module_to_patch.named_parameters(recurse=False)), weight=patch_weight)
+        if not params_dict:
+            logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+            logger.warning(f"LoRA patch returned no parameters for module: {module_to_patch_key}")
+            return
+
+        for param_name, param_weight in params_dict.items():
             param_key = module_to_patch_key + "." + param_name
             module_param = module_to_patch.get_parameter(param_name)
 
             # Save original weight
             original_weights.save(param_key, module_param)
 
-            # HACK(ryand): This condition is only necessary to handle layers in FLUX control LoRAs that change the
-            # shape of the original layer.
+            # Handle layers that change the shape of the original layer.
+            # FLUX control LoRAs intentionally expand certain layers - we pad the original weight with zeros.
+            # For other LoRAs (e.g., Z-Image with architecture mismatch), skip incompatible layers with a warning.
             if module_param.nelement() != param_weight.nelement():
-                assert isinstance(patch, FluxControlLoRALayer)
-                expanded_weight = pad_with_zeros(module_param, param_weight.shape)
-                setattr(
-                    module_to_patch,
-                    param_name,
-                    torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
-                )
-                module_param = expanded_weight
+                if isinstance(patch, FluxControlLoRALayer):
+                    # FLUX Control LoRAs intentionally expand layers - pad with zeros
+                    expanded_weight = pad_with_zeros(module_param, param_weight.shape)
+                    setattr(
+                        module_to_patch,
+                        param_name,
+                        torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
+                    )
+                    module_param = expanded_weight
+                else:
+                    # For other LoRAs, shape mismatch indicates architecture incompatibility - skip the layer
+                    logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                    logger.warning(
+                        f"Skipping LoRA layer '{module_to_patch_key}.{param_name}' due to shape mismatch: "
+                        f"model has {module_param.nelement()} elements, LoRA expects {param_weight.nelement()}. "
+                        "This LoRA may be incompatible with this model architecture."
+                    )
+                    continue
 
-            module_param += param_weight.to(dtype=dtype)
+            # Convert param_weight to the correct device and dtype, then apply to model weights
+            param_weight_converted = param_weight.to(device=device, dtype=dtype)
+            module_param.data.copy_(module_param.data + param_weight_converted)
 
         patch.to(device=TorchDevice.CPU_DEVICE)
 

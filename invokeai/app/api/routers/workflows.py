@@ -223,6 +223,15 @@ async def get_workflow_thumbnail(
         raise HTTPException(status_code=404)
 
 
+@workflows_router.get("/tags", operation_id="get_all_tags")
+async def get_all_tags(
+    categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories to include"),
+) -> list[str]:
+    """Gets all unique tags from workflows"""
+
+    return ApiDependencies.invoker.services.workflow_records.get_all_tags(categories=categories)
+
+
 @workflows_router.get("/counts_by_tag", operation_id="get_counts_by_tag")
 async def get_counts_by_tag(
     tags: list[str] = Query(description="The tags to get counts for"),

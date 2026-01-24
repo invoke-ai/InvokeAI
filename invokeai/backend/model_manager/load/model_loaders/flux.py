@@ -122,9 +122,9 @@ class CLIPDiffusersLoader(ModelLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer:
-                return CLIPTokenizer.from_pretrained(Path(config.path) / "tokenizer")
+                return CLIPTokenizer.from_pretrained(Path(config.path) / "tokenizer", local_files_only=True)
             case SubModelType.TextEncoder:
-                return CLIPTextModel.from_pretrained(Path(config.path) / "text_encoder")
+                return CLIPTextModel.from_pretrained(Path(config.path) / "text_encoder", local_files_only=True)
 
         raise ValueError(
             f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
@@ -148,10 +148,12 @@ class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
             )
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
-                return T5TokenizerFast.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
+                return T5TokenizerFast.from_pretrained(
+                    Path(config.path) / "tokenizer_2", max_length=512, local_files_only=True
+                )
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
                 te2_model_path = Path(config.path) / "text_encoder_2"
-                model_config = AutoConfig.from_pretrained(te2_model_path)
+                model_config = AutoConfig.from_pretrained(te2_model_path, local_files_only=True)
                 with accelerate.init_empty_weights():
                     model = AutoModelForTextEncoding.from_config(model_config)
                     model = quantize_model_llm_int8(model, modules_to_not_convert=set())
@@ -192,10 +194,15 @@ class T5EncoderCheckpointModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
-                return T5TokenizerFast.from_pretrained(Path(config.path) / "tokenizer_2", max_length=512)
+                return T5TokenizerFast.from_pretrained(
+                    Path(config.path) / "tokenizer_2", max_length=512, local_files_only=True
+                )
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
                 return T5EncoderModel.from_pretrained(
-                    Path(config.path) / "text_encoder_2", torch_dtype="auto", low_cpu_mem_usage=True
+                    Path(config.path) / "text_encoder_2",
+                    torch_dtype="auto",
+                    low_cpu_mem_usage=True,
+                    local_files_only=True,
                 )
 
         raise ValueError(

@@ -9,6 +9,7 @@ import {
   zParameterCLIPGEmbedModel,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
+  zParameterFluxScheduler,
   zParameterGuidance,
   zParameterImageDimension,
   zParameterMaskBlurMethod,
@@ -23,6 +24,7 @@ import {
   zParameterStrength,
   zParameterT5EncoderModel,
   zParameterVAEModel,
+  zParameterZImageScheduler,
 } from 'features/parameters/types/parameterSchemas';
 import type { JsonObject } from 'type-fest';
 import { z } from 'zod';
@@ -411,6 +413,14 @@ const zControlLoRAConfig = z.object({
 });
 export type ControlLoRAConfig = z.infer<typeof zControlLoRAConfig>;
 
+const zZImageControlConfig = z.object({
+  type: z.literal('z_image_control'),
+  model: zModelIdentifierField.nullable(),
+  weight: z.number().gte(0).lte(2), // control_context_scale, recommended 0.65-0.80
+  beginEndStepPct: zBeginEndStepPct,
+});
+export type ZImageControlConfig = z.infer<typeof zZImageControlConfig>;
+
 /**
  * All simple params normalized to `[-1, 1]` except sharpness `[0, 1]`.
  *
@@ -468,7 +478,12 @@ export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 const zCanvasControlLayerState = zCanvasRasterLayerState.extend({
   type: z.literal('control_layer'),
   withTransparencyEffect: z.boolean(),
-  controlAdapter: z.discriminatedUnion('type', [zControlNetConfig, zT2IAdapterConfig, zControlLoRAConfig]),
+  controlAdapter: z.discriminatedUnion('type', [
+    zControlNetConfig,
+    zT2IAdapterConfig,
+    zControlLoRAConfig,
+    zZImageControlConfig,
+  ]),
 });
 export type CanvasControlLayerState = z.infer<typeof zCanvasControlLayerState>;
 
@@ -583,6 +598,8 @@ export const zParamsState = z.object({
   optimizedDenoisingEnabled: z.boolean(),
   iterations: z.number(),
   scheduler: zParameterScheduler,
+  fluxScheduler: zParameterFluxScheduler,
+  zImageScheduler: zParameterZImageScheduler,
   upscaleScheduler: zParameterScheduler,
   upscaleCfgScale: zParameterCFGScale,
   seed: zParameterSeed,
@@ -612,6 +629,14 @@ export const zParamsState = z.object({
   clipLEmbedModel: zParameterCLIPLEmbedModel.nullable(),
   clipGEmbedModel: zParameterCLIPGEmbedModel.nullable(),
   controlLora: zParameterControlLoRAModel.nullable(),
+  // Z-Image model components - can use separate models or extract from a Diffusers source
+  zImageVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX VAE
+  zImageQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder
+  zImageQwen3SourceModel: zParameterModel.nullable(), // Diffusers Z-Image model (fallback for VAE/Encoder)
+  // Z-Image Seed Variance Enhancer settings
+  zImageSeedVarianceEnabled: z.boolean(),
+  zImageSeedVarianceStrength: z.number().min(0).max(2),
+  zImageSeedVarianceRandomizePercent: z.number().min(1).max(100),
   dimensions: zDimensionsState,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
@@ -633,6 +658,8 @@ export const getInitialParamsState = (): ParamsState => ({
   optimizedDenoisingEnabled: true,
   iterations: 1,
   scheduler: 'dpmpp_3m_k',
+  fluxScheduler: 'euler',
+  zImageScheduler: 'euler',
   upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,
   seed: 0,
@@ -662,6 +689,12 @@ export const getInitialParamsState = (): ParamsState => ({
   clipLEmbedModel: null,
   clipGEmbedModel: null,
   controlLora: null,
+  zImageVaeModel: null,
+  zImageQwen3EncoderModel: null,
+  zImageQwen3SourceModel: null,
+  zImageSeedVarianceEnabled: false,
+  zImageSeedVarianceStrength: 0.1,
+  zImageSeedVarianceRandomizePercent: 50,
   dimensions: {
     width: 512,
     height: 512,

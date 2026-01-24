@@ -255,6 +255,19 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'z-image') {
+    // Check if VAE source is available (either separate VAE or Qwen3 Source)
+    const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
+    if (!hasVaeSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+    }
+    // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
+    const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
+    if (!hasQwen3Source) {
+      reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    }
+  }
+
   if (model) {
     for (const lora of loras.filter(({ isEnabled }) => isEnabled === true)) {
       if (model.base !== lora.model.base) {
@@ -570,6 +583,19 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
           }),
         });
       }
+    }
+  }
+
+  if (model?.base === 'z-image') {
+    // Check if VAE source is available (either separate VAE or Qwen3 Source)
+    const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
+    if (!hasVaeSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+    }
+    // Check if Qwen3 Encoder source is available (either separate Encoder or Qwen3 Source)
+    const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
+    if (!hasQwen3Source) {
+      reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
     }
   }
 

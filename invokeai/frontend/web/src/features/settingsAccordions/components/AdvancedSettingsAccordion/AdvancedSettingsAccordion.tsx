@@ -1,15 +1,22 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Flex, FormControlGroup, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { Box, Flex, FormControlGroup, SimpleGrid, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectIsFLUX, selectIsSD3, selectParamsSlice, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectIsFLUX,
+  selectIsSD3,
+  selectIsZImage,
+  selectParamsSlice,
+  selectVAEKey,
+} from 'features/controlLayers/store/paramsSlice';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
 import ParamCLIPEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPEmbedModelSelect';
 import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPGEmbedModelSelect';
 import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
+import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
 import ParamColorCompensation from 'features/parameters/components/VAEModel/ParamColorCompensation';
@@ -34,6 +41,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
+  const isZImage = useAppSelector(selectIsZImage);
 
   const selectBadges = useMemo(
     () =>
@@ -82,11 +90,13 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        <Flex gap={4} w="full">
-          {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
-          {!isFLUX && !isSD3 && <ParamVAEPrecision />}
-        </Flex>
-        {!isFLUX && !isSD3 && (
+        {!isZImage && (
+          <Flex gap={4} w="full">
+            {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
+            {!isFLUX && !isSD3 && <ParamVAEPrecision />}
+          </Flex>
+        )}
+        {!isFLUX && !isSD3 && !isZImage && (
           <>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamClipSkip />
@@ -94,13 +104,15 @@ export const AdvancedSettingsAccordion = memo(() => {
             </FormControlGroup>
             <Flex gap={4} w="full">
               <FormControlGroup formLabelProps={formLabelProps2}>
-                <ParamSeamlessXAxis />
-                <ParamSeamlessYAxis />
+                <SimpleGrid columns={2} spacing={4} w="full">
+                  <ParamSeamlessXAxis />
+                  <ParamSeamlessYAxis />
+                  <ParamColorCompensation />
+                  {/* Empty box for visual alignment. Replace with new option when needed. */}
+                  <Box />
+                </SimpleGrid>
               </FormControlGroup>
             </Flex>
-            <FormControlGroup formLabelProps={formLabelProps}>
-              <ParamColorCompensation />
-            </FormControlGroup>
           </>
         )}
         {isFLUX && (
@@ -114,6 +126,11 @@ export const AdvancedSettingsAccordion = memo(() => {
             <ParamT5EncoderModelSelect />
             <ParamCLIPLEmbedModelSelect />
             <ParamCLIPGEmbedModelSelect />
+          </FormControlGroup>
+        )}
+        {isZImage && (
+          <FormControlGroup>
+            <ParamZImageQwen3VaeModelSelect />
           </FormControlGroup>
         )}
       </Flex>

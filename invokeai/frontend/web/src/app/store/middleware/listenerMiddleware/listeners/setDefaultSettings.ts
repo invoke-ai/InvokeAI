@@ -84,7 +84,7 @@ export const addSetDefaultSettingsListener = (startAppListening: AppStartListeni
           }
         }
 
-        if (cfg_scale) {
+        if (!isNil(cfg_scale)) {
           if (isParameterCFGScale(cfg_scale)) {
             dispatch(setCfgScale(cfg_scale));
           }

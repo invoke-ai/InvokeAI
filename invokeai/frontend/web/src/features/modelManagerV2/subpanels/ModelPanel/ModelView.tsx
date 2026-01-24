@@ -10,10 +10,12 @@ import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AnyModelConfig } from 'services/api/types';
 
+import { isExternalModel } from './isExternalModel';
 import { MainModelDefaultSettings } from './MainModelDefaultSettings/MainModelDefaultSettings';
 import { ModelAttrView } from './ModelAttrView';
 import { ModelDeleteButton } from './ModelDeleteButton';
 import { ModelReidentifyButton } from './ModelReidentifyButton';
+import { ModelUpdatePathButton } from './ModelUpdatePathButton';
 import { RelatedModels } from './RelatedModels';
 
 type Props = {
@@ -22,6 +24,9 @@ type Props = {
 
 export const ModelView = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
+
+  // Only allow path updates for external models (not Invoke-controlled)
+  const canUpdatePath = useMemo(() => isExternalModel(modelConfig.path), [modelConfig.path]);
 
   const withSettings = useMemo(() => {
     if (modelConfig.type === 'main' && modelConfig.base !== 'sdxl-refiner') {
@@ -44,6 +49,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
   return (
     <Flex flexDir="column" gap={4} h="full">
       <ModelHeader modelConfig={modelConfig}>
+        {canUpdatePath && <ModelUpdatePathButton modelConfig={modelConfig} />}
         <ModelReidentifyButton modelConfig={modelConfig} />
         {modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />

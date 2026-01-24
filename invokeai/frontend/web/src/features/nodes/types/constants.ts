@@ -35,6 +35,7 @@ export const NO_PAN_CLASS = 'nopan';
 export const FIELD_COLORS: { [key: string]: string } = {
   BoardField: 'purple.500',
   BooleanField: 'green.500',
+  StylePresetField: 'purple.400',
   CLIPField: 'green.500',
   ColorField: 'pink.300',
   ConditioningField: 'cyan.500',
@@ -54,6 +55,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   FluxMainModelField: 'teal.500',
   SD3MainModelField: 'teal.500',
   CogView4MainModelField: 'teal.500',
+  ZImageMainModelField: 'teal.500',
   SDXLMainModelField: 'teal.500',
   SDXLRefinerModelField: 'teal.500',
   SpandrelImageToImageModelField: 'teal.500',
@@ -62,6 +64,7 @@ export const FIELD_COLORS: { [key: string]: string } = {
   T2IAdapterModelField: 'teal.500',
   UNetField: 'red.500',
   T5EncoderField: 'green.500',
+  Qwen3EncoderField: 'green.500',
   TransformerField: 'red.500',
   VAEField: 'blue.500',
   VAEModelField: 'teal.500',

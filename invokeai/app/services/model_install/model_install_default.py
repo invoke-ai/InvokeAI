@@ -1,8 +1,10 @@
 """Model installation class."""
 
+import gc
 import locale
 import os
 import re
+import sys
 import threading
 import time
 from copy import deepcopy
@@ -187,6 +189,22 @@ class ModelInstallService(ModelInstallServiceBase):
         config.source_type = ModelSourceType.Path
         return self._register(model_path, config)
 
+    # TODO: Replace this with a proper fix for underlying problem of Windows holding open
+    # the file when it needs to be moved.
+    @staticmethod
+    def _move_with_retries(src: Path, dst: Path, attempts: int = 5, delay: float = 0.5) -> None:
+        """Workaround for Windows file-handle issues when moving files."""
+        for tries_left in range(attempts, 0, -1):
+            try:
+                move(src, dst)
+                return
+            except PermissionError:
+                gc.collect()
+                if tries_left == 1:
+                    raise
+                time.sleep(delay)
+                delay *= 2  # Exponential backoff
+
     def install_path(
         self,
         model_path: Union[Path, str],
@@ -205,7 +223,7 @@ class ModelInstallService(ModelInstallServiceBase):
             dest_dir.mkdir(parents=True)
             dest_path = dest_dir / model_path.name if model_path.is_file() else dest_dir
             if model_path.is_file():
-                move(model_path, dest_path)
+                self._move_with_retries(model_path, dest_path)  # Windows workaround TODO: fix root cause
             elif model_path.is_dir():
                 # Move the contents of the directory, not the directory itself
                 for item in model_path.iterdir():
@@ -417,10 +435,15 @@ class ModelInstallService(ModelInstallServiceBase):
         model_path.mkdir(parents=True, exist_ok=True)
         model_source = self._guess_source(str(source))
         remote_files, _ = self._remote_files_from_source(model_source)
+        # Handle multiple subfolders for HFModelSource
+        subfolders = model_source.subfolders if isinstance(model_source, HFModelSource) else []
         job = self._multifile_download(
             dest=model_path,
             remote_files=remote_files,
-            subfolder=model_source.subfolder if isinstance(model_source, HFModelSource) else None,
+            subfolder=model_source.subfolder
+            if isinstance(model_source, HFModelSource) and len(subfolders) <= 1
+            else None,
+            subfolders=subfolders if len(subfolders) > 1 else None,
         )
         files_string = "file" if len(remote_files) == 1 else "files"
         self._logger.info(f"Queuing model download: {source} ({len(remote_files)} {files_string})")
@@ -438,10 +461,13 @@ class ModelInstallService(ModelInstallServiceBase):
         if isinstance(source, HFModelSource):
             metadata = HuggingFaceMetadataFetch(self._session).from_id(source.repo_id, source.variant)
             assert isinstance(metadata, ModelMetadataWithFiles)
+            # Use subfolders property which handles '+' separated multiple subfolders
+            subfolders = source.subfolders
             return (
                 metadata.download_urls(
                     variant=source.variant or self._guess_variant(),
-                    subfolder=source.subfolder,
+                    subfolder=source.subfolder if len(subfolders) <= 1 else None,
+                    subfolders=subfolders if len(subfolders) > 1 else None,
                     session=self._session,
                 ),
                 metadata,
@@ -492,6 +518,39 @@ class ModelInstallService(ModelInstallServiceBase):
         self._install_thread.start()
         self._running = True
 
+    @staticmethod
+    def _safe_rmtree(path: Path, logger: Any) -> None:
+        """Remove a directory tree with retry logic for Windows file locking issues.
+
+        On Windows, memory-mapped files may not be immediately released even after
+        the file handle is closed. This function retries the removal with garbage
+        collection to help release any lingering references.
+        """
+        max_retries = 3
+        retry_delay = 0.5  # seconds
+
+        for attempt in range(max_retries):
+            try:
+                # Force garbage collection to release any lingering file references
+                gc.collect()
+                rmtree(path)
+                return
+            except PermissionError as e:
+                if attempt < max_retries - 1 and sys.platform == "win32":
+                    logger.warning(
+                        f"Failed to remove {path} (attempt {attempt + 1}/{max_retries}): {e}. "
+                        f"Retrying in {retry_delay}s..."
+                    )
+                    time.sleep(retry_delay)
+                    retry_delay *= 2  # Exponential backoff
+                else:
+                    logger.error(f"Failed to remove temporary directory {path}: {e}")
+                    # On final failure, don't raise - the temp dir will be cleaned up on next startup
+                    return
+            except Exception as e:
+                logger.error(f"Unexpected error removing {path}: {e}")
+                return
+
     def _install_next_item(self) -> None:
         self._logger.debug(f"Installer thread {threading.get_ident()} starting")
         while True:
@@ -521,7 +580,7 @@ class ModelInstallService(ModelInstallServiceBase):
             finally:
                 # if this is an install of a remote file, then clean up the temporary directory
                 if job._install_tmpdir is not None:
-                    rmtree(job._install_tmpdir)
+                    self._safe_rmtree(job._install_tmpdir, self._logger)
                 self._install_completed_event.set()
                 self._install_queue.task_done()
         self._logger.info(f"Installer thread {threading.get_ident()} exiting")
@@ -566,7 +625,7 @@ class ModelInstallService(ModelInstallServiceBase):
         path = self._app_config.models_path
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
             self._logger.info(f"Removing dangling temporary directory {tmpdir}")
-            rmtree(tmpdir)
+            self._safe_rmtree(tmpdir, self._logger)
 
     def _scan_for_missing_models(self) -> list[AnyModelConfig]:
         """Scan the models directory for missing models and return a list of them."""
@@ -741,10 +800,13 @@ class ModelInstallService(ModelInstallServiceBase):
         install_job._install_tmpdir = destdir
         install_job.total_bytes = sum((x.size or 0) for x in remote_files)
 
+        # Handle multiple subfolders for HFModelSource
+        subfolders = source.subfolders if isinstance(source, HFModelSource) else []
         multifile_job = self._multifile_download(
             remote_files=remote_files,
             dest=destdir,
-            subfolder=source.subfolder if isinstance(source, HFModelSource) else None,
+            subfolder=source.subfolder if isinstance(source, HFModelSource) and len(subfolders) <= 1 else None,
+            subfolders=subfolders if len(subfolders) > 1 else None,
             access_token=source.access_token,
             submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
         )
@@ -771,6 +833,7 @@ class ModelInstallService(ModelInstallServiceBase):
         remote_files: List[RemoteModelFile],
         dest: Path,
         subfolder: Optional[Path] = None,
+        subfolders: Optional[List[Path]] = None,
         access_token: Optional[str] = None,
         submit_job: bool = True,
     ) -> MultiFileDownloadJob:
@@ -778,24 +841,61 @@ class ModelInstallService(ModelInstallServiceBase):
         # we are installing the "vae" subfolder, we do not want to create an additional folder level, such
         # as "sdxl-turbo/vae", nor do we want to put the contents of the vae folder directly into "sdxl-turbo".
         # So what we do is to synthesize a folder named "sdxl-turbo_vae" here.
-        if subfolder:
+        #
+        # For multiple subfolders (e.g., text_encoder+tokenizer), we create a combined folder name
+        # (e.g., sdxl-turbo_text_encoder_tokenizer) and keep each subfolder's contents in its own
+        # subdirectory within the model folder.
+
+        if subfolders and len(subfolders) > 1:
+            # Multiple subfolders: create combined name and keep subfolder structure
+            top = Path(remote_files[0].path.parts[0])  # e.g. "Z-Image-Turbo/"
+            subfolder_names = [sf.name.replace("/", "_").replace("\\", "_") for sf in subfolders]
+            combined_name = "_".join(subfolder_names)
+            path_to_add = Path(f"{top}_{combined_name}")
+
+            parts: List[RemoteModelFile] = []
+            for model_file in remote_files:
+                assert model_file.size is not None
+                # Determine which subfolder this file belongs to
+                file_path = model_file.path
+                new_path: Optional[Path] = None
+                for sf in subfolders:
+                    try:
+                        # Try to get relative path from this subfolder
+                        relative = file_path.relative_to(top / sf)
+                        # Keep the subfolder name as a subdirectory
+                        new_path = path_to_add / sf.name / relative
+                        break
+                    except ValueError:
+                        continue
+
+                if new_path is None:
+                    # File doesn't match any subfolder, keep original path structure
+                    new_path = path_to_add / file_path.relative_to(top)
+
+                parts.append(RemoteModelFile(url=model_file.url, path=new_path))
+        elif subfolder:
+            # Single subfolder: flatten into renamed folder
             top = Path(remote_files[0].path.parts[0])  # e.g. "sdxl-turbo/"
             path_to_remove = top / subfolder  # sdxl-turbo/vae/
             subfolder_rename = subfolder.name.replace("/", "_").replace("\\", "_")
             path_to_add = Path(f"{top}_{subfolder_rename}")
-        else:
-            path_to_remove = Path(".")
-            path_to_add = Path(".")
 
-        parts: List[RemoteModelFile] = []
-        for model_file in remote_files:
-            assert model_file.size is not None
-            parts.append(
-                RemoteModelFile(
-                    url=model_file.url,  # if a subfolder, then sdxl-turbo_vae/config.json
-                    path=path_to_add / model_file.path.relative_to(path_to_remove),
+            parts = []
+            for model_file in remote_files:
+                assert model_file.size is not None
+                parts.append(
+                    RemoteModelFile(
+                        url=model_file.url,
+                        path=path_to_add / model_file.path.relative_to(path_to_remove),
+                    )
                 )
-            )
+        else:
+            # No subfolder specified - pass through unchanged
+            parts = []
+            for model_file in remote_files:
+                assert model_file.size is not None
+                parts.append(RemoteModelFile(url=model_file.url, path=model_file.path))
 
         return self._download_queue.multifile_download(
             parts=parts,

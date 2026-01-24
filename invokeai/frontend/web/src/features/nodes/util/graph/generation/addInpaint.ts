@@ -24,7 +24,7 @@ type AddInpaintArg = {
   state: RootState;
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
-  i2l: Invocation<'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l'>;
+  i2l: Invocation<'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l' | 'z_image_i2l'>;
   noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
@@ -53,7 +53,12 @@ export const addInpaint = async ({
 
   const { originalSize, scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
 
-  if (denoise.type === 'cogview4_denoise' || denoise.type === 'flux_denoise' || denoise.type === 'sd3_denoise') {
+  if (
+    denoise.type === 'cogview4_denoise' ||
+    denoise.type === 'flux_denoise' ||
+    denoise.type === 'sd3_denoise' ||
+    denoise.type === 'z_image_denoise'
+  ) {
     denoise.width = scaledSize.width;
     denoise.height = scaledSize.height;
   } else {

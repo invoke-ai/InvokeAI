@@ -16,7 +16,9 @@ The launcher uses GitHub as the source of truth for available releases.
 
 ## General Prep
 
-Make a developer call-out for PRs to merge. Merge and test things out. Bump the version by editing `invokeai/version/invokeai_version.py`.
+Make a developer call-out for PRs to merge. Merge and test things
+out. Create a branch with a name like user/chore/vX.X.X-prep and bump the version by editing
+`invokeai/version/invokeai_version.py` and commit locally.
 
 ## Release Workflow
 
@@ -26,13 +28,13 @@ It is triggered on **tag push**, when the tag matches `v*`.
 
 ### Triggering the Workflow
 
-Ensure all commits that should be in the release are merged, and you have pulled them locally.
-
-Double-check that you have checked out the commit that will represent the release (typically the latest commit on `main`).
+Ensure all commits that should be in the release are merged into this branch, and that you have pulled them locally.
 
 Run `make tag-release` to tag the current commit and kick off the workflow. You will be prompted to provide a message - use the version specifier.
 
 If this version's tag already exists for some reason (maybe you had to make a last minute change), the script will overwrite it.
+
+Push the commit to trigger the workflow.
 
 > In case you cannot use the Make target, the release may also be dispatched [manually] via GH.
 
@@ -89,7 +91,7 @@ The publish jobs will not run if any of the previous jobs fail.
 
 They use [GitHub environments], which are configured as [trusted publishers] on PyPI.
 
-Both jobs require a @hipsterusername or @psychedelicious to approve them from the workflow's **Summary** tab.
+Both jobs require a @lstein or @blessedcoolant to approve them from the workflow's **Summary** tab.
 
 - Click the **Review deployments** button
 - Select the environment (either `testpypi` or `pypi` - typically you select both)
@@ -101,7 +103,7 @@ Both jobs require a @hipsterusername or @psychedelicious to approve them from th
 
 Check the [python infrastructure status page] for incidents.
 
-If there are no incidents, contact @hipsterusername or @lstein, who have owner access to GH and PyPI, to see if access has expired or something like that.
+If there are no incidents, contact @lstein or @blessedcoolant, who have owner access to GH and PyPI, to see if access has expired or something like that.
 
 #### `publish-testpypi` Job
 

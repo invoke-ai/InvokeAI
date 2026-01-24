@@ -150,10 +150,15 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
 
     @classmethod
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
-        # First rule out ControlLoRA and Diffusers LoRA
+        # First rule out ControlLoRA
         flux_format = _get_flux_lora_format(mod)
         if flux_format in [FluxLoRAFormat.Control]:
             raise NotAMatchError("model looks like Control LoRA")
+
+        # If it's a recognized Flux LoRA format (Kohya, Diffusers, OneTrainer, AIToolkit, XLabs, etc.),
+        # it's valid and we skip the heuristic check
+        if flux_format is not None:
+            return
 
         # Note: Existence of these key prefixes/suffixes does not guarantee that this is a LoRA.
         # Some main models have these keys, likely due to the creator merging in a LoRA.
@@ -215,6 +220,73 @@ class LoRA_LyCORIS_SDXL_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
 class LoRA_LyCORIS_FLUX_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+
+
+class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Z-Image LoRA models in LyCORIS format."""
+
+    base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Z-Image LoRAs have different key patterns than SD/SDXL LoRAs.
+
+        Z-Image LoRAs use keys like:
+        - diffusion_model.layers.X.attention.to_k.lora_down.weight (DoRA format)
+        - diffusion_model.layers.X.attention.to_k.lora_A.weight (PEFT format)
+        - diffusion_model.layers.X.attention.to_k.dora_scale (DoRA scale)
+        """
+        state_dict = mod.load_state_dict()
+
+        # Check for Z-Image specific LoRA patterns
+        has_z_image_lora_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "diffusion_model.layers.",  # Z-Image S3-DiT layer pattern
+            },
+        )
+
+        # Also check for LoRA weight suffixes (various formats)
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+                "dora_scale",
+            },
+        )
+
+        if has_z_image_lora_keys and has_lora_suffix:
+            return
+
+        raise NotAMatchError("model does not match Z-Image LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        """Z-Image LoRAs are identified by their diffusion_model.layers structure.
+
+        Z-Image uses S3-DiT architecture with layer names like:
+        - diffusion_model.layers.0.attention.to_k.lora_A.weight
+        - diffusion_model.layers.0.feed_forward.w1.lora_A.weight
+        """
+        state_dict = mod.load_state_dict()
+
+        # Check for Z-Image transformer layer patterns
+        # Z-Image uses diffusion_model.layers.X structure (unlike Flux which uses double_blocks/single_blocks)
+        has_z_image_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "diffusion_model.layers.",  # Z-Image S3-DiT layer pattern
+            },
+        )
+
+        # If it looks like a Z-Image LoRA, return ZImage base
+        if has_z_image_keys:
+            return BaseModelType.ZImage
+
+        raise NotAMatchError("model does not look like a Z-Image LoRA")
 
 
 class ControlAdapter_Config_Base(ABC, BaseModel):
@@ -320,3 +392,9 @@ class LoRA_Diffusers_SDXL_Config(LoRA_Diffusers_Config_Base, Config_Base):
 
 class LoRA_Diffusers_FLUX_Config(LoRA_Diffusers_Config_Base, Config_Base):
     base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+
+
+class LoRA_Diffusers_ZImage_Config(LoRA_Diffusers_Config_Base, Config_Base):
+    """Model config for Z-Image LoRA models in Diffusers format."""
+
+    base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)

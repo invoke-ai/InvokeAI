@@ -21,6 +21,7 @@ const contentSx = {
   p: 0,
   bg: 'base.900',
   borderRadius: '0',
+  zIndex: 0,
 } satisfies SystemStyleObject;
 
 export const ModelListWrapper = memo((props: ModelListWrapperProps) => {

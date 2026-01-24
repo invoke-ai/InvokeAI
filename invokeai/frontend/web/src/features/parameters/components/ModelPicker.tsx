@@ -219,7 +219,7 @@ export const ModelPicker = typedMemo(
       const _options: Group<WithStarred<T>>[] = [];
 
       // Add groups in the original order
-      for (const groupId of ['api', 'flux', 'cogview4', 'sdxl', 'sd-3', 'sd-2', 'sd-1']) {
+      for (const groupId of ['api', 'flux', 'z-image', 'cogview4', 'sdxl', 'sd-3', 'sd-2', 'sd-1']) {
         const group = groups[groupId];
         if (group) {
           // Sort options within each group so starred ones come first

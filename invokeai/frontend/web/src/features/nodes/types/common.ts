@@ -16,6 +16,10 @@ export const zBoardField = z.object({
 });
 export type BoardField = z.infer<typeof zBoardField>;
 
+export const zStylePresetField = z.object({
+  style_preset_id: z.string().trim().min(1),
+});
+
 export const zColorField = z.object({
   r: z.number().int().min(0).max(255),
   g: z.number().int().min(0).max(255),
@@ -60,6 +64,12 @@ export const zSchedulerField = z.enum([
   'tcd',
 ]);
 export type SchedulerField = z.infer<typeof zSchedulerField>;
+
+// Flux-specific scheduler options (Flow Matching schedulers)
+export const zFluxSchedulerField = z.enum(['euler', 'heun', 'lcm']);
+
+// Z-Image scheduler options (Flow Matching schedulers, same as Flux)
+export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // #endregion
 
 // #region Model-related schemas
@@ -72,10 +82,11 @@ export const zBaseModelType = z.enum([
   'sdxl-refiner',
   'flux',
   'cogview4',
+  'z-image',
   'unknown',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModelType>;
-export const zMainModelBase = z.enum(['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'cogview4']);
+export const zMainModelBase = z.enum(['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'cogview4', 'z-image']);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
 export const zModelType = z.enum([
@@ -92,6 +103,7 @@ export const zModelType = z.enum([
   'clip_vision',
   'spandrel_image_to_image',
   't5_encoder',
+  'qwen3_encoder',
   'clip_embed',
   'siglip',
   'flux_redux',
@@ -130,6 +142,7 @@ export const zModelFormat = z.enum([
   'embedding_folder',
   'invokeai',
   't5_encoder',
+  'qwen3_encoder',
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',

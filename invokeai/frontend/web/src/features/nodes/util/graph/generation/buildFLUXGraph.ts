@@ -43,7 +43,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   const canvas = selectCanvasSlice(state);
   const refImages = selectRefImagesSlice(state);
 
-  const { guidance: baseGuidance, steps, fluxVAE, t5EncoderModel, clipEmbedModel } = params;
+  const { guidance: baseGuidance, steps, fluxScheduler, fluxVAE, t5EncoderModel, clipEmbedModel } = params;
 
   assert(t5EncoderModel, 'No T5 Encoder model found in state');
   assert(clipEmbedModel, 'No CLIP Embed model found in state');
@@ -114,6 +114,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     id: getPrefixedId('flux_denoise'),
     guidance,
     num_steps: steps,
+    scheduler: fluxScheduler,
   });
 
   const l2i = g.addNode({
@@ -142,6 +143,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     guidance,
     model: Graph.getModelMetadataField(model),
     steps,
+    scheduler: fluxScheduler,
     vae: fluxVAE,
     t5_encoder: t5EncoderModel,
     clip_embed_model: clipEmbedModel,

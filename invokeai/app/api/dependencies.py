@@ -49,6 +49,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     FLUXConditioningInfo,
     SD3ConditioningInfo,
     SDXLConditioningInfo,
+    ZImageConditioningInfo,
 )
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
@@ -129,6 +130,7 @@ class ApiDependencies:
                     FLUXConditioningInfo,
                     SD3ConditioningInfo,
                     CogView4ConditioningInfo,
+                    ZImageConditioningInfo,
                 ],
                 ephemeral=True,
             ),

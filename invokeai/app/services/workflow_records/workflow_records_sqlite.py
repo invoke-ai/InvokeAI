@@ -332,6 +332,48 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 (workflow_id,),
             )
 
+    def get_all_tags(
+        self,
+        categories: Optional[list[WorkflowCategory]] = None,
+    ) -> list[str]:
+        with self._db.transaction() as cursor:
+            conditions: list[str] = []
+            params: list[str] = []
+
+            # Only get workflows that have tags
+            conditions.append("tags IS NOT NULL AND tags != ''")
+
+            if categories:
+                assert all(c in WorkflowCategory for c in categories)
+                placeholders = ", ".join("?" for _ in categories)
+                conditions.append(f"category IN ({placeholders})")
+                params.extend([category.value for category in categories])
+
+            stmt = """--sql
+                SELECT DISTINCT tags
+                FROM workflow_library
+                """
+
+            if conditions:
+                stmt += " WHERE " + " AND ".join(conditions)
+
+            cursor.execute(stmt, params)
+            rows = cursor.fetchall()
+
+            # Parse comma-separated tags and collect unique tags
+            all_tags: set[str] = set()
+
+            for row in rows:
+                tags_value = row[0]
+                if tags_value and isinstance(tags_value, str):
+                    # Tags are stored as comma-separated string
+                    for tag in tags_value.split(","):
+                        tag_stripped = tag.strip()
+                        if tag_stripped:
+                            all_tags.add(tag_stripped)
+
+            return sorted(all_tags)
+
     def _sync_default_workflows(self) -> None:
         """Syncs default workflows to the database. Internal use only."""
 

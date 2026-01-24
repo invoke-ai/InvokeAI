@@ -52,6 +52,7 @@ from invokeai.app.invocations.primitives import (
 )
 from invokeai.app.invocations.scheduler import SchedulerOutput
 from invokeai.app.invocations.t2i_adapter import T2IAdapterField, T2IAdapterInvocation
+from invokeai.app.invocations.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -720,6 +721,52 @@ class FluxDenoiseLatentsMetaInvocation(FluxDenoiseInvocation, WithMetadata):
         md.update({"cfg_scale": self.cfg_scale})
         md.update({"cfg_scale_start_step": self.cfg_scale_start_step})
         md.update({"cfg_scale_end_step": self.cfg_scale_end_step})
+        if len(self.transformer.loras) > 0:
+            md.update({"loras": _loras_to_json(self.transformer.loras)})
+
+        params = obj.__dict__.copy()
+        del params["type"]
+
+        return LatentsMetaOutput(**params, metadata=MetadataField.model_validate(md))
+
+
+@invocation(
+    "z_image_denoise_meta",
+    title=f"{ZImageDenoiseInvocation.UIConfig.title} + Metadata",
+    tags=["z-image", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
+    category="latents",
+    version="1.0.0",
+)
+class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation, WithMetadata):
+    """Run denoising process with a Z-Image transformer model + metadata."""
+
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
+        def _loras_to_json(obj: Union[Any, list[Any]]):
+            if not isinstance(obj, list):
+                obj = [obj]
+
+            output: list[dict[str, Any]] = []
+            for item in obj:
+                output.append(
+                    LoRAMetadataField(
+                        model=item.lora,
+                        weight=item.weight,
+                    ).model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
+                )
+            return output
+
+        obj = super().invoke(context)
+
+        md: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
+        md.update({"width": obj.width})
+        md.update({"height": obj.height})
+        md.update({"steps": self.steps})
+        md.update({"guidance": self.guidance_scale})
+        md.update({"denoising_start": self.denoising_start})
+        md.update({"denoising_end": self.denoising_end})
+        md.update({"scheduler": self.scheduler})
+        md.update({"model": self.transformer.transformer})
+        md.update({"seed": self.seed})
         if len(self.transformer.loras) > 0:
             md.update({"loras": _loras_to_json(self.transformer.loras)})
 
