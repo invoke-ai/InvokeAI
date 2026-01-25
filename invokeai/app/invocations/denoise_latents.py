@@ -74,9 +74,9 @@ from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGE
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.stable_diffusion.extensions.t2i_adapter import T2IAdapterExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
+from invokeai.backend.stable_diffusion.hidiffusion_utils import hidiffusion_patch
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
-from invokeai.backend.stable_diffusion.hidiffusion_utils import hidiffusion_patch
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.hotfixes import ControlNetModel
 from invokeai.backend.util.mask import to_standard_float_mask
