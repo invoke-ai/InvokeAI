@@ -83,11 +83,12 @@ const DataViewer = (props: Props) => {
   const { t } = useTranslation();
 
   const highlightedDataString = useMemo(() => {
-    if (!searchTerm) {
+    const trimmedSearchTerm = searchTerm.trim();
+    if (!trimmedSearchTerm) {
       return dataString;
     }
 
-    const regex = new RegExp(`(${escapeRegExp(searchTerm)})`, 'gi');
+    const regex = new RegExp(`(${escapeRegExp(trimmedSearchTerm)})`, 'gi');
     const parts = dataString.split(regex);
 
     return parts.map((part, index) => {
