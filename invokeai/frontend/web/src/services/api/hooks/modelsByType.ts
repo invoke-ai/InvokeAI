@@ -12,6 +12,7 @@ import {
   isCLIPEmbedModelConfigOrSubmodel,
   isControlLayerModelConfig,
   isControlNetModelConfig,
+  isFlux1VAEModelConfig,
   isFlux2VAEModelConfig,
   isFluxKontextModelConfig,
   isFluxReduxModelConfig,
@@ -56,6 +57,7 @@ export const useSpandrelImageToImageModels = buildModelsHook(isSpandrelImageToIm
 export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
 export const useVAEModels = () => buildModelsHook(isVAEModelConfigOrSubmodel)();
 export const useFluxVAEModels = () => buildModelsHook(isFluxVAEModelConfig)();
+export const useFlux1VAEModels = () => buildModelsHook(isFlux1VAEModelConfig)();
 export const useFlux2VAEModels = () => buildModelsHook(isFlux2VAEModelConfig)();
 export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
