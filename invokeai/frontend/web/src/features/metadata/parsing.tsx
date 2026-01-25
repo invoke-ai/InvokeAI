@@ -9,6 +9,8 @@ import { bboxHeightChanged, bboxWidthChanged, canvasMetadataRecalled } from 'fea
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
   heightChanged,
+  kleinQwen3EncoderModelSelected,
+  kleinVaeModelSelected,
   negativePromptChanged,
   positivePromptChanged,
   refinerModelChanged,
@@ -34,8 +36,6 @@ import {
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceRandomizePercent,
   setZImageSeedVarianceStrength,
-  kleinQwen3EncoderModelSelected,
-  kleinVaeModelSelected,
   vaeSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
