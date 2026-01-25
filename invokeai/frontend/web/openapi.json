@@ -15475,6 +15475,54 @@
             "title": "HiDiffusion: Window Attention",
             "type": "boolean"
           },
+          "hidiffusion_t1_ratio": {
+            "default": 0.4,
+            "description": "Override HiDiffusion early switch threshold (T1 ratio)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.4,
+            "orig_required": false,
+            "title": "HiDiffusion: T1 Ratio",
+            "type": "number"
+          },
+          "hidiffusion_t2_ratio": {
+            "default": 0,
+            "description": "Override HiDiffusion late switch threshold (T2 ratio)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "HiDiffusion: T2 Ratio",
+            "type": "number"
+          },
+          "hidiffusion_t1_ratio": {
+            "default": 0.4,
+            "description": "Override HiDiffusion early switch threshold (T1 ratio)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.4,
+            "orig_required": false,
+            "title": "HiDiffusion: T1 Ratio",
+            "type": "number"
+          },
+          "hidiffusion_t2_ratio": {
+            "default": 0,
+            "description": "Override HiDiffusion late switch threshold (T2 ratio)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "HiDiffusion: T2 Ratio",
+            "type": "number"
+          },
           "latents": {
             "anyOf": [
               {

@@ -3,6 +3,8 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Any, Optional
 
+import copy
+
 
 @contextmanager
 def hidiffusion_patch(
@@ -10,9 +12,12 @@ def hidiffusion_patch(
     name_or_path: Optional[str],
     apply_raunet: bool = True,
     apply_window_attn: bool = True,
+    t1_ratio: Optional[float] = None,
+    t2_ratio: Optional[float] = None,
 ):
     """Context manager that applies HiDiffusion and restores the model on exit."""
     try:
+        import hidiffusion as hd
         from hidiffusion import apply_hidiffusion, remove_hidiffusion
     except ImportError as exc:
         raise ImportError(
@@ -82,11 +87,45 @@ def hidiffusion_patch(
 
     original_num_upsamplers = getattr(target, "num_upsamplers", None)
 
+    ratio_overrides = None
+    ratio_dicts = None
+    if t1_ratio is not None or t2_ratio is not None:
+        try:
+            from hidiffusion.hidiffusion import (
+                switching_threshold_ratio_dict as _switching_threshold_ratio_dict,
+                text_to_img_controlnet_switching_threshold_ratio_dict as _text_to_img_controlnet_switching_threshold_ratio_dict,
+            )
+
+            ratio_dicts = (
+                _switching_threshold_ratio_dict,
+                _text_to_img_controlnet_switching_threshold_ratio_dict,
+            )
+        except Exception:
+            ratio_dicts = None
+
+    if ratio_dicts is not None:
+        ratio_overrides = (copy.deepcopy(ratio_dicts[0]), copy.deepcopy(ratio_dicts[1]))
+
+        def _apply_ratio_overrides(ratio_dict: dict) -> None:
+            for _, entry in ratio_dict.items():
+                if t1_ratio is not None:
+                    entry["T1_ratio"] = t1_ratio
+                if t2_ratio is not None and "T2_ratio" in entry:
+                    entry["T2_ratio"] = t2_ratio
+
+        _apply_ratio_overrides(ratio_dicts[0])
+        _apply_ratio_overrides(ratio_dicts[1])
+
     apply_hidiffusion(model, apply_raunet=apply_raunet, apply_window_attn=apply_window_attn)
     try:
         yield
     finally:
         remove_hidiffusion(model)
+        if ratio_overrides is not None and ratio_dicts is not None:
+            ratio_dicts[0].clear()
+            ratio_dicts[0].update(ratio_overrides[0])
+            ratio_dicts[1].clear()
+            ratio_dicts[1].update(ratio_overrides[1])
         if original_num_upsamplers is not None:
             target.num_upsamplers = original_num_upsamplers
         if set_model_name_or_path:

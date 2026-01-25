@@ -12,9 +12,11 @@ Learn more: https://github.com/megvii-research/HiDiffusion
 
 1. Open the **Canvas** tab.
 2. Expand **Advanced Settings**.
-3. In the **Advanced** grid, enable **HiDiffusion** and optionally adjust the two sub‑toggles:
+3. In the **Advanced** grid, enable **HiDiffusion** and optionally adjust the two sub‑toggles and ratios:
    - **HiDiffusion: RAU‑Net**
    - **HiDiffusion: Window Attention**
+   - **HiDiffusion: T1 Ratio**
+   - **HiDiffusion: T2 Ratio**
 
 ## What the switches do
 
@@ -27,8 +29,18 @@ Learn more: https://github.com/megvii-research/HiDiffusion
 - **HiDiffusion: Window Attention**  
   Enables windowed attention blocks. This can boost local texture/detail, but may slightly affect global coherence in some prompts.
 
+- **HiDiffusion: T1 Ratio**  
+  Controls when HiDiffusion switches into its mid‑stage behavior. Lower values switch earlier; higher values preserve global structure longer.
+
+- **HiDiffusion: T2 Ratio**  
+  Controls when HiDiffusion switches into its late‑stage behavior. Higher values keep window attention active longer and can sharpen local detail.
+
 ## Tips
 
 - Try **1536–2048 px** for the clearest benefits (SDXL).
 - If results look worse, disable **Window Attention** first, then RAU‑Net.
 - Effects vary by scheduler and model; compare with the same seed for a fair test.
+
+---
+
+TODO: Decide whether HiDiffusion toggles and ratios should always be emitted in metadata for recall.

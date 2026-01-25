@@ -68,6 +68,8 @@ export type Feature =
   | 'hidiffusion'
   | 'hidiffusionRauNet'
   | 'hidiffusionWindowAttn'
+  | 'hidiffusionT1Ratio'
+  | 'hidiffusionT2Ratio'
   | 'colorCompensation'
   | 'upscaleModel'
   | 'scale'
@@ -228,6 +230,8 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
   },
   hidiffusionRauNet: {},
   hidiffusionWindowAttn: {},
+  hidiffusionT1Ratio: {},
+  hidiffusionT2Ratio: {},
 } as const;
 
 export const OPEN_DELAY = 1000; // in milliseconds

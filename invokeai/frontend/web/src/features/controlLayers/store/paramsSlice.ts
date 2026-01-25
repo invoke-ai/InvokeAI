@@ -107,6 +107,12 @@ const slice = createSlice({
     setHiDiffusionWindowAttnEnabled: (state, action: PayloadAction<boolean>) => {
       state.hiDiffusionWindowAttnEnabled = action.payload;
     },
+    setHiDiffusionT1Ratio: (state, action: PayloadAction<number>) => {
+      state.hiDiffusionT1Ratio = action.payload;
+    },
+    setHiDiffusionT2Ratio: (state, action: PayloadAction<number>) => {
+      state.hiDiffusionT2Ratio = action.payload;
+    },
     setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
       state.seamlessXAxis = action.payload;
     },
@@ -486,6 +492,8 @@ export const {
   setHiDiffusionEnabled,
   setHiDiffusionRauNetEnabled,
   setHiDiffusionWindowAttnEnabled,
+  setHiDiffusionT1Ratio,
+  setHiDiffusionT2Ratio,
   setSeamlessXAxis,
   setSeamlessYAxis,
   setShouldRandomizeSeed,
@@ -559,6 +567,12 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
       if (!('hiDiffusionWindowAttnEnabled' in state)) {
         state.hiDiffusionWindowAttnEnabled = true;
       }
+      if (!('hiDiffusionT1Ratio' in state)) {
+        state.hiDiffusionT1Ratio = 0.4;
+      }
+      if (!('hiDiffusionT2Ratio' in state)) {
+        state.hiDiffusionT2Ratio = 0.0;
+      }
 
       return zParamsState.parse(state);
     },
@@ -616,6 +630,8 @@ export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => 
 export const selectHiDiffusionEnabled = createParamsSelector((params) => params.hiDiffusionEnabled);
 export const selectHiDiffusionRauNetEnabled = createParamsSelector((params) => params.hiDiffusionRauNetEnabled);
 export const selectHiDiffusionWindowAttnEnabled = createParamsSelector((params) => params.hiDiffusionWindowAttnEnabled);
+export const selectHiDiffusionT1Ratio = createParamsSelector((params) => params.hiDiffusionT1Ratio);
+export const selectHiDiffusionT2Ratio = createParamsSelector((params) => params.hiDiffusionT2Ratio);
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
 export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');

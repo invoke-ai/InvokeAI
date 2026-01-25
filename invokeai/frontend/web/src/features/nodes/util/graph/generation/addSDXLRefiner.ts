@@ -25,6 +25,8 @@ export const addSDXLRefiner = async (
     refinerStart,
     hiDiffusionEnabled,
     hiDiffusionRauNetEnabled,
+    hiDiffusionT1Ratio,
+    hiDiffusionT2Ratio,
     hiDiffusionWindowAttnEnabled,
   } = state.params;
 
@@ -63,6 +65,8 @@ export const addSDXLRefiner = async (
     hidiffusion: hiDiffusionEnabled,
     hidiffusion_raunet: hiDiffusionRauNetEnabled,
     hidiffusion_window_attn: hiDiffusionWindowAttnEnabled,
+    hidiffusion_t1_ratio: hiDiffusionEnabled ? hiDiffusionT1Ratio : undefined,
+    hidiffusion_t2_ratio: hiDiffusionEnabled ? hiDiffusionT2Ratio : undefined,
     denoising_start: refinerStart,
     denoising_end: 1,
   });

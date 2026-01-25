@@ -16,11 +16,15 @@ class HiDiffusionExt(ExtensionBase):
         name_or_path: Optional[str],
         apply_raunet: bool = True,
         apply_window_attn: bool = True,
+        t1_ratio: Optional[float] = None,
+        t2_ratio: Optional[float] = None,
     ):
         super().__init__()
         self._name_or_path = name_or_path
         self._apply_raunet = apply_raunet
         self._apply_window_attn = apply_window_attn
+        self._t1_ratio = t1_ratio
+        self._t2_ratio = t2_ratio
 
     @contextmanager
     def patch_unet(self, unet: UNet2DConditionModel, original_weights: OriginalWeightsStorage):
@@ -29,5 +33,7 @@ class HiDiffusionExt(ExtensionBase):
             name_or_path=self._name_or_path,
             apply_raunet=self._apply_raunet,
             apply_window_attn=self._apply_window_attn,
+            t1_ratio=self._t1_ratio,
+            t2_ratio=self._t2_ratio,
         ):
             yield None

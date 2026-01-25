@@ -17,6 +17,8 @@ import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import {
   ParamHiDiffusionRauNetToggle,
+  ParamHiDiffusionT1Ratio,
+  ParamHiDiffusionT2Ratio,
   ParamHiDiffusionToggle,
   ParamHiDiffusionWindowAttnToggle,
 } from 'features/parameters/components/Advanced/ParamHiDiffusionToggle';
@@ -119,6 +121,8 @@ export const AdvancedSettingsAccordion = memo(() => {
                   <ParamColorCompensation />
                   <ParamHiDiffusionRauNetToggle />
                   <ParamHiDiffusionWindowAttnToggle />
+                  <ParamHiDiffusionT1Ratio />
+                  <ParamHiDiffusionT2Ratio />
                 </SimpleGrid>
               </FormControlGroup>
             </Flex>

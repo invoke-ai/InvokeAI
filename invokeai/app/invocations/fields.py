@@ -150,6 +150,8 @@ class FieldDescriptions:
     hidiffusion = "Apply HiDiffusion (RAU-Net + MSW-MSA) for higher-resolution denoising"
     hidiffusion_raunet = "Apply HiDiffusion RAU-Net blocks"
     hidiffusion_window_attn = "Apply HiDiffusion window attention blocks"
+    hidiffusion_t1_ratio = "Override HiDiffusion early switch threshold (T1 ratio)"
+    hidiffusion_t2_ratio = "Override HiDiffusion late switch threshold (T2 ratio)"
     scheduler = "Scheduler to use during inference"
     positive_cond = "Positive conditioning tensor"
     negative_cond = "Negative conditioning tensor"

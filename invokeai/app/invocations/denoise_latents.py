@@ -208,6 +208,20 @@ class DenoiseLatentsInvocation(BaseInvocation):
         description=FieldDescriptions.hidiffusion_window_attn,
         title="HiDiffusion: Window Attention",
     )
+    hidiffusion_t1_ratio: float = InputField(
+        default=0.4,
+        ge=0,
+        le=1,
+        description=FieldDescriptions.hidiffusion_t1_ratio,
+        title="HiDiffusion: T1 Ratio",
+    )
+    hidiffusion_t2_ratio: float = InputField(
+        default=0.0,
+        ge=0,
+        le=1,
+        description=FieldDescriptions.hidiffusion_t2_ratio,
+        title="HiDiffusion: T2 Ratio",
+    )
     latents: Optional[LatentsField] = InputField(
         default=None,
         description=FieldDescriptions.latents,
@@ -906,6 +920,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     name_or_path=hidiffusion_name_or_path,
                     apply_raunet=self.hidiffusion_raunet,
                     apply_window_attn=self.hidiffusion_window_attn,
+                    t1_ratio=self.hidiffusion_t1_ratio,
+                    t2_ratio=self.hidiffusion_t2_ratio,
                 )
             )
 
@@ -1130,6 +1146,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     name_or_path=hidiffusion_name_or_path,
                     apply_raunet=self.hidiffusion_raunet,
                     apply_window_attn=self.hidiffusion_window_attn,
+                    t1_ratio=self.hidiffusion_t1_ratio,
+                    t2_ratio=self.hidiffusion_t2_ratio,
                 )
                 if self.hidiffusion
                 else nullcontext()

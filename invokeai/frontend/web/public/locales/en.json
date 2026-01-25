@@ -841,6 +841,8 @@
         "hiDiffusion": "HiDiffusion",
         "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
         "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
+        "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
+        "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
         "imageDetails": "Image Details",
         "imageDimensions": "Image Dimensions",
         "metadata": "Metadata",
@@ -1299,6 +1301,8 @@
         "hiDiffusion": "HiDiffusion",
         "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
         "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
+        "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
+        "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
         "coherenceMode": "Mode",
         "coherenceEdgeSize": "Edge Size",
         "coherenceMinDenoise": "Min Denoise",
@@ -1607,6 +1611,20 @@
             "paragraphs": [
                 "Enables windowed attention used by HiDiffusion.",
                 "Can boost local detail, but may affect global coherence."
+            ]
+        },
+        "hidiffusionT1Ratio": {
+            "heading": "HiDiffusion: T1 Ratio",
+            "paragraphs": [
+                "Controls the early switch point for HiDiffusion (T1).",
+                "Lower values switch earlier; higher values preserve global structure longer."
+            ]
+        },
+        "hidiffusionT2Ratio": {
+            "heading": "HiDiffusion: T2 Ratio",
+            "paragraphs": [
+                "Controls the late switch point for HiDiffusion (T2).",
+                "Higher values keep window attention active longer."
             ]
         },
         "clipSkip": {
