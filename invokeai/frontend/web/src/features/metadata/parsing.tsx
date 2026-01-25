@@ -34,6 +34,8 @@ import {
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceRandomizePercent,
   setZImageSeedVarianceStrength,
+  kleinQwen3EncoderModelSelected,
+  kleinVaeModelSelected,
   vaeSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
@@ -380,8 +382,8 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
   recall: (value, store) => {
     // Dispatch to the appropriate scheduler based on the current model base
     const base = selectBase(store.getState());
-    if (base === 'flux') {
-      // Flux only supports euler, heun, lcm
+    if (base === 'flux' || base === 'flux2') {
+      // Flux and Flux2 (Klein) only support euler, heun, lcm
       if (value === 'euler' || value === 'heun' || value === 'lcm') {
         store.dispatch(setFluxScheduler(value));
       }
@@ -847,6 +849,54 @@ const ZImageQwen3SourceModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion ZImageQwen3SourceModel
 
+//#region KleinVAEModel
+const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'KleinVAEModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'vae');
+    const parsed = await parseModelIdentifier(raw, store, 'vae');
+    assert(parsed.type === 'vae');
+    // Only recall if the current main model is FLUX.2 Klein
+    const base = selectBase(store.getState());
+    assert(base === 'flux2', 'KleinVAEModel handler only works with FLUX.2 Klein models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(kleinVaeModelSelected(value));
+  },
+  i18nKey: 'metadata.vae',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion KleinVAEModel
+
+//#region KleinQwen3EncoderModel
+const KleinQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'KleinQwen3EncoderModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'qwen3_encoder');
+    const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
+    assert(parsed.type === 'qwen3_encoder');
+    // Only recall if the current main model is FLUX.2 Klein
+    const base = selectBase(store.getState());
+    assert(base === 'flux2', 'KleinQwen3EncoderModel handler only works with FLUX.2 Klein models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(kleinQwen3EncoderModelSelected(value));
+  },
+  i18nKey: 'metadata.qwen3Encoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion KleinQwen3EncoderModel
+
 //#region LoRAs
 const LoRAs: CollectionMetadataHandler<LoRA[]> = {
   [CollectionMetadataKey]: true,
@@ -1085,6 +1135,8 @@ export const ImageMetadataHandlers = {
   Qwen3EncoderModel,
   ZImageVAEModel,
   ZImageQwen3SourceModel,
+  KleinVAEModel,
+  KleinQwen3EncoderModel,
   ZImageSeedVarianceEnabled,
   ZImageSeedVarianceStrength,
   ZImageSeedVarianceRandomizePercent,
