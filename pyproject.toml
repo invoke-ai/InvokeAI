@@ -38,7 +38,7 @@ dependencies = [
   "compel==2.1.1",
   "diffusers[torch]==0.36.0",
   "gguf",
-  "hidiffusion",
+  "hidiffusion",                          # optional high-res denoise patch (HiDiffusion)
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",
   "onnx==1.16.1",
