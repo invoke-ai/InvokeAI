@@ -76,12 +76,12 @@ export const AdvancedSettingsAccordion = memo(() => {
           if (params.cfgRescaleMultiplier) {
             badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
           }
-        if (params.seamlessXAxis || params.seamlessYAxis) {
-          badges.push('seamless');
-        }
-        if (params.hiDiffusionEnabled) {
-          badges.push('HiDiffusion');
-        }
+          if (params.seamlessXAxis || params.seamlessYAxis) {
+            badges.push('seamless');
+          }
+          if (params.hiDiffusionEnabled) {
+            badges.push('HiDiffusion');
+          }
         }
 
         return badges;

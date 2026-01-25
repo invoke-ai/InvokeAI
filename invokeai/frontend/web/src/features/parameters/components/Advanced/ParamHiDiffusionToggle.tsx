@@ -45,6 +45,13 @@ export const ParamHiDiffusionRauNetToggle = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
+  const onChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setHiDiffusionRauNetEnabled(event.target.checked));
+    },
+    [dispatch]
+  );
+
   return (
     <FormControl>
       <InformationalPopover feature="hidiffusionRauNet">
@@ -52,13 +59,7 @@ export const ParamHiDiffusionRauNetToggle = memo(() => {
           {t('parameters.hiDiffusionRauNet')}
         </FormLabel>
       </InformationalPopover>
-      <Switch
-        isChecked={hiDiffusionRauNetEnabled}
-        isDisabled={!hiDiffusionEnabled}
-        onChange={(event: ChangeEvent<HTMLInputElement>) =>
-          dispatch(setHiDiffusionRauNetEnabled(event.target.checked))
-        }
-      />
+      <Switch isChecked={hiDiffusionRauNetEnabled} isDisabled={!hiDiffusionEnabled} onChange={onChange} />
     </FormControl>
   );
 });
@@ -71,6 +72,13 @@ export const ParamHiDiffusionWindowAttnToggle = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
+  const onChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setHiDiffusionWindowAttnEnabled(event.target.checked));
+    },
+    [dispatch]
+  );
+
   return (
     <FormControl>
       <InformationalPopover feature="hidiffusionWindowAttn">
@@ -78,13 +86,7 @@ export const ParamHiDiffusionWindowAttnToggle = memo(() => {
           {t('parameters.hiDiffusionWindowAttn')}
         </FormLabel>
       </InformationalPopover>
-      <Switch
-        isChecked={hiDiffusionWindowAttnEnabled}
-        isDisabled={!hiDiffusionEnabled}
-        onChange={(event: ChangeEvent<HTMLInputElement>) =>
-          dispatch(setHiDiffusionWindowAttnEnabled(event.target.checked))
-        }
-      />
+      <Switch isChecked={hiDiffusionWindowAttnEnabled} isDisabled={!hiDiffusionEnabled} onChange={onChange} />
     </FormControl>
   );
 });
