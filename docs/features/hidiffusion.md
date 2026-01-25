@@ -6,6 +6,8 @@ title: HiDiffusion
 
 HiDiffusion is an optional denoising enhancement that can improve detail and structure at higher resolutions for SD 1.5 and SDXL. It modifies the UNet during denoising and is most noticeable at 1536px and above.
 
+Learn more: https://github.com/megvii-research/HiDiffusion
+
 ## Where to find the switches
 
 1. Open the **Canvas** tab.
