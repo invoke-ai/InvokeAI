@@ -1,5 +1,5 @@
 import type { FormLabelProps } from '@invoke-ai/ui-library';
-import { Box, Flex, FormControlGroup, SimpleGrid, StandaloneAccordion } from '@invoke-ai/ui-library';
+import { Flex, FormControlGroup, SimpleGrid, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
@@ -15,6 +15,11 @@ import ParamCLIPEmbedModelSelect from 'features/parameters/components/Advanced/P
 import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPGEmbedModelSelect';
 import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
+import {
+  ParamHiDiffusionRauNetToggle,
+  ParamHiDiffusionToggle,
+  ParamHiDiffusionWindowAttnToggle,
+} from 'features/parameters/components/Advanced/ParamHiDiffusionToggle';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
@@ -71,9 +76,12 @@ export const AdvancedSettingsAccordion = memo(() => {
           if (params.cfgRescaleMultiplier) {
             badges.push(`Rescale ${params.cfgRescaleMultiplier}`);
           }
-          if (params.seamlessXAxis || params.seamlessYAxis) {
-            badges.push('seamless');
-          }
+        if (params.seamlessXAxis || params.seamlessYAxis) {
+          badges.push('seamless');
+        }
+        if (params.hiDiffusionEnabled) {
+          badges.push('HiDiffusion');
+        }
         }
 
         return badges;
@@ -107,9 +115,10 @@ export const AdvancedSettingsAccordion = memo(() => {
                 <SimpleGrid columns={2} spacing={4} w="full">
                   <ParamSeamlessXAxis />
                   <ParamSeamlessYAxis />
+                  <ParamHiDiffusionToggle />
                   <ParamColorCompensation />
-                  {/* Empty box for visual alignment. Replace with new option when needed. */}
-                  <Box />
+                  <ParamHiDiffusionRauNetToggle />
+                  <ParamHiDiffusionWindowAttnToggle />
                 </SimpleGrid>
               </FormControlGroup>
             </Flex>

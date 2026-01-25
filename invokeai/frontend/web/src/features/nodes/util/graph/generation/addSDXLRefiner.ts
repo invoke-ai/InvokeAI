@@ -23,6 +23,9 @@ export const addSDXLRefiner = async (
     refinerScheduler,
     refinerCFGScale,
     refinerStart,
+    hiDiffusionEnabled,
+    hiDiffusionRauNetEnabled,
+    hiDiffusionWindowAttnEnabled,
   } = state.params;
 
   assert(refinerModel, 'No refiner model found in state');
@@ -57,6 +60,9 @@ export const addSDXLRefiner = async (
     cfg_scale: refinerCFGScale,
     steps: refinerSteps,
     scheduler: refinerScheduler,
+    hidiffusion: hiDiffusionEnabled,
+    hidiffusion_raunet: hiDiffusionRauNetEnabled,
+    hidiffusion_window_attn: hiDiffusionWindowAttnEnabled,
     denoising_start: refinerStart,
     denoising_end: 1,
   });

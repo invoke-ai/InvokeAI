@@ -98,6 +98,15 @@ const slice = createSlice({
     setOptimizedDenoisingEnabled: (state, action: PayloadAction<boolean>) => {
       state.optimizedDenoisingEnabled = action.payload;
     },
+    setHiDiffusionEnabled: (state, action: PayloadAction<boolean>) => {
+      state.hiDiffusionEnabled = action.payload;
+    },
+    setHiDiffusionRauNetEnabled: (state, action: PayloadAction<boolean>) => {
+      state.hiDiffusionRauNetEnabled = action.payload;
+    },
+    setHiDiffusionWindowAttnEnabled: (state, action: PayloadAction<boolean>) => {
+      state.hiDiffusionWindowAttnEnabled = action.payload;
+    },
     setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
       state.seamlessXAxis = action.payload;
     },
@@ -474,6 +483,9 @@ export const {
   setSeed,
   setImg2imgStrength,
   setOptimizedDenoisingEnabled,
+  setHiDiffusionEnabled,
+  setHiDiffusionRauNetEnabled,
+  setHiDiffusionWindowAttnEnabled,
   setSeamlessXAxis,
   setSeamlessYAxis,
   setShouldRandomizeSeed,
@@ -538,6 +550,16 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.positivePromptHistory = [];
       }
 
+      if (!('hiDiffusionEnabled' in state)) {
+        state.hiDiffusionEnabled = false;
+      }
+      if (!('hiDiffusionRauNetEnabled' in state)) {
+        state.hiDiffusionRauNetEnabled = true;
+      }
+      if (!('hiDiffusionWindowAttnEnabled' in state)) {
+        state.hiDiffusionWindowAttnEnabled = true;
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -591,6 +613,9 @@ export const selectInfillPatchmatchDownscaleSize = createParamsSelector(
 export const selectInfillColorValue = createParamsSelector((params) => params.infillColorValue);
 export const selectImg2imgStrength = createParamsSelector((params) => params.img2imgStrength);
 export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => params.optimizedDenoisingEnabled);
+export const selectHiDiffusionEnabled = createParamsSelector((params) => params.hiDiffusionEnabled);
+export const selectHiDiffusionRauNetEnabled = createParamsSelector((params) => params.hiDiffusionRauNetEnabled);
+export const selectHiDiffusionWindowAttnEnabled = createParamsSelector((params) => params.hiDiffusionWindowAttnEnabled);
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
 export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');

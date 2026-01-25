@@ -661,6 +661,10 @@ class DenoiseLatentsMetaInvocation(DenoiseLatentsInvocation, WithMetadata):
         md.update({"denoising_end": self.denoising_end})
         md.update({"scheduler": self.scheduler})
         md.update({"model": self.unet.unet})
+        if self.hidiffusion:
+            md.update({"hidiffusion": self.hidiffusion})
+            md.update({"hidiffusion_raunet": self.hidiffusion_raunet})
+            md.update({"hidiffusion_window_attn": self.hidiffusion_window_attn})
         if isinstance(self.control, ControlField) or (isinstance(self.control, list) and len(self.control) > 0):
             md.update({"controlnets": _to_json(self.control)})
         if isinstance(self.ip_adapter, IPAdapterField) or (

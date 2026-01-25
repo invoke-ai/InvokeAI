@@ -15445,6 +15445,36 @@
             "title": "CFG Rescale Multiplier",
             "type": "number"
           },
+          "hidiffusion": {
+            "default": false,
+            "description": "Apply HiDiffusion (RAU-Net + MSW-MSA) for higher-resolution denoising",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "HiDiffusion",
+            "type": "boolean"
+          },
+          "hidiffusion_raunet": {
+            "default": true,
+            "description": "Apply HiDiffusion RAU-Net blocks",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "HiDiffusion: RAU-Net",
+            "type": "boolean"
+          },
+          "hidiffusion_window_attn": {
+            "default": true,
+            "description": "Apply HiDiffusion window attention blocks",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "HiDiffusion: Window Attention",
+            "type": "boolean"
+          },
           "latents": {
             "anyOf": [
               {
@@ -15802,6 +15832,36 @@
             "orig_required": false,
             "title": "CFG Rescale Multiplier",
             "type": "number"
+          },
+          "hidiffusion": {
+            "default": false,
+            "description": "Apply HiDiffusion (RAU-Net + MSW-MSA) for higher-resolution denoising",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "HiDiffusion",
+            "type": "boolean"
+          },
+          "hidiffusion_raunet": {
+            "default": true,
+            "description": "Apply HiDiffusion RAU-Net blocks",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "HiDiffusion: RAU-Net",
+            "type": "boolean"
+          },
+          "hidiffusion_window_attn": {
+            "default": true,
+            "description": "Apply HiDiffusion window attention blocks",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "HiDiffusion: Window Attention",
+            "type": "boolean"
           },
           "latents": {
             "anyOf": [

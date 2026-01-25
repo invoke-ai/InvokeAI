@@ -18,6 +18,9 @@ import {
   setClipSkip,
   setFluxScheduler,
   setGuidance,
+  setHiDiffusionEnabled,
+  setHiDiffusionRauNetEnabled,
+  setHiDiffusionWindowAttnEnabled,
   setImg2imgStrength,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
@@ -536,6 +539,60 @@ const SeamlessY: SingleMetadataHandler<ParameterSeamlessY> = {
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterSeamlessY>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion SeamlessY
+
+//#region HiDiffusion
+const HiDiffusion: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusion',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusion',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusion
+
+//#region HiDiffusionRAUNet
+const HiDiffusionRauNet: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionRauNet',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_raunet');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionRauNetEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusionRauNet',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionRAUNet
+
+//#region HiDiffusionWindowAttn
+const HiDiffusionWindowAttn: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionWindowAttn',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_window_attn');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionWindowAttnEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusionWindowAttn',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionWindowAttn
 
 //#region ZImageSeedVarianceEnabled
 const ZImageSeedVarianceEnabled: SingleMetadataHandler<boolean> = {
@@ -1071,6 +1128,9 @@ export const ImageMetadataHandlers = {
   DenoisingStrength,
   SeamlessX,
   SeamlessY,
+  HiDiffusion,
+  HiDiffusionRauNet,
+  HiDiffusionWindowAttn,
   RefinerModel,
   RefinerSteps,
   RefinerCFGScale,

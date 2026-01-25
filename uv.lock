@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11, <3.13"
 resolution-markers = [
     "python_full_version >= '3.12' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm'",
@@ -816,6 +816,15 @@ wheels = [
 ]
 
 [[package]]
+name = "hidiffusion"
+version = "0.1.10"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/fd/2b/422acb8106f1295e94a8f98363e2b9b0d6be6f90f672d353f8b2c38654fe/hidiffusion-0.1.10.tar.gz", hash = "sha256:e8a7cfab49a3a29d83b33f3c6c4adcaf32377cb535d3a279bbf53125e5a57bcd", size = 41303, upload-time = "2024-06-16T17:23:58.739Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/64/fb/ebee9c90768db7c8368922d1387c64311051c4423de88aecfe1dcb8387ad/hidiffusion-0.1.10-py3-none-any.whl", hash = "sha256:9498c8fcc07f60645e533feeaaf66aeb6c74b289788be333f59507980556e9e4", size = 37727, upload-time = "2024-06-16T17:23:56.478Z" },
+]
+
+[[package]]
 name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
@@ -972,6 +981,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "fastapi-events" },
     { name = "gguf" },
+    { name = "hidiffusion" },
     { name = "huggingface-hub" },
     { name = "mediapipe" },
     { name = "numpy" },
@@ -1079,6 +1089,7 @@ requires-dist = [
     { name = "fastapi-events" },
     { name = "gguf" },
     { name = "gprof2dot", marker = "extra == 'dev'" },
+    { name = "hidiffusion" },
     { name = "httpx", marker = "extra == 'test'" },
     { name = "huggingface-hub" },
     { name = "humanize", marker = "extra == 'test'", specifier = "==4.12.1" },
@@ -3650,7 +3661,7 @@ name = "triton"
 version = "3.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "setuptools", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux' and extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-rocm') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra == 'extra-8-invokeai-cuda') or (sys_platform != 'darwin' and sys_platform != 'linux' and extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-rocm') or (sys_platform == 'linux' and extra == 'extra-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm')" },
+    { name = "setuptools", marker = "sys_platform != 'darwin'" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/21/2f/3e56ea7b58f80ff68899b1dbe810ff257c9d177d288c6b0f55bf2fe4eb50/triton-3.3.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:b31e3aa26f8cb3cc5bf4e187bf737cbacf17311e1112b781d4a059353dfd731b", size = 155689937, upload-time = "2025-05-29T23:39:44.182Z" },

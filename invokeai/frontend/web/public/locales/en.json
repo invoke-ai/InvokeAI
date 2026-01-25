@@ -838,6 +838,9 @@
         "generationMode": "Generation Mode",
         "guidance": "Guidance",
         "height": "Height",
+        "hiDiffusion": "HiDiffusion",
+        "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+        "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
         "imageDetails": "Image Details",
         "imageDimensions": "Image Dimensions",
         "metadata": "Metadata",
@@ -1293,6 +1296,9 @@
         "cfgScale": "CFG Scale",
         "cfgRescaleMultiplier": "CFG Rescale Multiplier",
         "clipSkip": "CLIP Skip",
+        "hiDiffusion": "HiDiffusion",
+        "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+        "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
         "coherenceMode": "Mode",
         "coherenceEdgeSize": "Edge Size",
         "coherenceMinDenoise": "Min Denoise",
@@ -1582,6 +1588,27 @@
         "invalidBboxDesc": "The bounding box has no valid dimensions"
     },
     "popovers": {
+        "hidiffusion": {
+            "heading": "HiDiffusion",
+            "paragraphs": [
+                "Enables HiDiffusion denoising for higher-resolution generation.",
+                "Try at 1536px or higher for the most visible effect."
+            ]
+        },
+        "hidiffusionRauNet": {
+            "heading": "HiDiffusion: RAU-Net",
+            "paragraphs": [
+                "Enables RAU-Net blocks used by HiDiffusion.",
+                "Can improve structure and detail at higher resolutions."
+            ]
+        },
+        "hidiffusionWindowAttn": {
+            "heading": "HiDiffusion: Window Attention",
+            "paragraphs": [
+                "Enables windowed attention used by HiDiffusion.",
+                "Can boost local detail, but may affect global coherence."
+            ]
+        },
         "clipSkip": {
             "heading": "CLIP Skip",
             "paragraphs": [

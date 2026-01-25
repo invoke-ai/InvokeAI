@@ -6519,6 +6519,24 @@ export type components = {
              */
             cfg_rescale_multiplier?: number;
             /**
+             * HiDiffusion
+             * @description Apply HiDiffusion (RAU-Net + MSW-MSA) for higher-resolution denoising
+             * @default false
+             */
+            hidiffusion?: boolean;
+            /**
+             * HiDiffusion: RAU-Net
+             * @description Apply HiDiffusion RAU-Net blocks
+             * @default true
+             */
+            hidiffusion_raunet?: boolean;
+            /**
+             * HiDiffusion: Window Attention
+             * @description Apply HiDiffusion window attention blocks
+             * @default true
+             */
+            hidiffusion_window_attn?: boolean;
+            /**
              * @description Latents tensor
              * @default null
              */
@@ -6636,6 +6654,24 @@ export type components = {
              * @default 0
              */
             cfg_rescale_multiplier?: number;
+            /**
+             * HiDiffusion
+             * @description Apply HiDiffusion (RAU-Net + MSW-MSA) for higher-resolution denoising
+             * @default false
+             */
+            hidiffusion?: boolean;
+            /**
+             * HiDiffusion: RAU-Net
+             * @description Apply HiDiffusion RAU-Net blocks
+             * @default true
+             */
+            hidiffusion_raunet?: boolean;
+            /**
+             * HiDiffusion: Window Attention
+             * @description Apply HiDiffusion window attention blocks
+             * @default true
+             */
+            hidiffusion_window_attn?: boolean;
             /**
              * @description Latents tensor
              * @default null
