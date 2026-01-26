@@ -78,7 +78,7 @@ const GradientRadialIcon = memo(() => {
     <Box as="svg" viewBox="0 0 24 24" boxSize="22px" aria-hidden focusable={false} display="block">
       <defs>
         <radialGradient id={gradientId} cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.25" />
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.0" />
           <stop offset="100%" stopColor="currentColor" stopOpacity="0.85" />
         </radialGradient>
       </defs>
