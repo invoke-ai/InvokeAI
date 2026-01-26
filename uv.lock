@@ -978,12 +978,12 @@ dependencies = [
     { name = "onnx" },
     { name = "onnxruntime" },
     { name = "opencv-contrib-python" },
+    { name = "patchmatch-cython" },
     { name = "picklescan" },
     { name = "pillow" },
     { name = "prompt-toolkit" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
-    { name = "pypatchmatch" },
     { name = "python-multipart" },
     { name = "python-socketio" },
     { name = "pywavelets" },
@@ -1096,6 +1096,7 @@ requires-dist = [
     { name = "onnxruntime-directml", marker = "extra == 'onnx-directml'" },
     { name = "onnxruntime-gpu", marker = "extra == 'onnx-cuda'" },
     { name = "opencv-contrib-python" },
+    { name = "patchmatch-cython", specifier = "==0.1.4" },
     { name = "picklescan" },
     { name = "pillow" },
     { name = "pip-tools", marker = "extra == 'dist'" },
@@ -1106,7 +1107,6 @@ requires-dist = [
     { name = "pudb", marker = "extra == 'dev'" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
-    { name = "pypatchmatch" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">6.0.0" },
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "pytest-datadir", marker = "extra == 'test'" },
@@ -2301,6 +2301,29 @@ wheels = [
 ]
 
 [[package]]
+name = "patchmatch-cython"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/27/26/e127775dd0de73d5207655d1f9fa2c649d0ace45124901817ff30180d6da/patchmatch_cython-0.1.4.tar.gz", hash = "sha256:58bcaf4eaa4da271354573216a32d7b6d2c6ad3a43da196852d5230c441d5857", size = 197432, upload-time = "2025-07-08T01:35:51.93Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a4/1f/c54edbc310d6e89cdeddb29dcd801b044761ae7141b66de8334e29e8aff6/patchmatch_cython-0.1.4-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:6ec9edcfe4145fd7e63658eb6c22969d5033a5ee8991533bccc54257589a0823", size = 296242, upload-time = "2025-07-08T01:35:32.286Z" },
+    { url = "https://files.pythonhosted.org/packages/05/5b/2b088c80b82cddb480c379b6dfe402ffd5e432fbff9b9cf725effc80c6d7/patchmatch_cython-0.1.4-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:68b2650dceb07f75f66e46c58b77a965b6d7c42df1445e46552985b0897acb70", size = 289759, upload-time = "2025-07-08T01:35:33.613Z" },
+    { url = "https://files.pythonhosted.org/packages/20/ca/1609262c28f09ee0aad7aadb655ead6f140aefca9bd505b60b89ff0ca7f2/patchmatch_cython-0.1.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f068926ef9b69a9159ce3d5936dae23556e6fddddaf0bbd1086418da8bbf327f", size = 844561, upload-time = "2025-07-08T01:35:34.602Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/3c/d6bfaba3a377770b09618b012a0fd0a48731e96667dea1e12b5d610d8f58/patchmatch_cython-0.1.4-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:6ae5e0b1aa2322929c23cc2cf308a72e28c7c8d7bce1c217eb09d6e1681dcb35", size = 848161, upload-time = "2025-07-08T01:35:35.675Z" },
+    { url = "https://files.pythonhosted.org/packages/09/53/f12c032f3f6be5f3e075d5d35067969dffb66a0fe45b5035e3d384cb9556/patchmatch_cython-0.1.4-cp311-cp311-win32.whl", hash = "sha256:e276d6d282bd53418a3da535c65bcb130428b0b1cf39779c412e691336eacde1", size = 268608, upload-time = "2025-07-08T01:35:36.667Z" },
+    { url = "https://files.pythonhosted.org/packages/08/4a/bf0f94daa60a9b9592f02d54fc2e443353200d5b4abb4440ec9b6716bf57/patchmatch_cython-0.1.4-cp311-cp311-win_amd64.whl", hash = "sha256:3748ded18d301528910c8d8db0de4e339b9afba5a21fcfc18736505bb29378a7", size = 284621, upload-time = "2025-07-08T01:35:37.5Z" },
+    { url = "https://files.pythonhosted.org/packages/57/42/8a522b5ace75bbcb96749c44dfad079815b011cf5c40375b5c41dbe4d554/patchmatch_cython-0.1.4-cp312-cp312-macosx_10_13_x86_64.whl", hash = "sha256:54a018400c17bdbd18f11a7066a32940bd85ebeb2d291a870907c6d5808d11ef", size = 295579, upload-time = "2025-07-08T01:35:38.77Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/d5/22a8244215ec9e92268984576e80705efcb2626f663b8c344f24459b0bca/patchmatch_cython-0.1.4-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:3120335b235f59198905952e30110ba35838a03c27ab310bf7a783b3baaa23c6", size = 289312, upload-time = "2025-07-08T01:35:39.732Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/78/a3975b6084e17d130319858a6d0e37c7bfa635ae6d73903aa1409c7ead2c/patchmatch_cython-0.1.4-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:b55692f2e28d2063b2350cb1f2bc2391397e8c9dbed3af13a0a7e7f1f4e412ac", size = 853821, upload-time = "2025-07-08T01:35:40.623Z" },
+    { url = "https://files.pythonhosted.org/packages/db/b8/87678d1773d81aa985df374b649eeafc8f1c1be96fffd2c8a092e3b1ebc9/patchmatch_cython-0.1.4-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:e3928da5bad58ba9fe987ae7b7c9f0270499882811da1b6f43346a10903397a0", size = 851426, upload-time = "2025-07-08T01:35:41.979Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/61/d6791b6849da4571df9b868a33c8545f9b8d48170a2eefc82161284730a8/patchmatch_cython-0.1.4-cp312-cp312-win32.whl", hash = "sha256:c5044141d4cb7514b90ac11e9afb98df70976b2de2e53714eec98bc14190d57b", size = 268007, upload-time = "2025-07-08T01:35:42.924Z" },
+    { url = "https://files.pythonhosted.org/packages/d4/ab/2f3e6d7be58089a9d9bbbf94dae4858b12c343ce65ad0bc906d7ec56cac9/patchmatch_cython-0.1.4-cp312-cp312-win_amd64.whl", hash = "sha256:8d52c6106668c943866362ca1777bd814ff528cceec5e47b13a3e6bc093f33af", size = 284390, upload-time = "2025-07-08T01:35:43.813Z" },
+]
+
+[[package]]
 name = "pathspec"
 version = "0.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2626,20 +2649,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/bb/22/f1129e69d94ffff626bdb5c835506b3a5b4f3d070f17ea295e12c2c6f60f/pyparsing-3.2.3.tar.gz", hash = "sha256:b9c13f1ab8b3b542f72e28f634bad4de758ab3ce4546e4301970ad6fa77c38be", size = 1088608, upload-time = "2025-03-25T05:01:28.114Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/05/e7/df2285f3d08fee213f2d041540fa4fc9ca6c2d44cf36d3a035bf2a8d2bcc/pyparsing-3.2.3-py3-none-any.whl", hash = "sha256:a749938e02d6fd0b59b356ca504a24982314bb090c383e3cf201c95ef7e2bfcf", size = 111120, upload-time = "2025-03-25T05:01:24.908Z" },
-]
-
-[[package]]
-name = "pypatchmatch"
-version = "1.0.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy" },
-    { name = "pillow" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/89/7f/4403ceb49442988ec7aeb0d5fa372ea4a150967bb50fd64ecc7280d72d15/PyPatchMatch-1.0.2.tar.gz", hash = "sha256:7e01e332cdffa082a0c0fd752eb7644167e8f4e5297b464f501418eae7079b41", size = 16633, upload-time = "2025-05-06T21:23:52.3Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/14/85/403c3491d3820f85772c44cb411b16a249065f136fd85115fe3830acb620/PyPatchMatch-1.0.2-py3-none-any.whl", hash = "sha256:d749b411c5376086bbf2ca7a3638553c745c8e4318d7531e8e065106335cba9c", size = 20287, upload-time = "2025-05-06T21:23:50.965Z" },
 ]
 
 [[package]]
