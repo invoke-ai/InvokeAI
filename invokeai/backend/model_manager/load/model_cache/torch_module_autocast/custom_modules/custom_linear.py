@@ -9,6 +9,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 
 def linear_lora_forward(input: torch.Tensor, lora_layer: LoRALayer, lora_weight: float) -> torch.Tensor:
@@ -73,12 +74,25 @@ def autocast_linear_forward_sidecar_patches(
 
 
 class CustomLinear(torch.nn.Linear, CustomModuleMixin):
+    def _cast_weight_bias_for_input(self, input: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor | None]:
+        weight = cast_to_device(self.weight, input.device)
+        bias = cast_to_device(self.bias, input.device)
+        if (
+            input.is_floating_point()
+            and weight.is_floating_point()
+            and not isinstance(weight, GGMLTensor)
+            and weight.dtype != input.dtype
+        ):
+            weight = weight.to(dtype=input.dtype)
+            if bias is not None and not isinstance(bias, GGMLTensor):
+                bias = bias.to(dtype=input.dtype)
+        return weight, bias
+
     def _autocast_forward_with_patches(self, input: torch.Tensor) -> torch.Tensor:
         return autocast_linear_forward_sidecar_patches(self, input, self._patches_and_weights)
 
     def _autocast_forward(self, input: torch.Tensor) -> torch.Tensor:
-        weight = cast_to_device(self.weight, input.device)
-        bias = cast_to_device(self.bias, input.device)
+        weight, bias = self._cast_weight_bias_for_input(input)
         return torch.nn.functional.linear(input, weight, bias)
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
@@ -86,5 +100,12 @@ class CustomLinear(torch.nn.Linear, CustomModuleMixin):
             return self._autocast_forward_with_patches(input)
         elif self._device_autocasting_enabled:
             return self._autocast_forward(input)
+        elif (
+            input.is_floating_point()
+            and self.weight.is_floating_point()
+            and self.weight.dtype != input.dtype
+        ):
+            weight, bias = self._cast_weight_bias_for_input(input)
+            return torch.nn.functional.linear(input, weight, bias)
         else:
             return super().forward(input)
