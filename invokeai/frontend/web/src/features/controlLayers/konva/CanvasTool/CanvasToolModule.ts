@@ -341,7 +341,11 @@ export class CanvasToolModule extends CanvasModuleBase {
       const tool = this.$tool.get();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
-      if (selectedEntity?.bufferRenderer.state?.type !== 'rect' && selectedEntity?.bufferRenderer.hasBuffer()) {
+      if (
+        selectedEntity?.bufferRenderer.state?.type !== 'rect' &&
+        selectedEntity?.bufferRenderer.state?.type !== 'gradient' &&
+        selectedEntity?.bufferRenderer.hasBuffer()
+      ) {
         selectedEntity.bufferRenderer.commitBuffer();
         return;
       }
@@ -473,6 +477,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       if (
         selectedEntity &&
         selectedEntity.bufferRenderer.state?.type !== 'rect' &&
+        selectedEntity.bufferRenderer.state?.type !== 'gradient' &&
         selectedEntity.bufferRenderer.hasBuffer()
       ) {
         selectedEntity.bufferRenderer.commitBuffer();
