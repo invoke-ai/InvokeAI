@@ -8,7 +8,7 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import { isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
+import { isFlux2ReferenceImageConfig, isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { zImageField } from 'features/nodes/types/common';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
@@ -244,6 +244,31 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     const flux2Denoise = denoise as Invocation<'flux2_denoise'>;
     const flux2ModelLoader = modelLoader as Invocation<'flux2_klein_model_loader'>;
     const flux2L2i = l2i as Invocation<'flux2_vae_decode'>;
+
+    // FLUX.2 Klein has built-in multi-reference image editing - no separate model needed
+    const validFlux2RefImageConfigs = selectRefImagesSlice(state)
+      .entities.filter((entity) => entity.isEnabled)
+      .filter((entity) => isFlux2ReferenceImageConfig(entity.config))
+      .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
+
+    if (validFlux2RefImageConfigs.length > 0) {
+      const flux2KontextCollect = g.addNode({
+        type: 'collect',
+        id: getPrefixedId('flux2_kontext_collect'),
+      });
+      for (const { config } of validFlux2RefImageConfigs) {
+        // FLUX.2 uses the same flux_kontext node - it just packages the image
+        const kontextConditioning = g.addNode({
+          type: 'flux_kontext',
+          id: getPrefixedId('flux_kontext'),
+          image: zImageField.parse(config.image?.crop?.image ?? config.image?.original.image),
+        });
+        g.addEdge(kontextConditioning, 'kontext_cond', flux2KontextCollect, 'item');
+      }
+      g.addEdge(flux2KontextCollect, 'collection', flux2Denoise, 'kontext_conditioning');
+
+      g.upsertMetadata({ ref_images: [validFlux2RefImageConfigs] }, 'merge');
+    }
 
     if (generationMode === 'txt2img') {
       canvasOutput = addTextToImage({

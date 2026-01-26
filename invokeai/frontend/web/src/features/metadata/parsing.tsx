@@ -1079,7 +1079,8 @@ const RefImages: CollectionMetadataHandler<RefImageState[]> = {
       if (refImage.config.image) {
         await throwIfImageDoesNotExist(refImage.config.image.original.image.image_name, store);
       }
-      if (refImage.config.model) {
+      // FLUX.2 reference images don't have a model field (built-in support)
+      if ('model' in refImage.config && refImage.config.model) {
         await throwIfModelDoesNotExist(refImage.config.model.key, store);
       }
     }
@@ -1097,7 +1098,8 @@ const RefImages: CollectionMetadataHandler<RefImageState[]> = {
   i18nKey: 'controlLayers.referenceImage',
   LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: CollectionMetadataValueProps<RefImageState[]>) => {
-    if (value.config.model) {
+    // FLUX.2 reference images don't have a model field (built-in support)
+    if ('model' in value.config && value.config.model) {
       return <MetadataPrimitiveValue value={value.config.model.name} />;
     }
     return <MetadataPrimitiveValue value="No model" />;

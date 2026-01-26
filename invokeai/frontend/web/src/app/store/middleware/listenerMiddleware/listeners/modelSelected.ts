@@ -184,6 +184,11 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           // All ref image entities are updated to use the same new model
           const refImageEntities = selectReferenceImageEntities(state);
           for (const entity of refImageEntities) {
+            // Skip FLUX.2 reference images - they don't have a model field (built-in support)
+            if (!('model' in entity.config)) {
+              continue;
+            }
+
             const shouldUpdateModel =
               (entity.config.model && entity.config.model.base !== newBase) ||
               (!entity.config.model && newGlobalRefImageModel);

@@ -16,6 +16,7 @@ from invokeai.app.invocations.fields import (
     DenoiseMaskField,
     FieldDescriptions,
     FluxConditioningField,
+    FluxKontextConditioningField,
     Input,
     InputField,
     LatentsField,
@@ -26,6 +27,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
 from invokeai.backend.flux2.denoise import denoise
+from invokeai.backend.flux2.ref_image_extension import Flux2RefImageExtension
 from invokeai.backend.flux2.sampling_utils import (
     compute_empirical_mu,
     generate_img_ids_flux2,
@@ -49,7 +51,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
     category="image",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class Flux2DenoiseInvocation(BaseInvocation):
@@ -117,6 +119,12 @@ class Flux2DenoiseInvocation(BaseInvocation):
     vae: VAEField = InputField(
         description="FLUX.2 VAE model (required for BN statistics).",
         input=Input.Connection,
+    )
+    kontext_conditioning: FluxKontextConditioningField | list[FluxKontextConditioningField] | None = InputField(
+        default=None,
+        description="FLUX Kontext conditioning (reference images for multi-reference image editing).",
+        input=Input.Connection,
+        title="Reference Images",
     )
 
     def _get_bn_stats(self, context: InvocationContext) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
@@ -369,6 +377,21 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 time_shift_type="exponential",
             )
 
+        # Prepare reference image extension for FLUX.2 Klein built-in editing
+        ref_image_extension = None
+        if self.kontext_conditioning:
+            ref_image_extension = Flux2RefImageExtension(
+                context=context,
+                ref_image_conditioning=self.kontext_conditioning
+                if isinstance(self.kontext_conditioning, list)
+                else [self.kontext_conditioning],
+                vae_field=self.vae,
+                device=device,
+                dtype=inference_dtype,
+                bn_mean=bn_mean,
+                bn_std=bn_std,
+            )
+
         with ExitStack() as exit_stack:
             # Load the transformer model
             (cached_weights, transformer) = exit_stack.enter_context(
@@ -400,6 +423,17 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 )
             )
 
+            # Prepare reference image conditioning if provided
+            img_cond_seq = None
+            img_cond_seq_ids = None
+            if ref_image_extension is not None:
+                # Ensure batch sizes match
+                ref_image_extension.ensure_batch_size(x.shape[0])
+                img_cond_seq, img_cond_seq_ids = (
+                    ref_image_extension.ref_image_latents,
+                    ref_image_extension.ref_image_ids,
+                )
+
             x = denoise(
                 model=transformer,
                 img=x,
@@ -414,6 +448,8 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 scheduler=scheduler,
                 mu=mu,
                 inpaint_extension=inpaint_extension,
+                img_cond_seq=img_cond_seq,
+                img_cond_seq_ids=img_cond_seq_ids,
             )
 
         # Apply BN denormalization if BN stats are available

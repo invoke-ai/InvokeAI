@@ -35,6 +35,9 @@ def denoise(
     mu: float | None = None,
     # Inpainting extension for merging latents during denoising
     inpaint_extension: RectifiedFlowInpaintExtension | None = None,
+    # Reference image conditioning (multi-reference image editing)
+    img_cond_seq: torch.Tensor | None = None,
+    img_cond_seq_ids: torch.Tensor | None = None,
 ) -> torch.Tensor:
     """Denoise latents using a FLUX.2 Klein transformer model.
 
@@ -63,6 +66,14 @@ def denoise(
         Denoised latent tensor.
     """
     total_steps = len(timesteps) - 1
+
+    # Store original sequence length for extracting output later (before concatenating reference images)
+    original_seq_len = img.shape[1]
+
+    # Concatenate reference image conditioning if provided (multi-reference image editing)
+    if img_cond_seq is not None and img_cond_seq_ids is not None:
+        img = torch.cat([img, img_cond_seq], dim=1)
+        img_ids = torch.cat([img_ids, img_cond_seq_ids], dim=1)
 
     # Klein has guidance_embeds=False, but the transformer forward() still requires a guidance tensor
     # We pass a dummy value (1.0) since it won't affect the output when guidance_embeds=False
@@ -170,13 +181,15 @@ def denoise(
                     preview_img = img - t_curr * pred
                     if inpaint_extension is not None:
                         preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
+                    # Extract only the generated image portion for preview (exclude reference images)
+                    callback_latents = preview_img[:, :original_seq_len, :] if img_cond_seq is not None else preview_img
                     step_callback(
                         PipelineIntermediateState(
                             step=user_step,
                             order=1,
                             total_steps=total_steps,
                             timestep=int(t_curr * 1000),
-                            latents=preview_img,
+                            latents=callback_latents,
                         ),
                     )
 
@@ -229,14 +242,20 @@ def denoise(
                 img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
                 preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
 
+            # Extract only the generated image portion for preview (exclude reference images)
+            callback_latents = preview_img[:, :original_seq_len, :] if img_cond_seq is not None else preview_img
             step_callback(
                 PipelineIntermediateState(
                     step=step_index + 1,
                     order=1,
                     total_steps=total_steps,
                     timestep=int(t_curr),
-                    latents=preview_img,
+                    latents=callback_latents,
                 ),
             )
+
+    # Extract only the generated image portion (exclude concatenated reference images)
+    if img_cond_seq is not None:
+        img = img[:, :original_seq_len, :]
 
     return img
