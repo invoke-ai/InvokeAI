@@ -8,16 +8,54 @@ FLUX.2 Klein has built-in support for reference image editing (unlike FLUX.1
 which requires a separate Kontext model).
 """
 
+import math
+
 import torch
 import torch.nn.functional as F
 import torchvision.transforms as T
 from einops import repeat
+from PIL import Image
 
 from invokeai.app.invocations.fields import FluxKontextConditioningField
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux2.sampling_utils import pack_flux2
 from invokeai.backend.util.devices import TorchDevice
+
+# Maximum pixel counts for reference images (matches BFL FLUX.2 sampling.py)
+# Single reference image: 2024² pixels, Multiple: 1024² pixels
+MAX_PIXELS_SINGLE_REF = 2024**2  # ~4.1M pixels
+MAX_PIXELS_MULTI_REF = 1024**2  # ~1M pixels
+
+
+def resize_image_to_max_pixels(image: Image.Image, max_pixels: int) -> Image.Image:
+    """Resize image to fit within max_pixels while preserving aspect ratio.
+
+    This matches the BFL FLUX.2 sampling.py cap_pixels() behavior.
+
+    Args:
+        image: PIL Image to resize.
+        max_pixels: Maximum total pixel count (width * height).
+
+    Returns:
+        Resized PIL Image (or original if already within bounds).
+    """
+    width, height = image.size
+    pixel_count = width * height
+
+    if pixel_count <= max_pixels:
+        return image
+
+    # Calculate scale factor to fit within max_pixels (BFL approach)
+    scale = math.sqrt(max_pixels / pixel_count)
+    new_width = int(width * scale)
+    new_height = int(height * scale)
+
+    # Ensure dimensions are at least 1
+    new_width = max(1, new_width)
+    new_height = max(1, new_height)
+
+    return image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
 
 def generate_img_ids_flux2_with_offset(
@@ -147,9 +185,16 @@ class Flux2RefImageExtension:
 
         vae_info = self._context.models.load(self._vae_field.vae)
 
+        # Determine max pixels based on number of reference images (BFL FLUX.2 approach)
+        num_refs = len(self.ref_image_conditioning)
+        max_pixels = MAX_PIXELS_SINGLE_REF if num_refs == 1 else MAX_PIXELS_MULTI_REF
+
         for idx, ref_image_field in enumerate(self.ref_image_conditioning):
             image = self._context.images.get_pil(ref_image_field.image.image_name)
             image = image.convert("RGB")
+
+            # Resize large images to max pixel count (matches BFL FLUX.2 sampling.py)
+            image = resize_image_to_max_pixels(image, max_pixels)
 
             # Convert to tensor using torchvision transforms
             transformation = T.Compose([T.ToTensor()])
