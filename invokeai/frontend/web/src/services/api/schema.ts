@@ -6545,7 +6545,7 @@ export type components = {
             /**
              * HiDiffusion: T2 Ratio
              * @description Override HiDiffusion late switch threshold (T2 ratio)
-             * @default 0.0
+             * @default 0
              */
             hidiffusion_t2_ratio?: number;
             /**
@@ -6693,7 +6693,7 @@ export type components = {
             /**
              * HiDiffusion: T2 Ratio
              * @description Override HiDiffusion late switch threshold (T2 ratio)
-             * @default 0.0
+             * @default 0
              */
             hidiffusion_t2_ratio?: number;
             /**

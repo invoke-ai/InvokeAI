@@ -90,8 +90,8 @@ def hidiffusion_patch(
     ratio_dicts = None
     if t1_ratio is not None or t2_ratio is not None:
         try:
+            from hidiffusion.hidiffusion import switching_threshold_ratio_dict as _switching_threshold_ratio_dict
             from hidiffusion.hidiffusion import (
-                switching_threshold_ratio_dict as _switching_threshold_ratio_dict,
                 text_to_img_controlnet_switching_threshold_ratio_dict as _text_to_img_controlnet_switching_threshold_ratio_dict,
             )
 
