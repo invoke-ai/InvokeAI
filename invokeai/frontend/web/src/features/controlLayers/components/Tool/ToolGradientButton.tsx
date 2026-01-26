@@ -51,7 +51,7 @@ const GradientLinearIcon = memo(() => {
     <Box as="svg" viewBox="0 0 24 24" boxSize="22px" aria-hidden focusable={false} display="block">
       <defs>
         <linearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor="currentColor" stopOpacity="0.25" />
+          <stop offset="0%" stopColor="currentColor" stopOpacity="0.0" />
           <stop offset="100%" stopColor="currentColor" stopOpacity="0.85" />
         </linearGradient>
       </defs>
