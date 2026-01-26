@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import copy
+import importlib.util
 from contextlib import contextmanager
 from typing import Any, Optional
-
-import copy
 
 
 @contextmanager
@@ -16,13 +16,12 @@ def hidiffusion_patch(
     t2_ratio: Optional[float] = None,
 ):
     """Context manager that applies HiDiffusion and restores the model on exit."""
-    try:
-        import hidiffusion as hd
-        from hidiffusion import apply_hidiffusion, remove_hidiffusion
-    except ImportError as exc:
+    if importlib.util.find_spec("hidiffusion") is None:
         raise ImportError(
             "HiDiffusion is not installed. Install it with `pip install hidiffusion` to enable this option."
-        ) from exc
+        )
+
+    from hidiffusion import apply_hidiffusion, remove_hidiffusion
 
     target = model.unet if hasattr(model, "unet") else model
 

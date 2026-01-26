@@ -6549,18 +6549,6 @@ export type components = {
              */
             hidiffusion_t2_ratio?: number;
             /**
-             * HiDiffusion: T1 Ratio
-             * @description Override HiDiffusion early switch threshold (T1 ratio)
-             * @default 0.4
-             */
-            hidiffusion_t1_ratio?: number;
-            /**
-             * HiDiffusion: T2 Ratio
-             * @description Override HiDiffusion late switch threshold (T2 ratio)
-             * @default 0.0
-             */
-            hidiffusion_t2_ratio?: number;
-            /**
              * @description Latents tensor
              * @default null
              */
@@ -6696,6 +6684,18 @@ export type components = {
              * @default true
              */
             hidiffusion_window_attn?: boolean;
+            /**
+             * HiDiffusion: T1 Ratio
+             * @description Override HiDiffusion early switch threshold (T1 ratio)
+             * @default 0.4
+             */
+            hidiffusion_t1_ratio?: number;
+            /**
+             * HiDiffusion: T2 Ratio
+             * @description Override HiDiffusion late switch threshold (T2 ratio)
+             * @default 0.0
+             */
+            hidiffusion_t2_ratio?: number;
             /**
              * @description Latents tensor
              * @default null
