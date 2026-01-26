@@ -1019,10 +1019,17 @@ zimage_bundle: list[StarterModel] = [
     flux_vae,
 ]
 
+flux2_klein_bundle: list[StarterModel] = [
+    flux2_klein_4b_gguf_q4,
+    flux2_vae,
+    flux2_klein_qwen3_4b_encoder,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
     BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
+    BaseModelType.Flux2: StarterModelBundle(name="FLUX.2 Klein", models=flux2_klein_bundle),
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
 }
 
