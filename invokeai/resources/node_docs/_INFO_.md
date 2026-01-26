@@ -20,14 +20,15 @@ This folder contains developer-authored node documentation to be displayed in th
 - Place image files in the `images/` subfolder next to the markdown file. Reference them using relative paths in the markdown.
 - Ensure image names are unique and descriptive. Images can be reused across multiple docs if applicable, e.g., SD1.5 denoise and prompt nodes can all be shown in a single image since their usage is tied together.
 - Images can be screenshots of the node in use, example outputs, or diagrams illustrating concepts.
-- When displaying node usage examples, keep the example focused on the node and its immediate upstream/downstream connections. For best readability, keep the image width approximately two nodes wide.
+- When displaying node usage examples, keep the example focused on the node and its immediate upstream/downstream connections. For best readability, keep the image width approximately two or three nodes wide.
+- To reduce space requirements, use JPG format for all example images.
 
 [Use IMAGE_PLACEHOLDER for any images at this time. We will replace these with actual images later.]
 
 ## Submitting:
 
-- Because these docs are included as an installed module and served through API, new files will only be included after a `uv pip install`. This ensures parity between dev and user installs.
 - Check that your markdown renders correctly in a markdown viewer in the UI.
+- Because these docs are included as an installed module and served through API, new folders will only be included after a `uv pip install`. This ensures parity between dev and user installs. Just adding new files to existing folders *shouldn't* require installing again.
 
 ## Doc Template:
 
@@ -47,17 +48,21 @@ This folder contains developer-authored node documentation to be displayed in th
 - [Output 2 Name]: [Description of output 2]
 - ...
 
+---
+
 ## Example Usage
 
 ### [Example Scenario 1]
 
-![Descriptive Alt Text for Example 1](./images/[image_file_name_1].png)  
+![Alt Text for Example 1](./images/[image_file_name_1].png)  
 [Brief description of Example Scenario 1.]
 
 ### [Example Scenario 2]
 
-![Descriptive Alt Text for Example 2](./images/[image_file_name_2].png)  
+![Alt Text for Example 2](./images/[image_file_name_2].png)  
 [Brief description of Example Scenario 2.]
+
+---
 
 ## Notes:
 

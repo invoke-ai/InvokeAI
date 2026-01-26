@@ -10,7 +10,7 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor i
 
 ### Text-to-Image
 
-![Z Image Denoise Text-to-Image Example](./images/z_image_example_t2i.png)
+![Z Image Denoise Text-to-Image Example](./images/z_image_example_t2i.jpg)
 
 ## Notes:
 
