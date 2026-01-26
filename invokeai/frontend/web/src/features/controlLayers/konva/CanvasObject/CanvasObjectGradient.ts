@@ -46,8 +46,8 @@ export class CanvasObjectGradient extends CanvasModuleBase {
       this.isFirstRender = false;
 
       const { rect, fgColor, bgColor } = state;
-      const fg = rgbaColorToString(fgColor.a === 0 ? { ...fgColor, r: 0, g: 0, b: 0 } : fgColor);
-      const bg = rgbaColorToString(bgColor.a === 0 ? { ...bgColor, r: 0, g: 0, b: 0 } : bgColor);
+      const fg = rgbaColorToString(fgColor);
+      const bg = rgbaColorToString(bgColor);
 
       this.log.trace({ state }, 'Updating gradient');
       this.konva.rect.setAttrs({
