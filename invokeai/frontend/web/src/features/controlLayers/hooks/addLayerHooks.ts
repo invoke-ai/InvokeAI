@@ -26,6 +26,7 @@ import type {
   CanvasRegionalGuidanceState,
   ControlLoRAConfig,
   ControlNetConfig,
+  Flux2ReferenceImageConfig,
   FluxKontextReferenceImageConfig,
   IPAdapterConfig,
   RegionalGuidanceIPAdapterConfig,
@@ -33,6 +34,7 @@ import type {
 } from 'features/controlLayers/store/types';
 import {
   initialControlNet,
+  initialFlux2ReferenceImage,
   initialFluxKontextReferenceImage,
   initialIPAdapter,
   initialRegionalGuidanceIPAdapter,
@@ -74,13 +76,20 @@ export const selectDefaultControlAdapter = createSelector(
   }
 );
 
-export const getDefaultRefImageConfig = (getState: AppGetState): IPAdapterConfig | FluxKontextReferenceImageConfig => {
+export const getDefaultRefImageConfig = (
+  getState: AppGetState
+): IPAdapterConfig | FluxKontextReferenceImageConfig | Flux2ReferenceImageConfig => {
   const state = getState();
 
   const mainModelConfig = selectMainModelConfig(state);
   const ipAdapterModelConfigs = selectIPAdapterModels(state);
 
   const base = mainModelConfig?.base;
+
+  // FLUX.2 Klein has built-in reference image support - no model needed
+  if (base === 'flux2') {
+    return deepClone(initialFlux2ReferenceImage);
+  }
 
   if (base === 'flux' && mainModelConfig?.name?.toLowerCase().includes('kontext')) {
     const config = deepClone(initialFluxKontextReferenceImage);
