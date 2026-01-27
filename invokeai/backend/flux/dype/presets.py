@@ -1,17 +1,27 @@
 """DyPE presets and automatic configuration."""
 
 from dataclasses import dataclass
-from enum import Enum
+from typing import Literal
 
 from invokeai.backend.flux.dype.base import DyPEConfig
 
 
-class DyPEPreset(str, Enum):
-    """Predefined DyPE configurations."""
+# DyPE preset type - using Literal for proper frontend dropdown support
+DyPEPreset = Literal["off", "on", "auto", "4k"]
 
-    OFF = "off"  # DyPE disabled
-    AUTO = "auto"  # Automatically enable based on resolution
-    PRESET_4K = "4k"  # Optimized for 3840x2160 / 4096x2160
+# Constants for preset values
+DYPE_PRESET_OFF: DyPEPreset = "off"
+DYPE_PRESET_ON: DyPEPreset = "on"
+DYPE_PRESET_AUTO: DyPEPreset = "auto"
+DYPE_PRESET_4K: DyPEPreset = "4k"
+
+# Human-readable labels for the UI
+DYPE_PRESET_LABELS: dict[str, str] = {
+    "off": "Off",
+    "on": "On",
+    "auto": "Auto (>1536px)",
+    "4k": "4K Optimized",
+}
 
 
 @dataclass
@@ -27,7 +37,7 @@ class DyPEPresetConfig:
 
 # Predefined preset configurations
 DYPE_PRESETS: dict[DyPEPreset, DyPEPresetConfig] = {
-    DyPEPreset.PRESET_4K: DyPEPresetConfig(
+    DYPE_PRESET_4K: DyPEPresetConfig(
         base_resolution=1024,
         method="vision_yarn",
         dype_scale=2.0,
@@ -98,7 +108,7 @@ def get_dype_config_from_preset(
     Returns:
         DyPEConfig if DyPE should be enabled, None otherwise
     """
-    if preset == DyPEPreset.OFF:
+    if preset == DYPE_PRESET_OFF:
         # Check if custom values are provided even with preset=OFF
         if custom_scale is not None:
             return DyPEConfig(
@@ -111,7 +121,21 @@ def get_dype_config_from_preset(
             )
         return None
 
-    if preset == DyPEPreset.AUTO:
+    if preset == DYPE_PRESET_ON:
+        # Always enable DyPE with dynamic settings based on resolution
+        max_dim = max(width, height)
+        scale = max_dim / 1024
+        dynamic_dype_scale = min(2.0 * scale, 8.0)
+        return DyPEConfig(
+            enable_dype=True,
+            base_resolution=1024,
+            method="vision_yarn",
+            dype_scale=custom_scale if custom_scale is not None else dynamic_dype_scale,
+            dype_exponent=custom_exponent if custom_exponent is not None else 2.0,
+            dype_start_sigma=1.0,
+        )
+
+    if preset == DYPE_PRESET_AUTO:
         config = get_dype_config_for_resolution(
             width=width,
             height=height,

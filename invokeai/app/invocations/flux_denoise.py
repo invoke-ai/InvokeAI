@@ -32,7 +32,12 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
 from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
 from invokeai.backend.flux.denoise import denoise
-from invokeai.backend.flux.dype.presets import DyPEPreset, get_dype_config_from_preset
+from invokeai.backend.flux.dype.presets import (
+    DYPE_PRESET_LABELS,
+    DYPE_PRESET_OFF,
+    DyPEPreset,
+    get_dype_config_from_preset,
+)
 from invokeai.backend.flux.extensions.dype_extension import DyPEExtension
 from invokeai.backend.flux.extensions.instantx_controlnet_extension import InstantXControlNetExtension
 from invokeai.backend.flux.extensions.kontext_extension import KontextExtension
@@ -66,7 +71,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="4.3.0",
+    version="4.4.0",
 )
 class FluxDenoiseInvocation(BaseInvocation):
     """Run denoising process with a FLUX transformer model."""
@@ -170,20 +175,24 @@ class FluxDenoiseInvocation(BaseInvocation):
 
     # DyPE (Dynamic Position Extrapolation) for high-resolution generation
     dype_preset: DyPEPreset = InputField(
-        default=DyPEPreset.OFF,
+        default=DYPE_PRESET_OFF,
         description="DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.",
+        ui_order=100,
+        ui_choice_labels=DYPE_PRESET_LABELS,
     )
     dype_scale: Optional[float] = InputField(
         default=None,
         ge=0.0,
         le=8.0,
         description="DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.",
+        ui_order=101,
     )
     dype_exponent: Optional[float] = InputField(
         default=None,
         ge=0.0,
         le=1000.0,
         description="DyPE decay speed (λt). Controls transition from low to high frequency detail. Only used when dype_preset is not 'off'.",
+        ui_order=102,
     )
 
     @torch.no_grad()

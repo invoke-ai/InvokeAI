@@ -8,11 +8,24 @@ Based on: https://github.com/wildminder/ComfyUI-DyPE
 
 from invokeai.backend.flux.dype.base import DyPEConfig
 from invokeai.backend.flux.dype.embed import DyPEEmbedND
-from invokeai.backend.flux.dype.presets import DyPEPreset, get_dype_config_for_resolution
+from invokeai.backend.flux.dype.presets import (
+    DYPE_PRESET_4K,
+    DYPE_PRESET_AUTO,
+    DYPE_PRESET_LABELS,
+    DYPE_PRESET_OFF,
+    DYPE_PRESET_ON,
+    DyPEPreset,
+    get_dype_config_for_resolution,
+)
 
 __all__ = [
     "DyPEConfig",
     "DyPEEmbedND",
     "DyPEPreset",
+    "DYPE_PRESET_OFF",
+    "DYPE_PRESET_ON",
+    "DYPE_PRESET_AUTO",
+    "DYPE_PRESET_4K",
+    "DYPE_PRESET_LABELS",
     "get_dype_config_for_resolution",
 ]
