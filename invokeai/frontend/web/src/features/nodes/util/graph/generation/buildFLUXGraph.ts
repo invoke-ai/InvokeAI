@@ -277,7 +277,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       }
       g.addEdge(flux2KontextCollect, 'collection', flux2Denoise, 'kontext_conditioning');
 
-      g.upsertMetadata({ ref_images: [validFlux2RefImageConfigs] }, 'merge');
+      g.upsertMetadata({ ref_images: validFlux2RefImageConfigs }, 'merge');
     }
 
     if (generationMode === 'txt2img') {
@@ -379,7 +379,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
         }
         g.addEdge(fluxKontextCollect, 'collection', fluxDenoise, 'kontext_conditioning');
 
-        g.upsertMetadata({ ref_images: [validFLUXKontextConfigs] }, 'merge');
+        g.upsertMetadata({ ref_images: validFLUXKontextConfigs }, 'merge');
       }
     }
 
