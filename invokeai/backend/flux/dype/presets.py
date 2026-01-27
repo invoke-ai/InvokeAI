@@ -5,7 +5,6 @@ from typing import Literal
 
 from invokeai.backend.flux.dype.base import DyPEConfig
 
-
 # DyPE preset type - using Literal for proper frontend dropdown support
 DyPEPreset = Literal["off", "on", "auto", "4k"]
 
