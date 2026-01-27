@@ -322,6 +322,13 @@ const zFluxKontextReferenceImageConfig = z.object({
 });
 export type FluxKontextReferenceImageConfig = z.infer<typeof zFluxKontextReferenceImageConfig>;
 
+// FLUX.2 Klein has built-in reference image support - no separate model needed
+const zFlux2ReferenceImageConfig = z.object({
+  type: z.literal('flux2_reference_image'),
+  image: zCroppableImageWithDims.nullable(),
+});
+export type Flux2ReferenceImageConfig = z.infer<typeof zFlux2ReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -332,7 +339,12 @@ const zCanvasEntityBase = z.object({
 export const zRefImageState = z.object({
   id: zId,
   isEnabled: z.boolean().default(true),
-  config: z.discriminatedUnion('type', [zIPAdapterConfig, zFLUXReduxConfig, zFluxKontextReferenceImageConfig]),
+  config: z.discriminatedUnion('type', [
+    zIPAdapterConfig,
+    zFLUXReduxConfig,
+    zFluxKontextReferenceImageConfig,
+    zFlux2ReferenceImageConfig,
+  ]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
 
@@ -345,6 +357,9 @@ export const isFLUXReduxConfig = (config: RefImageState['config']): config is FL
 export const isFluxKontextReferenceImageConfig = (
   config: RefImageState['config']
 ): config is FluxKontextReferenceImageConfig => config.type === 'flux_kontext_reference_image';
+
+export const isFlux2ReferenceImageConfig = (config: RefImageState['config']): config is Flux2ReferenceImageConfig =>
+  config.type === 'flux2_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -633,6 +648,9 @@ export const zParamsState = z.object({
   zImageVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX VAE
   zImageQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder
   zImageQwen3SourceModel: zParameterModel.nullable(), // Diffusers Z-Image model (fallback for VAE/Encoder)
+  // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
+  kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
+  kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
   // Z-Image Seed Variance Enhancer settings
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
@@ -692,6 +710,8 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageVaeModel: null,
   zImageQwen3EncoderModel: null,
   zImageQwen3SourceModel: null,
+  kleinVaeModel: null,
+  kleinQwen3EncoderModel: null,
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,

@@ -630,6 +630,21 @@ class UtilInterface(InvocationContextInterface):
             is_canceled=self.is_canceled,
         )
 
+    def flux2_step_callback(self, intermediate_state: PipelineIntermediateState) -> None:
+        """
+        The step callback for FLUX.2 Klein models (32-channel VAE).
+
+        Args:
+            intermediate_state: The intermediate state of the diffusion pipeline.
+        """
+
+        diffusion_step_callback(
+            signal_progress=self.signal_progress,
+            intermediate_state=intermediate_state,
+            base_model=BaseModelType.Flux2,
+            is_canceled=self.is_canceled,
+        )
+
     def signal_progress(
         self,
         message: str,
