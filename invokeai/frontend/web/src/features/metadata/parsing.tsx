@@ -18,6 +18,7 @@ import {
   setCfgRescaleMultiplier,
   setCfgScale,
   setClipSkip,
+  setFluxDypePreset,
   setFluxScheduler,
   setGuidance,
   setImg2imgStrength,
@@ -53,6 +54,7 @@ import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
   ParameterCLIPSkip,
+  ParameterFluxDypePreset,
   ParameterGuidance,
   ParameterHeight,
   ParameterModel,
@@ -76,6 +78,7 @@ import {
   zParameterCFGRescaleMultiplier,
   zParameterCFGScale,
   zParameterCLIPSkip,
+  zParameterFluxDypePreset,
   zParameterGuidance,
   zParameterImageDimension,
   zParameterNegativePrompt,
@@ -369,6 +372,26 @@ const Guidance: SingleMetadataHandler<ParameterGuidance> = {
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterGuidance>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Guidance
+
+//#region FluxDypePreset
+const FluxDypePreset: SingleMetadataHandler<ParameterFluxDypePreset> = {
+  [SingleMetadataKey]: true,
+  type: 'FluxDypePreset',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'dype_preset');
+    const parsed = zParameterFluxDypePreset.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setFluxDypePreset(value));
+  },
+  i18nKey: 'metadata.dypePreset',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterFluxDypePreset>) => (
+    <MetadataPrimitiveValue value={value} />
+  ),
+};
+//#endregion FluxDypePreset
 
 //#region Scheduler
 const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
@@ -1116,6 +1139,7 @@ export const ImageMetadataHandlers = {
   CFGRescaleMultiplier,
   CLIPSkip,
   Guidance,
+  FluxDypePreset,
   Width,
   Height,
   Seed,
