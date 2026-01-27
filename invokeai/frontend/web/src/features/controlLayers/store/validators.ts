@@ -125,12 +125,15 @@ export const getGlobalReferenceImageWarnings = (
 
     const { config } = entity;
 
-    if (!config.model) {
-      // No model selected
-      warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
-    } else if (!areBasesCompatibleForRefImage(config.model, model)) {
-      // Supported model architecture but doesn't match
-      warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
+    // FLUX.2 reference images don't require a model - it's built-in
+    if (config.type !== 'flux2_reference_image') {
+      if (!('model' in config) || !config.model) {
+        // No model selected
+        warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
+      } else if (!areBasesCompatibleForRefImage(config.model, model)) {
+        // Supported model architecture but doesn't match
+        warnings.push(WARNINGS.IP_ADAPTER_INCOMPATIBLE_BASE_MODEL);
+      }
     }
 
     if (!entity.config.image) {

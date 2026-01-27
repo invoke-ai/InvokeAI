@@ -33,6 +33,18 @@ REGEX_TO_BASE: dict[str, BaseModelType] = {
 }
 
 
+def _is_flux2_vae(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict is a FLUX.2 VAE (AutoencoderKLFlux2).
+
+    FLUX.2 VAE has a Batch Normalization layer (bn.running_mean, bn.running_var)
+    which is unique to FLUX.2 and not present in FLUX.1 VAE.
+    """
+    # Check for BN layer which is unique to FLUX.2 VAE
+    # Note: We cannot use encoder.conv_out channel count because both FLUX.1 and FLUX.2
+    # have 32 output channels (FLUX.1: 16 latent × 2, FLUX.2: 32 latent × 2 but patchified)
+    return "bn.running_mean" in state_dict or "bn.running_var" in state_dict
+
+
 class VAE_Checkpoint_Config_Base(Checkpoint_Config_Base):
     """Model config for standalone VAE models."""
 
@@ -61,14 +73,19 @@ class VAE_Checkpoint_Config_Base(Checkpoint_Config_Base):
 
     @classmethod
     def _validate_looks_like_vae(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
         if not state_dict_has_any_keys_starting_with(
-            mod.load_state_dict(),
+            state_dict,
             {
                 "encoder.conv_in",
                 "decoder.conv_in",
             },
         ):
             raise NotAMatchError("model does not match Checkpoint VAE heuristics")
+
+        # Exclude FLUX.2 VAEs - they have their own config class
+        if _is_flux2_vae(state_dict):
+            raise NotAMatchError("model is a FLUX.2 VAE, not a standard VAE")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
@@ -111,6 +128,44 @@ class VAE_Checkpoint_SDXL_Config(VAE_Checkpoint_Config_Base, Config_Base):
 
 class VAE_Checkpoint_FLUX_Config(VAE_Checkpoint_Config_Base, Config_Base):
     base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+
+
+class VAE_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Config_Base):
+    """Model config for FLUX.2 VAE checkpoint models (AutoencoderKLFlux2)."""
+
+    type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_vae(mod)
+
+        cls._validate_is_flux2_vae(mod)
+
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_vae(cls, mod: ModelOnDisk) -> None:
+        if not state_dict_has_any_keys_starting_with(
+            mod.load_state_dict(),
+            {
+                "encoder.conv_in",
+                "decoder.conv_in",
+            },
+        ):
+            raise NotAMatchError("model does not match Checkpoint VAE heuristics")
+
+    @classmethod
+    def _validate_is_flux2_vae(cls, mod: ModelOnDisk) -> None:
+        """Validate that this is a FLUX.2 VAE, not FLUX.1."""
+        state_dict = mod.load_state_dict()
+        if not _is_flux2_vae(state_dict):
+            raise NotAMatchError("state dict does not look like a FLUX.2 VAE")
 
 
 class VAE_Diffusers_Config_Base(Diffusers_Config_Base):
@@ -178,3 +233,26 @@ class VAE_Diffusers_SD1_Config(VAE_Diffusers_Config_Base, Config_Base):
 
 class VAE_Diffusers_SDXL_Config(VAE_Diffusers_Config_Base, Config_Base):
     base: Literal[BaseModelType.StableDiffusionXL] = Field(default=BaseModelType.StableDiffusionXL)
+
+
+class VAE_Diffusers_Flux2_Config(Diffusers_Config_Base, Config_Base):
+    """Model config for FLUX.2 VAE models in diffusers format (AutoencoderKLFlux2)."""
+
+    type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
+    format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "AutoencoderKLFlux2",
+            },
+        )
+
+        return cls(**override_fields)
