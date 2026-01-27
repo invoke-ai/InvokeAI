@@ -72,7 +72,24 @@ class VAE_Checkpoint_Config_Base(Checkpoint_Config_Base):
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
-        # Heuristic: VAEs of all architectures have a similar structure; the best we can do is guess based on name
+        # First, try to identify by latent space dimensions (most reliable)
+        state_dict = mod.load_state_dict()
+        decoder_conv_in_key = "decoder.conv_in.weight"
+        if decoder_conv_in_key in state_dict:
+            latent_channels = state_dict[decoder_conv_in_key].shape[1]
+            if latent_channels == 16:
+                # Flux1 VAE has 16-dimensional latent space
+                return BaseModelType.Flux
+            elif latent_channels == 4:
+                # SD/SDXL VAE has 4-dimensional latent space
+                # Try to distinguish SD1/SD2/SDXL by name, fallback to SD1
+                for regexp, base in REGEX_TO_BASE.items():
+                    if re.search(regexp, mod.path.name, re.IGNORECASE):
+                        return base
+                # Default to SD1 if we can't determine from name
+                return BaseModelType.StableDiffusion1
+
+        # Fallback: guess based on name
         for regexp, base in REGEX_TO_BASE.items():
             if re.search(regexp, mod.path.name, re.IGNORECASE):
                 return base
