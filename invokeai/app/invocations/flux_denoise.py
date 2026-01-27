@@ -473,7 +473,7 @@ class FluxDenoiseInvocation(BaseInvocation):
                     target_width=self.width,
                 )
                 context.logger.info(
-                    f"DyPE enabled: {self.width}x{self.height}, preset={self.dype_preset.value}, "
+                    f"DyPE enabled: {self.width}x{self.height}, preset={self.dype_preset}, "
                     f"scale={dype_config.dype_scale:.2f}, method={dype_config.method}"
                 )
 
