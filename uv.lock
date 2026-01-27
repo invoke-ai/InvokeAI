@@ -816,15 +816,6 @@ wheels = [
 ]
 
 [[package]]
-name = "hidiffusion"
-version = "0.1.10"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/fd/2b/422acb8106f1295e94a8f98363e2b9b0d6be6f90f672d353f8b2c38654fe/hidiffusion-0.1.10.tar.gz", hash = "sha256:e8a7cfab49a3a29d83b33f3c6c4adcaf32377cb535d3a279bbf53125e5a57bcd", size = 41303, upload-time = "2024-06-16T17:23:58.739Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/64/fb/ebee9c90768db7c8368922d1387c64311051c4423de88aecfe1dcb8387ad/hidiffusion-0.1.10-py3-none-any.whl", hash = "sha256:9498c8fcc07f60645e533feeaaf66aeb6c74b289788be333f59507980556e9e4", size = 37727, upload-time = "2024-06-16T17:23:56.478Z" },
-]
-
-[[package]]
 name = "httpcore"
 version = "1.0.9"
 source = { registry = "https://pypi.org/simple" }
@@ -981,7 +972,6 @@ dependencies = [
     { name = "fastapi" },
     { name = "fastapi-events" },
     { name = "gguf" },
-    { name = "hidiffusion" },
     { name = "huggingface-hub" },
     { name = "mediapipe" },
     { name = "numpy" },
@@ -1089,7 +1079,6 @@ requires-dist = [
     { name = "fastapi-events" },
     { name = "gguf" },
     { name = "gprof2dot", marker = "extra == 'dev'" },
-    { name = "hidiffusion" },
     { name = "httpx", marker = "extra == 'test'" },
     { name = "huggingface-hub" },
     { name = "humanize", marker = "extra == 'test'", specifier = "==4.12.1" },

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import copy
-import importlib.util
 from contextlib import contextmanager
 from typing import Any, Optional
 
@@ -16,12 +15,7 @@ def hidiffusion_patch(
     t2_ratio: Optional[float] = None,
 ):
     """Context manager that applies HiDiffusion and restores the model on exit."""
-    if importlib.util.find_spec("hidiffusion") is None:
-        raise ImportError(
-            "HiDiffusion is not installed. Install it with `pip install hidiffusion` to enable this option."
-        )
-
-    from hidiffusion import apply_hidiffusion, remove_hidiffusion
+    from invokeai.backend.hidiffusion.hidiffusion import apply_hidiffusion, remove_hidiffusion
 
     target = model.unet if hasattr(model, "unet") else model
 
@@ -90,8 +84,8 @@ def hidiffusion_patch(
     ratio_dicts = None
     if t1_ratio is not None or t2_ratio is not None:
         try:
-            from hidiffusion.hidiffusion import switching_threshold_ratio_dict as _switching_threshold_ratio_dict
-            from hidiffusion.hidiffusion import (
+            from invokeai.backend.hidiffusion.hidiffusion import (
+                switching_threshold_ratio_dict as _switching_threshold_ratio_dict,
                 text_to_img_controlnet_switching_threshold_ratio_dict as _text_to_img_controlnet_switching_threshold_ratio_dict,
             )
 

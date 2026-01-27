@@ -38,7 +38,6 @@ dependencies = [
   "compel==2.1.1",
   "diffusers[torch]==0.36.0",
   "gguf",
-  "hidiffusion",                          # optional high-res denoise patch (HiDiffusion)
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",
   "onnx==1.16.1",
@@ -189,6 +188,7 @@ version = { attr = "invokeai.version.__version__" }
 [tool.setuptools.package-data]
 "invokeai.app.assets" = ["**/*.png"]
 "invokeai.app.services.workflow_records.default_workflows" = ["*.json"]
+"invokeai.backend.hidiffusion" = ["LICENSE", "NOTICE", "sd_module_key/*.txt"]
 "invokeai.app.services.style_preset_records" = ["*.json"]
 "invokeai.app.services.style_preset_images.default_style_preset_images" = [
   "*.png",
