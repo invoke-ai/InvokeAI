@@ -56,6 +56,7 @@ from invokeai.backend.model_manager.configs.lora import (
 )
 from invokeai.backend.model_manager.configs.main import (
     Main_BnBNF4_FLUX_Config,
+    Main_Checkpoint_Flux2_Config,
     Main_Checkpoint_FLUX_Config,
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
@@ -63,12 +64,15 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXLRefiner_Config,
     Main_Checkpoint_ZImage_Config,
     Main_Diffusers_CogView4_Config,
+    Main_Diffusers_Flux2_Config,
+    Main_Diffusers_FLUX_Config,
     Main_Diffusers_SD1_Config,
     Main_Diffusers_SD2_Config,
     Main_Diffusers_SD3_Config,
     Main_Diffusers_SDXL_Config,
     Main_Diffusers_SDXLRefiner_Config,
     Main_Diffusers_ZImage_Config,
+    Main_GGUF_Flux2_Config,
     Main_GGUF_FLUX_Config,
     Main_GGUF_ZImage_Config,
     MainModelDefaultSettings,
@@ -95,10 +99,12 @@ from invokeai.backend.model_manager.configs.textual_inversion import (
 )
 from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.configs.vae import (
+    VAE_Checkpoint_Flux2_Config,
     VAE_Checkpoint_FLUX_Config,
     VAE_Checkpoint_SD1_Config,
     VAE_Checkpoint_SD2_Config,
     VAE_Checkpoint_SDXL_Config,
+    VAE_Diffusers_Flux2_Config,
     VAE_Diffusers_SD1_Config,
     VAE_Diffusers_SDXL_Config,
 )
@@ -148,17 +154,25 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_SDXL_Config, Main_Diffusers_SDXL_Config.get_tag()],
         Annotated[Main_Diffusers_SDXLRefiner_Config, Main_Diffusers_SDXLRefiner_Config.get_tag()],
         Annotated[Main_Diffusers_SD3_Config, Main_Diffusers_SD3_Config.get_tag()],
+        Annotated[Main_Diffusers_FLUX_Config, Main_Diffusers_FLUX_Config.get_tag()],
+        Annotated[Main_Diffusers_Flux2_Config, Main_Diffusers_Flux2_Config.get_tag()],
         Annotated[Main_Diffusers_CogView4_Config, Main_Diffusers_CogView4_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
+        # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
+        # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
         Annotated[Main_Checkpoint_SD1_Config, Main_Checkpoint_SD1_Config.get_tag()],
         Annotated[Main_Checkpoint_SD2_Config, Main_Checkpoint_SD2_Config.get_tag()],
         Annotated[Main_Checkpoint_SDXL_Config, Main_Checkpoint_SDXL_Config.get_tag()],
         Annotated[Main_Checkpoint_SDXLRefiner_Config, Main_Checkpoint_SDXLRefiner_Config.get_tag()],
+        Annotated[Main_Checkpoint_Flux2_Config, Main_Checkpoint_Flux2_Config.get_tag()],
         Annotated[Main_Checkpoint_FLUX_Config, Main_Checkpoint_FLUX_Config.get_tag()],
         Annotated[Main_Checkpoint_ZImage_Config, Main_Checkpoint_ZImage_Config.get_tag()],
         # Main (Pipeline) - quantized formats
+        # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
+        # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
         Annotated[Main_BnBNF4_FLUX_Config, Main_BnBNF4_FLUX_Config.get_tag()],
+        Annotated[Main_GGUF_Flux2_Config, Main_GGUF_Flux2_Config.get_tag()],
         Annotated[Main_GGUF_FLUX_Config, Main_GGUF_FLUX_Config.get_tag()],
         Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
         # VAE - checkpoint format
@@ -166,9 +180,11 @@ AnyModelConfig = Annotated[
         Annotated[VAE_Checkpoint_SD2_Config, VAE_Checkpoint_SD2_Config.get_tag()],
         Annotated[VAE_Checkpoint_SDXL_Config, VAE_Checkpoint_SDXL_Config.get_tag()],
         Annotated[VAE_Checkpoint_FLUX_Config, VAE_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[VAE_Checkpoint_Flux2_Config, VAE_Checkpoint_Flux2_Config.get_tag()],
         # VAE - diffusers format
         Annotated[VAE_Diffusers_SD1_Config, VAE_Diffusers_SD1_Config.get_tag()],
         Annotated[VAE_Diffusers_SDXL_Config, VAE_Diffusers_SDXL_Config.get_tag()],
+        Annotated[VAE_Diffusers_Flux2_Config, VAE_Diffusers_Flux2_Config.get_tag()],
         # ControlNet - checkpoint format
         Annotated[ControlNet_Checkpoint_SD1_Config, ControlNet_Checkpoint_SD1_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_SD2_Config, ControlNet_Checkpoint_SD2_Config.get_tag()],
@@ -498,7 +514,9 @@ class ModelConfigFactory:
         # Now do any post-processing needed for specific model types/bases/etc.
         match config.type:
             case ModelType.Main:
-                config.default_settings = MainModelDefaultSettings.from_base(config.base)
+                # Pass variant if available (e.g., for Flux2 models)
+                variant = getattr(config, "variant", None)
+                config.default_settings = MainModelDefaultSettings.from_base(config.base, variant)
             case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
                 config.default_settings = ControlAdapterDefaultSettings.from_model_name(config.name)
             case ModelType.LoRA:

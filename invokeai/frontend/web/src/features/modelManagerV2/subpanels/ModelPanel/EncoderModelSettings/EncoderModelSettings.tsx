@@ -3,6 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useEncoderModelSettings } from 'features/modelManagerV2/hooks/useEncoderModelSettings';
 import { selectSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
+import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
 import { toast } from 'features/toast/toast';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';

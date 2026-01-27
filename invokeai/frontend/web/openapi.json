@@ -215,6 +215,12 @@
                       "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
@@ -233,6 +239,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
@@ -240,6 +249,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
@@ -260,10 +272,16 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -476,6 +494,12 @@
                       "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
@@ -494,6 +518,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
@@ -501,6 +528,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
@@ -521,10 +551,16 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -782,6 +818,12 @@
                       "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
@@ -800,6 +842,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
@@ -807,6 +852,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
@@ -827,10 +875,16 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -1107,6 +1161,12 @@
                       "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
@@ -1125,6 +1185,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
@@ -1132,6 +1195,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
@@ -1152,10 +1218,16 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -1948,6 +2020,12 @@
                       "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
@@ -1966,6 +2044,9 @@
                       "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                     },
                     {
@@ -1973,6 +2054,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
@@ -1993,10 +2077,16 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -7168,6 +7258,12 @@
             "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
           },
           {
@@ -7186,6 +7282,9 @@
             "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
           },
           {
@@ -7193,6 +7292,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
@@ -7213,10 +7315,16 @@
             "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
           },
           {
+            "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+          },
+          {
             "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
           },
           {
             "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+          },
+          {
+            "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
           },
           {
             "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -7644,7 +7752,19 @@
       },
       "BaseModelType": {
         "type": "string",
-        "enum": ["any", "sd-1", "sd-2", "sd-3", "sdxl", "sdxl-refiner", "flux", "cogview4", "z-image", "unknown"],
+        "enum": [
+          "any",
+          "sd-1",
+          "sd-2",
+          "sd-3",
+          "sdxl",
+          "sdxl-refiner",
+          "flux",
+          "flux2",
+          "cogview4",
+          "z-image",
+          "unknown"
+        ],
         "title": "BaseModelType",
         "description": "An enumeration of base model architectures. For example, Stable Diffusion 1.x, Stable Diffusion 2.x, FLUX, etc.\n\nEvery model config must have a base architecture type.\n\nNot all models are associated with a base architecture. For example, CLIP models are their own thing, not related\nto any particular model architecture. To simplify internal APIs and make it easier to work with models, we use a\nfallback/null value `BaseModelType.Any` for these models, instead of making the model base optional."
       },
@@ -14073,6 +14193,10 @@
                   "flux_img2img",
                   "flux_inpaint",
                   "flux_outpaint",
+                  "flux2_txt2img",
+                  "flux2_img2img",
+                  "flux2_inpaint",
+                  "flux2_outpaint",
                   "sd3_txt2img",
                   "sd3_img2img",
                   "sd3_inpaint",
@@ -16753,6 +16877,12 @@
         "title": "DownloadStartedEvent",
         "type": "object"
       },
+      "DyPEPreset": {
+        "description": "Predefined DyPE configurations.",
+        "enum": ["off", "auto", "4k"],
+        "title": "DyPEPreset",
+        "type": "string"
+      },
       "DynamicPromptInvocation": {
         "category": "prompt",
         "class": "invocation",
@@ -18513,6 +18643,746 @@
           "$ref": "#/components/schemas/IntegerOutput"
         }
       },
+      "Flux2DenoiseInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nIt does not support ControlNet, IP-Adapters, or regional prompting.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoise_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DenoiseMaskField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoising_start": {
+            "default": 0.0,
+            "description": "When to start denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Denoising Start",
+            "type": "number"
+          },
+          "denoising_end": {
+            "default": 1.0,
+            "description": "When to stop denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Denoising End",
+            "type": "number"
+          },
+          "add_noise": {
+            "default": true,
+            "description": "Add noise based on denoising start.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Add Noise",
+            "type": "boolean"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Flux model (Transformer) to load",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_text_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FluxConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "negative_text_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FluxConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negative conditioning tensor. Can be None if cfg_scale is 1.0.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "cfg_scale": {
+            "default": 1.0,
+            "description": "Classifier-Free Guidance scale",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "CFG Scale",
+            "type": "number"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "num_steps": {
+            "default": 4,
+            "description": "Number of diffusion steps. Use 4 for distilled models, 28+ for base models.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 4,
+            "orig_required": false,
+            "title": "Num Steps",
+            "type": "integer"
+          },
+          "scheduler": {
+            "default": "euler",
+            "description": "Scheduler (sampler) for the denoising process. 'euler' is fast and standard. 'heun' is 2nd-order (better quality, 2x slower). 'lcm' is optimized for few steps.",
+            "enum": ["euler", "heun", "lcm"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "euler",
+            "orig_required": false,
+            "title": "Scheduler",
+            "type": "string",
+            "ui_choice_labels": {
+              "euler": "Euler",
+              "heun": "Heun (2nd order)",
+              "lcm": "LCM"
+            }
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "FLUX.2 VAE model (required for BN statistics).",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "kontext_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FluxKontextConditioningField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/FluxKontextConditioningField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "FLUX Kontext conditioning (reference images for multi-reference image editing).",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Reference Images"
+          },
+          "type": {
+            "const": "flux2_denoise",
+            "default": "flux2_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "flux", "flux2", "klein", "denoise"],
+        "title": "FLUX2 Denoise",
+        "type": "object",
+        "version": "1.3.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "Flux2KleinModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads a Flux2 Klein model, outputting its submodels.\n\nFlux2 Klein uses Qwen3 as the text encoder instead of CLIP+T5.\nIt uses a 32-channel VAE (AutoencoderKLFlux2) instead of the 16-channel FLUX.1 VAE.\n\nWhen using a Diffusers format model, both VAE and Qwen3 encoder are extracted\nautomatically from the main model. You can override with standalone models:\n- Transformer: Always from Flux2 Klein main model\n- VAE: From main model (Diffusers) or standalone VAE\n- Qwen3 Encoder: From main model (Diffusers) or standalone Qwen3 model",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Flux model (Transformer) to load",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Transformer",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["main"]
+          },
+          "vae_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone VAE model. Flux2 Klein uses the same VAE as FLUX (16-channel). If not provided, VAE will be loaded from the Qwen3 Source model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "VAE",
+            "ui_model_base": ["flux", "flux2"],
+            "ui_model_type": ["vae"]
+          },
+          "qwen3_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3 Encoder model. If not provided, encoder will be loaded from the Qwen3 Source model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen3 Encoder",
+            "ui_model_type": ["qwen3_encoder"]
+          },
+          "qwen3_source_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Diffusers Flux2 Klein model to extract VAE and/or Qwen3 encoder from. Use this if you don't have separate VAE/Qwen3 models. Ignored if both VAE and Qwen3 Encoder are provided separately.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen3 Source (Diffusers)",
+            "ui_model_base": ["flux2"],
+            "ui_model_format": ["diffusers"],
+            "ui_model_type": ["main"]
+          },
+          "max_seq_len": {
+            "default": 512,
+            "description": "Max sequence length for the Qwen3 encoder.",
+            "enum": [256, 512],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 512,
+            "orig_required": false,
+            "title": "Max Seq Length",
+            "type": "integer"
+          },
+          "type": {
+            "const": "flux2_klein_model_loader",
+            "default": "flux2_klein_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "flux", "klein", "qwen3"],
+        "title": "Main Model - Flux2 Klein",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Flux2KleinModelLoaderOutput"
+        }
+      },
+      "Flux2KleinModelLoaderOutput": {
+        "class": "output",
+        "description": "Flux2 Klein model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/TransformerField",
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "qwen3_encoder": {
+            "$ref": "#/components/schemas/Qwen3EncoderField",
+            "description": "Qwen3 tokenizer and text encoder",
+            "field_kind": "output",
+            "title": "Qwen3 Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "VAE",
+            "ui_hidden": false
+          },
+          "max_seq_len": {
+            "description": "The max sequence length for the Qwen3 encoder.",
+            "enum": [256, 512],
+            "field_kind": "output",
+            "title": "Max Seq Length",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "flux2_klein_model_loader_output",
+            "default": "flux2_klein_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "max_seq_len", "type", "type"],
+        "title": "Flux2KleinModelLoaderOutput",
+        "type": "object"
+      },
+      "Flux2KleinTextEncoderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes and preps a prompt for Flux2 Klein image generation.\n\nFlux2 Klein uses Qwen3 as the text encoder, extracting hidden states from\nlayers (9, 18, 27) and stacking them for richer text representations.\nThis matches the diffusers Flux2KleinPipeline implementation exactly.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt to encode.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "qwen3_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Qwen3EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3 tokenizer and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Qwen3 Encoder"
+          },
+          "max_seq_len": {
+            "default": 512,
+            "description": "Max sequence length for the Qwen3 encoder.",
+            "enum": [256, 512],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 512,
+            "orig_required": false,
+            "title": "Max Seq Len",
+            "type": "integer"
+          },
+          "mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TensorField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask defining the region that this conditioning prompt applies to.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "type": {
+            "const": "flux2_klein_text_encoder",
+            "default": "flux2_klein_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "flux", "klein", "qwen3"],
+        "title": "Prompt - Flux2 Klein",
+        "type": "object",
+        "version": "1.1.0",
+        "output": {
+          "$ref": "#/components/schemas/FluxConditioningOutput"
+        }
+      },
+      "Flux2VaeDecodeInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Generates an image from latents using FLUX.2 Klein's 32-channel VAE.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "type": {
+            "const": "flux2_vae_decode",
+            "default": "flux2_vae_decode",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "vae", "l2i", "flux2", "klein"],
+        "title": "Latents to Image - FLUX2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "Flux2VaeEncodeInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes an image into latents using FLUX.2 Klein's 32-channel VAE.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to encode.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "type": {
+            "const": "flux2_vae_encode",
+            "default": "flux2_vae_encode",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "vae", "i2l", "flux2", "klein"],
+        "title": "Image to Latents - FLUX2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "Flux2VariantType": {
+        "type": "string",
+        "enum": ["klein_4b", "klein_9b", "klein_9b_base"],
+        "title": "Flux2VariantType",
+        "description": "FLUX.2 model variants."
+      },
       "FluxConditioningCollectionOutput": {
         "class": "output",
         "description": "Base class for nodes that output a collection of conditioning tensors",
@@ -19351,6 +20221,53 @@
             "orig_required": false,
             "title": "Kontext Conditioning"
           },
+          "dype_preset": {
+            "$ref": "#/components/schemas/DyPEPreset",
+            "default": "off",
+            "description": "DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "off",
+            "orig_required": false
+          },
+          "dype_scale": {
+            "anyOf": [
+              {
+                "maximum": 8.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "DyPE magnitude (\u03bbs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Dype Scale"
+          },
+          "dype_exponent": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "DyPE decay speed (\u03bbt). Controls transition from low to high frequency detail. Only used when dype_preset is not 'off'.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Dype Exponent"
+          },
           "type": {
             "const": "flux_denoise",
             "default": "flux_denoise",
@@ -19363,7 +20280,7 @@
         "tags": ["image", "flux"],
         "title": "FLUX Denoise",
         "type": "object",
-        "version": "4.2.0",
+        "version": "4.3.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -19790,6 +20707,53 @@
             "orig_default": null,
             "orig_required": false,
             "title": "Kontext Conditioning"
+          },
+          "dype_preset": {
+            "$ref": "#/components/schemas/DyPEPreset",
+            "default": "off",
+            "description": "DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "off",
+            "orig_required": false
+          },
+          "dype_scale": {
+            "anyOf": [
+              {
+                "maximum": 8.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "DyPE magnitude (\u03bbs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Dype Scale"
+          },
+          "dype_exponent": {
+            "anyOf": [
+              {
+                "maximum": 1000.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "DyPE decay speed (\u03bbt). Controls transition from low to high frequency detail. Only used when dype_preset is not 'off'.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Dype Exponent"
           },
           "type": {
             "const": "flux_denoise_meta",
@@ -21103,7 +22067,8 @@
       "FluxVariantType": {
         "type": "string",
         "enum": ["schnell", "dev", "dev_fill"],
-        "title": "FluxVariantType"
+        "title": "FluxVariantType",
+        "description": "FLUX.1 model variants."
       },
       "FoundModel": {
         "properties": {
@@ -21585,6 +22550,21 @@
                 },
                 {
                   "$ref": "#/components/schemas/FloatToIntegerInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2KleinModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2VaeEncodeInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
@@ -22199,6 +23179,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/FloatOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2KleinModelLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/FluxConditioningCollectionOutput"
@@ -28523,6 +29506,21 @@
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeEncodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
               },
               {
@@ -29095,6 +30093,9 @@
                 "$ref": "#/components/schemas/FloatOutput"
               },
               {
+                "$ref": "#/components/schemas/Flux2KleinModelLoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/FluxConditioningCollectionOutput"
               },
               {
@@ -29520,6 +30521,21 @@
               },
               {
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeEncodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
@@ -30222,6 +31238,21 @@
           "float_to_int": {
             "$ref": "#/components/schemas/IntegerOutput"
           },
+          "flux2_denoise": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "flux2_klein_model_loader": {
+            "$ref": "#/components/schemas/Flux2KleinModelLoaderOutput"
+          },
+          "flux2_klein_text_encoder": {
+            "$ref": "#/components/schemas/FluxConditioningOutput"
+          },
+          "flux2_vae_decode": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
+          "flux2_vae_encode": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
           "flux_control_lora_loader": {
             "$ref": "#/components/schemas/FluxControlLoRALoaderOutput"
           },
@@ -30734,229 +31765,234 @@
           }
         },
         "required": [
-          "image_collection",
-          "infill_rgba",
-          "cv_inpaint",
-          "cogview4_i2l",
-          "face_identifier",
-          "img_ilerp",
-          "flux_redux",
-          "seamless",
-          "invokeai_img_blend",
-          "show_image",
-          "infill_cv2",
-          "z_image_seed_variance_enhancer",
-          "z_image_model_loader",
-          "invokeai_img_val_thresholds",
-          "scheduler",
-          "float",
-          "dw_openpose_detection",
-          "lora_selector",
-          "segment_anything",
-          "sub",
-          "spandrel_image_to_image_autoscale",
-          "ip_adapter",
-          "model_identifier",
-          "integer",
-          "create_gradient_mask",
-          "img_pad_crop",
-          "color",
-          "z_image_denoise",
-          "flux_lora_collection_loader",
-          "heuristic_resize",
-          "prompt_from_file",
-          "grounding_dino",
-          "latents_collection",
-          "noise",
-          "sd3_l2i",
-          "compel",
-          "pair_tile_image",
-          "string_split_neg",
-          "ideal_size",
-          "rectangle_mask",
-          "t2i_adapter",
-          "img_blur",
-          "tensor_mask_to_image",
-          "metadata_to_float",
-          "metadata_from_image",
-          "invokeai_img_dilate_erode",
-          "metadata_to_sdlx_loras",
-          "string_batch",
-          "calculate_image_tiles_min_overlap",
-          "cogview4_text_encoder",
-          "mul",
-          "img_crop",
-          "string_join",
-          "metadata_to_integer",
-          "z_image_denoise_meta",
-          "tile_to_properties",
-          "string",
-          "float_generator",
-          "z_image_text_encoder",
-          "mask_from_id",
-          "string_join_three",
-          "float_math",
-          "boolean",
-          "img_watermark",
-          "create_denoise_mask",
-          "invokeai_img_hue_adjust_plus",
-          "i2l",
-          "metadata_to_loras",
-          "cogview4_l2i",
-          "lora_loader",
-          "img_chan",
-          "dynamic_prompt",
-          "metadata_to_bool",
-          "image",
-          "normal_map",
-          "flux_text_encoder",
-          "pidi_edge_detection",
-          "unsharp_mask",
-          "flux_lora_loader",
-          "infill_lama",
-          "invokeai_img_enhance",
           "integer_generator",
-          "string_replace",
-          "flux_vae_decode",
-          "z_image_control",
-          "tiled_multi_diffusion_denoise_latents",
-          "integer_batch",
-          "img_noise",
-          "metadata_to_sdxl_model",
-          "sdxl_refiner_model_loader",
-          "image_generator",
-          "image_batch",
-          "conditioning_collection",
-          "metadata_to_string_collection",
-          "metadata_to_model",
-          "metadata_to_vae",
-          "apply_mask_to_image",
-          "flux_model_loader",
-          "metadata_to_ip_adapters",
-          "z_image_l2i",
-          "freeu",
-          "clip_skip",
-          "sdxl_compel_prompt",
-          "flux_denoise_meta",
-          "boolean_collection",
-          "add",
-          "canvas_v2_mask_and_crop",
-          "get_image_mask_bounding_box",
-          "img_nsfw",
-          "sdxl_model_loader",
-          "mediapipe_face_detection",
-          "metadata_item_linked",
-          "img_resize",
-          "infill_patchmatch",
-          "paste_image_into_bounding_box",
-          "esrgan",
-          "metadata_to_float_collection",
-          "random_range",
-          "iterate",
-          "latents",
-          "flux_ip_adapter",
-          "float_collection",
-          "integer_collection",
-          "color_map",
-          "z_image_lora_collection_loader",
-          "metadata_field_extractor",
-          "calculate_image_tiles_even_split",
-          "face_mask_detection",
-          "mlsd_detection",
-          "invokeai_ealightness",
-          "lineart_anime_edge_detection",
-          "range_of_size",
-          "flux_kontext_image_prep",
-          "controlnet",
-          "bounding_box",
-          "content_shuffle",
-          "float_to_int",
-          "lscale",
-          "denoise_latents",
-          "mask_edge",
-          "rand_int",
-          "string_generator",
-          "cogview4_model_loader",
-          "cogview4_denoise",
-          "image_panel_layout",
-          "float_batch",
-          "invert_tensor_mask",
-          "blank_image",
-          "metadata_item",
-          "vae_loader",
-          "core_metadata",
-          "sd3_text_encoder",
-          "sdxl_refiner_compel_prompt",
-          "main_model_loader",
-          "metadata_to_scheduler",
-          "flux_denoise",
-          "range",
-          "sd3_model_loader",
-          "img_paste",
-          "integer_math",
-          "prompt_template",
-          "string_split",
-          "mask_combine",
-          "calculate_image_tiles",
-          "z_image_i2l",
-          "crop_latents",
-          "flux_control_lora_loader",
-          "tomask",
-          "img_scale",
-          "collect",
-          "sd3_denoise",
-          "metadata_to_string",
-          "z_image_lora_loader",
-          "conditioning",
-          "image_mask_to_tensor",
-          "img_channel_multiply",
-          "metadata_to_t2i_adapters",
-          "merge_tiles_to_image",
-          "spandrel_image_to_image",
-          "img_conv",
-          "alpha_mask_to_tensor",
-          "metadata_to_bool_collection",
-          "div",
-          "img_mul",
           "llava_onevision_vllm",
-          "crop_image_to_bounding_box",
-          "string_collection",
-          "invokeai_img_composite",
-          "face_off",
-          "sd3_i2l",
-          "img_hue_adjust",
-          "metadata",
-          "denoise_latents_meta",
-          "round_float",
-          "save_image",
-          "merge_metadata",
-          "metadata_to_controlnets",
-          "flux_controlnet",
-          "canvas_paste_back",
-          "sdxl_lora_loader",
-          "flux_kontext",
-          "img_channel_offset",
           "depth_anything_depth_estimation",
-          "expand_mask_with_fade",
-          "hed_edge_detection",
-          "apply_tensor_mask_to_image",
-          "rand_float",
-          "flux_fill",
-          "img_lerp",
-          "metadata_to_integer_collection",
-          "infill_tile",
-          "sdxl_lora_collection_loader",
-          "lineart_edge_detection",
-          "color_correct",
+          "invokeai_img_blend",
+          "metadata_field_extractor",
+          "collect",
+          "integer_collection",
+          "noise",
+          "main_model_loader",
+          "float",
+          "sd3_denoise",
+          "tensor_mask_to_image",
+          "cogview4_text_encoder",
+          "mask_combine",
+          "image",
+          "denoise_latents",
+          "flux2_vae_encode",
+          "img_channel_multiply",
+          "invokeai_img_val_thresholds",
+          "alpha_mask_to_tensor",
+          "string",
+          "metadata_to_controlnets",
           "lblend",
-          "float_range",
-          "canny_edge_detection",
-          "flux_vae_encode",
-          "l2i",
-          "metadata_to_lora_collection",
-          "pbr_maps",
+          "prompt_template",
+          "core_metadata",
+          "lineart_edge_detection",
+          "pair_tile_image",
+          "compel",
+          "z_image_i2l",
+          "flux_kontext_image_prep",
+          "div",
+          "metadata_to_float",
+          "dw_openpose_detection",
+          "z_image_text_encoder",
+          "mask_edge",
+          "spandrel_image_to_image",
+          "image_batch",
+          "img_hue_adjust",
+          "metadata_to_integer",
+          "save_image",
+          "cogview4_l2i",
+          "canvas_v2_mask_and_crop",
+          "spandrel_image_to_image_autoscale",
+          "flux_lora_loader",
+          "flux_vae_decode",
+          "metadata_to_bool_collection",
+          "img_conv",
+          "hed_edge_detection",
+          "flux_kontext",
+          "tile_to_properties",
+          "expand_mask_with_fade",
+          "flux_controlnet",
+          "esrgan",
+          "sdxl_lora_loader",
+          "heuristic_resize",
+          "range_of_size",
+          "controlnet",
+          "apply_mask_to_image",
+          "img_watermark",
+          "img_channel_offset",
+          "infill_rgba",
+          "metadata_to_scheduler",
+          "pidi_edge_detection",
+          "color_correct",
+          "conditioning",
+          "integer_math",
+          "invokeai_img_composite",
+          "paste_image_into_bounding_box",
+          "metadata",
+          "img_noise",
+          "t2i_adapter",
+          "sdxl_lora_collection_loader",
+          "invokeai_img_dilate_erode",
+          "img_pad_crop",
+          "flux_denoise",
+          "invokeai_img_hue_adjust_plus",
+          "infill_tile",
+          "latents",
+          "float_to_int",
+          "sd3_text_encoder",
+          "flux2_klein_model_loader",
+          "tomask",
+          "ip_adapter",
+          "img_ilerp",
+          "face_mask_detection",
+          "flux2_vae_decode",
+          "get_image_mask_bounding_box",
+          "denoise_latents_meta",
+          "lscale",
+          "img_crop",
+          "rand_int",
+          "metadata_to_bool",
+          "invokeai_img_enhance",
+          "string_split",
           "lresize",
-          "lora_collection_loader"
+          "apply_tensor_mask_to_image",
+          "sdxl_refiner_model_loader",
+          "range",
+          "z_image_lora_loader",
+          "string_batch",
+          "clip_skip",
+          "string_collection",
+          "lora_selector",
+          "metadata_to_model",
+          "model_identifier",
+          "ideal_size",
+          "bounding_box",
+          "rectangle_mask",
+          "img_chan",
+          "flux_fill",
+          "z_image_denoise_meta",
+          "seamless",
+          "image_panel_layout",
+          "pbr_maps",
+          "float_generator",
+          "metadata_from_image",
+          "flux_ip_adapter",
+          "boolean",
+          "prompt_from_file",
+          "float_range",
+          "metadata_to_t2i_adapters",
+          "add",
+          "invokeai_ealightness",
+          "cogview4_model_loader",
+          "calculate_image_tiles_even_split",
+          "tiled_multi_diffusion_denoise_latents",
+          "face_off",
+          "random_range",
+          "flux_text_encoder",
+          "cv_inpaint",
+          "color",
+          "metadata_to_lora_collection",
+          "round_float",
+          "merge_metadata",
+          "img_blur",
+          "lora_loader",
+          "calculate_image_tiles",
+          "image_generator",
+          "integer_batch",
+          "freeu",
+          "metadata_to_float_collection",
+          "sd3_l2i",
+          "crop_image_to_bounding_box",
+          "float_collection",
+          "img_scale",
+          "img_nsfw",
+          "boolean_collection",
+          "flux_denoise_meta",
+          "sd3_i2l",
+          "vae_loader",
+          "metadata_to_loras",
+          "create_gradient_mask",
+          "scheduler",
+          "metadata_to_integer_collection",
+          "metadata_item",
+          "float_math",
+          "z_image_seed_variance_enhancer",
+          "image_collection",
+          "sd3_model_loader",
+          "unsharp_mask",
+          "metadata_item_linked",
+          "mediapipe_face_detection",
+          "metadata_to_sdxl_model",
+          "flux2_klein_text_encoder",
+          "sdxl_compel_prompt",
+          "z_image_denoise",
+          "metadata_to_vae",
+          "cogview4_denoise",
+          "image_mask_to_tensor",
+          "sub",
+          "segment_anything",
+          "canvas_paste_back",
+          "content_shuffle",
+          "merge_tiles_to_image",
+          "integer",
+          "normal_map",
+          "z_image_control",
+          "blank_image",
+          "iterate",
+          "sdxl_refiner_compel_prompt",
+          "string_split_neg",
+          "infill_cv2",
+          "sdxl_model_loader",
+          "img_lerp",
+          "string_generator",
+          "dynamic_prompt",
+          "z_image_lora_collection_loader",
+          "string_join",
+          "lora_collection_loader",
+          "flux_lora_collection_loader",
+          "flux_vae_encode",
+          "flux2_denoise",
+          "flux_control_lora_loader",
+          "z_image_model_loader",
+          "l2i",
+          "color_map",
+          "lineart_anime_edge_detection",
+          "flux_model_loader",
+          "invert_tensor_mask",
+          "face_identifier",
+          "img_paste",
+          "img_resize",
+          "infill_lama",
+          "canny_edge_detection",
+          "infill_patchmatch",
+          "string_join_three",
+          "float_batch",
+          "show_image",
+          "z_image_l2i",
+          "img_mul",
+          "mul",
+          "conditioning_collection",
+          "calculate_image_tiles_min_overlap",
+          "mlsd_detection",
+          "rand_float",
+          "string_replace",
+          "grounding_dino",
+          "metadata_to_sdlx_loras",
+          "crop_latents",
+          "metadata_to_ip_adapters",
+          "latents_collection",
+          "i2l",
+          "metadata_to_string_collection",
+          "create_denoise_mask",
+          "cogview4_i2l",
+          "metadata_to_string",
+          "mask_from_id",
+          "flux_redux"
         ]
       },
       "InvocationProgressEvent": {
@@ -31186,6 +32222,21 @@
               },
               {
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeEncodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
@@ -31970,6 +33021,21 @@
               },
               {
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeEncodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
@@ -38020,6 +39086,162 @@
         "title": "Main_Checkpoint_FLUX_Config",
         "description": "Model config for main checkpoint models."
       },
+      "Main_Checkpoint_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Flux2VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "format",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Checkpoint_Flux2_Config",
+        "description": "Model config for FLUX.2 checkpoint models (e.g. Klein)."
+      },
       "Main_Checkpoint_SD1_Config": {
         "properties": {
           "key": {
@@ -38950,6 +40172,302 @@
           "base"
         ],
         "title": "Main_Diffusers_CogView4_Config"
+      },
+      "Main_Diffusers_FLUX_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "flux",
+            "title": "Base",
+            "default": "flux"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/FluxVariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Diffusers_FLUX_Config",
+        "description": "Model config for FLUX.1 models in diffusers format."
+      },
+      "Main_Diffusers_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Flux2VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Diffusers_Flux2_Config",
+        "description": "Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."
       },
       "Main_Diffusers_SD1_Config": {
         "properties": {
@@ -40016,6 +41534,162 @@
         ],
         "title": "Main_GGUF_FLUX_Config",
         "description": "Model config for main checkpoint models."
+      },
+      "Main_GGUF_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Flux2VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_GGUF_Flux2_Config",
+        "description": "Model config for GGUF-quantized FLUX.2 checkpoint models (e.g. Klein)."
       },
       "Main_GGUF_ZImage_Config": {
         "properties": {
@@ -43928,6 +45602,12 @@
                 "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
               },
               {
@@ -43946,6 +45626,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
               },
               {
@@ -43953,6 +45636,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
@@ -43973,10 +45659,16 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -44424,6 +46116,12 @@
                     "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                   },
                   {
@@ -44442,6 +46140,9 @@
                     "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                   },
                   {
@@ -44449,6 +46150,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
@@ -44469,10 +46173,16 @@
                     "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                   },
                   {
                     "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
                   },
                   {
                     "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -44813,6 +46523,12 @@
                 "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
               },
               {
@@ -44831,6 +46547,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
               },
               {
@@ -44838,6 +46557,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
@@ -44858,10 +46580,16 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -45060,6 +46788,12 @@
                 "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
               },
               {
@@ -45078,6 +46812,9 @@
                 "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
               },
               {
@@ -45085,6 +46822,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
@@ -45105,10 +46845,16 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -45518,6 +47264,12 @@
                 "$ref": "#/components/schemas/FluxVariantType"
               },
               {
+                "$ref": "#/components/schemas/Flux2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VariantType"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -45685,6 +47437,12 @@
                   "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                 },
                 {
@@ -45703,6 +47461,9 @@
                   "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
                 },
                 {
@@ -45710,6 +47471,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
@@ -45730,10 +47494,16 @@
                   "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                },
+                {
                   "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                 },
                 {
                   "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
@@ -47494,6 +49264,10 @@
             ],
             "title": "Cpu Only",
             "description": "Whether this model should run on CPU only"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Qwen3VariantType",
+            "description": "Qwen3 model size variant (4B or 8B)"
           }
         },
         "type": "object",
@@ -47512,7 +49286,8 @@
           "base",
           "type",
           "format",
-          "cpu_only"
+          "cpu_only",
+          "variant"
         ],
         "title": "Qwen3Encoder_Checkpoint_Config",
         "description": "Configuration for single-file Qwen3 Encoder models (safetensors)."
@@ -47630,6 +49405,10 @@
             ],
             "title": "Cpu Only",
             "description": "Whether this model should run on CPU only"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Qwen3VariantType",
+            "description": "Qwen3 model size variant (4B or 8B)"
           }
         },
         "type": "object",
@@ -47648,7 +49427,8 @@
           "base",
           "type",
           "format",
-          "cpu_only"
+          "cpu_only",
+          "variant"
         ],
         "title": "Qwen3Encoder_GGUF_Config",
         "description": "Configuration for GGUF-quantized Qwen3 Encoder models."
@@ -47754,6 +49534,10 @@
             ],
             "title": "Cpu Only",
             "description": "Whether this model should run on CPU only"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Qwen3VariantType",
+            "description": "Qwen3 model size variant (4B or 8B)"
           }
         },
         "type": "object",
@@ -47771,10 +49555,17 @@
           "base",
           "type",
           "format",
-          "cpu_only"
+          "cpu_only",
+          "variant"
         ],
         "title": "Qwen3Encoder_Qwen3Encoder_Config",
         "description": "Configuration for Qwen3 Encoder models in a diffusers-like format.\n\nThe model weights are expected to be in a folder called text_encoder inside the model directory,\ncompatible with Qwen2VLForConditionalGeneration or similar architectures used by Z-Image."
+      },
+      "Qwen3VariantType": {
+        "type": "string",
+        "enum": ["qwen3_4b", "qwen3_8b"],
+        "title": "Qwen3VariantType",
+        "description": "Qwen3 text encoder variants based on model size."
       },
       "RandomFloatInvocation": {
         "category": "math",
@@ -52897,6 +54688,12 @@
                 "$ref": "#/components/schemas/FluxVariantType"
               },
               {
+                "$ref": "#/components/schemas/Flux2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VariantType"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -55547,7 +57344,7 @@
             "input": "any",
             "orig_required": true,
             "title": "VAE",
-            "ui_model_base": ["sd-1", "sd-2", "sdxl", "sd-3", "flux"],
+            "ui_model_base": ["sd-1", "sd-2", "sdxl", "sd-3", "flux", "flux2"],
             "ui_model_type": ["vae"]
           },
           "type": {
@@ -55711,6 +57508,129 @@
           "base"
         ],
         "title": "VAE_Checkpoint_FLUX_Config"
+      },
+      "VAE_Checkpoint_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "vae",
+            "title": "Type",
+            "default": "vae"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base"
+        ],
+        "title": "VAE_Checkpoint_Flux2_Config",
+        "description": "Model config for FLUX.2 VAE checkpoint models (AutoencoderKLFlux2)."
       },
       "VAE_Checkpoint_SD1_Config": {
         "properties": {
@@ -56077,6 +57997,121 @@
           "base"
         ],
         "title": "VAE_Checkpoint_SDXL_Config"
+      },
+      "VAE_Diffusers_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "const": "vae",
+            "title": "Type",
+            "default": "vae"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "format",
+          "repo_variant",
+          "type",
+          "base"
+        ],
+        "title": "VAE_Diffusers_Flux2_Config",
+        "description": "Model config for FLUX.2 VAE models in diffusers format (AutoencoderKLFlux2)."
       },
       "VAE_Diffusers_SD1_Config": {
         "properties": {
