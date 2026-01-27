@@ -2881,9 +2881,8 @@
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
             "FLUX.2 Klein Support: InvokeAI now supports the new FLUX.2 Klein models (4B and 9B variants) with GGUF, FP8, and Diffusers formats. Features include txt2img, img2img, inpainting, and outpainting. See 'Starter Models' to get started.",
-            "Support for Z-Image-Turbo: InvokeAI now supports the fast and accurate Z-Image-Turbo model. See 'Starter Models' to get started.",
-            "Hotkeys: Add and edit keyboard shortcuts for any of Invoke's major functions.",
-            "Model Manager: The Model Manager user interface now supports bulk tagging and deletion."
+            "DyPE support for FLUX models improves high-resolution  (>1536 px up to 4K) images. Go to the 'Advanced Options' section to activate.",
+            "Z-Image Turbo diversity: Active 'Seed Variance Enhancer' under 'Advanced Options' to add diversitiy to your ZiT gens."
         ],
         "takeUserSurvey": "📣 Let us know how you like InvokeAI. Take our User Experience Survey!",
         "readReleaseNotes": "Read Release Notes",
