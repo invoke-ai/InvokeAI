@@ -87,8 +87,13 @@ def denoise(
         # The scheduler will apply dynamic shifting internally using mu (if enabled in scheduler config)
         sigmas = np.array(timesteps[:-1], dtype=np.float32)  # Exclude final 0.0
 
-        # Pass mu if provided - it will only be used if scheduler has use_dynamic_shifting=True
-        if mu is not None:
+        # Check if scheduler supports sigmas parameter (Heun scheduler does not)
+        is_heun = hasattr(scheduler, "state_in_first_order")
+        if is_heun:
+            # FlowMatchHeunDiscreteScheduler only supports num_inference_steps, not sigmas/mu
+            scheduler.set_timesteps(num_inference_steps=len(sigmas), device=img.device)
+        elif mu is not None:
+            # Pass mu if provided - it will only be used if scheduler has use_dynamic_shifting=True
             scheduler.set_timesteps(sigmas=sigmas.tolist(), mu=mu, device=img.device)
         else:
             scheduler.set_timesteps(sigmas=sigmas.tolist(), device=img.device)
