@@ -21,7 +21,7 @@ type AddImageToImageArg = {
   state: RootState;
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
-  i2l: Invocation<'i2l' | 'flux_vae_encode' | 'sd3_i2l' | 'cogview4_i2l' | 'z_image_i2l'>;
+  i2l: Invocation<'i2l' | 'flux_vae_encode' | 'flux2_vae_encode' | 'sd3_i2l' | 'cogview4_i2l' | 'z_image_i2l'>;
   noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
   vaeSource: Invocation<VaeSourceNodes | MainModelLoaderNodes>;
@@ -37,7 +37,7 @@ export const addImageToImage = async ({
   denoise,
   vaeSource,
 }: AddImageToImageArg): Promise<
-  Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'sd3_l2i' | 'cogview4_l2i' | 'z_image_l2i'>
+  Invocation<'img_resize' | 'l2i' | 'flux_vae_decode' | 'flux2_vae_decode' | 'sd3_l2i' | 'cogview4_l2i' | 'z_image_l2i'>
 > => {
   const { denoising_start, denoising_end } = getDenoisingStartAndEnd(state);
   denoise.denoising_start = denoising_start;
@@ -48,6 +48,7 @@ export const addImageToImage = async ({
   if (
     denoise.type === 'cogview4_denoise' ||
     denoise.type === 'flux_denoise' ||
+    denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||
     denoise.type === 'z_image_denoise'
   ) {

@@ -510,6 +510,7 @@ class VAELoaderInvocation(BaseInvocation):
             BaseModelType.StableDiffusionXL,
             BaseModelType.StableDiffusion3,
             BaseModelType.Flux,
+            BaseModelType.Flux2,
         ],
         ui_model_type=ModelType.VAE,
     )

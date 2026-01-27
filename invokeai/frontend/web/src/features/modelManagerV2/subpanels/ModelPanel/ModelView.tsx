@@ -66,7 +66,7 @@ export const ModelView = memo(({ modelConfig }: Props) => {
             <ModelAttrView label={t('modelManager.modelFormat')} value={modelConfig.format} />
             <ModelAttrView label={t('modelManager.path')} value={modelConfig.path} />
             <ModelAttrView label={t('modelManager.fileSize')} value={filesize(modelConfig.file_size)} />
-            {modelConfig.type === 'main' && 'variant' in modelConfig && (
+            {'variant' in modelConfig && modelConfig.variant && (
               <ModelAttrView label={t('modelManager.variant')} value={modelConfig.variant} />
             )}
             {modelConfig.type === 'main' && modelConfig.format === 'diffusers' && modelConfig.repo_variant && (

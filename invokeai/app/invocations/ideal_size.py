@@ -46,7 +46,12 @@ class IdealSizeInvocation(BaseInvocation):
             dimension = 512
         elif unet_config.base == BaseModelType.StableDiffusion2:
             dimension = 768
-        elif unet_config.base in (BaseModelType.StableDiffusionXL, BaseModelType.Flux, BaseModelType.StableDiffusion3):
+        elif unet_config.base in (
+            BaseModelType.StableDiffusionXL,
+            BaseModelType.Flux,
+            BaseModelType.Flux2,
+            BaseModelType.StableDiffusion3,
+        ):
             dimension = 1024
         else:
             raise ValueError(f"Unsupported model type: {unet_config.base}")

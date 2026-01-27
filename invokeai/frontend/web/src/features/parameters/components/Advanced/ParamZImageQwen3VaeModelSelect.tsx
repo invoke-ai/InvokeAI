@@ -12,18 +12,18 @@ import {
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFluxVAEModels, useQwen3EncoderModels, useZImageDiffusersModels } from 'services/api/hooks/modelsByType';
+import { useFlux1VAEModels, useQwen3EncoderModels, useZImageDiffusersModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig, Qwen3EncoderModelConfig, VAEModelConfig } from 'services/api/types';
 
 /**
- * Z-Image VAE Model Select - uses FLUX VAE models
+ * Z-Image VAE Model Select - uses FLUX 1.0 VAE models only (not FLUX.2 Klein VAEs)
  * Selecting this will clear Qwen3 Source (mutually exclusive)
  */
 const ParamZImageVaeModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const zImageVaeModel = useAppSelector(selectZImageVaeModel);
-  const [modelConfigs, { isLoading }] = useFluxVAEModels();
+  const [modelConfigs, { isLoading }] = useFlux1VAEModels();
 
   const _onChange = useCallback(
     (model: VAEModelConfig | null) => {

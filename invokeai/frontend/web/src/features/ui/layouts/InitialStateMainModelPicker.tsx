@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { MdMoneyOff } from 'react-icons/md';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
-import { type AnyModelConfig, isFluxDevMainModelConfig } from 'services/api/types';
+import { type AnyModelConfig, isNonCommercialMainModelConfig } from 'services/api/types';
 
 export const InitialStateMainModelPicker = memo(() => {
   const { t } = useTranslation();
@@ -22,8 +22,8 @@ export const InitialStateMainModelPicker = memo(() => {
     [dispatch]
   );
 
-  const isFluxDevSelected = useMemo(
-    () => selectedModelConfig && isFluxDevMainModelConfig(selectedModelConfig),
+  const isNonCommercialSelected = useMemo(
+    () => selectedModelConfig && isNonCommercialMainModelConfig(selectedModelConfig),
     [selectedModelConfig]
   );
 
@@ -31,7 +31,7 @@ export const InitialStateMainModelPicker = memo(() => {
     <FormControl orientation="vertical" alignItems="unset">
       <FormLabel display="flex" fontSize="md" gap={2}>
         {t('common.selectYourModel')}{' '}
-        {isFluxDevSelected && (
+        {isNonCommercialSelected && (
           <InformationalPopover feature="fluxDevLicense" hideDisable={true}>
             <Flex justifyContent="flex-start">
               <Icon as={MdMoneyOff} />

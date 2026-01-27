@@ -140,6 +140,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   sdxl: 'invokeBlue',
   'sdxl-refiner': 'invokeBlue',
   flux: 'gold',
+  flux2: 'gold',
   cogview4: 'red',
   'z-image': 'cyan',
   unknown: 'red',
@@ -180,6 +181,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   sdxl: 'Stable Diffusion XL',
   'sdxl-refiner': 'Stable Diffusion XL Refiner',
   flux: 'FLUX',
+  flux2: 'FLUX.2',
   cogview4: 'CogView4',
   'z-image': 'Z-Image',
   unknown: 'Unknown',
@@ -196,6 +198,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   sdxl: 'SDXL',
   'sdxl-refiner': 'SDXLR',
   flux: 'FLUX',
+  flux2: 'FLUX.2',
   cogview4: 'CogView4',
   'z-image': 'Z-Image',
   unknown: 'Unknown',
@@ -208,8 +211,13 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   dev: 'FLUX Dev',
   dev_fill: 'FLUX Dev - Fill',
   schnell: 'FLUX Schnell',
+  klein_4b: 'FLUX.2 Klein 4B',
+  klein_9b: 'FLUX.2 Klein 9B',
+  klein_9b_base: 'FLUX.2 Klein 9B Base',
   large: 'CLIP L',
   gigantic: 'CLIP G',
+  qwen3_4b: 'Qwen3 4B',
+  qwen3_8b: 'Qwen3 8B',
 };
 
 export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
@@ -232,7 +240,7 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
 
 export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3', 'z-image'];
 
-export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux'];
+export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux', 'flux2'];
 
 export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
   'sd-1',

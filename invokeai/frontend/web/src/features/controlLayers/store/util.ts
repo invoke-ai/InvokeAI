@@ -10,6 +10,7 @@ import type {
   ControlLoRAConfig,
   ControlNetConfig,
   CroppableImageWithDims,
+  Flux2ReferenceImageConfig,
   FluxKontextReferenceImageConfig,
   FLUXReduxConfig,
   ImageWithDims,
@@ -111,6 +112,10 @@ export const initialFluxKontextReferenceImage: FluxKontextReferenceImageConfig =
   type: 'flux_kontext_reference_image',
   image: null,
   model: null,
+};
+export const initialFlux2ReferenceImage: Flux2ReferenceImageConfig = {
+  type: 'flux2_reference_image',
+  image: null,
 };
 export const initialT2IAdapter: T2IAdapterConfig = {
   type: 't2i_adapter',

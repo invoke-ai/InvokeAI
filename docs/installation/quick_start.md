@@ -25,11 +25,17 @@ Hardware requirements vary significantly depending on model and image output siz
         - Memory: At least 16GB RAM.
         - Disk: 10GB for base installation plus 100GB for models.
 
-    === "FLUX - 1024×1024"
+    === "FLUX.1 - 1024×1024"
 
         - GPU: Nvidia 20xx series or later, 10GB+ VRAM.
         - Memory: At least 32GB RAM.
         - Disk: 10GB for base installation plus 200GB for models.
+
+    === "FLUX.2 Klein - 1024×1024"
+
+        - GPU: Nvidia 20xx series or later, 6GB+ VRAM for GGUF Q4 quantized models, 12GB+ for full precision.
+        - Memory: At least 16GB RAM.
+        - Disk: 10GB for base installation plus 20GB for models.
 
     === "Z-Image Turbo - 1024x1024"
         - GPU: Nvidia 20xx series or later, 8GB+ VRAM for the Q4_K quantized model. 16GB+ needed for the Q8 or BF16 models.

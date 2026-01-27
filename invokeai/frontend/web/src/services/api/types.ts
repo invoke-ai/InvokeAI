@@ -79,7 +79,9 @@ export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDT
 // Model Configs
 export type AnyModelConfig = S['AnyModelConfig'];
 export type MainModelConfig = Extract<S['AnyModelConfig'], { type: 'main' }>;
-export type FLUXModelConfig = Extract<S['AnyModelConfig'], { type: 'main'; base: 'flux' }>;
+type FLUXModelConfig = Extract<S['AnyModelConfig'], { type: 'main'; base: 'flux' }>;
+type FLUX2ModelConfig = Extract<S['AnyModelConfig'], { type: 'main'; base: 'flux2' }>;
+export type AnyFLUXModelConfig = FLUXModelConfig | FLUX2ModelConfig;
 export type ControlLoRAModelConfig = Extract<S['AnyModelConfig'], { type: 'control_lora' }>;
 export type LoRAModelConfig = Extract<S['AnyModelConfig'], { type: 'lora' }>;
 export type VAEModelConfig = Extract<S['AnyModelConfig'], { type: 'vae' }>;
@@ -168,14 +170,29 @@ export const isNonFluxVAEModelConfig = (
 ): config is VAEModelConfig => {
   return (
     (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
-    config.base !== 'flux'
+    config.base !== 'flux' &&
+    config.base !== 'flux2'
   );
 };
 
 export const isFluxVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
   return (
     (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
+    (config.base === 'flux' || config.base === 'flux2')
+  );
+};
+
+export const isFlux1VAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
     config.base === 'flux'
+  );
+};
+
+export const isFlux2VAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
+    config.base === 'flux2'
   );
 };
 
@@ -289,8 +306,16 @@ export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is
   return config.type === 'main' && config.base === 'sdxl-refiner';
 };
 
-export const isFluxDevMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+const isFluxDevMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'flux' && config.variant === 'dev';
+};
+
+const isFlux2Klein9BMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'flux2' && config.name.toLowerCase().includes('9b');
+};
+
+export const isNonCommercialMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return isFluxDevMainModelConfig(config) || isFlux2Klein9BMainModelConfig(config);
 };
 
 export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

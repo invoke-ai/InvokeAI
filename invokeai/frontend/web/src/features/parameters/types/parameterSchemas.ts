@@ -2,6 +2,7 @@ import { NUMPY_RAND_MAX } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import {
+  zFluxDypePresetField,
   zFluxSchedulerField,
   zModelIdentifierField,
   zSchedulerField,
@@ -74,6 +75,11 @@ export type ParameterFluxScheduler = z.infer<typeof zParameterFluxScheduler>;
 // #region Z-Image Scheduler
 export const [zParameterZImageScheduler, isParameterZImageScheduler] = buildParameter(zZImageSchedulerField);
 export type ParameterZImageScheduler = z.infer<typeof zParameterZImageScheduler>;
+// #endregion
+
+// #region Flux DyPE Preset
+export const [zParameterFluxDypePreset, isParameterFluxDypePreset] = buildParameter(zFluxDypePresetField);
+export type ParameterFluxDypePreset = z.infer<typeof zParameterFluxDypePreset>;
 // #endregion
 
 // #region seed

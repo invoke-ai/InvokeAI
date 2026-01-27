@@ -5,6 +5,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectIsFLUX,
+  selectIsFlux2,
   selectIsSD3,
   selectIsZImage,
   selectParamsSlice,
@@ -15,6 +16,7 @@ import ParamCLIPEmbedModelSelect from 'features/parameters/components/Advanced/P
 import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPGEmbedModelSelect';
 import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
+import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
@@ -40,14 +42,16 @@ export const AdvancedSettingsAccordion = memo(() => {
   const vaeKey = useAppSelector(selectVAEKey);
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const isFLUX = useAppSelector(selectIsFLUX);
+  const isFlux2 = useAppSelector(selectIsFlux2);
   const isSD3 = useAppSelector(selectIsSD3);
   const isZImage = useAppSelector(selectIsZImage);
 
   const selectBadges = useMemo(
     () =>
-      createMemoizedSelector([selectParamsSlice, selectIsFLUX], (params, isFLUX) => {
+      createMemoizedSelector([selectParamsSlice, selectIsFLUX, selectIsFlux2], (params, isFLUX, isFlux2) => {
         const badges: (string | number)[] = [];
-        if (isFLUX) {
+        // FLUX.2 has VAE built into main model - no badge needed
+        if (isFLUX && !isFlux2) {
           if (vaeConfig) {
             let vaeBadge = vaeConfig.name;
             if (params.vaePrecision === 'fp16') {
@@ -55,7 +59,7 @@ export const AdvancedSettingsAccordion = memo(() => {
             }
             badges.push(vaeBadge);
           }
-        } else {
+        } else if (!isFlux2) {
           if (vaeConfig) {
             let vaeBadge = vaeConfig.name;
             if (params.vaePrecision === 'fp16') {
@@ -90,13 +94,13 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && (
+        {!isZImage && !isFlux2 && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
           </Flex>
         )}
-        {!isFLUX && !isSD3 && !isZImage && (
+        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && (
           <>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamClipSkip />
@@ -115,10 +119,15 @@ export const AdvancedSettingsAccordion = memo(() => {
             </Flex>
           </>
         )}
-        {isFLUX && (
+        {isFLUX && !isFlux2 && (
           <FormControlGroup>
             <ParamT5EncoderModelSelect />
             <ParamCLIPEmbedModelSelect />
+          </FormControlGroup>
+        )}
+        {isFlux2 && (
+          <FormControlGroup>
+            <ParamFlux2KleinModelSelect />
           </FormControlGroup>
         )}
         {isSD3 && (
