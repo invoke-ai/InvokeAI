@@ -47,9 +47,7 @@ def _is_flux2_vae(state_dict: dict[str | int, Any]) -> bool:
 
     # Check for 32-channel latent space (FLUX.2 has 32, FLUX.1 has 16)
     decoder_conv_in_key = "decoder.conv_in.weight"
-    has_32_latent_channels = (
-        decoder_conv_in_key in state_dict and state_dict[decoder_conv_in_key].shape[1] == 32
-    )
+    has_32_latent_channels = decoder_conv_in_key in state_dict and state_dict[decoder_conv_in_key].shape[1] == 32
 
     return has_bn or has_32_latent_channels
 
