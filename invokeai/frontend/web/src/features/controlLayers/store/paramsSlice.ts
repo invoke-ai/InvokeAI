@@ -203,6 +203,23 @@ const slice = createSlice({
       }
       state.zImageQwen3SourceModel = result.data;
     },
+    kleinVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.kleinVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.kleinVaeModel = result.data;
+    },
+    kleinQwen3EncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.kleinQwen3EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.kleinQwen3EncoderModel = result.data;
+    },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
     },
@@ -449,6 +466,8 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageVaeModel = oldState.zImageVaeModel;
   newState.zImageQwen3EncoderModel = oldState.zImageQwen3EncoderModel;
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
+  newState.kleinVaeModel = oldState.kleinVaeModel;
+  newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
   return newState;
 };
 
@@ -491,6 +510,8 @@ export const {
   zImageVaeModelSelected,
   zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
+  kleinVaeModelSelected,
+  kleinQwen3EncoderModelSelected,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   setColorCompensation,
@@ -556,6 +577,7 @@ export const selectIsFLUX = createParamsSelector((params) => params.model?.base 
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
+export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -576,6 +598,8 @@ export const selectCLIPGEmbedModel = createParamsSelector((params) => params.cli
 export const selectZImageVaeModel = createParamsSelector((params) => params.zImageVaeModel);
 export const selectZImageQwen3EncoderModel = createParamsSelector((params) => params.zImageQwen3EncoderModel);
 export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
+export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
+export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);

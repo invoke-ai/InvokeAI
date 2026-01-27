@@ -84,12 +84,13 @@ export const zBaseModelType = z.enum([
   'sdxl',
   'sdxl-refiner',
   'flux',
+  'flux2',
   'cogview4',
   'z-image',
   'unknown',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModelType>;
-export const zMainModelBase = z.enum(['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'cogview4', 'z-image']);
+export const zMainModelBase = z.enum(['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'flux2', 'cogview4', 'z-image']);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
 export const zModelType = z.enum([
@@ -132,7 +133,15 @@ export const zSubModelType = z.enum([
 export const zClipVariantType = z.enum(['large', 'gigantic']);
 export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
 export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
-export const zAnyModelVariant = z.union([zModelVariantType, zClipVariantType, zFluxVariantType]);
+export const zFlux2VariantType = z.enum(['klein_4b', 'klein_9b', 'klein_9b_base']);
+export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b']);
+export const zAnyModelVariant = z.union([
+  zModelVariantType,
+  zClipVariantType,
+  zFluxVariantType,
+  zFlux2VariantType,
+  zQwen3VariantType,
+]);
 export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;
 export const zModelFormat = z.enum([
   'omi',
