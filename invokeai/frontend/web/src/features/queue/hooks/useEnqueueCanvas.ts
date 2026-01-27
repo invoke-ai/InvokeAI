@@ -52,7 +52,8 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
         return await buildSD1Graph(graphBuilderArg);
       case `sd-3`:
         return await buildSD3Graph(graphBuilderArg);
-      case `flux`:
+      case 'flux':
+      case 'flux2':
         return await buildFLUXGraph(graphBuilderArg);
       case 'cogview4':
         return await buildCogView4Graph(graphBuilderArg);

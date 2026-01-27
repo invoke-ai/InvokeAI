@@ -1057,6 +1057,10 @@
         "zImageQwen3EncoderPlaceholder": "From Qwen3 source model",
         "zImageQwen3Source": "Qwen3 & VAE Source Model",
         "zImageQwen3SourcePlaceholder": "Required if VAE/Encoder empty",
+        "flux2KleinVae": "VAE (optional)",
+        "flux2KleinVaePlaceholder": "From main model",
+        "flux2KleinQwen3Encoder": "Qwen3 Encoder (optional)",
+        "flux2KleinQwen3EncoderPlaceholder": "From main model",
         "upcastAttention": "Upcast Attention",
         "uploadImage": "Upload Image",
         "urlOrLocalPath": "URL or Local Path",
@@ -1338,6 +1342,7 @@
             "noT5EncoderModelSelected": "No T5 Encoder model selected for FLUX generation",
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
+            "noQwen3EncoderModelSelected": "No Qwen3 Encoder model selected for FLUX2 Klein generation",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox width is {{width}}",
@@ -1486,6 +1491,8 @@
         "baseModelChanged": "Base Model Changed",
         "baseModelChangedCleared_one": "Updated, cleared or disabled {{count}} incompatible submodel",
         "baseModelChangedCleared_other": "Updated, cleared or disabled {{count}} incompatible submodels",
+        "kleinEncoderCleared": "Qwen3 Encoder Cleared",
+        "kleinEncoderClearedDescription": "Please select a compatible Qwen3 encoder for the new Klein model variant",
         "canceled": "Processing Canceled",
         "connected": "Connected to Server",
         "imageCopied": "Image Copied",
@@ -1989,7 +1996,7 @@
         "fluxDevLicense": {
             "heading": "Non-Commercial License",
             "paragraphs": [
-                "FLUX.1 [dev] models are licensed under the FLUX [dev] non-commercial license. To use this model type for commercial purposes in Invoke, visit our website to learn more."
+                "This model is licensed for non-commercial use only. FLUX.1 [dev] models use the FLUX.1 [dev] Non-Commercial License, and FLUX.2 Klein 9B uses the FLUX.2 Non-Commercial License."
             ]
         },
         "optimizedDenoising": {
@@ -2858,7 +2865,7 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Models: InvokeAI adds preliminary support for the fast Flux.2 Klein models. See 'Starter Models' to get going.",
+            "FLUX.2 Klein Support: InvokeAI now supports the new FLUX.2 Klein models (4B and 9B variants) with GGUF, FP8, and Diffusers formats. Features include txt2img, img2img, inpainting, and outpainting. See 'Starter Models' to get started.",
             "Z-Image Turbo diversity: Active 'Seed Variance Enhancer' under 'Advanced Options' to add diversitiy to your ZiT gens."
         ],
         "takeUserSurvey": "📣 Let us know how you like InvokeAI. Take our User Experience Survey!",

@@ -219,7 +219,16 @@ async def reidentify_model(
         result = ModelConfigFactory.from_model_on_disk(mod)
         if result.config is None:
             raise InvalidModelException("Unable to identify model format")
-        result.config.key = config.key  # retain the same key
+
+        # Retain user-editable fields from the original config
+        result.config.key = config.key
+        result.config.name = config.name
+        result.config.description = config.description
+        result.config.cover_image = config.cover_image
+        result.config.trigger_phrases = config.trigger_phrases
+        result.config.source = config.source
+        result.config.source_type = config.source_type
+
         new_config = ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
         return new_config
     except UnknownModelException as e:
@@ -905,15 +914,48 @@ class StarterModelResponse(BaseModel):
 def get_is_installed(
     starter_model: StarterModel | StarterModelWithoutDependencies, installed_models: list[AnyModelConfig]
 ) -> bool:
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
     for model in installed_models:
+        # Check if source matches exactly
         if model.source == starter_model.source:
             return True
+        # Check if name (or previous names), base and type match
         if (
             (model.name == starter_model.name or model.name in starter_model.previous_names)
             and model.base == starter_model.base
             and model.type == starter_model.type
         ):
             return True
+
+    # Special handling for Qwen3Encoder models - check by type and variant
+    # This allows renamed models to still be detected as installed
+    if starter_model.type == ModelType.Qwen3Encoder:
+        from invokeai.backend.model_manager.taxonomy import Qwen3VariantType
+
+        # Determine expected variant from source pattern
+        expected_variant: Qwen3VariantType | None = None
+        if "klein-9B" in starter_model.source or "qwen3_8b" in starter_model.source.lower():
+            expected_variant = Qwen3VariantType.Qwen3_8B
+        elif (
+            "klein-4B" in starter_model.source
+            or "qwen3_4b" in starter_model.source.lower()
+            or "Z-Image" in starter_model.source
+        ):
+            expected_variant = Qwen3VariantType.Qwen3_4B
+
+        if expected_variant is not None:
+            for model in installed_models:
+                if model.type == ModelType.Qwen3Encoder and hasattr(model, "variant"):
+                    model_variant = model.variant
+                    # Handle both enum and string values
+                    if isinstance(model_variant, Qwen3VariantType):
+                        if model_variant == expected_variant:
+                            return True
+                    elif isinstance(model_variant, str):
+                        if model_variant == expected_variant.value:
+                            return True
+
     return False
 
 
