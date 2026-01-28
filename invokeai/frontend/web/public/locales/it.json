@@ -276,6 +276,14 @@
             "promptHistoryNext": {
                 "title": "Prossimo prompt nella cronologia",
                 "desc": "Quando il prompt è attivo, passa al prompt successivo (più recente) nella cronologia."
+            },
+            "promptWeightUp": {
+                "title": "Aumenta il peso della selezione del prompt",
+                "desc": "Quando il prompt è attivo e il testo è selezionato, aumenta il peso del prompt selezionato."
+            },
+            "promptWeightDown": {
+                "title": "Riduce il peso della selezione del prompt",
+                "desc": "Quando il prompt è attivo e il testo è selezionato, riduce il peso del prompt selezionato."
             }
         },
         "hotkeys": "Tasti di scelta rapida",
@@ -1785,7 +1793,7 @@
         "fluxDevLicense": {
             "heading": "Licenza non commerciale",
             "paragraphs": [
-                "I modelli FLUX.1 [dev] sono concessi in licenza con la licenza non commerciale FLUX [dev]. Per utilizzare questo tipo di modello per scopi commerciali in Invoke, visita il nostro sito Web per saperne di più."
+                "Questo modello è concesso in licenza esclusivamente per uso non commerciale. I modelli FLUX.1 [dev] utilizzano la licenza FLUX.1 [dev] Non-Commercial, mentre FLUX.2 Klein 9B utilizza la licenza FLUX.2 Non-Commercial."
             ]
         },
         "optimizedDenoising": {
@@ -1850,6 +1858,18 @@
                 "Controlla la sovrapposizione tra riquadri adiacenti durante l'ampliamento. Valori di sovrapposizione più elevati aiutano a ridurre le giunzioni visibili tra i riquadri, ma consuma più memoria.",
                 "Il valore predefinito di 128 è adatto alla maggior parte dei casi, ma è possibile modificarlo in base alle proprie esigenze specifiche e ai limiti di memoria."
             ]
+        },
+        "colorCompensation": {
+            "paragraphs": [
+                "Regola l'immagine di input per ridurre le variazioni di colore durante l'inpainting o img2img (solo SDXL)."
+            ],
+            "heading": "Compensazione del colore"
+        },
+        "seedVarianceRandomizePercent": {
+            "paragraphs": [
+                "Percentuale di valori di incorporamento che ricevono rumore (1-100%).",
+                "Valori più bassi creano modelli di rumore più selettivi, mentre il 100% influisce su tutti i valori in egual misura."
+            ]
         }
     },
     "sdxl": {
@@ -1901,7 +1921,9 @@
         "seamlessYAxis": "Asse Y senza giunte",
         "vae": "VAE",
         "parsingFailed": "Analisi non riuscita",
-        "recallParameter": "Richiama {{label}}"
+        "recallParameter": "Richiama {{label}}",
+        "dypePreset": "Preimpostazione DyPE",
+        "seedVarianceRandomizePercent": ""
     },
     "hrf": {
         "metadata": {
@@ -2321,6 +2343,9 @@
                 "hue": "Tonalità (HSV)",
                 "saturation": "Saturazione (HSV)",
                 "value": "Valore (HSV)"
+            },
+            "pbr_maps": {
+                "label": "Crea mappe PBR"
             }
         },
         "fill": {
@@ -2381,7 +2406,10 @@
             "fitMode": "Adattamento",
             "fitModeContain": "Contieni",
             "fitModeFill": "Riempi",
-            "fitModeCover": "Copri"
+            "fitModeCover": "Copri",
+            "smoothingMode": "Modalità di ricampionamento",
+            "smoothingDesc": "Applica un ricampionamento di alta qualità lato backend alla conferma delle trasformazioni.",
+            "smoothing": "Smussamento"
         },
         "stagingArea": {
             "next": "Successiva",
@@ -2580,7 +2608,11 @@
         "replaceCurrent": "Sostituisci l'attuale",
         "uploadOrDragAnImage": "Trascina un'immagine dalla galleria o <UploadButton>carica un'immagine</UploadButton>.",
         "sendingToCanvas": "Predisponi le generazioni sulla Tela",
-        "viewProgressInViewer": "Visualizza i progressi e gli output nel <Btn>Visualizzatore immagini</Btn>."
+        "viewProgressInViewer": "Visualizza i progressi e gli output nel <Btn>Visualizzatore immagini</Btn>.",
+        "extractMaskedAreaMissingData": "Impossibile estrarre: mancano i dati dell'immagine o della maschera.",
+        "extractMaskedAreaFailed": "Impossibile estrarre l'area mascherata.",
+        "maskLayerEmpty": "Il livello maschera è vuoto",
+        "extractRegion": "Estrai regione"
     },
     "ui": {
         "tabs": {
@@ -2746,7 +2778,9 @@
         "noTemplates": "Nessun modello",
         "acceptedColumnsKeys": "Colonne/chiavi accettate:",
         "promptTemplateCleared": "Modello di prompt cancellato",
-        "togglePromptPreviews": "Attiva/disattiva le anteprime dei prompt"
+        "togglePromptPreviews": "Attiva/disattiva le anteprime dei prompt",
+        "noMatchingPresets": "Nessuna preimpostazione corrispondente",
+        "selectPreset": "Seleziona stile predefinito"
     },
     "newUserExperience": {
         "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
@@ -2761,11 +2795,12 @@
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
-            "Gestione modelli: se non è possibile identificare un modello durante l'installazione, ora è possibile selezionare manualmente il tipo di modello e l'architettura.",
-            "Interno: sistema di identificazione dei modelli migliorato, che semplifica per i collaboratori l'aggiunta del supporto per nuovi modelli.",
-            "Strumento di ritaglio per immagini di riferimento"
+            "Supporto FLUX.2 Klein: InvokeAI ora supporta i nuovi modelli FLUX.2 Klein (varianti 4B e 9B) con formati GGUF, FP8 e Diffusers. Le funzionalità includono txt2img, img2img, inpainting e outpainting. Consultare la sezione \"Modelli di partenza\" per iniziare.",
+            "Il supporto DyPE per i modelli FLUX migliora le immagini ad alta risoluzione (da >1536 px fino a 4K). Vai alla sezione \"Opzioni avanzate\" per attivarlo.",
+            "Diversità Z-Image Turbo: attiva 'Seed Variance Enhancer' in 'Opzioni avanzate' per aggiungere diversità alle tue generazioni ZiT."
         ],
-        "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente"
+        "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente",
+        "takeUserSurvey": "📣 Facci sapere cosa ne pensi di InvokeAI. Partecipa al nostro sondaggio sull'esperienza utente!"
     },
     "system": {
         "logLevel": {
