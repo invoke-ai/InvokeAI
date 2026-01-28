@@ -10,11 +10,11 @@ This documentation describes all the steps required to integrate a new model typ
 2. [Backend: Model Configs](#2-backend-model-configs)
 3. [Backend: Model Loader](#3-backend-model-loader)
 4. [Backend: Invocations](#4-backend-invocations)
-5. [Backend: Sampling & Denoise](#5-backend-sampling--denoise)
+5. [Backend: Sampling and Denoise](#5-backend-sampling-and-denoise)
 6. [Frontend: Graph Building](#6-frontend-graph-building)
 7. [Frontend: State Management](#7-frontend-state-management)
 8. [Frontend: Parameter Recall](#8-frontend-parameter-recall)
-9. [Metadata & Generation Modes](#9-metadata--generation-modes)
+9. [Metadata and Generation Modes](#9-metadata-and-generation-modes)
 10. [Starter Models](#10-starter-models)
 11. [Optional Features](#11-optional-features)
 
@@ -166,7 +166,59 @@ def _is_newmodel_vae(state_dict: dict) -> bool:
 
 **File:** `invokeai/backend/model_manager/configs/[encoder_type].py`
 
-Examples:
+```python
+def _has_newmodel_encoder_keys(state_dict: dict) -> bool:
+    """Check if state dict contains NewModel encoder keys."""
+    required_keys = ["model.layers.0.", "model.embed_tokens.weight"]
+    return any(
+        key.startswith(indicator) or key == indicator
+        for key in state_dict.keys()
+        for indicator in required_keys
+        if isinstance(key, str)
+    )
+
+@ModelConfigFactory.register
+class NewModelEncoder_Checkpoint_Config(Checkpoint_Config_Base):
+    """Configuration for single-file NewModel Encoder models."""
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.NewModelEncoder] = Field(default=ModelType.NewModelEncoder)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        if not _has_newmodel_encoder_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like a NewModel encoder")
+
+        return cls(**override_fields)
+
+@ModelConfigFactory.register
+class NewModelEncoder_Diffusers_Config(Config_Base):
+    """Configuration for NewModel Encoder in diffusers directory format."""
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.NewModelEncoder] = Field(default=ModelType.NewModelEncoder)
+    format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        # Check for text_encoder config
+        config_path = mod.path / "text_encoder" / "config.json"
+        if not config_path.exists():
+            raise NotAMatchError(f"config file not found: {config_path}")
+
+        raise_for_class_name(config_path, {"NewModelForCausalLM"})
+
+        return cls(**override_fields)
+```
+
+Examples of existing implementations:
 - `t5_encoder.py` - T5 Encoder for FLUX.1, SD3
 - `qwen3_encoder.py` - Qwen3 Encoder for FLUX.2 Klein, Z-Image
 - `clip_embed.py` - CLIP Encoder for SDXL, SD3
@@ -241,10 +293,59 @@ class NewModelVAELoader(ModelLoader):
         return vae
 ```
 
+### 3.3 Text Encoder Loader (if custom encoder)
+
+**File:** `invokeai/backend/model_manager/load/model_loaders/[newmodel].py`
+
+```python
+@ModelLoaderRegistry.register(
+    base=BaseModelType.Any,
+    type=ModelType.NewModelEncoder,
+    format=ModelFormat.Checkpoint
+)
+class NewModelEncoderLoader(ModelLoader):
+    """Load single-file NewModel Encoder models."""
+
+    def _load_model(self, config: AnyModelConfig, submodel_type: SubModelType | None) -> AnyModel:
+        match submodel_type:
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder(config)
+            case SubModelType.Tokenizer:
+                # Load tokenizer from HuggingFace or local path
+                return AutoTokenizer.from_pretrained("org/newmodel-base")
+
+        raise ValueError(f"Unsupported submodel: {submodel_type}")
+
+    def _load_text_encoder(self, config: AnyModelConfig) -> AnyModel:
+        from safetensors.torch import load_file
+        from transformers import NewModelConfig, NewModelForCausalLM
+
+        # Load state dict and determine model configuration
+        sd = load_file(config.path)
+
+        # Detect model architecture from weights
+        layer_count = self._count_layers(sd)
+        hidden_size = sd["model.embed_tokens.weight"].shape[1]
+
+        # Create model with detected configuration
+        model_config = NewModelConfig(
+            hidden_size=hidden_size,
+            num_hidden_layers=layer_count,
+            # ... other config parameters
+        )
+
+        with accelerate.init_empty_weights():
+            model = NewModelForCausalLM(model_config)
+
+        model.load_state_dict(sd, assign=True)
+        return model
+```
+
 ### Backend Model Loader Checklist
 
 - [ ] Create and register main model loader
 - [ ] Create VAE loader if custom VAE
+- [ ] Create text encoder loader if custom encoder
 - [ ] Implement state dict conversion if needed (different formats)
 - [ ] Implement submodel loading (Diffusers format)
 
@@ -289,16 +390,47 @@ class NewModelTextEncoderInvocation(BaseInvocation):
     encoder: EncoderField = InputField()
 
     def invoke(self, context: InvocationContext) -> ConditioningOutput:
-        # Example FLUX.2 Klein: Extract layers 9, 18, 27 and stack them
+        # 1. Tokenize the prompt
+        with context.models.load(self.encoder.tokenizer) as tokenizer:
+            input_ids = tokenizer(
+                self.prompt,
+                return_tensors="pt",
+                padding="max_length",
+                max_length=256,
+                truncation=True
+            ).input_ids
+
+        # 2. Run encoder and extract hidden states
+        # Example FLUX.2 Klein/Z-Image: Extract specific layers and stack them
+        # Different models use different layer extraction strategies:
+        # - Some use the final hidden state only
+        # - Others stack multiple intermediate layers for richer representations
         with context.models.load(self.encoder.text_encoder) as encoder:
-            hidden_states = encoder(input_ids, output_hidden_states=True)
-            # Stack layers: (batch, seq_len, hidden_size * 3)
-            stacked = torch.cat([
+            outputs = encoder(input_ids, output_hidden_states=True)
+            hidden_states = outputs.hidden_states
+
+            # Stack layers 9, 18, 27 to create combined text embedding
+            # This captures features at different abstraction levels
+            # Shape: (batch, seq_len, hidden_size) -> (batch, seq_len, hidden_size * 3)
+            stacked_embeddings = torch.cat([
                 hidden_states[9],
                 hidden_states[18],
                 hidden_states[27]
             ], dim=-1)
-        return ConditioningOutput(conditioning=conditioning)
+
+        # 3. Create conditioning data structure
+        # The stacked embeddings become the text conditioning that guides denoising
+        conditioning_data = ConditioningFieldData(
+            conditionings=[
+                BasicConditioningInfo(embeds=stacked_embeddings)
+            ]
+        )
+
+        # 4. Save conditioning to context and return reference
+        conditioning_name = context.conditioning.save(conditioning_data)
+        return ConditioningOutput(
+            conditioning=ConditioningField(conditioning_name=conditioning_name)
+        )
 ```
 
 ### 4.3 Denoise Invocation
@@ -411,7 +543,7 @@ class NewModelVaeDecodeInvocation(BaseInvocation):
 
 ---
 
-## 5. Backend: Sampling & Denoise
+## 5. Backend: Sampling and Denoise
 
 ### 5.1 Sampling Utilities
 
@@ -555,7 +687,7 @@ NEWMODEL_SCHEDULER_MAP = {
 }
 ```
 
-### Backend Sampling & Denoise Checklist
+### Backend Sampling and Denoise Checklist
 
 - [ ] Noise generation (`get_noise_newmodel()`)
 - [ ] Pack/unpack functions (if transformer-based)
@@ -836,7 +968,7 @@ const recallNewmodelEncoderModel = async (metadata: CoreMetadata) => {
 
 ---
 
-## 9. Metadata & Generation Modes
+## 9. Metadata and Generation Modes
 
 ### 9.1 Add Generation Modes
 
@@ -875,7 +1007,7 @@ class CoreMetadataOutput(BaseInvocationOutput):
     newmodel_custom_param: float | None = None
 ```
 
-### Metadata & Generation Modes Checklist
+### Metadata and Generation Modes Checklist
 
 - [ ] Add generation modes to `GENERATION_MODES`
 - [ ] Extend CoreMetadata if model-specific fields needed
