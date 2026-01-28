@@ -10,6 +10,8 @@ import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
 import { useGalleryImageNames } from './use-gallery-image-names';
 
+const ARROW_SIZE = 48;
+
 const NextPrevItemButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineStart' | 'insetInlineEnd'] }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
@@ -53,8 +55,13 @@ const NextPrevItemButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineSt
           top="50%"
           transform="translate(0, -50%)"
           aria-label={t('accessibility.previousImage')}
-          icon={<PiCaretLeftBold size={64} />}
+          icon={<PiCaretLeftBold size={ARROW_SIZE} />}
           variant="unstyled"
+          padding={0}
+          minW={0}
+          minH={0}
+          w={`${ARROW_SIZE}px`}
+          h={`${ARROW_SIZE}px`}
           onClick={onClickLeftArrow}
           isDisabled={isFetching}
           color="base.100"
@@ -68,8 +75,13 @@ const NextPrevItemButtons = ({ inset = 8 }: { inset?: ChakraProps['insetInlineSt
           top="50%"
           transform="translate(0, -50%)"
           aria-label={t('accessibility.nextImage')}
-          icon={<PiCaretRightBold size={64} />}
+          icon={<PiCaretRightBold size={ARROW_SIZE} />}
           variant="unstyled"
+          padding={0}
+          minW={0}
+          minH={0}
+          w={`${ARROW_SIZE}px`}
+          h={`${ARROW_SIZE}px`}
           onClick={onClickRightArrow}
           isDisabled={isFetching}
           color="base.100"

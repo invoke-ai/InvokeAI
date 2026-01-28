@@ -66,8 +66,13 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
 
   const modelName = useMemo(() => {
     switch (installJob.source.type) {
-      case 'hf':
-        return installJob.source.repo_id;
+      case 'hf': {
+        const { repo_id, subfolder } = installJob.source;
+        if (subfolder) {
+          return `${repo_id}::${subfolder}`;
+        }
+        return repo_id;
+      }
       case 'url':
         return installJob.source.url.split('/').slice(-1)[0] ?? t('common.unknown');
       case 'local':

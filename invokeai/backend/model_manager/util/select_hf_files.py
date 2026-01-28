@@ -60,7 +60,7 @@ def filter_files(
 
     # Start by filtering on model file extensions, discarding images, docs, etc
     for file in files:
-        if file.name.endswith((".json", ".txt")):
+        if file.name.endswith((".json", ".txt", ".jinja")):  # .jinja for chat templates
             paths.append(file)
         elif file.name.endswith(
             (
@@ -116,7 +116,8 @@ def _filter_by_variant(files: List[Path], variant: ModelRepoVariant) -> Set[Path
 
         # Note: '.model' was added to support:
         # https://huggingface.co/black-forest-labs/FLUX.1-schnell/blob/768d12a373ed5cc9ef9a9dea7504dc09fcc14842/tokenizer_2/spiece.model
-        elif path.suffix in [".json", ".txt", ".model"]:
+        # Note: '.jinja' was added to support chat templates for FLUX.2 Klein models
+        elif path.suffix in [".json", ".txt", ".model", ".jinja"]:
             result.add(path)
 
         elif variant in [
