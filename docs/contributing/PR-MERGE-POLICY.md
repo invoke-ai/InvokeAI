@@ -30,6 +30,12 @@ One of the maintainers is responsible for:
 
 **Important:** Collaborators are strongly discouraged from merging PRs on their own, except in case of emergency (e.g., critical bug fix and no maintainer is available).
 
+### 5. Release Policy
+
+Once a feature release candidate is published, no feature PRs are to
+be merged into main. Only bugfixes are allowed until the final
+release.
+
 ## Best Practices
 
 ### Clean Commit History
