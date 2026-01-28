@@ -18,6 +18,8 @@ export const GalleryImageGridPaged = memo(() => {
   const [pageSize, setPageSize] = useState(FALLBACK_PAGE_SIZE);
   const gridRootRef = useRef<HTMLDivElement>(null);
   const lastSelectedRef = useRef<string | null>(null);
+  const lastPageSizeRef = useRef<number | null>(null);
+  const lastImageNamesRef = useRef<string[] | null>(null);
 
   const pageCount = Math.ceil(imageNames.length / pageSize);
   const pageImageNames = useMemo(() => {
@@ -34,12 +36,24 @@ export const GalleryImageGridPaged = memo(() => {
   useEffect(() => {
     if (!lastSelectedItem) {
       lastSelectedRef.current = null;
+      lastPageSizeRef.current = null;
+      lastImageNamesRef.current = imageNames;
       return;
     }
-    if (lastSelectedRef.current === lastSelectedItem) {
+
+    const shouldRecompute =
+      lastSelectedRef.current !== lastSelectedItem ||
+      lastPageSizeRef.current !== pageSize ||
+      lastImageNamesRef.current !== imageNames;
+
+    if (!shouldRecompute) {
       return;
     }
+
     lastSelectedRef.current = lastSelectedItem;
+    lastPageSizeRef.current = pageSize;
+    lastImageNamesRef.current = imageNames;
+
     const selectedIndex = imageNames.indexOf(lastSelectedItem);
     if (selectedIndex === -1) {
       return;

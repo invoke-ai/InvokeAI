@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
   useDisclosure,
 } from '@invoke-ai/ui-library';
-import { memo, useCallback, useEffect, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
@@ -23,28 +23,35 @@ type JumpToPagedProps = {
 export const JumpToPaged = memo(({ pageIndex, pageCount, onChange }: JumpToPagedProps) => {
   const { t } = useTranslation();
   const disclosure = useDisclosure();
-  const [newPage, setNewPage] = useState(pageIndex + 1);
+  const [newPageInput, setNewPageInput] = useState(String(pageIndex + 1));
+  const inputWrapperRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (disclosure.isOpen) {
-      setNewPage(pageIndex + 1);
+      const nextPage = pageIndex + 1;
+      setNewPageInput(String(nextPage));
+      setTimeout(() => {
+        const input = inputWrapperRef.current?.querySelector('input');
+        input?.focus();
+      }, 0);
     }
   }, [disclosure.isOpen, pageIndex]);
 
-  const onChangeJumpTo = useCallback((valueAsString: string, valueAsNumber: number) => {
-    if (!valueAsString) {
-      return;
-    }
-    if (Number.isNaN(valueAsNumber)) {
-      return;
-    }
-    setNewPage(valueAsNumber);
+  const onChangeJumpTo = useCallback((valueAsString: string, _valueAsNumber: number) => {
+    setNewPageInput(valueAsString);
   }, []);
 
   const onClickGo = useCallback(() => {
-    onChange(String(newPage), newPage);
+    if (!newPageInput) {
+      return;
+    }
+    const parsed = Number.parseInt(newPageInput, 10);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+    onChange(String(parsed), parsed);
     disclosure.onClose();
-  }, [disclosure, newPage, onChange]);
+  }, [disclosure, newPageInput, onChange]);
 
   useHotkeys(
     'enter',
@@ -58,7 +65,8 @@ export const JumpToPaged = memo(({ pageIndex, pageCount, onChange }: JumpToPaged
   useHotkeys(
     'esc',
     () => {
-      setNewPage(pageIndex + 1);
+      const nextPage = pageIndex + 1;
+      setNewPageInput(String(nextPage));
       disclosure.onClose();
     },
     { enabled: disclosure.isOpen, enableOnFormTags: ['input'] },
@@ -77,9 +85,10 @@ export const JumpToPaged = memo(({ pageIndex, pageCount, onChange }: JumpToPaged
         <PopoverBody>
           <Flex gap={2} alignItems="center">
             <NumberInput
+              ref={inputWrapperRef}
               min={1}
               max={pageCount}
-              value={newPage}
+              value={newPageInput}
               onChange={onChangeJumpTo}
               size="sm"
               w="72px"
