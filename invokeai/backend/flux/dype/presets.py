@@ -108,16 +108,7 @@ def get_dype_config_from_preset(
         DyPEConfig if DyPE should be enabled, None otherwise
     """
     if preset == DYPE_PRESET_OFF:
-        # Check if custom values are provided even with preset=OFF
-        if custom_scale is not None:
-            return DyPEConfig(
-                enable_dype=True,
-                base_resolution=1024,
-                method="vision_yarn",
-                dype_scale=custom_scale,
-                dype_exponent=custom_exponent if custom_exponent is not None else 2.0,
-                dype_start_sigma=1.0,
-            )
+        # DyPE is disabled - ignore any custom values
         return None
 
     if preset == DYPE_PRESET_ON:

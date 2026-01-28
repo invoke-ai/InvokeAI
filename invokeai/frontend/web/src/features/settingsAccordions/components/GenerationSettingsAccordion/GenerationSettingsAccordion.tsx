@@ -14,7 +14,9 @@ import {
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
+import ParamFluxDypeExponent from 'features/parameters/components/Core/ParamFluxDypeExponent';
 import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDypePreset';
+import ParamFluxDypeScale from 'features/parameters/components/Core/ParamFluxDypeScale';
 import ParamFluxScheduler from 'features/parameters/components/Core/ParamFluxScheduler';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
@@ -80,11 +82,13 @@ export const GenerationSettingsAccordion = memo(() => {
             <FormControlGroup formLabelProps={formLabelProps}>
               {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && <ParamScheduler />}
               {(isFLUX || isFlux2) && <ParamFluxScheduler />}
-              {isFLUX && <ParamFluxDypePreset />}
               {isZImage && <ParamZImageScheduler />}
               <ParamSteps />
               {(isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
               {!isFLUX && !isFlux2 && <ParamCFGScale />}
+              {isFLUX && <ParamFluxDypePreset />}
+              {isFLUX && <ParamFluxDypeScale />}
+              {isFLUX && <ParamFluxDypeExponent />}
             </FormControlGroup>
             {isZImage && <ParamZImageSeedVarianceSettings />}
           </Flex>

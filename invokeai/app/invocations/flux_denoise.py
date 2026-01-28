@@ -473,9 +473,13 @@ class FluxDenoiseInvocation(BaseInvocation):
                     target_width=self.width,
                 )
                 context.logger.info(
-                    f"DyPE enabled: {self.width}x{self.height}, preset={self.dype_preset}, "
-                    f"scale={dype_config.dype_scale:.2f}, method={dype_config.method}"
+                    f"DyPE enabled: resolution={self.width}x{self.height}, preset={self.dype_preset}, "
+                    f"method={dype_config.method}, scale={dype_config.dype_scale:.2f}, "
+                    f"exponent={dype_config.dype_exponent:.2f}, start_sigma={dype_config.dype_start_sigma:.2f}, "
+                    f"base_resolution={dype_config.base_resolution}"
                 )
+            else:
+                context.logger.debug(f"DyPE disabled: resolution={self.width}x{self.height}, preset={self.dype_preset}")
 
             x = denoise(
                 model=transformer,
