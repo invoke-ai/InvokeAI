@@ -30,7 +30,7 @@ from invokeai.app.services.shared.sqlite_migrator.migrations.migration_24 import
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_25 import build_migration_25
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_26 import build_migration_26
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_27 import build_migration_27
-from invokeai.app.services.shared.sqlite_migrator.migrations.migration_27 import build_migration_28
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_28 import build_migration_28
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SqliteMigrator
 
 

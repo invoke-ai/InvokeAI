@@ -1,4 +1,4 @@
-"""Migration 27: Add app_settings table for storing JWT secret and other app-level settings.
+"""Migration 28: Add app_settings table for storing JWT secret and other app-level settings.
 
 This migration adds the app_settings table to securely store application-level configuration:
 - Creates app_settings table with key-value storage
@@ -12,7 +12,7 @@ import sqlite3
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 
-class Migration27Callback:
+class Migration28Callback:
     """Migration to add app_settings table and JWT secret."""
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
@@ -65,13 +65,13 @@ class Migration27Callback:
             )
 
 
-def build_migration_27() -> Migration:
-    """Builds the migration object for migrating from version 26 to version 27.
+def build_migration_28() -> Migration:
+    """Builds the migration object for migrating from version 27 to version 28.
 
     This migration adds the app_settings table and generates a JWT secret for token signing.
     """
     return Migration(
         from_version=27,
         to_version=28,
-        callback=Migration27Callback(),
+        callback=Migration28Callback(),
     )

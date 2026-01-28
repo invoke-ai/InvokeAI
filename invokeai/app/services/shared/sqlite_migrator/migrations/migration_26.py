@@ -1,4 +1,4 @@
-"""Migration 25: Add multi-user support.
+"""Migration 26: Add multi-user support.
 
 This migration adds the database schema for multi-user support, including:
 - users table for user accounts
@@ -13,7 +13,7 @@ import sqlite3
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 
-class Migration25Callback:
+class Migration26Callback:
     """Migration to add multi-user support."""
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
@@ -210,13 +210,13 @@ class Migration25Callback:
         """)
 
 
-def build_migration_25() -> Migration:
-    """Builds the migration object for migrating from version 24 to version 25.
+def build_migration_26() -> Migration:
+    """Builds the migration object for migrating from version 25 to version 26.
 
     This migration adds multi-user support to the database schema.
     """
     return Migration(
         from_version=25,
         to_version=26,
-        callback=Migration25Callback(),
+        callback=Migration26Callback(),
     )

@@ -1,4 +1,4 @@
-"""Migration 26: Add user_id to client_state table for multi-user support.
+"""Migration 27: Add user_id to client_state table for multi-user support.
 
 This migration updates the client_state table to support per-user state isolation:
 - Drops the single-row constraint (CHECK(id = 1))
@@ -13,7 +13,7 @@ import sqlite3
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 
-class Migration26Callback:
+class Migration27Callback:
     """Migration to add per-user client state support."""
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
@@ -108,13 +108,13 @@ class Migration26Callback:
             )
 
 
-def build_migration_26() -> Migration:
-    """Builds the migration object for migrating from version 25 to version 26.
+def build_migration_27() -> Migration:
+    """Builds the migration object for migrating from version 26 to version 27.
 
     This migration adds per-user client state support to prevent data leakage between users.
     """
     return Migration(
         from_version=26,
         to_version=27,
-        callback=Migration26Callback(),
+        callback=Migration27Callback(),
     )
