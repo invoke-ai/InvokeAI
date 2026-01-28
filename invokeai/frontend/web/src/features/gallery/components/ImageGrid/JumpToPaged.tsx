@@ -33,6 +33,7 @@ export const JumpToPaged = memo(({ pageIndex, pageCount, onChange }: JumpToPaged
       setTimeout(() => {
         const input = inputWrapperRef.current?.querySelector('input');
         input?.focus();
+        input?.select();
       }, 0);
     }
   }, [disclosure.isOpen, pageIndex]);
