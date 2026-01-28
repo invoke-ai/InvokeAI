@@ -576,7 +576,32 @@
                 "desc": "Aggiungi/Rimuovi contrassegno all'immagine selezionata.",
                 "title": "Aggiungi / Rimuovi contrassegno immagine"
             }
-        }
+        },
+        "editMode": "Modalità modifica",
+        "viewMode": "Modalità visualizzazione",
+        "editHotkey": "Modifica tasto di scelta rapida",
+        "addHotkey": "Aggiungi tasto di scelta rapida",
+        "resetToDefault": "Ripristina predefinito",
+        "resetAll": "Ripristina tutto ai predefiniti",
+        "resetAllConfirmation": "Vuoi davvero ripristinare tutti i tasti di scelta rapida ai valori predefiniti? Questa operazione non può essere annullata.",
+        "enterHotkeys": "Inserisci i tasti di scelta rapida, separati da virgole",
+        "save": "Salva",
+        "cancel": "Annulla",
+        "modifiers": "Modificatori",
+        "syntaxHelp": "Guida alla sintassi",
+        "combineWith": "Combina con +",
+        "multipleHotkeys": "Tasti di scelta rapida multipli con virgola",
+        "validKeys": "Tasti validi",
+        "help": "Aiuto",
+        "noHotkeysRecorded": "Nessun tasto di scelta rapida registrato ancora",
+        "pressKeys": "Premi i tasti...",
+        "setHotkey": "Imposta",
+        "setAnother": "Imposta un'altro",
+        "removeLastHotkey": "Rimuovi l'ultimo tasto di scelta rapida",
+        "clearAll": "Cancella tutto",
+        "duplicateWarning": "Questo tasto di scelta rapida è già registrato",
+        "conflictWarning": "è già utilizzato da \"{{hotkeyTitle}}\"",
+        "thisHotkey": "questo tasto di scelta rapida"
     },
     "modelManager": {
         "modelManager": "Gestione Modelli",
@@ -756,7 +781,30 @@
         "reidentifyTooltip": "Se un modello non è stato installato correttamente (ad esempio, ha il tipo sbagliato o non funziona), puoi provare a identificarlo nuovamente. Questo reimposterà tutte le impostazioni personalizzate che potresti aver applicato.",
         "reidentifySuccess": "Modello reidentificato con successo",
         "reidentifyUnknown": "Impossibile identificare il modello",
-        "reidentifyError": "Errore durante la reidentificazione del modello"
+        "reidentifyError": "Errore durante la reidentificazione del modello",
+        "flux2KleinQwen3EncoderPlaceholder": "Dal modello principale",
+        "flux2KleinQwen3Encoder": "Encoder Qwen3 (opzionale)",
+        "flux2KleinVaePlaceholder": "Dal modello principale",
+        "flux2KleinVae": "VAE (opzionale)",
+        "zImageQwen3SourcePlaceholder": "Obbligatorio se VAE/Encoder è vuoto",
+        "zImageQwen3Source": "Modello sorgente Qwen3 e VAE",
+        "zImageQwen3EncoderPlaceholder": "Dal modello sorgente Qwen3",
+        "zImageQwen3Encoder": "Encoder Qwen3 (opzionale)",
+        "zImageVaePlaceholder": "Dal modello sorgente VAE",
+        "qwen3Encoder": "Encoder Quen3",
+        "selectAll": "Seleziona tutto",
+        "deleteModels": "Elimina modelli",
+        "invalidPathFormat": "Il percorso deve essere un percorso assoluto (ad esempio, C:\\Models\\... o /home/user/models/...)",
+        "pathUpdateFailed": "Impossibile aggiornare il percorso del modello",
+        "pathUpdated": "Percorso del modello aggiornato correttamente",
+        "newPathPlaceholder": "Inserisci un nuovo percorso...",
+        "newPath": "Nuovo percorso",
+        "currentPath": "Percorso attuale",
+        "updatePathDescription": "Inserisci il nuovo percorso del file o della directory del modello. Utilizza questo percorso se hai spostato manualmente i file del modello sul disco.",
+        "updatePathTooltip": "Aggiorna il percorso del file per questo modello se hai spostato i file del modello in una nuova posizione.",
+        "updatePath": "Aggiorna percorso",
+        "actions": "Azioni in blocco",
+        "zImageVae": "VAE (opzionale)"
     },
     "parameters": {
         "images": "Immagini",
@@ -844,7 +892,10 @@
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la larghezza del riquadro è {{width}}",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), l'altezza del riquadro è {{height}}",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la larghezza ridimensionata del riquadro è {{width}}",
-            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), l'altezza ridimensionata del riquadro è {{height}}"
+            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), l'altezza ridimensionata del riquadro è {{height}}",
+            "noZImageQwen3EncoderSourceSelected": "Nessuna sorgente Qwen3 Encoder: seleziona il modello Qwen3 Encoder o Qwen3 Source",
+            "noZImageVaeSourceSelected": "Nessuna sorgente VAE: selezionare il modello di sorgente VAE (FLUX) o Qwen3",
+            "noQwen3EncoderModelSelected": "Nessun modello di encoder Qwen3 selezionato per la generazione Klein di FLUX2"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -880,7 +931,11 @@
         "images_withCount_other": "Immagini",
         "resolution": "Risoluzione",
         "downloadImage": "Scarica l'immagine",
-        "showOptionsPanel": "Mostra pannello laterale (O o T)"
+        "showOptionsPanel": "Mostra pannello laterale (O o T)",
+        "seedVarianceRandomizePercent": "Percentuale di variazione",
+        "seedVarianceStrength": "Intensità della varianza",
+        "seedVarianceEnabled": "Potenziamento della varianza del seme",
+        "colorCompensation": "Compensazione Colore"
     },
     "settings": {
         "models": "Modelli",
@@ -1021,7 +1076,9 @@
         "noInpaintMaskSelected": "Nessuna maschera di inpaint selezionata",
         "noInpaintMaskSelectedDesc": "Seleziona una maschera di inpaint da invertire",
         "invalidBbox": "Riquadro di delimitazione non valido",
-        "invalidBboxDesc": "Il riquadro di delimitazione non ha dimensioni valide"
+        "invalidBboxDesc": "Il riquadro di delimitazione non ha dimensioni valide",
+        "kleinEncoderClearedDescription": "Selezionare un encoder Qwen3 compatibile per la nuova variante del modello Klein",
+        "kleinEncoderCleared": "Encoder Qwen3 cancellato"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1869,7 +1926,29 @@
             "paragraphs": [
                 "Percentuale di valori di incorporamento che ricevono rumore (1-100%).",
                 "Valori più bassi creano modelli di rumore più selettivi, mentre il 100% influisce su tutti i valori in egual misura."
-            ]
+            ],
+            "heading": "Percentuale di variazione"
+        },
+        "seedVarianceStrength": {
+            "paragraphs": [
+                "Controlla l'intensità del rumore aggiunto agli embedding. L'intensità viene calibrata automaticamente in base alla deviazione standard dell'embedding.",
+                "Valori inferiori a 0.1 produrranno variazioni lievi, che aumenteranno fino a diventare più marcate a 0,5. Valori superiori a 0.5 potrebbero portare a risultati inaspettati."
+            ],
+            "heading": "Intensità della varianza"
+        },
+        "seedVarianceEnhancer": {
+            "paragraphs": [
+                "Z-Image-Turbo può produrre immagini relativamente simili con semi diversi. Questa funzionalità aggiunge rumore basato sui semi agli embedding di testo per aumentare la variabilità visiva mantenendo la riproducibilità.",
+                "Abilita questa opzione per ottenere risultati più diversificati quando esplori semi diversi."
+            ],
+            "heading": "Potenziamento varianza del seme"
+        },
+        "fluxDypePreset": {
+            "paragraphs": [
+                "L'estrapolazione dinamica della posizione (DyPE) migliora la qualità della generazione FLUX a risoluzioni superiori alla dimensione di addestramento (1024px).",
+                "Off: generazione standard. Auto: abilita automaticamente per immagini > 1536px. 4K: impostazioni ottimizzate per output con risoluzione 4K."
+            ],
+            "heading": "DyPE (alta risoluzione)"
         }
     },
     "sdxl": {
@@ -1922,7 +2001,10 @@
         "vae": "VAE",
         "parsingFailed": "Analisi non riuscita",
         "recallParameter": "Richiama {{label}}",
-        "dypePreset": "Preimpostazione DyPE"
+        "dypePreset": "Preimpostazione DyPE",
+        "seedVarianceRandomizePercent": "Casualità della varianza del seme %",
+        "seedVarianceEnabled": "Varianza seme abilitata",
+        "seedVarianceStrength": "Intensità della varianza del seme"
     },
     "hrf": {
         "metadata": {
@@ -2067,7 +2149,8 @@
         "noDescription": "Nessuna descrizione",
         "searchWorkflows": "Ricerca flussi di lavoro",
         "clearWorkflowSearchFilter": "Cancella filtro di ricerca del flusso di lavoro",
-        "openLibrary": "Apri libreria"
+        "openLibrary": "Apri libreria",
+        "tags": "Etichette"
     },
     "accordions": {
         "compositing": {
