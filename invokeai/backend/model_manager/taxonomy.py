@@ -211,7 +211,9 @@ class FluxLoRAFormat(str, Enum):
     XLabs = "flux.xlabs"
 
 
-AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, FluxVariantType, Flux2VariantType, ZImageVariantType, Qwen3VariantType]
+AnyVariant: TypeAlias = Union[
+    ModelVariantType, ClipVariantType, FluxVariantType, Flux2VariantType, ZImageVariantType, Qwen3VariantType
+]
 variant_type_adapter = TypeAdapter[
     ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | ZImageVariantType | Qwen3VariantType
 ](ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | ZImageVariantType | Qwen3VariantType)
