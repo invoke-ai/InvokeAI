@@ -5,6 +5,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import {
+  selectFluxDypePreset,
   selectIsCogView4,
   selectIsFLUX,
   selectIsFlux2,
@@ -43,6 +44,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
+  const fluxDypePreset = useAppSelector(selectFluxDypePreset);
 
   const selectBadges = useMemo(
     () =>
@@ -87,8 +89,8 @@ export const GenerationSettingsAccordion = memo(() => {
               {(isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
               {!isFLUX && !isFlux2 && <ParamCFGScale />}
               {isFLUX && <ParamFluxDypePreset />}
-              {isFLUX && <ParamFluxDypeScale />}
-              {isFLUX && <ParamFluxDypeExponent />}
+              {isFLUX && fluxDypePreset === 'on' && <ParamFluxDypeScale />}
+              {isFLUX && fluxDypePreset === 'on' && <ParamFluxDypeExponent />}
             </FormControlGroup>
             {isZImage && <ParamZImageSeedVarianceSettings />}
           </Flex>
