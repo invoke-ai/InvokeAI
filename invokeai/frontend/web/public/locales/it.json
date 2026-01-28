@@ -1922,8 +1922,7 @@
         "vae": "VAE",
         "parsingFailed": "Analisi non riuscita",
         "recallParameter": "Richiama {{label}}",
-        "dypePreset": "Preimpostazione DyPE",
-        "seedVarianceRandomizePercent": ""
+        "dypePreset": "Preimpostazione DyPE"
     },
     "hrf": {
         "metadata": {
