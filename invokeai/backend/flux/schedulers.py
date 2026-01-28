@@ -40,9 +40,9 @@ if _HAS_LCM:
     FLUX_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler
 
 
-# Z-Image scheduler types (same schedulers as Flux, both use Flow Matching)
-# Note: Z-Image-Turbo is optimized for ~8 steps with Euler, but other schedulers
-# can be used for experimentation.
+# Z-Image scheduler types (Flow Matching schedulers)
+# Note: Z-Image-Turbo is optimized for ~8 steps with Euler, LCM can also work.
+# Z-Image Base (undistilled) should only use Euler or Heun (LCM not supported for undistilled models).
 ZIMAGE_SCHEDULER_NAME_VALUES = Literal["euler", "heun", "lcm"]
 
 # Human-readable labels for the UI
@@ -52,7 +52,7 @@ ZIMAGE_SCHEDULER_LABELS: dict[str, str] = {
     "lcm": "LCM",
 }
 
-# Mapping from scheduler names to scheduler classes (same as Flux)
+# Mapping from scheduler names to scheduler classes
 ZIMAGE_SCHEDULER_MAP: dict[str, Type[SchedulerMixin]] = {
     "euler": FlowMatchEulerDiscreteScheduler,
     "heun": FlowMatchHeunDiscreteScheduler,

@@ -1495,6 +1495,8 @@
         "baseModelChangedCleared_other": "Updated, cleared or disabled {{count}} incompatible submodels",
         "kleinEncoderCleared": "Qwen3 Encoder Cleared",
         "kleinEncoderClearedDescription": "Please select a compatible Qwen3 encoder for the new Klein model variant",
+        "schedulerReset": "Scheduler Reset",
+        "schedulerResetZImageBase": "LCM scheduler is not compatible with Z-Image Base models. Reset to Euler.",
         "canceled": "Processing Canceled",
         "connected": "Connected to Server",
         "imageCopied": "Image Copied",
