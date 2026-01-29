@@ -8747,7 +8747,7 @@ export type components = {
              * @default off
              * @enum {string}
              */
-            dype_preset?: "off" | "on" | "auto" | "4k";
+            dype_preset?: "off" | "manual" | "auto" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
@@ -8941,7 +8941,7 @@ export type components = {
              * @default off
              * @enum {string}
              */
-            dype_preset?: "off" | "on" | "auto" | "4k";
+            dype_preset?: "off" | "manual" | "auto" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
