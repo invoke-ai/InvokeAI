@@ -196,8 +196,8 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       scheduler: fluxScheduler,
       dype_preset: fluxDypePreset,
       // Only send custom scale/exponent when DyPE is not off
-      dype_scale: fluxDypePreset !== 'off' ? fluxDypeScale : undefined,
-      dype_exponent: fluxDypePreset !== 'off' ? fluxDypeExponent : undefined,
+      dype_scale: fluxDypeScale,
+      dype_exponent: fluxDypeExponent,
     });
 
     posCondCollect = g.addNode({

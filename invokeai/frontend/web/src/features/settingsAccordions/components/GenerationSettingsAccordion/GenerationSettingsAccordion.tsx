@@ -89,8 +89,8 @@ export const GenerationSettingsAccordion = memo(() => {
               {(isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
               {!isFLUX && !isFlux2 && <ParamCFGScale />}
               {isFLUX && <ParamFluxDypePreset />}
-              {isFLUX && fluxDypePreset === 'on' && <ParamFluxDypeScale />}
-              {isFLUX && fluxDypePreset === 'on' && <ParamFluxDypeExponent />}
+              {isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeScale />}
+              {isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
             </FormControlGroup>
             {isZImage && <ParamZImageSeedVarianceSettings />}
           </Flex>

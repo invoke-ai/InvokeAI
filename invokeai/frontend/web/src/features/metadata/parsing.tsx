@@ -404,10 +404,10 @@ const FluxDypeScale: SingleMetadataHandler<ParameterFluxDypeScale> = {
   [SingleMetadataKey]: true,
   type: 'FluxDypeScale',
   parse: (metadata, _store) => {
-    // Only parse if preset is 'on' (custom values)
+    // Only parse if preset is 'manual' (custom values)
     const preset = getProperty(metadata, 'dype_preset');
-    if (preset !== 'on') {
-      throw new Error('DyPE scale only available when preset is "on"');
+    if (preset !== 'manual') {
+      throw new Error('DyPE scale only available when preset is "manual"');
     }
     const raw = getProperty(metadata, 'dype_scale');
     const parsed = zParameterFluxDypeScale.parse(raw);
@@ -429,10 +429,10 @@ const FluxDypeExponent: SingleMetadataHandler<ParameterFluxDypeExponent> = {
   [SingleMetadataKey]: true,
   type: 'FluxDypeExponent',
   parse: (metadata, _store) => {
-    // Only parse if preset is 'on' (custom values)
+    // Only parse if preset is 'manual' (custom values)
     const preset = getProperty(metadata, 'dype_preset');
-    if (preset !== 'on') {
-      throw new Error('DyPE exponent only available when preset is "on"');
+    if (preset !== 'manual') {
+      throw new Error('DyPE exponent only available when preset is "manual"');
     }
     const raw = getProperty(metadata, 'dype_exponent');
     const parsed = zParameterFluxDypeExponent.parse(raw);

@@ -101,8 +101,8 @@ def get_dype_config_from_preset(
         preset: The DyPE preset to use
         width: Target image width
         height: Target image height
-        custom_scale: Optional custom dype_scale (only used with 'on' preset)
-        custom_exponent: Optional custom dype_exponent (only used with 'on' preset)
+        custom_scale: Optional custom dype_scale (only used with 'manual' preset)
+        custom_exponent: Optional custom dype_exponent (only used with 'manual' preset)
 
     Returns:
         DyPEConfig if DyPE should be enabled, None otherwise
