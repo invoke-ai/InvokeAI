@@ -12,8 +12,8 @@ from invokeai.backend.flux.dype.presets import (
     DYPE_PRESET_4K,
     DYPE_PRESET_AUTO,
     DYPE_PRESET_LABELS,
+    DYPE_PRESET_MANUAL,
     DYPE_PRESET_OFF,
-    DYPE_PRESET_ON,
     DyPEPreset,
     get_dype_config_for_resolution,
 )
@@ -23,7 +23,7 @@ __all__ = [
     "DyPEEmbedND",
     "DyPEPreset",
     "DYPE_PRESET_OFF",
-    "DYPE_PRESET_ON",
+    "DYPE_PRESET_MANUAL",
     "DYPE_PRESET_AUTO",
     "DYPE_PRESET_4K",
     "DYPE_PRESET_LABELS",

@@ -6,18 +6,18 @@ from typing import Literal
 from invokeai.backend.flux.dype.base import DyPEConfig
 
 # DyPE preset type - using Literal for proper frontend dropdown support
-DyPEPreset = Literal["off", "on", "auto", "4k"]
+DyPEPreset = Literal["off", "manual", "auto", "4k"]
 
 # Constants for preset values
 DYPE_PRESET_OFF: DyPEPreset = "off"
-DYPE_PRESET_ON: DyPEPreset = "on"
+DYPE_PRESET_MANUAL: DyPEPreset = "manual"
 DYPE_PRESET_AUTO: DyPEPreset = "auto"
 DYPE_PRESET_4K: DyPEPreset = "4k"
 
 # Human-readable labels for the UI
 DYPE_PRESET_LABELS: dict[str, str] = {
     "off": "Off",
-    "on": "On",
+    "manual": "Manual",
     "auto": "Auto (>1536px)",
     "4k": "4K Optimized",
 }
@@ -101,18 +101,17 @@ def get_dype_config_from_preset(
         preset: The DyPE preset to use
         width: Target image width
         height: Target image height
-        custom_scale: Optional custom dype_scale (overrides preset)
-        custom_exponent: Optional custom dype_exponent (overrides preset)
+        custom_scale: Optional custom dype_scale (only used with 'on' preset)
+        custom_exponent: Optional custom dype_exponent (only used with 'on' preset)
 
     Returns:
         DyPEConfig if DyPE should be enabled, None otherwise
     """
     if preset == DYPE_PRESET_OFF:
-        # DyPE is disabled - ignore any custom values
         return None
 
-    if preset == DYPE_PRESET_ON:
-        # Always enable DyPE with dynamic settings based on resolution
+    if preset == DYPE_PRESET_MANUAL:
+        # Manual mode - custom values can override defaults
         max_dim = max(width, height)
         scale = max_dim / 1024
         dynamic_dype_scale = min(2.0 * scale, 8.0)
@@ -126,21 +125,15 @@ def get_dype_config_from_preset(
         )
 
     if preset == DYPE_PRESET_AUTO:
-        config = get_dype_config_for_resolution(
+        # Auto preset - custom values are ignored
+        return get_dype_config_for_resolution(
             width=width,
             height=height,
             base_resolution=1024,
             activation_threshold=1536,
         )
-        # Apply custom overrides if provided
-        if config is not None:
-            if custom_scale is not None:
-                config.dype_scale = custom_scale
-            if custom_exponent is not None:
-                config.dype_exponent = custom_exponent
-        return config
 
-    # Use preset configuration
+    # Use preset configuration (4K etc.) - custom values are ignored
     preset_config = DYPE_PRESETS.get(preset)
     if preset_config is None:
         return None
@@ -149,7 +142,7 @@ def get_dype_config_from_preset(
         enable_dype=True,
         base_resolution=preset_config.base_resolution,
         method=preset_config.method,
-        dype_scale=custom_scale if custom_scale is not None else preset_config.dype_scale,
-        dype_exponent=custom_exponent if custom_exponent is not None else preset_config.dype_exponent,
+        dype_scale=preset_config.dype_scale,
+        dype_exponent=preset_config.dype_exponent,
         dype_start_sigma=preset_config.dype_start_sigma,
     )
