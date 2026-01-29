@@ -18,12 +18,14 @@ import { serializeError } from 'serialize-error';
 import {
   modelConfigsAdapterSelectors,
   useBulkDeleteModelsMutation,
+  useGetMissingModelsQuery,
   useGetModelConfigsQuery,
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
 import { BulkDeleteModelsModal } from './BulkDeleteModelsModal';
 import { FetchingModelsLoader } from './FetchingModelsLoader';
+import { MissingModelsProvider } from './MissingModelsContext';
 import { ModelListWrapper } from './ModelListWrapper';
 
 const log = logger('models');
@@ -40,11 +42,30 @@ const ModelList = () => {
   const { isOpen, close } = useBulkDeleteModal();
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const { data, isLoading } = useGetModelConfigsQuery();
+  const { data: allModelsData, isLoading: isLoadingAll } = useGetModelConfigsQuery();
+  const { data: missingModelsData, isLoading: isLoadingMissing } = useGetMissingModelsQuery();
   const [bulkDeleteModels] = useBulkDeleteModelsMutation();
+
+  const data = filteredModelType === 'missing' ? missingModelsData : allModelsData;
+  const isLoading = filteredModelType === 'missing' ? isLoadingMissing : isLoadingAll;
 
   const models = useMemo(() => {
     const modelConfigs = modelConfigsAdapterSelectors.selectAll(data ?? { ids: [], entities: {} });
+
+    // For missing models filter, show all models in a single category
+    if (filteredModelType === 'missing') {
+      const filtered = modelConfigs.filter(
+        (m) =>
+          m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.base.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.type.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      return {
+        total: filtered.length,
+        byCategory: [{ i18nKey: 'modelManager.missingFiles', configs: filtered }],
+      };
+    }
+
     const baseFilteredModelConfigs = modelsFilter(modelConfigs, searchTerm, filteredModelType);
     const byCategory: { i18nKey: string; configs: AnyModelConfig[] }[] = [];
     const total = baseFilteredModelConfigs.length;
@@ -128,7 +149,7 @@ const ModelList = () => {
   }, [bulkDeleteModels, selectedModelKeys, dispatch, close, toast, t]);
 
   return (
-    <>
+    <MissingModelsProvider>
       <Flex flexDirection="column" w="full" h="full">
         <ScrollableContent>
           <Flex flexDirection="column" w="full" h="full" gap={4}>
@@ -152,7 +173,7 @@ const ModelList = () => {
         modelCount={selectedModelKeys.length}
         isDeleting={isDeleting}
       />
-    </>
+    </MissingModelsProvider>
   );
 };
 
