@@ -4,6 +4,8 @@ import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/c
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
 import {
+  kleinQwen3EncoderModelSelected,
+  kleinVaeModelSelected,
   modelChanged,
   syncedToOptimalDimension,
   vaeSelected,
@@ -23,6 +25,7 @@ import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
+import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import {
   selectFluxVAEModels,
   selectGlobalRefImageModels,
@@ -140,6 +143,19 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
         }
 
+        // handle incompatible FLUX.2 Klein models - clear if switching away from flux2
+        const { kleinVaeModel, kleinQwen3EncoderModel } = state.params;
+        if (newBase !== 'flux2') {
+          if (kleinVaeModel) {
+            dispatch(kleinVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (kleinQwen3EncoderModel) {
+            dispatch(kleinQwen3EncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+        }
+
         if (SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
           // Handle incompatible reference image models - switch to first compatible model, with some smart logic
           // to choose the best available model based on the new main model.
@@ -168,6 +184,11 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           // All ref image entities are updated to use the same new model
           const refImageEntities = selectReferenceImageEntities(state);
           for (const entity of refImageEntities) {
+            // Skip FLUX.2 reference images - they don't have a model field (built-in support)
+            if (!('model' in entity.config)) {
+              continue;
+            }
+
             const shouldUpdateModel =
               (entity.config.model && entity.config.model.base !== newBase) ||
               (!entity.config.model && newGlobalRefImageModel);
@@ -219,6 +240,38 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             }),
             status: 'warning',
           });
+        }
+      }
+
+      // Handle FLUX.2 Klein model changes within the same base (different variants need different encoders)
+      // Clear the Qwen3 encoder only when switching between different Klein variants
+      // (e.g., klein_4b needs qwen3_4b, klein_9b needs qwen3_8b)
+      if (newBase === 'flux2' && state.params.model?.base === 'flux2' && newModel.key !== state.params.model?.key) {
+        const { kleinQwen3EncoderModel } = state.params;
+        if (kleinQwen3EncoderModel) {
+          // Get model configs to compare variants
+          const modelConfigsResult = selectModelConfigsQuery(state);
+          if (modelConfigsResult.data) {
+            const oldModelConfig = modelConfigsAdapterSelectors.selectById(
+              modelConfigsResult.data,
+              state.params.model.key
+            );
+            const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+
+            // Extract variants (only clear if variants are different)
+            const oldVariant = oldModelConfig && 'variant' in oldModelConfig ? oldModelConfig.variant : null;
+            const newVariant = newModelConfig && 'variant' in newModelConfig ? newModelConfig.variant : null;
+
+            if (oldVariant !== newVariant) {
+              dispatch(kleinQwen3EncoderModelSelected(null));
+              toast({
+                id: 'KLEIN_ENCODER_CLEARED',
+                title: t('toast.kleinEncoderCleared'),
+                description: t('toast.kleinEncoderClearedDescription'),
+                status: 'info',
+              });
+            }
+          }
         }
       }
 

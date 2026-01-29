@@ -34,7 +34,7 @@ import type {
   FLUXReduxImageInfluence as FLUXReduxImageInfluenceType,
   IPMethodV2,
 } from 'features/controlLayers/store/types';
-import { isFLUXReduxConfig, isIPAdapterConfig } from 'features/controlLayers/store/types';
+import { isFlux2ReferenceImageConfig, isFLUXReduxConfig, isIPAdapterConfig } from 'features/controlLayers/store/types';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
@@ -121,19 +121,34 @@ const RefImageSettingsContent = memo(() => {
 
   const isFLUX = useAppSelector(selectIsFLUX);
 
+  // FLUX.2 Klein has built-in reference image support - no model selector needed
+  const showModelSelector = !isFlux2ReferenceImageConfig(config);
+
   return (
     <Flex flexDir="column" gap={2} position="relative" w="full">
-      <Flex gap={2} alignItems="center" w="full">
-        <RefImageModel modelKey={config.model?.key ?? null} onChangeModel={onChangeModel} />
-        {isIPAdapterConfig(config) && (
-          <IPAdapterCLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
-        )}
-        {tab === 'canvas' && (
+      {showModelSelector && (
+        <Flex gap={2} alignItems="center" w="full">
+          <RefImageModel
+            modelKey={'model' in config ? (config.model?.key ?? null) : null}
+            onChangeModel={onChangeModel}
+          />
+          {isIPAdapterConfig(config) && (
+            <IPAdapterCLIPVisionModel model={config.clipVisionModel} onChange={onChangeCLIPVisionModel} />
+          )}
+          {tab === 'canvas' && (
+            <CanvasManagerProviderGate>
+              <PullBboxIntoRefImageIconButton />
+            </CanvasManagerProviderGate>
+          )}
+        </Flex>
+      )}
+      {!showModelSelector && tab === 'canvas' && (
+        <Flex gap={2} alignItems="center" w="full" justifyContent="flex-end">
           <CanvasManagerProviderGate>
             <PullBboxIntoRefImageIconButton />
           </CanvasManagerProviderGate>
-        )}
-      </Flex>
+        </Flex>
+      )}
       <Flex gap={2} w="full">
         {isIPAdapterConfig(config) && (
           <Flex flexDir="column" gap={2} w="full">

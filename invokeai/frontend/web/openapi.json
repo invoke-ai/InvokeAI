@@ -215,6 +215,12 @@
                       "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
@@ -234,6 +240,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -257,6 +269,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
@@ -273,6 +288,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -333,6 +351,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -464,6 +488,12 @@
                       "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
@@ -483,6 +513,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -506,6 +542,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
@@ -522,6 +561,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -582,6 +624,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -758,6 +806,12 @@
                       "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
@@ -777,6 +831,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -800,6 +860,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
@@ -816,6 +879,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -876,6 +942,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -1071,6 +1143,12 @@
                       "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
@@ -1090,6 +1168,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -1113,6 +1197,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
@@ -1129,6 +1216,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -1189,6 +1279,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -1516,6 +1612,47 @@
           },
           "404": {
             "description": "Model image not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/i/bulk_delete": {
+      "post": {
+        "tags": ["model_manager"],
+        "summary": "Bulk Delete Models",
+        "description": "Delete multiple model records from database.\n\nThe configuration records will be removed. The corresponding weights files will be\ndeleted as well if they reside within the InvokeAI \"models\" directory.\nReturns a list of successfully deleted keys and failed deletions with error messages.",
+        "operationId": "bulk_delete_models",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkDeleteModelsRequest",
+                "description": "List of model keys to delete"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Models deleted (possibly with some failures)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkDeleteModelsResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1859,6 +1996,12 @@
                       "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
@@ -1878,6 +2021,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -1901,6 +2050,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                     },
                     {
@@ -1917,6 +2069,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -1977,6 +2132,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
                     },
                     {
                       "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -6157,6 +6318,63 @@
         }
       }
     },
+    "/api/v1/workflows/tags": {
+      "get": {
+        "tags": ["workflows"],
+        "summary": "Get All Tags",
+        "description": "Gets all unique tags from workflows",
+        "operationId": "get_all_tags",
+        "parameters": [
+          {
+            "name": "categories",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WorkflowCategory"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The categories to include",
+              "title": "Categories"
+            },
+            "description": "The categories to include"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Get All Tags"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workflows/counts_by_tag": {
       "get": {
         "tags": ["workflows"],
@@ -7010,6 +7228,12 @@
             "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
           },
           {
@@ -7029,6 +7253,12 @@
           },
           {
             "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
           },
           {
             "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -7052,6 +7282,9 @@
             "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
           },
           {
+            "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+          },
+          {
             "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
           },
           {
@@ -7068,6 +7301,9 @@
           },
           {
             "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
           },
           {
             "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -7128,6 +7364,12 @@
           },
           {
             "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
           },
           {
             "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -7474,7 +7716,19 @@
       },
       "BaseModelType": {
         "type": "string",
-        "enum": ["any", "sd-1", "sd-2", "sd-3", "sdxl", "sdxl-refiner", "flux", "cogview4", "z-image", "unknown"],
+        "enum": [
+          "any",
+          "sd-1",
+          "sd-2",
+          "sd-3",
+          "sdxl",
+          "sdxl-refiner",
+          "flux",
+          "flux2",
+          "cogview4",
+          "z-image",
+          "unknown"
+        ],
         "title": "BaseModelType",
         "description": "An enumeration of base model architectures. For example, Stable Diffusion 1.x, Stable Diffusion 2.x, FLUX, etc.\n\nEvery model config must have a base architecture type.\n\nNot all models are associated with a base architecture. For example, CLIP models are their own thing, not related\nto any particular model architecture. To simplify internal APIs and make it easier to work with models, we use a\nfallback/null value `BaseModelType.Any` for these models, instead of making the model base optional."
       },
@@ -8932,6 +9186,47 @@
         "required": ["output_meta", "bounding_box", "type", "type"],
         "title": "BoundingBoxOutput",
         "type": "object"
+      },
+      "BulkDeleteModelsRequest": {
+        "properties": {
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Keys",
+            "description": "List of model keys to delete"
+          }
+        },
+        "type": "object",
+        "required": ["keys"],
+        "title": "BulkDeleteModelsRequest",
+        "description": "Request body for bulk model deletion."
+      },
+      "BulkDeleteModelsResponse": {
+        "properties": {
+          "deleted": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deleted",
+            "description": "List of successfully deleted model keys"
+          },
+          "failed": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Failed",
+            "description": "List of failed deletions with error messages"
+          }
+        },
+        "type": "object",
+        "required": ["deleted", "failed"],
+        "title": "BulkDeleteModelsResponse",
+        "description": "Response body for bulk model deletion."
       },
       "BulkDownloadCompleteEvent": {
         "description": "Event model for bulk_download_complete",
@@ -13119,6 +13414,140 @@
         ],
         "title": "ControlNet_Checkpoint_SDXL_Config"
       },
+      "ControlNet_Checkpoint_ZImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "controlnet",
+            "title": "Type",
+            "default": "controlnet"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "z-image",
+            "title": "Base",
+            "default": "z-image"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ControlAdapterDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "default_settings"
+        ],
+        "title": "ControlNet_Checkpoint_ZImage_Config",
+        "description": "Model config for Z-Image Control adapter models (Safetensors checkpoint).\n\nZ-Image Control models are standalone adapters containing only the control layers\n(control_layers, control_all_x_embedder, control_noise_refiner) that extend\nthe base Z-Image transformer with spatial conditioning capabilities.\n\nSupports: Canny, HED, Depth, Pose, MLSD.\nRecommended control_context_scale: 0.65-0.80."
+      },
       "ControlNet_Diffusers_FLUX_Config": {
         "properties": {
           "key": {
@@ -13689,6 +14118,7 @@
                   "flux_img2img",
                   "flux_inpaint",
                   "flux_outpaint",
+                  "flux2_txt2img",
                   "sd3_txt2img",
                   "sd3_img2img",
                   "sd3_inpaint",
@@ -14083,6 +14513,22 @@
             "orig_default": null,
             "orig_required": false
           },
+          "qwen3_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The Qwen3 text encoder model used for Z-Image inference",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
           "hrf_enabled": {
             "anyOf": [
               {
@@ -14298,7 +14744,7 @@
         "tags": ["metadata"],
         "title": "Core Metadata",
         "type": "object",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
@@ -18113,6 +18559,645 @@
           "$ref": "#/components/schemas/IntegerOutput"
         }
       },
+      "Flux2DenoiseInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Run denoising process with a FLUX.2 Klein transformer model.\n\nThis node is designed for FLUX.2 Klein models which use Qwen3 as the text encoder.\nIt does not support ControlNet, IP-Adapters, or regional prompting.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoise_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DenoiseMaskField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoising_start": {
+            "default": 0.0,
+            "description": "When to start denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Denoising Start",
+            "type": "number"
+          },
+          "denoising_end": {
+            "default": 1.0,
+            "description": "When to stop denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Denoising End",
+            "type": "number"
+          },
+          "add_noise": {
+            "default": true,
+            "description": "Add noise based on denoising start.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Add Noise",
+            "type": "boolean"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Flux model (Transformer) to load",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_text_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FluxConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "negative_text_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FluxConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negative conditioning tensor. Can be None if cfg_scale is 1.0.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "cfg_scale": {
+            "default": 1.0,
+            "description": "Classifier-Free Guidance scale",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "CFG Scale",
+            "type": "number"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "num_steps": {
+            "default": 28,
+            "description": "Number of diffusion steps. Recommended: 28 for Klein.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 28,
+            "orig_required": false,
+            "title": "Num Steps",
+            "type": "integer"
+          },
+          "scheduler": {
+            "default": "euler",
+            "description": "Scheduler (sampler) for the denoising process. 'euler' is fast and standard. 'heun' is 2nd-order (better quality, 2x slower). 'lcm' is optimized for few steps.",
+            "enum": ["euler", "heun", "lcm"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "euler",
+            "orig_required": false,
+            "title": "Scheduler",
+            "type": "string",
+            "ui_choice_labels": {
+              "euler": "Euler",
+              "heun": "Heun (2nd order)",
+              "lcm": "LCM"
+            }
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "FLUX.2 VAE model (required for BN statistics).",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "type": {
+            "const": "flux2_denoise",
+            "default": "flux2_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "flux", "flux2", "klein", "denoise"],
+        "title": "FLUX2 Denoise",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "Flux2KleinModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads a Flux2 Klein model, outputting its submodels.\n\nFlux2 Klein uses Qwen3 as the text encoder instead of CLIP+T5.\nIt uses a 32-channel VAE (AutoencoderKLFlux2) instead of the 16-channel FLUX.1 VAE.\n\nWhen using a Diffusers format model, both VAE and Qwen3 encoder are extracted\nautomatically from the main model. You can override with standalone models:\n- Transformer: Always from Flux2 Klein main model\n- VAE: From main model (Diffusers) or standalone VAE\n- Qwen3 Encoder: From main model (Diffusers) or standalone Qwen3 model",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Flux model (Transformer) to load",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Transformer",
+            "ui_model_base": ["flux2"],
+            "ui_model_type": ["main"]
+          },
+          "vae_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone VAE model. Flux2 Klein uses the same VAE as FLUX (16-channel). If not provided, VAE will be loaded from the Qwen3 Source model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "VAE",
+            "ui_model_base": ["flux", "flux2"],
+            "ui_model_type": ["vae"]
+          },
+          "qwen3_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3 Encoder model. If not provided, encoder will be loaded from the Qwen3 Source model.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen3 Encoder",
+            "ui_model_type": ["qwen3_encoder"]
+          },
+          "qwen3_source_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Diffusers Flux2 Klein model to extract VAE and/or Qwen3 encoder from. Use this if you don't have separate VAE/Qwen3 models. Ignored if both VAE and Qwen3 Encoder are provided separately.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Qwen3 Source (Diffusers)",
+            "ui_model_base": ["flux2"],
+            "ui_model_format": ["diffusers"],
+            "ui_model_type": ["main"]
+          },
+          "max_seq_len": {
+            "default": 512,
+            "description": "Max sequence length for the Qwen3 encoder.",
+            "enum": [256, 512],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 512,
+            "orig_required": false,
+            "title": "Max Seq Length",
+            "type": "integer"
+          },
+          "type": {
+            "const": "flux2_klein_model_loader",
+            "default": "flux2_klein_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "flux", "klein", "qwen3"],
+        "title": "Main Model - Flux2 Klein",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Flux2KleinModelLoaderOutput"
+        }
+      },
+      "Flux2KleinModelLoaderOutput": {
+        "class": "output",
+        "description": "Flux2 Klein model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/TransformerField",
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "qwen3_encoder": {
+            "$ref": "#/components/schemas/Qwen3EncoderField",
+            "description": "Qwen3 tokenizer and text encoder",
+            "field_kind": "output",
+            "title": "Qwen3 Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "VAE",
+            "ui_hidden": false
+          },
+          "max_seq_len": {
+            "description": "The max sequence length for the Qwen3 encoder.",
+            "enum": [256, 512],
+            "field_kind": "output",
+            "title": "Max Seq Length",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "flux2_klein_model_loader_output",
+            "default": "flux2_klein_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "max_seq_len", "type", "type"],
+        "title": "Flux2KleinModelLoaderOutput",
+        "type": "object"
+      },
+      "Flux2KleinTextEncoderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes and preps a prompt for Flux2 Klein image generation.\n\nFlux2 Klein uses Qwen3 as the text encoder, extracting hidden states from\nlayers [9, 18, 27] and stacking them for richer text representations.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt to encode.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "qwen3_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Qwen3EncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen3 tokenizer and text encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Qwen3 Encoder"
+          },
+          "max_seq_len": {
+            "default": 512,
+            "description": "Max sequence length for the Qwen3 encoder.",
+            "enum": [256, 512],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 512,
+            "orig_required": false,
+            "title": "Max Seq Len",
+            "type": "integer"
+          },
+          "mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TensorField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask defining the region that this conditioning prompt applies to.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "type": {
+            "const": "flux2_klein_text_encoder",
+            "default": "flux2_klein_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "flux", "klein", "qwen3"],
+        "title": "Prompt - Flux2 Klein",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/FluxConditioningOutput"
+        }
+      },
+      "Flux2VaeDecodeInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Generates an image from latents using FLUX.2 Klein's 32-channel VAE.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "type": {
+            "const": "flux2_vae_decode",
+            "default": "flux2_vae_decode",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "vae", "l2i", "flux2", "klein"],
+        "title": "Latents to Image - FLUX2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "Flux2VariantType": {
+        "type": "string",
+        "enum": ["klein_4b", "klein_9b"],
+        "title": "Flux2VariantType",
+        "description": "FLUX.2 model variants."
+      },
       "FluxConditioningCollectionOutput": {
         "class": "output",
         "description": "Base class for nodes that output a collection of conditioning tensors",
@@ -18830,6 +19915,22 @@
             "title": "Num Steps",
             "type": "integer"
           },
+          "scheduler": {
+            "default": "euler",
+            "description": "Scheduler (sampler) for the denoising process. 'euler' is fast and standard. 'heun' is 2nd-order (better quality, 2x slower). 'lcm' is optimized for few steps.",
+            "enum": ["euler", "heun", "lcm"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "euler",
+            "orig_required": false,
+            "title": "Scheduler",
+            "type": "string",
+            "ui_choice_labels": {
+              "euler": "Euler",
+              "heun": "Heun (2nd order)",
+              "lcm": "LCM"
+            }
+          },
           "guidance": {
             "default": 4.0,
             "description": "The guidance strength. Higher values adhere more strictly to the prompt, and will produce less diverse images. FLUX dev only, ignored for schnell.",
@@ -18947,7 +20048,7 @@
         "tags": ["image", "flux"],
         "title": "FLUX Denoise",
         "type": "object",
-        "version": "4.1.0",
+        "version": "4.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -19253,6 +20354,22 @@
             "orig_required": false,
             "title": "Num Steps",
             "type": "integer"
+          },
+          "scheduler": {
+            "default": "euler",
+            "description": "Scheduler (sampler) for the denoising process. 'euler' is fast and standard. 'heun' is 2nd-order (better quality, 2x slower). 'lcm' is optimized for few steps.",
+            "enum": ["euler", "heun", "lcm"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "euler",
+            "orig_required": false,
+            "title": "Scheduler",
+            "type": "string",
+            "ui_choice_labels": {
+              "euler": "Euler",
+              "heun": "Heun (2nd order)",
+              "lcm": "LCM"
+            }
           },
           "guidance": {
             "default": 4.0,
@@ -20671,7 +21788,8 @@
       "FluxVariantType": {
         "type": "string",
         "enum": ["schnell", "dev", "dev_fill"],
-        "title": "FluxVariantType"
+        "title": "FluxVariantType",
+        "description": "FLUX.1 model variants."
       },
       "FoundModel": {
         "properties": {
@@ -21155,6 +22273,18 @@
                   "$ref": "#/components/schemas/FloatToIntegerInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2KleinModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
                 },
                 {
@@ -21479,6 +22609,9 @@
                   "$ref": "#/components/schemas/NormalMapInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/PBRMapsInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/PairTileImageInvocation"
                 },
                 {
@@ -21486,6 +22619,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/PiDiNetEdgeDetectionInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/PromptTemplateInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/PromptsFromFileInvocation"
@@ -21617,7 +22753,13 @@
                   "$ref": "#/components/schemas/VAELoaderInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/ZImageControlInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/ZImageDenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/ZImageDenoiseMetaInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/ZImageImageToLatentsInvocation"
@@ -21633,6 +22775,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ZImageModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/ZImageSeedVarianceEnhancerInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/ZImageTextEncoderInvocation"
@@ -21754,6 +22899,9 @@
                   "$ref": "#/components/schemas/FloatOutput"
                 },
                 {
+                  "$ref": "#/components/schemas/Flux2KleinModelLoaderOutput"
+                },
+                {
                   "$ref": "#/components/schemas/FluxConditioningCollectionOutput"
                 },
                 {
@@ -21865,7 +23013,13 @@
                   "$ref": "#/components/schemas/NoiseOutput"
                 },
                 {
+                  "$ref": "#/components/schemas/PBRMapsOutput"
+                },
+                {
                   "$ref": "#/components/schemas/PairTileImageOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/PromptTemplateOutput"
                 },
                 {
                   "$ref": "#/components/schemas/SD3ConditioningOutput"
@@ -21917,6 +23071,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ZImageConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/ZImageControlOutput"
                 },
                 {
                   "$ref": "#/components/schemas/ZImageLoRALoaderOutput"
@@ -22252,7 +23409,7 @@
         "type": "object",
         "required": ["repo_id"],
         "title": "HFModelSource",
-        "description": "A HuggingFace repo_id with optional variant, sub-folder and access token.\nNote that the variant option, if not provided to the constructor, will default to fp16, which is\nwhat people (almost) always want."
+        "description": "A HuggingFace repo_id with optional variant, sub-folder(s) and access token.\nNote that the variant option, if not provided to the constructor, will default to fp16, which is\nwhat people (almost) always want.\n\nThe subfolder can be a single path or multiple paths joined by '+' (e.g., \"text_encoder+tokenizer\").\nWhen multiple subfolders are specified, all of them will be downloaded and combined into the model directory."
       },
       "HFTokenStatus": {
         "type": "string",
@@ -28067,6 +29224,18 @@
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
               },
               {
@@ -28391,6 +29560,9 @@
                 "$ref": "#/components/schemas/NormalMapInvocation"
               },
               {
+                "$ref": "#/components/schemas/PBRMapsInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/PairTileImageInvocation"
               },
               {
@@ -28398,6 +29570,9 @@
               },
               {
                 "$ref": "#/components/schemas/PiDiNetEdgeDetectionInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/PromptTemplateInvocation"
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
@@ -28529,7 +29704,13 @@
                 "$ref": "#/components/schemas/VAELoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/ZImageControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ZImageDenoiseMetaInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageImageToLatentsInvocation"
@@ -28545,6 +29726,9 @@
               },
               {
                 "$ref": "#/components/schemas/ZImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ZImageSeedVarianceEnhancerInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageTextEncoderInvocation"
@@ -28622,6 +29806,9 @@
               },
               {
                 "$ref": "#/components/schemas/FloatOutput"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinModelLoaderOutput"
               },
               {
                 "$ref": "#/components/schemas/FluxConditioningCollectionOutput"
@@ -28735,7 +29922,13 @@
                 "$ref": "#/components/schemas/NoiseOutput"
               },
               {
+                "$ref": "#/components/schemas/PBRMapsOutput"
+              },
+              {
                 "$ref": "#/components/schemas/PairTileImageOutput"
+              },
+              {
+                "$ref": "#/components/schemas/PromptTemplateOutput"
               },
               {
                 "$ref": "#/components/schemas/SD3ConditioningOutput"
@@ -28787,6 +29980,9 @@
               },
               {
                 "$ref": "#/components/schemas/ZImageConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/ZImageControlOutput"
               },
               {
                 "$ref": "#/components/schemas/ZImageLoRALoaderOutput"
@@ -29042,6 +30238,18 @@
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
               },
               {
@@ -29366,6 +30574,9 @@
                 "$ref": "#/components/schemas/NormalMapInvocation"
               },
               {
+                "$ref": "#/components/schemas/PBRMapsInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/PairTileImageInvocation"
               },
               {
@@ -29373,6 +30584,9 @@
               },
               {
                 "$ref": "#/components/schemas/PiDiNetEdgeDetectionInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/PromptTemplateInvocation"
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
@@ -29504,7 +30718,13 @@
                 "$ref": "#/components/schemas/VAELoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/ZImageControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ZImageDenoiseMetaInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageImageToLatentsInvocation"
@@ -29520,6 +30740,9 @@
               },
               {
                 "$ref": "#/components/schemas/ZImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ZImageSeedVarianceEnhancerInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageTextEncoderInvocation"
@@ -29726,6 +30949,18 @@
           },
           "float_to_int": {
             "$ref": "#/components/schemas/IntegerOutput"
+          },
+          "flux2_denoise": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "flux2_klein_model_loader": {
+            "$ref": "#/components/schemas/Flux2KleinModelLoaderOutput"
+          },
+          "flux2_klein_text_encoder": {
+            "$ref": "#/components/schemas/FluxConditioningOutput"
+          },
+          "flux2_vae_decode": {
+            "$ref": "#/components/schemas/ImageOutput"
           },
           "flux_control_lora_loader": {
             "$ref": "#/components/schemas/FluxControlLoRALoaderOutput"
@@ -30069,11 +31304,17 @@
           "paste_image_into_bounding_box": {
             "$ref": "#/components/schemas/ImageOutput"
           },
+          "pbr_maps": {
+            "$ref": "#/components/schemas/PBRMapsOutput"
+          },
           "pidi_edge_detection": {
             "$ref": "#/components/schemas/ImageOutput"
           },
           "prompt_from_file": {
             "$ref": "#/components/schemas/StringCollectionOutput"
+          },
+          "prompt_template": {
+            "$ref": "#/components/schemas/PromptTemplateOutput"
           },
           "rand_float": {
             "$ref": "#/components/schemas/FloatOutput"
@@ -30201,8 +31442,14 @@
           "vae_loader": {
             "$ref": "#/components/schemas/VAEOutput"
           },
+          "z_image_control": {
+            "$ref": "#/components/schemas/ZImageControlOutput"
+          },
           "z_image_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "z_image_denoise_meta": {
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "z_image_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
@@ -30219,229 +31466,241 @@
           "z_image_model_loader": {
             "$ref": "#/components/schemas/ZImageModelLoaderOutput"
           },
+          "z_image_seed_variance_enhancer": {
+            "$ref": "#/components/schemas/ZImageConditioningOutput"
+          },
           "z_image_text_encoder": {
             "$ref": "#/components/schemas/ZImageConditioningOutput"
           }
         },
         "required": [
-          "rand_int",
-          "metadata_to_bool_collection",
-          "z_image_i2l",
-          "lora_loader",
-          "img_lerp",
-          "lblend",
-          "blank_image",
-          "integer_collection",
-          "z_image_denoise",
-          "create_denoise_mask",
-          "denoise_latents_meta",
-          "img_channel_multiply",
-          "sdxl_refiner_compel_prompt",
-          "show_image",
+          "flux2_klein_model_loader",
           "float_to_int",
-          "img_hue_adjust",
-          "sdxl_compel_prompt",
-          "get_image_mask_bounding_box",
-          "metadata_to_lora_collection",
-          "denoise_latents",
-          "img_channel_offset",
-          "string_generator",
-          "img_conv",
-          "range_of_size",
           "cogview4_denoise",
-          "float",
-          "metadata_to_integer",
-          "t2i_adapter",
-          "invokeai_ealightness",
-          "float_batch",
-          "metadata_item",
-          "img_ilerp",
-          "face_mask_detection",
-          "tile_to_properties",
-          "conditioning",
-          "freeu",
-          "flux_kontext",
-          "mlsd_detection",
-          "sdxl_lora_collection_loader",
-          "invokeai_img_blend",
-          "img_blur",
-          "ideal_size",
-          "range",
-          "metadata_to_t2i_adapters",
-          "l2i",
-          "metadata_to_vae",
-          "lora_collection_loader",
-          "canvas_paste_back",
-          "img_paste",
-          "lresize",
-          "random_range",
-          "metadata_to_integer_collection",
-          "tensor_mask_to_image",
-          "alpha_mask_to_tensor",
-          "invokeai_img_hue_adjust_plus",
-          "string_split_neg",
-          "flux_fill",
-          "sd3_denoise",
-          "flux_controlnet",
-          "invokeai_img_dilate_erode",
-          "canvas_v2_mask_and_crop",
-          "lineart_edge_detection",
-          "merge_metadata",
-          "string_batch",
-          "mask_combine",
-          "color",
-          "float_range",
-          "crop_latents",
-          "spandrel_image_to_image",
-          "metadata_to_float",
-          "mul",
-          "infill_tile",
-          "cv_inpaint",
-          "calculate_image_tiles",
-          "img_nsfw",
-          "image_generator",
-          "flux_lora_collection_loader",
-          "string_join",
-          "seamless",
-          "sd3_i2l",
-          "flux_control_lora_loader",
-          "paste_image_into_bounding_box",
-          "clip_skip",
-          "conditioning_collection",
-          "flux_ip_adapter",
-          "metadata_to_ip_adapters",
-          "esrgan",
-          "invokeai_img_val_thresholds",
-          "face_identifier",
-          "metadata",
-          "cogview4_model_loader",
-          "sub",
-          "metadata_to_controlnets",
-          "z_image_text_encoder",
-          "string_join_three",
-          "unsharp_mask",
-          "grounding_dino",
-          "metadata_to_bool",
-          "apply_tensor_mask_to_image",
-          "flux_denoise_meta",
-          "iterate",
-          "image_batch",
-          "metadata_from_image",
-          "integer_math",
-          "metadata_to_string_collection",
-          "expand_mask_with_fade",
-          "integer_generator",
-          "sd3_l2i",
-          "boolean_collection",
-          "round_float",
-          "infill_rgba",
-          "z_image_l2i",
-          "vae_loader",
-          "controlnet",
-          "tiled_multi_diffusion_denoise_latents",
-          "string_split",
-          "cogview4_i2l",
-          "image_mask_to_tensor",
-          "heuristic_resize",
-          "img_watermark",
-          "scheduler",
-          "img_crop",
-          "sdxl_refiner_model_loader",
-          "segment_anything",
-          "color_map",
-          "boolean",
-          "hed_edge_detection",
-          "rectangle_mask",
-          "infill_lama",
-          "main_model_loader",
-          "save_image",
-          "calculate_image_tiles_even_split",
-          "image",
-          "flux_redux",
-          "noise",
-          "llava_onevision_vllm",
-          "invokeai_img_enhance",
-          "model_identifier",
-          "img_resize",
-          "integer_batch",
-          "img_noise",
-          "cogview4_text_encoder",
-          "latents_collection",
-          "metadata_to_loras",
-          "dynamic_prompt",
-          "metadata_item_linked",
-          "z_image_lora_loader",
-          "merge_tiles_to_image",
-          "img_chan",
-          "float_generator",
-          "compel",
-          "string",
-          "add",
-          "canny_edge_detection",
-          "string_collection",
-          "flux_denoise",
-          "sd3_text_encoder",
-          "metadata_to_scheduler",
-          "mask_edge",
           "img_scale",
-          "flux_vae_decode",
-          "latents",
-          "flux_lora_loader",
-          "float_math",
-          "div",
-          "pidi_edge_detection",
-          "image_panel_layout",
-          "lscale",
-          "infill_patchmatch",
-          "face_off",
-          "sdxl_lora_loader",
-          "i2l",
-          "crop_image_to_bounding_box",
-          "core_metadata",
-          "calculate_image_tiles_min_overlap",
-          "image_collection",
-          "metadata_to_model",
-          "infill_cv2",
-          "z_image_lora_collection_loader",
-          "mask_from_id",
-          "tomask",
-          "cogview4_l2i",
-          "metadata_to_sdlx_loras",
-          "integer",
-          "normal_map",
-          "lineart_anime_edge_detection",
-          "content_shuffle",
-          "string_replace",
-          "img_mul",
-          "flux_text_encoder",
-          "sdxl_model_loader",
-          "prompt_from_file",
-          "invert_tensor_mask",
-          "rand_float",
-          "flux_vae_encode",
-          "ip_adapter",
-          "lora_selector",
-          "spandrel_image_to_image_autoscale",
+          "flux_fill",
+          "img_channel_offset",
+          "metadata_to_controlnets",
           "sd3_model_loader",
-          "bounding_box",
-          "metadata_to_string",
-          "dw_openpose_detection",
-          "collect",
-          "create_gradient_mask",
-          "flux_kontext_image_prep",
-          "apply_mask_to_image",
-          "pair_tile_image",
-          "z_image_model_loader",
-          "flux_model_loader",
-          "metadata_to_sdxl_model",
-          "metadata_to_float_collection",
+          "hed_edge_detection",
+          "z_image_denoise_meta",
+          "integer_collection",
+          "invokeai_img_blend",
+          "crop_latents",
+          "sd3_i2l",
+          "sdxl_refiner_compel_prompt",
+          "img_chan",
+          "metadata_to_bool",
           "color_correct",
-          "metadata_field_extractor",
-          "float_collection",
-          "mediapipe_face_detection",
+          "metadata_to_ip_adapters",
+          "apply_mask_to_image",
+          "lora_collection_loader",
+          "color",
+          "crop_image_to_bounding_box",
+          "lscale",
           "depth_anything_depth_estimation",
+          "apply_tensor_mask_to_image",
+          "img_conv",
+          "z_image_model_loader",
+          "pbr_maps",
+          "expand_mask_with_fade",
+          "controlnet",
+          "sdxl_compel_prompt",
           "invokeai_img_composite",
-          "img_pad_crop"
+          "string_replace",
+          "canvas_v2_mask_and_crop",
+          "metadata_to_integer",
+          "cogview4_model_loader",
+          "flux_lora_loader",
+          "integer_math",
+          "img_paste",
+          "sub",
+          "metadata_from_image",
+          "flux_ip_adapter",
+          "compel",
+          "cv_inpaint",
+          "boolean",
+          "z_image_i2l",
+          "normal_map",
+          "float_collection",
+          "img_ilerp",
+          "image_batch",
+          "flux_vae_encode",
+          "mask_from_id",
+          "alpha_mask_to_tensor",
+          "seamless",
+          "range",
+          "flux_vae_decode",
+          "metadata_to_string_collection",
+          "ideal_size",
+          "sd3_text_encoder",
+          "denoise_latents",
+          "infill_patchmatch",
+          "grounding_dino",
+          "metadata_to_loras",
+          "string",
+          "img_nsfw",
+          "z_image_text_encoder",
+          "z_image_lora_loader",
+          "float_generator",
+          "lresize",
+          "lora_loader",
+          "unsharp_mask",
+          "flux2_klein_text_encoder",
+          "conditioning_collection",
+          "metadata_to_t2i_adapters",
+          "sdxl_model_loader",
+          "metadata",
+          "mediapipe_face_detection",
+          "img_blur",
+          "float_math",
+          "invokeai_img_dilate_erode",
+          "random_range",
+          "z_image_lora_collection_loader",
+          "flux2_vae_decode",
+          "calculate_image_tiles_even_split",
+          "cogview4_l2i",
+          "float",
+          "invokeai_ealightness",
+          "img_resize",
+          "flux_controlnet",
+          "sdxl_lora_loader",
+          "latents_collection",
+          "invokeai_img_enhance",
+          "mask_edge",
+          "dynamic_prompt",
+          "flux_kontext",
+          "range_of_size",
+          "image_mask_to_tensor",
+          "metadata_to_sdxl_model",
+          "segment_anything",
+          "integer_batch",
+          "scheduler",
+          "blank_image",
+          "invert_tensor_mask",
+          "z_image_denoise",
+          "image_panel_layout",
+          "metadata_to_float_collection",
+          "sdxl_refiner_model_loader",
+          "color_map",
+          "collect",
+          "metadata_to_model",
+          "face_identifier",
+          "mlsd_detection",
+          "string_split",
+          "infill_tile",
+          "noise",
+          "conditioning",
+          "main_model_loader",
+          "metadata_to_string",
+          "canvas_paste_back",
+          "face_mask_detection",
+          "string_join_three",
+          "clip_skip",
+          "metadata_to_scheduler",
+          "string_join",
+          "esrgan",
+          "prompt_from_file",
+          "round_float",
+          "boolean_collection",
+          "mask_combine",
+          "div",
+          "lineart_edge_detection",
+          "flux_denoise",
+          "flux_lora_collection_loader",
+          "string_collection",
+          "show_image",
+          "heuristic_resize",
+          "flux2_denoise",
+          "spandrel_image_to_image",
+          "merge_metadata",
+          "metadata_to_lora_collection",
+          "z_image_seed_variance_enhancer",
+          "flux_control_lora_loader",
+          "canny_edge_detection",
+          "sd3_l2i",
+          "lora_selector",
+          "mul",
+          "pair_tile_image",
+          "face_off",
+          "denoise_latents_meta",
+          "flux_redux",
+          "lineart_anime_edge_detection",
+          "img_pad_crop",
+          "float_range",
+          "spandrel_image_to_image_autoscale",
+          "l2i",
+          "pidi_edge_detection",
+          "sd3_denoise",
+          "rand_int",
+          "iterate",
+          "add",
+          "image",
+          "save_image",
+          "tile_to_properties",
+          "string_generator",
+          "prompt_template",
+          "model_identifier",
+          "infill_lama",
+          "metadata_item_linked",
+          "create_gradient_mask",
+          "img_lerp",
+          "bounding_box",
+          "flux_model_loader",
+          "get_image_mask_bounding_box",
+          "invokeai_img_hue_adjust_plus",
+          "img_watermark",
+          "t2i_adapter",
+          "metadata_to_float",
+          "dw_openpose_detection",
+          "calculate_image_tiles_min_overlap",
+          "cogview4_i2l",
+          "metadata_to_vae",
+          "integer",
+          "invokeai_img_val_thresholds",
+          "tomask",
+          "img_noise",
+          "vae_loader",
+          "z_image_control",
+          "image_collection",
+          "merge_tiles_to_image",
+          "lblend",
+          "rectangle_mask",
+          "sdxl_lora_collection_loader",
+          "img_crop",
+          "i2l",
+          "infill_cv2",
+          "integer_generator",
+          "metadata_to_integer_collection",
+          "z_image_l2i",
+          "cogview4_text_encoder",
+          "infill_rgba",
+          "metadata_field_extractor",
+          "tensor_mask_to_image",
+          "image_generator",
+          "flux_kontext_image_prep",
+          "core_metadata",
+          "flux_text_encoder",
+          "latents",
+          "content_shuffle",
+          "string_batch",
+          "ip_adapter",
+          "img_channel_multiply",
+          "metadata_to_bool_collection",
+          "freeu",
+          "calculate_image_tiles",
+          "flux_denoise_meta",
+          "img_mul",
+          "string_split_neg",
+          "create_denoise_mask",
+          "rand_float",
+          "metadata_to_sdlx_loras",
+          "img_hue_adjust",
+          "tiled_multi_diffusion_denoise_latents",
+          "float_batch",
+          "llava_onevision_vllm",
+          "metadata_item",
+          "paste_image_into_bounding_box"
         ]
       },
       "InvocationProgressEvent": {
@@ -30671,6 +31930,18 @@
               },
               {
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
               },
               {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
@@ -30997,6 +32268,9 @@
                 "$ref": "#/components/schemas/NormalMapInvocation"
               },
               {
+                "$ref": "#/components/schemas/PBRMapsInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/PairTileImageInvocation"
               },
               {
@@ -31004,6 +32278,9 @@
               },
               {
                 "$ref": "#/components/schemas/PiDiNetEdgeDetectionInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/PromptTemplateInvocation"
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
@@ -31135,7 +32412,13 @@
                 "$ref": "#/components/schemas/VAELoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/ZImageControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ZImageDenoiseMetaInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageImageToLatentsInvocation"
@@ -31151,6 +32434,9 @@
               },
               {
                 "$ref": "#/components/schemas/ZImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ZImageSeedVarianceEnhancerInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageTextEncoderInvocation"
@@ -31442,6 +32728,18 @@
                 "$ref": "#/components/schemas/FloatToIntegerInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2KleinTextEncoderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VaeDecodeInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/FluxControlLoRALoaderInvocation"
               },
               {
@@ -31766,6 +33064,9 @@
                 "$ref": "#/components/schemas/NormalMapInvocation"
               },
               {
+                "$ref": "#/components/schemas/PBRMapsInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/PairTileImageInvocation"
               },
               {
@@ -31773,6 +33074,9 @@
               },
               {
                 "$ref": "#/components/schemas/PiDiNetEdgeDetectionInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/PromptTemplateInvocation"
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
@@ -31904,7 +33208,13 @@
                 "$ref": "#/components/schemas/VAELoaderInvocation"
               },
               {
+                "$ref": "#/components/schemas/ZImageControlInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/ZImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ZImageDenoiseMetaInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageImageToLatentsInvocation"
@@ -31920,6 +33230,9 @@
               },
               {
                 "$ref": "#/components/schemas/ZImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/ZImageSeedVarianceEnhancerInvocation"
               },
               {
                 "$ref": "#/components/schemas/ZImageTextEncoderInvocation"
@@ -32219,6 +33532,13 @@
             "description": "If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.",
             "default": false
           },
+          "model_cache_keep_alive_min": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Model Cache Keep Alive Min",
+            "description": "How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.",
+            "default": 0
+          },
           "device_working_mem_gb": {
             "type": "number",
             "title": "Device Working Mem Gb",
@@ -32437,7 +33757,7 @@
         "additionalProperties": false,
         "type": "object",
         "title": "InvokeAIAppConfig",
-        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    clear_queue_on_startup: Empties session queue on startup.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation."
+        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    clear_queue_on_startup: Empties session queue on startup.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation."
       },
       "InvokeAIAppConfigWithSetFields": {
         "properties": {
@@ -37443,6 +38763,162 @@
         "title": "Main_Checkpoint_FLUX_Config",
         "description": "Model config for main checkpoint models."
       },
+      "Main_Checkpoint_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Flux2VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "format",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Checkpoint_Flux2_Config",
+        "description": "Model config for FLUX.2 checkpoint models (e.g. Klein)."
+      },
       "Main_Checkpoint_SD1_Config": {
         "properties": {
           "key": {
@@ -38079,6 +39555,158 @@
         ],
         "title": "Main_Checkpoint_SDXL_Config"
       },
+      "Main_Checkpoint_ZImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "z-image",
+            "title": "Base",
+            "default": "z-image"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format"
+        ],
+        "title": "Main_Checkpoint_ZImage_Config",
+        "description": "Model config for Z-Image single-file checkpoint models (safetensors, etc)."
+      },
       "Main_Diffusers_CogView4_Config": {
         "properties": {
           "key": {
@@ -38221,6 +39849,302 @@
           "base"
         ],
         "title": "Main_Diffusers_CogView4_Config"
+      },
+      "Main_Diffusers_FLUX_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "flux",
+            "title": "Base",
+            "default": "flux"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/FluxVariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Diffusers_FLUX_Config",
+        "description": "Model config for FLUX.1 models in diffusers format."
+      },
+      "Main_Diffusers_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Flux2VariantType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Diffusers_Flux2_Config",
+        "description": "Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."
       },
       "Main_Diffusers_SD1_Config": {
         "properties": {
@@ -43199,6 +45123,12 @@
                 "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
               },
               {
@@ -43218,6 +45148,12 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -43241,6 +45177,9 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
               },
               {
@@ -43257,6 +45196,9 @@
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -43317,6 +45259,12 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -43683,6 +45631,12 @@
                     "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                   },
                   {
@@ -43702,6 +45656,12 @@
                   },
                   {
                     "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -43725,6 +45685,9 @@
                     "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                   },
                   {
@@ -43741,6 +45704,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                   },
                   {
                     "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -43801,6 +45767,12 @@
                   },
                   {
                     "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
                   },
                   {
                     "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -44060,6 +46032,12 @@
                 "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
               },
               {
@@ -44079,6 +46057,12 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -44102,6 +46086,9 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
               },
               {
@@ -44118,6 +46105,9 @@
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -44178,6 +46168,12 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -44295,6 +46291,12 @@
                 "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
               },
               {
@@ -44314,6 +46316,12 @@
               },
               {
                 "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -44337,6 +46345,9 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
               },
               {
@@ -44353,6 +46364,9 @@
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
               },
               {
                 "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -44413,6 +46427,12 @@
               },
               {
                 "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
               },
               {
                 "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -44729,6 +46749,12 @@
                 "$ref": "#/components/schemas/FluxVariantType"
               },
               {
+                "$ref": "#/components/schemas/Flux2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VariantType"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -44896,6 +46922,12 @@
                   "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                 },
                 {
@@ -44915,6 +46947,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
@@ -44938,6 +46976,9 @@
                   "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                },
+                {
                   "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
                 },
                 {
@@ -44954,6 +46995,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
                 },
                 {
                   "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
@@ -45014,6 +47058,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
                 },
                 {
                   "$ref": "#/components/schemas/TI_File_SD1_Config"
@@ -45522,6 +47572,158 @@
         "title": "OutputFieldJSONSchemaExtra",
         "type": "object"
       },
+      "PBRMapsInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Generate Normal, Displacement and Roughness Map from a given image",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Input image",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "tile_size": {
+            "default": 512,
+            "description": "Tile size",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 512,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
+          "border_mode": {
+            "default": "none",
+            "description": "Border mode to apply to eliminate any artifacts or seams",
+            "enum": ["none", "seamless", "mirror", "replicate"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "none",
+            "orig_required": false,
+            "title": "Border Mode",
+            "type": "string"
+          },
+          "type": {
+            "const": "pbr_maps",
+            "default": "pbr_maps",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "material"],
+        "title": "PBR Maps",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/PBRMapsOutput"
+        }
+      },
+      "PBRMapsOutput": {
+        "class": "output",
+        "properties": {
+          "normal_map": {
+            "$ref": "#/components/schemas/ImageField",
+            "default": null,
+            "description": "The generated normal map",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "roughness_map": {
+            "$ref": "#/components/schemas/ImageField",
+            "default": null,
+            "description": "The generated roughness map",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "displacement_map": {
+            "$ref": "#/components/schemas/ImageField",
+            "default": null,
+            "description": "The generated displacement map",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "pbr_maps-output",
+            "default": "pbr_maps-output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "normal_map", "roughness_map", "displacement_map", "type", "type"],
+        "title": "PBRMapsOutput",
+        "type": "object"
+      },
       "PaginatedResults_WorkflowRecordListItemWithThumbnailDTO_": {
         "properties": {
           "page": {
@@ -45944,6 +48146,121 @@
         "title": "ProgressImage",
         "type": "object"
       },
+      "PromptTemplateInvocation": {
+        "category": "prompt",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Applies a Style Preset template to positive and negative prompts.\n\nSelect a Style Preset and provide positive/negative prompts. The node replaces\n{prompt} placeholders in the template with your input prompts.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "style_preset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StylePresetField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The Style Preset to use as a template",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "positive_prompt": {
+            "default": "",
+            "description": "The positive prompt to insert into the template's {prompt} placeholder",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Positive Prompt",
+            "type": "string",
+            "ui_component": "textarea"
+          },
+          "negative_prompt": {
+            "default": "",
+            "description": "The negative prompt to insert into the template's {prompt} placeholder",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Negative Prompt",
+            "type": "string",
+            "ui_component": "textarea"
+          },
+          "type": {
+            "const": "prompt_template",
+            "default": "prompt_template",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "template", "style", "preset"],
+        "title": "Prompt Template",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/PromptTemplateOutput"
+        }
+      },
+      "PromptTemplateOutput": {
+        "class": "output",
+        "description": "Output for the Prompt Template node",
+        "properties": {
+          "positive_prompt": {
+            "description": "The positive prompt with the template applied",
+            "field_kind": "output",
+            "title": "Positive Prompt",
+            "type": "string",
+            "ui_hidden": false
+          },
+          "negative_prompt": {
+            "description": "The negative prompt with the template applied",
+            "field_kind": "output",
+            "title": "Negative Prompt",
+            "type": "string",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "prompt_template_output",
+            "default": "prompt_template_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "positive_prompt", "negative_prompt", "type", "type"],
+        "title": "PromptTemplateOutput",
+        "type": "object"
+      },
       "PromptsFromFileInvocation": {
         "category": "prompt",
         "class": "invocation",
@@ -46313,6 +48630,262 @@
         "title": "Qwen3EncoderField",
         "type": "object"
       },
+      "Qwen3Encoder_Checkpoint_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen3_encoder",
+            "title": "Type",
+            "default": "qwen3_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Qwen3VariantType",
+            "description": "Qwen3 model size variant (4B or 8B)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "variant"
+        ],
+        "title": "Qwen3Encoder_Checkpoint_Config",
+        "description": "Configuration for single-file Qwen3 Encoder models (safetensors)."
+      },
+      "Qwen3Encoder_GGUF_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "qwen3_encoder",
+            "title": "Type",
+            "default": "qwen3_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Qwen3VariantType",
+            "description": "Qwen3 model size variant (4B or 8B)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "variant"
+        ],
+        "title": "Qwen3Encoder_GGUF_Config",
+        "description": "Configuration for GGUF-quantized Qwen3 Encoder models."
+      },
       "Qwen3Encoder_Qwen3Encoder_Config": {
         "properties": {
           "key": {
@@ -46402,6 +48975,10 @@
             "const": "qwen3_encoder",
             "title": "Format",
             "default": "qwen3_encoder"
+          },
+          "variant": {
+            "$ref": "#/components/schemas/Qwen3VariantType",
+            "description": "Qwen3 model size variant (4B or 8B)"
           }
         },
         "type": "object",
@@ -46418,10 +48995,17 @@
           "cover_image",
           "base",
           "type",
-          "format"
+          "format",
+          "variant"
         ],
         "title": "Qwen3Encoder_Qwen3Encoder_Config",
         "description": "Configuration for Qwen3 Encoder models in a diffusers-like format.\n\nThe model weights are expected to be in a folder called text_encoder inside the model directory,\ncompatible with Qwen2VLForConditionalGeneration or similar architectures used by Z-Image."
+      },
+      "Qwen3VariantType": {
+        "type": "string",
+        "enum": ["qwen3_4b", "qwen3_8b"],
+        "title": "Qwen3VariantType",
+        "description": "Qwen3 text encoder variants based on model size."
       },
       "RandomFloatInvocation": {
         "category": "math",
@@ -51440,6 +54024,19 @@
           "$ref": "#/components/schemas/StringPosNegOutput"
         }
       },
+      "StylePresetField": {
+        "description": "A style preset primitive field",
+        "properties": {
+          "style_preset_id": {
+            "description": "The id of the style preset",
+            "title": "Style Preset Id",
+            "type": "string"
+          }
+        },
+        "required": ["style_preset_id"],
+        "title": "StylePresetField",
+        "type": "object"
+      },
       "StylePresetRecordWithImage": {
         "properties": {
           "name": {
@@ -51516,6 +54113,12 @@
               },
               {
                 "$ref": "#/components/schemas/FluxVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VariantType"
               },
               {
                 "type": "null"
@@ -54142,7 +56745,7 @@
             "input": "any",
             "orig_required": true,
             "title": "VAE",
-            "ui_model_base": ["sd-1", "sd-2", "sdxl", "sd-3", "flux"],
+            "ui_model_base": ["sd-1", "sd-2", "sdxl", "sd-3", "flux", "flux2"],
             "ui_model_type": ["vae"]
           },
           "type": {
@@ -54306,6 +56909,129 @@
           "base"
         ],
         "title": "VAE_Checkpoint_FLUX_Config"
+      },
+      "VAE_Checkpoint_Flux2_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "vae",
+            "title": "Type",
+            "default": "vae"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux2",
+            "title": "Base",
+            "default": "flux2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base"
+        ],
+        "title": "VAE_Checkpoint_Flux2_Config",
+        "description": "Model config for FLUX.2 VAE checkpoint models (AutoencoderKLFlux2)."
       },
       "VAE_Checkpoint_SD1_Config": {
         "properties": {
@@ -55470,6 +58196,186 @@
         "title": "ZImageConditioningOutput",
         "type": "object"
       },
+      "ZImageControlField": {
+        "description": "A Z-Image control conditioning field for spatial control (Canny, HED, Depth, Pose, MLSD).",
+        "properties": {
+          "image_name": {
+            "description": "The name of the preprocessed control image",
+            "title": "Image Name",
+            "type": "string"
+          },
+          "control_model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "The Z-Image ControlNet adapter model"
+          },
+          "control_context_scale": {
+            "default": 0.75,
+            "description": "The strength of the control signal. Recommended range: 0.65-0.80.",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "title": "Control Context Scale",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the control is first applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the control is last applied (% of total steps)",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "End Step Percent",
+            "type": "number"
+          }
+        },
+        "required": ["image_name", "control_model"],
+        "title": "ZImageControlField",
+        "type": "object"
+      },
+      "ZImageControlInvocation": {
+        "category": "control",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Configure Z-Image ControlNet for spatial conditioning.\n\nTakes a preprocessed control image (e.g., Canny edges, depth map, pose)\nand a Z-Image ControlNet adapter model to enable spatial control.\n\nSupports 5 control modes: Canny, HED, Depth, Pose, MLSD.\nRecommended control_context_scale: 0.65-0.80.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The preprocessed control image (Canny, HED, Depth, Pose, or MLSD)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "control_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ControlNet model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Control Model",
+            "ui_model_base": ["z-image"],
+            "ui_model_type": ["controlnet"]
+          },
+          "control_context_scale": {
+            "default": 0.75,
+            "description": "Strength of the control signal. Recommended range: 0.65-0.80.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "orig_default": 0.75,
+            "orig_required": false,
+            "title": "Control Scale",
+            "type": "number"
+          },
+          "begin_step_percent": {
+            "default": 0.0,
+            "description": "When the control is first applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Begin Step Percent",
+            "type": "number"
+          },
+          "end_step_percent": {
+            "default": 1.0,
+            "description": "When the control is last applied (% of total steps)",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "End Step Percent",
+            "type": "number"
+          },
+          "type": {
+            "const": "z_image_control",
+            "default": "z_image_control",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "z-image", "control", "controlnet"],
+        "title": "Z-Image ControlNet",
+        "type": "object",
+        "version": "1.1.0",
+        "output": {
+          "$ref": "#/components/schemas/ZImageControlOutput"
+        }
+      },
+      "ZImageControlOutput": {
+        "class": "output",
+        "description": "Z-Image Control output containing control configuration.",
+        "properties": {
+          "control": {
+            "$ref": "#/components/schemas/ZImageControlField",
+            "description": "Z-Image control conditioning",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "z_image_control_output",
+            "default": "z_image_control_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "control", "type", "type"],
+        "title": "ZImageControlOutput",
+        "type": "object"
+      },
       "ZImageDenoiseInvocation": {
         "category": "image",
         "class": "invocation",
@@ -55477,22 +58383,283 @@
         "description": "Run the denoising process with a Z-Image model.\n\nSupports regional prompting by connecting multiple conditioning inputs with masks.",
         "node_pack": "invokeai",
         "properties": {
-          "board": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BoardField"
+                "$ref": "#/components/schemas/LatentsField"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "The board to save the image to",
-            "field_kind": "internal",
-            "input": "direct",
-            "orig_required": false,
-            "ui_hidden": false
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
           },
+          "denoise_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DenoiseMaskField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoising_start": {
+            "default": 0.0,
+            "description": "When to start denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Denoising Start",
+            "type": "number"
+          },
+          "denoising_end": {
+            "default": 1.0,
+            "description": "When to stop denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Denoising End",
+            "type": "number"
+          },
+          "add_noise": {
+            "default": true,
+            "description": "Add noise based on denoising start.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Add Noise",
+            "type": "boolean"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Z-Image model (Transformer) to load",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ZImageConditioningField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ZImageConditioningField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Positive Conditioning"
+          },
+          "negative_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ZImageConditioningField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ZImageConditioningField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negative conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Negative Conditioning"
+          },
+          "guidance_scale": {
+            "default": 1.0,
+            "description": "Guidance scale for classifier-free guidance. 1.0 = no CFG (recommended for Z-Image-Turbo). Values > 1.0 amplify guidance.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 1.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Guidance Scale",
+            "type": "number"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "steps": {
+            "default": 8,
+            "description": "Number of denoising steps. 8 recommended for Z-Image-Turbo.",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 8,
+            "orig_required": false,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "control": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ZImageControlField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Z-Image control conditioning for spatial control (Canny, HED, Depth, Pose, MLSD).",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE Required for control conditioning.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "scheduler": {
+            "default": "euler",
+            "description": "Scheduler (sampler) for the denoising process. Euler is the default and recommended for Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.",
+            "enum": ["euler", "heun", "lcm"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "euler",
+            "orig_required": false,
+            "title": "Scheduler",
+            "type": "string",
+            "ui_choice_labels": {
+              "euler": "Euler",
+              "heun": "Heun (2nd order)",
+              "lcm": "LCM"
+            }
+          },
+          "type": {
+            "const": "z_image_denoise",
+            "default": "z_image_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "z-image"],
+        "title": "Denoise - Z-Image",
+        "type": "object",
+        "version": "1.4.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "ZImageDenoiseMetaInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "stable",
+        "description": "Run denoising process with a Z-Image transformer model + metadata.",
+        "node_pack": "invokeai",
+        "properties": {
           "metadata": {
             "anyOf": [
               {
@@ -55589,6 +58756,16 @@
             "title": "Denoising End",
             "type": "number"
           },
+          "add_noise": {
+            "default": true,
+            "description": "Add noise based on denoising start.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": true,
+            "orig_required": false,
+            "title": "Add Noise",
+            "type": "boolean"
+          },
           "transformer": {
             "anyOf": [
               {
@@ -55651,12 +58828,12 @@
             "title": "Negative Conditioning"
           },
           "guidance_scale": {
-            "default": 0.0,
-            "description": "Guidance scale for classifier-free guidance. Use 0.0 for Z-Image-Turbo.",
+            "default": 1.0,
+            "description": "Guidance scale for classifier-free guidance. 1.0 = no CFG (recommended for Z-Image-Turbo). Values > 1.0 amplify guidance.",
             "field_kind": "input",
             "input": "any",
-            "minimum": 0.0,
-            "orig_default": 0.0,
+            "minimum": 1.0,
+            "orig_default": 1.0,
             "orig_required": false,
             "title": "Guidance Scale",
             "type": "number"
@@ -55704,21 +58881,69 @@
             "title": "Seed",
             "type": "integer"
           },
+          "control": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ZImageControlField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Z-Image control conditioning for spatial control (Canny, HED, Depth, Pose, MLSD).",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE Required for control conditioning.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "scheduler": {
+            "default": "euler",
+            "description": "Scheduler (sampler) for the denoising process. Euler is the default and recommended for Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.",
+            "enum": ["euler", "heun", "lcm"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "euler",
+            "orig_required": false,
+            "title": "Scheduler",
+            "type": "string",
+            "ui_choice_labels": {
+              "euler": "Euler",
+              "heun": "Heun (2nd order)",
+              "lcm": "LCM"
+            }
+          },
           "type": {
-            "const": "z_image_denoise",
-            "default": "z_image_denoise",
+            "const": "z_image_denoise_meta",
+            "default": "z_image_denoise_meta",
             "field_kind": "node_attribute",
             "title": "type",
             "type": "string"
           }
         },
         "required": ["type", "id"],
-        "tags": ["image", "z-image"],
-        "title": "Denoise - Z-Image",
+        "tags": ["z-image", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
+        "title": "Denoise - Z-Image + Metadata",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.0.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "ZImageImageToLatentsInvocation": {
@@ -56353,6 +59578,105 @@
         "required": ["output_meta", "transformer", "qwen3_encoder", "vae", "type", "type"],
         "title": "ZImageModelLoaderOutput",
         "type": "object"
+      },
+      "ZImageSeedVarianceEnhancerInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Adds seed-based noise to Z-Image conditioning to increase variance between seeds.\n\nZ-Image-Turbo can produce relatively similar images with different seeds,\nmaking it harder to explore variations of a prompt. This node implements\nreproducible, seed-based noise injection into text embeddings to increase\nvisual variation while maintaining reproducibility.\n\nThe noise strength is auto-calibrated relative to the embedding's standard\ndeviation, ensuring consistent results across different prompts.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ZImageConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Conditioning"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Seed for reproducible noise generation. Different seeds produce different noise patterns.",
+            "field_kind": "input",
+            "input": "any",
+            "minimum": 0,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "strength": {
+            "default": 0.1,
+            "description": "Noise strength as multiplier of embedding std. 0=off, 0.1=subtle, 0.5=strong.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 2.0,
+            "minimum": 0.0,
+            "orig_default": 0.1,
+            "orig_required": false,
+            "title": "Strength",
+            "type": "number"
+          },
+          "randomize_percent": {
+            "default": 50.0,
+            "description": "Percentage of embedding values to add noise to (1-100). Lower values create more selective noise patterns.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "orig_default": 50.0,
+            "orig_required": false,
+            "title": "Randomize Percent",
+            "type": "number"
+          },
+          "type": {
+            "const": "z_image_seed_variance_enhancer",
+            "default": "z_image_seed_variance_enhancer",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["conditioning", "z-image", "variance", "seed"],
+        "title": "Seed Variance Enhancer - Z-Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ZImageConditioningOutput"
+        }
       },
       "ZImageTextEncoderInvocation": {
         "category": "conditioning",
