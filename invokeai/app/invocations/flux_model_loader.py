@@ -6,7 +6,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, OutputField
+from invokeai.app.invocations.fields import FieldDescriptions, InputField, OutputField
 from invokeai.app.invocations.model import CLIPField, ModelIdentifierField, T5EncoderField, TransformerField, VAEField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.t5_model_identifier import (
@@ -37,28 +37,25 @@ class FluxModelLoaderOutput(BaseInvocationOutput):
     title="Main Model - FLUX",
     tags=["model", "flux"],
     category="model",
-    version="1.0.6",
+    version="1.0.7",
 )
 class FluxModelLoaderInvocation(BaseInvocation):
     """Loads a flux base model, outputting its submodels."""
 
     model: ModelIdentifierField = InputField(
         description=FieldDescriptions.flux_model,
-        input=Input.Direct,
         ui_model_base=BaseModelType.Flux,
         ui_model_type=ModelType.Main,
     )
 
     t5_encoder_model: ModelIdentifierField = InputField(
         description=FieldDescriptions.t5_encoder,
-        input=Input.Direct,
         title="T5 Encoder",
         ui_model_type=ModelType.T5Encoder,
     )
 
     clip_embed_model: ModelIdentifierField = InputField(
         description=FieldDescriptions.clip_embed_model,
-        input=Input.Direct,
         title="CLIP Embed",
         ui_model_type=ModelType.CLIPEmbed,
     )
