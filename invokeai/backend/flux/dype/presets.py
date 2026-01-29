@@ -6,18 +6,18 @@ from typing import Literal
 from invokeai.backend.flux.dype.base import DyPEConfig
 
 # DyPE preset type - using Literal for proper frontend dropdown support
-DyPEPreset = Literal["off", "on", "auto", "4k"]
+DyPEPreset = Literal["off", "manual", "auto", "4k"]
 
 # Constants for preset values
 DYPE_PRESET_OFF: DyPEPreset = "off"
-DYPE_PRESET_ON: DyPEPreset = "on"
+DYPE_PRESET_MANUAL: DyPEPreset = "manual"
 DYPE_PRESET_AUTO: DyPEPreset = "auto"
 DYPE_PRESET_4K: DyPEPreset = "4k"
 
 # Human-readable labels for the UI
 DYPE_PRESET_LABELS: dict[str, str] = {
     "off": "Off",
-    "on": "On",
+    "manual": "Manual",
     "auto": "Auto (>1536px)",
     "4k": "4K Optimized",
 }
@@ -110,7 +110,7 @@ def get_dype_config_from_preset(
     if preset == DYPE_PRESET_OFF:
         return None
 
-    if preset == DYPE_PRESET_ON:
+    if preset == DYPE_PRESET_MANUAL:
         # Manual mode - custom values can override defaults
         max_dim = max(width, height)
         scale = max_dim / 1024

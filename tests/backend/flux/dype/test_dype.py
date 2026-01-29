@@ -14,8 +14,8 @@ from invokeai.backend.flux.dype.embed import DyPEEmbedND
 from invokeai.backend.flux.dype.presets import (
     DYPE_PRESET_4K,
     DYPE_PRESET_AUTO,
+    DYPE_PRESET_MANUAL,
     DYPE_PRESET_OFF,
-    DYPE_PRESET_ON,
     DYPE_PRESETS,
     get_dype_config_for_resolution,
     get_dype_config_from_preset,
@@ -293,10 +293,10 @@ class TestDyPEPresets:
         assert config is not None
         assert config.enable_dype is True
 
-    def test_get_dype_config_from_preset_on_custom_overrides(self):
-        """Custom scale/exponent should override defaults only with 'on' preset."""
+    def test_get_dype_config_from_preset_manual_custom_overrides(self):
+        """Custom scale/exponent should override defaults only with 'manual' preset."""
         config = get_dype_config_from_preset(
-            preset=DYPE_PRESET_ON,
+            preset=DYPE_PRESET_MANUAL,
             width=2048,
             height=2048,
             custom_scale=5.0,
