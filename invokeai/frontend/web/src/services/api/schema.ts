@@ -9376,18 +9376,23 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /** @description Flux model (Transformer) to load */
-            model: components["schemas"]["ModelIdentifierField"];
+            /**
+             * @description Flux model (Transformer) to load
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * T5 Encoder
              * @description T5 tokenizer and text encoder
+             * @default null
              */
-            t5_encoder_model: components["schemas"]["ModelIdentifierField"];
+            t5_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * CLIP Embed
              * @description CLIP Embed loader
+             * @default null
              */
-            clip_embed_model: components["schemas"]["ModelIdentifierField"];
+            clip_embed_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * VAE
              * @description VAE model to load
