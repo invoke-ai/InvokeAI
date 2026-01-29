@@ -15,6 +15,7 @@ from invokeai.backend.flux.dype.presets import (
     DYPE_PRESET_4K,
     DYPE_PRESET_AUTO,
     DYPE_PRESET_OFF,
+    DYPE_PRESET_ON,
     DYPE_PRESETS,
     get_dype_config_for_resolution,
     get_dype_config_from_preset,
@@ -292,8 +293,21 @@ class TestDyPEPresets:
         assert config is not None
         assert config.enable_dype is True
 
-    def test_get_dype_config_from_preset_custom_overrides(self):
-        """Custom scale/exponent should override preset values."""
+    def test_get_dype_config_from_preset_on_custom_overrides(self):
+        """Custom scale/exponent should override defaults only with 'on' preset."""
+        config = get_dype_config_from_preset(
+            preset=DYPE_PRESET_ON,
+            width=2048,
+            height=2048,
+            custom_scale=5.0,
+            custom_exponent=10.0,
+        )
+        assert config is not None
+        assert config.dype_scale == 5.0
+        assert config.dype_exponent == 10.0
+
+    def test_get_dype_config_from_preset_4k_ignores_custom(self):
+        """4K preset should ignore custom scale/exponent values."""
         config = get_dype_config_from_preset(
             preset=DYPE_PRESET_4K,
             width=3840,
@@ -302,8 +316,9 @@ class TestDyPEPresets:
             custom_exponent=10.0,
         )
         assert config is not None
-        assert config.dype_scale == 5.0
-        assert config.dype_exponent == 10.0
+        # Custom values should be ignored - preset values used instead
+        assert config.dype_scale == 2.0  # 4K preset default
+        assert config.dype_exponent == 2.0  # 4K preset default
 
 
 class TestFrequencyComputation:
