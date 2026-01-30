@@ -21,6 +21,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.modules.autoencoder import AutoEncoder as FluxAutoEncoder
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
 # Z-Image can use either the Diffusers AutoencoderKL or the FLUX AutoEncoder
 ZImageVAE = Union[AutoencoderKL, FluxAutoEncoder]
@@ -53,12 +54,19 @@ class ZImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         is_flux_vae = isinstance(vae_info.model, FluxAutoEncoder)
 
+        # Estimate working memory needed for VAE decode
+        estimated_working_memory = estimate_vae_working_memory_flux(
+            operation="decode",
+            image_tensor=latents,
+            vae=vae_info.model,
+        )
+
         # FLUX VAE doesn't support seamless, so only apply for AutoencoderKL
         seamless_context = (
             nullcontext() if is_flux_vae else SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes)
         )
 
-        with seamless_context, vae_info.model_on_device() as (_, vae):
+        with seamless_context, vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             context.util.signal_progress("Running VAE")
             if not isinstance(vae, (AutoencoderKL, FluxAutoEncoder)):
                 raise TypeError(

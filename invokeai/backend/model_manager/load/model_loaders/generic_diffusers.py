@@ -37,12 +37,14 @@ class GenericDiffusersLoader(ModelLoader):
         repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
         try:
-            result: AnyModel = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, variant=variant)
+            result: AnyModel = model_class.from_pretrained(
+                model_path, torch_dtype=self._torch_dtype, variant=variant, local_files_only=True
+            )
         except OSError as e:
             if variant and "no file named" in str(
                 e
             ):  # try without the variant, just in case user's preferences changed
-                result = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype)
+                result = model_class.from_pretrained(model_path, torch_dtype=self._torch_dtype, local_files_only=True)
             else:
                 raise e
         return result

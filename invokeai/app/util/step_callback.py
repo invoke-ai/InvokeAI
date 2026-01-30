@@ -93,13 +93,59 @@ COGVIEW4_LATENT_RGB_FACTORS = [
     [-0.00955853, -0.00980067, -0.00977842],
 ]
 
+# FLUX.2 uses 32 latent channels.
+# Factors from ComfyUI: https://github.com/Comfy-Org/ComfyUI/blob/main/comfy/latent_formats.py
+FLUX2_LATENT_RGB_FACTORS = [
+    #   R        G        B
+    [0.0058, 0.0113, 0.0073],
+    [0.0495, 0.0443, 0.0836],
+    [-0.0099, 0.0096, 0.0644],
+    [0.2144, 0.3009, 0.3652],
+    [0.0166, -0.0039, -0.0054],
+    [0.0157, 0.0103, -0.0160],
+    [-0.0398, 0.0902, -0.0235],
+    [-0.0052, 0.0095, 0.0109],
+    [-0.3527, -0.2712, -0.1666],
+    [-0.0301, -0.0356, -0.0180],
+    [-0.0107, 0.0078, 0.0013],
+    [0.0746, 0.0090, -0.0941],
+    [0.0156, 0.0169, 0.0070],
+    [-0.0034, -0.0040, -0.0114],
+    [0.0032, 0.0181, 0.0080],
+    [-0.0939, -0.0008, 0.0186],
+    [0.0018, 0.0043, 0.0104],
+    [0.0284, 0.0056, -0.0127],
+    [-0.0024, -0.0022, -0.0030],
+    [0.1207, -0.0026, 0.0065],
+    [0.0128, 0.0101, 0.0142],
+    [0.0137, -0.0072, -0.0007],
+    [0.0095, 0.0092, -0.0059],
+    [0.0000, -0.0077, -0.0049],
+    [-0.0465, -0.0204, -0.0312],
+    [0.0095, 0.0012, -0.0066],
+    [0.0290, -0.0034, 0.0025],
+    [0.0220, 0.0169, -0.0048],
+    [-0.0332, -0.0457, -0.0468],
+    [-0.0085, 0.0389, 0.0609],
+    [-0.0076, 0.0003, -0.0043],
+    [-0.0111, -0.0460, -0.0614],
+]
+
+FLUX2_LATENT_RGB_BIAS = [-0.0329, -0.0718, -0.0851]
+
 
 def sample_to_lowres_estimated_image(
-    samples: torch.Tensor, latent_rgb_factors: torch.Tensor, smooth_matrix: Optional[torch.Tensor] = None
+    samples: torch.Tensor,
+    latent_rgb_factors: torch.Tensor,
+    smooth_matrix: Optional[torch.Tensor] = None,
+    latent_rgb_bias: Optional[torch.Tensor] = None,
 ):
     if samples.dim() == 4:
         samples = samples[0]
     latent_image = samples.permute(1, 2, 0) @ latent_rgb_factors
+
+    if latent_rgb_bias is not None:
+        latent_image = latent_image + latent_rgb_bias
 
     if smooth_matrix is not None:
         latent_image = latent_image.unsqueeze(0).permute(3, 0, 1, 2)
@@ -153,6 +199,7 @@ def diffusion_step_callback(
         sample = intermediate_state.latents
 
     smooth_matrix: list[list[float]] | None = None
+    latent_rgb_bias: list[float] | None = None
     if base_model in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
         latent_rgb_factors = SD1_5_LATENT_RGB_FACTORS
     elif base_model in [BaseModelType.StableDiffusionXL, BaseModelType.StableDiffusionXLRefiner]:
@@ -164,6 +211,9 @@ def diffusion_step_callback(
         latent_rgb_factors = COGVIEW4_LATENT_RGB_FACTORS
     elif base_model == BaseModelType.Flux:
         latent_rgb_factors = FLUX_LATENT_RGB_FACTORS
+    elif base_model == BaseModelType.Flux2:
+        latent_rgb_factors = FLUX2_LATENT_RGB_FACTORS
+        latent_rgb_bias = FLUX2_LATENT_RGB_BIAS
     elif base_model == BaseModelType.ZImage:
         # Z-Image uses FLUX-compatible VAE with 16 latent channels
         latent_rgb_factors = FLUX_LATENT_RGB_FACTORS
@@ -174,8 +224,14 @@ def diffusion_step_callback(
     smooth_matrix_torch = (
         torch.tensor(smooth_matrix, dtype=sample.dtype, device=sample.device) if smooth_matrix else None
     )
+    latent_rgb_bias_torch = (
+        torch.tensor(latent_rgb_bias, dtype=sample.dtype, device=sample.device) if latent_rgb_bias else None
+    )
     image = sample_to_lowres_estimated_image(
-        samples=sample, latent_rgb_factors=latent_rgb_factors_torch, smooth_matrix=smooth_matrix_torch
+        samples=sample,
+        latent_rgb_factors=latent_rgb_factors_torch,
+        smooth_matrix=smooth_matrix_torch,
+        latent_rgb_bias=latent_rgb_bias_torch,
     )
 
     width = image.width * 8

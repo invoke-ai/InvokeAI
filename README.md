@@ -16,6 +16,12 @@ Invoke is a leading creative engine built to empower professionals and enthusias
 
 ![Highlighted Features - Canvas and Workflows](https://github.com/invoke-ai/InvokeAI/assets/31807370/708f7a82-084f-4860-bfbe-e2588c53548d)
 
+---
+> ## 📣 Are you a new or returning InvokeAI user?
+> Take our first annual [User's Survey](https://forms.gle/rCE5KuQ7Wfrd1UnS7)
+
+---
+
 # Documentation
 
 | **Quick Links**                                                                                                                                             |

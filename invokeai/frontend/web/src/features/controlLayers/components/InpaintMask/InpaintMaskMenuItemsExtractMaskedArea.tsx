@@ -27,7 +27,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
       const maskAdapter = canvasManager.getAdapter(entityIdentifier);
       if (!maskAdapter) {
         log.error({ entityIdentifier }, 'Inpaint mask adapter not found when extracting masked area');
-        toast({ status: 'error', title: 'Unable to extract masked area.' });
+        toast({ status: 'error', title: t('controlLayers.extractMaskedAreaFailed') });
         return;
       }
 
@@ -44,7 +44,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
 
         // Abort when the canvas is effectively empty—no pixels to extract.
         if (rect.width <= 0 || rect.height <= 0) {
-          toast({ status: 'warning', title: 'Canvas is empty.' });
+          toast({ status: 'warning', title: t('controlLayers.maskLayerEmpty') });
           return;
         }
 
@@ -74,7 +74,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
             },
             'Mask and composite dimensions did not match when extracting masked area'
           );
-          toast({ status: 'error', title: 'Unable to extract masked area.' });
+          toast({ status: 'error', title: t('controlLayers.extractMaskedAreaFailed') });
           return;
         }
 
@@ -82,7 +82,7 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
         const maskArray = maskImageData.data;
 
         if (!compositeArray || !maskArray) {
-          toast({ status: 'error', title: 'Cannot extract: image or mask data is missing.' });
+          toast({ status: 'error', title: t('controlLayers.extractMaskedAreaMissingData') });
           return;
         }
 
@@ -137,10 +137,10 @@ export const InpaintMaskMenuItemsExtractMaskedArea = memo(() => {
         });
       } catch (error) {
         log.error({ error: serializeError(error as Error) }, 'Failed to extract masked area to raster layer');
-        toast({ status: 'error', title: 'Unable to extract masked area.' });
+        toast({ status: 'error', title: t('controlLayers.extractMaskedAreaFailed') });
       }
     })();
-  }, [canvasManager, entityIdentifier]);
+  }, [canvasManager, entityIdentifier, t]);
 
   return (
     <MenuItem onClick={onExtract} icon={<PiSelectionBackgroundBold />} isDisabled={isBusy}>

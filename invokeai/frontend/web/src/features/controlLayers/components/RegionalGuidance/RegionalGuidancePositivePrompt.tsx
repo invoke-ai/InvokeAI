@@ -65,7 +65,7 @@ export const RegionalGuidancePositivePrompt = memo(() => {
           minH={28}
           zIndex="0 !important"
           fontFamily="mono"
-          fontSize="sm"
+          fontSize="0.82rem"
           _focusVisible={_focusVisible}
         />
         <Flex

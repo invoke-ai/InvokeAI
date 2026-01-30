@@ -192,3 +192,6 @@ installer/InvokeAI-Installer/
 .aider*
 
 .claude/
+
+# Weblate configuration file
+weblate.ini

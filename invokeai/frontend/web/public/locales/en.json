@@ -835,6 +835,9 @@
         "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "clipSkip": "$t(parameters.clipSkip)",
         "createdBy": "Created By",
+        "dypePreset": "$t(parameters.dypePreset)",
+        "dypeScale": "$t(parameters.dypeScale)",
+        "dypeExponent": "$t(parameters.dypeExponent)",
         "generationMode": "Generation Mode",
         "guidance": "Guidance",
         "height": "Height",
@@ -850,11 +853,15 @@
         "parsingFailed": "Parsing Failed",
         "positivePrompt": "Positive Prompt",
         "qwen3Encoder": "Qwen3 Encoder",
+        "qwen3Source": "Qwen3 Source",
         "recallParameters": "Recall Parameters",
         "recallParameter": "Recall {{label}}",
         "scheduler": "Scheduler",
         "seamlessXAxis": "Seamless X Axis",
         "seamlessYAxis": "Seamless Y Axis",
+        "seedVarianceEnabled": "Seed Variance Enabled",
+        "seedVarianceStrength": "Seed Variance Strength",
+        "seedVarianceRandomizePercent": "Seed Variance Randomize %",
         "seed": "Seed",
         "steps": "Steps",
         "strength": "Image to image strength",
@@ -1048,11 +1055,15 @@
         "t5Encoder": "T5 Encoder",
         "qwen3Encoder": "Qwen3 Encoder",
         "zImageVae": "VAE (optional)",
-        "zImageVaePlaceholder": "From Qwen3 Source (leave empty)",
+        "zImageVaePlaceholder": "From VAE source model",
         "zImageQwen3Encoder": "Qwen3 Encoder (optional)",
-        "zImageQwen3EncoderPlaceholder": "From Qwen3 Source (leave empty)",
-        "zImageQwen3Source": "Qwen3 Source (Diffusers Z-Image)",
+        "zImageQwen3EncoderPlaceholder": "From Qwen3 source model",
+        "zImageQwen3Source": "Qwen3 & VAE Source Model",
         "zImageQwen3SourcePlaceholder": "Required if VAE/Encoder empty",
+        "flux2KleinVae": "VAE (optional)",
+        "flux2KleinVaePlaceholder": "From main model",
+        "flux2KleinQwen3Encoder": "Qwen3 Encoder (optional)",
+        "flux2KleinQwen3EncoderPlaceholder": "From main model",
         "upcastAttention": "Upcast Attention",
         "uploadImage": "Upload Image",
         "urlOrLocalPath": "URL or Local Path",
@@ -1334,6 +1345,7 @@
             "noT5EncoderModelSelected": "No T5 Encoder model selected for FLUX generation",
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
+            "noQwen3EncoderModelSelected": "No Qwen3 Encoder model selected for FLUX2 Klein generation",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox width is {{width}}",
@@ -1370,10 +1382,16 @@
         "scaledHeight": "Scaled H",
         "scaledWidth": "Scaled W",
         "scheduler": "Scheduler",
+        "dypePreset": "DyPE",
+        "dypeScale": "DyPE λs",
+        "dypeExponent": "DyPE λt",
         "seamlessXAxis": "Seamless X Axis",
         "seamlessYAxis": "Seamless Y Axis",
         "colorCompensation": "Color Compensation",
         "seed": "Seed",
+        "seedVarianceEnabled": "Seed Variance Enhancer",
+        "seedVarianceStrength": "Variance Strength",
+        "seedVarianceRandomizePercent": "Randomize Percent",
         "imageActions": "Image Actions",
         "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",
@@ -1479,6 +1497,8 @@
         "baseModelChanged": "Base Model Changed",
         "baseModelChangedCleared_one": "Updated, cleared or disabled {{count}} incompatible submodel",
         "baseModelChangedCleared_other": "Updated, cleared or disabled {{count}} incompatible submodels",
+        "kleinEncoderCleared": "Qwen3 Encoder Cleared",
+        "kleinEncoderClearedDescription": "Please select a compatible Qwen3 encoder for the new Klein model variant",
         "canceled": "Processing Canceled",
         "connected": "Connected to Server",
         "imageCopied": "Image Copied",
@@ -1601,6 +1621,50 @@
             "paragraphs": [
                 "Scheduler used during the generation process.",
                 "Each scheduler defines how to iteratively add noise to an image or how to update a sample based on a model's output."
+            ]
+        },
+        "fluxDypePreset": {
+            "heading": "DyPE (High-Resolution)",
+            "paragraphs": [
+                "Dynamic Position Extrapolation (DyPE) improves FLUX generation quality at resolutions above the training size (1024px).",
+                "Off: Standard generation. Auto: Automatically enables for images > 1536px. 4K: Optimized settings for 4K resolution output."
+            ]
+        },
+        "fluxDypeScale": {
+            "heading": "DyPE Scale (λs)",
+            "paragraphs": [
+                "Controls the magnitude of the DyPE modulation. Higher values = stronger extrapolation.",
+                "Default: 2.0. Range: 0.0-8.0."
+            ]
+        },
+        "fluxDypeExponent": {
+            "heading": "DyPE Exponent (λt)",
+            "paragraphs": [
+                "Controls the strength of the dynamic effect over time.",
+                "2.0: Recommended for 4K+ resolutions. Aggressive schedule that transitions quickly to clean up artifacts.",
+                "1.0: Good starting point for ~2K-3K resolutions.",
+                "0.5: Gentler schedule for resolutions just above native (1024px)."
+            ]
+        },
+        "seedVarianceEnhancer": {
+            "heading": "Seed Variance Enhancer",
+            "paragraphs": [
+                "Z-Image-Turbo can produce relatively similar images with different seeds. This feature adds seed-based noise to the text embeddings to increase visual variation while maintaining reproducibility.",
+                "Enable this to get more diverse results when exploring different seeds."
+            ]
+        },
+        "seedVarianceStrength": {
+            "heading": "Variance Strength",
+            "paragraphs": [
+                "Controls the intensity of the noise added to embeddings. The strength is automatically calibrated relative to the embedding's standard deviation.",
+                "Values less than 0.1 will produce subtle variations, increasing to stronger ones at 0.5. Values above 0.5 may lead to unexpected results."
+            ]
+        },
+        "seedVarianceRandomizePercent": {
+            "heading": "Randomize Percent",
+            "paragraphs": [
+                "Percentage of embedding values that receive noise (1-100%).",
+                "Lower values create more selective noise patterns, while 100% affects all values equally."
             ]
         },
         "compositingMaskBlur": {
@@ -1961,7 +2025,7 @@
         "fluxDevLicense": {
             "heading": "Non-Commercial License",
             "paragraphs": [
-                "FLUX.1 [dev] models are licensed under the FLUX [dev] non-commercial license. To use this model type for commercial purposes in Invoke, visit our website to learn more."
+                "This model is licensed for non-commercial use only. FLUX.1 [dev] models use the FLUX.1 [dev] Non-Commercial License, and FLUX.2 Klein 9B uses the FLUX.2 Non-Commercial License."
             ]
         },
         "optimizedDenoising": {
@@ -2184,6 +2248,9 @@
         "showHUD": "Show HUD",
         "rectangle": "Rectangle",
         "maskFill": "Mask Fill",
+        "maskLayerEmpty": "Mask layer is empty",
+        "extractMaskedAreaFailed": "Unable to extract masked area.",
+        "extractMaskedAreaMissingData": "Cannot extract: image or mask data is missing.",
         "addPositivePrompt": "Add $t(controlLayers.prompt)",
         "addNegativePrompt": "Add $t(controlLayers.negativePrompt)",
         "addReferenceImage": "Add $t(controlLayers.referenceImage)",
@@ -2501,6 +2568,9 @@
                 "y": "Y (YCbCr)",
                 "cb": "Cb (YCbCr)",
                 "cr": "Cr (YCbCr)"
+            },
+            "pbr_maps": {
+                "label": "Create PBR Maps"
             }
         },
         "transform": {
@@ -2510,6 +2580,13 @@
             "fitModeContain": "Contain",
             "fitModeCover": "Cover",
             "fitModeFill": "Fill",
+            "smoothing": "Smoothing",
+            "smoothingDesc": "Apply a high-quality backend resample when committing transforms.",
+            "smoothingMode": "Resample Mode",
+            "smoothingModeBilinear": "Bilinear",
+            "smoothingModeBicubic": "Bicubic",
+            "smoothingModeHamming": "Hamming",
+            "smoothingModeLanczos": "Lanczos",
             "reset": "Reset",
             "apply": "Apply",
             "cancel": "Cancel"
@@ -2817,9 +2894,11 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "Model Manager: If a model cannot be identified during installation, you can now manually select the model type and architecture.",
-            "Internal: Improved model identification system, making it easier for contributors to add support for new models."
+            "FLUX.2 Klein Support: InvokeAI now supports the new FLUX.2 Klein models (4B and 9B variants) with GGUF, FP8, and Diffusers formats. Features include txt2img, img2img, inpainting, and outpainting. See 'Starter Models' to get started.",
+            "DyPE support for FLUX models improves high-resolution  (>1536 px up to 4K) images. Go to the 'Advanced Options' section to activate.",
+            "Z-Image Turbo diversity: Active 'Seed Variance Enhancer' under 'Advanced Options' to add diversitiy to your ZiT gens."
         ],
+        "takeUserSurvey": "📣 Let us know how you like InvokeAI. Take our User Experience Survey!",
         "readReleaseNotes": "Read Release Notes",
         "watchRecentReleaseVideos": "Watch Recent Release Videos",
         "watchUiUpdatesOverview": "Watch UI Updates Overview"

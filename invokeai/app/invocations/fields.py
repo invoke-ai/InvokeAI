@@ -532,7 +532,7 @@ def migrate_model_ui_type(ui_type: UIType | str, json_schema_extra: dict[str, An
         case UIType.VAEModel:
             ui_model_type = [ModelType.VAE]
         case UIType.FluxVAEModel:
-            ui_model_base = [BaseModelType.Flux]
+            ui_model_base = [BaseModelType.Flux, BaseModelType.Flux2]
             ui_model_type = [ModelType.VAE]
         case UIType.LoRAModel:
             ui_model_type = [ModelType.LoRA]
