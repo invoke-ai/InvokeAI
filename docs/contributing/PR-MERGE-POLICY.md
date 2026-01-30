@@ -46,6 +46,15 @@ To encourage a clean development log, PR authors are encouraged to use `git reba
 
 The maintainer will perform either a **3-way merge** or **squash merge** when merging a PR into the `main` branch. This approach helps avoid rebase conflict hell and maintains a cleaner project history.
 
+### Attribution
+
+The PR author should reference any papers, source code or
+documentation that they used while creating the code both in the PR
+and as comments in the code itself. If there are any licensing
+restrictions, these should be linked to and/or reproduced in the repo
+root.
+
+
 ## Summary
 
 This policy ensures that:
