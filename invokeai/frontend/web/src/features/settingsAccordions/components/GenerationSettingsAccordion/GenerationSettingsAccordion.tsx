@@ -79,7 +79,7 @@ export const GenerationSettingsAccordion = memo(() => {
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
               {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && <ParamScheduler />}
-              {(isFLUX || isFlux2) && <ParamFluxScheduler />}
+              {isFLUX && <ParamFluxScheduler />}
               {isFLUX && <ParamFluxDypePreset />}
               {isZImage && <ParamZImageScheduler />}
               <ParamSteps />

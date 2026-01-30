@@ -157,7 +157,6 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       type: 'flux2_denoise',
       id: getPrefixedId('flux2_denoise'),
       num_steps: steps,
-      scheduler: fluxScheduler,
     });
 
     // Klein: Connect Qwen3 encoder outputs
@@ -223,7 +222,6 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     const flux2Metadata: Record<string, unknown> = {
       model: Graph.getModelMetadataField(model),
       steps,
-      scheduler: fluxScheduler,
     };
     if (kleinVaeModel) {
       flux2Metadata.vae = kleinVaeModel;
