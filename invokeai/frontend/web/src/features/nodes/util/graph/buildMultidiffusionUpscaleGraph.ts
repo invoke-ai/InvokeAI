@@ -178,6 +178,17 @@ export const buildMultidiffusionUpscaleGraph = async (state: RootState): Promise
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
   const upscaleModelConfig = await fetchModelConfigWithTypeGuard(upscaleModel.key, isSpandrelImageToImageModelConfig);
+  
+// DISCUSSION: Currently we store only a reference to the original image
+// via `upscale_initial_image`. The full metadata of the source image
+// (prompt, seed, scheduler, etc.) is not included here. 
+//
+// Two options could be considered:
+// 1) Expose a UI way to jump to the source image in the gallery (leveraging this reference).
+// 2) Store all original image metadata under a separate field (e.g., `source_image_metadata`) 
+//    for external or export use.
+//
+// This PR is meant to discuss which approach is preferred before implementing.
 
   g.upsertMetadata({
     cfg_scale,
