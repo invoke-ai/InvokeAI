@@ -37,6 +37,7 @@ import {
   TEXT_MIN_FONT_SIZE,
   type TextFontId,
 } from 'features/controlLayers/text/textConstants';
+import type { KeyboardEvent } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -49,13 +50,6 @@ import {
   PiTextStrikethroughBold,
   PiTextUnderlineBold,
 } from 'react-icons/pi';
-
-const formatPx = (value: number | string) => {
-  if (isNaN(Number(value))) {
-    return '';
-  }
-  return `${value} px`;
-};
 
 const formatSliderValue = (value: number) => String(value);
 
@@ -95,7 +89,7 @@ const FontSelect = () => {
   );
 
   return (
-    <Flex minW={48} display="flex" alignItems="center" gap={2} maxW={64}>
+    <Flex w="200px" minW="200px" alignItems="center" gap={2}>
       <Text fontSize="sm" lineHeight="1" whiteSpace="nowrap">
         {t('controlLayers.text.font', { defaultValue: 'Font' })}
       </Text>
@@ -117,38 +111,55 @@ const FontSizeControl = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const fontSize = useAppSelector(selectTextFontSize);
-  const [localFontSize, setLocalFontSize] = useState(fontSize);
+
+  const [localFontSize, setLocalFontSize] = useState(String(fontSize));
+
   const marks = useMemo(
-    () =>
-      [5, 50, 100, 200, 300, 400, 500].filter((value) => value >= TEXT_MIN_FONT_SIZE && value <= TEXT_MAX_FONT_SIZE),
+    () => [1, 100, 200, 300, 400, 500].filter((value) => value >= TEXT_MIN_FONT_SIZE && value <= TEXT_MAX_FONT_SIZE),
     []
   );
-  const onChangeNumberInput = useCallback(
-    (valueAsString: string, valueAsNumber: number) => {
-      setLocalFontSize(valueAsNumber);
-      if (!isNaN(valueAsNumber)) {
-        dispatch(textFontSizeChanged(valueAsNumber));
-      }
+
+  const handleFontSizeCommit = useCallback(
+    (value: number) => {
+      const clamped = Math.min(Math.max(value, TEXT_MIN_FONT_SIZE), TEXT_MAX_FONT_SIZE);
+      setLocalFontSize(String(clamped));
+      dispatch(textFontSizeChanged(clamped));
     },
     [dispatch]
   );
+
+  const onChangeNumberInput = useCallback((valueAsString: string) => {
+    setLocalFontSize(valueAsString);
+  }, []);
+
+  const onBlur = useCallback(() => {
+    const num = parseInt(localFontSize, 10);
+    if (isNaN(num)) {
+      setLocalFontSize(String(fontSize));
+    } else {
+      handleFontSizeCommit(num);
+    }
+  }, [localFontSize, fontSize, handleFontSizeCommit]);
+
   const onChangeSlider = useCallback(
     (value: number) => {
-      setLocalFontSize(value);
-      dispatch(textFontSizeChanged(value));
+      handleFontSizeCommit(value);
     },
-    [dispatch]
+    [handleFontSizeCommit]
   );
-  const onBlur = useCallback(() => {
-    if (isNaN(Number(localFontSize))) {
-      setLocalFontSize(fontSize);
-      return;
-    }
-    dispatch(textFontSizeChanged(localFontSize));
-  }, [dispatch, fontSize, localFontSize]);
+
+  const onKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' || e.key === 'Escape') {
+        onBlur();
+        e.currentTarget.blur();
+      }
+    },
+    [onBlur]
+  );
 
   useEffect(() => {
-    setLocalFontSize(fontSize);
+    setLocalFontSize(String(fontSize));
   }, [fontSize]);
 
   return (
@@ -167,14 +178,15 @@ const FontSizeControl = () => {
                   alignItems="center"
                   min={TEXT_MIN_FONT_SIZE}
                   max={TEXT_MAX_FONT_SIZE}
-                  step={1}
                   value={localFontSize}
                   onChange={onChangeNumberInput}
                   onBlur={onBlur}
-                  format={formatPx}
-                  clampValueOnBlur={false}
+                  clampValueOnBlur={true}
                 >
-                  <NumberInputField _focusVisible={{ zIndex: 0 }} title="" paddingInlineEnd={7} />
+                  <NumberInputField _focusVisible={{ zIndex: 0 }} paddingInlineEnd={7} onKeyDown={onKeyDown} />
+                  <Box position="absolute" right="25px" fontSize="xs" color="base.500" pointerEvents="none">
+                    {t('controlLayers.text.px')}
+                  </Box>
                   <PopoverTrigger>
                     <IconButton
                       aria-label={t('controlLayers.text.size', { defaultValue: 'Size' })}
@@ -195,8 +207,8 @@ const FontSizeControl = () => {
                     <CompositeSlider
                       min={TEXT_MIN_FONT_SIZE}
                       max={TEXT_MAX_FONT_SIZE}
-                      step={2}
-                      value={localFontSize}
+                      step={1}
+                      value={fontSize}
                       onChange={onChangeSlider}
                       marks={marks}
                       formatValue={formatSliderValue}

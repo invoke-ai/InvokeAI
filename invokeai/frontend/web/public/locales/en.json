@@ -2429,7 +2429,8 @@
             "strikethrough": "Strikethrough",
             "alignLeft": "Align Left",
             "alignCenter": "Align Center",
-            "alignRight": "Align Right"
+            "alignRight": "Align Right",
+            "px": "px"
         },
         "filter": {
             "filter": "Filter",

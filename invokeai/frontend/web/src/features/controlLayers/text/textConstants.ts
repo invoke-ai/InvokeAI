@@ -71,7 +71,7 @@ export const TEXT_FONT_STACKS: Array<{ id: TextFontId; label: string; stack: str
 
 export const TEXT_DEFAULT_FONT_ID: TextFontId = 'sans';
 export const TEXT_DEFAULT_FONT_SIZE = 48;
-export const TEXT_MIN_FONT_SIZE = 8;
+export const TEXT_MIN_FONT_SIZE = 1;
 export const TEXT_MAX_FONT_SIZE = 500;
 export const TEXT_DEFAULT_LINE_HEIGHT = 1.25;
 export const TEXT_MIN_LINE_HEIGHT = 1;

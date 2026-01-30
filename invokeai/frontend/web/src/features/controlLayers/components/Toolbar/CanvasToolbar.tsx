@@ -46,7 +46,7 @@ export const CanvasToolbar = memo(() => {
 
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
-      <ToolOptionsRowContainer>
+      <ToolOptionsRowContainer gap={4} alignItems="center" h="full">
         <ToolFillColorPicker />
         {isTextSelected ? <TextToolOptions /> : showToolWithPicker && <ToolWidthPicker />}
       </ToolOptionsRowContainer>
