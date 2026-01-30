@@ -46,8 +46,10 @@ jobs:
           df -h
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo swapoff /mnt/swapfile
-          sudo rm -rf /mnt/swapfile
+          if [ -f /mnt/swapfile ]; then
+            sudo swapoff /mnt/swapfile
+            sudo rm -rf /mnt/swapfile
+          fi
           echo "----- Free space after cleanup"
           df -h
 
