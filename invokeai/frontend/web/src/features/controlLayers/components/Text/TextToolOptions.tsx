@@ -37,7 +37,7 @@ import {
   TEXT_MIN_FONT_SIZE,
   type TextFontId,
 } from 'features/controlLayers/text/textConstants';
-import type { KeyboardEvent } from 'react';
+import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -158,6 +158,17 @@ const FontSizeControl = () => {
     [onBlur]
   );
 
+  const onFocusNumberInput = useCallback((e: FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.select();
+  }, []);
+
+  const onMouseDownNumberInput = useCallback((e: MouseEvent<HTMLInputElement>) => {
+    // Ensure re-clicking an already-focused input reselects the value.
+    e.preventDefault();
+    e.currentTarget.focus();
+    e.currentTarget.select();
+  }, []);
+
   useEffect(() => {
     setLocalFontSize(String(fontSize));
   }, [fontSize]);
@@ -183,7 +194,13 @@ const FontSizeControl = () => {
                   onBlur={onBlur}
                   clampValueOnBlur={true}
                 >
-                  <NumberInputField _focusVisible={{ zIndex: 0 }} paddingInlineEnd={7} onKeyDown={onKeyDown} />
+                  <NumberInputField
+                    _focusVisible={{ zIndex: 0 }}
+                    paddingInlineEnd={7}
+                    onKeyDown={onKeyDown}
+                    onFocus={onFocusNumberInput}
+                    onMouseDown={onMouseDownNumberInput}
+                  />
                   <Box position="absolute" right="25px" fontSize="xs" color="base.500" pointerEvents="none">
                     {t('controlLayers.text.px')}
                   </Box>
