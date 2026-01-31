@@ -2207,6 +2207,7 @@
             "add": "Add Blend Mode",
             "remove": "Remove Blend Mode",
             "blendModes": {
+                "normal": "Normal",
                 "color": "Color",
                 "hue": "Hue",
                 "overlay": "Overlay",
