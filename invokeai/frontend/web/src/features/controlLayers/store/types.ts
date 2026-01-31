@@ -9,7 +9,9 @@ import {
   zParameterCLIPGEmbedModel,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
+  zParameterFluxDypeExponent,
   zParameterFluxDypePreset,
+  zParameterFluxDypeScale,
   zParameterFluxScheduler,
   zParameterGuidance,
   zParameterImageDimension,
@@ -262,6 +264,7 @@ const zCanvasImageState = z.object({
   id: zId,
   type: z.literal('image'),
   image: z.union([zImageWithDims, zImageWithDimsDataURL]),
+  usePixelBbox: z.boolean().optional(),
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
 
@@ -616,6 +619,8 @@ export const zParamsState = z.object({
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
   fluxDypePreset: zParameterFluxDypePreset,
+  fluxDypeScale: zParameterFluxDypeScale,
+  fluxDypeExponent: zParameterFluxDypeExponent,
   zImageScheduler: zParameterZImageScheduler,
   upscaleScheduler: zParameterScheduler,
   upscaleCfgScale: zParameterCFGScale,
@@ -680,6 +685,8 @@ export const getInitialParamsState = (): ParamsState => ({
   scheduler: 'dpmpp_3m_k',
   fluxScheduler: 'euler',
   fluxDypePreset: 'off',
+  fluxDypeScale: 2.0,
+  fluxDypeExponent: 2.0,
   zImageScheduler: 'euler',
   upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,

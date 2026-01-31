@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 // DyPE (Dynamic Position Extrapolation) preset options for high-resolution generation
 const FLUX_DYPE_PRESET_OPTIONS: ComboboxOption[] = [
   { value: 'off', label: 'Off' },
+  { value: 'manual', label: 'Manual' },
   { value: 'auto', label: 'Auto (> 1536px)' },
   { value: '4k', label: '4K Optimized' },
 ];

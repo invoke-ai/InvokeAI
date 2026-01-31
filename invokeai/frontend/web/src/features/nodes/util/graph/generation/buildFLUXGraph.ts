@@ -53,6 +53,8 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     steps,
     fluxScheduler,
     fluxDypePreset,
+    fluxDypeScale,
+    fluxDypeExponent,
     fluxVAE,
     t5EncoderModel,
     clipEmbedModel,
@@ -157,7 +159,6 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       type: 'flux2_denoise',
       id: getPrefixedId('flux2_denoise'),
       num_steps: steps,
-      scheduler: fluxScheduler,
     });
 
     // Klein: Connect Qwen3 encoder outputs
@@ -193,6 +194,9 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       num_steps: steps,
       scheduler: fluxScheduler,
       dype_preset: fluxDypePreset,
+      // Only send custom scale/exponent when DyPE is not off
+      dype_scale: fluxDypeScale,
+      dype_exponent: fluxDypeExponent,
     });
 
     posCondCollect = g.addNode({
@@ -223,7 +227,6 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     const flux2Metadata: Record<string, unknown> = {
       model: Graph.getModelMetadataField(model),
       steps,
-      scheduler: fluxScheduler,
     };
     if (kleinVaeModel) {
       flux2Metadata.vae = kleinVaeModel;
@@ -239,6 +242,8 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       steps,
       scheduler: fluxScheduler,
       dype_preset: fluxDypePreset,
+      dype_scale: fluxDypePreset !== 'off' ? fluxDypeScale : undefined,
+      dype_exponent: fluxDypePreset !== 'off' ? fluxDypeExponent : undefined,
       vae: fluxVAE,
       t5_encoder: t5EncoderModel,
       clip_embed_model: clipEmbedModel,

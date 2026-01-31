@@ -434,8 +434,9 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     for (const renderer of this.renderers.values()) {
       const isEraserLine = renderer instanceof CanvasObjectEraserLine;
       const isImage = renderer instanceof CanvasObjectImage;
+      const imageIgnoresTransparency = isImage && renderer.state.usePixelBbox === false;
       const hasClip = renderer instanceof CanvasObjectBrushLine && renderer.state.clip;
-      if (isEraserLine || hasClip || isImage) {
+      if (isEraserLine || hasClip || (isImage && !imageIgnoresTransparency)) {
         needsPixelBbox = true;
         break;
       }
