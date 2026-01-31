@@ -57,7 +57,7 @@ export const EntityListSelectedEntityActionBarCompositeOperation = memo(() => {
 
   return (
     <FormControl w="min-content" gap={2}>
-      <FormLabel m={0} whiteSpace="nowrap">
+      <FormLabel m={0} mt={1} whiteSpace="nowrap">
         {t('controlLayers.compositeOperation.label')}
       </FormLabel>
       <Select value={currentOperation} onChange={onChange} size="sm" variant="outline" minW="110px">
