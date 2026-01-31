@@ -21,6 +21,7 @@ import type {
   CanvasMetadata,
   ChannelName,
   ChannelPoints,
+  CompositeOperation,
   ControlLoRAConfig,
   EntityMovedByPayload,
   FillStyle,
@@ -192,6 +193,21 @@ const slice = createSlice({
         return;
       }
       layer.adjustments.collapsed = !layer.adjustments.collapsed;
+    },
+    rasterLayerGlobalCompositeOperationChanged: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<{ globalCompositeOperation?: CompositeOperation }, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier, globalCompositeOperation } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer) {
+        return;
+      }
+      if (globalCompositeOperation === undefined) {
+        delete layer.globalCompositeOperation;
+      } else {
+        layer.globalCompositeOperation = globalCompositeOperation;
+      }
     },
     rasterLayerAdded: {
       reducer: (
@@ -1747,6 +1763,7 @@ export const {
   rasterLayerAdjustmentsCollapsedToggled,
   rasterLayerAdjustmentsSimpleUpdated,
   rasterLayerAdjustmentsCurvesUpdated,
+  rasterLayerGlobalCompositeOperationChanged,
   entityDeleted,
   entityArrangedForwardOne,
   entityArrangedToFront,
