@@ -3,7 +3,6 @@ Tests for missing model detection (_scan_for_missing_models) and bulk deletion.
 """
 
 import gc
-import shutil
 from pathlib import Path
 
 import pytest
