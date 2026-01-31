@@ -491,7 +491,6 @@ export type RasterLayerAdjustments = z.infer<typeof zRasterLayerAdjustments>;
  * NOTE: All of these are supported by canvas layers, but not all are supported by CSS blend modes (live rendering).
  */
 const COMPOSITE_OPERATIONS = [
-  'normal',
   'darken',
   'multiply',
   'color-burn',
@@ -524,7 +523,7 @@ export type CompositeOperation = (typeof COMPOSITE_OPERATIONS)[number];
 
 // Subset of color blend modes for UI selection. All are supported by both Konva and CSS.
 export const COLOR_BLEND_MODES: CompositeOperation[] = [
-  'normal',
+  'source-over',
   'darken',
   'multiply',
   'color-burn',
