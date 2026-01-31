@@ -5,6 +5,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import {
+  selectFluxDypePreset,
   selectIsCogView4,
   selectIsFLUX,
   selectIsFlux2,
@@ -14,7 +15,9 @@ import {
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
+import ParamFluxDypeExponent from 'features/parameters/components/Core/ParamFluxDypeExponent';
 import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDypePreset';
+import ParamFluxDypeScale from 'features/parameters/components/Core/ParamFluxDypeScale';
 import ParamFluxScheduler from 'features/parameters/components/Core/ParamFluxScheduler';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
@@ -41,6 +44,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
+  const fluxDypePreset = useAppSelector(selectFluxDypePreset);
 
   const selectBadges = useMemo(
     () =>
@@ -79,12 +83,15 @@ export const GenerationSettingsAccordion = memo(() => {
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
               {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && <ParamScheduler />}
-              {(isFLUX || isFlux2) && <ParamFluxScheduler />}
+              {isFLUX && <ParamFluxScheduler />}
               {isFLUX && <ParamFluxDypePreset />}
               {isZImage && <ParamZImageScheduler />}
               <ParamSteps />
               {(isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
               {!isFLUX && !isFlux2 && <ParamCFGScale />}
+              {isFLUX && <ParamFluxDypePreset />}
+              {isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeScale />}
+              {isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
             </FormControlGroup>
             {isZImage && <ParamZImageSeedVarianceSettings />}
           </Flex>
