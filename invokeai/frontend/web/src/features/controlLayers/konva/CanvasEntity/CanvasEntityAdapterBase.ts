@@ -547,6 +547,14 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
   };
 
   /**
+   * Invalidates the raster cache for this entity by delegating to the renderer's
+   * `invalidateRasterCache` method.
+   */
+  invalidateRasterCache = () => {
+    this.renderer.invalidateRasterCache();
+  };
+
+  /**
    * Synchronizes the entity's locked state with the canvas.
    */
   syncIsLocked = () => {

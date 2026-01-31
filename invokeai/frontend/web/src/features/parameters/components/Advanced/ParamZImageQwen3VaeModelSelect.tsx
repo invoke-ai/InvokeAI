@@ -12,21 +12,24 @@ import {
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFluxVAEModels, useQwen3EncoderModels, useZImageDiffusersModels } from 'services/api/hooks/modelsByType';
+import { useFlux1VAEModels, useQwen3EncoderModels, useZImageDiffusersModels } from 'services/api/hooks/modelsByType';
 import type { MainModelConfig, Qwen3EncoderModelConfig, VAEModelConfig } from 'services/api/types';
 
 /**
- * Z-Image VAE Model Select - uses FLUX VAE models
+ * Z-Image VAE Model Select - uses FLUX 1.0 VAE models only (not FLUX.2 Klein VAEs)
+ * Selecting this will clear Qwen3 Source (mutually exclusive)
  */
 const ParamZImageVaeModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const zImageVaeModel = useAppSelector(selectZImageVaeModel);
-  const [modelConfigs, { isLoading }] = useFluxVAEModels();
+  const [modelConfigs, { isLoading }] = useFlux1VAEModels();
 
   const _onChange = useCallback(
     (model: VAEModelConfig | null) => {
       if (model) {
+        // Clear conflicting Qwen3Source when setting VAE
+        dispatch(zImageQwen3SourceModelSelected(null));
         dispatch(zImageVaeModelSelected(zModelIdentifierField.parse(model)));
       } else {
         dispatch(zImageVaeModelSelected(null));
@@ -61,6 +64,7 @@ ParamZImageVaeModelSelect.displayName = 'ParamZImageVaeModelSelect';
 
 /**
  * Z-Image Qwen3 Encoder Model Select
+ * Selecting this will clear Qwen3 Source (mutually exclusive)
  */
 const ParamZImageQwen3EncoderModelSelect = memo(() => {
   const dispatch = useAppDispatch();
@@ -71,6 +75,8 @@ const ParamZImageQwen3EncoderModelSelect = memo(() => {
   const _onChange = useCallback(
     (model: Qwen3EncoderModelConfig | null) => {
       if (model) {
+        // Clear conflicting Qwen3Source when setting Encoder
+        dispatch(zImageQwen3SourceModelSelected(null));
         dispatch(zImageQwen3EncoderModelSelected(zModelIdentifierField.parse(model)));
       } else {
         dispatch(zImageQwen3EncoderModelSelected(null));
@@ -105,6 +111,7 @@ ParamZImageQwen3EncoderModelSelect.displayName = 'ParamZImageQwen3EncoderModelSe
 
 /**
  * Z-Image Qwen3 Source Model Select - Diffusers Z-Image models for fallback
+ * Selecting this will clear VAE and Qwen3 Encoder (mutually exclusive)
  */
 const ParamZImageQwen3SourceModelSelect = memo(() => {
   const dispatch = useAppDispatch();
@@ -115,6 +122,9 @@ const ParamZImageQwen3SourceModelSelect = memo(() => {
   const _onChange = useCallback(
     (model: MainModelConfig | null) => {
       if (model) {
+        // Clear conflicting VAE and Encoder when setting Qwen3Source
+        dispatch(zImageVaeModelSelected(null));
+        dispatch(zImageQwen3EncoderModelSelected(null));
         dispatch(zImageQwen3SourceModelSelected(zModelIdentifierField.parse(model)));
       } else {
         dispatch(zImageQwen3SourceModelSelected(null));
