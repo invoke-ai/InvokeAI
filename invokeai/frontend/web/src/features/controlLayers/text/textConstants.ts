@@ -73,8 +73,8 @@ export const TEXT_DEFAULT_FONT_ID: TextFontId = 'sans';
 export const TEXT_DEFAULT_FONT_SIZE = 48;
 export const TEXT_MIN_FONT_SIZE = 1;
 export const TEXT_MAX_FONT_SIZE = 500;
-export const TEXT_DEFAULT_LINE_HEIGHT = 1.25;
-export const TEXT_MIN_LINE_HEIGHT = 1;
+export const TEXT_DEFAULT_LINE_HEIGHT = 1.0;
+export const TEXT_MIN_LINE_HEIGHT = 0.6;
 export const TEXT_MAX_LINE_HEIGHT = 2;
 export const TEXT_RASTER_PADDING = 4;
 

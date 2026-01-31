@@ -84,6 +84,7 @@ export const {
   textUnderlineToggled,
   textStrikethroughToggled,
   textAlignmentChanged,
+  textLineHeightChanged,
 } = slice.actions;
 
 export const canvasTextSliceConfig: SliceConfig<typeof slice> = {
@@ -102,3 +103,4 @@ const createCanvasTextSelector = <T>(selector: (state: CanvasTextSettingsState) 
 export const selectTextFontId = createCanvasTextSelector((state) => state.fontId);
 export const selectTextFontSize = createCanvasTextSelector((state) => state.fontSize);
 export const selectTextAlignment = createCanvasTextSelector((state) => state.alignment);
+export const selectTextLineHeight = createCanvasTextSelector((state) => state.lineHeight);

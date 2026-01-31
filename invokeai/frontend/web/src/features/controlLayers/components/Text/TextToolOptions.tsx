@@ -22,11 +22,13 @@ import {
   selectTextAlignment,
   selectTextFontId,
   selectTextFontSize,
+  selectTextLineHeight,
   textAlignmentChanged,
   textBoldToggled,
   textFontChanged,
   textFontSizeChanged,
   textItalicToggled,
+  textLineHeightChanged,
   textStrikethroughToggled,
   textUnderlineToggled,
 } from 'features/controlLayers/store/canvasTextSlice';
@@ -58,6 +60,7 @@ export const TextToolOptions = () => {
     <Flex alignItems="center" gap={2} minW={0} flexShrink={1} overflow="hidden" data-text-tool-safezone="true">
       <FontSelect />
       <FontSizeControl />
+      <LineHeightSelect />
       <FormatControls />
       <AlignmentControls />
     </Flex>
@@ -238,6 +241,46 @@ const FontSizeControl = () => {
           </Box>
         </Tooltip>
       </Flex>
+    </Flex>
+  );
+};
+
+const lineHeightOptions = [
+  { value: 0.6, label: 'Dense' },
+  { value: 1.0, label: 'Normal' },
+  { value: 1.25, label: 'Spacious' },
+];
+
+const LineHeightSelect = () => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const lineHeight = useAppSelector(selectTextLineHeight);
+  const selectedOption = lineHeightOptions.find((option) => option.value === lineHeight) ?? lineHeightOptions[1];
+  const handleLineHeightChange = useCallback(
+    (option: { value: number } | null) => {
+      if (!option) {
+        return;
+      }
+      dispatch(textLineHeightChanged(option.value));
+    },
+    [dispatch]
+  );
+
+  return (
+    <Flex w="160px" minW="160px" alignItems="center" gap={2}>
+      <Text fontSize="sm" lineHeight="1" whiteSpace="nowrap">
+        {t('controlLayers.text.lineHeight', { defaultValue: 'Spacing' })}
+      </Text>
+      <Tooltip label={t('controlLayers.text.lineHeight', { defaultValue: 'Spacing' })}>
+        <Combobox
+          size="sm"
+          variant="outline"
+          isSearchable={false}
+          options={lineHeightOptions}
+          value={selectedOption}
+          onChange={handleLineHeightChange}
+        />
+      </Tooltip>
     </Flex>
   );
 };

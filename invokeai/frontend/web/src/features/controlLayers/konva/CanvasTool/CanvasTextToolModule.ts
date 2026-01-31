@@ -3,8 +3,9 @@ import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase'
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { type CanvasTextSettingsState, selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
-import type { CanvasImageState, Coordinate, RgbaColor, Tool } from 'features/controlLayers/store/types';
+import type { CanvasImageState, Coordinate, RgbaColor } from 'features/controlLayers/store/types';
 import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import {
   buildFontDescriptor,
   calculateLayerPosition,
@@ -98,6 +99,13 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(selectCanvasTextSlice, () => {
         this.render();
+      })
+    );
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectActiveTab, (activeTab) => {
+        if (activeTab !== 'canvas') {
+          this.clearSession();
+        }
       })
     );
     this.subscriptions.add(
@@ -220,7 +228,7 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       return;
     }
     if (this.$session.get()) {
-      this.commitExistingSession();
+      return;
     }
     this.beginSession(cursorPos.relative);
   };
@@ -274,6 +282,14 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     this.$session.set({ ...current, position });
   };
 
+  updateSessionAnchor = (sessionId: string, anchor: Coordinate) => {
+    const current = this.$session.get();
+    if (!current || current.id !== sessionId) {
+      return;
+    }
+    this.$session.set({ ...current, anchor });
+  };
+
   commitExistingSession = () => {
     const session = this.$session.get();
     if (!session) {
@@ -282,10 +298,8 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     this.requestCommit(session.id);
   };
 
-  onToolChanged = (prevTool: Tool, nextTool: Tool) => {
-    if (prevTool === 'text' && nextTool !== 'text') {
-      this.commitExistingSession();
-    }
+  onToolChanged = () => {
+    return;
   };
 
   requestCommit = (sessionId: string) => {

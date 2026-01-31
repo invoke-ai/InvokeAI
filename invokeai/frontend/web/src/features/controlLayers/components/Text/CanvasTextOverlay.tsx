@@ -6,12 +6,14 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import type { CanvasTextSettingsState } from 'features/controlLayers/store/canvasTextSlice';
 import { selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
+import type { Coordinate } from 'features/controlLayers/store/types';
 import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
 import { isAllowedTextShortcut } from 'features/controlLayers/text/textHotkeys';
-import { hasVisibleGlyphs, measureTextContent, type TextMeasureConfig } from 'features/controlLayers/text/textRenderer';
+import { measureTextContent, type TextMeasureConfig } from 'features/controlLayers/text/textRenderer';
 import {
   type ClipboardEvent as ReactClipboardEvent,
   type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   memo,
   useCallback,
   useEffect,
@@ -44,7 +46,7 @@ export const CanvasTextOverlay = memo(() => {
         transform={`translate(${stageAttrs.x}px, ${stageAttrs.y}px) scale(${stageAttrs.scale})`}
         transformOrigin="top left"
       >
-        <TextEditor sessionId={session.id} anchor={session.anchor} initialText={session.text} />
+        <TextEditor sessionId={session.id} anchor={session.anchor} initialText={session.text} stageAttrs={stageAttrs} />
       </Box>
     </Flex>
   );
@@ -68,10 +70,12 @@ const TextEditor = ({
   sessionId,
   anchor,
   initialText,
+  stageAttrs,
 }: {
   sessionId: string;
   anchor: { x: number; y: number };
   initialText: string;
+  stageAttrs: { x: number; y: number; scale: number };
 }) => {
   const canvasManager = useCanvasManager();
   const textSettings = useAppSelector(selectCanvasTextSlice);
@@ -85,7 +89,27 @@ const TextEditor = ({
   const [contentMetrics, setContentMetrics] = useState(() =>
     measureTextContent(buildMeasureConfig(initialText, textSettings))
   );
-  const [isEmpty, setIsEmpty] = useState(() => !hasVisibleGlyphs(initialText));
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startPointer: Coordinate;
+    startAnchor: Coordinate;
+  } | null>(null);
+  const [isCtrlPressed, setIsCtrlPressed] = useState(false);
+
+  const isMoveModifierPressed = useCallback((event: { ctrlKey: boolean; metaKey: boolean }) => {
+    return event.ctrlKey || event.metaKey;
+  }, []);
+
+  const getStagePoint = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const rect = canvasManager.stage.container.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left - stageAttrs.x) / stageAttrs.scale,
+        y: (event.clientY - rect.top - stageAttrs.y) / stageAttrs.scale,
+      };
+    },
+    [canvasManager.stage.container, stageAttrs.x, stageAttrs.y, stageAttrs.scale]
+  );
 
   const focusEditor = useCallback(() => {
     const node = editorRef.current;
@@ -119,7 +143,6 @@ const TextEditor = ({
       lastFocusedSessionIdRef.current = null;
       node.textContent = initialText;
       const syncedText = (node.innerText ?? '').replace(/\r/g, '');
-      setIsEmpty(!hasVisibleGlyphs(syncedText));
       setTextValue(syncedText);
       setContentMetrics(measureTextContent(buildMeasureConfig(syncedText, textSettings)));
       canvasManager.tool.tools.text.updateSessionText(sessionId, syncedText);
@@ -147,44 +170,8 @@ const TextEditor = ({
     setContentMetrics(measureTextContent(buildMeasureConfig(textValue, textSettings)));
   }, [textSettings, textValue]);
 
-  useEffect(() => {
-    const shouldIgnorePointerDown = (event: PointerEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) {
-        return false;
-      }
-      const path = event.composedPath?.() ?? [];
-      for (const node of path) {
-        if (!(node instanceof HTMLElement)) {
-          continue;
-        }
-        const role = node.getAttribute('role');
-        if (role === 'listbox' || role === 'option') {
-          return true;
-        }
-        if (editorRef.current && editorRef.current.contains(node)) {
-          return true;
-        }
-        if (node.dataset?.textToolSafezone === 'true') {
-          return true;
-        }
-      }
-      return editorRef.current?.contains(target) ?? false;
-    };
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (shouldIgnorePointerDown(event)) {
-        return;
-      }
-      canvasManager.tool.tools.text.requestCommit(sessionId);
-    };
-    window.addEventListener('pointerdown', handlePointerDown, true);
-    return () => window.removeEventListener('pointerdown', handlePointerDown, true);
-  }, [canvasManager.tool.tools.text, sessionId]);
-
   const handleInput = useCallback(() => {
     const value = (editorRef.current?.innerText ?? '').replace(/\r/g, '');
-    setIsEmpty(!hasVisibleGlyphs(value));
     setTextValue(value);
     setContentMetrics(measureTextContent(buildMeasureConfig(value, textSettings)));
     canvasManager.tool.tools.text.updateSessionText(sessionId, value);
@@ -220,6 +207,84 @@ const TextEditor = ({
 
   const handleCompositionStart = useCallback(() => setIsComposing(true), []);
   const handleCompositionEnd = useCallback(() => setIsComposing(false), []);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Control' || event.key === 'Meta') {
+        setIsCtrlPressed(true);
+      }
+    };
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Control' || event.key === 'Meta') {
+        setIsCtrlPressed(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  const handleContainerPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const modifierPressed = isMoveModifierPressed(event);
+      if (modifierPressed !== isCtrlPressed) {
+        setIsCtrlPressed(modifierPressed);
+      }
+      if (!modifierPressed) {
+        if (canvasManager.tool.$tool.get() !== 'text') {
+          canvasManager.tool.$tool.set('text');
+        }
+        return;
+      }
+      if (event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const startPointer = getStagePoint(event);
+      dragStateRef.current = {
+        pointerId: event.pointerId,
+        startPointer,
+        startAnchor: { ...anchor },
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [anchor, getStagePoint, isCtrlPressed, isMoveModifierPressed]
+  );
+
+  const handleContainerPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const modifierPressed = isMoveModifierPressed(event);
+      if (modifierPressed !== isCtrlPressed) {
+        setIsCtrlPressed(modifierPressed);
+      }
+      const dragState = dragStateRef.current;
+      if (!dragState || dragState.pointerId !== event.pointerId) {
+        return;
+      }
+      event.preventDefault();
+      const currentPointer = getStagePoint(event);
+      const deltaX = currentPointer.x - dragState.startPointer.x;
+      const deltaY = currentPointer.y - dragState.startPointer.y;
+      canvasManager.tool.tools.text.updateSessionAnchor(sessionId, {
+        x: dragState.startAnchor.x + deltaX,
+        y: dragState.startAnchor.y + deltaY,
+      });
+    },
+    [canvasManager.tool.tools.text, getStagePoint, isCtrlPressed, isMoveModifierPressed, sessionId]
+  );
+
+  const handleContainerPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const dragState = dragStateRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    dragStateRef.current = null;
+  }, []);
 
   const textContainerData = useMemo(() => {
     const padding = TEXT_RASTER_PADDING;
@@ -295,7 +360,21 @@ const TextEditor = ({
   }, [canvasSettings, contentMetrics.lineHeightPx, textSettings]);
 
   return (
-    <Box position="absolute" pointerEvents="auto" {...containerStyle}>
+    <Box
+      position="absolute"
+      pointerEvents="auto"
+      borderWidth="1px"
+      borderStyle="dotted"
+      borderColor="invokeBlue.300"
+      borderRadius="md"
+      boxSizing="border-box"
+      sx={{ cursor: isCtrlPressed ? 'move' : 'text' }}
+      onPointerDown={handleContainerPointerDown}
+      onPointerMove={handleContainerPointerMove}
+      onPointerUp={handleContainerPointerUp}
+      onPointerCancel={handleContainerPointerUp}
+      {...containerStyle}
+    >
       <Box
         ref={setEditorRef}
         contentEditable
@@ -310,15 +389,9 @@ const TextEditor = ({
           minHeight: `${textSettings.fontSize}px`,
           whiteSpace: 'pre',
           outline: 'none',
-          cursor: 'text',
+          cursor: isCtrlPressed ? 'move' : 'text',
           display: 'inline-block',
-          borderWidth: '1px',
-          borderStyle: isEmpty ? 'dashed' : 'solid',
-          borderColor: isEmpty ? 'baseAlpha.400' : 'transparent',
-          borderRadius: 'sm',
-          bg: isEmpty ? 'baseAlpha.200' : 'transparent',
-          transitionProperty: 'border-color, background-color',
-          transitionDuration: 'normal',
+          pointerEvents: isCtrlPressed ? 'none' : 'auto',
           ...textStyle,
         }}
       />
