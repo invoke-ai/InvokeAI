@@ -1,5 +1,4 @@
-import { Button, Tooltip } from '@invoke-ai/ui-library';
-import { useDisclosure } from '@invoke-ai/ui-library';
+import { Button, Tooltip, useDisclosure } from '@invoke-ai/ui-library';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsClockwiseBold } from 'react-icons/pi';

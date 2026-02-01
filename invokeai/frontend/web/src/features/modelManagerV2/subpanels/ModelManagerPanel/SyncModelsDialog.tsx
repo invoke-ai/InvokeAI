@@ -101,10 +101,17 @@ export const SyncModelsDialog = memo(({ isOpen, onClose }: SyncModelsDialogProps
     });
   }, []);
 
+  const createToggleExpandedHandler = useCallback(
+    (path: string) => () => handleToggleExpanded(path),
+    [handleToggleExpanded]
+  );
+
+  const createToggleModelHandler = useCallback((path: string) => () => handleToggleModel(path), [handleToggleModel]);
+
   const handleDelete = useCallback(async () => {
     try {
       const result = await deleteOrphanedModels({ paths: Array.from(selectedModels) }).unwrap();
-      
+
       if (result.deleted.length > 0) {
         toast({
           title: t('modelManager.orphanedModelsDeleted', { count: result.deleted.length }),
@@ -123,7 +130,7 @@ export const SyncModelsDialog = memo(({ isOpen, onClose }: SyncModelsDialogProps
       }
 
       onClose();
-    } catch (error) {
+    } catch {
       toast({
         title: t('modelManager.orphanedModelsDeleteFailed'),
         status: 'error',
@@ -198,9 +205,7 @@ export const SyncModelsDialog = memo(({ isOpen, onClose }: SyncModelsDialogProps
             <Text>{t('modelManager.orphanedModelsDescription')}</Text>
 
             <Flex justifyContent="space-between" alignItems="center">
-              <Heading size="sm">
-                {t('modelManager.foundOrphanedModels', { count: orphanedModels.length })}
-              </Heading>
+              <Heading size="sm">{t('modelManager.foundOrphanedModels', { count: orphanedModels.length })}</Heading>
               <Checkbox isChecked={selectAll} onChange={handleToggleSelectAll}>
                 {selectAll ? t('modelManager.deselectAll') : t('modelManager.selectAll')}
               </Checkbox>
@@ -208,15 +213,7 @@ export const SyncModelsDialog = memo(({ isOpen, onClose }: SyncModelsDialogProps
 
             <Flex flexDir="column" gap={2}>
               {orphanedModels.map((model: OrphanedModel) => (
-                <Flex
-                  key={model.path}
-                  p={3}
-                  borderWidth={1}
-                  borderRadius="md"
-                  flexDir="column"
-                  gap={2}
-                  bg="base.750"
-                >
+                <Flex key={model.path} p={3} borderWidth={1} borderRadius="md" flexDir="column" gap={2} bg="base.750">
                   <Flex justifyContent="space-between" alignItems="center">
                     <Flex alignItems="center" gap={2} flex={1}>
                       <IconButton
@@ -224,11 +221,11 @@ export const SyncModelsDialog = memo(({ isOpen, onClose }: SyncModelsDialogProps
                         icon={expandedModels.has(model.path) ? <PiCaretDownBold /> : <PiCaretRightBold />}
                         size="xs"
                         variant="ghost"
-                        onClick={() => handleToggleExpanded(model.path)}
+                        onClick={createToggleExpandedHandler(model.path)}
                       />
                       <Checkbox
                         isChecked={selectedModels.has(model.path)}
-                        onChange={() => handleToggleModel(model.path)}
+                        onChange={createToggleModelHandler(model.path)}
                       >
                         <Text fontWeight="semibold">{model.path}</Text>
                       </Checkbox>
