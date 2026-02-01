@@ -290,6 +290,13 @@ export const modelsApi = api.injectEndpoints({
         });
       },
     }),
+    getMissingModels: build.query<EntityState<AnyModelConfig, string>, void>({
+      query: () => ({ url: buildModelsUrl('missing') }),
+      providesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
+      transformResponse: (response: GetModelConfigsResponse) => {
+        return modelConfigsAdapter.setAll(modelConfigsAdapter.getInitialState(), response.models);
+      },
+    }),
     getStarterModels: build.query<GetStarterModelsResponse, void>({
       query: () => buildModelsUrl('starter_models'),
       providesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
@@ -357,6 +364,7 @@ export const modelsApi = api.injectEndpoints({
 export const {
   useGetModelConfigsQuery,
   useGetModelConfigQuery,
+  useGetMissingModelsQuery,
   useDeleteModelsMutation,
   useBulkDeleteModelsMutation,
   useDeleteModelImageMutation,
@@ -378,3 +386,4 @@ export const {
 } = modelsApi;
 
 export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select();
+export const selectMissingModelsQuery = modelsApi.endpoints.getMissingModels.select();

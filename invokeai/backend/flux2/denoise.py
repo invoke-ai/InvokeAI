@@ -160,7 +160,15 @@ def denoise(
 
             # Apply inpainting merge at each step
             if inpaint_extension is not None:
-                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
+                # Separate the generated latents from the reference conditioning
+                gen_img = img[:, :original_seq_len, :]
+                ref_img = img[:, original_seq_len:, :]
+
+                # Merge only the generated part
+                gen_img = inpaint_extension.merge_intermediate_latents_with_init_latents(gen_img, t_prev)
+
+                # Concatenate back together
+                img = torch.cat([gen_img, ref_img], dim=1)
 
             # For Heun, only increment user step after second-order step completes
             if is_heun:
@@ -247,8 +255,19 @@ def denoise(
 
             # Apply inpainting merge at each step
             if inpaint_extension is not None:
-                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
-                preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
+                # Separate the generated latents from the reference conditioning
+                gen_img = img[:, :original_seq_len, :]
+                ref_img = img[:, original_seq_len:, :]
+
+                # Merge only the generated part
+                gen_img = inpaint_extension.merge_intermediate_latents_with_init_latents(gen_img, t_prev)
+
+                # Concatenate back together
+                img = torch.cat([gen_img, ref_img], dim=1)
+
+                # Handling preview images
+                preview_gen = preview_img[:, :original_seq_len, :]
+                preview_gen = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_gen, 0.0)
 
             # Extract only the generated image portion for preview (exclude reference images)
             callback_latents = preview_img[:, :original_seq_len, :] if img_cond_seq is not None else preview_img
