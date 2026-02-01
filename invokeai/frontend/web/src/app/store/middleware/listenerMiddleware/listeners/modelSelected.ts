@@ -14,14 +14,25 @@ import {
   zImageQwen3SourceModelSelected,
   zImageVaeModelSelected,
 } from 'features/controlLayers/store/paramsSlice';
-import { refImageModelChanged, selectReferenceImageEntities } from 'features/controlLayers/store/refImagesSlice';
+import {
+  refImageConfigChanged,
+  refImageModelChanged,
+  selectReferenceImageEntities,
+} from 'features/controlLayers/store/refImagesSlice';
 import {
   selectAllEntitiesOfType,
   selectBboxModelBase,
   selectCanvasSlice,
 } from 'features/controlLayers/store/selectors';
-import { getEntityIdentifier } from 'features/controlLayers/store/types';
+import { getEntityIdentifier, isFlux2ReferenceImageConfig } from 'features/controlLayers/store/types';
+import {
+  initialFlux2ReferenceImage,
+  initialFluxKontextReferenceImage,
+  initialFLUXRedux,
+  initialIPAdapter,
+} from 'features/controlLayers/store/util';
 import { SUPPORTS_REF_IMAGES_BASE_MODELS } from 'features/modelManagerV2/models';
+import { zModelIdentifierField } from 'features/nodes/types/common';
 import { modelSelected } from 'features/parameters/store/actions';
 import { zParameterModel } from 'features/parameters/types/parameterSchemas';
 import { toast } from 'features/toast/toast';
@@ -185,11 +196,45 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           // All ref image entities are updated to use the same new model
           const refImageEntities = selectReferenceImageEntities(state);
           for (const entity of refImageEntities) {
-            // Skip FLUX.2 reference images - they don't have a model field (built-in support)
-            if (!('model' in entity.config)) {
+            if (newBase === 'flux2') {
+              // Switching TO FLUX.2 - convert any non-flux2 configs to flux2_reference_image
+              if (!isFlux2ReferenceImageConfig(entity.config)) {
+                dispatch(
+                  refImageConfigChanged({
+                    id: entity.id,
+                    config: { ...initialFlux2ReferenceImage },
+                  })
+                );
+                modelsUpdatedDisabledOrCleared += 1;
+              }
               continue;
             }
 
+            if (isFlux2ReferenceImageConfig(entity.config)) {
+              // Switching AWAY from FLUX.2 - convert flux2_reference_image to the appropriate config type
+              let newConfig;
+              if (newGlobalRefImageModel) {
+                const parsedModel = zModelIdentifierField.parse(newGlobalRefImageModel);
+                if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
+                  newConfig = { ...initialFluxKontextReferenceImage, model: parsedModel };
+                } else if (newGlobalRefImageModel.type === 'flux_redux') {
+                  newConfig = { ...initialFLUXRedux, model: parsedModel };
+                } else {
+                  newConfig = { ...initialIPAdapter, model: parsedModel };
+                  if (parsedModel.base === 'flux') {
+                    newConfig.clipVisionModel = 'ViT-L';
+                  }
+                }
+              } else {
+                // No compatible model found - fall back to an empty IP adapter config
+                newConfig = { ...initialIPAdapter };
+              }
+              dispatch(refImageConfigChanged({ id: entity.id, config: newConfig }));
+              modelsUpdatedDisabledOrCleared += 1;
+              continue;
+            }
+
+            // Standard handling for non-flux2 configs
             const shouldUpdateModel =
               (entity.config.model && entity.config.model.base !== newBase) ||
               (!entity.config.model && newGlobalRefImageModel);

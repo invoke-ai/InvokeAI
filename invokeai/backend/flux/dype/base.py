@@ -99,13 +99,17 @@ def compute_vision_yarn_freqs(
     The NTK-aware approach smoothly interpolates frequencies to cover larger
     position ranges without breaking the attention patterns.
 
+    DyPE (Dynamic Position Extrapolation) modulates the NTK scaling based on
+    the current timestep - stronger extrapolation in early steps (global structure),
+    weaker in late steps (fine details).
+
     Args:
         pos: Position tensor
         dim: Embedding dimension
         theta: RoPE base frequency
         scale_h: Height scaling factor
         scale_w: Width scaling factor
-        current_sigma: Current noise level (reserved for future timestep-aware scaling)
+        current_sigma: Current noise level (1.0 = full noise, 0.0 = clean)
         dype_config: DyPE configuration
 
     Returns:
@@ -124,7 +128,24 @@ def compute_vision_yarn_freqs(
     # This increases the wavelength of position encodings proportionally
     if scale > 1.0:
         ntk_alpha = scale ** (dim / (dim - 2))
-        scaled_theta = theta * ntk_alpha
+
+        # Apply timestep-dependent DyPE modulation
+        # mscale controls how strongly we apply the NTK extrapolation
+        # Early steps (high sigma): stronger extrapolation for global structure
+        # Late steps (low sigma): weaker extrapolation for fine details
+        mscale = get_timestep_mscale(
+            scale=scale,
+            current_sigma=current_sigma,
+            dype_scale=dype_config.dype_scale,
+            dype_exponent=dype_config.dype_exponent,
+            dype_start_sigma=dype_config.dype_start_sigma,
+        )
+
+        # Modulate NTK alpha by mscale
+        # When mscale > 1: interpolate towards stronger extrapolation
+        # When mscale = 1: use base NTK alpha
+        modulated_alpha = 1.0 + (ntk_alpha - 1.0) * mscale
+        scaled_theta = theta * modulated_alpha
     else:
         scaled_theta = theta
 
@@ -151,14 +172,15 @@ def compute_yarn_freqs(
 ) -> tuple[Tensor, Tensor]:
     """Compute RoPE frequencies using YARN/NTK method.
 
-    Uses NTK-aware theta scaling for high-resolution support.
+    Uses NTK-aware theta scaling for high-resolution support with
+    timestep-dependent DyPE modulation.
 
     Args:
         pos: Position tensor
         dim: Embedding dimension
         theta: RoPE base frequency
         scale: Uniform scaling factor
-        current_sigma: Current noise level (reserved for future use)
+        current_sigma: Current noise level (1.0 = full noise, 0.0 = clean)
         dype_config: DyPE configuration
 
     Returns:
@@ -169,10 +191,22 @@ def compute_yarn_freqs(
     device = pos.device
     dtype = torch.float64 if device.type != "mps" else torch.float32
 
-    # NTK-aware theta scaling
+    # NTK-aware theta scaling with DyPE modulation
     if scale > 1.0:
         ntk_alpha = scale ** (dim / (dim - 2))
-        scaled_theta = theta * ntk_alpha
+
+        # Apply timestep-dependent DyPE modulation
+        mscale = get_timestep_mscale(
+            scale=scale,
+            current_sigma=current_sigma,
+            dype_scale=dype_config.dype_scale,
+            dype_exponent=dype_config.dype_exponent,
+            dype_start_sigma=dype_config.dype_start_sigma,
+        )
+
+        # Modulate NTK alpha by mscale
+        modulated_alpha = 1.0 + (ntk_alpha - 1.0) * mscale
+        scaled_theta = theta * modulated_alpha
     else:
         scaled_theta = theta
 
