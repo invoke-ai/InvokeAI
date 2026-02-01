@@ -5,7 +5,6 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { type CanvasTextSettingsState, selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
 import type { CanvasImageState, Coordinate, RgbaColor } from 'features/controlLayers/store/types';
 import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
-import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import {
   buildFontDescriptor,
   calculateLayerPosition,
@@ -15,6 +14,7 @@ import {
   type TextMeasureConfig,
 } from 'features/controlLayers/text/textRenderer';
 import { type TextSessionStatus, transitionTextSessionStatus } from 'features/controlLayers/text/textSessionMachine';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
@@ -24,6 +24,8 @@ type CanvasTextSessionState = {
   id: string;
   anchor: Coordinate;
   position: Coordinate | null;
+  size: { width: number; height: number } | null;
+  rotation: number;
   status: CanvasTextSessionStatus;
   createdAt: number;
   text: string;
@@ -244,6 +246,8 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       id,
       anchor,
       position: null,
+      size: null,
+      rotation: 0,
       status,
       createdAt: Date.now(),
       text: '',
@@ -282,20 +286,28 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     this.$session.set({ ...current, position });
   };
 
+  updateSessionSize = (sessionId: string, size: { width: number; height: number }) => {
+    const current = this.$session.get();
+    if (!current || current.id !== sessionId) {
+      return;
+    }
+    this.$session.set({ ...current, size });
+  };
+
+  updateSessionRotation = (sessionId: string, rotation: number) => {
+    const current = this.$session.get();
+    if (!current || current.id !== sessionId) {
+      return;
+    }
+    this.$session.set({ ...current, rotation });
+  };
+
   updateSessionAnchor = (sessionId: string, anchor: Coordinate) => {
     const current = this.$session.get();
     if (!current || current.id !== sessionId) {
       return;
     }
     this.$session.set({ ...current, anchor });
-  };
-
-  commitExistingSession = () => {
-    const session = this.$session.get();
-    if (!session) {
-      return;
-    }
-    this.requestCommit(session.id);
   };
 
   onToolChanged = () => {
@@ -361,14 +373,26 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       devicePixelRatio: window.devicePixelRatio ?? 1,
     });
 
-    const dataURL = renderResult.canvas.toDataURL('image/png');
+    const rotation = session.rotation ?? 0;
+    let renderCanvas = renderResult.canvas;
+    let totalWidth = renderResult.totalWidth;
+    let totalHeight = renderResult.totalHeight;
+    if (rotation !== 0) {
+      const dprScale = renderResult.canvas.width / renderResult.totalWidth;
+      const rotated = rotateCanvas(renderResult.canvas, rotation, dprScale);
+      renderCanvas = rotated.canvas;
+      totalWidth = rotated.width;
+      totalHeight = rotated.height;
+    }
+
+    const dataURL = renderCanvas.toDataURL('image/png');
     const imageState: CanvasImageState = {
       id: getPrefixedId('image'),
       type: 'image',
       image: {
         dataURL,
-        width: renderResult.totalWidth,
-        height: renderResult.totalHeight,
+        width: totalWidth,
+        height: totalHeight,
       },
     };
 
@@ -378,7 +402,15 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       renderResult.contentWidth,
       TEXT_RASTER_PADDING
     );
-    const position = session.position ? { x: session.position.x, y: session.position.y } : fallbackPosition;
+    const basePosition = session.position ? { x: session.position.x, y: session.position.y } : fallbackPosition;
+    const baseSize = session.size ?? { width: renderResult.totalWidth, height: renderResult.totalHeight };
+    const position =
+      rotation === 0
+        ? basePosition
+        : {
+            x: basePosition.x + baseSize.width / 2 - totalWidth / 2,
+            y: basePosition.y + baseSize.height / 2 - totalHeight / 2,
+          };
 
     const selectedAdapter = this.manager.stateApi.getSelectedEntityAdapter();
     const addAfter =
@@ -405,3 +437,27 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     return flattened.length > 32 ? `${flattened.slice(0, 29)}…` : flattened;
   };
 }
+
+const rotateCanvas = (source: HTMLCanvasElement, radians: number, dprScale: number) => {
+  const width = source.width;
+  const height = source.height;
+  const cos = Math.abs(Math.cos(radians));
+  const sin = Math.abs(Math.sin(radians));
+  const newWidthPx = Math.ceil(width * cos + height * sin);
+  const newHeightPx = Math.ceil(width * sin + height * cos);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, newWidthPx);
+  canvas.height = Math.max(1, newHeightPx);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Unable to acquire 2D context for rotation');
+  }
+  ctx.translate(newWidthPx / 2, newHeightPx / 2);
+  ctx.rotate(radians);
+  ctx.drawImage(source, -width / 2, -height / 2);
+  return {
+    canvas,
+    width: newWidthPx / dprScale,
+    height: newHeightPx / dprScale,
+  };
+};

@@ -246,7 +246,7 @@ const FontSizeControl = () => {
 };
 
 const lineHeightOptions = [
-  { value: 0.6, label: 'Dense' },
+  { value: 0.75, label: 'Dense' },
   { value: 1.0, label: 'Normal' },
   { value: 1.25, label: 'Spacious' },
 ];

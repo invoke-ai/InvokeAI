@@ -126,7 +126,8 @@ export const measureTextContent = (config: TextMeasureConfig): TextMetrics => {
   const baselineOffset = ascent + extraLeading / 2;
   const lineWidths = lines.map((line) => measureCtx.measureText(line === '' ? ' ' : line).width);
   const contentWidth = Math.max(...lineWidths, config.fontSize);
-  const contentHeight = Math.max(lines.length, 1) * lineHeightPx;
+  const totalLineHeight = Math.max(lines.length, 1) * lineHeightPx;
+  const contentHeight = totalLineHeight;
   return {
     lines,
     lineWidths,

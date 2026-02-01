@@ -7,14 +7,18 @@ import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSe
 import type { CanvasTextSettingsState } from 'features/controlLayers/store/canvasTextSlice';
 import { selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
 import type { Coordinate } from 'features/controlLayers/store/types';
-import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
+import {
+  getFontStackById,
+  TEXT_RASTER_PADDING,
+  TEXT_RASTER_PADDING_BOTTOM,
+} from 'features/controlLayers/text/textConstants';
 import { isAllowedTextShortcut } from 'features/controlLayers/text/textHotkeys';
 import { measureTextContent, type TextMeasureConfig } from 'features/controlLayers/text/textRenderer';
 import {
   type ClipboardEvent as ReactClipboardEvent,
   type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
   memo,
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -46,7 +50,13 @@ export const CanvasTextOverlay = memo(() => {
         transform={`translate(${stageAttrs.x}px, ${stageAttrs.y}px) scale(${stageAttrs.scale})`}
         transformOrigin="top left"
       >
-        <TextEditor sessionId={session.id} anchor={session.anchor} initialText={session.text} stageAttrs={stageAttrs} />
+        <TextEditor
+          sessionId={session.id}
+          anchor={session.anchor}
+          initialText={session.text}
+          rotation={session.rotation}
+          stageAttrs={stageAttrs}
+        />
       </Box>
     </Flex>
   );
@@ -70,11 +80,13 @@ const TextEditor = ({
   sessionId,
   anchor,
   initialText,
+  rotation,
   stageAttrs,
 }: {
   sessionId: string;
   anchor: { x: number; y: number };
   initialText: string;
+  rotation: number;
   stageAttrs: { x: number; y: number; scale: number };
 }) => {
   const canvasManager = useCanvasManager();
@@ -94,11 +106,28 @@ const TextEditor = ({
     startPointer: Coordinate;
     startAnchor: Coordinate;
   } | null>(null);
+  const rotateStateRef = useRef<{
+    pointerId: number;
+    startAngle: number;
+    startRotation: number;
+    center: Coordinate;
+  } | null>(null);
   const [isCtrlPressed, setIsCtrlPressed] = useState(false);
 
   const isMoveModifierPressed = useCallback((event: { ctrlKey: boolean; metaKey: boolean }) => {
     return event.ctrlKey || event.metaKey;
   }, []);
+
+  const syncModifierState = useCallback(
+    (event: { ctrlKey: boolean; metaKey: boolean }) => {
+      const modifierPressed = isMoveModifierPressed(event);
+      if (modifierPressed !== isCtrlPressed) {
+        setIsCtrlPressed(modifierPressed);
+      }
+      return modifierPressed;
+    },
+    [isCtrlPressed, isMoveModifierPressed]
+  );
 
   const getStagePoint = useCallback(
     (event: ReactPointerEvent<HTMLElement>) => {
@@ -208,6 +237,43 @@ const TextEditor = ({
   const handleCompositionStart = useCallback(() => setIsComposing(true), []);
   const handleCompositionEnd = useCallback(() => setIsComposing(false), []);
 
+  const textContainerData = useMemo(() => {
+    const padding = TEXT_RASTER_PADDING;
+    const paddingBottom = TEXT_RASTER_PADDING_BOTTOM;
+    const extraRightPadding = Math.ceil(textSettings.fontSize * 0.26);
+    const extraLeftPadding = Math.ceil(textSettings.fontSize * 0.12);
+    let offsetX = -padding - extraLeftPadding;
+    if (textSettings.alignment === 'center') {
+      offsetX = -(contentMetrics.contentWidth / 2) - padding - extraLeftPadding;
+    } else if (textSettings.alignment === 'right') {
+      offsetX = -contentMetrics.contentWidth - padding - extraLeftPadding;
+    }
+    const lineCount = Math.max(contentMetrics.lines.length, 1);
+    const isMultiLine = lineCount > 1;
+    const singleLineExtra = !isMultiLine ? Math.max(4, Math.ceil(contentMetrics.descent * 1.5) + 2) : 0;
+    return {
+      x: anchor.x + offsetX,
+      y: anchor.y - padding,
+      padding,
+      paddingBottom,
+      extraLeftPadding,
+      extraRightPadding,
+      width: contentMetrics.contentWidth + padding * 2 + extraLeftPadding + extraRightPadding,
+      height: contentMetrics.contentHeight + padding + paddingBottom,
+      visualHeight: contentMetrics.contentHeight + padding + paddingBottom + (isMultiLine ? 0 : singleLineExtra),
+      visualPaddingBottom: paddingBottom + (isMultiLine ? 0 : singleLineExtra),
+    };
+  }, [
+    anchor.x,
+    anchor.y,
+    contentMetrics.descent,
+    contentMetrics.contentHeight,
+    contentMetrics.contentWidth,
+    contentMetrics.lines.length,
+    textSettings.alignment,
+    textSettings.fontSize,
+  ]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Control' || event.key === 'Meta') {
@@ -229,10 +295,7 @@ const TextEditor = ({
 
   const handleContainerPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      const modifierPressed = isMoveModifierPressed(event);
-      if (modifierPressed !== isCtrlPressed) {
-        setIsCtrlPressed(modifierPressed);
-      }
+      const modifierPressed = syncModifierState(event);
       if (!modifierPressed) {
         if (canvasManager.tool.$tool.get() !== 'text') {
           canvasManager.tool.$tool.set('text');
@@ -252,15 +315,12 @@ const TextEditor = ({
       };
       event.currentTarget.setPointerCapture(event.pointerId);
     },
-    [anchor, getStagePoint, isCtrlPressed, isMoveModifierPressed]
+    [anchor, canvasManager.tool.$tool, getStagePoint, syncModifierState]
   );
 
   const handleContainerPointerMove = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
-      const modifierPressed = isMoveModifierPressed(event);
-      if (modifierPressed !== isCtrlPressed) {
-        setIsCtrlPressed(modifierPressed);
-      }
+      syncModifierState(event);
       const dragState = dragStateRef.current;
       if (!dragState || dragState.pointerId !== event.pointerId) {
         return;
@@ -274,7 +334,7 @@ const TextEditor = ({
         y: dragState.startAnchor.y + deltaY,
       });
     },
-    [canvasManager.tool.tools.text, getStagePoint, isCtrlPressed, isMoveModifierPressed, sessionId]
+    [canvasManager.tool.tools.text, getStagePoint, sessionId, syncModifierState]
   );
 
   const handleContainerPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -286,51 +346,86 @@ const TextEditor = ({
     dragStateRef.current = null;
   }, []);
 
-  const textContainerData = useMemo(() => {
-    const padding = TEXT_RASTER_PADDING;
-    const extraRightPadding = Math.ceil(textSettings.fontSize * 0.26);
-    const extraLeftPadding = Math.ceil(textSettings.fontSize * 0.12);
-    let offsetX = -padding - extraLeftPadding;
-    if (textSettings.alignment === 'center') {
-      offsetX = -(contentMetrics.contentWidth / 2) - padding - extraLeftPadding;
-    } else if (textSettings.alignment === 'right') {
-      offsetX = -contentMetrics.contentWidth - padding - extraLeftPadding;
+  const handleRotationPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const center = {
+        x: textContainerData.x + textContainerData.width / 2,
+        y: textContainerData.y + textContainerData.height / 2,
+      };
+      const startPointer = getStagePoint(event);
+      const startAngle = Math.atan2(startPointer.y - center.y, startPointer.x - center.x);
+      rotateStateRef.current = {
+        pointerId: event.pointerId,
+        startAngle,
+        startRotation: rotation,
+        center,
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [
+      getStagePoint,
+      rotation,
+      textContainerData.height,
+      textContainerData.width,
+      textContainerData.x,
+      textContainerData.y,
+    ]
+  );
+
+  const handleRotationPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const rotateState = rotateStateRef.current;
+      if (!rotateState || rotateState.pointerId !== event.pointerId) {
+        return;
+      }
+      event.preventDefault();
+      const currentPointer = getStagePoint(event);
+      const currentAngle = Math.atan2(currentPointer.y - rotateState.center.y, currentPointer.x - rotateState.center.x);
+      let nextRotation = rotateState.startRotation + (currentAngle - rotateState.startAngle);
+      if (event.shiftKey) {
+        const snap = Math.PI / 12;
+        nextRotation = Math.round(nextRotation / snap) * snap;
+      }
+      canvasManager.tool.tools.text.updateSessionRotation(sessionId, nextRotation);
+    },
+    [canvasManager.tool.tools.text, getStagePoint, sessionId]
+  );
+
+  const handleRotationPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const rotateState = rotateStateRef.current;
+    if (!rotateState || rotateState.pointerId !== event.pointerId) {
+      return;
     }
-    return {
-      x: anchor.x + offsetX,
-      y: anchor.y - padding,
-      padding,
-      extraLeftPadding,
-      extraRightPadding,
-      width: contentMetrics.contentWidth + padding * 2 + extraLeftPadding + extraRightPadding,
-      height: contentMetrics.contentHeight + padding * 2,
-    };
-  }, [
-    anchor.x,
-    anchor.y,
-    contentMetrics.contentHeight,
-    contentMetrics.contentWidth,
-    textSettings.alignment,
-    textSettings.fontSize,
-  ]);
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    rotateStateRef.current = null;
+  }, []);
 
   useEffect(() => {
     canvasManager.tool.tools.text.updateSessionPosition(sessionId, {
       x: textContainerData.x,
       y: textContainerData.y,
     });
-  }, [canvasManager.tool.tools.text, sessionId, textContainerData]);
+    canvasManager.tool.tools.text.updateSessionSize(sessionId, {
+      width: Math.max(textContainerData.width, textSettings.fontSize),
+      height: Math.max(textContainerData.height, textSettings.fontSize),
+    });
+  }, [canvasManager.tool.tools.text, sessionId, textContainerData, textSettings.fontSize]);
 
   const containerStyle = useMemo(() => {
     return {
       left: `${textContainerData.x}px`,
       top: `${textContainerData.y}px`,
       paddingTop: `${textContainerData.padding}px`,
-      paddingBottom: `${textContainerData.padding}px`,
+      paddingBottom: `${textContainerData.visualPaddingBottom}px`,
       paddingLeft: `${textContainerData.padding + textContainerData.extraLeftPadding}px`,
       paddingRight: `${textContainerData.padding + textContainerData.extraRightPadding}px`,
       width: `${Math.max(textContainerData.width, textSettings.fontSize)}px`,
-      height: `${Math.max(textContainerData.height, textSettings.fontSize)}px`,
+      height: `${Math.max(textContainerData.visualHeight, textSettings.fontSize)}px`,
       textAlign: textSettings.alignment,
     };
   }, [textContainerData, textSettings.alignment, textSettings.fontSize]);
@@ -368,6 +463,8 @@ const TextEditor = ({
       borderColor="invokeBlue.300"
       borderRadius="md"
       boxSizing="border-box"
+      transform={`rotate(${rotation}rad)`}
+      transformOrigin="center"
       sx={{ cursor: isCtrlPressed ? 'move' : 'text' }}
       onPointerDown={handleContainerPointerDown}
       onPointerMove={handleContainerPointerMove}
@@ -375,6 +472,34 @@ const TextEditor = ({
       onPointerCancel={handleContainerPointerUp}
       {...containerStyle}
     >
+      <Box
+        position="absolute"
+        top={-18}
+        left="50%"
+        transform="translateX(-50%)"
+        width="0"
+        height="18px"
+        borderLeftWidth="1px"
+        borderLeftStyle="dotted"
+        borderLeftColor="invokeBlue.300"
+      />
+      <Box
+        position="absolute"
+        top={-18}
+        left="50%"
+        transform="translate(-50%, -100%)"
+        width="12px"
+        height="12px"
+        borderRadius="full"
+        bg="invokeBlue.300"
+        borderWidth="1px"
+        borderColor="base.900"
+        cursor="grab"
+        onPointerDown={handleRotationPointerDown}
+        onPointerMove={handleRotationPointerMove}
+        onPointerUp={handleRotationPointerUp}
+        onPointerCancel={handleRotationPointerUp}
+      />
       <Box
         ref={setEditorRef}
         contentEditable
