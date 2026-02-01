@@ -6,11 +6,18 @@ import eslint from 'vite-plugin-eslint';
 import tsconfigPaths from 'vite-tsconfig-paths';
 import { loggerContextPlugin } from './vite-plugin-logger-context';
 
+import babel from 'vite-plugin-babel';
+
 export default defineConfig(({ mode }) => {
   return {
     base: './',
     plugins: [
       react(),
+      babel({
+        babelConfig: {
+          plugins: ['babel-plugin-react-compiler'],
+        },
+      }),
       mode !== 'test' && eslint({ failOnError: mode === 'production', failOnWarning: mode === 'production' }),
       tsconfigPaths(),
       mode !== 'test' && loggerContextPlugin(),
