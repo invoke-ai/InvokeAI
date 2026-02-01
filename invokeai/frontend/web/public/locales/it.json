@@ -2660,7 +2660,9 @@
             "temperature": "Temperatura",
             "tint": "Tinta",
             "sharpness": "Nitidezza",
-            "reset": "Reimposta"
+            "reset": "Reimposta",
+            "master": "Composito",
+            "finish": "Applica"
         },
         "deletePrompt": "Elimina prompt",
         "addGlobalReferenceImage": "Aggiungi $t(controlLayers.globalReferenceImage)",
