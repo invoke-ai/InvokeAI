@@ -974,6 +974,8 @@
         "loraModels": "LoRAs",
         "main": "Main",
         "metadata": "Metadata",
+        "missingFiles": "Missing Files",
+        "missingFilesTooltip": "Model files are missing from disk",
         "model": "Model",
         "modelConversionFailed": "Model Conversion Failed",
         "modelConverted": "Model Converted",
