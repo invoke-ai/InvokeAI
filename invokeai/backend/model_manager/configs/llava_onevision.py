@@ -25,6 +25,7 @@ class LlavaOnevision_Diffusers_Config(Diffusers_Config_Base, Config_Base):
 
     type: Literal[ModelType.LlavaOnevision] = Field(default=ModelType.LlavaOnevision)
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:

@@ -58,6 +58,12 @@ class FluxTextEncoderInvocation(BaseInvocation):
         # scoped. This ensures that the T5 model can be freed and gc'd before loading the CLIP model (if necessary).
         t5_embeddings = self._t5_encode(context)
         clip_embeddings = self._clip_encode(context)
+
+        # Move embeddings to CPU for storage to save VRAM
+        # They will be moved to the appropriate device when used by the denoiser
+        t5_embeddings = t5_embeddings.detach().to("cpu")
+        clip_embeddings = clip_embeddings.detach().to("cpu")
+
         conditioning_data = ConditioningFieldData(
             conditionings=[FLUXConditioningInfo(clip_embeds=clip_embeddings, t5_embeds=t5_embeddings)]
         )

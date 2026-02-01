@@ -3255,6 +3255,11 @@ export type components = {
              */
             type: "clip_embed";
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /**
              * Variant
              * @default gigantic
              * @constant
@@ -3330,6 +3335,11 @@ export type components = {
              * @constant
              */
             type: "clip_embed";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Variant
              * @default large
@@ -3502,6 +3512,11 @@ export type components = {
              * @constant
              */
             type: "clip_vision";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * CV2 Infill
@@ -14967,6 +14982,11 @@ export type components = {
              * @constant
              */
             base: "any";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * Apply LoRA Collection - SD1.5
@@ -16255,6 +16275,11 @@ export type components = {
              * @description Default Guidance for this model
              */
             guidance?: number | null;
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only?: boolean | null;
         };
         /**
          * Main Model - SD1.5, SD2
@@ -20125,6 +20150,11 @@ export type components = {
              */
             default_settings?: components["schemas"]["MainModelDefaultSettings"] | components["schemas"]["LoraModelDefaultSettings"] | components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only?: boolean | null;
+            /**
              * Variant
              * @description The variant of the model.
              */
@@ -21112,6 +21142,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /** @description Qwen3 model size variant (4B or 8B) */
             variant: components["schemas"]["Qwen3VariantType"];
         };
@@ -21190,6 +21225,11 @@ export type components = {
              * @constant
              */
             format: "gguf_quantized";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /** @description Qwen3 model size variant (4B or 8B) */
             variant: components["schemas"]["Qwen3VariantType"];
         };
@@ -21266,6 +21306,11 @@ export type components = {
              * @constant
              */
             format: "qwen3_encoder";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /** @description Qwen3 model size variant (4B or 8B) */
             variant: components["schemas"]["Qwen3VariantType"];
         };
@@ -23193,6 +23238,11 @@ export type components = {
              * @constant
              */
             base: "any";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * Image-to-Image (Autoscale)
@@ -24384,6 +24434,11 @@ export type components = {
              * @constant
              */
             format: "bnb_quantized_int8b";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * T5Encoder_T5Encoder_Config
@@ -24456,6 +24511,11 @@ export type components = {
              * @constant
              */
             format: "t5_encoder";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** TBLR */
         TBLR: {
