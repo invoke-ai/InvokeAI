@@ -6,6 +6,7 @@ import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObject
 import { CanvasObjectBrushLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLineWithPressure';
 import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLine';
 import { CanvasObjectEraserLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLineWithPressure';
+import { CanvasObjectGradient } from 'features/controlLayers/konva/CanvasObject/CanvasObjectGradient';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
@@ -152,6 +153,15 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
       }
 
       didRender = this.renderer.update(this.state, true);
+    } else if (this.state.type === 'gradient') {
+      assert(this.renderer instanceof CanvasObjectGradient || !this.renderer);
+
+      if (!this.renderer) {
+        this.renderer = new CanvasObjectGradient(this.state, this);
+        this.konva.group.add(this.renderer.konva.group);
+      }
+
+      didRender = this.renderer.update(this.state, true);
     } else if (this.state.type === 'image') {
       assert(this.renderer instanceof CanvasObjectImage || !this.renderer);
 
@@ -236,6 +246,9 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
           break;
         case 'rect':
           this.manager.stateApi.addRect({ entityIdentifier, rect: this.state });
+          break;
+        case 'gradient':
+          this.manager.stateApi.addGradient({ entityIdentifier, gradient: this.state });
           break;
       }
     }
