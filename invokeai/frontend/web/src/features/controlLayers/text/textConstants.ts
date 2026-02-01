@@ -77,7 +77,6 @@ export const TEXT_DEFAULT_LINE_HEIGHT = 1.0;
 export const TEXT_MIN_LINE_HEIGHT = 0.6;
 export const TEXT_MAX_LINE_HEIGHT = 2;
 export const TEXT_RASTER_PADDING = 4;
-export const TEXT_RASTER_PADDING_BOTTOM = 2;
 
 const TEXT_ALIGNMENTS = ['left', 'center', 'right'] as const;
 export const zTextAlignment = z.enum(TEXT_ALIGNMENTS);

@@ -7,10 +7,7 @@ import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSe
 import type { CanvasTextSettingsState } from 'features/controlLayers/store/canvasTextSlice';
 import { selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
 import type { Coordinate } from 'features/controlLayers/store/types';
-import {
-  getFontStackById,
-  TEXT_RASTER_PADDING,
-} from 'features/controlLayers/text/textConstants';
+import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
 import { isAllowedTextShortcut } from 'features/controlLayers/text/textHotkeys';
 import { measureTextContent, type TextMeasureConfig } from 'features/controlLayers/text/textRenderer';
 import {
@@ -258,7 +255,7 @@ const TextEditor = ({
     const value = (editorRef.current?.innerText ?? '').replace(/\r/g, '');
     setTextValue(value);
     canvasManager.tool.tools.text.updateSessionText(sessionId, value);
-  }, [canvasManager.tool.tools.text, sessionId, textSettings]);
+  }, [canvasManager.tool.tools.text, sessionId]);
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -457,14 +454,7 @@ const TextEditor = ({
       };
       event.currentTarget.setPointerCapture(event.pointerId);
     },
-    [
-      effectiveHeight,
-      effectiveWidth,
-      getStagePoint,
-      rotation,
-      textContainerData.x,
-      textContainerData.y,
-    ]
+    [effectiveHeight, effectiveWidth, getStagePoint, rotation, textContainerData.x, textContainerData.y]
   );
 
   const handleRotationPointerMove = useCallback(
