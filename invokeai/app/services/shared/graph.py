@@ -124,38 +124,36 @@ def is_any(t: Any) -> bool:
 
 
 def are_connection_types_compatible(from_type: Any, to_type: Any) -> bool:
-    if not from_type:
-        return False
-    if not to_type:
+    if not from_type or not to_type:
         return False
 
-    # TODO: this is pretty forgiving on generic types. Clean that up (need to handle optionals and such)
-    if from_type and to_type:
-        # Ports are compatible
-        if from_type == to_type or is_any(from_type) or is_any(to_type):
-            return True
+    # Ports are compatible
+    if from_type == to_type or is_any(from_type) or is_any(to_type):
+        return True
 
-        if from_type in get_args(to_type):
-            return True
+    if from_type in get_args(to_type):
+        return True
 
-        if to_type in get_args(from_type):
-            return True
+    if to_type in get_args(from_type):
+        return True
 
-        # allow int -> float, pydantic will cast for us
-        if from_type is int and to_type is float:
-            return True
+    # allow int -> float, pydantic will cast for us
+    if from_type is int and to_type is float:
+        return True
 
-        # allow int|float -> str, pydantic will cast for us
-        if (from_type is int or from_type is float) and to_type is str:
-            return True
+    # allow int|float -> str, pydantic will cast for us
+    if (from_type is int or from_type is float) and to_type is str:
+        return True
 
-        # if not issubclass(from_type, to_type):
-        if not is_union_subtype(from_type, to_type):
-            return False
-    else:
-        return False
+    # Prefer issubclass when both are real classes
+    try:
+        if isinstance(from_type, type) and isinstance(to_type, type):
+            return issubclass(from_type, to_type)
+    except TypeError:
+        pass
 
-    return True
+    # Union-to-Union (or Union-to-non-Union) handling
+    return is_union_subtype(from_type, to_type)
 
 
 def are_connections_compatible(
@@ -654,6 +652,9 @@ class Graph(BaseModel):
         if new_output is not None:
             outputs.append(new_output)
 
+        if len(inputs) == 0:
+            return "Iterator must have a collection input edge"
+
         # Only one input is allowed for iterators
         if len(inputs) > 1:
             return "Iterator may only have one input edge"
@@ -675,9 +676,13 @@ class Graph(BaseModel):
 
         # Collector input type must match all iterator output types
         if isinstance(input_node, CollectInvocation):
+            collector_inputs = self._get_input_edges(input_node.id, ITEM_FIELD)
+            if len(collector_inputs) == 0:
+                return "Iterator input collector must have at least one item input edge"
+
             # Traverse the graph to find the first collector input edge. Collectors validate that their collection
             # inputs are all of the same type, so we can use the first input edge to determine the collector's type
-            first_collector_input_edge = self._get_input_edges(input_node.id, ITEM_FIELD)[0]
+            first_collector_input_edge = collector_inputs[0]
             first_collector_input_type = get_output_field_type(
                 self.get_node(first_collector_input_edge.source.node_id), first_collector_input_edge.source.field
             )
@@ -751,21 +756,12 @@ class Graph(BaseModel):
         g.add_edges_from({(e.source.node_id, e.destination.node_id) for e in self.edges})
         return g
 
-    def nx_graph_with_data(self) -> nx.DiGraph:
-        """Returns a NetworkX DiGraph representing the data and layout of this graph"""
-        g = nx.DiGraph()
-        g.add_nodes_from(list(self.nodes.items()))
-        g.add_edges_from({(e.source.node_id, e.destination.node_id) for e in self.edges})
-        return g
-
     def nx_graph_flat(self, nx_graph: Optional[nx.DiGraph] = None) -> nx.DiGraph:
         """Returns a flattened NetworkX DiGraph, including all subgraphs (but not with iterations expanded)"""
         g = nx_graph or nx.DiGraph()
 
         # Add all nodes from this graph except graph/iteration nodes
-        g.add_nodes_from([n.id for n in self.nodes.values() if not isinstance(n, IterateInvocation)])
-
-        # TODO: figure out if iteration nodes need to be expanded
+        g.add_nodes_from([n.id for n in self.nodes.values()])
 
         unique_edges = {(e.source.node_id, e.destination.node_id) for e in self.edges}
         g.add_edges_from(unique_edges)

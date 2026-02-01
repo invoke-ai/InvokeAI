@@ -270,3 +270,47 @@ def test_graph_nested_iterate_execution_order(execution_number: int):
             sum_values.append(o.value)
 
     assert sum_values == [0, 1, 10, 11]
+
+
+def test_graph_validate_self_iterator_without_collection_input_raises_invalid_edge_error():
+    """Iterator nodes with no collection input should fail validation cleanly.
+
+    This test exposes the bug where validation crashes with IndexError instead of raising InvalidEdgeError.
+    """
+    from invokeai.app.services.shared.graph import InvalidEdgeError
+
+    graph = Graph()
+    graph.add_node(IterateInvocation(id="iterate"))
+
+    with pytest.raises(InvalidEdgeError):
+        graph.validate_self()
+
+
+def test_graph_validate_self_collector_without_item_inputs_raises_invalid_edge_error():
+    """Collector nodes with no item inputs should fail validation cleanly.
+
+    This test exposes the bug where validation can crash (e.g. StopIteration) instead of raising InvalidEdgeError.
+    """
+    from invokeai.app.services.shared.graph import InvalidEdgeError
+
+    graph = Graph()
+    graph.add_node(CollectInvocation(id="collect"))
+
+    with pytest.raises(InvalidEdgeError):
+        graph.validate_self()
+
+
+def test_are_connection_types_compatible_accepts_subclass_to_base():
+    """A subclass output should be connectable to a base-class input.
+
+    This test exposes the bug where non-Union targets reject valid subclass connections.
+    """
+    from invokeai.app.services.shared.graph import are_connection_types_compatible
+
+    class Base:
+        pass
+
+    class Child(Base):
+        pass
+
+    assert are_connection_types_compatible(Child, Base) is True
