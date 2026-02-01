@@ -311,7 +311,13 @@ export class CanvasTextToolModule extends CanvasModuleBase {
   };
 
   onToolChanged = () => {
-    return;
+    const session = this.$session.get();
+    if (!session || session.status === 'committed') {
+      return;
+    }
+    if (this.parent.$tool.get() !== 'text') {
+      this.parent.$tool.set('text');
+    }
   };
 
   requestCommit = (sessionId: string) => {
@@ -374,12 +380,30 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     });
 
     const rotation = session.rotation ?? 0;
+    const dprScale = renderResult.canvas.width / renderResult.totalWidth;
     let renderCanvas = renderResult.canvas;
     let totalWidth = renderResult.totalWidth;
     let totalHeight = renderResult.totalHeight;
+    if (session.size) {
+      const targetWidth = Math.max(1, Math.ceil(session.size.width));
+      const targetHeight = Math.max(1, Math.ceil(session.size.height));
+      if (targetWidth !== totalWidth || targetHeight !== totalHeight) {
+        const adjustedCanvas = document.createElement('canvas');
+        adjustedCanvas.width = Math.max(1, Math.ceil(targetWidth * dprScale));
+        adjustedCanvas.height = Math.max(1, Math.ceil(targetHeight * dprScale));
+        const ctx = adjustedCanvas.getContext('2d');
+        if (!ctx) {
+          throw new Error('Unable to acquire 2D context for adjusted canvas');
+        }
+        ctx.drawImage(renderCanvas, 0, 0);
+        renderCanvas = adjustedCanvas;
+        totalWidth = targetWidth;
+        totalHeight = targetHeight;
+      }
+    }
+
     if (rotation !== 0) {
-      const dprScale = renderResult.canvas.width / renderResult.totalWidth;
-      const rotated = rotateCanvas(renderResult.canvas, rotation, dprScale);
+      const rotated = rotateCanvas(renderCanvas, rotation, dprScale);
       renderCanvas = rotated.canvas;
       totalWidth = rotated.width;
       totalHeight = rotated.height;
@@ -396,11 +420,13 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       },
     };
 
+    const extraLeftPadding = Math.ceil(textSettings.fontSize * 0.12);
     const fallbackPosition = calculateLayerPosition(
       session.anchor,
       textSettings.alignment,
       renderResult.contentWidth,
-      TEXT_RASTER_PADDING
+      TEXT_RASTER_PADDING,
+      extraLeftPadding
     );
     const basePosition = session.position ? { x: session.position.x, y: session.position.y } : fallbackPosition;
     const baseSize = session.size ?? { width: renderResult.totalWidth, height: renderResult.totalHeight };

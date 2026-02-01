@@ -10,7 +10,6 @@ import type { Coordinate } from 'features/controlLayers/store/types';
 import {
   getFontStackById,
   TEXT_RASTER_PADDING,
-  TEXT_RASTER_PADDING_BOTTOM,
 } from 'features/controlLayers/text/textConstants';
 import { isAllowedTextShortcut } from 'features/controlLayers/text/textHotkeys';
 import { measureTextContent, type TextMeasureConfig } from 'features/controlLayers/text/textRenderer';
@@ -64,6 +63,14 @@ export const CanvasTextOverlay = memo(() => {
 
 CanvasTextOverlay.displayName = 'CanvasTextOverlay';
 
+const ROTATE_ANCHOR_SIZE = 14;
+const ROTATE_ANCHOR_BASE_SIZE = 12;
+// Match Konva.Transformer default rotate anchor offset (50px) for consistent spacing.
+const ROTATE_ANCHOR_GAP = 50;
+const ROTATE_ANCHOR_LINE_LENGTH = ROTATE_ANCHOR_GAP;
+const ROTATE_ANCHOR_FILL = 'invokeBlue.50';
+const ROTATE_ANCHOR_STROKE = 'invokeBlue.500';
+
 const buildMeasureConfig = (text: string, settings: CanvasTextSettingsState): TextMeasureConfig => {
   const fontStyle: TextMeasureConfig['fontStyle'] = settings.italic ? 'italic' : 'normal';
   return {
@@ -92,15 +99,23 @@ const TextEditor = ({
   const canvasManager = useCanvasManager();
   const textSettings = useAppSelector(selectCanvasTextSlice);
   const canvasSettings = useAppSelector(selectCanvasSettingsSlice);
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLDivElement | null>(null);
   const lastSessionIdRef = useRef<string | null>(null);
   const lastFocusedSessionIdRef = useRef<string | null>(null);
   const focusRafIdRef = useRef<number | null>(null);
+  const measureRafIdRef = useRef<number | null>(null);
+  const lastObservedSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const lastMeasuredSizeRef = useRef<{ width: number; height: number } | null>(null);
   const [isComposing, setIsComposing] = useState(false);
   const [textValue, setTextValue] = useState(initialText);
   const [contentMetrics, setContentMetrics] = useState(() =>
     measureTextContent(buildMeasureConfig(initialText, textSettings))
   );
+  const [measuredSize, setMeasuredSize] = useState(() => ({
+    width: Math.max(contentMetrics.contentWidth, textSettings.fontSize),
+    height: Math.max(contentMetrics.contentHeight, textSettings.fontSize),
+  }));
   const dragStateRef = useRef<{
     pointerId: number;
     startPointer: Coordinate;
@@ -161,6 +176,10 @@ const TextEditor = ({
     editorRef.current = node;
   }, []);
 
+  const setContainerRef = useCallback((node: HTMLDivElement | null) => {
+    containerRef.current = node;
+  }, []);
+
   useEffect(() => {
     const node = editorRef.current;
     if (!node) {
@@ -170,6 +189,8 @@ const TextEditor = ({
     if (isNewSession) {
       lastSessionIdRef.current = sessionId;
       lastFocusedSessionIdRef.current = null;
+      lastObservedSizeRef.current = null;
+      lastMeasuredSizeRef.current = null;
       node.textContent = initialText;
       const syncedText = (node.innerText ?? '').replace(/\r/g, '');
       setTextValue(syncedText);
@@ -199,10 +220,43 @@ const TextEditor = ({
     setContentMetrics(measureTextContent(buildMeasureConfig(textValue, textSettings)));
   }, [textSettings, textValue]);
 
+  const updateMeasuredSize = useCallback(
+    (width: number, height: number) => {
+      const nextWidth = Math.max(width, textSettings.fontSize);
+      const nextHeight = Math.max(height, textSettings.fontSize);
+      const last = lastMeasuredSizeRef.current;
+      if (last && Math.abs(last.width - nextWidth) < 0.5 && Math.abs(last.height - nextHeight) < 0.5) {
+        return;
+      }
+      const next = { width: nextWidth, height: nextHeight };
+      lastMeasuredSizeRef.current = next;
+      setMeasuredSize(next);
+      canvasManager.tool.tools.text.updateSessionSize(sessionId, next);
+    },
+    [canvasManager.tool.tools.text, sessionId, textSettings.fontSize]
+  );
+
+  const measureContainer = useCallback(() => {
+    const observed = lastObservedSizeRef.current;
+    if (observed) {
+      updateMeasuredSize(observed.width, observed.height);
+      return;
+    }
+    const node = containerRef.current;
+    if (!node) {
+      return;
+    }
+    const width = node.offsetWidth;
+    const height = node.offsetHeight;
+    if (!width || !height) {
+      return;
+    }
+    updateMeasuredSize(width, height);
+  }, [updateMeasuredSize]);
+
   const handleInput = useCallback(() => {
     const value = (editorRef.current?.innerText ?? '').replace(/\r/g, '');
     setTextValue(value);
-    setContentMetrics(measureTextContent(buildMeasureConfig(value, textSettings)));
     canvasManager.tool.tools.text.updateSessionText(sessionId, value);
   }, [canvasManager.tool.tools.text, sessionId, textSettings]);
 
@@ -217,6 +271,7 @@ const TextEditor = ({
 
       if (event.key === 'Enter' && !event.shiftKey && !isComposing) {
         event.preventDefault();
+        measureContainer();
         canvasManager.tool.tools.text.requestCommit(sessionId);
       }
 
@@ -225,7 +280,7 @@ const TextEditor = ({
         canvasManager.tool.tools.text.clearSession();
       }
     },
-    [canvasManager.tool.tools.text, isComposing, sessionId]
+    [canvasManager.tool.tools.text, isComposing, measureContainer, sessionId]
   );
 
   const handlePaste = useCallback((event: ReactClipboardEvent<HTMLDivElement>) => {
@@ -239,7 +294,6 @@ const TextEditor = ({
 
   const textContainerData = useMemo(() => {
     const padding = TEXT_RASTER_PADDING;
-    const paddingBottom = TEXT_RASTER_PADDING_BOTTOM;
     const extraRightPadding = Math.ceil(textSettings.fontSize * 0.26);
     const extraLeftPadding = Math.ceil(textSettings.fontSize * 0.12);
     let offsetX = -padding - extraLeftPadding;
@@ -248,28 +302,20 @@ const TextEditor = ({
     } else if (textSettings.alignment === 'right') {
       offsetX = -contentMetrics.contentWidth - padding - extraLeftPadding;
     }
-    const lineCount = Math.max(contentMetrics.lines.length, 1);
-    const isMultiLine = lineCount > 1;
-    const singleLineExtra = !isMultiLine ? Math.max(4, Math.ceil(contentMetrics.descent * 1.5) + 2) : 0;
     return {
       x: anchor.x + offsetX,
       y: anchor.y - padding,
       padding,
-      paddingBottom,
       extraLeftPadding,
       extraRightPadding,
       width: contentMetrics.contentWidth + padding * 2 + extraLeftPadding + extraRightPadding,
-      height: contentMetrics.contentHeight + padding + paddingBottom,
-      visualHeight: contentMetrics.contentHeight + padding + paddingBottom + (isMultiLine ? 0 : singleLineExtra),
-      visualPaddingBottom: paddingBottom + (isMultiLine ? 0 : singleLineExtra),
+      height: contentMetrics.contentHeight + padding * 2,
     };
   }, [
     anchor.x,
     anchor.y,
-    contentMetrics.descent,
     contentMetrics.contentHeight,
     contentMetrics.contentWidth,
-    contentMetrics.lines.length,
     textSettings.alignment,
     textSettings.fontSize,
   ]);
@@ -292,6 +338,50 @@ const TextEditor = ({
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, []);
+
+  const fallbackWidth = Math.max(textContainerData.width, textSettings.fontSize);
+  const fallbackHeight = Math.max(textContainerData.height, textSettings.fontSize);
+  const effectiveWidth = lastMeasuredSizeRef.current ? measuredSize.width : fallbackWidth;
+  const effectiveHeight = lastMeasuredSizeRef.current ? measuredSize.height : fallbackHeight;
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) {
+      return;
+    }
+    const observer = new ResizeObserver((entries) => {
+      if (measureRafIdRef.current !== null) {
+        cancelAnimationFrame(measureRafIdRef.current);
+      }
+      measureRafIdRef.current = requestAnimationFrame(() => {
+        measureRafIdRef.current = null;
+        const entry = entries[0];
+        if (entry) {
+          const borderSize = entry.borderBoxSize?.[0];
+          const width = borderSize?.inlineSize ?? entry.contentRect.width;
+          const height = borderSize?.blockSize ?? entry.contentRect.height;
+          if (width && height) {
+            lastObservedSizeRef.current = { width, height };
+            updateMeasuredSize(width, height);
+            return;
+          }
+        }
+        measureContainer();
+      });
+    });
+    observer.observe(node, { box: 'border-box' });
+    measureRafIdRef.current = requestAnimationFrame(() => {
+      measureRafIdRef.current = null;
+      measureContainer();
+    });
+    return () => {
+      observer.disconnect();
+      if (measureRafIdRef.current !== null) {
+        cancelAnimationFrame(measureRafIdRef.current);
+        measureRafIdRef.current = null;
+      }
+    };
+  }, [measureContainer, updateMeasuredSize]);
 
   const handleContainerPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -354,8 +444,8 @@ const TextEditor = ({
       event.preventDefault();
       event.stopPropagation();
       const center = {
-        x: textContainerData.x + textContainerData.width / 2,
-        y: textContainerData.y + textContainerData.height / 2,
+        x: textContainerData.x + effectiveWidth / 2,
+        y: textContainerData.y + effectiveHeight / 2,
       };
       const startPointer = getStagePoint(event);
       const startAngle = Math.atan2(startPointer.y - center.y, startPointer.x - center.x);
@@ -368,10 +458,10 @@ const TextEditor = ({
       event.currentTarget.setPointerCapture(event.pointerId);
     },
     [
+      effectiveHeight,
+      effectiveWidth,
       getStagePoint,
       rotation,
-      textContainerData.height,
-      textContainerData.width,
       textContainerData.x,
       textContainerData.y,
     ]
@@ -410,22 +500,17 @@ const TextEditor = ({
       x: textContainerData.x,
       y: textContainerData.y,
     });
-    canvasManager.tool.tools.text.updateSessionSize(sessionId, {
-      width: Math.max(textContainerData.width, textSettings.fontSize),
-      height: Math.max(textContainerData.height, textSettings.fontSize),
-    });
-  }, [canvasManager.tool.tools.text, sessionId, textContainerData, textSettings.fontSize]);
+  }, [canvasManager.tool.tools.text, sessionId, textContainerData.x, textContainerData.y]);
 
   const containerStyle = useMemo(() => {
     return {
       left: `${textContainerData.x}px`,
       top: `${textContainerData.y}px`,
       paddingTop: `${textContainerData.padding}px`,
-      paddingBottom: `${textContainerData.visualPaddingBottom}px`,
+      paddingBottom: `${textContainerData.padding}px`,
       paddingLeft: `${textContainerData.padding + textContainerData.extraLeftPadding}px`,
       paddingRight: `${textContainerData.padding + textContainerData.extraRightPadding}px`,
       width: `${Math.max(textContainerData.width, textSettings.fontSize)}px`,
-      height: `${Math.max(textContainerData.visualHeight, textSettings.fontSize)}px`,
       textAlign: textSettings.alignment,
     };
   }, [textContainerData, textSettings.alignment, textSettings.fontSize]);
@@ -454,14 +539,17 @@ const TextEditor = ({
     } as const;
   }, [canvasSettings, contentMetrics.lineHeightPx, textSettings]);
 
+  const stageScale = stageAttrs.scale || 1;
+  const outlineScale = stageScale ? 1 / stageScale : 1;
+  const outlineWidthPx = effectiveWidth * stageScale;
+  const outlineHeightPx = effectiveHeight * stageScale;
+
   return (
     <Box
+      ref={setContainerRef}
       position="absolute"
       pointerEvents="auto"
-      borderWidth="1px"
-      borderStyle="dotted"
-      borderColor="invokeBlue.300"
-      borderRadius="md"
+      borderWidth="0px"
       boxSizing="border-box"
       transform={`rotate(${rotation}rad)`}
       transformOrigin="center"
@@ -474,32 +562,48 @@ const TextEditor = ({
     >
       <Box
         position="absolute"
-        top={-18}
-        left="50%"
-        transform="translateX(-50%)"
-        width="0"
-        height="18px"
-        borderLeftWidth="1px"
-        borderLeftStyle="dotted"
-        borderLeftColor="invokeBlue.300"
-      />
-      <Box
-        position="absolute"
-        top={-18}
-        left="50%"
-        transform="translate(-50%, -100%)"
-        width="12px"
-        height="12px"
-        borderRadius="full"
-        bg="invokeBlue.300"
-        borderWidth="1px"
-        borderColor="base.900"
-        cursor="grab"
-        onPointerDown={handleRotationPointerDown}
-        onPointerMove={handleRotationPointerMove}
-        onPointerUp={handleRotationPointerUp}
-        onPointerCancel={handleRotationPointerUp}
-      />
+        top={0}
+        left={0}
+        width={`${outlineWidthPx}px`}
+        height={`${outlineHeightPx}px`}
+        transform={`scale(${outlineScale})`}
+        transformOrigin="top left"
+        pointerEvents="none"
+        borderWidth="2px"
+        borderStyle="dashed"
+        borderColor="invokeBlue.300"
+        borderRadius="md"
+      >
+        <Box
+          position="absolute"
+          top={-ROTATE_ANCHOR_LINE_LENGTH}
+          left="50%"
+          transform="translateX(-50%)"
+          width="0"
+          height={`${ROTATE_ANCHOR_LINE_LENGTH}px`}
+          borderLeftWidth="2px"
+          borderLeftStyle="dashed"
+          borderLeftColor={ROTATE_ANCHOR_STROKE}
+        />
+        <Box
+          position="absolute"
+          top={-(ROTATE_ANCHOR_LINE_LENGTH + ROTATE_ANCHOR_BASE_SIZE)}
+          left="50%"
+          transform="translateX(-50%)"
+          width={`${ROTATE_ANCHOR_SIZE}px`}
+          height={`${ROTATE_ANCHOR_SIZE}px`}
+          borderRadius="full"
+          bg={ROTATE_ANCHOR_FILL}
+          borderWidth="2px"
+          borderColor={ROTATE_ANCHOR_STROKE}
+          cursor="grab"
+          pointerEvents="auto"
+          onPointerDown={handleRotationPointerDown}
+          onPointerMove={handleRotationPointerMove}
+          onPointerUp={handleRotationPointerUp}
+          onPointerCancel={handleRotationPointerUp}
+        />
+      </Box>
       <Box
         ref={setEditorRef}
         contentEditable

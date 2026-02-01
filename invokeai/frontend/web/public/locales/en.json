@@ -2644,6 +2644,7 @@
         "HUD": {
             "bbox": "Bbox",
             "scaledBbox": "Scaled Bbox",
+            "textSessionActive": "Text input is active",
             "entityStatus": {
                 "isFiltering": "{{title}} is filtering",
                 "isTransforming": "{{title}} is transforming",

@@ -5,6 +5,7 @@ import { CanvasAlertsInvocationProgress } from 'features/controlLayers/component
 import { CanvasAlertsPreserveMask } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsPreserveMask';
 import { CanvasAlertsSaveAllImagesToGallery } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSaveAllImagesToGallery';
 import { CanvasAlertsSelectedEntityStatus } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsSelectedEntityStatus';
+import { CanvasAlertsTextSessionActive } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsTextSessionActive';
 import { CanvasBusySpinner } from 'features/controlLayers/components/CanvasBusySpinner';
 import { CanvasContextMenuGlobalMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuGlobalMenuItems';
 import { CanvasContextMenuSelectedEntityMenuItems } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuSelectedEntityMenuItems';
@@ -95,6 +96,7 @@ export const CanvasWorkspacePanel = memo(() => {
                   {showHUD && <CanvasHUD />}
                   <CanvasAlertsSaveAllImagesToGallery />
                   <CanvasAlertsSelectedEntityStatus />
+                  <CanvasAlertsTextSessionActive />
                   <CanvasAlertsPreserveMask />
                   <CanvasAlertsInvocationProgress />
                   <CanvasAlertsBboxVisibility />
