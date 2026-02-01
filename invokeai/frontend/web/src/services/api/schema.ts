@@ -6991,12 +6991,6 @@ export type components = {
             download_path: string;
         };
         /**
-         * DyPEPreset
-         * @description Predefined DyPE configurations.
-         * @enum {string}
-         */
-        DyPEPreset: "off" | "auto" | "4k";
-        /**
          * Dynamic Prompt
          * @description Parses a prompt using adieyal/dynamicprompts' random or combinatorial generator
          */
@@ -8748,10 +8742,12 @@ export type components = {
              */
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
+             * Dype Preset
              * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
              * @default off
+             * @enum {string}
              */
-            dype_preset?: components["schemas"]["DyPEPreset"];
+            dype_preset?: "off" | "manual" | "auto" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
@@ -8940,10 +8936,12 @@ export type components = {
              */
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
+             * Dype Preset
              * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
              * @default off
+             * @enum {string}
              */
-            dype_preset?: components["schemas"]["DyPEPreset"];
+            dype_preset?: "off" | "manual" | "auto" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
