@@ -22,15 +22,15 @@ import {
 } from 'services/api/types';
 import { objectEntries } from 'tsafe';
 
-import type { FilterableModelType } from './store/modelManagerV2Slice';
+import type { ModelCategoryType } from './store/modelManagerV2Slice';
 
 export type ModelCategoryData = {
-  category: FilterableModelType;
+  category: ModelCategoryType;
   i18nKey: string;
   filter: (config: AnyModelConfig) => boolean;
 };
 
-export const MODEL_CATEGORIES: Record<FilterableModelType, ModelCategoryData> = {
+export const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
   unknown: {
     category: 'unknown',
     i18nKey: 'common.unknown',
