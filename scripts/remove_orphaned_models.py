@@ -272,11 +272,11 @@ class OrphanedModelsApp:
         'model-id/file.safetensors', then 'model-id' is the model directory and ALL files
         under it belong to that model.
         """
-        print("\nScanning models directory for orphaned files...")
+        print("\nScanning models directory for orphaned models...")
 
         # Get all model files on disk
         disk_model_files = file_mapper.get_all_model_files()
-        print(f"Found {len(disk_model_files)} model files on disk")
+        print(f"Found {len(disk_model_files)} model directories on disk")
 
         # Get all model directories from database
         db_model_directories = db_mapper.get_all_model_directories(models_path)
@@ -314,7 +314,7 @@ class OrphanedModelsApp:
         """Ask user whether they want to continue with the operation."""
         while True:
             try:
-                input_choice = input("\nDo you wish to continue? (Y or N) [N]: ")
+                input_choice = input("\nDo you wish to delete these models? (Y or N) [N]: ")
                 # Default to 'N' if user presses Enter without input
                 if input_choice.strip() == "":
                     return False
@@ -362,7 +362,7 @@ class OrphanedModelsApp:
                 print()
 
             self.orphaned_count = sum(len(files) for files in orphaned_dirs.values())
-            print(f"Total orphaned files: {self.orphaned_count}")
+            print(f"Total orphans: {self.orphaned_count}")
 
             # Ask for confirmation unless --delete flag is used
             if not self.delete_without_confirm:
