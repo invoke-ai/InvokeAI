@@ -467,7 +467,7 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
         store.dispatch(setFluxScheduler(value));
       }
     } else if (base === 'z-image') {
-      // Z-Image only supports euler, heun, lcm
+      // Z-Image supports euler, heun, lcm (but LCM only works well with Turbo, not Base)
       if (value === 'euler' || value === 'heun' || value === 'lcm') {
         store.dispatch(setZImageScheduler(value));
       }
