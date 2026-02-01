@@ -245,23 +245,26 @@ const FontSizeControl = () => {
   );
 };
 
-const lineHeightOptions = [
-  { value: 0.75, label: 'Dense' },
-  { value: 1.0, label: 'Normal' },
-  { value: 1.25, label: 'Spacious' },
-];
-
 const LineHeightSelect = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const lineHeight = useAppSelector(selectTextLineHeight);
-  const selectedOption = lineHeightOptions.find((option) => option.value === lineHeight) ?? lineHeightOptions[1];
+  const lineHeightOptions = useMemo(
+    () => [
+      { value: '0.75', label: t('controlLayers.text.lineHeightDense', { defaultValue: 'Dense' }) },
+      { value: '1.0', label: t('controlLayers.text.lineHeightNormal', { defaultValue: 'Normal' }) },
+      { value: '1.25', label: t('controlLayers.text.lineHeightSpacious', { defaultValue: 'Spacious' }) },
+    ],
+    [t]
+  );
+  const selectedOption =
+    lineHeightOptions.find((option) => parseFloat(option.value) === lineHeight) ?? lineHeightOptions[1];
   const handleLineHeightChange = useCallback(
-    (option: { value: number } | null) => {
+    (option: { value: string } | null) => {
       if (!option) {
         return;
       }
-      dispatch(textLineHeightChanged(option.value));
+      dispatch(textLineHeightChanged(parseFloat(option.value)));
     },
     [dispatch]
   );

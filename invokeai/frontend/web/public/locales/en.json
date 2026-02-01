@@ -2263,6 +2263,14 @@
         "sendToGalleryDesc": "Pressing Invoke generates and saves a unique image to your gallery.",
         "sendToCanvas": "Send To Canvas",
         "newLayerFromImage": "New Layer from Image",
+        "text": {
+            "font": "Font",
+            "size": "Size",
+            "lineHeight": "Spacing",
+            "lineHeightDense": "Dense",
+            "lineHeightNormal": "Normal",
+            "lineHeightSpacious": "Spacious"
+        },
         "newCanvasFromImage": "New Canvas from Image",
         "newImg2ImgCanvasFromImage": "New Img2Img from Image",
         "copyToClipboard": "Copy to Clipboard",

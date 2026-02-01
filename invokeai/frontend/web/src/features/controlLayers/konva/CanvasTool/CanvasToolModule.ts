@@ -141,13 +141,11 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.subscriptions.add(this.manager.$isBusy.listen(this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSettingsSlice, this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.render));
-    let previousTool: Tool = this.$tool.get();
     this.subscriptions.add(
-      this.$tool.listen((nextTool) => {
+      this.$tool.listen(() => {
         // On tool switch, reset mouse state
         this.manager.tool.$isPrimaryPointerDown.set(false);
-        void this.tools.text.onToolChanged(previousTool, nextTool);
-        previousTool = nextTool;
+        void this.tools.text.onToolChanged();
         this.render();
       })
     );
