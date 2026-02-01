@@ -11,7 +11,7 @@ The Text tool uses a set of predefined font stacks. When you choose a font, the 
 
 ## Uncommitted state
 
-While text is uncommitted, it remains editable on-canvas. Access to other tools is blocked. Switching to other tabs (|Generate, Upascaling, Workflows etc.) discards the text. The uncommitted box scan be moved and rotated:
+While text is uncommitted, it remains editable on-canvas. Access to other tools is blocked. Switching to other tabs (Generate, Upascaling, Workflows etc.) discards the text. The uncommitted box can be moved and rotated:
 
 - **Move:** Hold Ctrl (Windows/Linux) or Command (macOS) and drag to move the text box.
 - **Rotate:** Drag the rotation handle above the box. Hold **Shift** while rotating to snap to 15 degree increments.
