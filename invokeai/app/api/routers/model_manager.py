@@ -150,6 +150,28 @@ async def list_model_records(
 
 
 @model_manager_router.get(
+    "/missing",
+    operation_id="list_missing_models",
+    responses={200: {"description": "List of models with missing files"}},
+)
+async def list_missing_models() -> ModelsList:
+    """Get models whose files are missing from disk.
+
+    These are models that have database entries but their corresponding
+    weight files have been deleted externally (not via Model Manager).
+    """
+    record_store = ApiDependencies.invoker.services.model_manager.store
+    models_path = ApiDependencies.invoker.services.configuration.models_path
+
+    missing_models: list[AnyModelConfig] = []
+    for model_config in record_store.all_models():
+        if not (models_path / model_config.path).resolve().exists():
+            missing_models.append(model_config)
+
+    return ModelsList(models=missing_models)
+
+
+@model_manager_router.get(
     "/get_by_attrs",
     operation_id="get_model_records_by_attrs",
     response_model=AnyModelConfig,

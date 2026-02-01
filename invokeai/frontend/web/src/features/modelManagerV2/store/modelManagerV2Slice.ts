@@ -7,7 +7,10 @@ import { zModelType } from 'features/nodes/types/common';
 import { assert } from 'tsafe';
 import z from 'zod';
 
-const zFilterableModelType = zModelType.exclude(['onnx']).or(z.literal('refiner'));
+const zModelCategoryType = zModelType.exclude(['onnx']).or(z.literal('refiner'));
+export type ModelCategoryType = z.infer<typeof zModelCategoryType>;
+
+const zFilterableModelType = zModelCategoryType.or(z.literal('missing'));
 export type FilterableModelType = z.infer<typeof zFilterableModelType>;
 
 const zModelManagerState = z.object({

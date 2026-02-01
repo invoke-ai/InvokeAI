@@ -187,6 +187,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Missing Models
+         * @description Get models whose files are missing from disk.
+         *
+         *     These are models that have database entries but their corresponding
+         *     weight files have been deleted externally (not via Model Manager).
+         */
+        get: operations["list_missing_models"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/get_by_attrs": {
         parameters: {
             query?: never;
@@ -27698,6 +27721,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_missing_models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of models with missing files */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelsList"];
                 };
             };
         };
