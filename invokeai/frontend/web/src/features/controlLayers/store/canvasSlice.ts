@@ -257,11 +257,7 @@ const slice = createSlice({
         const entityIdentifier = getEntityIdentifier(entityState);
 
         // When sources were either deleted OR disabled, select the new merged layer
-        if (
-          isSelected ||
-          mergedEntitiesToDelete.length > 0 ||
-          mergedEntitiesToDisable.length > 0
-        ) {
+        if (isSelected || mergedEntitiesToDelete.length > 0 || mergedEntitiesToDisable.length > 0) {
           state.selectedEntityIdentifier = entityIdentifier;
         }
 
