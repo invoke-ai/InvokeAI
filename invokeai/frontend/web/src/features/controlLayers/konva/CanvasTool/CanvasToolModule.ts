@@ -566,6 +566,11 @@ export class CanvasToolModule extends CanvasModuleBase {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return;
     }
+    // Suppress canvas key handlers while an uncommitted text session is active.
+    const hasActiveTextSession = this.tools.text.$session.get() !== null;
+    if (hasActiveTextSession) {
+      return;
+    }
 
     // Handle nudging - must be before repeat, as we may want to catch repeating keys
     if (this.tools.move.isNudgeKey(e.key)) {
@@ -615,6 +620,11 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+    // Suppress canvas key handlers while an uncommitted text session is active.
+    const hasActiveTextSession = this.tools.text.$session.get() !== null;
+    if (hasActiveTextSession) {
       return;
     }
 

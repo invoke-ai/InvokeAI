@@ -105,6 +105,8 @@ const TextEditor = ({
   const lastObservedSizeRef = useRef<{ width: number; height: number } | null>(null);
   const lastMeasuredSizeRef = useRef<{ width: number; height: number } | null>(null);
   const [isComposing, setIsComposing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
   const [textValue, setTextValue] = useState(initialText);
   const [contentMetrics, setContentMetrics] = useState(() =>
     measureTextContent(buildMeasureConfig(initialText, textSettings))
@@ -260,7 +262,8 @@ const TextEditor = ({
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
       const nativeEvent = event.nativeEvent;
-      if (!isAllowedTextShortcut(nativeEvent)) {
+      const isModifierOnlyKey = event.key === 'Control' || event.key === 'Meta';
+      if (!isModifierOnlyKey && !isAllowedTextShortcut(nativeEvent)) {
         event.stopPropagation();
         nativeEvent.stopPropagation();
         nativeEvent.stopImmediatePropagation?.();
@@ -400,9 +403,29 @@ const TextEditor = ({
         startPointer,
         startAnchor: { ...anchor },
       };
+      setIsDragging(true);
       event.currentTarget.setPointerCapture(event.pointerId);
     },
     [anchor, canvasManager.tool.$tool, getStagePoint, syncModifierState]
+  );
+
+  const handleBorderPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      const startPointer = getStagePoint(event);
+      dragStateRef.current = {
+        pointerId: event.pointerId,
+        startPointer,
+        startAnchor: { ...anchor },
+      };
+      setIsDragging(true);
+      event.currentTarget.setPointerCapture(event.pointerId);
+    },
+    [anchor, getStagePoint]
   );
 
   const handleContainerPointerMove = useCallback(
@@ -431,6 +454,7 @@ const TextEditor = ({
     }
     event.currentTarget.releasePointerCapture(event.pointerId);
     dragStateRef.current = null;
+    setIsDragging(false);
   }, []);
 
   const handleRotationPointerDown = useCallback(
@@ -452,6 +476,7 @@ const TextEditor = ({
         startRotation: rotation,
         center,
       };
+      setIsRotating(true);
       event.currentTarget.setPointerCapture(event.pointerId);
     },
     [effectiveHeight, effectiveWidth, getStagePoint, rotation, textContainerData.x, textContainerData.y]
@@ -483,6 +508,26 @@ const TextEditor = ({
     }
     event.currentTarget.releasePointerCapture(event.pointerId);
     rotateStateRef.current = null;
+    setIsRotating(false);
+  }, []);
+
+  useEffect(() => {
+    const handleWindowPointerEnd = () => {
+      if (dragStateRef.current) {
+        dragStateRef.current = null;
+        setIsDragging(false);
+      }
+      if (rotateStateRef.current) {
+        rotateStateRef.current = null;
+        setIsRotating(false);
+      }
+    };
+    window.addEventListener('pointerup', handleWindowPointerEnd);
+    window.addEventListener('pointercancel', handleWindowPointerEnd);
+    return () => {
+      window.removeEventListener('pointerup', handleWindowPointerEnd);
+      window.removeEventListener('pointercancel', handleWindowPointerEnd);
+    };
   }, []);
 
   useEffect(() => {
@@ -533,6 +578,10 @@ const TextEditor = ({
   const outlineScale = stageScale ? 1 / stageScale : 1;
   const outlineWidthPx = effectiveWidth * stageScale;
   const outlineHeightPx = effectiveHeight * stageScale;
+  const borderHitInsidePx = 8;
+  const borderHitOutsetPx = 4;
+  const borderHitThicknessPx = `${(borderHitInsidePx + borderHitOutsetPx) * stageScale}px`;
+  const borderHitOutsetOffsetPx = `${borderHitOutsetPx * stageScale}px`;
 
   return (
     <Box
@@ -543,7 +592,7 @@ const TextEditor = ({
       boxSizing="border-box"
       transform={`rotate(${rotation}rad)`}
       transformOrigin="center"
-      sx={{ cursor: isCtrlPressed ? 'move' : 'text' }}
+      sx={{ cursor: isDragging ? 'grabbing' : isCtrlPressed ? 'grab' : 'text' }}
       onPointerDown={handleContainerPointerDown}
       onPointerMove={handleContainerPointerMove}
       onPointerUp={handleContainerPointerUp}
@@ -564,6 +613,60 @@ const TextEditor = ({
         borderColor="invokeBlue.300"
         borderRadius="md"
       >
+        <Box position="absolute" inset={0} pointerEvents="none" borderRadius="md">
+          <Box
+            position="absolute"
+            top={`-${borderHitOutsetOffsetPx}`}
+            left={`-${borderHitOutsetOffsetPx}`}
+            right={`-${borderHitOutsetOffsetPx}`}
+            height={borderHitThicknessPx}
+            pointerEvents="auto"
+            cursor={isDragging ? 'grabbing' : 'grab'}
+            onPointerDown={handleBorderPointerDown}
+            onPointerMove={handleContainerPointerMove}
+            onPointerUp={handleContainerPointerUp}
+            onPointerCancel={handleContainerPointerUp}
+          />
+          <Box
+            position="absolute"
+            bottom={`-${borderHitOutsetOffsetPx}`}
+            left={`-${borderHitOutsetOffsetPx}`}
+            right={`-${borderHitOutsetOffsetPx}`}
+            height={borderHitThicknessPx}
+            pointerEvents="auto"
+            cursor={isDragging ? 'grabbing' : 'grab'}
+            onPointerDown={handleBorderPointerDown}
+            onPointerMove={handleContainerPointerMove}
+            onPointerUp={handleContainerPointerUp}
+            onPointerCancel={handleContainerPointerUp}
+          />
+          <Box
+            position="absolute"
+            top={`-${borderHitOutsetOffsetPx}`}
+            bottom={`-${borderHitOutsetOffsetPx}`}
+            left={`-${borderHitOutsetOffsetPx}`}
+            width={borderHitThicknessPx}
+            pointerEvents="auto"
+            cursor={isDragging ? 'grabbing' : 'grab'}
+            onPointerDown={handleBorderPointerDown}
+            onPointerMove={handleContainerPointerMove}
+            onPointerUp={handleContainerPointerUp}
+            onPointerCancel={handleContainerPointerUp}
+          />
+          <Box
+            position="absolute"
+            top={`-${borderHitOutsetOffsetPx}`}
+            bottom={`-${borderHitOutsetOffsetPx}`}
+            right={`-${borderHitOutsetOffsetPx}`}
+            width={borderHitThicknessPx}
+            pointerEvents="auto"
+            cursor={isDragging ? 'grabbing' : 'grab'}
+            onPointerDown={handleBorderPointerDown}
+            onPointerMove={handleContainerPointerMove}
+            onPointerUp={handleContainerPointerUp}
+            onPointerCancel={handleContainerPointerUp}
+          />
+        </Box>
         <Box
           position="absolute"
           top={-ROTATE_ANCHOR_LINE_LENGTH}
@@ -586,7 +689,7 @@ const TextEditor = ({
           bg={ROTATE_ANCHOR_FILL}
           borderWidth="2px"
           borderColor={ROTATE_ANCHOR_STROKE}
-          cursor="grab"
+          cursor={isRotating ? 'grabbing' : 'grab'}
           pointerEvents="auto"
           onPointerDown={handleRotationPointerDown}
           onPointerMove={handleRotationPointerMove}
@@ -608,7 +711,7 @@ const TextEditor = ({
           minHeight: `${textSettings.fontSize}px`,
           whiteSpace: 'pre',
           outline: 'none',
-          cursor: isCtrlPressed ? 'move' : 'text',
+          cursor: isCtrlPressed ? 'grab' : 'text',
           display: 'inline-block',
           pointerEvents: isCtrlPressed ? 'none' : 'auto',
           ...textStyle,
