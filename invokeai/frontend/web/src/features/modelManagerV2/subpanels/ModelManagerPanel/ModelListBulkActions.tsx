@@ -11,7 +11,11 @@ import {
 import { t } from 'i18next';
 import { memo, useCallback, useMemo } from 'react';
 import { PiCaretDownBold, PiTrashSimpleBold } from 'react-icons/pi';
-import { modelConfigsAdapterSelectors, useGetModelConfigsQuery } from 'services/api/endpoints/models';
+import {
+  modelConfigsAdapterSelectors,
+  useGetMissingModelsQuery,
+  useGetModelConfigsQuery,
+} from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
 import { useBulkDeleteModal } from './ModelList';
@@ -31,7 +35,8 @@ export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => 
   const filteredModelType = useAppSelector(selectFilteredModelType);
   const selectedModelKeys = useAppSelector(selectSelectedModelKeys);
   const searchTerm = useAppSelector(selectSearchTerm);
-  const { data } = useGetModelConfigsQuery();
+  const { data: allModelsData } = useGetModelConfigsQuery();
+  const { data: missingModelsData } = useGetMissingModelsQuery();
   const bulkDeleteModal = useBulkDeleteModal();
 
   const handleBulkDelete = useCallback(() => {
@@ -40,10 +45,24 @@ export const ModelListBulkActions = memo(({ sx }: ModelListBulkActionsProps) => 
 
   // Calculate displayed (filtered) model keys
   const displayedModelKeys = useMemo(() => {
+    // Use missing models data when the filter is 'missing'
+    const data = filteredModelType === 'missing' ? missingModelsData : allModelsData;
     const modelConfigs = modelConfigsAdapterSelectors.selectAll(data ?? { ids: [], entities: {} });
+
+    // For missing models filter, only apply search term filter
+    if (filteredModelType === 'missing') {
+      const filtered = modelConfigs.filter(
+        (m) =>
+          m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.base.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          m.type.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      return filtered.map((m) => m.key);
+    }
+
     const filteredModels = modelsFilter(modelConfigs, searchTerm, filteredModelType);
     return filteredModels.map((m) => m.key);
-  }, [data, searchTerm, filteredModelType]);
+  }, [allModelsData, missingModelsData, searchTerm, filteredModelType]);
 
   const { allSelected, someSelected } = useMemo(() => {
     if (displayedModelKeys.length === 0) {
