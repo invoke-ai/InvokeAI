@@ -27,7 +27,12 @@ export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
       }
       dispatch(rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: op }));
       try {
-        await canvasManager.compositor.mergeByEntityIdentifiers([entityIdentifierBelowThisOne, entityIdentifier], true);
+        // Use boolean-specific merge which disables the source raster layers instead of deleting them
+        await canvasManager.compositor.mergeBooleanRasterLayers(
+          entityIdentifierBelowThisOne as CanvasEntityIdentifier<'raster_layer'>,
+          entityIdentifier as CanvasEntityIdentifier<'raster_layer'>,
+          true
+        );
       } finally {
         dispatch(rasterLayerGlobalCompositeOperationChanged({ entityIdentifier, globalCompositeOperation: undefined }));
       }

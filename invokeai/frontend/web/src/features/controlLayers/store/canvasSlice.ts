@@ -218,16 +218,35 @@ const slice = createSlice({
           isSelected?: boolean;
           isBookmarked?: boolean;
           mergedEntitiesToDelete?: string[];
+          mergedEntitiesToDisable?: string[];
           addAfter?: string;
         }>
       ) => {
-        const { id, overrides, isSelected, isBookmarked, mergedEntitiesToDelete = [], addAfter } = action.payload;
+        const {
+          id,
+          overrides,
+          isSelected,
+          isBookmarked,
+          mergedEntitiesToDelete = [],
+          mergedEntitiesToDisable = [],
+          addAfter,
+        } = action.payload;
         const entityState = getRasterLayerState(id, overrides);
 
         const index = addAfter
           ? state.rasterLayers.entities.findIndex((e) => e.id === addAfter) + 1
           : state.rasterLayers.entities.length;
         state.rasterLayers.entities.splice(index, 0, entityState);
+
+        // For boolean operations we may want to disable the source layers instead of deleting them
+        if (mergedEntitiesToDisable.length > 0) {
+          for (const idToDisable of mergedEntitiesToDisable) {
+            const entity = state.rasterLayers.entities.find((e) => e.id === idToDisable);
+            if (entity) {
+              entity.isEnabled = false;
+            }
+          }
+        }
 
         if (mergedEntitiesToDelete.length > 0) {
           state.rasterLayers.entities = state.rasterLayers.entities.filter(
@@ -237,7 +256,12 @@ const slice = createSlice({
 
         const entityIdentifier = getEntityIdentifier(entityState);
 
-        if (isSelected || mergedEntitiesToDelete.length > 0) {
+        // When sources were either deleted OR disabled, select the new merged layer
+        if (
+          isSelected ||
+          mergedEntitiesToDelete.length > 0 ||
+          mergedEntitiesToDisable.length > 0
+        ) {
           state.selectedEntityIdentifier = entityIdentifier;
         }
 
@@ -250,6 +274,7 @@ const slice = createSlice({
         isSelected?: boolean;
         isBookmarked?: boolean;
         mergedEntitiesToDelete?: string[];
+        mergedEntitiesToDisable?: string[];
         addAfter?: string;
       }) => ({
         payload: { ...payload, id: getPrefixedId('raster_layer') },

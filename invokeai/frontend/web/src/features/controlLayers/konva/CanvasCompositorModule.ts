@@ -404,6 +404,59 @@ export class CanvasCompositorModule extends CanvasModuleBase {
   };
 
   /**
+   * Performs a boolean merge specifically for raster layers.
+   * Creates a new raster layer with the composite result and disables the source layers instead of deleting them.
+   */
+  mergeBooleanRasterLayers = async (
+    below: CanvasEntityIdentifier<'raster_layer'>,
+    top: CanvasEntityIdentifier<'raster_layer'>,
+    disableSources = true
+  ): Promise<ImageDTO | null> => {
+    toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergingLayers'), withCount: false });
+
+    const adapters = this.manager.getAdapters([below, top]);
+    assert(adapters.length === 2, 'Failed to get adapters for boolean merge');
+
+    const rect = this.getRectOfAdapters(adapters);
+
+    const compositingOptions: CompositingOptions = {
+      globalCompositeOperation: 'source-over',
+    };
+
+    const result = await withResultAsync(() =>
+      this.getCompositeImageDTO(adapters, rect, { is_intermediate: true }, compositingOptions)
+    );
+
+    if (result.isErr()) {
+      this.log.error({ error: serializeError(result.error) }, 'Failed to boolean merge raster layers');
+      toast({
+        id: 'MERGE_LAYERS_TOAST',
+        title: t('controlLayers.mergeVisibleError'),
+        status: 'error',
+        withCount: false,
+      });
+      return null;
+    }
+
+    // Add new raster layer while disabling the merged sources
+    const addEntityArg = {
+      isSelected: true,
+      overrides: {
+        objects: [imageDTOToImageObject(result.value)],
+        position: { x: Math.floor(rect.x), y: Math.floor(rect.y) },
+      },
+      mergedEntitiesToDisable: disableSources ? [below.id, top.id] : [],
+      addAfter: top.id,
+    } as const;
+
+    this.manager.stateApi.addRasterLayer(addEntityArg as any);
+
+    toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergeVisibleOk'), status: 'success', withCount: false });
+
+    return result.value;
+  };
+
+  /**
    * Merges all visible entities of the given type. This is used for "merge visible" functionality.
    *
    * @param type The type of entity to merge
