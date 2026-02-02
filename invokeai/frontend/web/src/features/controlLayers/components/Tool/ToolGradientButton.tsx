@@ -18,7 +18,14 @@ export const ToolGradientButton = memo(() => {
 
   return (
     <Tooltip label={gradientLabel} placement="end">
-      <IconButton aria-label={gradientLabel} icon={<GradientToolIcon />} isActive={isSelected} colorScheme={isSelected ? 'invokeBlue' : 'base'} variant="solid" onClick={handleClick} />
+      <IconButton
+        aria-label={gradientLabel}
+        icon={<GradientToolIcon />}
+        isActive={isSelected}
+        colorScheme={isSelected ? 'invokeBlue' : 'base'}
+        variant="solid"
+        onClick={handleClick}
+      />
     </Tooltip>
   );
 });
