@@ -14,7 +14,6 @@ import {
   mapId,
   previewBlob,
 } from 'features/controlLayers/konva/util';
-import type { rasterLayerAdded } from 'features/controlLayers/store/canvasSlice';
 import {
   selectActiveControlLayerEntities,
   selectActiveInpaintMaskEntities,
@@ -39,7 +38,7 @@ import { serializeError } from 'serialize-error';
 import { getImageDTOSafe, uploadImage } from 'services/api/endpoints/images';
 import type { ImageDTO, UploadImageArg } from 'services/api/types';
 import stableHash from 'stable-hash';
-import type { Equals, Param0 } from 'tsafe';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 import type { JsonObject, SetOptional } from 'type-fest';
 
@@ -450,7 +449,7 @@ export class CanvasCompositorModule extends CanvasModuleBase {
       addAfter: top.id,
     };
 
-    this.manager.stateApi.addRasterLayer(addEntityArg as Param0<typeof rasterLayerAdded>);
+    this.manager.stateApi.addRasterLayer(addEntityArg);
 
     toast({ id: 'MERGE_LAYERS_TOAST', title: t('controlLayers.mergeVisibleOk'), status: 'success', withCount: false });
 
