@@ -3,6 +3,7 @@ import { CanvasSettingsPopover } from 'features/controlLayers/components/Setting
 import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { ToolGradientClipToggle } from 'features/controlLayers/components/Tool/ToolGradientClipToggle';
+import { ToolGradientModeToggle } from 'features/controlLayers/components/Tool/ToolGradientModeToggle';
 import { ToolWidthPicker } from 'features/controlLayers/components/Tool/ToolWidthPicker';
 import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
 import { CanvasToolbarFitBboxToMasksButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToMasksButton';
@@ -48,8 +49,9 @@ export const CanvasToolbar = memo(() => {
       <Flex alignItems="center" h="full" flexGrow={1}>
         <ToolFillColorPicker />
         {isGradientSelected && (
-          <Box ms={2} mt="-2px">
+          <Box ms={2} mt="-2px" display="flex" alignItems="center" gap={2}>
             <ToolGradientClipToggle />
+            <ToolGradientModeToggle />
           </Box>
         )}
         {showToolWithPicker && <ToolWidthPicker />}
