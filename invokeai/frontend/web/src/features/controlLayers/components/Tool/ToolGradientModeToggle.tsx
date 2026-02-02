@@ -1,10 +1,9 @@
 import { ButtonGroup, IconButton, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { GradientLinearIcon, GradientRadialIcon } from 'features/controlLayers/components/Tool/GradientIcons';
 import { selectGradientType, settingsGradientTypeChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { GradientLinearIcon, GradientRadialIcon } from './GradientIcons';
 
 export const ToolGradientModeToggle = memo(() => {
   const { t } = useTranslation();
@@ -22,8 +21,6 @@ export const ToolGradientModeToggle = memo(() => {
           icon={<GradientLinearIcon />}
           colorScheme={gradientType === 'linear' ? 'invokeBlue' : 'base'}
           variant="solid"
-          w="30px"
-          h="30px"
           onClick={onLinearClick}
         />
       </Tooltip>
@@ -33,8 +30,6 @@ export const ToolGradientModeToggle = memo(() => {
           icon={<GradientRadialIcon />}
           colorScheme={gradientType === 'radial' ? 'invokeBlue' : 'base'}
           variant="solid"
-          w="30px"
-          h="30px"
           onClick={onRadialClick}
         />
       </Tooltip>

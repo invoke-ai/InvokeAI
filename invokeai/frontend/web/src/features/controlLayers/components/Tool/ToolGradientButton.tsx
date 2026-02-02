@@ -1,11 +1,8 @@
 import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { GradientToolIcon } from 'features/controlLayers/components/Tool/GradientIcons';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { GradientToolIcon } from './GradientIcons';
-
-// icons moved to GradientIcons.tsx
 
 export const ToolGradientButton = memo(() => {
   const { t } = useTranslation();
