@@ -2018,7 +2018,6 @@
         "vae": "VAE",
         "parsingFailed": "Analisi non riuscita",
         "recallParameter": "Richiama {{label}}",
-        "dypePreset": "",
         "seedVarianceRandomizePercent": "Casualità della varianza del seme %",
         "seedVarianceEnabled": "Varianza seme abilitata",
         "seedVarianceStrength": "Intensità della varianza del seme"
