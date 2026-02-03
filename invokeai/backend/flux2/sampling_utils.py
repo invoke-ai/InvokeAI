@@ -110,7 +110,9 @@ def unpack_flux2(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
 def compute_empirical_mu(image_seq_len: int, num_steps: int) -> float:
     """Compute empirical mu for FLUX.2 schedule shifting.
 
-    This matches the diffusers Flux2Pipeline implementation.
+    This implementation smooths the transition between low and high resolution formulas
+    to avoid the discontinuity present in the original diffusers implementation at 4300.
+
     The mu value controls how much the schedule is shifted towards higher timesteps.
 
     Args:
@@ -123,18 +125,33 @@ def compute_empirical_mu(image_seq_len: int, num_steps: int) -> float:
     a1, b1 = 8.73809524e-05, 1.89833333
     a2, b2 = 0.00016927, 0.45666666
 
-    if image_seq_len > 4300:
-        mu = a2 * image_seq_len + b2
-        return float(mu)
-
+    # Compute both formulas
+    # Low-res formula: interpolates based on num_steps (between 10 and 200 steps)
     m_200 = a2 * image_seq_len + b2
     m_10 = a1 * image_seq_len + b1
-
     a = (m_200 - m_10) / 190.0
     b = m_200 - 200.0 * a
-    mu = a * num_steps + b
+    mu_low_res = a * num_steps + b
 
-    return float(mu)
+    # High-res formula: independent of num_steps
+    mu_high_res = a2 * image_seq_len + b2
+
+    # Smooth transition between formulas to avoid discontinuity
+    # At 1024x1024 (seq_len=4096) and below: use low-res formula
+    # At 1073x1073 (seq_len=4500) and above: use high-res formula
+    # In between: smooth blend
+    if image_seq_len <= 4096:
+        return float(mu_low_res)
+    elif image_seq_len >= 4500:
+        return float(mu_high_res)
+    else:
+        # Smooth cosine interpolation in transition zone (4096-4500)
+        # This avoids the sharp discontinuity at 4300 in the original implementation
+        blend_factor = (image_seq_len - 4096) / (4500 - 4096)
+        # Use cosine for smoother transition: (1 - cos(π*t)) / 2
+        blend_smooth = (1.0 - math.cos(math.pi * blend_factor)) / 2.0
+        mu = (1.0 - blend_smooth) * mu_low_res + blend_smooth * mu_high_res
+        return float(mu)
 
 
 def get_schedule_flux2(

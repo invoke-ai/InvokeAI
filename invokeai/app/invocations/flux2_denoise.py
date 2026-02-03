@@ -374,6 +374,11 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     shift=3.0,
                 )
             else:
+                # Calculate max_image_seq_len dynamically based on actual resolution
+                # This ensures the scheduler can properly handle any resolution, not just 1024x1024
+                # Previously hardcoded to 4096 (1024x1024), which caused degradation at higher resolutions
+                max_seq_for_scheduler = max(4096, image_seq_len)
+
                 scheduler = scheduler_class(
                     num_train_timesteps=1000,
                     shift=3.0,
@@ -381,7 +386,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     base_shift=0.5,
                     max_shift=1.15,
                     base_image_seq_len=256,
-                    max_image_seq_len=4096,
+                    max_image_seq_len=max_seq_for_scheduler,
                     time_shift_type="exponential",
                 )
 
