@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from threading import Event
-from typing import Optional, Protocol
+from typing import Any, Optional, Protocol
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
 from invokeai.app.services.invocation_services import InvocationServices
@@ -36,10 +36,13 @@ class SessionRunnerBase(ABC):
         pass
 
     @abstractmethod
-    def run_node(self, transient_storage: dict, invocation: BaseInvocation, queue_item: SessionQueueItem) -> None:
+    def run_node(
+        self, transient_storage: dict[str, Any], invocation: BaseInvocation, queue_item: SessionQueueItem
+    ) -> None:
         """Run a single node in the graph.
 
         Args:
+            transient_storage: Transient storage passed to each node that executes.
             invocation: The invocation to run.
             queue_item: The session queue item.
         """

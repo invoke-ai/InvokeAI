@@ -317,10 +317,12 @@ def test_are_connection_types_compatible_accepts_subclass_to_base():
     assert are_connection_types_compatible(Child, Base) is True
 
 
-def _make_invocation_context() -> InvocationContext:
+def _make_invocation_context(transient_storage: Optional[dict] = None) -> InvocationContext:
     """
     Best-effort constructor that adapts to InvocationContext's signature by supplying Mock()
     for any required parameters.
+
+    If transient_storage is provided, it is reused (per-workflow lifetime).
     """
     sig = inspect.signature(InvocationContext)
     kwargs = {}
@@ -328,9 +330,8 @@ def _make_invocation_context() -> InvocationContext:
         if name == "self":
             continue
 
-        # Ensure dict-like transient storage (and satisfy required ctor arg).
         if name == "transient_storage":
-            kwargs[name] = {}
+            kwargs[name] = {} if transient_storage is None else transient_storage
             continue
 
         if param.default is not inspect._empty:
@@ -339,8 +340,6 @@ def _make_invocation_context() -> InvocationContext:
         kwargs[name] = Mock(name=f"InvocationContext.{name}")
 
     ctx = InvocationContext(**kwargs)
-
-    # Strong guarantee for these tests:
     assert isinstance(ctx.transient_storage, dict)
     return ctx
 
@@ -401,7 +400,13 @@ def test_transient_storage_persists_within_one_graph_execution_and_resets_for_ne
     class _TransientStorageTestOutput(BaseInvocationOutput):
         value: Optional[str] = OutputField(default=None)
 
-    @invocation("transient_storage_write_test", title="Transient Storage Write Test", tags=["test"], version="1.0.0")
+    @invocation(
+        "transient_storage_write_test",
+        title="Transient Storage Write Test",
+        tags=["test"],
+        version="1.0.0",
+        use_cache=False
+    )
     class _TransientStorageWriteTestInvocation(BaseInvocation):
         key: str = InputField(default="k")
         value: str = InputField(default="v")
@@ -410,7 +415,13 @@ def test_transient_storage_persists_within_one_graph_execution_and_resets_for_ne
             context.transient_storage[self.key] = self.value
             return _TransientStorageTestOutput(value=self.value)
 
-    @invocation("transient_storage_read_test", title="Transient Storage Read Test", tags=["test"], version="1.0.0")
+    @invocation(
+        "transient_storage_read_test",
+        title="Transient Storage Read Test",
+        tags=["test"],
+        version="1.0.0",
+        use_cache=False
+    )
     class _TransientStorageReadTestInvocation(BaseInvocation):
         key: str = InputField(default="k")
         trigger: str = InputField(default="")  # only to enforce dependency
@@ -418,18 +429,21 @@ def test_transient_storage_persists_within_one_graph_execution_and_resets_for_ne
         def invoke(self, context: InvocationContext) -> _TransientStorageTestOutput:
             return _TransientStorageTestOutput(value=_ts_get(context.transient_storage, self.key))
 
-    def run_graph(graph: Graph, context: InvocationContext) -> list[tuple[BaseInvocation, BaseInvocationOutput]]:
+    def run_graph(graph: Graph, transient_storage: dict) -> list[tuple[BaseInvocation, BaseInvocationOutput]]:
         state = GraphExecutionState(graph=graph)
         out: list[tuple[BaseInvocation, BaseInvocationOutput]] = []
         while True:
             n = state.next()
             if n is None:
                 break
-            o = n.invoke(context)
+            # Mirror production: new InvocationContext per node, shared transient_storage per workflow
+            ctx = _make_invocation_context(transient_storage=transient_storage)
+            o = n.invoke(ctx)
             state.complete(n.id, o)
             out.append((n, o))
         assert state.is_complete()
         return out
+
 
     # Execution 1: write then read in the same workflow should succeed.
     g1 = Graph()
@@ -437,8 +451,8 @@ def test_transient_storage_persists_within_one_graph_execution_and_resets_for_ne
     g1.add_node(_TransientStorageReadTestInvocation(id="read", key="k"))
     g1.add_edge(create_edge("write", "value", "read", "trigger"))
 
-    ctx1 = _make_invocation_context()
-    trace1 = run_graph(g1, ctx1)
+    ts1: dict = {}
+    trace1 = run_graph(g1, ts1)
 
     read_outputs_1 = [o for (n, o) in trace1 if isinstance(n, _TransientStorageReadTestInvocation)]
     assert len(read_outputs_1) == 1
@@ -448,8 +462,8 @@ def test_transient_storage_persists_within_one_graph_execution_and_resets_for_ne
     g2 = Graph()
     g2.add_node(_TransientStorageReadTestInvocation(id="read_only", key="k"))
 
-    ctx2 = _make_invocation_context()
-    trace2 = run_graph(g2, ctx2)
+    ts2: dict = {}
+    trace2 = run_graph(g2, ts2)
 
     read_outputs_2 = [o for (n, o) in trace2 if isinstance(n, _TransientStorageReadTestInvocation)]
     assert len(read_outputs_2) == 1

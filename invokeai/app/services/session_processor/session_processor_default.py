@@ -3,7 +3,7 @@ import traceback
 from contextlib import suppress
 from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
-from typing import Optional
+from typing import Any, Optional
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
 from invokeai.app.services.events.events_common import (
@@ -111,7 +111,7 @@ class DefaultSessionRunner(SessionRunnerBase):
 
         self._on_after_run_session(queue_item=queue_item)
 
-    def run_node(self, transient_storage: dict, invocation: BaseInvocation, queue_item: SessionQueueItem):
+    def run_node(self, transient_storage: dict[str, Any], invocation: BaseInvocation, queue_item: SessionQueueItem):
         try:
             # Any unhandled exception in this scope is an invocation error & will fail the graph
             with self._services.performance_statistics.collect_stats(invocation, queue_item.session_id):

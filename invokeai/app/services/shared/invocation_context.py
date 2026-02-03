@@ -45,7 +45,8 @@ For example:
 Wrapping these services provides a simpler and safer interface for nodes to use.
 
 When a node executes, a fresh `InvocationContext` is built for it, ensuring nodes cannot interfere
-with each other.
+with each other with the exception of shared per-graph transient_storage for intra-workflow node
+communication.
 
 Many of the wrappers have the same signature as the methods they wrap. This allows us to write
 user-facing docstrings and not need to go and update the internal services to match.
@@ -771,6 +772,7 @@ def build_invocation_context(
     Args:
         services: The invocation services to wrap.
         data: The invocation context data.
+        transient_storage: Transient storage passed along to every executed node in this workflow.
 
     Returns:
         The invocation context.
@@ -796,7 +798,7 @@ def build_invocation_context(
         conditioning=conditioning,
         services=services,
         boards=boards,
-        transient_storage=transient_storage
+        transient_storage=transient_storage,
     )
 
     return ctx
