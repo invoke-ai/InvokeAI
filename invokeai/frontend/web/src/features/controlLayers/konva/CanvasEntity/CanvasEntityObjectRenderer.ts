@@ -8,6 +8,7 @@ import { CanvasObjectBrushLine } from 'features/controlLayers/konva/CanvasObject
 import { CanvasObjectBrushLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectBrushLineWithPressure';
 import { CanvasObjectEraserLine } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLine';
 import { CanvasObjectEraserLineWithPressure } from 'features/controlLayers/konva/CanvasObject/CanvasObjectEraserLineWithPressure';
+import { CanvasObjectGradient } from 'features/controlLayers/konva/CanvasObject/CanvasObjectGradient';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
@@ -401,6 +402,16 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
       }
 
       didRender = renderer.update(objectState, force || isFirstRender);
+    } else if (objectState.type === 'gradient') {
+      assert(renderer instanceof CanvasObjectGradient || !renderer);
+
+      if (!renderer) {
+        renderer = new CanvasObjectGradient(objectState, this);
+        this.renderers.set(renderer.id, renderer);
+        this.konva.objectGroup.add(renderer.konva.group);
+      }
+
+      didRender = renderer.update(objectState, force || isFirstRender);
     } else if (objectState.type === 'image') {
       assert(renderer instanceof CanvasObjectImage || !renderer);
 
@@ -434,8 +445,9 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
     for (const renderer of this.renderers.values()) {
       const isEraserLine = renderer instanceof CanvasObjectEraserLine;
       const isImage = renderer instanceof CanvasObjectImage;
+      const imageIgnoresTransparency = isImage && renderer.state.usePixelBbox === false;
       const hasClip = renderer instanceof CanvasObjectBrushLine && renderer.state.clip;
-      if (isEraserLine || hasClip || isImage) {
+      if (isEraserLine || hasClip || (isImage && !imageIgnoresTransparency)) {
         needsPixelBbox = true;
         break;
       }

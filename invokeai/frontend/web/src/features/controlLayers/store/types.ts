@@ -9,7 +9,9 @@ import {
   zParameterCLIPGEmbedModel,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
+  zParameterFluxDypeExponent,
   zParameterFluxDypePreset,
+  zParameterFluxDypeScale,
   zParameterFluxScheduler,
   zParameterGuidance,
   zParameterImageDimension,
@@ -103,7 +105,7 @@ const zIPMethodV2 = z.enum(['full', 'style', 'composition', 'style_strong', 'sty
 export type IPMethodV2 = z.infer<typeof zIPMethodV2>;
 export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safeParse(v).success;
 
-const _zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'view', 'bbox', 'colorPicker', 'text']);
+const _zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'gradient', 'view', 'bbox', 'colorPicker', 'text']);
 export type Tool = z.infer<typeof _zTool>;
 
 const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, {
@@ -258,10 +260,47 @@ const zCanvasRectState = z.object({
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
+// Gradient state includes clip metadata so the tool can optionally clip to drag gesture.
+const zCanvasLinearGradientState = z.object({
+  id: zId,
+  type: z.literal('gradient'),
+  gradientType: z.literal('linear'),
+  rect: zRect,
+  start: zCoordinate,
+  end: zCoordinate,
+  clipCenter: zCoordinate,
+  clipRadius: z.number().min(0),
+  clipAngle: z.number(),
+  clipEnabled: z.boolean().default(true),
+  bboxRect: zRect,
+  fgColor: zRgbaColor,
+  bgColor: zRgbaColor,
+});
+const zCanvasRadialGradientState = z.object({
+  id: zId,
+  type: z.literal('gradient'),
+  gradientType: z.literal('radial'),
+  rect: zRect,
+  center: zCoordinate,
+  radius: z.number().min(0),
+  clipCenter: zCoordinate,
+  clipRadius: z.number().min(0),
+  clipEnabled: z.boolean().default(true),
+  bboxRect: zRect,
+  fgColor: zRgbaColor,
+  bgColor: zRgbaColor,
+});
+const zCanvasGradientState = z.discriminatedUnion('gradientType', [
+  zCanvasLinearGradientState,
+  zCanvasRadialGradientState,
+]);
+export type CanvasGradientState = z.infer<typeof zCanvasGradientState>;
+
 const zCanvasImageState = z.object({
   id: zId,
   type: z.literal('image'),
   image: z.union([zImageWithDims, zImageWithDimsDataURL]),
+  usePixelBbox: z.boolean().optional(),
 });
 export type CanvasImageState = z.infer<typeof zCanvasImageState>;
 
@@ -272,6 +311,7 @@ const zCanvasObjectState = z.union([
   zCanvasRectState,
   zCanvasBrushLineWithPressureState,
   zCanvasEraserLineWithPressureState,
+  zCanvasGradientState,
 ]);
 export type CanvasObjectState = z.infer<typeof zCanvasObjectState>;
 
@@ -616,6 +656,8 @@ export const zParamsState = z.object({
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
   fluxDypePreset: zParameterFluxDypePreset,
+  fluxDypeScale: zParameterFluxDypeScale,
+  fluxDypeExponent: zParameterFluxDypeExponent,
   zImageScheduler: zParameterZImageScheduler,
   upscaleScheduler: zParameterScheduler,
   upscaleCfgScale: zParameterCFGScale,
@@ -680,6 +722,8 @@ export const getInitialParamsState = (): ParamsState => ({
   scheduler: 'dpmpp_3m_k',
   fluxScheduler: 'euler',
   fluxDypePreset: 'off',
+  fluxDypeScale: 2.0,
+  fluxDypeExponent: 2.0,
   zImageScheduler: 'euler',
   upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,
@@ -823,6 +867,7 @@ export type EntityEraserLineAddedPayload = EntityIdentifierPayload<{
   eraserLine: CanvasEraserLineState | CanvasEraserLineWithPressureState;
 }>;
 export type EntityRectAddedPayload = EntityIdentifierPayload<{ rect: CanvasRectState }>;
+export type EntityGradientAddedPayload = EntityIdentifierPayload<{ gradient: CanvasGradientState }>;
 export type EntityRasterizedPayload = EntityIdentifierPayload<{
   imageObject: CanvasImageState;
   position: Coordinate;

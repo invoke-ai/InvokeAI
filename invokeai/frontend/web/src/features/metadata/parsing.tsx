@@ -18,7 +18,9 @@ import {
   setCfgRescaleMultiplier,
   setCfgScale,
   setClipSkip,
+  setFluxDypeExponent,
   setFluxDypePreset,
+  setFluxDypeScale,
   setFluxScheduler,
   setGuidance,
   setImg2imgStrength,
@@ -54,7 +56,9 @@ import type {
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
   ParameterCLIPSkip,
+  ParameterFluxDypeExponent,
   ParameterFluxDypePreset,
+  ParameterFluxDypeScale,
   ParameterGuidance,
   ParameterHeight,
   ParameterModel,
@@ -78,7 +82,9 @@ import {
   zParameterCFGRescaleMultiplier,
   zParameterCFGScale,
   zParameterCLIPSkip,
+  zParameterFluxDypeExponent,
   zParameterFluxDypePreset,
+  zParameterFluxDypeScale,
   zParameterGuidance,
   zParameterImageDimension,
   zParameterNegativePrompt,
@@ -393,6 +399,56 @@ const FluxDypePreset: SingleMetadataHandler<ParameterFluxDypePreset> = {
 };
 //#endregion FluxDypePreset
 
+//#region FluxDypeScale
+const FluxDypeScale: SingleMetadataHandler<ParameterFluxDypeScale> = {
+  [SingleMetadataKey]: true,
+  type: 'FluxDypeScale',
+  parse: (metadata, _store) => {
+    // Only parse if preset is 'manual' (custom values)
+    const preset = getProperty(metadata, 'dype_preset');
+    if (preset !== 'manual') {
+      throw new Error('DyPE scale only available when preset is "manual"');
+    }
+    const raw = getProperty(metadata, 'dype_scale');
+    const parsed = zParameterFluxDypeScale.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setFluxDypeScale(value));
+  },
+  i18nKey: 'metadata.dypeScale',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterFluxDypeScale>) => (
+    <MetadataPrimitiveValue value={value} />
+  ),
+};
+//#endregion FluxDypeScale
+
+//#region FluxDypeExponent
+const FluxDypeExponent: SingleMetadataHandler<ParameterFluxDypeExponent> = {
+  [SingleMetadataKey]: true,
+  type: 'FluxDypeExponent',
+  parse: (metadata, _store) => {
+    // Only parse if preset is 'manual' (custom values)
+    const preset = getProperty(metadata, 'dype_preset');
+    if (preset !== 'manual') {
+      throw new Error('DyPE exponent only available when preset is "manual"');
+    }
+    const raw = getProperty(metadata, 'dype_exponent');
+    const parsed = zParameterFluxDypeExponent.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setFluxDypeExponent(value));
+  },
+  i18nKey: 'metadata.dypeExponent',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterFluxDypeExponent>) => (
+    <MetadataPrimitiveValue value={value} />
+  ),
+};
+//#endregion FluxDypeExponent
+
 //#region Scheduler
 const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
   [SingleMetadataKey]: true,
@@ -567,9 +623,14 @@ const ZImageSeedVarianceEnabled: SingleMetadataHandler<boolean> = {
   [SingleMetadataKey]: true,
   type: 'ZImageSeedVarianceEnabled',
   parse: (metadata, _store) => {
-    const raw = getProperty(metadata, 'z_image_seed_variance_enabled');
-    const parsed = z.boolean().parse(raw);
-    return Promise.resolve(parsed);
+    try {
+      const raw = getProperty(metadata, 'z_image_seed_variance_enabled');
+      const parsed = z.boolean().parse(raw);
+      return Promise.resolve(parsed);
+    } catch {
+      // Default to false when metadata doesn't contain this field (e.g. older images)
+      return Promise.resolve(false);
+    }
   },
   recall: (value, store) => {
     store.dispatch(setZImageSeedVarianceEnabled(value));
@@ -1140,6 +1201,8 @@ export const ImageMetadataHandlers = {
   CLIPSkip,
   Guidance,
   FluxDypePreset,
+  FluxDypeScale,
+  FluxDypeExponent,
   Width,
   Height,
   Seed,
