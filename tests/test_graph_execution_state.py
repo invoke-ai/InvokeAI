@@ -4,6 +4,14 @@ from unittest.mock import Mock
 import inspect
 import pytest
 
+# This import must happen before other invoke imports or test in other files(!!) break
+from tests.test_nodes import (
+    PromptCollectionTestInvocation,
+    PromptTestInvocation,
+    TextToImageTestInvocation,
+    create_edge,
+)
+
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from invokeai.app.invocations.collections import RangeInvocation
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
@@ -12,14 +20,6 @@ from invokeai.app.services.shared.graph import (
     Graph,
     GraphExecutionState,
     IterateInvocation,
-)
-
-# This import must happen before other invoke imports or test in other files(!!) break
-from tests.test_nodes import (
-    PromptCollectionTestInvocation,
-    PromptTestInvocation,
-    TextToImageTestInvocation,
-    create_edge,
 )
 
 
