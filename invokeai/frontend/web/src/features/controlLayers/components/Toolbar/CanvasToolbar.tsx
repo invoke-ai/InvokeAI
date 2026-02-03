@@ -3,9 +3,9 @@ import { CanvasSettingsPopover } from 'features/controlLayers/components/Setting
 import { TextToolOptions } from 'features/controlLayers/components/Text/TextToolOptions';
 import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
-import { ToolOptionsRowContainer } from 'features/controlLayers/components/Tool/ToolOptionsRowContainer';
 import { ToolGradientClipToggle } from 'features/controlLayers/components/Tool/ToolGradientClipToggle';
 import { ToolGradientModeToggle } from 'features/controlLayers/components/Tool/ToolGradientModeToggle';
+import { ToolOptionsRowContainer } from 'features/controlLayers/components/Tool/ToolOptionsRowContainer';
 import { ToolWidthPicker } from 'features/controlLayers/components/Tool/ToolWidthPicker';
 import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
 import { CanvasToolbarFitBboxToMasksButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToMasksButton';
