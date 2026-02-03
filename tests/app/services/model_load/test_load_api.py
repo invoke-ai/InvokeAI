@@ -25,6 +25,7 @@ def mock_context(
         services=mock_services,
         data=InvocationContextData(queue_item=None, invocation=None, source_invocation_id=None),  # type: ignore
         is_canceled=None,  # type: ignore
+        transient_storage={},
     )
 
 
