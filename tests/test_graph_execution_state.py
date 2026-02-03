@@ -38,7 +38,7 @@ def invoke_next(g: GraphExecutionState) -> tuple[Optional[BaseInvocation], Optio
         return (None, None)
 
     print(f"invoking {n.id}: {type(n)}")
-    o = n.invoke(Mock(InvocationContext))
+    o = n.invoke(Mock(spec=InvocationContext))
     g.complete(n.id, o)
 
     return (n, o)
@@ -194,7 +194,7 @@ def test_graph_executes_depth_first():
         n = g.next()
         if n is None:
             break
-        o = n.invoke(Mock(InvocationContext))
+        o = n.invoke(Mock(spec=InvocationContext))
         g.complete(n.id, o)
         order.append(n.id)
 
