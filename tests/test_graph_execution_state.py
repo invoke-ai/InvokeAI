@@ -1,6 +1,7 @@
 from typing import Optional
 from unittest.mock import Mock
 
+import inspect
 import pytest
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
@@ -314,3 +315,142 @@ def test_are_connection_types_compatible_accepts_subclass_to_base():
         pass
 
     assert are_connection_types_compatible(Child, Base) is True
+
+
+def _make_invocation_context() -> InvocationContext:
+    """
+    Best-effort constructor that adapts to InvocationContext's signature by supplying Mock()
+    for any required parameters.
+    """
+    sig = inspect.signature(InvocationContext)
+    kwargs = {}
+    for name, param in sig.parameters.items():
+        if name == "self":
+            continue
+
+        # Ensure dict-like transient storage (and satisfy required ctor arg).
+        if name == "transient_storage":
+            kwargs[name] = {}
+            continue
+
+        if param.default is not inspect._empty:
+            continue
+
+        kwargs[name] = Mock(name=f"InvocationContext.{name}")
+
+    ctx = InvocationContext(**kwargs)
+
+    # Strong guarantee for these tests:
+    assert isinstance(ctx.transient_storage, dict)
+    return ctx
+
+
+def _ts_get(storage, key: str):
+    try:
+        return storage[key]
+    except Exception:
+        # KeyError for dict-like; some storages may raise different exceptions
+        return None
+
+
+def _ts_contains(storage, key: str) -> bool:
+    try:
+        return key in storage
+    except Exception:
+        try:
+            storage[key]
+            return True
+        except Exception:
+            return False
+
+
+def test_invocation_context_transient_storage_is_per_instance_and_starts_empty():
+    ctx1 = _make_invocation_context()
+    ctx2 = _make_invocation_context()
+
+    assert hasattr(ctx1, "transient_storage")
+    assert hasattr(ctx2, "transient_storage")
+
+    assert ctx1.transient_storage == {}
+    assert ctx2.transient_storage == {}
+
+    # Must not be shared across contexts (guards against class-level mutable default / singleton).
+    assert ctx1.transient_storage is not ctx2.transient_storage
+
+    # Must start empty for a new execution context.
+    assert not _ts_contains(ctx1.transient_storage, "__sentinel__")
+    assert not _ts_contains(ctx2.transient_storage, "__sentinel__")
+
+    ctx1.transient_storage["__sentinel__"] = "x"
+
+    # Must not appear in the second context.
+    assert not _ts_contains(ctx2.transient_storage, "__sentinel__")
+
+
+def test_transient_storage_persists_within_one_graph_execution_and_resets_for_next():
+    """
+    a) Persists across multiple node invocations during a single workflow execution.
+    b) Does not leak into a second workflow execution (fresh InvocationContext).
+    """
+
+    # Local imports to avoid perturbing module import ordering.
+    from invokeai.app.invocations.baseinvocation import invocation, invocation_output
+    from invokeai.app.invocations.fields import InputField, OutputField
+
+    @invocation_output("transient_storage_test_output")
+    class _TransientStorageTestOutput(BaseInvocationOutput):
+        value: Optional[str] = OutputField(default=None)
+
+    @invocation("transient_storage_write_test", title="Transient Storage Write Test", tags=["test"], version="1.0.0")
+    class _TransientStorageWriteTestInvocation(BaseInvocation):
+        key: str = InputField(default="k")
+        value: str = InputField(default="v")
+
+        def invoke(self, context: InvocationContext) -> _TransientStorageTestOutput:
+            context.transient_storage[self.key] = self.value
+            return _TransientStorageTestOutput(value=self.value)
+
+    @invocation("transient_storage_read_test", title="Transient Storage Read Test", tags=["test"], version="1.0.0")
+    class _TransientStorageReadTestInvocation(BaseInvocation):
+        key: str = InputField(default="k")
+        trigger: str = InputField(default="")  # only to enforce dependency
+
+        def invoke(self, context: InvocationContext) -> _TransientStorageTestOutput:
+            return _TransientStorageTestOutput(value=_ts_get(context.transient_storage, self.key))
+
+    def run_graph(graph: Graph, context: InvocationContext) -> list[tuple[BaseInvocation, BaseInvocationOutput]]:
+        state = GraphExecutionState(graph=graph)
+        out: list[tuple[BaseInvocation, BaseInvocationOutput]] = []
+        while True:
+            n = state.next()
+            if n is None:
+                break
+            o = n.invoke(context)
+            state.complete(n.id, o)
+            out.append((n, o))
+        assert state.is_complete()
+        return out
+
+    # Execution 1: write then read in the same workflow should succeed.
+    g1 = Graph()
+    g1.add_node(_TransientStorageWriteTestInvocation(id="write", key="k", value="hello"))
+    g1.add_node(_TransientStorageReadTestInvocation(id="read", key="k"))
+    g1.add_edge(create_edge("write", "value", "read", "trigger"))
+
+    ctx1 = _make_invocation_context()
+    trace1 = run_graph(g1, ctx1)
+
+    read_outputs_1 = [o for (n, o) in trace1 if isinstance(n, _TransientStorageReadTestInvocation)]
+    assert len(read_outputs_1) == 1
+    assert read_outputs_1[0].value == "hello"
+
+    # Execution 2: read-only graph with a fresh InvocationContext must not see prior state.
+    g2 = Graph()
+    g2.add_node(_TransientStorageReadTestInvocation(id="read_only", key="k"))
+
+    ctx2 = _make_invocation_context()
+    trace2 = run_graph(g2, ctx2)
+
+    read_outputs_2 = [o for (n, o) in trace2 if isinstance(n, _TransientStorageReadTestInvocation)]
+    assert len(read_outputs_2) == 1
+    assert read_outputs_2[0].value is None
