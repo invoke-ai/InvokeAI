@@ -521,6 +521,62 @@ const zRasterLayerAdjustments = z.object({
 });
 export type RasterLayerAdjustments = z.infer<typeof zRasterLayerAdjustments>;
 
+/**
+ * Available global composite operations (blend modes) for layers.
+ * These are the standard Canvas 2D composite operations.
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation
+ * NOTE: All of these are supported by canvas layers, but not all are supported by CSS blend modes (live rendering).
+ */
+const COMPOSITE_OPERATIONS = [
+  'darken',
+  'multiply',
+  'color-burn',
+  'lighten',
+  'screen',
+  'color-dodge',
+  'lighter',
+  'overlay',
+  'soft-light',
+  'hard-light',
+  'difference',
+  'exclusion',
+  'xor',
+  'hue',
+  'saturation',
+  'color',
+  'luminosity',
+  'source-over',
+  'source-in',
+  'source-out',
+  'source-atop',
+  'destination-over',
+  'destination-in',
+  'destination-out',
+  'destination-atop',
+  'copy',
+] as const;
+
+export type CompositeOperation = (typeof COMPOSITE_OPERATIONS)[number];
+
+// Subset of color blend modes for UI selection. All are supported by both Konva and CSS.
+export const COLOR_BLEND_MODES: CompositeOperation[] = [
+  'source-over',
+  'darken',
+  'multiply',
+  'color-burn',
+  'lighten',
+  'screen',
+  'color-dodge',
+  'overlay',
+  'soft-light',
+  'hard-light',
+  'difference',
+  'hue',
+  'saturation',
+  'color',
+  'luminosity',
+];
+
 const zCanvasRasterLayerState = zCanvasEntityBase.extend({
   type: z.literal('raster_layer'),
   position: zCoordinate,
@@ -528,6 +584,8 @@ const zCanvasRasterLayerState = zCanvasEntityBase.extend({
   objects: z.array(zCanvasObjectState),
   // Optional per-layer color adjustments (simple + curves). When undefined, no adjustments are applied.
   adjustments: zRasterLayerAdjustments.optional(),
+  // Optional per-layer composite operation. When undefined, defaults to 'source-over'.
+  globalCompositeOperation: z.enum(COMPOSITE_OPERATIONS).optional(),
 });
 export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 
