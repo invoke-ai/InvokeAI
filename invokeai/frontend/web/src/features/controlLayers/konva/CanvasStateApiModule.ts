@@ -20,6 +20,7 @@ import {
   controlLayerAdded,
   entityBrushLineAdded,
   entityEraserLineAdded,
+  entityGradientAdded,
   entityMovedBy,
   entityMovedTo,
   entityRasterized,
@@ -40,6 +41,7 @@ import type {
   CanvasState,
   EntityBrushLineAddedPayload,
   EntityEraserLineAddedPayload,
+  EntityGradientAddedPayload,
   EntityIdentifierPayload,
   EntityMovedByPayload,
   EntityMovedToPayload,
@@ -171,6 +173,13 @@ export class CanvasStateApiModule extends CanvasModuleBase {
    */
   addRect = (arg: EntityRectAddedPayload) => {
     this.store.dispatch(entityRectAdded(arg));
+  };
+
+  /**
+   * Adds a gradient to an entity, pushing state to redux.
+   */
+  addGradient = (arg: EntityGradientAddedPayload) => {
+    this.store.dispatch(entityGradientAdded(arg));
   };
 
   /**

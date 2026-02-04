@@ -531,13 +531,45 @@ export const IMAGE_FILTERS: { [key in FilterConfig['type']]: ImageFilterData<key
     }),
     buildGraph: ({ image_name }, { blur_type, radius }) => {
       const graph = new Graph(getPrefixedId('img_blur'));
+      // Blur can bleed beyond the original bounds, so pad first to avoid clipping.
+      const multiplier = blur_type === 'gaussian' ? 3 : 1;
+      const padding = Math.max(0, Math.ceil(radius * multiplier));
+      const padNode =
+        padding > 0
+          ? graph.addNode({
+              id: getPrefixedId('img_pad_crop'),
+              type: 'img_pad_crop',
+              image: { image_name },
+              left: padding,
+              right: padding,
+              top: padding,
+              bottom: padding,
+            })
+          : null;
       const node = graph.addNode({
         id: getPrefixedId('img_blur'),
         type: 'img_blur',
-        image: { image_name },
+        ...(padNode ? {} : { image: { image_name } }),
         blur_type: blur_type,
         radius: radius,
       });
+      if (padNode) {
+        graph.addEdge(padNode, 'image', node, 'image');
+      }
+      if (padding > 0) {
+        // Nudge alpha to keep the padded area from being trimmed by pixel-bbox calculations.
+        const alphaNode = graph.addNode({
+          id: getPrefixedId('img_channel_offset'),
+          type: 'img_channel_offset',
+          channel: 'Alpha (RGBA)',
+          offset: 1,
+        });
+        graph.addEdge(node, 'image', alphaNode, 'image');
+        return {
+          graph,
+          outputNodeId: alphaNode.id,
+        };
+      }
       return {
         graph,
         outputNodeId: node.id,

@@ -4,6 +4,8 @@ import denoisingStrength from 'public/assets/images/denoising-strength.png';
 export type Feature =
   | 'clipSkip'
   | 'fluxDypePreset'
+  | 'fluxDypeScale'
+  | 'fluxDypeExponent'
   | 'hrf'
   | 'paramNegativeConditioning'
   | 'paramPositiveConditioning'
@@ -95,6 +97,12 @@ export const POPOVER_DATA: { [key in Feature]?: PopoverData } = {
     href: 'https://support.invoke.ai/support/solutions/articles/151000178161-advanced-settings',
   },
   fluxDypePreset: {
+    placement: 'right',
+  },
+  fluxDypeScale: {
+    placement: 'right',
+  },
+  fluxDypeExponent: {
     placement: 'right',
   },
   inpainting: {
