@@ -39,7 +39,8 @@ import type { TabName } from 'features/ui/store/uiTypes';
 import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
-import type { MainModelConfig } from 'services/api/types';
+import type { MainOrExternalModelConfig } from 'services/api/types';
+import { isExternalApiModelConfig } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
 /**
@@ -221,7 +222,7 @@ const disconnectedReason = (t: typeof i18n.t) => ({ content: t('parameters.invok
 
 const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   isConnected: boolean;
-  model: MainModelConfig | null | undefined;
+  model: MainOrExternalModelConfig | null | undefined;
   params: ParamsState;
   refImages: RefImagesState;
   loras: LoRA[];
@@ -243,7 +244,11 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
   }
 
-  if (model?.base === 'flux') {
+  if (!model) {
+    // nothing else to validate
+  } else if (isExternalApiModelConfig(model)) {
+    // external models don't require local sub-models
+  } else if (model.base === 'flux') {
     if (!params.t5EncoderModel) {
       reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
     }
@@ -280,7 +285,7 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
-  if (model && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)) {
+  if (model && !isExternalApiModelConfig(model) && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)) {
     const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
 
     enabledRefImages.forEach((entity, i) => {
@@ -431,7 +436,7 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
 
 const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   isConnected: boolean;
-  model: MainModelConfig | null | undefined;
+  model: MainOrExternalModelConfig | null | undefined;
   canvas: CanvasState;
   params: ParamsState;
   refImages: RefImagesState;
@@ -488,7 +493,11 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     reasons.push({ content: i18n.t('parameters.invoke.noModelSelected') });
   }
 
-  if (model?.base === 'flux') {
+  if (!model) {
+    // nothing else to validate
+  } else if (isExternalApiModelConfig(model)) {
+    // external models don't require local sub-models
+  } else if (model.base === 'flux') {
     if (!params.t5EncoderModel) {
       reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
     }
@@ -682,7 +691,7 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   });
 
-  if (model && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)) {
+  if (model && !isExternalApiModelConfig(model) && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)) {
     const enabledRefImages = refImages.entities.filter(({ isEnabled }) => isEnabled);
 
     enabledRefImages.forEach((entity, i) => {

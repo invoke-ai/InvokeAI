@@ -207,6 +207,16 @@ class InvokeAIAppConfig(BaseSettings):
     # MULTIUSER
     multiuser:                     bool = Field(default=False,              description="Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.")
 
+    # EXTERNAL PROVIDERS
+    external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
+    external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")
+    external_gemini_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Gemini image generation."
+    )
+    external_openai_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for OpenAI image generation."
+    )
+
     # fmt: on
 
     model_config = SettingsConfigDict(env_prefix="INVOKEAI_", env_ignore_empty=True)

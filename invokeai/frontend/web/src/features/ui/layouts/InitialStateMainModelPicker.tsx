@@ -1,8 +1,10 @@
 import { Flex, FormControl, FormLabel, Icon } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
+import { isExternalModelUnsupportedForTab } from 'features/parameters/components/MainModel/mainModelPickerUtils';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { modelSelected } from 'features/parameters/store/actions';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MdMoneyOff } from 'react-icons/md';
@@ -13,6 +15,7 @@ import { type AnyModelConfig, isNonCommercialMainModelConfig } from 'services/ap
 export const InitialStateMainModelPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const activeTab = useAppSelector(selectActiveTab);
   const [modelConfigs] = useMainModels();
   const selectedModelConfig = useSelectedModelConfig();
   const onChange = useCallback(
@@ -25,6 +28,11 @@ export const InitialStateMainModelPicker = memo(() => {
   const isNonCommercialSelected = useMemo(
     () => selectedModelConfig && isNonCommercialMainModelConfig(selectedModelConfig),
     [selectedModelConfig]
+  );
+
+  const getIsOptionDisabled = useCallback(
+    (modelConfig: AnyModelConfig) => isExternalModelUnsupportedForTab(modelConfig, activeTab),
+    [activeTab]
   );
 
   return (
@@ -45,6 +53,7 @@ export const InitialStateMainModelPicker = memo(() => {
         selectedModelConfig={selectedModelConfig}
         onChange={onChange}
         grouped
+        getIsOptionDisabled={getIsOptionDisabled}
       />
     </FormControl>
   );

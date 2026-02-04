@@ -43,6 +43,9 @@ export type InvocationJSONSchemaExtra = S['UIConfigBase'];
 
 // App Info
 export type AppVersion = S['AppVersion'];
+export type ExternalProviderStatus = S['ExternalProviderStatusModel'];
+export type ExternalProviderConfig = S['ExternalProviderConfigModel'];
+export type UpdateModelBody = paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 
 const zResourceOrigin = z.enum(['internal', 'external']);
 type ResourceOrigin = z.infer<typeof zResourceOrigin>;
@@ -109,6 +112,46 @@ export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
 export type Gemini2_5ModelConfig = ApiModelConfig;
 type SubmodelDefinition = S['SubmodelDefinition'];
+
+export type ExternalImageSize = {
+  width: number;
+  height: number;
+};
+
+export type ExternalModelCapabilities = {
+  modes: ('txt2img' | 'img2img' | 'inpaint')[];
+  supports_reference_images?: boolean;
+  supports_negative_prompt?: boolean;
+  supports_seed?: boolean;
+  supports_guidance?: boolean;
+  max_images_per_request?: number | null;
+  max_image_size?: ExternalImageSize | null;
+  allowed_aspect_ratios?: string[] | null;
+  max_reference_images?: number | null;
+  mask_format?: 'alpha' | 'binary' | 'none';
+  input_image_required_for?: ('txt2img' | 'img2img' | 'inpaint')[] | null;
+};
+
+export type ExternalApiModelDefaultSettings = {
+  width?: number | null;
+  height?: number | null;
+  steps?: number | null;
+  guidance?: number | null;
+  num_images?: number | null;
+};
+
+export type ExternalApiModelConfig = AnyModelConfig & {
+  base: 'external';
+  type: 'external_image_generator';
+  format: 'external_api';
+  provider_id: string;
+  provider_model_id: string;
+  capabilities: ExternalModelCapabilities;
+  default_settings?: ExternalApiModelDefaultSettings | null;
+  tags?: string[] | null;
+  is_default?: boolean;
+};
+export type MainOrExternalModelConfig = MainModelConfig | ExternalApiModelConfig;
 
 /**
  * Checks if a list of submodels contains any that match a given variant or type
@@ -290,6 +333,10 @@ export const isFluxReduxModelConfig = (config: AnyModelConfig): config is FLUXRe
   return config.type === 'flux_redux';
 };
 
+export const isExternalApiModelConfig = (config: AnyModelConfig): config is ExternalApiModelConfig => {
+  return (config as { format?: string }).format === 'external_api';
+};
+
 export const isUnknownModelConfig = (config: AnyModelConfig): config is UnknownModelConfig => {
   return config.type === 'unknown';
 };
@@ -300,6 +347,10 @@ export const isFluxKontextModelConfig = (config: AnyModelConfig): config is FLUX
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base !== 'sdxl-refiner';
+};
+
+export const isMainOrExternalModelConfig = (config: AnyModelConfig): config is MainOrExternalModelConfig => {
+  return isNonRefinerMainModelConfig(config) || isExternalApiModelConfig(config);
 };
 
 export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

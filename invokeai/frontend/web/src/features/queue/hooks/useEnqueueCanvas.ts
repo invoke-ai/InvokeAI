@@ -9,6 +9,7 @@ import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
+import { buildExternalGraph } from 'features/nodes/util/graph/generation/buildExternalGraph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
 import { buildSD1Graph } from 'features/nodes/util/graph/generation/buildSD1Graph';
 import { buildSD3Graph } from 'features/nodes/util/graph/generation/buildSD3Graph';
@@ -59,6 +60,8 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
         return await buildCogView4Graph(graphBuilderArg);
       case 'z-image':
         return await buildZImageGraph(graphBuilderArg);
+      case 'external':
+        return await buildExternalGraph(graphBuilderArg);
       default:
         assert(false, `No graph builders for base ${base}`);
     }
