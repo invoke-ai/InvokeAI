@@ -236,6 +236,15 @@ const slice = createSlice({
       }
       entity.isEnabled = !entity.isEnabled;
     },
+    refImageConfigChanged: (state, action: PayloadActionWithId<{ config: RefImageState['config'] }>) => {
+      const { id, config } = action.payload;
+      const entity = selectRefImageEntity(state, id);
+      if (!entity) {
+        return;
+      }
+      // Preserve the existing image when replacing the config
+      entity.config = { ...config, image: entity.config.image };
+    },
     refImagesReset: () => getInitialRefImagesState(),
   },
 });
@@ -247,6 +256,7 @@ export const {
   refImageImageChanged,
   refImageIPAdapterMethodChanged,
   refImageModelChanged,
+  refImageConfigChanged,
   refImageIPAdapterCLIPVisionModelChanged,
   refImageIPAdapterWeightChanged,
   refImageIPAdapterBeginEndStepPctChanged,

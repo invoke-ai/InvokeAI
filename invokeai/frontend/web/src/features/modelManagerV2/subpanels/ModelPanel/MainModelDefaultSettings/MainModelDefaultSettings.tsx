@@ -48,8 +48,8 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const selectedModelKey = useAppSelector(selectSelectedModelKey);
   const { t } = useTranslation();
 
-  const isFlux = useMemo(() => {
-    return modelConfig.base === 'flux';
+  const isFluxFamily = useMemo(() => {
+    return ['flux', 'flux2'].includes(modelConfig.base);
   }, [modelConfig]);
 
   const defaultSettingsDefaults = useMainModelDefaultSettings(modelConfig);
@@ -125,12 +125,12 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
 
       <SimpleGrid columns={2} gap={8}>
         <DefaultVae control={control} name="vae" />
-        {!isFlux && <DefaultVaePrecision control={control} name="vaePrecision" />}
-        {!isFlux && <DefaultScheduler control={control} name="scheduler" />}
+        {!isFluxFamily && <DefaultVaePrecision control={control} name="vaePrecision" />}
+        {!isFluxFamily && <DefaultScheduler control={control} name="scheduler" />}
         <DefaultSteps control={control} name="steps" />
-        {isFlux && <DefaultGuidance control={control} name="guidance" />}
-        {!isFlux && <DefaultCfgScale control={control} name="cfgScale" />}
-        {!isFlux && <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />}
+        {isFluxFamily && <DefaultGuidance control={control} name="guidance" />}
+        {!isFluxFamily && <DefaultCfgScale control={control} name="cfgScale" />}
+        {!isFluxFamily && <DefaultCfgRescaleMultiplier control={control} name="cfgRescaleMultiplier" />}
         <DefaultWidth control={control} optimalDimension={optimalDimension} />
         <DefaultHeight control={control} optimalDimension={optimalDimension} />
       </SimpleGrid>

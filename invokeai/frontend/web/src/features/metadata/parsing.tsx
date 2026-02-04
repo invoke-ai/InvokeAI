@@ -623,9 +623,14 @@ const ZImageSeedVarianceEnabled: SingleMetadataHandler<boolean> = {
   [SingleMetadataKey]: true,
   type: 'ZImageSeedVarianceEnabled',
   parse: (metadata, _store) => {
-    const raw = getProperty(metadata, 'z_image_seed_variance_enabled');
-    const parsed = z.boolean().parse(raw);
-    return Promise.resolve(parsed);
+    try {
+      const raw = getProperty(metadata, 'z_image_seed_variance_enabled');
+      const parsed = z.boolean().parse(raw);
+      return Promise.resolve(parsed);
+    } catch {
+      // Default to false when metadata doesn't contain this field (e.g. older images)
+      return Promise.resolve(false);
+    }
   },
   recall: (value, store) => {
     store.dispatch(setZImageSeedVarianceEnabled(value));
