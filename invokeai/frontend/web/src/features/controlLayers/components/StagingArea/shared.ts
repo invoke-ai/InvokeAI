@@ -1,4 +1,4 @@
-import { isImageField } from 'features/nodes/types/common';
+import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
 import { isCanvasOutputNodeId } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { S } from 'services/api/types';
 import { formatProgressMessage } from 'services/events/stores';
@@ -28,6 +28,9 @@ export const getOutputImageName = (item: S['SessionQueueItem']) => {
   for (const [_name, value] of objectEntries(output)) {
     if (isImageField(value)) {
       return value.image_name;
+    }
+    if (isImageFieldCollection(value)) {
+      return value[0]?.image_name ?? null;
     }
   }
 

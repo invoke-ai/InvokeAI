@@ -52,6 +52,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
     """Indicates the model is associated with Z-Image model architecture, including Z-Image-Turbo."""
+    External = "external"
+    """Indicates the model is hosted by an external provider."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -76,6 +78,7 @@ class ModelType(str, Enum):
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
+    ExternalImageGenerator = "external_image_generator"
     Unknown = "unknown"
 
 
@@ -160,6 +163,7 @@ class ModelFormat(str, Enum):
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
+    ExternalApi = "external_api"
     Unknown = "unknown"
 
 

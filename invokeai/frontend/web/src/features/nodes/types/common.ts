@@ -93,6 +93,7 @@ export const zBaseModelType = z.enum([
   'flux2',
   'cogview4',
   'z-image',
+  'external',
   'unknown',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModelType>;
@@ -117,6 +118,7 @@ export const zModelType = z.enum([
   'clip_embed',
   'siglip',
   'flux_redux',
+  'external_image_generator',
   'unknown',
 ]);
 export type ModelType = z.infer<typeof zModelType>;
@@ -164,6 +166,7 @@ export const zModelFormat = z.enum([
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',
+  'external_api',
   'unknown',
 ]);
 export type ModelFormat = z.infer<typeof zModelFormat>;

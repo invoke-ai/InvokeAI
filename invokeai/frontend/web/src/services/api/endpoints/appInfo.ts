@@ -1,7 +1,7 @@
 import type { OpenAPIV3_1 } from 'openapi-types';
 import type { stringify } from 'querystring';
 import type { paths } from 'services/api/schema';
-import type { AppVersion } from 'services/api/types';
+import type { AppVersion, ExternalProviderConfig, ExternalProviderStatus } from 'services/api/types';
 
 import { api, buildV1Url } from '..';
 
@@ -52,6 +52,35 @@ export const appInfoApi = api.injectEndpoints({
         method: 'GET',
       }),
     }),
+    getExternalProviderStatuses: build.query<ExternalProviderStatus[], void>({
+      query: () => ({
+        url: buildAppInfoUrl('external_providers/status'),
+        method: 'GET',
+      }),
+      providesTags: ['FetchOnReconnect'],
+    }),
+    getExternalProviderConfigs: build.query<ExternalProviderConfig[], void>({
+      query: () => ({
+        url: buildAppInfoUrl('external_providers/config'),
+        method: 'GET',
+      }),
+      providesTags: ['AppConfig', 'FetchOnReconnect'],
+    }),
+    setExternalProviderConfig: build.mutation<ExternalProviderConfig, SetExternalProviderConfigArg>({
+      query: ({ provider_id, ...body }) => ({
+        url: buildAppInfoUrl(`external_providers/config/${provider_id}`),
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['AppConfig', 'FetchOnReconnect'],
+    }),
+    resetExternalProviderConfig: build.mutation<ExternalProviderConfig, string>({
+      query: (provider_id) => ({
+        url: buildAppInfoUrl(`external_providers/config/${provider_id}`),
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['AppConfig', 'FetchOnReconnect'],
+    }),
     getInvocationCacheStatus: build.query<
       paths['/api/v1/app/invocation_cache/status']['get']['responses']['200']['content']['application/json'],
       void
@@ -95,6 +124,10 @@ export const {
   useGetAppDepsQuery,
   useGetPatchmatchStatusQuery,
   useGetRuntimeConfigQuery,
+  useGetExternalProviderStatusesQuery,
+  useGetExternalProviderConfigsQuery,
+  useSetExternalProviderConfigMutation,
+  useResetExternalProviderConfigMutation,
   useClearInvocationCacheMutation,
   useDisableInvocationCacheMutation,
   useEnableInvocationCacheMutation,
@@ -102,3 +135,8 @@ export const {
   useGetOpenAPISchemaQuery,
   useLazyGetOpenAPISchemaQuery,
 } = appInfoApi;
+
+type SetExternalProviderConfigArg =
+  paths['/api/v1/app/external_providers/config/{provider_id}']['post']['requestBody']['content']['application/json'] & {
+    provider_id: paths['/api/v1/app/external_providers/config/{provider_id}']['post']['parameters']['path']['provider_id'];
+  };

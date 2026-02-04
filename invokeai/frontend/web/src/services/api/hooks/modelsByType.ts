@@ -9,11 +9,12 @@ import {
   useGetMissingModelsQuery,
   useGetModelConfigsQuery,
 } from 'services/api/endpoints/models';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfig, MainOrExternalModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfigOrSubmodel,
   isControlLayerModelConfig,
   isControlNetModelConfig,
+  isExternalApiModelConfig,
   isFlux1VAEModelConfig,
   isFlux2VAEModelConfig,
   isFluxKontextModelConfig,
@@ -21,7 +22,7 @@ import {
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
   isLoRAModelConfig,
-  isNonRefinerMainModelConfig,
+  isMainOrExternalModelConfig,
   isQwen3EncoderModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
@@ -50,13 +51,13 @@ const buildModelsHook =
       return modelConfigsAdapterSelectors
         .selectAll(result.data)
         .filter((config) => typeGuard(config))
-        .filter((config) => !missingModelKeys.has(config.key))
+        .filter((config) => !missingModelKeys.has(config.key) || isExternalApiModelConfig(config))
         .filter(filter);
     }, [filter, result.data, missingModelsData]);
 
     return [modelConfigs, result] as const;
   };
-export const useMainModels = buildModelsHook(isNonRefinerMainModelConfig);
+export const useMainModels = buildModelsHook<MainOrExternalModelConfig>(isMainOrExternalModelConfig);
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
 export const useControlLayerModels = buildModelsHook(isControlLayerModelConfig);
@@ -94,7 +95,7 @@ const buildModelsSelector =
     return modelConfigsAdapterSelectors
       .selectAll(result.data)
       .filter(typeGuard)
-      .filter((config) => !missingModelKeys.has(config.key));
+      .filter((config) => !missingModelKeys.has(config.key) || isExternalApiModelConfig(config));
   };
 export const selectIPAdapterModels = buildModelsSelector(isIPAdapterModelConfig);
 export const selectGlobalRefImageModels = buildModelsSelector(

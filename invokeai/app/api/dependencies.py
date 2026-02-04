@@ -13,6 +13,8 @@ from invokeai.app.services.bulk_download.bulk_download_default import BulkDownlo
 from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.download.download_default import DownloadQueueService
+from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
+from invokeai.app.services.external_generation.providers import GeminiProvider, OpenAIProvider
 from invokeai.app.services.events.events_fastapievents import FastAPIEventService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
@@ -136,6 +138,13 @@ class ApiDependencies:
             ),
         )
         download_queue_service = DownloadQueueService(app_config=configuration, event_bus=events)
+        external_generation = ExternalGenerationService(
+            providers={
+                GeminiProvider.provider_id: GeminiProvider(app_config=configuration, logger=logger),
+                OpenAIProvider.provider_id: OpenAIProvider(app_config=configuration, logger=logger),
+            },
+            logger=logger,
+        )
         model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
         model_manager = ModelManagerService.build_model_manager(
             app_config=configuration,
@@ -174,6 +183,7 @@ class ApiDependencies:
             model_relationships=model_relationships,
             model_relationship_records=model_relationship_records,
             download_queue=download_queue_service,
+            external_generation=external_generation,
             names=names,
             performance_statistics=performance_statistics,
             session_processor=session_processor,

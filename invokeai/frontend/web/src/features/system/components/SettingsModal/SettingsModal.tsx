@@ -20,6 +20,7 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { selectShouldUseCPUNoise, shouldUseCpuNoiseChanged } from 'features/controlLayers/store/paramsSlice';
+import { ExternalProviderStatusList } from 'features/system/components/SettingsModal/ExternalProviderStatusList';
 import { useRefreshAfterResetModal } from 'features/system/components/SettingsModal/RefreshAfterResetModal';
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
@@ -48,8 +49,7 @@ import {
 } from 'features/system/store/systemSlice';
 import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import { setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
-import type { ChangeEvent, ReactElement } from 'react';
-import { cloneElement, memo, useCallback, useEffect } from 'react';
+import { type ChangeEvent, cloneElement, memo, type ReactElement, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { SettingsLanguageSelect } from './SettingsLanguageSelect';
@@ -196,6 +196,10 @@ const SettingsModal = (props: { children: ReactElement }) => {
                       <FormLabel>{t('settings.enableInvisibleWatermark')}</FormLabel>
                       <Switch isChecked={shouldUseWatermarker} onChange={handleChangeShouldUseWatermarker} />
                     </FormControl>
+                  </StickyScrollable>
+
+                  <StickyScrollable title={t('settings.models')}>
+                    <ExternalProviderStatusList />
                   </StickyScrollable>
 
                   <StickyScrollable title={t('settings.ui')}>

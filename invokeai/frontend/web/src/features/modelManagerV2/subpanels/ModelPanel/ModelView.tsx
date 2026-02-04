@@ -9,14 +9,15 @@ import { TriggerPhrases } from 'features/modelManagerV2/subpanels/ModelPanel/Tri
 import { filesize } from 'filesize';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type {
-  AnyModelConfig,
-  CLIPEmbedModelConfig,
-  CLIPVisionModelConfig,
-  LlavaOnevisionModelConfig,
-  Qwen3EncoderModelConfig,
-  SigLIPModelConfig,
-  T5EncoderModelConfig,
+import {
+  isExternalApiModelConfig,
+  type AnyModelConfig,
+  type CLIPEmbedModelConfig,
+  type CLIPVisionModelConfig,
+  type LlavaOnevisionModelConfig,
+  type Qwen3EncoderModelConfig,
+  type SigLIPModelConfig,
+  type T5EncoderModelConfig,
 } from 'services/api/types';
 
 import { isExternalModel } from './isExternalModel';
@@ -98,6 +99,12 @@ export const ModelView = memo(({ modelConfig }: Props) => {
             <ModelAttrView label={t('modelManager.modelFormat')} value={modelConfig.format} />
             <ModelAttrView label={t('modelManager.path')} value={modelConfig.path} />
             <ModelAttrView label={t('modelManager.fileSize')} value={filesize(modelConfig.file_size)} />
+            {isExternalApiModelConfig(modelConfig) && (
+              <>
+                <ModelAttrView label={t('modelManager.providerId')} value={modelConfig.provider_id} />
+                <ModelAttrView label={t('modelManager.providerModelId')} value={modelConfig.provider_model_id} />
+              </>
+            )}
             {'variant' in modelConfig && modelConfig.variant && (
               <ModelAttrView label={t('modelManager.variant')} value={modelConfig.variant} />
             )}

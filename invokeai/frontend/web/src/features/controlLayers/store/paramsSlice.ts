@@ -42,7 +42,7 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import { isNonRefinerMainModelConfig } from 'services/api/types';
+import { isExternalApiModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 const slice = createSlice({
@@ -631,15 +631,42 @@ export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => 
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
 export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');
+export const selectModelConfig = createSelector(
+  selectModelConfigsQuery,
+  selectParamsSlice,
+  (modelConfigs, { model }) => {
+    if (!modelConfigs.data) {
+      return null;
+    }
+    if (!model) {
+      return null;
+    }
+    return modelConfigsAdapterSelectors.selectById(modelConfigs.data, model.key) ?? null;
+  }
+);
 export const selectHasNegativePrompt = createParamsSelector((params) => params.negativePrompt !== null);
 export const selectModelSupportsNegativePrompt = createSelector(
   selectModel,
-  (model) => !!model && SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base)
+  selectModelConfig,
+  (model, modelConfig) => {
+    if (!model) {
+      return false;
+    }
+    if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+      return modelConfig.capabilities.supports_negative_prompt ?? false;
+    }
+    return SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base);
+  }
 );
-export const selectModelSupportsRefImages = createSelector(
-  selectModel,
-  (model) => !!model && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base)
-);
+export const selectModelSupportsRefImages = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+  if (!model) {
+    return false;
+  }
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return modelConfig.capabilities.supports_reference_images ?? false;
+  }
+  return SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base);
+});
 export const selectModelSupportsOptimizedDenoising = createSelector(
   selectModel,
   (model) => !!model && SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS.includes(model.base)
@@ -686,24 +713,23 @@ export const selectHeight = createParamsSelector((params) => params.dimensions.h
 export const selectAspectRatioID = createParamsSelector((params) => params.dimensions.aspectRatio.id);
 export const selectAspectRatioValue = createParamsSelector((params) => params.dimensions.aspectRatio.value);
 export const selectAspectRatioIsLocked = createParamsSelector((params) => params.dimensions.aspectRatio.isLocked);
+export const selectAllowedAspectRatioIDs = createSelector(selectModelConfig, (modelConfig) => {
+  if (!modelConfig || !isExternalApiModelConfig(modelConfig)) {
+    return null;
+  }
+  const allowed = modelConfig.capabilities.allowed_aspect_ratios;
+  return allowed?.length ? allowed : null;
+});
 
-export const selectMainModelConfig = createSelector(
-  selectModelConfigsQuery,
-  selectParamsSlice,
-  (modelConfigs, { model }) => {
-    if (!modelConfigs.data) {
-      return null;
-    }
-    if (!model) {
-      return null;
-    }
-    const modelConfig = modelConfigsAdapterSelectors.selectById(modelConfigs.data, model.key);
-    if (!modelConfig) {
-      return null;
-    }
-    if (!isNonRefinerMainModelConfig(modelConfig)) {
-      return null;
-    }
+export const selectMainModelConfig = createSelector(selectModelConfig, (modelConfig) => {
+  if (!modelConfig) {
+    return null;
+  }
+  if (isExternalApiModelConfig(modelConfig)) {
     return modelConfig;
   }
-);
+  if (!isNonRefinerMainModelConfig(modelConfig)) {
+    return null;
+  }
+  return modelConfig;
+});

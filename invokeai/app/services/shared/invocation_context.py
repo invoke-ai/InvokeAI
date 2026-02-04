@@ -385,6 +385,8 @@ class ModelsInterface(InvocationContextInterface):
             submodel_type = submodel_type or identifier.submodel_type
             model = self._services.model_manager.store.get_model(identifier.key)
 
+        self._raise_if_external(model)
+
         message = f"Loading model {model.name}"
         if submodel_type:
             message += f" ({submodel_type.value})"
@@ -414,11 +416,17 @@ class ModelsInterface(InvocationContextInterface):
         if len(configs) > 1:
             raise ValueError(f"More than one model found with name {name}, base {base}, and type {type}")
 
+        self._raise_if_external(configs[0])
         message = f"Loading model {name}"
         if submodel_type:
             message += f" ({submodel_type.value})"
         self._util.signal_progress(message)
         return self._services.model_manager.load.load_model(configs[0], submodel_type)
+
+    @staticmethod
+    def _raise_if_external(model: AnyModelConfig) -> None:
+        if model.base == BaseModelType.External or model.format == ModelFormat.ExternalApi:
+            raise ValueError("External API models cannot be loaded from disk")
 
     def get_config(self, identifier: Union[str, "ModelIdentifierField"]) -> AnyModelConfig:
         """Get a model's config.

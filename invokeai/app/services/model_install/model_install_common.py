@@ -138,12 +138,27 @@ class URLModelSource(StringLikeSource):
         return str(self.url)
 
 
-ModelSource = Annotated[Union[LocalModelSource, HFModelSource, URLModelSource], Field(discriminator="type")]
+class ExternalModelSource(StringLikeSource):
+    """An external provider model identifier."""
+
+    provider_id: str
+    provider_model_id: str
+    type: Literal["external"] = "external"
+
+    def __str__(self) -> str:
+        return f"external://{self.provider_id}/{self.provider_model_id}"
+
+
+ModelSource = Annotated[
+    Union[LocalModelSource, HFModelSource, URLModelSource, ExternalModelSource],
+    Field(discriminator="type"),
+]
 
 MODEL_SOURCE_TO_TYPE_MAP = {
     URLModelSource: ModelSourceType.Url,
     HFModelSource: ModelSourceType.HFRepoID,
     LocalModelSource: ModelSourceType.Path,
+    ExternalModelSource: ModelSourceType.Url,
 }
 
 
