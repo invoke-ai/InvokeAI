@@ -366,16 +366,24 @@ class Flux2DenoiseInvocation(BaseInvocation):
         if self.scheduler in FLUX_SCHEDULER_MAP and not is_inpainting:
             # Only use scheduler for txt2img - use manual Euler for inpainting to preserve exact timesteps
             scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
-            scheduler = scheduler_class(
-                num_train_timesteps=1000,
-                shift=3.0,
-                use_dynamic_shifting=True,
-                base_shift=0.5,
-                max_shift=1.15,
-                base_image_seq_len=256,
-                max_image_seq_len=4096,
-                time_shift_type="exponential",
-            )
+            # FlowMatchHeunDiscreteScheduler only supports num_train_timesteps and shift parameters
+            # FlowMatchEulerDiscreteScheduler and FlowMatchLCMScheduler support dynamic shifting
+            if self.scheduler == "heun":
+                scheduler = scheduler_class(
+                    num_train_timesteps=1000,
+                    shift=3.0,
+                )
+            else:
+                scheduler = scheduler_class(
+                    num_train_timesteps=1000,
+                    shift=3.0,
+                    use_dynamic_shifting=True,
+                    base_shift=0.5,
+                    max_shift=1.15,
+                    base_image_seq_len=256,
+                    max_image_seq_len=4096,
+                    time_shift_type="exponential",
+                )
 
         # Prepare reference image extension for FLUX.2 Klein built-in editing
         ref_image_extension = None

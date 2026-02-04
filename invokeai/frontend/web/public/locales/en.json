@@ -432,6 +432,7 @@
         "oldestFirst": "Oldest First",
         "sortDirection": "Sort Direction",
         "showStarredImagesFirst": "Show Starred Images First",
+        "usePagedGalleryView": "Use Paged Gallery View",
         "noImageSelected": "No Image Selected",
         "noImagesInGallery": "No Images to Display",
         "starImage": "Star",
@@ -2476,10 +2477,16 @@
             "horizontal": "Horizontal",
             "diagonal": "Diagonal"
         },
+        "gradient": {
+            "linear": "Linear",
+            "radial": "Radial",
+            "clip": "Clip Gradient"
+        },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
             "rectangle": "Rectangle",
+            "gradient": "Gradient",
             "bbox": "Bbox",
             "move": "Move",
             "view": "View",
