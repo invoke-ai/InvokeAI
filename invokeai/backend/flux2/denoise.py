@@ -4,6 +4,7 @@ This module provides the denoising function for FLUX.2 Klein models,
 which use Qwen3 as the text encoder instead of CLIP+T5.
 """
 
+import inspect
 import math
 from typing import Any, Callable
 
@@ -87,11 +88,18 @@ def denoise(
         # The scheduler will apply dynamic shifting internally using mu (if enabled in scheduler config)
         sigmas = np.array(timesteps[:-1], dtype=np.float32)  # Exclude final 0.0
 
-        # Pass mu if provided - it will only be used if scheduler has use_dynamic_shifting=True
-        if mu is not None:
+        # Check if scheduler supports sigmas parameter using inspect.signature
+        # FlowMatchHeunDiscreteScheduler and FlowMatchLCMScheduler don't support sigmas
+        set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
+        supports_sigmas = "sigmas" in set_timesteps_sig.parameters
+        if supports_sigmas and mu is not None:
+            # Pass mu if provided - it will only be used if scheduler has use_dynamic_shifting=True
             scheduler.set_timesteps(sigmas=sigmas.tolist(), mu=mu, device=img.device)
-        else:
+        elif supports_sigmas:
             scheduler.set_timesteps(sigmas=sigmas.tolist(), device=img.device)
+        else:
+            # Scheduler doesn't support sigmas (e.g., Heun, LCM) - use num_inference_steps
+            scheduler.set_timesteps(num_inference_steps=len(sigmas), device=img.device)
         num_scheduler_steps = len(scheduler.timesteps)
         is_heun = hasattr(scheduler, "state_in_first_order")
         user_step = 0
@@ -152,7 +160,15 @@ def denoise(
 
             # Apply inpainting merge at each step
             if inpaint_extension is not None:
-                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
+                # Separate the generated latents from the reference conditioning
+                gen_img = img[:, :original_seq_len, :]
+                ref_img = img[:, original_seq_len:, :]
+
+                # Merge only the generated part
+                gen_img = inpaint_extension.merge_intermediate_latents_with_init_latents(gen_img, t_prev)
+
+                # Concatenate back together
+                img = torch.cat([gen_img, ref_img], dim=1)
 
             # For Heun, only increment user step after second-order step completes
             if is_heun:
@@ -239,8 +255,19 @@ def denoise(
 
             # Apply inpainting merge at each step
             if inpaint_extension is not None:
-                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
-                preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
+                # Separate the generated latents from the reference conditioning
+                gen_img = img[:, :original_seq_len, :]
+                ref_img = img[:, original_seq_len:, :]
+
+                # Merge only the generated part
+                gen_img = inpaint_extension.merge_intermediate_latents_with_init_latents(gen_img, t_prev)
+
+                # Concatenate back together
+                img = torch.cat([gen_img, ref_img], dim=1)
+
+                # Handling preview images
+                preview_gen = preview_img[:, :original_seq_len, :]
+                preview_gen = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_gen, 0.0)
 
             # Extract only the generated image portion for preview (exclude reference images)
             callback_latents = preview_img[:, :original_seq_len, :] if img_cond_seq is not None else preview_img
