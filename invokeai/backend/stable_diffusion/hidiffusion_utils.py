@@ -4,6 +4,13 @@ import copy
 from contextlib import contextmanager
 from typing import Any, Optional
 
+from invokeai.backend.hidiffusion.hidiffusion import (
+    switching_threshold_ratio_dict as _switching_threshold_ratio_dict,
+)
+from invokeai.backend.hidiffusion.hidiffusion import (
+    text_to_img_controlnet_switching_threshold_ratio_dict as _text_to_img_controlnet_switching_threshold_ratio_dict,
+)
+
 
 @contextmanager
 def hidiffusion_patch(
@@ -83,18 +90,10 @@ def hidiffusion_patch(
     ratio_overrides = None
     ratio_dicts = None
     if t1_ratio is not None or t2_ratio is not None:
-        try:
-            from invokeai.backend.hidiffusion.hidiffusion import (
-                switching_threshold_ratio_dict as _switching_threshold_ratio_dict,
-                text_to_img_controlnet_switching_threshold_ratio_dict as _text_to_img_controlnet_switching_threshold_ratio_dict,
-            )
-
-            ratio_dicts = (
-                _switching_threshold_ratio_dict,
-                _text_to_img_controlnet_switching_threshold_ratio_dict,
-            )
-        except Exception:
-            ratio_dicts = None
+        ratio_dicts = (
+            _switching_threshold_ratio_dict,
+            _text_to_img_controlnet_switching_threshold_ratio_dict,
+        )
 
     if ratio_dicts is not None:
         ratio_overrides = (copy.deepcopy(ratio_dicts[0]), copy.deepcopy(ratio_dicts[1]))

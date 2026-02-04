@@ -5,7 +5,7 @@ def isinstance_str(x: object, cls_name: str, prefix: bool = False, contains: boo
     """
     Checks whether x has any class equal to, prefixed with, or contains (cls_name) in its ancestry.
     Doesn't require access to the class's implementation.
-    
+
     Useful for patching!
     """
 
@@ -16,11 +16,11 @@ def isinstance_str(x: object, cls_name: str, prefix: bool = False, contains: boo
             return True
         if _cls.__name__ == cls_name:
             return True
-    
+
     return False
 
 
-def init_generator(device: torch.device, fallback: torch.Generator=None):
+def init_generator(device: torch.device, fallback: torch.Generator | None = None):
     """
     Forks the current default random generator given device.
     """
@@ -33,4 +33,3 @@ def init_generator(device: torch.device, fallback: torch.Generator=None):
             return init_generator(torch.device("cpu"))
         else:
             return fallback
-    
