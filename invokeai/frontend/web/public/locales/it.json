@@ -202,7 +202,8 @@
         "unableToLoad": "Impossibile caricare la Galleria",
         "selectAnImageToCompare": "Seleziona un'immagine da confrontare",
         "openViewer": "Apri Visualizzatore",
-        "closeViewer": "Chiudi Visualizzatore"
+        "closeViewer": "Chiudi Visualizzatore",
+        "usePagedGalleryView": "Utilizza la visualizzazione Galleria a pagine"
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
@@ -276,6 +277,14 @@
             "promptHistoryNext": {
                 "title": "Prossimo prompt nella cronologia",
                 "desc": "Quando il prompt è attivo, passa al prompt successivo (più recente) nella cronologia."
+            },
+            "promptWeightUp": {
+                "title": "Aumenta il peso della selezione del prompt",
+                "desc": "Quando il prompt è attivo e il testo è selezionato, aumenta il peso del prompt selezionato."
+            },
+            "promptWeightDown": {
+                "title": "Riduce il peso della selezione del prompt",
+                "desc": "Quando il prompt è attivo e il testo è selezionato, riduce il peso del prompt selezionato."
             }
         },
         "hotkeys": "Tasti di scelta rapida",
@@ -568,7 +577,32 @@
                 "desc": "Aggiungi/Rimuovi contrassegno all'immagine selezionata.",
                 "title": "Aggiungi / Rimuovi contrassegno immagine"
             }
-        }
+        },
+        "editMode": "Modalità modifica",
+        "viewMode": "Modalità visualizzazione",
+        "editHotkey": "Modifica tasto di scelta rapida",
+        "addHotkey": "Aggiungi tasto di scelta rapida",
+        "resetToDefault": "Ripristina predefinito",
+        "resetAll": "Ripristina tutto ai predefiniti",
+        "resetAllConfirmation": "Vuoi davvero ripristinare tutti i tasti di scelta rapida ai valori predefiniti? Questa operazione non può essere annullata.",
+        "enterHotkeys": "Inserisci i tasti di scelta rapida, separati da virgole",
+        "save": "Salva",
+        "cancel": "Annulla",
+        "modifiers": "Modificatori",
+        "syntaxHelp": "Guida alla sintassi",
+        "combineWith": "Combina con +",
+        "multipleHotkeys": "Tasti di scelta rapida multipli con virgola",
+        "validKeys": "Tasti validi",
+        "help": "Aiuto",
+        "noHotkeysRecorded": "Nessun tasto di scelta rapida registrato ancora",
+        "pressKeys": "Premi i tasti...",
+        "setHotkey": "Imposta",
+        "setAnother": "Imposta un'altro",
+        "removeLastHotkey": "Rimuovi l'ultimo tasto di scelta rapida",
+        "clearAll": "Cancella tutto",
+        "duplicateWarning": "Questo tasto di scelta rapida è già registrato",
+        "conflictWarning": "è già utilizzato da \"{{hotkeyTitle}}\"",
+        "thisHotkey": "questo tasto di scelta rapida"
     },
     "modelManager": {
         "modelManager": "Gestione Modelli",
@@ -748,7 +782,32 @@
         "reidentifyTooltip": "Se un modello non è stato installato correttamente (ad esempio, ha il tipo sbagliato o non funziona), puoi provare a identificarlo nuovamente. Questo reimposterà tutte le impostazioni personalizzate che potresti aver applicato.",
         "reidentifySuccess": "Modello reidentificato con successo",
         "reidentifyUnknown": "Impossibile identificare il modello",
-        "reidentifyError": "Errore durante la reidentificazione del modello"
+        "reidentifyError": "Errore durante la reidentificazione del modello",
+        "flux2KleinQwen3EncoderPlaceholder": "Dal modello principale",
+        "flux2KleinQwen3Encoder": "Encoder Qwen3 (opzionale)",
+        "flux2KleinVaePlaceholder": "Dal modello principale",
+        "flux2KleinVae": "VAE (opzionale)",
+        "zImageQwen3SourcePlaceholder": "Obbligatorio se VAE/Encoder è vuoto",
+        "zImageQwen3Source": "Modello sorgente Qwen3 e VAE",
+        "zImageQwen3EncoderPlaceholder": "Dal modello sorgente Qwen3",
+        "zImageQwen3Encoder": "Encoder Qwen3 (opzionale)",
+        "zImageVaePlaceholder": "Dal modello sorgente VAE",
+        "qwen3Encoder": "Encoder Quen3",
+        "selectAll": "Seleziona tutto",
+        "deleteModels": "Elimina modelli",
+        "invalidPathFormat": "Il percorso deve essere un percorso assoluto (ad esempio, C:\\Models\\... o /home/user/models/...)",
+        "pathUpdateFailed": "Impossibile aggiornare il percorso del modello",
+        "pathUpdated": "Percorso del modello aggiornato correttamente",
+        "newPathPlaceholder": "Inserisci un nuovo percorso...",
+        "newPath": "Nuovo percorso",
+        "currentPath": "Percorso attuale",
+        "updatePathDescription": "Inserisci il nuovo percorso del file o della directory del modello. Utilizza questo percorso se hai spostato manualmente i file del modello sul disco.",
+        "updatePathTooltip": "Aggiorna il percorso del file per questo modello se hai spostato i file del modello in una nuova posizione.",
+        "updatePath": "Aggiorna percorso",
+        "actions": "Azioni in blocco",
+        "zImageVae": "VAE (opzionale)",
+        "missingFiles": "File mancanti",
+        "missingFilesTooltip": "I file del modello sono mancanti dal disco"
     },
     "parameters": {
         "images": "Immagini",
@@ -836,7 +895,10 @@
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la larghezza del riquadro è {{width}}",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), l'altezza del riquadro è {{height}}",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), la larghezza ridimensionata del riquadro è {{width}}",
-            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), l'altezza ridimensionata del riquadro è {{height}}"
+            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), l'altezza ridimensionata del riquadro è {{height}}",
+            "noZImageQwen3EncoderSourceSelected": "Nessuna sorgente Qwen3 Encoder: seleziona il modello Qwen3 Encoder o Qwen3 Source",
+            "noZImageVaeSourceSelected": "Nessuna sorgente VAE: selezionare il modello di sorgente VAE (FLUX) o Qwen3",
+            "noQwen3EncoderModelSelected": "Nessun modello di encoder Qwen3 selezionato per la generazione Klein di FLUX2"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -872,7 +934,11 @@
         "images_withCount_other": "Immagini",
         "resolution": "Risoluzione",
         "downloadImage": "Scarica l'immagine",
-        "showOptionsPanel": "Mostra pannello laterale (O o T)"
+        "showOptionsPanel": "Mostra pannello laterale (O o T)",
+        "seedVarianceRandomizePercent": "Percentuale di variazione",
+        "seedVarianceStrength": "Intensità della varianza",
+        "seedVarianceEnabled": "Potenziamento della varianza del seme",
+        "colorCompensation": "Compensazione Colore"
     },
     "settings": {
         "models": "Modelli",
@@ -1013,7 +1079,9 @@
         "noInpaintMaskSelected": "Nessuna maschera di inpaint selezionata",
         "noInpaintMaskSelectedDesc": "Seleziona una maschera di inpaint da invertire",
         "invalidBbox": "Riquadro di delimitazione non valido",
-        "invalidBboxDesc": "Il riquadro di delimitazione non ha dimensioni valide"
+        "invalidBboxDesc": "Il riquadro di delimitazione non ha dimensioni valide",
+        "kleinEncoderClearedDescription": "Selezionare un encoder Qwen3 compatibile per la nuova variante del modello Klein",
+        "kleinEncoderCleared": "Encoder Qwen3 cancellato"
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1785,7 +1853,7 @@
         "fluxDevLicense": {
             "heading": "Licenza non commerciale",
             "paragraphs": [
-                "I modelli FLUX.1 [dev] sono concessi in licenza con la licenza non commerciale FLUX [dev]. Per utilizzare questo tipo di modello per scopi commerciali in Invoke, visita il nostro sito Web per saperne di più."
+                "Questo modello è concesso in licenza esclusivamente per uso non commerciale. I modelli FLUX.1 [dev] utilizzano la licenza FLUX.1 [dev] Non-Commercial, mentre FLUX.2 Klein 9B utilizza la licenza FLUX.2 Non-Commercial."
             ]
         },
         "optimizedDenoising": {
@@ -1850,6 +1918,54 @@
                 "Controlla la sovrapposizione tra riquadri adiacenti durante l'ampliamento. Valori di sovrapposizione più elevati aiutano a ridurre le giunzioni visibili tra i riquadri, ma consuma più memoria.",
                 "Il valore predefinito di 128 è adatto alla maggior parte dei casi, ma è possibile modificarlo in base alle proprie esigenze specifiche e ai limiti di memoria."
             ]
+        },
+        "colorCompensation": {
+            "paragraphs": [
+                "Regola l'immagine di input per ridurre le variazioni di colore durante l'inpainting o img2img (solo SDXL)."
+            ],
+            "heading": "Compensazione del colore"
+        },
+        "seedVarianceRandomizePercent": {
+            "paragraphs": [
+                "Percentuale di valori di incorporamento che ricevono rumore (1-100%).",
+                "Valori più bassi creano modelli di rumore più selettivi, mentre il 100% influisce su tutti i valori in egual misura."
+            ],
+            "heading": "Percentuale di variazione"
+        },
+        "seedVarianceStrength": {
+            "paragraphs": [
+                "Controlla l'intensità del rumore aggiunto agli embedding. L'intensità viene calibrata automaticamente in base alla deviazione standard dell'embedding.",
+                "Valori inferiori a 0.1 produrranno variazioni lievi, che aumenteranno fino a diventare più marcate a 0,5. Valori superiori a 0.5 potrebbero portare a risultati inaspettati."
+            ],
+            "heading": "Intensità della varianza"
+        },
+        "seedVarianceEnhancer": {
+            "paragraphs": [
+                "Z-Image-Turbo può produrre immagini relativamente simili con semi diversi. Questa funzionalità aggiunge rumore basato sui semi agli embedding di testo per aumentare la variabilità visiva mantenendo la riproducibilità.",
+                "Abilita questa opzione per ottenere risultati più diversificati quando esplori semi diversi."
+            ],
+            "heading": "Potenziamento varianza del seme"
+        },
+        "fluxDypePreset": {
+            "paragraphs": [
+                "L'estrapolazione dinamica della posizione (DyPE) migliora la qualità della generazione FLUX a risoluzioni superiori alla dimensione di addestramento (1024px).",
+                "Off: generazione standard. Auto: abilita automaticamente per immagini > 1536px. 4K: impostazioni ottimizzate per output con risoluzione 4K."
+            ],
+            "heading": "DyPE (alta risoluzione)"
+        },
+        "fluxDypeScale": {
+            "paragraphs": [
+                "Controlla l'entità della modulazione DyPE. Valori più alti = estrapolazione più forte.",
+                "Predefinito: 2.0. Intervallo: 0.0-8.0."
+            ]
+        },
+        "fluxDypeExponent": {
+            "paragraphs": [
+                "Controlla l'intensità dell'effetto dinamico nel tempo.",
+                "2.0: Consigliato per risoluzioni 4K+. Programmazione aggressiva con transizioni rapide per la pulizia degli artefatti.",
+                "1.0: Buon punto di partenza per risoluzioni ~2K-3K.",
+                "0.5: Programma più delicato per risoluzioni appena superiori a quelle native (1024px)."
+            ]
         }
     },
     "sdxl": {
@@ -1901,7 +2017,10 @@
         "seamlessYAxis": "Asse Y senza giunte",
         "vae": "VAE",
         "parsingFailed": "Analisi non riuscita",
-        "recallParameter": "Richiama {{label}}"
+        "recallParameter": "Richiama {{label}}",
+        "seedVarianceRandomizePercent": "Casualità della varianza del seme %",
+        "seedVarianceEnabled": "Varianza seme abilitata",
+        "seedVarianceStrength": "Intensità della varianza del seme"
     },
     "hrf": {
         "metadata": {
@@ -2046,7 +2165,8 @@
         "noDescription": "Nessuna descrizione",
         "searchWorkflows": "Ricerca flussi di lavoro",
         "clearWorkflowSearchFilter": "Cancella filtro di ricerca del flusso di lavoro",
-        "openLibrary": "Apri libreria"
+        "openLibrary": "Apri libreria",
+        "tags": "Etichette"
     },
     "accordions": {
         "compositing": {
@@ -2321,6 +2441,9 @@
                 "hue": "Tonalità (HSV)",
                 "saturation": "Saturazione (HSV)",
                 "value": "Valore (HSV)"
+            },
+            "pbr_maps": {
+                "label": "Crea mappe PBR"
             }
         },
         "fill": {
@@ -2381,7 +2504,10 @@
             "fitMode": "Adattamento",
             "fitModeContain": "Contieni",
             "fitModeFill": "Riempi",
-            "fitModeCover": "Copri"
+            "fitModeCover": "Copri",
+            "smoothingMode": "Modalità di ricampionamento",
+            "smoothingDesc": "Applica un ricampionamento di alta qualità lato backend alla conferma delle trasformazioni.",
+            "smoothing": "Smussamento"
         },
         "stagingArea": {
             "next": "Successiva",
@@ -2550,7 +2676,9 @@
             "temperature": "Temperatura",
             "tint": "Tinta",
             "sharpness": "Nitidezza",
-            "reset": "Reimposta"
+            "reset": "Reimposta",
+            "master": "Composito",
+            "finish": "Applica"
         },
         "deletePrompt": "Elimina prompt",
         "addGlobalReferenceImage": "Aggiungi $t(controlLayers.globalReferenceImage)",
@@ -2580,7 +2708,11 @@
         "replaceCurrent": "Sostituisci l'attuale",
         "uploadOrDragAnImage": "Trascina un'immagine dalla galleria o <UploadButton>carica un'immagine</UploadButton>.",
         "sendingToCanvas": "Predisponi le generazioni sulla Tela",
-        "viewProgressInViewer": "Visualizza i progressi e gli output nel <Btn>Visualizzatore immagini</Btn>."
+        "viewProgressInViewer": "Visualizza i progressi e gli output nel <Btn>Visualizzatore immagini</Btn>.",
+        "extractMaskedAreaMissingData": "Impossibile estrarre: mancano i dati dell'immagine o della maschera.",
+        "extractMaskedAreaFailed": "Impossibile estrarre l'area mascherata.",
+        "maskLayerEmpty": "Il livello maschera è vuoto",
+        "extractRegion": "Estrai regione"
     },
     "ui": {
         "tabs": {
@@ -2746,7 +2878,9 @@
         "noTemplates": "Nessun modello",
         "acceptedColumnsKeys": "Colonne/chiavi accettate:",
         "promptTemplateCleared": "Modello di prompt cancellato",
-        "togglePromptPreviews": "Attiva/disattiva le anteprime dei prompt"
+        "togglePromptPreviews": "Attiva/disattiva le anteprime dei prompt",
+        "noMatchingPresets": "Nessuna preimpostazione corrispondente",
+        "selectPreset": "Seleziona stile predefinito"
     },
     "newUserExperience": {
         "gettingStartedSeries": "Desideri maggiori informazioni? Consulta la nostra <LinkComponent>Getting Started Series</LinkComponent> per suggerimenti su come sfruttare appieno il potenziale di Invoke Studio.",
@@ -2761,11 +2895,12 @@
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
-            "Gestione modelli: se non è possibile identificare un modello durante l'installazione, ora è possibile selezionare manualmente il tipo di modello e l'architettura.",
-            "Interno: sistema di identificazione dei modelli migliorato, che semplifica per i collaboratori l'aggiunta del supporto per nuovi modelli.",
-            "Strumento di ritaglio per immagini di riferimento"
+            "Supporto FLUX.2 Klein: InvokeAI ora supporta i nuovi modelli FLUX.2 Klein (varianti 4B e 9B) con formati GGUF, FP8 e Diffusers. Le funzionalità includono txt2img, img2img, inpainting e outpainting. Consultare la sezione \"Modelli di partenza\" per iniziare.",
+            "Il supporto DyPE per i modelli FLUX migliora le immagini ad alta risoluzione (da >1536 px fino a 4K). Vai alla sezione \"Opzioni avanzate\" per attivarlo.",
+            "Diversità Z-Image Turbo: attiva 'Seed Variance Enhancer' in 'Opzioni avanzate' per aggiungere diversità alle tue generazioni ZiT."
         ],
-        "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente"
+        "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente",
+        "takeUserSurvey": "📣 Facci sapere cosa ne pensi di InvokeAI. Partecipa al nostro sondaggio sull'esperienza utente!"
     },
     "system": {
         "logLevel": {

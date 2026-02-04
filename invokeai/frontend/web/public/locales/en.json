@@ -389,6 +389,7 @@
         "oldestFirst": "Oldest First",
         "sortDirection": "Sort Direction",
         "showStarredImagesFirst": "Show Starred Images First",
+        "usePagedGalleryView": "Use Paged Gallery View",
         "noImageSelected": "No Image Selected",
         "noImagesInGallery": "No Images to Display",
         "starImage": "Star",
@@ -835,7 +836,9 @@
         "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "clipSkip": "$t(parameters.clipSkip)",
         "createdBy": "Created By",
-        "dypePreset": "DyPE Preset",
+        "dypePreset": "$t(parameters.dypePreset)",
+        "dypeScale": "$t(parameters.dypeScale)",
+        "dypeExponent": "$t(parameters.dypeExponent)",
         "generationMode": "Generation Mode",
         "guidance": "Guidance",
         "height": "Height",
@@ -974,6 +977,8 @@
         "loraModels": "LoRAs",
         "main": "Main",
         "metadata": "Metadata",
+        "missingFiles": "Missing Files",
+        "missingFilesTooltip": "Model files are missing from disk",
         "model": "Model",
         "modelConversionFailed": "Model Conversion Failed",
         "modelConverted": "Model Converted",
@@ -1383,6 +1388,8 @@
         "scaledWidth": "Scaled W",
         "scheduler": "Scheduler",
         "dypePreset": "DyPE",
+        "dypeScale": "DyPE λs",
+        "dypeExponent": "DyPE λt",
         "seamlessXAxis": "Seamless X Axis",
         "seamlessYAxis": "Seamless Y Axis",
         "colorCompensation": "Color Compensation",
@@ -1624,6 +1631,22 @@
             "paragraphs": [
                 "Dynamic Position Extrapolation (DyPE) improves FLUX generation quality at resolutions above the training size (1024px).",
                 "Off: Standard generation. Auto: Automatically enables for images > 1536px. 4K: Optimized settings for 4K resolution output."
+            ]
+        },
+        "fluxDypeScale": {
+            "heading": "DyPE Scale (λs)",
+            "paragraphs": [
+                "Controls the magnitude of the DyPE modulation. Higher values = stronger extrapolation.",
+                "Default: 2.0. Range: 0.0-8.0."
+            ]
+        },
+        "fluxDypeExponent": {
+            "heading": "DyPE Exponent (λt)",
+            "paragraphs": [
+                "Controls the strength of the dynamic effect over time.",
+                "2.0: Recommended for 4K+ resolutions. Aggressive schedule that transitions quickly to clean up artifacts.",
+                "1.0: Good starting point for ~2K-3K resolutions.",
+                "0.5: Gentler schedule for resolutions just above native (1024px)."
             ]
         },
         "seedVarianceEnhancer": {
@@ -2417,10 +2440,16 @@
             "horizontal": "Horizontal",
             "diagonal": "Diagonal"
         },
+        "gradient": {
+            "linear": "Linear",
+            "radial": "Radial",
+            "clip": "Clip Gradient"
+        },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
             "rectangle": "Rectangle",
+            "gradient": "Gradient",
             "bbox": "Bbox",
             "move": "Move",
             "view": "View",

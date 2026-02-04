@@ -39,6 +39,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Missing Models
+         * @description Get models whose files are missing from disk.
+         *
+         *     These are models that have database entries but their corresponding
+         *     weight files have been deleted externally (not via Model Manager).
+         */
+        get: operations["list_missing_models"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/get_by_attrs": {
         parameters: {
             query?: never;
@@ -7006,12 +7029,6 @@ export type components = {
             download_path: string;
         };
         /**
-         * DyPEPreset
-         * @description Predefined DyPE configurations.
-         * @enum {string}
-         */
-        DyPEPreset: "off" | "auto" | "4k";
-        /**
          * Dynamic Prompt
          * @description Parses a prompt using adieyal/dynamicprompts' random or combinatorial generator
          */
@@ -8763,10 +8780,12 @@ export type components = {
              */
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
+             * Dype Preset
              * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
              * @default off
+             * @enum {string}
              */
-            dype_preset?: components["schemas"]["DyPEPreset"];
+            dype_preset?: "off" | "manual" | "auto" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
@@ -8955,10 +8974,12 @@ export type components = {
              */
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
+             * Dype Preset
              * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
              * @default off
+             * @enum {string}
              */
-            dype_preset?: components["schemas"]["DyPEPreset"];
+            dype_preset?: "off" | "manual" | "auto" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
@@ -9331,18 +9352,23 @@ export type components = {
              * @default true
              */
             use_cache?: boolean;
-            /** @description Flux model (Transformer) to load */
-            model: components["schemas"]["ModelIdentifierField"];
+            /**
+             * @description Flux model (Transformer) to load
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * T5 Encoder
              * @description T5 tokenizer and text encoder
+             * @default null
              */
-            t5_encoder_model: components["schemas"]["ModelIdentifierField"];
+            t5_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * CLIP Embed
              * @description CLIP Embed loader
+             * @default null
              */
-            clip_embed_model: components["schemas"]["ModelIdentifierField"];
+            clip_embed_model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * VAE
              * @description VAE model to load
@@ -27257,6 +27283,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_missing_models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of models with missing files */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelsList"];
                 };
             };
         };
