@@ -20,81 +20,94 @@ from invokeai.backend.hidiffusion.utils import isinstance_str
 diffusers_version = diffusers.__version__
 if diffusers_version < "0.27.0":
     from diffusers.models.unet_2d_condition import UNet2DConditionOutput
+
     old_diffusers = True
 else:
     from diffusers.models.unets.unet_2d_condition import UNet2DConditionOutput
+
     old_diffusers = False
+
 
 def sd15_hidiffusion_key():
     modified_key = {}
-    modified_key['down_module_key'] = ['down_blocks.0.downsamplers.0.conv']
-    modified_key['down_module_key_extra'] = ['down_blocks.1']
-    modified_key['up_module_key'] = ['up_blocks.2.upsamplers.0.conv']
-    modified_key['up_module_key_extra'] = ['up_blocks.2']
-    modified_key['windown_attn_module_key'] = ['down_blocks.0.attentions.0.transformer_blocks.0',
-                               'down_blocks.0.attentions.1.transformer_blocks.0',
-                               'up_blocks.3.attentions.0.transformer_blocks.0',
-                               'up_blocks.3.attentions.1.transformer_blocks.0',
-                               'up_blocks.3.attentions.2.transformer_blocks.0']
+    modified_key["down_module_key"] = ["down_blocks.0.downsamplers.0.conv"]
+    modified_key["down_module_key_extra"] = ["down_blocks.1"]
+    modified_key["up_module_key"] = ["up_blocks.2.upsamplers.0.conv"]
+    modified_key["up_module_key_extra"] = ["up_blocks.2"]
+    modified_key["windown_attn_module_key"] = [
+        "down_blocks.0.attentions.0.transformer_blocks.0",
+        "down_blocks.0.attentions.1.transformer_blocks.0",
+        "up_blocks.3.attentions.0.transformer_blocks.0",
+        "up_blocks.3.attentions.1.transformer_blocks.0",
+        "up_blocks.3.attentions.2.transformer_blocks.0",
+    ]
     return modified_key
+
 
 def sdxl_hidiffusion_key():
     modified_key = {}
-    modified_key['down_module_key'] = ['down_blocks.1']
-    modified_key['down_module_key_extra'] = ['down_blocks.1.downsamplers.0.conv']
-    modified_key['up_module_key'] = ['up_blocks.1']
-    modified_key['up_module_key_extra'] = ['up_blocks.0.upsamplers.0.conv']
-    modified_key['windown_attn_module_key'] = ['down_blocks.1.attentions.0.transformer_blocks.0',
-                               'down_blocks.1.attentions.0.transformer_blocks.1',
-                               'down_blocks.1.attentions.1.transformer_blocks.0',
-                               'down_blocks.1.attentions.1.transformer_blocks.1',
-                               'up_blocks.1.attentions.0.transformer_blocks.0',
-                               'up_blocks.1.attentions.0.transformer_blocks.1',
-                               'up_blocks.1.attentions.1.transformer_blocks.0',
-                               'up_blocks.1.attentions.1.transformer_blocks.1',
-                               'up_blocks.1.attentions.2.transformer_blocks.0',
-                               'up_blocks.1.attentions.2.transformer_blocks.1']
+    modified_key["down_module_key"] = ["down_blocks.1"]
+    modified_key["down_module_key_extra"] = ["down_blocks.1.downsamplers.0.conv"]
+    modified_key["up_module_key"] = ["up_blocks.1"]
+    modified_key["up_module_key_extra"] = ["up_blocks.0.upsamplers.0.conv"]
+    modified_key["windown_attn_module_key"] = [
+        "down_blocks.1.attentions.0.transformer_blocks.0",
+        "down_blocks.1.attentions.0.transformer_blocks.1",
+        "down_blocks.1.attentions.1.transformer_blocks.0",
+        "down_blocks.1.attentions.1.transformer_blocks.1",
+        "up_blocks.1.attentions.0.transformer_blocks.0",
+        "up_blocks.1.attentions.0.transformer_blocks.1",
+        "up_blocks.1.attentions.1.transformer_blocks.0",
+        "up_blocks.1.attentions.1.transformer_blocks.1",
+        "up_blocks.1.attentions.2.transformer_blocks.0",
+        "up_blocks.1.attentions.2.transformer_blocks.1",
+    ]
 
     return modified_key
 
 
 def sdxl_turbo_hidiffusion_key():
     modified_key = {}
-    modified_key['down_module_key'] = ['down_blocks.1']
-    modified_key['up_module_key'] = ['up_blocks.1']
-    modified_key['windown_attn_module_key'] = ['down_blocks.1.attentions.0.transformer_blocks.0',
-                               'down_blocks.1.attentions.0.transformer_blocks.1',
-                               'down_blocks.1.attentions.1.transformer_blocks.0',
-                               'down_blocks.1.attentions.1.transformer_blocks.1',
-                               'up_blocks.1.attentions.0.transformer_blocks.0',
-                               'up_blocks.1.attentions.0.transformer_blocks.1',
-                               'up_blocks.1.attentions.1.transformer_blocks.0',
-                               'up_blocks.1.attentions.1.transformer_blocks.1',
-                               'up_blocks.1.attentions.2.transformer_blocks.0',
-                               'up_blocks.1.attentions.2.transformer_blocks.1']
+    modified_key["down_module_key"] = ["down_blocks.1"]
+    modified_key["up_module_key"] = ["up_blocks.1"]
+    modified_key["windown_attn_module_key"] = [
+        "down_blocks.1.attentions.0.transformer_blocks.0",
+        "down_blocks.1.attentions.0.transformer_blocks.1",
+        "down_blocks.1.attentions.1.transformer_blocks.0",
+        "down_blocks.1.attentions.1.transformer_blocks.1",
+        "up_blocks.1.attentions.0.transformer_blocks.0",
+        "up_blocks.1.attentions.0.transformer_blocks.1",
+        "up_blocks.1.attentions.1.transformer_blocks.0",
+        "up_blocks.1.attentions.1.transformer_blocks.1",
+        "up_blocks.1.attentions.2.transformer_blocks.0",
+        "up_blocks.1.attentions.2.transformer_blocks.1",
+    ]
 
     return modified_key
 
+
 # supported official model. If you use non-official model based on the following models/pipelines, hidiffusion will automatically select the best strategy to fit it.
 supported_official_model = [
-    'runwayml/stable-diffusion-v1-5', 'stabilityai/stable-diffusion-2-1-base',
-    'stabilityai/stable-diffusion-xl-base-1.0', 'diffusers/stable-diffusion-xl-1.0-inpainting-0.1',
-    'stabilityai/sdxl-turbo'
+    "runwayml/stable-diffusion-v1-5",
+    "stabilityai/stable-diffusion-2-1-base",
+    "stabilityai/stable-diffusion-xl-base-1.0",
+    "diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
+    "stabilityai/sdxl-turbo",
 ]
 
 
 # T1_ratio: see T1 introduced in the main paper. T1 = number_inference_step * T1_ratio. A higher T1_ratio can better mitigate object duplication. We set T1_ratio=0.4 by default. You'd better adjust it to fit your prompt. Only active when apply_raunet=True.
 # T2_ratio: see T2 introduced in the appendix, used in extreme resolution image generation. T2 = number_inference_step * T2_ratio. A higher T2_ratio can better mitigate object duplication. Only active when apply_raunet=True
 switching_threshold_ratio_dict = {
-    'sd15_1024': {'T1_ratio': 0.4, 'T2_ratio': 0.0},
-    'sd15_2048': {'T1_ratio': 0.7, 'T2_ratio': 0.3},
-    'sdxl_2048': {'T1_ratio': 0.4, 'T2_ratio': 0.0},
-    'sdxl_4096': {'T1_ratio': 0.7, 'T2_ratio': 0.3},
-    'sdxl_turbo_1024': {'T1_ratio': 0.5, 'T2_ratio': 0.0},
+    "sd15_1024": {"T1_ratio": 0.4, "T2_ratio": 0.0},
+    "sd15_2048": {"T1_ratio": 0.7, "T2_ratio": 0.3},
+    "sdxl_2048": {"T1_ratio": 0.4, "T2_ratio": 0.0},
+    "sdxl_4096": {"T1_ratio": 0.7, "T2_ratio": 0.3},
+    "sdxl_turbo_1024": {"T1_ratio": 0.5, "T2_ratio": 0.0},
 }
 
 text_to_img_controlnet_switching_threshold_ratio_dict = {
-    'sdxl_2048': {'T1_ratio': 0.5, 'T2_ratio': 0.0},
+    "sdxl_2048": {"T1_ratio": 0.5, "T2_ratio": 0.0},
 }
 controlnet_apply_steps_rate = 0.6
 
@@ -105,12 +118,10 @@ inpainting_is_aggressive_raunet = False
 playground_is_aggressive_raunet = False
 
 
-with importlib.resources.open_text(
-        f"{__package__}.sd_module_key", "sd15_module_key.txt", encoding="utf-8") as f:
+with importlib.resources.open_text(f"{__package__}.sd_module_key", "sd15_module_key.txt", encoding="utf-8") as f:
     sd15_module_key = f.read().splitlines()
 
-with importlib.resources.open_text(
-        f"{__package__}.sd_module_key", "sdxl_module_key.txt", encoding="utf-8") as f:
+with importlib.resources.open_text(f"{__package__}.sd_module_key", "sdxl_module_key.txt", encoding="utf-8") as f:
     sdxl_module_key = f.read().splitlines()
 
 
@@ -118,15 +129,14 @@ def _get_max_timesteps(info_dict: dict) -> int:
     """
     Helper function to get the maximum number of timesteps from a pipeline.
     """
-    pipeline = info_dict['pipeline']
-    if hasattr(pipeline, '_num_timesteps'):
+    pipeline = info_dict["pipeline"]
+    if hasattr(pipeline, "_num_timesteps"):
         return pipeline._num_timesteps
     else:
         return len(pipeline.scheduler.timesteps)
 
 
 def make_diffusers_sdxl_controlnet_ppl(block_class):
-
     class sdxl_controlnet_ppl(block_class):
         # Save for unpatching later
         _parent = block_class
@@ -336,9 +346,9 @@ def make_diffusers_sdxl_controlnet_ppl(block_class):
             if control_image is None:
                 control_image = image
                 image = None
-                self.info['text_to_img_controlnet'] = True
+                self.info["text_to_img_controlnet"] = True
             else:
-                self.info['text_to_img_controlnet'] = False
+                self.info["text_to_img_controlnet"] = False
 
             callback = kwargs.pop("callback", None)
             callback_steps = kwargs.pop("callback_steps", None)
@@ -748,8 +758,7 @@ def make_diffusers_sdxl_controlnet_ppl(block_class):
 
                     if isinstance(controlnet_keep[i], list):
                         cond_scale = [
-                            c * s
-                            for c, s in zip(controlnet_conditioning_scale, controlnet_keep[i], strict=False)
+                            c * s for c, s in zip(controlnet_conditioning_scale, controlnet_keep[i], strict=False)
                         ]
                     else:
                         controlnet_cond_scale = controlnet_conditioning_scale
@@ -757,19 +766,20 @@ def make_diffusers_sdxl_controlnet_ppl(block_class):
                             controlnet_cond_scale = controlnet_cond_scale[0]
                         cond_scale = controlnet_cond_scale * controlnet_keep[i]
 
-
                     if i < controlnet_apply_steps_rate * num_inference_steps:
-
-                        original_h, original_w = (128,128)
+                        original_h, original_w = (128, 128)
                         _, _, model_input_h, model_input_w = control_model_input.shape
-                        downsample_factor = max(model_input_h/original_h, model_input_w/original_w)
-                        downsample_size = (int(model_input_h//downsample_factor)//8*8, int(model_input_w//downsample_factor)//8*8)
+                        downsample_factor = max(model_input_h / original_h, model_input_w / original_w)
+                        downsample_size = (
+                            int(model_input_h // downsample_factor) // 8 * 8,
+                            int(model_input_w // downsample_factor) // 8 * 8,
+                        )
 
                         # original_pixel_h, original_pixel_w = (1024,1024)
                         # _, _, pixel_h, pixel_w = control_image.shape
                         # downsample_pixel_factor = max(pixel_h/original_pixel_h, pixel_w/original_pixel_w)
                         # downsample_pixel_size = (int(pixel_h//downsample_pixel_factor)//8*8, int(pixel_w//downsample_pixel_factor)//8*8)
-                        downsample_pixel_size = [downsample_size[0]*8, downsample_size[1]*8]
+                        downsample_pixel_size = [downsample_size[0] * 8, downsample_size[1] * 8]
 
                         down_block_res_samples, mid_block_res_sample = self.controlnet(
                             F.interpolate(control_model_input, downsample_size),
@@ -888,10 +898,10 @@ def make_diffusers_sdxl_controlnet_ppl(block_class):
 
 
 def make_diffusers_unet_2d_condition(block_class):
-
     class unet_2d_condition(block_class):
         # Save for unpatching later
         _parent = block_class
+
         def forward(
             self,
             sample: torch.FloatTensor,
@@ -1194,7 +1204,9 @@ def make_diffusers_unet_2d_condition(block_class):
                     down_block_res_samples, down_block_additional_residuals, strict=False
                 ):
                     _, _, ori_H, ori_W = down_block_res_sample.shape
-                    down_block_additional_residual = F.interpolate(down_block_additional_residual, (ori_H, ori_W), mode='bicubic')
+                    down_block_additional_residual = F.interpolate(
+                        down_block_additional_residual, (ori_H, ori_W), mode="bicubic"
+                    )
                     down_block_res_sample = down_block_res_sample + down_block_additional_residual
                     new_down_block_res_samples = new_down_block_res_samples + (down_block_res_sample,)
 
@@ -1224,7 +1236,9 @@ def make_diffusers_unet_2d_condition(block_class):
 
             if is_controlnet:
                 _, _, ori_H, ori_W = sample.shape
-                mid_block_additional_residual = F.interpolate(mid_block_additional_residual, (ori_H, ori_W), mode='bicubic')
+                mid_block_additional_residual = F.interpolate(
+                    mid_block_additional_residual, (ori_H, ori_W), mode="bicubic"
+                )
                 sample = sample + mid_block_additional_residual
 
             # 5. up
@@ -1280,10 +1294,13 @@ def make_diffusers_unet_2d_condition(block_class):
                 return (sample,)
 
             return UNet2DConditionOutput(sample=sample)
+
     return unet_2d_condition
 
 
-def make_diffusers_transformer_block(block_class: Type[torch.nn.Module], generator: torch.Generator) -> Type[torch.nn.Module]:
+def make_diffusers_transformer_block(
+    block_class: Type[torch.nn.Module], generator: torch.Generator
+) -> Type[torch.nn.Module]:
     # replace global self-attention with MSW-MSA
     class transformer_block(block_class):
         # Save for unpatching later
@@ -1300,7 +1317,6 @@ def make_diffusers_transformer_block(block_class: Type[torch.nn.Module], generat
             class_labels: Optional[torch.LongTensor] = None,
             added_cond_kwargs: Optional[Dict[str, torch.Tensor]] = None,
         ) -> torch.FloatTensor:
-
             # reference: https://github.com/microsoft/Swin-Transformer
             def window_partition(x, window_size, shift_size, H, W):
                 """
@@ -1312,15 +1328,23 @@ def make_diffusers_transformer_block(block_class: Type[torch.nn.Module], generat
                     windows: (num_windows*B, window_size, window_size, C)
                 """
                 B, N, C = x.shape
-                x = x.view(B,H,W,C)
+                x = x.view(B, H, W, C)
                 if H % 2 != 0 or W % 2 != 0:
                     warnings.warn(
-                        f"HiDiffusion Warning: The feature size is {(H,W)} and cannot be directly partitioned into windows. We interpolate the size to {(window_size[0]*2, window_size[1]*2)} "
+                        f"HiDiffusion Warning: The feature size is {(H, W)} and cannot be directly partitioned into windows. We interpolate the size to {(window_size[0] * 2, window_size[1] * 2)} "
                         f"to enable the window partition. Even though the generation is OK, the image quality would be largely decreased. "
                         f"We suggest removing window attention by setting apply_hidiffusion(pipe, apply_window_attn=False) for better image quality.",
                         stacklevel=2,
                     )
-                    x = F.interpolate(x.permute(0,3,1,2).contiguous(), size=(window_size[0]*2, window_size[1]*2), mode='bicubic').permute(0,2,3,1).contiguous()
+                    x = (
+                        F.interpolate(
+                            x.permute(0, 3, 1, 2).contiguous(),
+                            size=(window_size[0] * 2, window_size[1] * 2),
+                            mode="bicubic",
+                        )
+                        .permute(0, 2, 3, 1)
+                        .contiguous()
+                    )
                 if type(shift_size) is list or type(shift_size) is tuple:
                     if shift_size[0] > 0:
                         x = torch.roll(x, shifts=(-shift_size[0], -shift_size[1]), dims=(1, 2))
@@ -1331,7 +1355,6 @@ def make_diffusers_transformer_block(block_class: Type[torch.nn.Module], generat
                 windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size[0], window_size[1], C)
                 windows = windows.view(-1, window_size[0] * window_size[1], C)
                 return windows
-
 
             def window_reverse(windows, window_size, H, W, shift_size):
                 """
@@ -1346,9 +1369,9 @@ def make_diffusers_transformer_block(block_class: Type[torch.nn.Module], generat
                 """
                 B, N, C = windows.shape
                 windows = windows.view(-1, window_size[0], window_size[1], C)
-                B = int(windows.shape[0] / 4) # 2x2
+                B = int(windows.shape[0] / 4)  # 2x2
                 x = windows.view(B, 2, 2, window_size[0], window_size[1], -1)
-                x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, window_size[0]*2, window_size[1]*2, -1)
+                x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, window_size[0] * 2, window_size[1] * 2, -1)
                 if type(shift_size) is list or type(shift_size) is tuple:
                     if shift_size[0] > 0:
                         x = torch.roll(x, shifts=(shift_size[0], shift_size[1]), dims=(1, 2))
@@ -1356,8 +1379,12 @@ def make_diffusers_transformer_block(block_class: Type[torch.nn.Module], generat
                     if shift_size > 0:
                         x = torch.roll(x, shifts=(shift_size, shift_size), dims=(1, 2))
                 if H % 2 != 0 or W % 2 != 0:
-                    x = F.interpolate(x.permute(0,3,1,2).contiguous(), size=(H, W), mode='bicubic').permute(0,2,3,1).contiguous()
-                x = x.view(B, H*W, C)
+                    x = (
+                        F.interpolate(x.permute(0, 3, 1, 2).contiguous(), size=(H, W), mode="bicubic")
+                        .permute(0, 2, 3, 1)
+                        .contiguous()
+                    )
+                x = x.view(B, H * W, C)
                 return x
 
             # Notice that normalization is always applied before the real computation in the following blocks.
@@ -1393,18 +1420,18 @@ def make_diffusers_transformer_block(block_class: Type[torch.nn.Module], generat
                 rand_num = torch.rand(1)
 
             B, N, C = hidden_states.shape
-            ori_H, ori_W = self.info['size']
-            downsample_ratio = round(((ori_H*ori_W) / N)**0.5)
-            H, W = (math.ceil(ori_H/downsample_ratio), math.ceil(ori_W/downsample_ratio))
-            widow_size = (math.ceil(H/2), math.ceil(W/2))
+            ori_H, ori_W = self.info["size"]
+            downsample_ratio = round(((ori_H * ori_W) / N) ** 0.5)
+            H, W = (math.ceil(ori_H / downsample_ratio), math.ceil(ori_W / downsample_ratio))
+            widow_size = (math.ceil(H / 2), math.ceil(W / 2))
             if rand_num <= 0.25:
-                shift_size = (0,0)
+                shift_size = (0, 0)
             if rand_num > 0.25 and rand_num <= 0.5:
-                shift_size = (widow_size[0]//4, widow_size[1]//4)
+                shift_size = (widow_size[0] // 4, widow_size[1] // 4)
             if rand_num > 0.5 and rand_num <= 0.75:
-                shift_size = (widow_size[0]//4*2, widow_size[1]//4*2)
+                shift_size = (widow_size[0] // 4 * 2, widow_size[1] // 4 * 2)
             if rand_num > 0.75 and rand_num <= 1:
-                shift_size = (widow_size[0]//4*3, widow_size[1]//4*3)
+                shift_size = (widow_size[0] // 4 * 3, widow_size[1] // 4 * 3)
             norm_hidden_states = window_partition(norm_hidden_states, widow_size, shift_size, H, W)
             # 2. Prepare GLIGEN inputs
             cross_attention_kwargs = cross_attention_kwargs.copy() if cross_attention_kwargs is not None else {}
@@ -1472,9 +1499,7 @@ def make_diffusers_transformer_block(block_class: Type[torch.nn.Module], generat
 
             if self._chunk_size is not None:
                 # "feed_forward_chunk_size" can be used to save memory
-                ff_output = _chunked_feed_forward(
-                    self.ff, norm_hidden_states, self._chunk_dim, self._chunk_size
-                )
+                ff_output = _chunked_feed_forward(self.ff, norm_hidden_states, self._chunk_dim, self._chunk_size)
                 # ff_output = _chunked_feed_forward(
                 #     self.ff, norm_hidden_states, self._chunk_dim, self._chunk_size, lora_scale=lora_scale
                 # )
@@ -1507,7 +1532,7 @@ def make_diffusers_cross_attn_down_block(block_class: Type[torch.nn.Module]) -> 
         T1_start = 0
         T1_end = 0
         aggressive_raunet = False
-        T1 = 0 # to avoid confict with sdxl-turbo
+        T1 = 0  # to avoid confict with sdxl-turbo
         max_timestep = 50
         info: dict = None
         model: str = None
@@ -1522,39 +1547,40 @@ def make_diffusers_cross_attn_down_block(block_class: Type[torch.nn.Module]) -> 
             encoder_attention_mask: Optional[torch.FloatTensor] = None,
             additional_residuals: Optional[torch.FloatTensor] = None,
         ) -> Tuple[torch.FloatTensor, Tuple[torch.FloatTensor, ...]]:
-
             self.max_timestep = _get_max_timesteps(self.info)
-            ori_H, ori_W = self.info['size']
-            if self.model == 'sd15':
+            ori_H, ori_W = self.info["size"]
+            if self.model == "sd15":
                 if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict['sd15_1024'][self.switching_threshold_ratio]
+                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict['sd15_2048'][self.switching_threshold_ratio]
-            elif self.model == 'sdxl':
+                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
+            elif self.model == "sdxl":
                 if ori_H < 512 or ori_W < 512:
-                    if self.info['text_to_img_controlnet']:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict['sdxl_2048'][self.switching_threshold_ratio]
+                    if self.info["text_to_img_controlnet"]:
+                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
+                            self.switching_threshold_ratio
+                        ]
                     else:
-                        self.T1_ratio = switching_threshold_ratio_dict['sdxl_2048'][self.switching_threshold_ratio]
+                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
 
-                    if self.info['is_inpainting_task']:
+                    if self.info["is_inpainting_task"]:
                         self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info['is_playground']:
+                    elif self.info["is_playground"]:
                         self.aggressive_raunet = playground_is_aggressive_raunet
                     else:
                         self.aggressive_raunet = is_aggressive_raunet
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict['sdxl_4096'][self.switching_threshold_ratio]
-            elif self.model == 'sdxl_turbo':
-                self.T1_ratio = switching_threshold_ratio_dict['sdxl_turbo_1024'][self.switching_threshold_ratio]
+                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
+            elif self.model == "sdxl_turbo":
+                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
             else:
                 raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
 
             if self.aggressive_raunet:
                 # self.T1_start = min(int(self.max_timestep * self.T1_ratio * 0.4), int(8/50 * self.max_timestep))
-                self.T1_start = int(aggressive_step/50 * self.max_timestep)
+                self.T1_start = int(aggressive_step / 50 * self.max_timestep)
                 self.T1_end = int(self.max_timestep * self.T1_ratio)
-                self.T1 = 0 # to avoid confict with sdxl-turbo
+                self.T1 = 0  # to avoid confict with sdxl-turbo
             else:
                 self.T1 = int(self.max_timestep * self.T1_ratio)
 
@@ -1608,10 +1634,10 @@ def make_diffusers_cross_attn_down_block(block_class: Type[torch.nn.Module]) -> 
                 if i == 0:
                     if self.aggressive_raunet and self.timestep >= self.T1_start and self.timestep < self.T1_end:
                         self.info["upsample_size"] = (hidden_states.shape[2], hidden_states.shape[3])
-                        hidden_states = F.avg_pool2d(hidden_states, kernel_size=(2,2),ceil_mode=True)
+                        hidden_states = F.avg_pool2d(hidden_states, kernel_size=(2, 2), ceil_mode=True)
                     elif self.timestep < self.T1:
                         self.info["upsample_size"] = (hidden_states.shape[2], hidden_states.shape[3])
-                        hidden_states = F.avg_pool2d(hidden_states, kernel_size=(2,2),ceil_mode=True)
+                        hidden_states = F.avg_pool2d(hidden_states, kernel_size=(2, 2), ceil_mode=True)
                 output_states = output_states + (hidden_states,)
 
             if self.downsamplers is not None:
@@ -1626,7 +1652,9 @@ def make_diffusers_cross_attn_down_block(block_class: Type[torch.nn.Module]) -> 
                 self.timestep = 0
 
             return hidden_states, output_states
+
     return cross_attn_down_block
+
 
 def make_diffusers_cross_attn_up_block(block_class: Type[torch.nn.Module]) -> Type[torch.nn.Module]:
     # replace conventional downsampler with resolution-aware downsampler
@@ -1639,7 +1667,7 @@ def make_diffusers_cross_attn_up_block(block_class: Type[torch.nn.Module]) -> Ty
         T1_start = 0
         T1_end = 0
         aggressive_raunet = False
-        T1 = 0 # to avoid confict with sdxl-turbo
+        T1 = 0  # to avoid confict with sdxl-turbo
         max_timestep = 50
 
         def forward(
@@ -1653,40 +1681,41 @@ def make_diffusers_cross_attn_up_block(block_class: Type[torch.nn.Module]) -> Ty
             attention_mask: Optional[torch.FloatTensor] = None,
             encoder_attention_mask: Optional[torch.FloatTensor] = None,
         ) -> torch.FloatTensor:
-
             self.max_timestep = _get_max_timesteps(self.info)
-            ori_H, ori_W = self.info['size']
-            if self.model == 'sd15':
+            ori_H, ori_W = self.info["size"]
+            if self.model == "sd15":
                 if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict['sd15_1024'][self.switching_threshold_ratio]
+                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict['sd15_2048'][self.switching_threshold_ratio]
-            elif self.model == 'sdxl':
+                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
+            elif self.model == "sdxl":
                 if ori_H < 512 or ori_W < 512:
-                    if self.info['text_to_img_controlnet']:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict['sdxl_2048'][self.switching_threshold_ratio]
+                    if self.info["text_to_img_controlnet"]:
+                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
+                            self.switching_threshold_ratio
+                        ]
                     else:
-                        self.T1_ratio = switching_threshold_ratio_dict['sdxl_2048'][self.switching_threshold_ratio]
+                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
 
-                    if self.info['is_inpainting_task']:
+                    if self.info["is_inpainting_task"]:
                         self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info['is_playground']:
+                    elif self.info["is_playground"]:
                         self.aggressive_raunet = playground_is_aggressive_raunet
                     else:
                         self.aggressive_raunet = is_aggressive_raunet
 
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict['sdxl_4096'][self.switching_threshold_ratio]
-            elif self.model == 'sdxl_turbo':
-                self.T1_ratio = switching_threshold_ratio_dict['sdxl_turbo_1024'][self.switching_threshold_ratio]
+                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
+            elif self.model == "sdxl_turbo":
+                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
             else:
                 raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
 
             if self.aggressive_raunet:
                 # self.T1_start = min(int(self.max_timestep * self.T1_ratio * 0.4), int(8/50 * self.max_timestep))
-                self.T1_start = int(aggressive_step/50 * self.max_timestep)
+                self.T1_start = int(aggressive_step / 50 * self.max_timestep)
                 self.T1_end = int(self.max_timestep * self.T1_ratio)
-                self.T1 = 0 # to avoid confict with sdxl-turbo
+                self.T1 = 0  # to avoid confict with sdxl-turbo
             else:
                 self.T1 = int(self.max_timestep * self.T1_ratio)
 
@@ -1756,9 +1785,13 @@ def make_diffusers_cross_attn_up_block(block_class: Type[torch.nn.Module]) -> Ty
 
                     if i == 1:
                         if self.aggressive_raunet and self.timestep >= self.T1_start and self.timestep < self.T1_end:
-                            hidden_states = F.interpolate(hidden_states, size=self.info["upsample_size"], mode='bicubic')
+                            hidden_states = F.interpolate(
+                                hidden_states, size=self.info["upsample_size"], mode="bicubic"
+                            )
                         elif self.timestep < self.T1:
-                            hidden_states = F.interpolate(hidden_states, size=self.info["upsample_size"], mode='bicubic')
+                            hidden_states = F.interpolate(
+                                hidden_states, size=self.info["upsample_size"], mode="bicubic"
+                            )
             if self.upsamplers is not None:
                 for upsampler in self.upsamplers:
                     hidden_states = upsampler(hidden_states, upsample_size)
@@ -1769,8 +1802,8 @@ def make_diffusers_cross_attn_up_block(block_class: Type[torch.nn.Module]) -> Ty
                 self.timestep = 0
 
             return hidden_states
-    return cross_attn_up_block
 
+    return cross_attn_up_block
 
 
 def make_diffusers_downsampler_block(block_class: Type[torch.nn.Module]) -> Type[torch.nn.Module]:
@@ -1784,37 +1817,39 @@ def make_diffusers_downsampler_block(block_class: Type[torch.nn.Module]) -> Type
         aggressive_raunet = False
         max_timestep = 50
 
-        def forward(self, hidden_states: torch.Tensor, scale = 1.0) -> torch.Tensor:
+        def forward(self, hidden_states: torch.Tensor, scale=1.0) -> torch.Tensor:
             self.max_timestep = _get_max_timesteps(self.info)
-            ori_H, ori_W = self.info['size']
-            if self.model == 'sd15':
+            ori_H, ori_W = self.info["size"]
+            if self.model == "sd15":
                 if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict['sd15_1024'][self.switching_threshold_ratio]
+                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict['sd15_2048'][self.switching_threshold_ratio]
-            elif self.model == 'sdxl':
+                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
+            elif self.model == "sdxl":
                 if ori_H < 512 or ori_W < 512:
-                    if self.info['text_to_img_controlnet']:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict['sdxl_2048'][self.switching_threshold_ratio]
+                    if self.info["text_to_img_controlnet"]:
+                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
+                            self.switching_threshold_ratio
+                        ]
                     else:
-                        self.T1_ratio = switching_threshold_ratio_dict['sdxl_2048'][self.switching_threshold_ratio]
+                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
 
-                    if self.info['is_inpainting_task']:
+                    if self.info["is_inpainting_task"]:
                         self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info['is_playground']:
+                    elif self.info["is_playground"]:
                         self.aggressive_raunet = playground_is_aggressive_raunet
                     else:
                         self.aggressive_raunet = is_aggressive_raunet
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict['sdxl_4096'][self.switching_threshold_ratio]
-            elif self.model == 'sdxl_turbo':
-                self.T1_ratio = switching_threshold_ratio_dict['sdxl_turbo_1024'][self.switching_threshold_ratio]
+                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
+            elif self.model == "sdxl_turbo":
+                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
             else:
                 raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
 
             if self.aggressive_raunet:
                 # self.T1 = min(int(self.max_timestep * self.T1_ratio), int(8/50 * self.max_timestep))
-                self.T1 = int(aggressive_step/50 * self.max_timestep)
+                self.T1 = int(aggressive_step / 50 * self.max_timestep)
             else:
                 self.T1 = int(self.max_timestep * self.T1_ratio)
             if self.timestep < self.T1:
@@ -1822,9 +1857,9 @@ def make_diffusers_downsampler_block(block_class: Type[torch.nn.Module]) -> Type
                 self.ori_padding = self.padding
                 self.ori_dilation = self.dilation
 
-                self.stride = (4,4)
-                self.padding = (2,2)
-                self.dilation = (2,2)
+                self.stride = (4, 4)
+                self.padding = (2, 2)
+                self.dilation = (2, 2)
 
             if old_diffusers:
                 if self.lora_layer is None:
@@ -1858,6 +1893,7 @@ def make_diffusers_downsampler_block(block_class: Type[torch.nn.Module]) -> Type
                 if self.timestep == self.max_timestep:
                     self.timestep = 0
                 return hidden_states
+
     return downsampler_block
 
 
@@ -1873,38 +1909,39 @@ def make_diffusers_upsampler_block(block_class: Type[torch.nn.Module]) -> Type[t
         max_timestep = 50
         info: dict = None
 
-        def forward(self, hidden_states: torch.Tensor, scale = 1.0) -> torch.Tensor:
+        def forward(self, hidden_states: torch.Tensor, scale=1.0) -> torch.Tensor:
             self.max_timestep = _get_max_timesteps(self.info)
-            ori_H, ori_W = self.info['size']
-            if self.model == 'sd15':
+            ori_H, ori_W = self.info["size"]
+            if self.model == "sd15":
                 if ori_H < 256 or ori_W < 256:
-                    self.T1_ratio = switching_threshold_ratio_dict['sd15_1024'][self.switching_threshold_ratio]
+                    self.T1_ratio = switching_threshold_ratio_dict["sd15_1024"][self.switching_threshold_ratio]
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict['sd15_2048'][self.switching_threshold_ratio]
-            elif self.model == 'sdxl':
+                    self.T1_ratio = switching_threshold_ratio_dict["sd15_2048"][self.switching_threshold_ratio]
+            elif self.model == "sdxl":
                 if ori_H < 512 or ori_W < 512:
-                    if self.info['text_to_img_controlnet']:
-                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict['sdxl_2048'][self.switching_threshold_ratio]
+                    if self.info["text_to_img_controlnet"]:
+                        self.T1_ratio = text_to_img_controlnet_switching_threshold_ratio_dict["sdxl_2048"][
+                            self.switching_threshold_ratio
+                        ]
                     else:
-                        self.T1_ratio = switching_threshold_ratio_dict['sdxl_2048'][self.switching_threshold_ratio]
+                        self.T1_ratio = switching_threshold_ratio_dict["sdxl_2048"][self.switching_threshold_ratio]
 
-                    if self.info['is_inpainting_task']:
+                    if self.info["is_inpainting_task"]:
                         self.aggressive_raunet = inpainting_is_aggressive_raunet
-                    elif self.info['is_playground']:
+                    elif self.info["is_playground"]:
                         self.aggressive_raunet = playground_is_aggressive_raunet
                     else:
                         self.aggressive_raunet = is_aggressive_raunet
                 else:
-                    self.T1_ratio = switching_threshold_ratio_dict['sdxl_4096'][self.switching_threshold_ratio]
-            elif self.model == 'sdxl_turbo':
-                self.T1_ratio = switching_threshold_ratio_dict['sdxl_turbo_1024'][self.switching_threshold_ratio]
+                    self.T1_ratio = switching_threshold_ratio_dict["sdxl_4096"][self.switching_threshold_ratio]
+            elif self.model == "sdxl_turbo":
+                self.T1_ratio = switching_threshold_ratio_dict["sdxl_turbo_1024"][self.switching_threshold_ratio]
             else:
                 raise Exception("Error model. HiDiffusion now only supports sd15, sd21, sdxl, sdxl-turbo.")
 
-
             if self.aggressive_raunet:
                 # self.T1 = min(int(self.max_timestep * self.T1_ratio), int(8/50 * self.max_timestep))
-                self.T1 = int(aggressive_step/50 * self.max_timestep)
+                self.T1 = int(aggressive_step / 50 * self.max_timestep)
             else:
                 self.T1 = int(self.max_timestep * self.T1_ratio)
             self.timestep += 1
@@ -1927,12 +1964,13 @@ def make_diffusers_upsampler_block(block_class: Type[torch.nn.Module]) -> Type[t
                 return F.conv2d(
                     hidden_states, self.weight, self.bias, self.stride, self.padding, self.dilation, self.groups
                 )
+
     return upsampler_block
 
 
-
 def hook_diffusion_model(model: torch.nn.Module):
-    """ Adds a forward pre hook to get the image size. This hook can be removed with remove_hidiffusion. """
+    """Adds a forward pre hook to get the image size. This hook can be removed with remove_hidiffusion."""
+
     def hook(module, args):
         module.info["size"] = (args[0].shape[2], args[0].shape[3])
         return None
@@ -1940,13 +1978,13 @@ def hook_diffusion_model(model: torch.nn.Module):
     model.info["hooks"].append(model.register_forward_pre_hook(hook))
 
 
-
 def apply_hidiffusion(
-        model: torch.nn.Module,
-        apply_raunet: bool = True,
-        apply_window_attn: bool = True,
-        is_playground = False,
-        generator: torch.Generator | None = None):
+    model: torch.nn.Module,
+    apply_raunet: bool = True,
+    apply_window_attn: bool = True,
+    is_playground=False,
+    generator: torch.Generator | None = None,
+):
     """
     model: diffusers model. We support SD 1.5, 2.1, XL, XL Turbo.
 
@@ -1964,12 +2002,16 @@ def apply_hidiffusion(
         raise RuntimeError("Provided model was not a diffusers model/pipeline, as expected.")
     else:
         # Check if the pipeline is a ControlNet pipeline
-        is_sdxl_controlnet = hasattr(model, 'controlnet') and isinstance_str(model, "StableDiffusionXLControlNet", prefix=True)
-        is_sd_controlnet = hasattr(model, 'controlnet') and isinstance_str(model, "StableDiffusionControlNet", prefix=True)
+        is_sdxl_controlnet = hasattr(model, "controlnet") and isinstance_str(
+            model, "StableDiffusionXLControlNet", prefix=True
+        )
+        is_sd_controlnet = hasattr(model, "controlnet") and isinstance_str(
+            model, "StableDiffusionControlNet", prefix=True
+        )
 
         # Check for ControlNet Inpaint pipelines
-        is_sdxl_controlnet_inpaint = is_sdxl_controlnet and isinstance_str(model, 'Inpaint', contains=True)
-        is_sd_controlnet_inpaint = is_sd_controlnet and isinstance_str(model, 'Inpaint', contains=True)
+        is_sdxl_controlnet_inpaint = is_sdxl_controlnet and isinstance_str(model, "Inpaint", contains=True)
+        is_sd_controlnet_inpaint = is_sd_controlnet and isinstance_str(model, "Inpaint", contains=True)
 
         if is_sdxl_controlnet_inpaint or is_sd_controlnet_inpaint:
             # For ControlNet Inpaint pipelines, we don't patch the pipeline class
@@ -2000,105 +2042,107 @@ def apply_hidiffusion(
         for key, _module in diffusion_model.named_modules():
             diffusion_model_module_key.append(key)
         if set(sd15_module_key) < set(diffusion_model_module_key):
-            name_or_path = 'runwayml/stable-diffusion-v1-5'
+            name_or_path = "runwayml/stable-diffusion-v1-5"
         elif set(sdxl_module_key) < set(diffusion_model_module_key):
-            name_or_path = 'stabilityai/stable-diffusion-xl-base-1.0'
+            name_or_path = "stabilityai/stable-diffusion-xl-base-1.0"
 
     diffusion_model.info = {
-        'size': None,
-        'upsample_size': None,
-        'hooks': [],
-        'text_to_img_controlnet': hasattr(model, 'controlnet'),
-        'is_inpainting_task': model.__class__ in auto_pipeline.AUTO_INPAINT_PIPELINES_MAPPING.values(),
-        'is_playground': is_playground,
-        'pipeline': model
+        "size": None,
+        "upsample_size": None,
+        "hooks": [],
+        "text_to_img_controlnet": hasattr(model, "controlnet"),
+        "is_inpainting_task": model.__class__ in auto_pipeline.AUTO_INPAINT_PIPELINES_MAPPING.values(),
+        "is_playground": is_playground,
+        "pipeline": model,
     }
     model.info = diffusion_model.info
     hook_diffusion_model(diffusion_model)
 
-    if name_or_path in ['runwayml/stable-diffusion-v1-5', 'stabilityai/stable-diffusion-2-1-base']:
+    if name_or_path in ["runwayml/stable-diffusion-v1-5", "stabilityai/stable-diffusion-2-1-base"]:
         modified_key = sd15_hidiffusion_key()
         for key, module in diffusion_model.named_modules():
-            if apply_raunet and key in modified_key['down_module_key']:
+            if apply_raunet and key in modified_key["down_module_key"]:
                 make_block_fn = make_diffusers_downsampler_block
                 module.__class__ = make_block_fn(module.__class__)
-                module.switching_threshold_ratio = 'T1_ratio'
-            if apply_raunet and key in modified_key['down_module_key_extra']:
+                module.switching_threshold_ratio = "T1_ratio"
+            if apply_raunet and key in modified_key["down_module_key_extra"]:
                 make_block_fn = make_diffusers_cross_attn_down_block
                 module.__class__ = make_block_fn(module.__class__)
-                module.switching_threshold_ratio = 'T2_ratio'
-            if apply_raunet and key in modified_key['up_module_key']:
+                module.switching_threshold_ratio = "T2_ratio"
+            if apply_raunet and key in modified_key["up_module_key"]:
                 make_block_fn = make_diffusers_upsampler_block
                 module.__class__ = make_block_fn(module.__class__)
-                module.switching_threshold_ratio = 'T1_ratio'
-            if apply_raunet and key in modified_key['up_module_key_extra']:
+                module.switching_threshold_ratio = "T1_ratio"
+            if apply_raunet and key in modified_key["up_module_key_extra"]:
                 make_block_fn = make_diffusers_cross_attn_up_block
                 module.__class__ = make_block_fn(module.__class__)
-                module.switching_threshold_ratio = 'T2_ratio'
-            if apply_window_attn and key in modified_key['windown_attn_module_key']:
+                module.switching_threshold_ratio = "T2_ratio"
+            if apply_window_attn and key in modified_key["windown_attn_module_key"]:
                 make_block_fn = make_diffusers_transformer_block
                 module.__class__ = make_block_fn(module.__class__, generator)
-            module.model = 'sd15'
+            module.model = "sd15"
             module.info = diffusion_model.info
 
-    elif name_or_path in ['stabilityai/stable-diffusion-xl-base-1.0', 'diffusers/stable-diffusion-xl-1.0-inpainting-0.1']:
+    elif name_or_path in [
+        "stabilityai/stable-diffusion-xl-base-1.0",
+        "diffusers/stable-diffusion-xl-1.0-inpainting-0.1",
+    ]:
         modified_key = sdxl_hidiffusion_key()
         for key, module in diffusion_model.named_modules():
-            if apply_raunet and key in modified_key['down_module_key']:
+            if apply_raunet and key in modified_key["down_module_key"]:
                 make_block_fn = make_diffusers_cross_attn_down_block
                 module.__class__ = make_block_fn(module.__class__)
-                module.switching_threshold_ratio = 'T1_ratio'
+                module.switching_threshold_ratio = "T1_ratio"
 
-            if apply_raunet and key in modified_key['down_module_key_extra']:
+            if apply_raunet and key in modified_key["down_module_key_extra"]:
                 make_block_fn = make_diffusers_downsampler_block
                 module.__class__ = make_block_fn(module.__class__)
-                module.switching_threshold_ratio = 'T2_ratio'
+                module.switching_threshold_ratio = "T2_ratio"
 
-            if apply_raunet and key in modified_key['up_module_key']:
+            if apply_raunet and key in modified_key["up_module_key"]:
                 make_block_fn = make_diffusers_cross_attn_up_block
                 module.__class__ = make_block_fn(module.__class__)
-                module.switching_threshold_ratio = 'T1_ratio'
+                module.switching_threshold_ratio = "T1_ratio"
 
-            if apply_raunet and key in modified_key['up_module_key_extra']:
+            if apply_raunet and key in modified_key["up_module_key_extra"]:
                 make_block_fn = make_diffusers_upsampler_block
                 module.__class__ = make_block_fn(module.__class__)
-                module.switching_threshold_ratio = 'T2_ratio'
+                module.switching_threshold_ratio = "T2_ratio"
 
-            if apply_window_attn and key in modified_key['windown_attn_module_key']:
+            if apply_window_attn and key in modified_key["windown_attn_module_key"]:
                 make_block_fn = make_diffusers_transformer_block
                 module.__class__ = make_block_fn(module.__class__, generator)
-            module.model = 'sdxl'
+            module.model = "sdxl"
             module.info = diffusion_model.info
 
-    elif name_or_path == 'stabilityai/sdxl-turbo':
+    elif name_or_path == "stabilityai/sdxl-turbo":
         modified_key = sdxl_turbo_hidiffusion_key()
         for key, module in diffusion_model.named_modules():
-            if apply_raunet and key in modified_key['down_module_key']:
+            if apply_raunet and key in modified_key["down_module_key"]:
                 make_block_fn = make_diffusers_cross_attn_down_block
                 module.__class__ = make_block_fn(module.__class__)
-                module.switching_threshold_ratio = 'T1_ratio'
+                module.switching_threshold_ratio = "T1_ratio"
 
-            if apply_raunet and key in modified_key['up_module_key']:
+            if apply_raunet and key in modified_key["up_module_key"]:
                 make_block_fn = make_diffusers_cross_attn_up_block
                 module.__class__ = make_block_fn(module.__class__)
-                module.switching_threshold_ratio = 'T1_ratio'
+                module.switching_threshold_ratio = "T1_ratio"
 
-            if apply_window_attn and key in modified_key['windown_attn_module_key']:
+            if apply_window_attn and key in modified_key["windown_attn_module_key"]:
                 make_block_fn = make_diffusers_transformer_block
                 module.__class__ = make_block_fn(module.__class__, generator)
 
-            module.model = 'sdxl_turbo'
+            module.model = "sdxl_turbo"
             module.info = diffusion_model.info
     else:
-        raise Exception(f'{model.name_or_path} is not a supported model. HiDiffusion now only supports runwayml/stable-diffusion-v1-5, stabilityai/stable-diffusion-2-1-base, stabilityai/stable-diffusion-xl-base-1.0, stabilityai/sdxl-turbo, diffusers/stable-diffusion-xl-1.0-inpainting-0.1 and their derivative models/pipelines.')
+        raise Exception(
+            f"{model.name_or_path} is not a supported model. HiDiffusion now only supports runwayml/stable-diffusion-v1-5, stabilityai/stable-diffusion-2-1-base, stabilityai/stable-diffusion-xl-base-1.0, stabilityai/sdxl-turbo, diffusers/stable-diffusion-xl-1.0-inpainting-0.1 and their derivative models/pipelines."
+        )
     return model
 
 
-
-
-
 def remove_hidiffusion(model: torch.nn.Module):
-    """ Removes hidiffusion from a Diffusion module if it was already patched. """
+    """Removes hidiffusion from a Diffusion module if it was already patched."""
     # For diffusers
     model = model.unet if hasattr(model, "unet") else model
 
