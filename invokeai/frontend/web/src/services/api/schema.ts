@@ -8743,11 +8743,11 @@ export type components = {
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
              * Dype Preset
-             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
+             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. 'area' enables automatically based on image area. '4k' uses optimized settings for 4K output.
              * @default off
              * @enum {string}
              */
-            dype_preset?: "off" | "manual" | "auto" | "4k";
+            dype_preset?: "off" | "manual" | "auto" | "area" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
@@ -8937,11 +8937,11 @@ export type components = {
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
              * Dype Preset
-             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
+             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. 'area' enables automatically based on image area. '4k' uses optimized settings for 4K output.
              * @default off
              * @enum {string}
              */
-            dype_preset?: "off" | "manual" | "auto" | "4k";
+            dype_preset?: "off" | "manual" | "auto" | "area" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
