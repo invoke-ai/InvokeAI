@@ -105,13 +105,13 @@ def get_dype_config_for_area(
         DyPEConfig if DyPE should be enabled, None otherwise
     """
     area = width * height
-    base_area = base_resolution * base_resolution
+    base_area = base_resolution**2
 
     if area <= base_area:
         return None
 
     area_ratio = area / base_area
-    effective_side_ratio = area_ratio**0.5  # 1.0 at base, 2.0 at 2K (if base is 1K)
+    effective_side_ratio = math.sqrt(area_ratio)  # 1.0 at base, 2.0 at 2K (if base is 1K)
 
     # Strength: keep original growth-with-size behavior, but make it 0 at base.
     # This yields: 2K -> 4.0, 4K -> 8.0 (clamped), matching the prior intent.
@@ -120,7 +120,7 @@ def get_dype_config_for_area(
     # Continuous exponent schedule:
     # r=1 -> 0.5, r=2 -> 1.0, r=4 -> 2.0 (exact), smoothly varying in between.
     x = math.log2(effective_side_ratio)
-    dype_exponent = 0.25 * x * x + 0.25 * x + 0.5
+    dype_exponent = 0.25 * (x**2) + 0.25 * x + 0.5
     dype_exponent = max(0.5, min(dype_exponent, 2.0))
 
     return DyPEConfig(
