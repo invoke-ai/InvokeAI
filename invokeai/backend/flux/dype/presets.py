@@ -1,17 +1,19 @@
 """DyPE presets and automatic configuration."""
 
+import math
 from dataclasses import dataclass
 from typing import Literal
 
 from invokeai.backend.flux.dype.base import DyPEConfig
 
 # DyPE preset type - using Literal for proper frontend dropdown support
-DyPEPreset = Literal["off", "manual", "auto", "4k"]
+DyPEPreset = Literal["off", "manual", "auto", "area", "4k"]
 
 # Constants for preset values
 DYPE_PRESET_OFF: DyPEPreset = "off"
 DYPE_PRESET_MANUAL: DyPEPreset = "manual"
 DYPE_PRESET_AUTO: DyPEPreset = "auto"
+DYPE_PRESET_AREA: DyPEPreset = "area"
 DYPE_PRESET_4K: DyPEPreset = "4k"
 
 # Human-readable labels for the UI
@@ -19,6 +21,7 @@ DYPE_PRESET_LABELS: dict[str, str] = {
     "off": "Off",
     "manual": "Manual",
     "auto": "Auto (>1536px)",
+    "area": "Area (auto)",
     "4k": "4K Optimized",
 }
 
@@ -88,6 +91,48 @@ def get_dype_config_for_resolution(
     )
 
 
+def get_dype_config_for_area(
+    width: int,
+    height: int,
+    base_resolution: int = 1024,
+) -> DyPEConfig | None:
+    """Automatically determine DyPE config based on target area.
+
+    Uses sqrt(area/base_area) as an effective side-length ratio.
+    DyPE is enabled only when target area exceeds base area.
+
+    Returns:
+        DyPEConfig if DyPE should be enabled, None otherwise
+    """
+    area = width * height
+    base_area = base_resolution * base_resolution
+
+    if area <= base_area:
+        return None
+
+    area_ratio = area / base_area
+    effective_side_ratio = area_ratio**0.5  # 1.0 at base, 2.0 at 2K (if base is 1K)
+
+    # Strength: keep original growth-with-size behavior, but make it 0 at base.
+    # This yields: 2K -> 4.0, 4K -> 8.0 (clamped), matching the prior intent.
+    dynamic_dype_scale = min(4.0 * (effective_side_ratio - 1.0), 8.0)
+
+    # Continuous exponent schedule:
+    # r=1 -> 0.5, r=2 -> 1.0, r=4 -> 2.0 (exact), smoothly varying in between.
+    x = math.log2(effective_side_ratio)
+    dype_exponent = 0.25 * x * x + 0.25 * x + 0.5
+    dype_exponent = max(0.5, min(dype_exponent, 2.0))
+
+    return DyPEConfig(
+        enable_dype=True,
+        base_resolution=base_resolution,
+        method="vision_yarn",
+        dype_scale=dynamic_dype_scale,
+        dype_exponent=dype_exponent,
+        dype_start_sigma=1.0,
+    )
+
+
 def get_dype_config_from_preset(
     preset: DyPEPreset,
     width: int,
@@ -131,6 +176,14 @@ def get_dype_config_from_preset(
             height=height,
             base_resolution=1024,
             activation_threshold=1536,
+        )
+
+    if preset == DYPE_PRESET_AREA:
+        # Area-based preset - custom values are ignored
+        return get_dype_config_for_area(
+            width=width,
+            height=height,
+            base_resolution=1024,
         )
 
     # Use preset configuration (4K etc.) - custom values are ignored
