@@ -54,10 +54,8 @@ class Flux2VaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             device = TorchDevice.choose_torch_device()
             latents = latents.to(device=device, dtype=vae_dtype)
 
-
             # Decode using diffusers API
             decoded = vae.decode(latents, return_dict=False)[0]
-
 
         # Convert from [-1, 1] to [0, 1] then to [0, 255] PIL image
         img = (decoded / 2 + 0.5).clamp(0, 1)
