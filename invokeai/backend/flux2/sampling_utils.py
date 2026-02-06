@@ -108,33 +108,27 @@ def unpack_flux2(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
 
 
 def compute_empirical_mu(image_seq_len: int, num_steps: int) -> float:
-    """Compute empirical mu for FLUX.2 schedule shifting.
+    """Compute mu for FLUX.2 schedule shifting.
 
-    This matches the diffusers Flux2Pipeline implementation.
-    The mu value controls how much the schedule is shifted towards higher timesteps.
+    Uses a fixed mu value of 2.02, matching ComfyUI's proven FLUX.2 configuration.
+
+    The previous implementation (from diffusers' FLUX.1 pipeline) computed mu as a
+    linear function of image_seq_len, which produced excessively high values at
+    high resolutions (e.g., mu=3.23 at 2048x2048). This over-shifted the sigma
+    schedule, compressing almost all values above 0.9 and forcing the model to
+    denoise everything in the final 1-2 steps, causing severe grid/diamond artifacts.
+
+    ComfyUI uses a fixed shift=2.02 for FLUX.2 Klein at all resolutions and produces
+    artifact-free images even at 2048x2048.
 
     Args:
-        image_seq_len: Number of image tokens (packed_h * packed_w).
-        num_steps: Number of denoising steps.
+        image_seq_len: Number of image tokens (packed_h * packed_w). Currently unused.
+        num_steps: Number of denoising steps. Currently unused.
 
     Returns:
-        The empirical mu value.
+        The mu value (fixed at 2.02).
     """
-    a1, b1 = 8.73809524e-05, 1.89833333
-    a2, b2 = 0.00016927, 0.45666666
-
-    if image_seq_len > 4300:
-        mu = a2 * image_seq_len + b2
-        return float(mu)
-
-    m_200 = a2 * image_seq_len + b2
-    m_10 = a1 * image_seq_len + b1
-
-    a = (m_200 - m_10) / 190.0
-    b = m_200 - 200.0 * a
-    mu = a * num_steps + b
-
-    return float(mu)
+    return 2.02
 
 
 def get_schedule_flux2(
@@ -169,10 +163,13 @@ def get_schedule_flux2(
 
 
 def generate_img_ids_flux2(h: int, w: int, batch_size: int, device: torch.device) -> torch.Tensor:
-    """Generate tensor of image position ids for FLUX.2.
+    """Generate tensor of image position ids for FLUX.2 with RoPE scaling.
 
     FLUX.2 uses 4D position coordinates (T, H, W, L) for its rotary position embeddings.
     This is different from FLUX.1 which uses 3D coordinates.
+
+    RoPE Scaling: For resolutions >1536x1536, position IDs are scaled down using
+    Position Interpolation to prevent RoPE degradation and diamond/grid artifacts.
 
     IMPORTANT: Position IDs must use int64 (long) dtype like diffusers, not bfloat16.
     Using floating point dtype for position IDs can cause NaN in rotary embeddings.
