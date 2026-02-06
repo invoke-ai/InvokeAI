@@ -1,19 +1,65 @@
 import { Badge, Portal } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectIsAuthenticated } from 'features/auth/store/authSlice';
 import type { RefObject } from 'react';
-import { memo, useEffect, useState } from 'react';
+import { memo, useEffect, useMemo, useState } from 'react';
 import { useGetQueueStatusQuery } from 'services/api/endpoints/queue';
+import type { components } from 'services/api/schema';
 
 type Props = {
   targetRef: RefObject<HTMLDivElement>;
 };
 
+type SessionQueueStatus = components['schemas']['SessionQueueStatus'];
+
+/**
+ * Determines if user-specific queue counts are available.
+ */
+const hasUserCounts = (queueData: SessionQueueStatus): boolean => {
+  return (
+    queueData.user_pending !== undefined &&
+    queueData.user_pending !== null &&
+    queueData.user_in_progress !== undefined &&
+    queueData.user_in_progress !== null
+  );
+};
+
+/**
+ * Calculates the appropriate badge text based on queue status and authentication state.
+ * Returns null if badge should be hidden.
+ */
+const getBadgeText = (queueData: SessionQueueStatus | undefined, isAuthenticated: boolean): string | null => {
+  if (!queueData) {
+    return null;
+  }
+
+  const totalPending = queueData.pending + queueData.in_progress;
+
+  // Hide badge if there are no pending jobs
+  if (totalPending === 0) {
+    return null;
+  }
+
+  // In multiuser mode (authenticated user), show "X/Y" format where X is user's jobs and Y is total jobs
+  if (isAuthenticated && hasUserCounts(queueData)) {
+    const userPending = queueData.user_pending! + queueData.user_in_progress!;
+    return `${userPending}/${totalPending}`;
+  }
+
+  // In single-user mode or when user counts aren't available, show total count only
+  return totalPending.toString();
+};
+
 export const QueueCountBadge = memo(({ targetRef }: Props) => {
   const [badgePos, setBadgePos] = useState<{ x: string; y: string } | null>(null);
-  const { queueSize } = useGetQueueStatusQuery(undefined, {
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const { queueData } = useGetQueueStatusQuery(undefined, {
     selectFromResult: (res) => ({
-      queueSize: res.data ? res.data.queue.pending + res.data.queue.in_progress : 0,
+      queueData: res.data?.queue,
     }),
   });
+
+  const badgeText = useMemo(() => getBadgeText(queueData, isAuthenticated), [queueData, isAuthenticated]);
 
   useEffect(() => {
     if (!targetRef.current) {
@@ -57,7 +103,7 @@ export const QueueCountBadge = memo(({ targetRef }: Props) => {
     };
   }, [targetRef]);
 
-  if (queueSize === 0) {
+  if (!badgeText) {
     return null;
   }
   if (!badgePos) {
@@ -75,7 +121,7 @@ export const QueueCountBadge = memo(({ targetRef }: Props) => {
         shadow="dark-lg"
         userSelect="none"
       >
-        {queueSize}
+        {badgeText}
       </Badge>
     </Portal>
   );

@@ -19,6 +19,7 @@ from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException
 from typing_extensions import Annotated
 
+from invokeai.app.api.auth_dependencies import AdminUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
@@ -228,6 +229,7 @@ async def get_model_record(
 )
 async def reidentify_model(
     key: Annotated[str, Path(description="Key of the model to reidentify.")],
+    current_admin: AdminUserOrDefault,
 ) -> AnyModelConfig:
     """Attempt to reidentify a model by re-probing its weights file."""
     try:
@@ -363,6 +365,7 @@ async def get_hugging_face_models(
 async def update_model_record(
     key: Annotated[str, Path(description="Unique key of model")],
     changes: Annotated[ModelRecordChanges, Body(description="Model config", examples=[example_model_input])],
+    current_admin: AdminUserOrDefault,
 ) -> AnyModelConfig:
     """Update a model's config."""
     logger = ApiDependencies.invoker.services.logger
@@ -425,6 +428,7 @@ async def get_model_image(
 async def update_model_image(
     key: Annotated[str, Path(description="Unique key of model")],
     image: UploadFile,
+    current_admin: AdminUserOrDefault,
 ) -> None:
     if not image.content_type or not image.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
@@ -458,6 +462,7 @@ async def update_model_image(
     status_code=204,
 )
 async def delete_model(
+    current_admin: AdminUserOrDefault,
     key: str = Path(description="Unique key of model to remove from model registry."),
 ) -> Response:
     """
@@ -500,6 +505,7 @@ class BulkDeleteModelsResponse(BaseModel):
     status_code=200,
 )
 async def bulk_delete_models(
+    current_admin: AdminUserOrDefault,
     request: BulkDeleteModelsRequest = Body(description="List of model keys to delete"),
 ) -> BulkDeleteModelsResponse:
     """
@@ -541,6 +547,7 @@ async def bulk_delete_models(
     status_code=204,
 )
 async def delete_model_image(
+    current_admin: AdminUserOrDefault,
     key: str = Path(description="Unique key of model image to remove from model_images directory."),
 ) -> None:
     logger = ApiDependencies.invoker.services.logger
@@ -566,6 +573,7 @@ async def delete_model_image(
     status_code=201,
 )
 async def install_model(
+    current_admin: AdminUserOrDefault,
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
     inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
     access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
@@ -636,6 +644,7 @@ async def install_model(
     response_class=HTMLResponse,
 )
 async def install_hugging_face_model(
+    current_admin: AdminUserOrDefault,
     source: str = Query(description="HuggingFace repo_id to install"),
 ) -> HTMLResponse:
     """Install a Hugging Face model using a string identifier."""
@@ -807,7 +816,10 @@ async def get_model_install_job(id: int = Path(description="Model install id")) 
     },
     status_code=201,
 )
-async def cancel_model_install_job(id: int = Path(description="Model install job ID")) -> None:
+async def cancel_model_install_job(
+    current_admin: AdminUserOrDefault,
+    id: int = Path(description="Model install job ID"),
+) -> None:
     """Cancel the model install job(s) corresponding to the given job ID."""
     installer = ApiDependencies.invoker.services.model_manager.install
     try:
@@ -825,7 +837,7 @@ async def cancel_model_install_job(id: int = Path(description="Model install job
         400: {"description": "Bad request"},
     },
 )
-async def prune_model_install_jobs() -> Response:
+async def prune_model_install_jobs(current_admin: AdminUserOrDefault) -> Response:
     """Prune all completed and errored jobs from the install job list."""
     ApiDependencies.invoker.services.model_manager.install.prune_jobs()
     return Response(status_code=204)
@@ -845,6 +857,7 @@ async def prune_model_install_jobs() -> Response:
     },
 )
 async def convert_model(
+    current_admin: AdminUserOrDefault,
     key: str = Path(description="Unique key of the safetensors main model to convert to diffusers format."),
 ) -> AnyModelConfig:
     """
@@ -1026,7 +1039,7 @@ async def get_stats() -> Optional[CacheStats]:
     operation_id="empty_model_cache",
     status_code=200,
 )
-async def empty_model_cache() -> None:
+async def empty_model_cache(current_admin: AdminUserOrDefault) -> None:
     """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
     # Request 1000GB of room in order to force the cache to drop all models.
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
@@ -1076,6 +1089,7 @@ async def get_hf_login_status() -> HFTokenStatus:
 
 @model_manager_router.post("/hf_login", operation_id="do_hf_login", response_model=HFTokenStatus)
 async def do_hf_login(
+    current_admin: AdminUserOrDefault,
     token: str = Body(description="Hugging Face token to use for login", embed=True),
 ) -> HFTokenStatus:
     HFTokenHelper.set_token(token)
@@ -1088,5 +1102,5 @@ async def do_hf_login(
 
 
 @model_manager_router.delete("/hf_login", operation_id="reset_hf_token", response_model=HFTokenStatus)
-async def reset_hf_token() -> HFTokenStatus:
+async def reset_hf_token(current_admin: AdminUserOrDefault) -> HFTokenStatus:
     return HFTokenHelper.reset_token()
