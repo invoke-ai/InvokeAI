@@ -104,7 +104,7 @@ The system treats model paths as directories:
 ### Skipped Directories
 - .download_cache
 - .convert_cache
-- __pycache__
+- \_\_pycache\_\_
 - .git
 
 ## Testing Recommendations
