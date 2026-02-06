@@ -256,7 +256,7 @@ class TestRopeDype:
 
         config = DyPEConfig(base_resolution=1024)
 
-        # No scaling needed
+        # No scaling needed (spatial axis)
         result_no_scale = rope_dype(
             pos=pos,
             dim=dim,
@@ -265,9 +265,10 @@ class TestRopeDype:
             target_height=1024,
             target_width=1024,
             dype_config=config,
+            axis_index=1,  # spatial axis
         )
 
-        # With scaling
+        # With scaling (spatial axis)
         result_with_scale = rope_dype(
             pos=pos,
             dim=dim,
@@ -276,10 +277,43 @@ class TestRopeDype:
             target_height=2048,
             target_width=2048,
             dype_config=config,
+            axis_index=1,  # spatial axis
         )
 
         # Results should be different when scaling is applied
         assert not torch.allclose(result_no_scale, result_with_scale)
+
+    def test_rope_dype_axis0_always_base(self):
+        """Axis 0 (time/channel) should always return base RoPE regardless of scaling."""
+        pos = torch.arange(16).unsqueeze(0).float()
+        dim = 16
+        theta = 10000
+
+        config = DyPEConfig(base_resolution=1024)
+
+        result_no_scale = rope_dype(
+            pos=pos,
+            dim=dim,
+            theta=theta,
+            current_sigma=0.5,
+            target_height=1024,
+            target_width=1024,
+            dype_config=config,
+            axis_index=0,
+        )
+        result_with_scale = rope_dype(
+            pos=pos,
+            dim=dim,
+            theta=theta,
+            current_sigma=0.5,
+            target_height=4096,
+            target_width=4096,
+            dype_config=config,
+            axis_index=0,
+        )
+
+        # Axis 0 should be identical regardless of target resolution
+        assert torch.allclose(result_no_scale, result_with_scale)
 
 
 class TestDyPEEmbedND:
@@ -489,8 +523,8 @@ class TestFrequencyComputation:
             pos=pos,
             dim=32,
             theta=10000,
-            scale_h=2.0,
-            scale_w=2.0,
+            linear_scale=2.0,
+            ntk_scale=2.0,
             current_sigma=0.5,
             dype_config=config,
         )
@@ -543,8 +577,8 @@ class TestThreeBandBlending:
             pos=pos,
             dim=32,
             theta=10000,
-            scale_h=2.0,
-            scale_w=2.0,
+            linear_scale=2.0,
+            ntk_scale=2.0,
             current_sigma=1.0,  # Early step
             dype_config=config,
         )
@@ -553,8 +587,8 @@ class TestThreeBandBlending:
             pos=pos,
             dim=32,
             theta=10000,
-            scale_h=2.0,
-            scale_w=2.0,
+            linear_scale=2.0,
+            ntk_scale=2.0,
             current_sigma=0.1,  # Late step
             dype_config=config,
         )
@@ -572,8 +606,8 @@ class TestThreeBandBlending:
             pos=pos,
             dim=32,
             theta=10000,
-            scale_h=1.0,
-            scale_w=1.0,
+            linear_scale=1.0,
+            ntk_scale=1.0,
             current_sigma=0.5,
             dype_config=config,
         )
@@ -591,8 +625,8 @@ class TestThreeBandBlending:
             pos=pos,
             dim=32,
             theta=10000,
-            scale_h=2.0,
-            scale_w=2.0,
+            linear_scale=2.0,
+            ntk_scale=2.0,
             current_sigma=0.5,
             dype_config=config,
         )
@@ -619,8 +653,8 @@ class TestThreeBandBlending:
             pos=pos,
             dim=32,
             theta=10000,
-            scale_h=4.0,
-            scale_w=4.0,
+            linear_scale=4.0,
+            ntk_scale=4.0,
             current_sigma=0.5,
             dype_config=config,
         )

@@ -3,7 +3,7 @@
 import torch
 from torch import Tensor, nn
 
-from invokeai.backend.flux.dype.base import FLUX_BASE_PE_LEN, DyPEConfig
+from invokeai.backend.flux.dype.base import DyPEConfig
 from invokeai.backend.flux.dype.rope import rope_dype
 
 # FLUX uses 8x8 patch compression with 2x2 packing
@@ -50,8 +50,9 @@ class DyPEEmbedND(nn.Module):
         # FLUX: 1024 / 8 / 2 = 64 patches per side
         self.base_patch_grid = dype_config.base_resolution // FLUX_PATCH_SIZE // FLUX_PACKING_FACTOR
 
-        # Original max position embedding length (for YaRN correction calculation)
-        self.ori_max_pe_len = FLUX_BASE_PE_LEN
+        # Original max position embedding length = base patch grid
+        # This is the number of spatial positions per side at base resolution
+        self.ori_max_pe_len = self.base_patch_grid
 
         # Step state - updated before each denoising step
         self._current_sigma: float = 1.0
@@ -96,6 +97,7 @@ class DyPEEmbedND(nn.Module):
                 target_height=self._target_height,
                 target_width=self._target_width,
                 dype_config=self.dype_config,
+                axis_index=i,
                 ori_max_pe_len=self.ori_max_pe_len,
             )
             embeddings.append(axis_emb)
