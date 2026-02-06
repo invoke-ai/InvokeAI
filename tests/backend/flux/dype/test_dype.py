@@ -8,8 +8,6 @@ from invokeai.backend.flux.dype.base import (
     FLUX_BASE_PE_LEN,
     YARN_BETA_0,
     YARN_BETA_1,
-    YARN_GAMMA_0,
-    YARN_GAMMA_1,
     DyPEConfig,
     compute_dype_k_t,
     compute_ntk_freqs,

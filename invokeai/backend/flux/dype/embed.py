@@ -3,7 +3,7 @@
 import torch
 from torch import Tensor, nn
 
-from invokeai.backend.flux.dype.base import DyPEConfig, FLUX_BASE_PE_LEN
+from invokeai.backend.flux.dype.base import FLUX_BASE_PE_LEN, DyPEConfig
 from invokeai.backend.flux.dype.rope import rope_dype
 
 # FLUX uses 8x8 patch compression with 2x2 packing

@@ -75,9 +75,7 @@ def find_correction_factor(
     # We want to find d where: wavelength / max_pe_len = num_rotations
     # => 2π * base^(d/dim) = num_rotations * max_pe_len
     # => d = dim * log(num_rotations * max_pe_len / 2π) / log(base)
-    return (dim * math.log(max_position_embeddings / (num_rotations * 2.0 * math.pi))) / (
-        2.0 * math.log(base)
-    )
+    return (dim * math.log(max_position_embeddings / (num_rotations * 2.0 * math.pi))) / (2.0 * math.log(base))
 
 
 def find_correction_range(
