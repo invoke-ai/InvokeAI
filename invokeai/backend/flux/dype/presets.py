@@ -113,9 +113,11 @@ def get_dype_config_for_area(
     area_ratio = area / base_area
     effective_side_ratio = math.sqrt(area_ratio)  # 1.0 at base, 2.0 at 2K (if base is 1K)
 
-    # Strength: keep original growth-with-size behavior, but make it 0 at base.
-    # This yields: 2K -> 4.0, 4K -> 8.0 (clamped), matching the prior intent.
-    dynamic_dype_scale = min(4.0 * (effective_side_ratio - 1.0), 8.0)
+    # Strength: 0 at base area, 8 at sat_area, clamped thereafter.
+    sat_area = 2027520  # Determined by experimentation where a vertical line appears
+    sat_side_ratio = math.sqrt(sat_area / base_area)
+    dynamic_dype_scale = 8.0 * (effective_side_ratio - 1.0) / (sat_side_ratio - 1.0)
+    dynamic_dype_scale = max(0.0, min(dynamic_dype_scale, 8.0))
 
     # Continuous exponent schedule:
     # r=1 -> 0.5, r=2 -> 1.0, r=4 -> 2.0 (exact), smoothly varying in between.
