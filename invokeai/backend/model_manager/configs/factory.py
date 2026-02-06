@@ -40,11 +40,13 @@ from invokeai.backend.model_manager.configs.ip_adapter import (
 from invokeai.backend.model_manager.configs.llava_onevision import LlavaOnevision_Diffusers_Config
 from invokeai.backend.model_manager.configs.lora import (
     ControlLoRA_LyCORIS_FLUX_Config,
+    LoRA_Diffusers_Flux2_Config,
     LoRA_Diffusers_FLUX_Config,
     LoRA_Diffusers_SD1_Config,
     LoRA_Diffusers_SD2_Config,
     LoRA_Diffusers_SDXL_Config,
     LoRA_Diffusers_ZImage_Config,
+    LoRA_LyCORIS_Flux2_Config,
     LoRA_LyCORIS_FLUX_Config,
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
@@ -197,18 +199,24 @@ AnyModelConfig = Annotated[
         Annotated[ControlNet_Diffusers_SDXL_Config, ControlNet_Diffusers_SDXL_Config.get_tag()],
         Annotated[ControlNet_Diffusers_FLUX_Config, ControlNet_Diffusers_FLUX_Config.get_tag()],
         # LoRA - LyCORIS format
+        # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
+        # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
         Annotated[LoRA_LyCORIS_SD1_Config, LoRA_LyCORIS_SD1_Config.get_tag()],
         Annotated[LoRA_LyCORIS_SD2_Config, LoRA_LyCORIS_SD2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_SDXL_Config, LoRA_LyCORIS_SDXL_Config.get_tag()],
+        Annotated[LoRA_LyCORIS_Flux2_Config, LoRA_LyCORIS_Flux2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_FLUX_Config, LoRA_LyCORIS_FLUX_Config.get_tag()],
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
         # LoRA - OMI format
         Annotated[LoRA_OMI_SDXL_Config, LoRA_OMI_SDXL_Config.get_tag()],
         Annotated[LoRA_OMI_FLUX_Config, LoRA_OMI_FLUX_Config.get_tag()],
         # LoRA - diffusers format
+        # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
+        # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
         Annotated[LoRA_Diffusers_SD1_Config, LoRA_Diffusers_SD1_Config.get_tag()],
         Annotated[LoRA_Diffusers_SD2_Config, LoRA_Diffusers_SD2_Config.get_tag()],
         Annotated[LoRA_Diffusers_SDXL_Config, LoRA_Diffusers_SDXL_Config.get_tag()],
+        Annotated[LoRA_Diffusers_Flux2_Config, LoRA_Diffusers_Flux2_Config.get_tag()],
         Annotated[LoRA_Diffusers_FLUX_Config, LoRA_Diffusers_FLUX_Config.get_tag()],
         Annotated[LoRA_Diffusers_ZImage_Config, LoRA_Diffusers_ZImage_Config.get_tag()],
         # ControlLoRA - diffusers format

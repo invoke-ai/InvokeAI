@@ -60,6 +60,85 @@ def _get_flux_lora_format(mod: ModelOnDisk) -> FluxLoRAFormat | None:
     return value
 
 
+# FLUX.2 Klein context_in_dim values: 3 * Qwen3 hidden_size
+# Klein 4B: 3 * 2560 = 7680, Klein 9B: 3 * 4096 = 12288
+_FLUX2_CONTEXT_IN_DIMS = {7680, 12288}
+
+# FLUX.2 Klein vec_in_dim values: Qwen3 hidden_size
+# Klein 4B: 2560 (Qwen3-4B), Klein 9B: 4096 (Qwen3-8B)
+_FLUX2_VEC_IN_DIMS = {2560, 4096}
+
+# FLUX.1 hidden_size is 3072. Klein 9B uses hidden_size=4096.
+# Klein 4B also uses 3072, so hidden_size alone can't distinguish Klein 4B from FLUX.1.
+_FLUX1_HIDDEN_SIZE = 3072
+
+
+def _is_flux2_lora(mod: ModelOnDisk) -> bool:
+    """Check if a FLUX-format LoRA is specifically for FLUX.2 (Klein) rather than FLUX.1.
+
+    Detection is based on:
+    1. Tensor shapes of embedding layers (context_embedder, vector_in) that differ between FLUX.1 and FLUX.2
+    2. Hidden size of attention layers (3072 for FLUX.1/Klein 4B, 4096 for Klein 9B)
+
+    Returns False for ambiguous LoRAs (e.g. Klein 4B transformer-only LoRAs with no distinguishing layers).
+    """
+    state_dict = mod.load_state_dict()
+    return _is_flux2_lora_state_dict(state_dict)
+
+
+def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
+    """Check state dict tensor shapes for FLUX.2 Klein-specific dimensions."""
+    # Check diffusers/PEFT format keys (with various prefixes)
+    for prefix in ["transformer.", "base_model.model.", ""]:
+        # Check context_embedder (txt_in) dimensions
+        # FLUX.1: context_in_dim=4096, FLUX.2 Klein 4B: 7680, Klein 9B: 12288
+        ctx_key_a = f"{prefix}context_embedder.lora_A.weight"
+        if ctx_key_a in state_dict:
+            return state_dict[ctx_key_a].shape[1] in _FLUX2_CONTEXT_IN_DIMS
+
+        # Check vector_in (time_text_embed.text_embedder) dimensions
+        # FLUX.1: vec_in_dim=768, FLUX.2 Klein 4B: 2560, Klein 9B: 4096
+        vec_key_a = f"{prefix}time_text_embed.text_embedder.linear_1.lora_A.weight"
+        if vec_key_a in state_dict:
+            return state_dict[vec_key_a].shape[1] in _FLUX2_VEC_IN_DIMS
+
+    # Check BFL PEFT format (diffusion_model.* prefix)
+    # Klein 9B has hidden_size=4096 (vs 3072 for FLUX.1 and Klein 4B).
+    # We can detect Klein 9B by checking attention projection dimensions.
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+
+        # BFL PEFT format: diffusion_model.double_blocks.X.img_attn.proj.lora_A.weight
+        if key.startswith("diffusion_model.") and key.endswith(".img_attn.proj.lora_A.weight"):
+            hidden_size = state_dict[key].shape[1]
+            if hidden_size != _FLUX1_HIDDEN_SIZE:
+                return True
+            break  # Found the key but it's FLUX.1-sized, check other indicators
+
+        # BFL PEFT format: context_embedder/txt_in
+        if key.startswith("diffusion_model.") and "txt_in" in key and key.endswith("lora_A.weight"):
+            return state_dict[key].shape[1] in _FLUX2_CONTEXT_IN_DIMS
+
+        # BFL PEFT format: vector_in
+        if key.startswith("diffusion_model.") and "vector_in" in key and key.endswith("lora_A.weight"):
+            return state_dict[key].shape[1] in _FLUX2_VEC_IN_DIMS
+
+    # Check kohya format: look for context_embedder or vector_in keys
+    # Kohya format uses lora_unet_ prefix with underscores instead of dots
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+        if key.startswith("lora_unet_txt_in.") or key.startswith("lora_unet_context_embedder."):
+            if key.endswith("lora_down.weight"):
+                return state_dict[key].shape[1] in _FLUX2_CONTEXT_IN_DIMS
+        if key.startswith("lora_unet_vector_in.") or key.startswith("lora_unet_time_text_embed_text_embedder_"):
+            if key.endswith("lora_down.weight"):
+                return state_dict[key].shape[1] in _FLUX2_VEC_IN_DIMS
+
+    return False
+
+
 class LoRA_OMI_Config_Base(LoRA_Config_Base):
     format: Literal[ModelFormat.OMI] = Field(default=ModelFormat.OMI)
 
@@ -189,6 +268,8 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
         if _get_flux_lora_format(mod):
+            if _is_flux2_lora(mod):
+                return BaseModelType.Flux2
             return BaseModelType.Flux
 
         state_dict = mod.load_state_dict()
@@ -220,6 +301,18 @@ class LoRA_LyCORIS_SDXL_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
 class LoRA_LyCORIS_FLUX_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+
+
+class LoRA_LyCORIS_Flux2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for FLUX.2 (Klein) LoRA models in LyCORIS format."""
+
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if _get_flux_lora_format(mod) and _is_flux2_lora(mod):
+            return BaseModelType.Flux2
+        raise NotAMatchError("model is not a FLUX.2 LoRA")
 
 
 class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
@@ -349,6 +442,8 @@ class LoRA_Diffusers_Config_Base(LoRA_Config_Base):
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
         if _get_flux_lora_format(mod):
+            if _is_flux2_lora(mod):
+                return BaseModelType.Flux2
             return BaseModelType.Flux
 
         # If we've gotten here, we assume that the LoRA is a Stable Diffusion LoRA
@@ -392,6 +487,20 @@ class LoRA_Diffusers_SDXL_Config(LoRA_Diffusers_Config_Base, Config_Base):
 
 class LoRA_Diffusers_FLUX_Config(LoRA_Diffusers_Config_Base, Config_Base):
     base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+
+
+class LoRA_Diffusers_Flux2_Config(LoRA_Diffusers_Config_Base, Config_Base):
+    """Model config for FLUX.2 (Klein) LoRA models in Diffusers format."""
+
+    base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        path_to_weight_file = cls._get_weight_file_or_raise(mod)
+        state_dict = mod.load_state_dict(path_to_weight_file)
+        if _is_flux2_lora_state_dict(state_dict):
+            return BaseModelType.Flux2
+        raise NotAMatchError("model is not a FLUX.2 Diffusers LoRA")
 
 
 class LoRA_Diffusers_ZImage_Config(LoRA_Diffusers_Config_Base, Config_Base):
