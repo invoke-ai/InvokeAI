@@ -103,7 +103,7 @@ class CompelInvocation(BaseInvocation):
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=TorchDevice.choose_torch_dtype,
                 truncate_long_prompts=False,
-                device=TorchDevice.choose_torch_device(),
+                device=text_encoder.device,  # Use the device the model is actually on
                 split_long_text_mode=SplitLongTextMode.SENTENCES,
             )
 
@@ -212,7 +212,7 @@ class SDXLPromptInvocationBase:
                 truncate_long_prompts=False,  # TODO:
                 returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,  # TODO: clip skip
                 requires_pooled=get_pooled,
-                device=TorchDevice.choose_torch_device(),
+                device=text_encoder.device,  # Use the device the model is actually on
                 split_long_text_mode=SplitLongTextMode.SENTENCES,
             )
 

@@ -273,6 +273,10 @@ const useKeepSelectedImageInView = (
       return;
     }
 
+    if (!imageNames.includes(targetImageName)) {
+      return;
+    }
+
     setTimeout(() => {
       scrollIntoView(targetImageName, imageNames, rootEl, virtuosoGridHandle, range);
     }, 0);
@@ -310,75 +314,89 @@ const useStarImageHotkey = () => {
   });
 };
 
+type GalleryImageGridContentProps = {
+  imageNames: string[];
+  isLoading: boolean;
+  queryArgs: ListImageNamesQueryArgs;
+  rootRef?: React.RefObject<HTMLDivElement>;
+};
+
+export const GalleryImageGridContent = memo(
+  ({ imageNames, isLoading, queryArgs, rootRef: rootRefProp }: GalleryImageGridContentProps) => {
+    const virtuosoRef = useRef<VirtuosoGridHandle>(null);
+    const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
+    const internalRootRef = useRef<HTMLDivElement>(null);
+    const rootRef = rootRefProp ?? internalRootRef;
+
+    // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
+    const { onRangeChanged } = useRangeBasedImageFetching({
+      imageNames,
+      enabled: !isLoading,
+    });
+
+    useStarImageHotkey();
+    useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
+    useKeyboardNavigation(imageNames, virtuosoRef, rootRef);
+    const scrollerRef = useScrollableGallery(rootRef);
+
+    /*
+     * We have to keep track of the visible range for keep-selected-image-in-view functionality and push the range to
+     * the range-based image fetching hook.
+     */
+    const handleRangeChanged = useCallback(
+      (range: ListRange) => {
+        rangeRef.current = range;
+        onRangeChanged(range);
+      },
+      [onRangeChanged]
+    );
+
+    const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
+
+    if (isLoading) {
+      return (
+        <Flex w="full" h="full" alignItems="center" justifyContent="center" gap={4}>
+          <Spinner size="lg" opacity={0.3} />
+          <Text color="base.300">Loading gallery...</Text>
+        </Flex>
+      );
+    }
+
+    if (imageNames.length === 0) {
+      return (
+        <Flex w="full" h="full" alignItems="center" justifyContent="center">
+          <Text color="base.300">No images found</Text>
+        </Flex>
+      );
+    }
+
+    return (
+      // This wrapper component is necessary to initialize the overlay scrollbars!
+      <Box data-overlayscrollbars-initialize="" ref={rootRef} position="relative" w="full" h="full">
+        <VirtuosoGrid<string, GridContext>
+          ref={virtuosoRef}
+          context={context}
+          data={imageNames}
+          increaseViewportBy={4096}
+          itemContent={itemContent}
+          computeItemKey={computeItemKey}
+          components={components}
+          style={style}
+          scrollerRef={scrollerRef}
+          scrollSeekConfiguration={scrollSeekConfiguration}
+          rangeChanged={handleRangeChanged}
+        />
+        <GallerySelectionCountTag imageNames={imageNames} />
+      </Box>
+    );
+  }
+);
+
+GalleryImageGridContent.displayName = 'GalleryImageGridContent';
+
 export const GalleryImageGrid = memo(() => {
-  const virtuosoRef = useRef<VirtuosoGridHandle>(null);
-  const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  // Get the ordered list of image names - this is our primary data source for virtualization
   const { queryArgs, imageNames, isLoading } = useGalleryImageNames();
-
-  // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
-  const { onRangeChanged } = useRangeBasedImageFetching({
-    imageNames,
-    enabled: !isLoading,
-  });
-
-  useStarImageHotkey();
-  useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
-  useKeyboardNavigation(imageNames, virtuosoRef, rootRef);
-  const scrollerRef = useScrollableGallery(rootRef);
-
-  /*
-   * We have to keep track of the visible range for keep-selected-image-in-view functionality and push the range to
-   * the range-based image fetching hook.
-   */
-  const handleRangeChanged = useCallback(
-    (range: ListRange) => {
-      rangeRef.current = range;
-      onRangeChanged(range);
-    },
-    [onRangeChanged]
-  );
-
-  const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
-
-  if (isLoading) {
-    return (
-      <Flex w="full" h="full" alignItems="center" justifyContent="center" gap={4}>
-        <Spinner size="lg" opacity={0.3} />
-        <Text color="base.300">Loading gallery...</Text>
-      </Flex>
-    );
-  }
-
-  if (imageNames.length === 0) {
-    return (
-      <Flex w="full" h="full" alignItems="center" justifyContent="center">
-        <Text color="base.300">No images found</Text>
-      </Flex>
-    );
-  }
-
-  return (
-    // This wrapper component is necessary to initialize the overlay scrollbars!
-    <Box data-overlayscrollbars-initialize="" ref={rootRef} position="relative" w="full" h="full">
-      <VirtuosoGrid<string, GridContext>
-        ref={virtuosoRef}
-        context={context}
-        data={imageNames}
-        increaseViewportBy={4096}
-        itemContent={itemContent}
-        computeItemKey={computeItemKey}
-        components={components}
-        style={style}
-        scrollerRef={scrollerRef}
-        scrollSeekConfiguration={scrollSeekConfiguration}
-        rangeChanged={handleRangeChanged}
-      />
-      <GallerySelectionCountTag />
-    </Box>
-  );
+  return <GalleryImageGridContent imageNames={imageNames} isLoading={isLoading} queryArgs={queryArgs} />;
 });
 
 GalleryImageGrid.displayName = 'GalleryImageGrid';

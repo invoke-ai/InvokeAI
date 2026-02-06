@@ -39,6 +39,29 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Missing Models
+         * @description Get models whose files are missing from disk.
+         *
+         *     These are models that have database entries but their corresponding
+         *     weight files have been deleted externally (not via Model Manager).
+         */
+        get: operations["list_missing_models"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/get_by_attrs": {
         parameters: {
             query?: never;
@@ -3269,6 +3292,11 @@ export type components = {
              */
             type: "clip_embed";
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /**
              * Variant
              * @default gigantic
              * @constant
@@ -3344,6 +3372,11 @@ export type components = {
              * @constant
              */
             type: "clip_embed";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Variant
              * @default large
@@ -3516,6 +3549,11 @@ export type components = {
              * @constant
              */
             type: "clip_vision";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * CV2 Infill
@@ -8809,11 +8847,11 @@ export type components = {
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
              * Dype Preset
-             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
+             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. 'area' enables automatically based on image area. '4k' uses optimized settings for 4K output.
              * @default off
              * @enum {string}
              */
-            dype_preset?: "off" | "manual" | "auto" | "4k";
+            dype_preset?: "off" | "manual" | "auto" | "area" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
@@ -9003,11 +9041,11 @@ export type components = {
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
              * Dype Preset
-             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
+             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. 'area' enables automatically based on image area. '4k' uses optimized settings for 4K output.
              * @default off
              * @enum {string}
              */
-            dype_preset?: "off" | "manual" | "auto" | "4k";
+            dype_preset?: "off" | "manual" | "auto" | "area" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
@@ -15010,6 +15048,11 @@ export type components = {
              * @constant
              */
             base: "any";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * Apply LoRA Collection - SD1.5
@@ -16298,6 +16341,11 @@ export type components = {
              * @description Default Guidance for this model
              */
             guidance?: number | null;
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only?: boolean | null;
         };
         /**
          * Main Model - SD1.5, SD2
@@ -20168,6 +20216,11 @@ export type components = {
              */
             default_settings?: components["schemas"]["MainModelDefaultSettings"] | components["schemas"]["LoraModelDefaultSettings"] | components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only?: boolean | null;
+            /**
              * Variant
              * @description The variant of the model.
              */
@@ -21181,6 +21234,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /** @description Qwen3 model size variant (4B or 8B) */
             variant: components["schemas"]["Qwen3VariantType"];
         };
@@ -21259,6 +21317,11 @@ export type components = {
              * @constant
              */
             format: "gguf_quantized";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /** @description Qwen3 model size variant (4B or 8B) */
             variant: components["schemas"]["Qwen3VariantType"];
         };
@@ -21335,6 +21398,11 @@ export type components = {
              * @constant
              */
             format: "qwen3_encoder";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /** @description Qwen3 model size variant (4B or 8B) */
             variant: components["schemas"]["Qwen3VariantType"];
         };
@@ -23262,6 +23330,11 @@ export type components = {
              * @constant
              */
             base: "any";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * Image-to-Image (Autoscale)
@@ -24453,6 +24526,11 @@ export type components = {
              * @constant
              */
             format: "bnb_quantized_int8b";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * T5Encoder_T5Encoder_Config
@@ -24525,6 +24603,11 @@ export type components = {
              * @constant
              */
             format: "t5_encoder";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** TBLR */
         TBLR: {
@@ -27292,6 +27375,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_missing_models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description List of models with missing files */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelsList"];
                 };
             };
         };
