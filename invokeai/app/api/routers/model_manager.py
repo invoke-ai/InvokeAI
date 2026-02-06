@@ -27,6 +27,7 @@ from invokeai.app.services.model_records import (
     ModelRecordChanges,
     UnknownModelException,
 )
+from invokeai.app.services.orphaned_models import OrphanedModelInfo
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.main import (
@@ -1090,3 +1091,79 @@ async def do_hf_login(
 @model_manager_router.delete("/hf_login", operation_id="reset_hf_token", response_model=HFTokenStatus)
 async def reset_hf_token() -> HFTokenStatus:
     return HFTokenHelper.reset_token()
+
+
+# Orphaned Models Management Routes
+
+
+class DeleteOrphanedModelsRequest(BaseModel):
+    """Request to delete specific orphaned model directories."""
+
+    paths: list[str] = Field(description="List of relative paths to delete")
+
+
+class DeleteOrphanedModelsResponse(BaseModel):
+    """Response from deleting orphaned models."""
+
+    deleted: list[str] = Field(description="Paths that were successfully deleted")
+    errors: dict[str, str] = Field(description="Paths that had errors, with error messages")
+
+
+@model_manager_router.get(
+    "/sync/orphaned",
+    operation_id="get_orphaned_models",
+    response_model=list[OrphanedModelInfo],
+)
+async def get_orphaned_models() -> list[OrphanedModelInfo]:
+    """Find orphaned model directories.
+
+    Orphaned models are directories in the models folder that contain model files
+    but are not referenced in the database. This can happen when models are deleted
+    from the database but the files remain on disk.
+
+    Returns:
+        List of orphaned model directory information
+    """
+    from invokeai.app.services.orphaned_models import OrphanedModelsService
+
+    # Access the database through the model records service
+    model_records_service = ApiDependencies.invoker.services.model_manager.store
+
+    service = OrphanedModelsService(
+        config=ApiDependencies.invoker.services.configuration,
+        db=model_records_service._db,  # Access the database from model records service
+    )
+    return service.find_orphaned_models()
+
+
+@model_manager_router.delete(
+    "/sync/orphaned",
+    operation_id="delete_orphaned_models",
+    response_model=DeleteOrphanedModelsResponse,
+)
+async def delete_orphaned_models(request: DeleteOrphanedModelsRequest) -> DeleteOrphanedModelsResponse:
+    """Delete specified orphaned model directories.
+
+    Args:
+        request: Request containing list of relative paths to delete
+
+    Returns:
+        Response indicating which paths were deleted and which had errors
+    """
+    from invokeai.app.services.orphaned_models import OrphanedModelsService
+
+    # Access the database through the model records service
+    model_records_service = ApiDependencies.invoker.services.model_manager.store
+
+    service = OrphanedModelsService(
+        config=ApiDependencies.invoker.services.configuration,
+        db=model_records_service._db,  # Access the database from model records service
+    )
+
+    results = service.delete_orphaned_models(request.paths)
+
+    # Separate successful deletions from errors
+    deleted = [path for path, status in results.items() if status == "deleted"]
+    errors = {path: status for path, status in results.items() if status != "deleted"}
+
+    return DeleteOrphanedModelsResponse(deleted=deleted, errors=errors)

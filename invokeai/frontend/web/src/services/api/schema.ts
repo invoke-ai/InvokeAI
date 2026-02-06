@@ -426,6 +426,43 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/sync/orphaned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Orphaned Models
+         * @description Find orphaned model directories.
+         *
+         *     Orphaned models are directories in the models folder that contain model files
+         *     but are not referenced in the database. This can happen when models are deleted
+         *     from the database but the files remain on disk.
+         *
+         *     Returns:
+         *         List of orphaned model directory information
+         */
+        get: operations["get_orphaned_models"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Orphaned Models
+         * @description Delete specified orphaned model directories.
+         *
+         *     Args:
+         *         request: Request containing list of relative paths to delete
+         *
+         *     Returns:
+         *         Response indicating which paths were deleted and which had errors
+         */
+        delete: operations["delete_orphaned_models"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/download_queue/": {
         parameters: {
             query?: never;
@@ -6456,6 +6493,35 @@ export type components = {
              * @description The names of the images that were deleted
              */
             deleted_images: string[];
+        };
+        /**
+         * DeleteOrphanedModelsRequest
+         * @description Request to delete specific orphaned model directories.
+         */
+        DeleteOrphanedModelsRequest: {
+            /**
+             * Paths
+             * @description List of relative paths to delete
+             */
+            paths: string[];
+        };
+        /**
+         * DeleteOrphanedModelsResponse
+         * @description Response from deleting orphaned models.
+         */
+        DeleteOrphanedModelsResponse: {
+            /**
+             * Deleted
+             * @description Paths that were successfully deleted
+             */
+            deleted: string[];
+            /**
+             * Errors
+             * @description Paths that had errors, with error messages
+             */
+            errors: {
+                [key: string]: string;
+            };
         };
         /**
          * Denoise - SD1.5, SDXL
@@ -20452,6 +20518,32 @@ export type components = {
             items: components["schemas"]["ImageDTO"][];
         };
         /**
+         * OrphanedModelInfo
+         * @description Information about an orphaned model directory.
+         */
+        OrphanedModelInfo: {
+            /**
+             * Path
+             * @description Relative path to the orphaned directory from models root
+             */
+            path: string;
+            /**
+             * Absolute Path
+             * @description Absolute path to the orphaned directory
+             */
+            absolute_path: string;
+            /**
+             * Files
+             * @description List of model files in this directory
+             */
+            files: string[];
+            /**
+             * Size Bytes
+             * @description Total size of all files in bytes
+             */
+            size_bytes: number;
+        };
+        /**
          * OutputFieldJSONSchemaExtra
          * @description Extra attributes to be added to input fields and their OpenAPI schema. Used by the workflow editor
          *     during schema parsing and UI rendering.
@@ -28259,6 +28351,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HFTokenStatus"];
+                };
+            };
+        };
+    };
+    get_orphaned_models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrphanedModelInfo"][];
+                };
+            };
+        };
+    };
+    delete_orphaned_models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteOrphanedModelsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteOrphanedModelsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
