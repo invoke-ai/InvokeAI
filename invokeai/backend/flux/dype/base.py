@@ -1,4 +1,8 @@
-"""DyPE base configuration and utilities."""
+"""DyPE base configuration and utilities.
+
+Implements Dynamic Position Extrapolation (DyPE) with YaRN-style frequency blending.
+Based on ComfyUI-DyPE: https://github.com/wildminder/ComfyUI-DyPE
+"""
 
 import math
 from dataclasses import dataclass
@@ -6,6 +10,16 @@ from typing import Literal
 
 import torch
 from torch import Tensor
+
+# YaRN default parameters for FLUX
+# These define the frequency correction ranges for blending
+YARN_BETA_0 = 1.25  # Low-frequency ratio (β₀)
+YARN_BETA_1 = 0.75  # High-frequency ratio (β₁)
+YARN_GAMMA_0 = 16.0  # Original position range (γ₀)
+YARN_GAMMA_1 = 2.0  # Extended position range (γ₁)
+
+# FLUX model constants
+FLUX_BASE_PE_LEN = 256  # Base position embedding length for FLUX
 
 
 @dataclass
@@ -20,66 +34,149 @@ class DyPEConfig:
     dype_start_sigma: float = 1.0  # When DyPE decay starts
 
 
-def get_mscale(scale: float, mscale_factor: float = 1.0) -> float:
-    """Calculate magnitude scaling factor.
+def get_mscale(scale: float) -> float:
+    """Calculate magnitude scaling factor (mscale).
+
+    Uses the formula from YaRN paper: mscale = 1 + 0.1 * log(s) / sqrt(s)
+    This provides better attention score normalization for high-resolution.
 
     Args:
-        scale: The resolution scaling factor
-        mscale_factor: Adjustment factor for the scaling
+        scale: The resolution scaling factor (NTK scale)
 
     Returns:
         The magnitude scaling factor
     """
     if scale <= 1.0:
         return 1.0
-    return mscale_factor * math.log(scale) + 1.0
+    return 1.0 + 0.1 * math.log(scale) / math.sqrt(scale)
 
 
-def get_timestep_mscale(
-    scale: float,
+def find_correction_factor(
+    num_rotations: int,
+    dim: int,
+    base: int,
+    max_position_embeddings: int,
+) -> float:
+    """Calculate correction factor for YaRN frequency masking.
+
+    Finds the dimension index where the wavelength equals a given number of rotations.
+    Used to determine which frequency components need interpolation.
+
+    Args:
+        num_rotations: Number of rotations to find the factor for
+        dim: Embedding dimension
+        base: RoPE base frequency (theta)
+        max_position_embeddings: Original maximum position embeddings
+
+    Returns:
+        The dimension index (can be fractional) where wavelength matches num_rotations
+    """
+    # Wavelength at dimension d = 2π * base^(d/dim)
+    # We want to find d where: wavelength / max_pe_len = num_rotations
+    # => 2π * base^(d/dim) = num_rotations * max_pe_len
+    # => d = dim * log(num_rotations * max_pe_len / 2π) / log(base)
+    return (dim * math.log(max_position_embeddings / (num_rotations * 2.0 * math.pi))) / (
+        2.0 * math.log(base)
+    )
+
+
+def find_correction_range(
+    low_ratio: float,
+    high_ratio: float,
+    dim: int,
+    base: int,
+    ori_max_pe_len: int,
+) -> tuple[float, float]:
+    """Find the dimension range for frequency correction.
+
+    Determines the range of dimensions that need interpolation between
+    different frequency scaling methods.
+
+    Args:
+        low_ratio: Low frequency ratio (beta or gamma low)
+        high_ratio: High frequency ratio (beta or gamma high)
+        dim: Embedding dimension
+        base: RoPE base frequency (theta)
+        ori_max_pe_len: Original maximum position embedding length
+
+    Returns:
+        Tuple of (low_dim, high_dim) indices for the correction range
+    """
+    low = max(find_correction_factor(low_ratio, dim, base, ori_max_pe_len), 0.0)
+    high = min(find_correction_factor(high_ratio, dim, base, ori_max_pe_len), dim - 1.0)
+    return low, high
+
+
+def linear_ramp_mask(
+    min_val: float,
+    max_val: float,
+    dim: int,
+    device: torch.device,
+    dtype: torch.dtype,
+) -> Tensor:
+    """Create linear interpolation mask between frequency bands.
+
+    Creates a tensor that ramps linearly from 0 to 1 between min_val and max_val,
+    with values clamped to [0, 1] outside that range.
+
+    Args:
+        min_val: Dimension index where mask starts (becomes > 0)
+        max_val: Dimension index where mask ends (becomes 1)
+        dim: Number of frequency components (half the embedding dimension)
+        device: Target device for the tensor
+        dtype: Target dtype for the tensor
+
+    Returns:
+        Tensor of shape (dim,) with values in [0, 1]
+    """
+    if max_val <= min_val:
+        # Degenerate case: no interpolation range, return step function
+        indices = torch.arange(dim, device=device, dtype=dtype)
+        return (indices >= min_val).to(dtype)
+
+    # Linear ramp: (i - min) / (max - min), clamped to [0, 1]
+    indices = torch.arange(dim, device=device, dtype=dtype)
+    mask = (indices - min_val) / (max_val - min_val)
+    return torch.clamp(mask, 0.0, 1.0)
+
+
+def compute_dype_k_t(
     current_sigma: float,
     dype_scale: float,
     dype_exponent: float,
     dype_start_sigma: float,
 ) -> float:
-    """Calculate timestep-dependent magnitude scaling.
+    """Compute the DyPE timestep modulation factor k_t.
 
     The key insight of DyPE: early steps focus on low frequencies (global structure),
-    late steps on high frequencies (details). This function modulates the scaling
-    based on the current timestep/sigma.
+    late steps on high frequencies (details). This function computes k_t which
+    modulates the YaRN correction parameters (beta, gamma).
+
+    Formula: k_t = dype_scale * (timestep ^ dype_exponent)
+
+    Where timestep is the normalized sigma value (0 at end, 1 at start of denoising).
 
     Args:
-        scale: Resolution scaling factor
         current_sigma: Current noise level (1.0 = full noise, 0.0 = clean)
-        dype_scale: DyPE magnitude (λs)
-        dype_exponent: DyPE decay speed (λt)
+        dype_scale: DyPE magnitude (λs, 0.0-8.0)
+        dype_exponent: DyPE decay speed (λt, 0.0-1000.0)
         dype_start_sigma: Sigma threshold to start decay
 
     Returns:
-        Timestep-modulated scaling factor
+        k_t modulation factor - larger values mean stronger extrapolation
     """
-    if scale <= 1.0:
-        return 1.0
-
     # Normalize sigma to [0, 1] range relative to start_sigma
     if current_sigma >= dype_start_sigma:
-        t_normalized = 1.0
+        timestep = 1.0
     else:
-        t_normalized = current_sigma / dype_start_sigma
+        timestep = current_sigma / dype_start_sigma
 
-    # Apply exponential decay: stronger extrapolation early, weaker late
-    # decay = exp(-λt * (1 - t))  where t=1 is early (high sigma), t=0 is late
-    decay = math.exp(-dype_exponent * (1.0 - t_normalized))
+    # DyPE formula: k_t = scale * (timestep ^ exponent)
+    # At timestep=1 (early, high sigma): k_t = dype_scale
+    # At timestep=0 (late, low sigma): k_t = 0
+    k_t = dype_scale * (timestep**dype_exponent)
 
-    # Base mscale from resolution
-    base_mscale = get_mscale(scale)
-
-    # Interpolate between base_mscale and 1.0 based on decay and dype_scale
-    # When decay=1 (early): use scaled value
-    # When decay=0 (late): use base value
-    scaled_mscale = 1.0 + (base_mscale - 1.0) * dype_scale * decay
-
-    return scaled_mscale
+    return k_t
 
 
 def compute_vision_yarn_freqs(
@@ -90,18 +187,17 @@ def compute_vision_yarn_freqs(
     scale_w: float,
     current_sigma: float,
     dype_config: DyPEConfig,
+    ori_max_pe_len: int = FLUX_BASE_PE_LEN,
 ) -> tuple[Tensor, Tensor]:
-    """Compute RoPE frequencies using NTK-aware scaling for high-resolution.
+    """Compute RoPE frequencies using DyPE-modulated NTK scaling.
 
     This method extends FLUX's position encoding to handle resolutions beyond
-    the 1024px training resolution by scaling the base frequency (theta).
+    the 1024px training resolution. Instead of complex YaRN 3-band blending,
+    it uses a simpler approach that directly modulates the NTK scaling factor
+    based on the current timestep.
 
-    The NTK-aware approach smoothly interpolates frequencies to cover larger
-    position ranges without breaking the attention patterns.
-
-    DyPE (Dynamic Position Extrapolation) modulates the NTK scaling based on
-    the current timestep - stronger extrapolation in early steps (global structure),
-    weaker in late steps (fine details).
+    DyPE insight: Early denoising steps focus on global structure (need stronger
+    extrapolation), late steps focus on fine details (need weaker extrapolation).
 
     Args:
         pos: Position tensor
@@ -111,53 +207,69 @@ def compute_vision_yarn_freqs(
         scale_w: Width scaling factor
         current_sigma: Current noise level (1.0 = full noise, 0.0 = clean)
         dype_config: DyPE configuration
+        ori_max_pe_len: Original maximum position embedding length (unused, kept for API compat)
 
     Returns:
         Tuple of (cos, sin) frequency tensors
     """
     assert dim % 2 == 0
 
-    # Use the larger scale for NTK calculation
-    scale = max(scale_h, scale_w)
-
     device = pos.device
     dtype = torch.float64 if device.type != "mps" else torch.float32
 
-    # NTK-aware theta scaling: extends position coverage for high-res
-    # Formula: theta_scaled = theta * scale^(dim/(dim-2))
-    # This increases the wavelength of position encodings proportionally
-    if scale > 1.0:
-        ntk_alpha = scale ** (dim / (dim - 2))
+    # Calculate base scale
+    linear_scale = max(scale_h, scale_w)
 
-        # Apply timestep-dependent DyPE modulation
-        # mscale controls how strongly we apply the NTK extrapolation
-        # Early steps (high sigma): stronger extrapolation for global structure
-        # Late steps (low sigma): weaker extrapolation for fine details
-        mscale = get_timestep_mscale(
-            scale=scale,
-            current_sigma=current_sigma,
-            dype_scale=dype_config.dype_scale,
-            dype_exponent=dype_config.dype_exponent,
-            dype_start_sigma=dype_config.dype_start_sigma,
-        )
+    if linear_scale <= 1.0:
+        # No scaling needed - use base frequencies
+        freq_seq = torch.arange(0, dim, 2, dtype=dtype, device=device) / dim
+        freqs = 1.0 / (theta**freq_seq)
+        angles = torch.einsum("...n,d->...nd", pos.to(dtype), freqs)
+        cos = torch.cos(angles)
+        sin = torch.sin(angles)
+        return cos.to(pos.dtype), sin.to(pos.dtype)
 
-        # Modulate NTK alpha by mscale
-        # When mscale > 1: interpolate towards stronger extrapolation
-        # When mscale = 1: use base NTK alpha
-        modulated_alpha = 1.0 + (ntk_alpha - 1.0) * mscale
-        scaled_theta = theta * modulated_alpha
+    # === DyPE-modulated NTK scaling ===
+
+    # Compute k_t: timestep modulation factor
+    k_t = compute_dype_k_t(
+        current_sigma=current_sigma,
+        dype_scale=dype_config.dype_scale,
+        dype_exponent=dype_config.dype_exponent,
+        dype_start_sigma=dype_config.dype_start_sigma,
+    )
+
+    # Base NTK factor
+    base_ntk = linear_scale ** (dim / (dim - 2))
+
+    # Apply DyPE modulation to NTK factor
+    # At high k_t (early steps): ntk_factor closer to base_ntk (stronger extrapolation)
+    # At low k_t (late steps): ntk_factor closer to 1.0 (weaker extrapolation)
+    # Formula: ntk_factor = 1 + (base_ntk - 1) * k_t / dype_scale
+    # This interpolates from 1.0 (no scaling) to base_ntk (full NTK)
+    if dype_config.dype_scale > 0:
+        blend_factor = min(k_t / dype_config.dype_scale, 1.0)
     else:
-        scaled_theta = theta
+        blend_factor = 1.0
+    ntk_factor = 1.0 + (base_ntk - 1.0) * blend_factor
 
-    # Standard RoPE frequency computation
+    # Compute scaled theta
+    scaled_theta = theta * ntk_factor
+
+    # Compute frequencies
     freq_seq = torch.arange(0, dim, 2, dtype=dtype, device=device) / dim
     freqs = 1.0 / (scaled_theta**freq_seq)
 
-    # Compute angles = position * frequency
+    # Compute angles
     angles = torch.einsum("...n,d->...nd", pos.to(dtype), freqs)
 
-    cos = torch.cos(angles)
-    sin = torch.sin(angles)
+    # Compute mscale (timestep-modulated)
+    # mscale goes from get_mscale(ntk_factor) at early steps to 1.0 at late steps
+    mscale_full = get_mscale(ntk_factor)
+    mscale = 1.0 + (mscale_full - 1.0) * blend_factor
+
+    cos = torch.cos(angles) * mscale
+    sin = torch.sin(angles) * mscale
 
     return cos.to(pos.dtype), sin.to(pos.dtype)
 
@@ -169,11 +281,11 @@ def compute_yarn_freqs(
     scale: float,
     current_sigma: float,
     dype_config: DyPEConfig,
+    ori_max_pe_len: int = FLUX_BASE_PE_LEN,
 ) -> tuple[Tensor, Tensor]:
-    """Compute RoPE frequencies using YARN/NTK method.
+    """Compute RoPE frequencies using DyPE-modulated NTK scaling.
 
-    Uses NTK-aware theta scaling for high-resolution support with
-    timestep-dependent DyPE modulation.
+    Uses the same approach as vision_yarn but with a uniform scale factor.
 
     Args:
         pos: Position tensor
@@ -182,43 +294,22 @@ def compute_yarn_freqs(
         scale: Uniform scaling factor
         current_sigma: Current noise level (1.0 = full noise, 0.0 = clean)
         dype_config: DyPE configuration
+        ori_max_pe_len: Original maximum position embedding length (unused)
 
     Returns:
         Tuple of (cos, sin) frequency tensors
     """
-    assert dim % 2 == 0
-
-    device = pos.device
-    dtype = torch.float64 if device.type != "mps" else torch.float32
-
-    # NTK-aware theta scaling with DyPE modulation
-    if scale > 1.0:
-        ntk_alpha = scale ** (dim / (dim - 2))
-
-        # Apply timestep-dependent DyPE modulation
-        mscale = get_timestep_mscale(
-            scale=scale,
-            current_sigma=current_sigma,
-            dype_scale=dype_config.dype_scale,
-            dype_exponent=dype_config.dype_exponent,
-            dype_start_sigma=dype_config.dype_start_sigma,
-        )
-
-        # Modulate NTK alpha by mscale
-        modulated_alpha = 1.0 + (ntk_alpha - 1.0) * mscale
-        scaled_theta = theta * modulated_alpha
-    else:
-        scaled_theta = theta
-
-    freq_seq = torch.arange(0, dim, 2, dtype=dtype, device=device) / dim
-    freqs = 1.0 / (scaled_theta**freq_seq)
-
-    angles = torch.einsum("...n,d->...nd", pos.to(dtype), freqs)
-
-    cos = torch.cos(angles)
-    sin = torch.sin(angles)
-
-    return cos.to(pos.dtype), sin.to(pos.dtype)
+    # Delegate to vision_yarn with uniform scale
+    return compute_vision_yarn_freqs(
+        pos=pos,
+        dim=dim,
+        theta=theta,
+        scale_h=scale,
+        scale_w=scale,
+        current_sigma=current_sigma,
+        dype_config=dype_config,
+        ori_max_pe_len=ori_max_pe_len,
+    )
 
 
 def compute_ntk_freqs(

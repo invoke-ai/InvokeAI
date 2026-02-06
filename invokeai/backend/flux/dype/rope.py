@@ -5,6 +5,7 @@ from einops import rearrange
 from torch import Tensor
 
 from invokeai.backend.flux.dype.base import (
+    FLUX_BASE_PE_LEN,
     DyPEConfig,
     compute_ntk_freqs,
     compute_vision_yarn_freqs,
@@ -20,6 +21,7 @@ def rope_dype(
     target_height: int,
     target_width: int,
     dype_config: DyPEConfig,
+    ori_max_pe_len: int = FLUX_BASE_PE_LEN,
 ) -> Tensor:
     """Compute RoPE with Dynamic Position Extrapolation.
 
@@ -34,6 +36,7 @@ def rope_dype(
         target_height: Target image height in pixels
         target_width: Target image width in pixels
         dype_config: DyPE configuration
+        ori_max_pe_len: Original maximum position embedding length for YaRN correction
 
     Returns:
         Rotary position embedding tensor with shape suitable for FLUX attention
@@ -62,6 +65,7 @@ def rope_dype(
             scale_w=scale_w,
             current_sigma=current_sigma,
             dype_config=dype_config,
+            ori_max_pe_len=ori_max_pe_len,
         )
     elif method == "yarn":
         cos, sin = compute_yarn_freqs(
@@ -71,6 +75,7 @@ def rope_dype(
             scale=scale,
             current_sigma=current_sigma,
             dype_config=dype_config,
+            ori_max_pe_len=ori_max_pe_len,
         )
     elif method == "ntk":
         cos, sin = compute_ntk_freqs(
