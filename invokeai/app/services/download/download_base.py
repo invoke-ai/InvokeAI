@@ -174,6 +174,7 @@ class DownloadJob(DownloadJobBase):
         default=None, description="Timestamp for when the download job ende1d (completed or errored)"
     )
     content_type: Optional[str] = Field(default=None, description="Content type of downloaded file")
+    canonical_url: Optional[str] = Field(default=None, description="Canonical URL to request on resume")
     etag: Optional[str] = Field(default=None, description="ETag from the remote server, if available")
     last_modified: Optional[str] = Field(default=None, description="Last-Modified from the remote server, if available")
     final_url: Optional[str] = Field(default=None, description="Final resolved URL after redirects, if available")

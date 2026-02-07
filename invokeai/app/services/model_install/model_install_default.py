@@ -119,6 +119,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 files.append(
                     {
                         "url": str(part.source),
+                        "canonical_url": part.canonical_url,
                         "etag": part.etag,
                         "last_modified": part.last_modified,
                         "expected_total_bytes": part.expected_total_bytes,
@@ -505,16 +506,14 @@ class ModelInstallService(ModelInstallServiceBase):
             return
         if not job.download_parts:
             return
-        failed_sources = {
-            str(part.source)
-            for part in job.download_parts
-            if part.resume_required or part.errored
-        }
-        if not failed_sources:
+        if not any(part.resume_required or part.errored for part in job.download_parts):
+            return
+        sources_to_restart = {str(part.source) for part in job.download_parts if not part.complete}
+        if not sources_to_restart:
             return
         job.status = InstallStatus.WAITING
         remote_files, metadata = self._remote_files_from_source(job.source)
-        remote_files = [rf for rf in remote_files if str(rf.url) in failed_sources]
+        remote_files = [rf for rf in remote_files if str(rf.url) in sources_to_restart]
         subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
         self._enqueue_remote_download(
             job=job,
@@ -1085,12 +1084,14 @@ class ModelInstallService(ModelInstallServiceBase):
                 target_path = part.dest
                 if target_path.exists():
                     try:
+                        self._logger.info(f"Deleting partial file before restart: {target_path}")
                         target_path.unlink()
                     except Exception:
                         pass
                 in_progress_path = target_path.with_name(target_path.name + ".downloading")
                 if in_progress_path.exists():
                     try:
+                        self._logger.info(f"Deleting partial file before restart: {in_progress_path}")
                         in_progress_path.unlink()
                     except Exception:
                         pass
@@ -1099,10 +1100,13 @@ class ModelInstallService(ModelInstallServiceBase):
                 meta = resume_metadata.get(str(part.source))
                 if not meta:
                     continue
+                part.canonical_url = meta.get("canonical_url") or part.canonical_url
                 part.etag = meta.get("etag") or part.etag
                 part.last_modified = meta.get("last_modified") or part.last_modified
                 part.expected_total_bytes = meta.get("expected_total_bytes") or part.expected_total_bytes
                 part.final_url = meta.get("final_url") or part.final_url
+                if meta.get("download_path"):
+                    part.download_path = Path(meta.get("download_path"))
         self._download_cache[multifile_job.id] = job
         job._multifile_job = multifile_job
 

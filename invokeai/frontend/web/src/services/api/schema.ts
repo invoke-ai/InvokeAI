@@ -7036,6 +7036,11 @@ export type components = {
              */
             content_type?: string | null;
             /**
+             * Canonical Url
+             * @description Canonical URL to request on resume
+             */
+            canonical_url?: string | null;
+            /**
              * Etag
              * @description ETag from the remote server, if available
              */

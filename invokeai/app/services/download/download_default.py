@@ -10,6 +10,7 @@ from pathlib import Path
 from queue import Empty, PriorityQueue
 from shutil import disk_usage
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
+from urllib.parse import urlparse
 
 import requests
 from pydantic.networks import AnyHttpUrl
@@ -60,6 +61,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._app_config = app_config or get_config()
         self._jobs: Dict[int, DownloadJob] = {}
         self._download_part2parent: Dict[AnyHttpUrl, MultiFileDownloadJob] = {}
+        self._mfd_pending: Dict[int, list[DownloadJob]] = {}
+        self._mfd_active: Dict[int, DownloadJob] = {}
         self._next_job_id = 0
         self._queue: PriorityQueue[DownloadJob] = PriorityQueue()
         self._stop_event = threading.Event()
@@ -194,6 +197,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 dest=path,
                 access_token=access_token or self._lookup_access_token(url),
             )
+            job.canonical_url = str(url)
             mfdj.download_parts.add(job)
             self._download_part2parent[job.source] = mfdj
         if submit_job:
@@ -201,15 +205,27 @@ class DownloadQueueService(DownloadQueueServiceBase):
         return mfdj
 
     def submit_multifile_download(self, job: MultiFileDownloadJob) -> None:
-        for download_job in job.download_parts:
-            self.submit_download_job(
-                download_job,
-                on_start=self._mfd_started,
-                on_progress=self._mfd_progress,
-                on_complete=self._mfd_complete,
-                on_cancelled=self._mfd_cancelled,
-                on_error=self._mfd_error,
-            )
+        pending = sorted(job.download_parts, key=lambda j: str(j.source))
+        self._mfd_pending[job.id] = list(pending)
+        self._mfd_active.pop(job.id, None)
+        self._submit_next_mfd_part(job)
+
+    def _submit_next_mfd_part(self, job: MultiFileDownloadJob) -> None:
+        pending = self._mfd_pending.get(job.id, [])
+        if not pending:
+            return
+        if self._mfd_active.get(job.id) is not None:
+            return
+        download_job = pending.pop(0)
+        self._mfd_active[job.id] = download_job
+        self.submit_download_job(
+            download_job,
+            on_start=self._mfd_started,
+            on_progress=self._mfd_progress,
+            on_complete=self._mfd_complete,
+            on_cancelled=self._mfd_cancelled,
+            on_error=self._mfd_error,
+        )
 
     def join(self) -> None:
         """Wait for all jobs to complete."""
@@ -316,7 +332,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def _do_download(self, job: DownloadJob) -> None:
         """Do the actual download."""
 
-        url = job.source
+        url = job.canonical_url or str(job.source)
         header = {"Authorization": f"Bearer {job.access_token}"} if job.access_token else {}
         open_mode = "wb"
         resume_from = 0
@@ -326,6 +342,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
             in_progress_path = self._in_progress_path(job.download_path)
             if in_progress_path.exists():
                 resume_from = in_progress_path.stat().st_size
+                job.bytes = resume_from
+                self._logger.debug(
+                    f"Resume check: in-progress file found at {in_progress_path} size={resume_from} bytes"
+                )
                 if resume_from > 0:
                     if job.etag:
                         header["If-Range"] = job.etag
@@ -333,11 +353,41 @@ class DownloadQueueService(DownloadQueueServiceBase):
                         header["If-Range"] = job.last_modified
                     header["Range"] = f"bytes={resume_from}-"
                     open_mode = "ab"
+            else:
+                self._logger.debug(f"Resume check: no in-progress file at {in_progress_path}")
+        elif job.download_path:
+            # Resume for directory downloads when we already know the filename.
+            in_progress_path = self._in_progress_path(job.download_path)
+            if in_progress_path.exists():
+                resume_from = in_progress_path.stat().st_size
+                job.bytes = resume_from
+                self._logger.debug(
+                    f"Resume check (dir): in-progress file found at {in_progress_path} size={resume_from} bytes"
+                )
+                if resume_from > 0:
+                    if job.etag:
+                        header["If-Range"] = job.etag
+                    elif job.last_modified:
+                        header["If-Range"] = job.last_modified
+                    header["Range"] = f"bytes={resume_from}-"
+                    open_mode = "ab"
+            else:
+                self._logger.debug(f"Resume check (dir): no in-progress file at {in_progress_path}")
+        elif job.dest.is_dir():
+            self._logger.debug("Resume check (dir): no prior download_path available; cannot resume from disk")
 
         # Make a streaming request. This will retrieve headers including
         # content-length and content-disposition, but not fetch any content itself
         resp = self._requests.get(str(url), headers=header, stream=True)
         job.final_url = str(resp.url) if resp.url else None
+        self._logger.debug(
+            "Resume response: "
+            f"status={resp.status_code} "
+            f"content_length={resp.headers.get('content-length')} "
+            f"content_range={resp.headers.get('Content-Range')} "
+            f"etag={resp.headers.get('ETag')} "
+            f"last_modified={resp.headers.get('Last-Modified')}"
+        )
         if resp.status_code == 416 and resume_from > 0:
             # Range not satisfiable - local partial is already complete
             expected = job.expected_total_bytes or job.total_bytes or resume_from
@@ -361,7 +411,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
         content_length = int(resp.headers.get("content-length", 0))
 
         if job.dest.is_dir():
-            file_name = os.path.basename(str(url.path))  # default is to use the last bit of the URL
+            parsed_url = urlparse(str(url))
+            file_name = os.path.basename(parsed_url.path)  # default is to use the last bit of the URL
 
             if match := re.search('filename="(.+)"', resp.headers.get("Content-Disposition", "")):
                 remote_name = match.group(1)
@@ -408,6 +459,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 self._signal_job_complete(job)
                 return
             # Existing file does not match expected size; treat as corrupt and restart.
+            self._logger.debug(
+                "Resume check: existing file size mismatch; deleting and restarting "
+                f"path={job.download_path} existing_size={existing_size} expected={job.total_bytes}"
+            )
             job.download_path.unlink()
 
         free_space = disk_usage(job.download_path.parent).free
@@ -521,6 +576,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def _signal_job_paused(self, job: DownloadJob) -> None:
         if job.status not in [DownloadJobStatus.RUNNING, DownloadJobStatus.WAITING]:
             return
+        if job.download_path:
+            in_progress_path = self._in_progress_path(job.download_path)
+            if in_progress_path.exists():
+                job.bytes = in_progress_path.stat().st_size
         job.status = DownloadJobStatus.PAUSED
         self._execute_cb(job, "on_cancelled")
         if self._event_bus:
@@ -582,11 +641,14 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._logger.info(f"Download complete: {download_job.source}")
         with self._lock:
             mf_job = self._download_part2parent[download_job.source]
+            self._mfd_active.pop(mf_job.id, None)
 
             # are there any more active jobs left in this task?
             if mf_job.running and all(x.complete for x in mf_job.download_parts):
                 mf_job.status = DownloadJobStatus.COMPLETED
                 self._execute_cb(mf_job, "on_complete")
+            elif mf_job.running:
+                self._submit_next_mfd_part(mf_job)
 
             # we're done with this sub-job
             self._job_terminated_event.set()
@@ -595,6 +657,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         with self._lock:
             mf_job = self._download_part2parent[download_job.source]
             assert mf_job is not None
+            self._mfd_active.pop(mf_job.id, None)
 
             if not mf_job.in_terminal_state:
                 if download_job.paused:
@@ -604,16 +667,17 @@ class DownloadQueueService(DownloadQueueServiceBase):
                     self._logger.warning(f"Download cancelled: {download_job.source}")
                     mf_job.cancel()
 
+            if download_job.paused:
+                return
             for s in mf_job.download_parts:
-                if download_job.paused:
-                    self.pause_job(s)
-                else:
-                    self.cancel_job(s)
+                self.cancel_job(s)
+            self._mfd_pending.pop(mf_job.id, None)
 
     def _mfd_error(self, download_job: DownloadJob, excp: Optional[Exception] = None) -> None:
         with self._lock:
             mf_job = self._download_part2parent[download_job.source]
             assert mf_job is not None
+            self._mfd_active.pop(mf_job.id, None)
             if not mf_job.in_terminal_state:
                 mf_job.status = download_job.status
                 mf_job.error = download_job.error
@@ -625,6 +689,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 for s in [x for x in mf_job.download_parts if x.running]:
                     self.cancel_job(s)
                 self._download_part2parent.pop(download_job.source)
+                self._mfd_pending.pop(mf_job.id, None)
                 self._job_terminated_event.set()
 
     def _execute_cb(
