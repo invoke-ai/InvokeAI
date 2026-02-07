@@ -72,7 +72,7 @@ dependencies = [
   "picklescan",
   "pillow",
   "prompt-toolkit",
-  "pypatchmatch",
+  "patchmatch-cython==0.1.4",
   "python-multipart",
   "requests",
   "semver~=3.0.1",
