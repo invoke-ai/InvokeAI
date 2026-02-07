@@ -6969,13 +6969,43 @@ export type components = {
              * @description Content type of downloaded file
              */
             content_type?: string | null;
+            /**
+             * Etag
+             * @description ETag from the remote server, if available
+             */
+            etag?: string | null;
+            /**
+             * Last Modified
+             * @description Last-Modified from the remote server, if available
+             */
+            last_modified?: string | null;
+            /**
+             * Final Url
+             * @description Final resolved URL after redirects, if available
+             */
+            final_url?: string | null;
+            /**
+             * Expected Total Bytes
+             * @description Expected total size of the download
+             */
+            expected_total_bytes?: number | null;
+            /**
+             * Resume Required
+             * @description True if server refused resume; restart required
+             */
+            resume_required?: boolean;
+            /**
+             * Resume Message
+             * @description Message explaining why resume is required
+             */
+            resume_message?: string | null;
         };
         /**
          * DownloadJobStatus
          * @description State of a download job.
          * @enum {string}
          */
-        DownloadJobStatus: "waiting" | "running" | "completed" | "cancelled" | "error";
+        DownloadJobStatus: "waiting" | "running" | "paused" | "completed" | "cancelled" | "error";
         /**
          * DownloadProgressEvent
          * @description Event model for download_progress

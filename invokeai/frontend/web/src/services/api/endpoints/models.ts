@@ -69,6 +69,8 @@ type CancelModelInstallResponse =
   paths['/api/v2/models/install/{id}']['delete']['responses']['201']['content']['application/json'];
 type PauseModelInstallResponse = ModelInstallJob;
 type ResumeModelInstallResponse = ModelInstallJob;
+type RestartFailedModelInstallResponse = ModelInstallJob;
+type RestartModelInstallFileResponse = ModelInstallJob;
 
 type PruneCompletedModelInstallsResponse =
   paths['/api/v2/models/install']['delete']['responses']['200']['content']['application/json'];
@@ -269,6 +271,25 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['ModelInstalls'],
     }),
+    restartFailedModelInstall: build.mutation<RestartFailedModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/restart_failed`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    restartModelInstallFile: build.mutation<RestartModelInstallFileResponse, { id: number; file_source: string }>({
+      query: ({ id, file_source }) => {
+        return {
+          url: buildModelsUrl(`install/${id}/restart_file`),
+          method: 'POST',
+          body: file_source,
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
     pruneCompletedModelInstalls: build.mutation<PruneCompletedModelInstallsResponse, void>({
       query: () => {
         return {
@@ -399,6 +420,8 @@ export const {
   useCancelModelInstallMutation,
   usePauseModelInstallMutation,
   useResumeModelInstallMutation,
+  useRestartFailedModelInstallMutation,
+  useRestartModelInstallFileMutation,
   usePruneCompletedModelInstallsMutation,
   useGetStarterModelsQuery,
   useGetHFTokenStatusQuery,

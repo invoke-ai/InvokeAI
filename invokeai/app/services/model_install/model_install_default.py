@@ -113,12 +113,28 @@ class ModelInstallService(ModelInstallServiceBase):
     def _write_install_marker(self, job: ModelInstallJob, status: Optional[InstallStatus] = None) -> None:
         if job._install_tmpdir is None:
             return
+        files: list[dict] = []
+        if job.download_parts:
+            for part in job.download_parts:
+                files.append(
+                    {
+                        "url": str(part.source),
+                        "etag": part.etag,
+                        "last_modified": part.last_modified,
+                        "expected_total_bytes": part.expected_total_bytes,
+                        "final_url": part.final_url,
+                        "download_path": part.download_path.as_posix() if part.download_path else None,
+                        "resume_required": part.resume_required,
+                        "resume_message": part.resume_message,
+                    }
+                )
         marker = {
             "version": INSTALL_MARKER_VERSION,
             "source": str(job.source),
             "config_in": job.config_in.model_dump(),
             "status": (status or job.status).value,
             "updated_at": get_iso_timestamp(),
+            "files": files,
         }
         path = self._marker_path(job._install_tmpdir)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -197,6 +213,9 @@ class ModelInstallService(ModelInstallServiceBase):
                 local_path=tmpdir,
             )
             job._install_tmpdir = tmpdir
+            files_meta = marker.get("files") or []
+            if files_meta:
+                job._resume_metadata = {f.get("url"): f for f in files_meta if f.get("url")}
             job.status = InstallStatus(status) if status else InstallStatus.WAITING
             self._install_jobs.append(job)
 
@@ -237,6 +256,7 @@ class ModelInstallService(ModelInstallServiceBase):
             destdir=job._install_tmpdir or job.local_path,
             subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
             subfolders=subfolders if len(subfolders) > 1 else None,
+            resume_metadata=job._resume_metadata,
         )
 
     @property
@@ -478,6 +498,55 @@ class ModelInstallService(ModelInstallServiceBase):
             return
         self._logger.info(f"Resuming {job.source}")
         self._resume_remote_download(job)
+
+    def restart_failed(self, job: ModelInstallJob) -> None:
+        """Restart failed or non-resumable downloads for a job."""
+        if not isinstance(job.source, (HFModelSource, URLModelSource)):
+            return
+        if not job.download_parts:
+            return
+        failed_sources = {
+            str(part.source)
+            for part in job.download_parts
+            if part.resume_required or part.errored
+        }
+        if not failed_sources:
+            return
+        job.status = InstallStatus.WAITING
+        remote_files, metadata = self._remote_files_from_source(job.source)
+        remote_files = [rf for rf in remote_files if str(rf.url) in failed_sources]
+        subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
+        self._enqueue_remote_download(
+            job=job,
+            source=job.source,
+            remote_files=remote_files,
+            metadata=metadata,
+            destdir=job._install_tmpdir or job.local_path,
+            subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
+            subfolders=subfolders if len(subfolders) > 1 else None,
+            clear_partials=True,
+        )
+
+    def restart_file(self, job: ModelInstallJob, file_source: str) -> None:
+        """Restart a specific file download for a job."""
+        if not isinstance(job.source, (HFModelSource, URLModelSource)):
+            return
+        job.status = InstallStatus.WAITING
+        remote_files, metadata = self._remote_files_from_source(job.source)
+        remote_files = [rf for rf in remote_files if str(rf.url) == file_source]
+        if not remote_files:
+            return
+        subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
+        self._enqueue_remote_download(
+            job=job,
+            source=job.source,
+            remote_files=remote_files,
+            metadata=metadata,
+            destdir=job._install_tmpdir or job.local_path,
+            subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
+            subfolders=subfolders if len(subfolders) > 1 else None,
+            clear_partials=True,
+        )
 
     def prune_jobs(self) -> None:
         """Prune all completed and errored jobs."""
@@ -995,6 +1064,8 @@ class ModelInstallService(ModelInstallServiceBase):
         destdir: Path,
         subfolder: Optional[Path] = None,
         subfolders: Optional[List[Path]] = None,
+        resume_metadata: Optional[dict] = None,
+        clear_partials: bool = False,
     ) -> ModelInstallJob:
         job.source_metadata = metadata
         job.local_path = destdir
@@ -1009,6 +1080,29 @@ class ModelInstallService(ModelInstallServiceBase):
             access_token=source.access_token,
             submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
         )
+        if clear_partials:
+            for part in multifile_job.download_parts:
+                target_path = part.dest
+                if target_path.exists():
+                    try:
+                        target_path.unlink()
+                    except Exception:
+                        pass
+                in_progress_path = target_path.with_name(target_path.name + ".downloading")
+                if in_progress_path.exists():
+                    try:
+                        in_progress_path.unlink()
+                    except Exception:
+                        pass
+        if resume_metadata:
+            for part in multifile_job.download_parts:
+                meta = resume_metadata.get(str(part.source))
+                if not meta:
+                    continue
+                part.etag = meta.get("etag") or part.etag
+                part.last_modified = meta.get("last_modified") or part.last_modified
+                part.expected_total_bytes = meta.get("expected_total_bytes") or part.expected_total_bytes
+                part.final_url = meta.get("final_url") or part.final_url
         self._download_cache[multifile_job.id] = job
         job._multifile_job = multifile_job
 
@@ -1161,6 +1255,11 @@ class ModelInstallService(ModelInstallServiceBase):
         with self._lock:
             if install_job := self._download_cache.pop(download_job.id, None):
                 self._downloads_changed_event.set()
+                if any(part.resume_required for part in download_job.download_parts):
+                    install_job.status = InstallStatus.PAUSED
+                    self._write_install_marker(install_job, status=InstallStatus.PAUSED)
+                    self._downloads_changed_event.set()
+                    return
                 # if install job has already registered an error, then do not replace its status with cancelled
                 if not install_job.errored and not install_job.paused:
                     install_job.cancel()

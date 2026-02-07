@@ -186,6 +186,7 @@ class ModelInstallJob(BaseModel):
     _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
     _multifile_job: Optional[MultiFileDownloadJob] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
+    _resume_metadata: Optional[dict] = PrivateAttr(default=None)
 
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""

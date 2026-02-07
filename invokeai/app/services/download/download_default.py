@@ -327,24 +327,37 @@ class DownloadQueueService(DownloadQueueServiceBase):
             if in_progress_path.exists():
                 resume_from = in_progress_path.stat().st_size
                 if resume_from > 0:
+                    if job.etag:
+                        header["If-Range"] = job.etag
+                    elif job.last_modified:
+                        header["If-Range"] = job.last_modified
                     header["Range"] = f"bytes={resume_from}-"
                     open_mode = "ab"
 
         # Make a streaming request. This will retrieve headers including
         # content-length and content-disposition, but not fetch any content itself
         resp = self._requests.get(str(url), headers=header, stream=True)
+        job.final_url = str(resp.url) if resp.url else None
         if resp.status_code == 416 and resume_from > 0:
             # Range not satisfiable - local partial is already complete
-            job.total_bytes = resume_from
-            job.bytes = resume_from
-            job.download_path = job.download_path or job.dest
-            self._signal_job_started(job)
-            self._signal_job_complete(job)
-            return
+            expected = job.expected_total_bytes or job.total_bytes or resume_from
+            if resume_from == expected:
+                job.total_bytes = expected
+                job.bytes = resume_from
+                job.download_path = job.download_path or job.dest
+                self._signal_job_started(job)
+                self._signal_job_complete(job)
+                return
+            job.resume_required = True
+            job.resume_message = "Resume refused by server. Restart required."
+            job.pause()
+            raise DownloadJobCancelledException("Resume refused by server. Restart required.")
         if not resp.ok:
             raise HTTPError(resp.reason)
 
         job.content_type = resp.headers.get("Content-Type")
+        job.etag = resp.headers.get("ETag") or job.etag
+        job.last_modified = resp.headers.get("Last-Modified") or job.last_modified
         content_length = int(resp.headers.get("content-length", 0))
 
         if job.dest.is_dir():
@@ -367,10 +380,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         if resume_from > 0 and resp.status_code == 200:
             # Server ignored Range. Restart download from scratch.
-            resume_from = 0
-            open_mode = "wb"
-            if in_progress_path.exists():
-                in_progress_path.unlink()
+            job.resume_required = True
+            job.resume_message = "Resume refused by server. Restart required."
+            job.pause()
+            raise DownloadJobCancelledException("Resume refused by server. Restart required.")
 
         if resume_from > 0 and resp.status_code == 206:
             content_range = resp.headers.get("Content-Range", "")
@@ -382,8 +395,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
             else:
                 job.total_bytes = resume_from + content_length
             job.bytes = resume_from
+            job.expected_total_bytes = job.total_bytes
         else:
             job.total_bytes = content_length
+            job.expected_total_bytes = content_length
 
         if job.download_path.exists() and resume_from == 0:
             existing_size = job.download_path.stat().st_size
@@ -590,7 +605,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
                     mf_job.cancel()
 
             for s in mf_job.download_parts:
-                self.cancel_job(s)
+                if download_job.paused:
+                    self.pause_job(s)
+                else:
+                    self.cancel_job(s)
 
     def _mfd_error(self, download_job: DownloadJob, excp: Optional[Exception] = None) -> None:
         with self._lock:

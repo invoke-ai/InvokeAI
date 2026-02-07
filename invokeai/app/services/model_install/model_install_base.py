@@ -214,6 +214,14 @@ class ModelInstallServiceBase(ABC):
         """Resume a previously paused job."""
 
     @abstractmethod
+    def restart_failed(self, job: ModelInstallJob) -> None:
+        """Restart failed or non-resumable downloads for a job."""
+
+    @abstractmethod
+    def restart_file(self, job: ModelInstallJob, file_source: str) -> None:
+        """Restart a specific file download for a job."""
+
+    @abstractmethod
     def wait_for_job(self, job: ModelInstallJob, timeout: int = 0) -> ModelInstallJob:
         """Wait for the indicated job to reach a terminal state.
 

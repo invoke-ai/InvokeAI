@@ -174,6 +174,12 @@ class DownloadJob(DownloadJobBase):
         default=None, description="Timestamp for when the download job ende1d (completed or errored)"
     )
     content_type: Optional[str] = Field(default=None, description="Content type of downloaded file")
+    etag: Optional[str] = Field(default=None, description="ETag from the remote server, if available")
+    last_modified: Optional[str] = Field(default=None, description="Last-Modified from the remote server, if available")
+    final_url: Optional[str] = Field(default=None, description="Final resolved URL after redirects, if available")
+    expected_total_bytes: Optional[int] = Field(default=None, description="Expected total size of the download")
+    resume_required: bool = Field(default=False, description="True if server refused resume; restart required")
+    resume_message: Optional[str] = Field(default=None, description="Message explaining why resume is required")
 
     def __hash__(self) -> int:
         """Return hash of the string representation of this object, for indexing."""
