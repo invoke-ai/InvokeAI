@@ -148,6 +148,11 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     [installJob.id, restartModelInstallFile]
   );
 
+  const getRestartFileHandler = useCallback(
+    (fileSource: string) => () => handleRestartFile(fileSource),
+    [handleRestartFile]
+  );
+
   const sourceLocation = useMemo(() => {
     switch (installJob.source.type) {
       case 'hf':
@@ -206,9 +211,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
   }, [installJob.bytes, installJob.download_parts, installJob.status, installJob.total_bytes]);
 
   const restartRequiredParts = useMemo(() => {
-    return (
-      installJob.download_parts?.filter((part) => part.resume_required || part.status === 'error') ?? []
-    );
+    return installJob.download_parts?.filter((part) => part.resume_required || part.status === 'error') ?? [];
   }, [installJob.download_parts]);
 
   const hasRestartRequired = restartRequiredParts.length > 0;
@@ -305,7 +308,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
                   tooltip={t('modelManager.restartFile')}
                   aria-label={t('modelManager.restartFile')}
                   icon={<PiArrowClockwiseBold />}
-                  onClick={() => handleRestartFile(part.source)}
+                  onClick={getRestartFileHandler(part.source)}
                   variant="ghost"
                 />
               </Flex>

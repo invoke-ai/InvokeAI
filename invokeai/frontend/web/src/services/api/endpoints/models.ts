@@ -6,10 +6,10 @@ import type { operations, paths } from 'services/api/schema';
 import type {
   AnyModelConfig,
   GetHFTokenStatusResponse,
+  ModelInstallJob,
   ResetHFTokenResponse,
   SetHFTokenArg,
   SetHFTokenResponse,
-  ModelInstallJob,
 } from 'services/api/types';
 import type { Param0 } from 'tsafe';
 
