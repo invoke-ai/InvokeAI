@@ -79,6 +79,25 @@ type GetHuggingFaceModelsResponse =
 
 type GetByAttrsArg = operations['get_model_records_by_attrs']['parameters']['query'];
 
+// Orphaned models types - manually defined since the schema hasn't been regenerated yet
+type OrphanedModelInfo = {
+  path: string;
+  absolute_path: string;
+  files: string[];
+  size_bytes: number;
+};
+
+type GetOrphanedModelsResponse = OrphanedModelInfo[];
+
+type DeleteOrphanedModelsArg = {
+  paths: string[];
+};
+
+type DeleteOrphanedModelsResponse = {
+  deleted: string[];
+  errors: Record<string, string>;
+};
+
 const modelConfigsAdapter = createEntityAdapter<AnyModelConfig, string>({
   selectId: (entity) => entity.key,
   sortComparer: (a, b) => a.name.localeCompare(b.name),
@@ -358,6 +377,21 @@ export const modelsApi = api.injectEndpoints({
         }
       },
     }),
+    getOrphanedModels: build.query<GetOrphanedModelsResponse, void>({
+      query: () => ({
+        url: buildModelsUrl('sync/orphaned'),
+        method: 'GET',
+      }),
+      providesTags: ['OrphanedModels'],
+    }),
+    deleteOrphanedModels: build.mutation<DeleteOrphanedModelsResponse, DeleteOrphanedModelsArg>({
+      query: (arg) => ({
+        url: buildModelsUrl('sync/orphaned'),
+        method: 'DELETE',
+        body: arg,
+      }),
+      invalidatesTags: ['OrphanedModels'],
+    }),
   }),
 });
 
@@ -383,6 +417,8 @@ export const {
   useResetHFTokenMutation,
   useEmptyModelCacheMutation,
   useReidentifyModelMutation,
+  useGetOrphanedModelsQuery,
+  useDeleteOrphanedModelsMutation,
 } = modelsApi;
 
 export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select();
