@@ -38,7 +38,7 @@ export type ASTNode =
 
 const WEIGHT_PATTERN = /^[+-]?(\d+(\.\d+)?|[+-]+)/;
 const WHITESPACE_PATTERN = /^\s+/;
-const PUNCTUATION_PATTERN = /^[.,]/;
+const PUNCTUATION_PATTERN = /^[.,/!?;:'"“”‘’`~@#$%^&*=_|]/;
 const OTHER_PATTERN = /\s/;
 
 /**
