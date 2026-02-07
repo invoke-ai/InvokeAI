@@ -56,13 +56,7 @@ class SqliteSessionQueue(SessionQueueBase):
             deleted = self._prune_terminal_to_limit(DEFAULT_QUEUE_ID, config.max_queue_history)
             if deleted > 0:
                 self.__invoker.services.logger.info(
-                    f"Pruned {deleted} completed/failed/canceled queue items (kept {config.max_queue_history})"
-                )
-        elif config.prune_queue_on_startup:
-            prune_result = self.prune(DEFAULT_QUEUE_ID)
-            if prune_result.deleted > 0:
-                self.__invoker.services.logger.info(
-                    f"Pruned {prune_result.deleted} completed/failed/canceled queue items"
+                    f"Pruned {deleted} completed/failed/canceled queue items (kept up to {config.max_queue_history})"
                 )
 
     def __init__(self, db: SqliteDatabase) -> None:
