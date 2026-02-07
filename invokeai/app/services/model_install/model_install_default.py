@@ -1,6 +1,7 @@
 """Model installation class."""
 
 import gc
+import json
 import locale
 import os
 import re
@@ -38,6 +39,7 @@ from invokeai.app.services.model_install.model_install_common import (
 )
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.factory import (
     AnyModelConfig,
@@ -65,6 +67,9 @@ if TYPE_CHECKING:
 
 
 TMPDIR_PREFIX = "tmpinstall_"
+# Marker file used to resume or pause remote model installs across restarts.
+INSTALL_MARKER_FILENAME = ".invokeai_install.json"
+INSTALL_MARKER_VERSION = 1
 
 
 class ModelInstallService(ModelInstallServiceBase):
@@ -102,6 +107,138 @@ class ModelInstallService(ModelInstallServiceBase):
         self._install_thread: Optional[threading.Thread] = None
         self._next_job_id = 0
 
+    def _marker_path(self, tmpdir: Path) -> Path:
+        return tmpdir / INSTALL_MARKER_FILENAME
+
+    def _write_install_marker(self, job: ModelInstallJob, status: Optional[InstallStatus] = None) -> None:
+        if job._install_tmpdir is None:
+            return
+        marker = {
+            "version": INSTALL_MARKER_VERSION,
+            "source": str(job.source),
+            "config_in": job.config_in.model_dump(),
+            "status": (status or job.status).value,
+            "updated_at": get_iso_timestamp(),
+        }
+        path = self._marker_path(job._install_tmpdir)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "wt", encoding="utf-8") as f:
+            json.dump(marker, f)
+
+    def _read_install_marker(self, tmpdir: Path) -> Optional[dict]:
+        path = self._marker_path(tmpdir)
+        if not path.exists():
+            return None
+        try:
+            with open(path, "rt", encoding="utf-8") as f:
+                marker = json.load(f)
+            if marker.get("version") != INSTALL_MARKER_VERSION:
+                return None
+            return marker
+        except Exception as e:
+            self._logger.warning(f"Invalid install marker in {tmpdir}: {e}")
+            return None
+
+    def _delete_install_marker(self, tmpdir: Path) -> None:
+        path = self._marker_path(tmpdir)
+        if path.exists():
+            try:
+                path.unlink()
+            except Exception as e:
+                self._logger.warning(f"Failed to remove install marker {path}: {e}")
+
+    def _find_reusable_tmpdir(self, source: ModelSource) -> Optional[Path]:
+        path = self._app_config.models_path
+        source_str = str(source)
+        candidates: list[tuple[str, Path]] = []
+        for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            marker = self._read_install_marker(tmpdir)
+            if not marker:
+                continue
+            if marker.get("source") != source_str:
+                continue
+            status = marker.get("status")
+            if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
+                continue
+            candidates.append((marker.get("updated_at", ""), tmpdir))
+        if not candidates:
+            return None
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[0][1]
+
+    def _restore_incomplete_installs(self) -> None:
+        path = self._app_config.models_path
+        seen_sources: set[str] = set()
+        for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            marker = self._read_install_marker(tmpdir)
+            if not marker:
+                continue
+            status = marker.get("status")
+            if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
+                continue
+
+            try:
+                source_str = marker["source"]
+                if source_str in seen_sources:
+                    self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
+                    self._safe_rmtree(tmpdir, self._logger)
+                    continue
+                seen_sources.add(source_str)
+                source = self._guess_source(source_str)
+            except Exception as e:
+                self._logger.warning(f"Skipping install marker in {tmpdir}: {e}")
+                continue
+
+            config_in = ModelRecordChanges(**(marker.get("config_in") or {}))
+            job = ModelInstallJob(
+                id=self._next_id(),
+                source=source,
+                config_in=config_in,
+                local_path=tmpdir,
+            )
+            job._install_tmpdir = tmpdir
+            job.status = InstallStatus(status) if status else InstallStatus.WAITING
+            self._install_jobs.append(job)
+
+            if job.paused:
+                continue
+
+            if job.status in [InstallStatus.DOWNLOADS_DONE, InstallStatus.RUNNING]:
+                job.status = InstallStatus.DOWNLOADS_DONE
+                self._put_in_queue(job)
+            else:
+                try:
+                    self._resume_remote_download(job)
+                except Exception as e:
+                    self._set_error(job, e)
+                    if job._install_tmpdir is not None:
+                        self._safe_rmtree(job._install_tmpdir, self._logger)
+
+    def _restore_incomplete_installs_async(self) -> None:
+        def _run() -> None:
+            try:
+                self._logger.info("Restoring incomplete installs")
+                self._restore_incomplete_installs()
+                self._logger.info("Finished restoring incomplete installs")
+            except Exception as e:
+                self._logger.error(f"Failed to restore incomplete installs: {e}")
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _resume_remote_download(self, job: ModelInstallJob) -> None:
+        job.status = InstallStatus.WAITING
+        remote_files, metadata = self._remote_files_from_source(job.source)
+        subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
+        self._enqueue_remote_download(
+            job=job,
+            source=job.source,
+            remote_files=remote_files,
+            metadata=metadata,
+            destdir=job._install_tmpdir or job.local_path,
+            subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
+            subfolders=subfolders if len(subfolders) > 1 else None,
+        )
+
     @property
     def app_config(self) -> InvokeAIAppConfig:  # noqa D102
         return self._app_config
@@ -138,6 +275,7 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._logger.warning(f"Missing model file: {model.name} at {model.path}")
 
             self._write_invoke_managed_models_dir_readme()
+            self._restore_incomplete_installs_async()
 
     def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
@@ -162,8 +300,12 @@ class ModelInstallService(ModelInstallServiceBase):
     def _clear_pending_jobs(self) -> None:
         for job in self.list_jobs():
             if not job.in_terminal_state:
-                self._logger.warning(f"Cancelling job {job.id}")
-                self.cancel_job(job)
+                if job._multifile_job is not None:
+                    self._logger.warning(f"Pausing job {job.id}")
+                    self.pause_job(job)
+                else:
+                    self._logger.warning(f"Cancelling job {job.id}")
+                    self.cancel_job(job)
         while True:
             try:
                 job = self._install_queue.get(block=False)
@@ -315,6 +457,27 @@ class ModelInstallService(ModelInstallServiceBase):
         self._logger.warning(f"Cancelling {job.source}")
         if dj := job._multifile_job:
             self._download_queue.cancel_job(dj)
+        if job._install_tmpdir is not None:
+            self._delete_install_marker(job._install_tmpdir)
+            self._safe_rmtree(job._install_tmpdir, self._logger)
+
+    def pause_job(self, job: ModelInstallJob) -> None:
+        """Pause the indicated job, preserving partial downloads."""
+        if job.in_terminal_state:
+            return
+        job.status = InstallStatus.PAUSED
+        self._logger.warning(f"Pausing {job.source}")
+        if dj := job._multifile_job:
+            for part in dj.download_parts:
+                self._download_queue.pause_job(part)
+        self._write_install_marker(job, status=InstallStatus.PAUSED)
+
+    def resume_job(self, job: ModelInstallJob) -> None:
+        """Resume a previously paused job."""
+        if not job.paused:
+            return
+        self._logger.info(f"Resuming {job.source}")
+        self._resume_remote_download(job)
 
     def prune_jobs(self) -> None:
         """Prune all completed and errored jobs."""
@@ -596,6 +759,9 @@ class ModelInstallService(ModelInstallServiceBase):
         if isinstance(job.source_metadata, (HuggingFaceMetadata)):
             job.config_in.source_api_response = job.source_metadata.api_response
 
+        if job._install_tmpdir is not None:
+            self._delete_install_marker(job._install_tmpdir)
+
         if job.inplace:
             key = self.register_path(job.local_path, job.config_in)
         else:
@@ -624,8 +790,15 @@ class ModelInstallService(ModelInstallServiceBase):
         """Remove leftover tmpdirs from aborted installs."""
         path = self._app_config.models_path
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
-            self._logger.info(f"Removing dangling temporary directory {tmpdir}")
-            self._safe_rmtree(tmpdir, self._logger)
+            marker = self._read_install_marker(tmpdir)
+            if marker is None:
+                self._logger.info(f"Removing dangling temporary directory {tmpdir}")
+                self._safe_rmtree(tmpdir, self._logger)
+                continue
+            status = marker.get("status")
+            if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
+                self._logger.info(f"Removing completed/errored temporary directory {tmpdir}")
+                self._safe_rmtree(tmpdir, self._logger)
 
     def _scan_for_missing_models(self) -> list[AnyModelConfig]:
         """Scan the models directory for missing models and return a list of them."""
@@ -781,12 +954,14 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> ModelInstallJob:
         if len(remote_files) == 0:
             raise ValueError(f"{source}: No downloadable files found")
-        destdir = Path(
-            mkdtemp(
-                dir=self._app_config.models_path,
-                prefix=TMPDIR_PREFIX,
+        destdir = self._find_reusable_tmpdir(source)
+        if destdir is None:
+            destdir = Path(
+                mkdtemp(
+                    dir=self._app_config.models_path,
+                    prefix=TMPDIR_PREFIX,
+                )
             )
-        )
         install_job = ModelInstallJob(
             id=self._next_id(),
             source=source,
@@ -798,26 +973,51 @@ class ModelInstallService(ModelInstallServiceBase):
         )
         # remember the temporary directory for later removal
         install_job._install_tmpdir = destdir
-        install_job.total_bytes = sum((x.size or 0) for x in remote_files)
 
         # Handle multiple subfolders for HFModelSource
         subfolders = source.subfolders if isinstance(source, HFModelSource) else []
+        return self._enqueue_remote_download(
+            job=install_job,
+            source=source,
+            remote_files=remote_files,
+            metadata=metadata,
+            destdir=destdir,
+            subfolder=source.subfolder if isinstance(source, HFModelSource) and len(subfolders) <= 1 else None,
+            subfolders=subfolders if len(subfolders) > 1 else None,
+        )
+
+    def _enqueue_remote_download(
+        self,
+        job: ModelInstallJob,
+        source: HFModelSource | URLModelSource,
+        remote_files: List[RemoteModelFile],
+        metadata: Optional[AnyModelRepoMetadata],
+        destdir: Path,
+        subfolder: Optional[Path] = None,
+        subfolders: Optional[List[Path]] = None,
+    ) -> ModelInstallJob:
+        job.source_metadata = metadata
+        job.local_path = destdir
+        job._install_tmpdir = destdir
+        job.total_bytes = sum((x.size or 0) for x in remote_files)
+
         multifile_job = self._multifile_download(
             remote_files=remote_files,
             dest=destdir,
-            subfolder=source.subfolder if isinstance(source, HFModelSource) and len(subfolders) <= 1 else None,
-            subfolders=subfolders if len(subfolders) > 1 else None,
+            subfolder=subfolder,
+            subfolders=subfolders,
             access_token=source.access_token,
             submit_job=False,  # Important! Don't submit the job until we have set our _download_cache dict
         )
-        self._download_cache[multifile_job.id] = install_job
-        install_job._multifile_job = multifile_job
+        self._download_cache[multifile_job.id] = job
+        job._multifile_job = multifile_job
 
+        self._write_install_marker(job, status=InstallStatus.WAITING)
         files_string = "file" if len(remote_files) == 1 else "files"
         self._logger.info(f"Queueing model install: {source} ({len(remote_files)} {files_string})")
         self._logger.debug(f"remote_files={remote_files}")
         self._download_queue.submit_multifile_download(multifile_job)
-        return install_job
+        return job
 
     def _stat_size(self, path: Path) -> int:
         size = 0
@@ -951,6 +1151,8 @@ class ModelInstallService(ModelInstallServiceBase):
                 assert excp is not None
                 self._set_error(install_job, excp)
                 self._download_queue.cancel_job(download_job)
+                if install_job._install_tmpdir is not None:
+                    self._safe_rmtree(install_job._install_tmpdir, self._logger)
 
                 # Let other threads know that the number of downloads has changed
                 self._downloads_changed_event.set()
@@ -960,8 +1162,10 @@ class ModelInstallService(ModelInstallServiceBase):
             if install_job := self._download_cache.pop(download_job.id, None):
                 self._downloads_changed_event.set()
                 # if install job has already registered an error, then do not replace its status with cancelled
-                if not install_job.errored:
+                if not install_job.errored and not install_job.paused:
                     install_job.cancel()
+                    if install_job._install_tmpdir is not None:
+                        self._safe_rmtree(install_job._install_tmpdir, self._logger)
 
                 # Let other threads know that the number of downloads has changed
                 self._downloads_changed_event.set()
@@ -972,6 +1176,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def _signal_job_running(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.RUNNING
         self._logger.info(f"Model install started: {job.source}")
+        self._write_install_marker(job, status=InstallStatus.RUNNING)
         if self._event_bus:
             self._event_bus.emit_model_install_started(job)
 
@@ -981,6 +1186,7 @@ class ModelInstallService(ModelInstallServiceBase):
             assert job.bytes is not None
             assert job.total_bytes is not None
             self._event_bus.emit_model_install_download_started(job)
+        self._write_install_marker(job, status=InstallStatus.DOWNLOADING)
 
     def _signal_job_downloading(self, job: ModelInstallJob) -> None:
         if self._event_bus:
@@ -992,6 +1198,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def _signal_job_downloads_done(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.DOWNLOADS_DONE
         self._logger.info(f"Model download complete: {job.source}")
+        self._write_install_marker(job, status=InstallStatus.DOWNLOADS_DONE)
         if self._event_bus:
             self._event_bus.emit_model_install_downloads_complete(job)
 
@@ -1000,6 +1207,8 @@ class ModelInstallService(ModelInstallServiceBase):
         assert job.config_out
         self._logger.info(f"Model install complete: {job.source}")
         self._logger.debug(f"{job.local_path} registered key {job.config_out.key}")
+        if job._install_tmpdir is not None:
+            self._delete_install_marker(job._install_tmpdir)
         if self._event_bus:
             assert job.local_path is not None
             assert job.config_out is not None
@@ -1007,6 +1216,8 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _signal_job_errored(self, job: ModelInstallJob) -> None:
         self._logger.error(f"Model install error: {job.source}\n{job.error_type}: {job.error}")
+        if job._install_tmpdir is not None:
+            self._delete_install_marker(job._install_tmpdir)
         if self._event_bus:
             assert job.error_type is not None
             assert job.error is not None
@@ -1014,6 +1225,8 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _signal_job_cancelled(self, job: ModelInstallJob) -> None:
         self._logger.info(f"Model install canceled: {job.source}")
+        if job._install_tmpdir is not None:
+            self._delete_install_marker(job._install_tmpdir)
         if self._event_bus:
             self._event_bus.emit_model_install_cancelled(job)
 

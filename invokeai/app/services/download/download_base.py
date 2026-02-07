@@ -18,6 +18,7 @@ class DownloadJobStatus(str, Enum):
 
     WAITING = "waiting"  # not enqueued, will not run
     RUNNING = "running"  # actively downloading
+    PAUSED = "paused"  # paused, can be resumed
     COMPLETED = "completed"  # finished running
     CANCELLED = "cancelled"  # user cancelled
     ERROR = "error"  # terminated with an error message
@@ -61,6 +62,7 @@ class DownloadJobBase(BaseModel):
 
     # internal flag
     _cancelled: bool = PrivateAttr(default=False)
+    _paused: bool = PrivateAttr(default=False)
 
     # optional event handlers passed in on creation
     _on_start: Optional[DownloadEventHandler] = PrivateAttr(default=None)
@@ -72,6 +74,12 @@ class DownloadJobBase(BaseModel):
     def cancel(self) -> None:
         """Call to cancel the job."""
         self._cancelled = True
+        self._paused = False
+
+    def pause(self) -> None:
+        """Pause the job, preserving partial downloads."""
+        self._paused = True
+        self._cancelled = True
 
     # cancelled and the callbacks are private attributes in order to prevent
     # them from being serialized and/or used in the Json Schema
@@ -79,6 +87,11 @@ class DownloadJobBase(BaseModel):
     def cancelled(self) -> bool:
         """Call to cancel the job."""
         return self._cancelled
+
+    @property
+    def paused(self) -> bool:
+        """Return true if job is paused."""
+        return self._paused
 
     @property
     def complete(self) -> bool:
@@ -320,6 +333,10 @@ class DownloadQueueServiceBase(ABC):
     def cancel_job(self, job: DownloadJobBase) -> None:
         """Cancel the job, clearing partial downloads and putting it into ERROR state."""
         pass
+
+    def pause_job(self, job: DownloadJobBase) -> None:  # noqa D401
+        """Pause the job, preserving partial downloads."""
+        raise NotImplementedError
 
     @abstractmethod
     def join(self) -> None:

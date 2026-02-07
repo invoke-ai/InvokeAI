@@ -12676,7 +12676,15 @@ export type components = {
          * @description State of an install job running in the background.
          * @enum {string}
          */
-        InstallStatus: "waiting" | "downloading" | "downloads_done" | "running" | "completed" | "error" | "cancelled";
+        InstallStatus:
+          | "waiting"
+          | "downloading"
+          | "downloads_done"
+          | "running"
+          | "paused"
+          | "completed"
+          | "error"
+          | "cancelled";
         /**
          * Integer Batch
          * @description Create a batched generation, where the workflow is executed once for each integer in the batch.

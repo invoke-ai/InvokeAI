@@ -8,6 +8,7 @@ const STATUSES = {
   downloading: { colorScheme: 'yellow', translationKey: 'queue.in_progress' },
   downloads_done: { colorScheme: 'yellow', translationKey: 'queue.in_progress' },
   running: { colorScheme: 'yellow', translationKey: 'queue.in_progress' },
+  paused: { colorScheme: 'orange', translationKey: 'queue.pause' },
   completed: { colorScheme: 'green', translationKey: 'queue.completed' },
   error: { colorScheme: 'red', translationKey: 'queue.failed' },
   cancelled: { colorScheme: 'orange', translationKey: 'queue.canceled' },

@@ -206,6 +206,14 @@ class ModelInstallServiceBase(ABC):
         """Cancel the indicated job."""
 
     @abstractmethod
+    def pause_job(self, job: ModelInstallJob) -> None:
+        """Pause the indicated job, preserving partial downloads."""
+
+    @abstractmethod
+    def resume_job(self, job: ModelInstallJob) -> None:
+        """Resume a previously paused job."""
+
+    @abstractmethod
     def wait_for_job(self, job: ModelInstallJob, timeout: int = 0) -> ModelInstallJob:
         """Wait for the indicated job to reach a terminal state.
 

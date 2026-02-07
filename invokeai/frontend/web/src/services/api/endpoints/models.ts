@@ -9,6 +9,7 @@ import type {
   ResetHFTokenResponse,
   SetHFTokenArg,
   SetHFTokenResponse,
+  ModelInstallJob,
 } from 'services/api/types';
 import type { Param0 } from 'tsafe';
 
@@ -66,6 +67,8 @@ type ListModelInstallsResponse =
 
 type CancelModelInstallResponse =
   paths['/api/v2/models/install/{id}']['delete']['responses']['201']['content']['application/json'];
+type PauseModelInstallResponse = ModelInstallJob;
+type ResumeModelInstallResponse = ModelInstallJob;
 
 type PruneCompletedModelInstallsResponse =
   paths['/api/v2/models/install']['delete']['responses']['200']['content']['application/json'];
@@ -248,6 +251,24 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['ModelInstalls'],
     }),
+    pauseModelInstall: build.mutation<PauseModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/pause`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    resumeModelInstall: build.mutation<ResumeModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/resume`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
     pruneCompletedModelInstalls: build.mutation<PruneCompletedModelInstallsResponse, void>({
       query: () => {
         return {
@@ -376,6 +397,8 @@ export const {
   useLazyGetHuggingFaceModelsQuery,
   useListModelInstallsQuery,
   useCancelModelInstallMutation,
+  usePauseModelInstallMutation,
+  useResumeModelInstallMutation,
   usePruneCompletedModelInstallsMutation,
   useGetStarterModelsQuery,
   useGetHFTokenStatusQuery,

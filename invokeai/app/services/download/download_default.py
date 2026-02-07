@@ -126,6 +126,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._jobs[job.id] = job
         self._queue.put(job)
 
+    def pause_job(self, job: DownloadJobBase) -> None:
+        """Pause the indicated job, preserving partial downloads."""
+        if job.status in [DownloadJobStatus.WAITING, DownloadJobStatus.RUNNING]:
+            job.pause()
+
     def download(
         self,
         source: AnyHttpUrl,
@@ -284,12 +289,17 @@ class DownloadQueueService(DownloadQueueServiceBase):
             except Empty:
                 continue
             try:
+                if job.cancelled:
+                    raise DownloadJobCancelledException("Job was cancelled before start")
                 job.job_started = get_iso_timestamp()
                 self._do_download(job)
                 self._signal_job_complete(job)
             except DownloadJobCancelledException:
-                self._signal_job_cancelled(job)
-                self._cleanup_cancelled_job(job)
+                if job.paused:
+                    self._signal_job_paused(job)
+                else:
+                    self._signal_job_cancelled(job)
+                    self._cleanup_cancelled_job(job)
             except Exception as excp:
                 job.error_type = excp.__class__.__name__ + f"({str(excp)})"
                 job.error = traceback.format_exc()
@@ -309,16 +319,33 @@ class DownloadQueueService(DownloadQueueServiceBase):
         url = job.source
         header = {"Authorization": f"Bearer {job.access_token}"} if job.access_token else {}
         open_mode = "wb"
+        resume_from = 0
+
+        if not job.dest.is_dir():
+            job.download_path = job.dest
+            in_progress_path = self._in_progress_path(job.download_path)
+            if in_progress_path.exists():
+                resume_from = in_progress_path.stat().st_size
+                if resume_from > 0:
+                    header["Range"] = f"bytes={resume_from}-"
+                    open_mode = "ab"
 
         # Make a streaming request. This will retrieve headers including
         # content-length and content-disposition, but not fetch any content itself
         resp = self._requests.get(str(url), headers=header, stream=True)
+        if resp.status_code == 416 and resume_from > 0:
+            # Range not satisfiable - local partial is already complete
+            job.total_bytes = resume_from
+            job.bytes = resume_from
+            job.download_path = job.download_path or job.dest
+            self._signal_job_started(job)
+            self._signal_job_complete(job)
+            return
         if not resp.ok:
             raise HTTPError(resp.reason)
 
         job.content_type = resp.headers.get("Content-Type")
         content_length = int(resp.headers.get("content-length", 0))
-        job.total_bytes = content_length
 
         if job.dest.is_dir():
             file_name = os.path.basename(str(url.path))  # default is to use the last bit of the URL
@@ -336,22 +363,53 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         assert job.download_path
 
+        in_progress_path = self._in_progress_path(job.download_path)
+
+        if resume_from > 0 and resp.status_code == 200:
+            # Server ignored Range. Restart download from scratch.
+            resume_from = 0
+            open_mode = "wb"
+            if in_progress_path.exists():
+                in_progress_path.unlink()
+
+        if resume_from > 0 and resp.status_code == 206:
+            content_range = resp.headers.get("Content-Range", "")
+            total_from_range = None
+            if match := re.match(r"bytes\\s+\\d+-\\d+/(\\d+)", content_range):
+                total_from_range = int(match.group(1))
+            if total_from_range is not None:
+                job.total_bytes = total_from_range
+            else:
+                job.total_bytes = resume_from + content_length
+            job.bytes = resume_from
+        else:
+            job.total_bytes = content_length
+
+        if job.download_path.exists() and resume_from == 0:
+            existing_size = job.download_path.stat().st_size
+            if job.total_bytes > 0 and existing_size == job.total_bytes:
+                job.bytes = existing_size
+                self._signal_job_started(job)
+                self._signal_job_complete(job)
+                return
+            # Existing file does not match expected size; treat as corrupt and restart.
+            job.download_path.unlink()
+
         free_space = disk_usage(job.download_path.parent).free
         GB = 2**30
-        self._logger.debug(f"Download is {job.total_bytes / GB:.2f} GB of {free_space / GB:.2f} GB free.")
-        if free_space < job.total_bytes:
+        remaining_bytes = max(job.total_bytes - job.bytes, 0)
+        self._logger.debug(f"Download is {remaining_bytes / GB:.2f} GB of {free_space / GB:.2f} GB free.")
+        if free_space < remaining_bytes:
             raise RuntimeError(
-                f"Free disk space {free_space / GB:.2f} GB is not enough for download of {job.total_bytes / GB:.2f} GB."
+                f"Free disk space {free_space / GB:.2f} GB is not enough for download of {remaining_bytes / GB:.2f} GB."
             )
 
         # Don't clobber an existing file. See commit 82c2c85202f88c6d24ff84710f297cfc6ae174af
         # for code that instead resumes an interrupted download.
-        if job.download_path.exists():
+        if job.download_path.exists() and resume_from == 0:
             raise OSError(f"[Errno 17] File {job.download_path} exists")
 
         # append ".downloading" to the path
-        in_progress_path = self._in_progress_path(job.download_path)
-
         # signal caller that the download is starting. At this point, key fields such as
         # download_path and total_bytes will be populated. We call it here because the might
         # discover that the local file is already complete and generate a COMPLETED status.
@@ -445,6 +503,19 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 parent_job.status = DownloadJobStatus.CANCELLED
                 self._execute_cb(parent_job, "on_cancelled")
 
+    def _signal_job_paused(self, job: DownloadJob) -> None:
+        if job.status not in [DownloadJobStatus.RUNNING, DownloadJobStatus.WAITING]:
+            return
+        job.status = DownloadJobStatus.PAUSED
+        self._execute_cb(job, "on_cancelled")
+        if self._event_bus:
+            self._event_bus.emit_download_paused(job)
+
+        if parent_job := self._download_part2parent.get(job.source, None):
+            if not parent_job.in_terminal_state:
+                parent_job.status = DownloadJobStatus.PAUSED
+                self._execute_cb(parent_job, "on_cancelled")
+
     def _signal_job_error(self, job: DownloadJob, excp: Optional[Exception] = None) -> None:
         job.status = DownloadJobStatus.ERROR
         self._logger.error(f"{str(job.source)}: {traceback.format_exception(excp)}")
@@ -454,6 +525,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
             self._event_bus.emit_download_error(job)
 
     def _cleanup_cancelled_job(self, job: DownloadJob) -> None:
+        if job.paused:
+            return
         self._logger.debug(f"Cleaning up leftover files from cancelled download job {job.download_path}")
         try:
             if job.download_path:
@@ -509,8 +582,12 @@ class DownloadQueueService(DownloadQueueServiceBase):
             assert mf_job is not None
 
             if not mf_job.in_terminal_state:
-                self._logger.warning(f"Download cancelled: {download_job.source}")
-                mf_job.cancel()
+                if download_job.paused:
+                    self._logger.warning(f"Download paused: {download_job.source}")
+                    mf_job.pause()
+                else:
+                    self._logger.warning(f"Download cancelled: {download_job.source}")
+                    mf_job.cancel()
 
             for s in mf_job.download_parts:
                 self.cancel_job(s)

@@ -1,10 +1,14 @@
-import { Flex, IconButton, Progress, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Flex, IconButton, Progress, Text, Tooltip } from '@invoke-ai/ui-library';
 import { isNil } from 'es-toolkit/compat';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { memo, useCallback, useMemo } from 'react';
-import { PiXBold } from 'react-icons/pi';
-import { useCancelModelInstallMutation } from 'services/api/endpoints/models';
+import { PiPauseBold, PiPlayBold, PiXBold } from 'react-icons/pi';
+import {
+  useCancelModelInstallMutation,
+  usePauseModelInstallMutation,
+  useResumeModelInstallMutation,
+} from 'services/api/endpoints/models';
 import type { ModelInstallJob } from 'services/api/types';
 
 import ModelInstallQueueBadge from './ModelInstallQueueBadge';
@@ -29,6 +33,8 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
   const { installJob } = props;
 
   const [deleteImportModel] = useCancelModelInstallMutation();
+  const [pauseModelInstall] = usePauseModelInstallMutation();
+  const [resumeModelInstall] = useResumeModelInstallMutation();
 
   const handleDeleteModelImport = useCallback(() => {
     deleteImportModel(installJob.id)
@@ -50,6 +56,48 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
         }
       });
   }, [deleteImportModel, installJob]);
+
+  const handlePauseModelInstall = useCallback(() => {
+    pauseModelInstall(installJob.id)
+      .unwrap()
+      .then(() => {
+        toast({
+          id: 'MODEL_INSTALL_PAUSED',
+          title: t('modelManager.pause'),
+          status: 'success',
+        });
+      })
+      .catch((error) => {
+        if (error) {
+          toast({
+            id: 'MODEL_INSTALL_PAUSE_FAILED',
+            title: `${error.data.detail} `,
+            status: 'error',
+          });
+        }
+      });
+  }, [installJob, pauseModelInstall]);
+
+  const handleResumeModelInstall = useCallback(() => {
+    resumeModelInstall(installJob.id)
+      .unwrap()
+      .then(() => {
+        toast({
+          id: 'MODEL_INSTALL_RESUMED',
+          title: t('modelManager.resume'),
+          status: 'success',
+        });
+      })
+      .catch((error) => {
+        if (error) {
+          toast({
+            id: 'MODEL_INSTALL_RESUME_FAILED',
+            title: `${error.data.detail} `,
+            status: 'error',
+          });
+        }
+      });
+  }, [installJob, resumeModelInstall]);
 
   const sourceLocation = useMemo(() => {
     switch (installJob.source.type) {
@@ -98,8 +146,16 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     return (installJob.bytes / installJob.total_bytes) * 100;
   }, [installJob.bytes, installJob.status, installJob.total_bytes]);
 
+  const showPause = installJob.status === 'downloading' || installJob.status === 'waiting';
+  const showResume = installJob.status === 'paused';
+  const showCancel =
+    installJob.status === 'downloading' ||
+    installJob.status === 'waiting' ||
+    installJob.status === 'running' ||
+    installJob.status === 'paused';
+
   return (
-    <Flex gap={3} w="full" alignItems="center">
+    <Flex gap={1} w="full" alignItems="center">
       <Tooltip maxW={600} label={<TooltipLabel name={modelName} source={sourceLocation} installJob={installJob} />}>
         <Flex gap={3} w="full" alignItems="center">
           <Text w={96} whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
@@ -116,17 +172,39 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
           <ModelInstallQueueBadge status={installJob.status} />
         </Flex>
       </Tooltip>
-      <IconButton
-        isDisabled={
-          installJob.status !== 'downloading' && installJob.status !== 'waiting' && installJob.status !== 'running'
-        }
-        size="xs"
-        tooltip={t('modelManager.cancel')}
-        aria-label={t('modelManager.cancel')}
-        icon={<PiXBold />}
-        onClick={handleDeleteModelImport}
-        variant="ghost"
-      />
+      <Flex gap={1} alignItems="center" justifyContent="flex-end" minW="64px">
+        {showResume && (
+          <IconButton
+            size="xs"
+            tooltip={t('modelManager.resume')}
+            aria-label={t('modelManager.resume')}
+            icon={<PiPlayBold />}
+            onClick={handleResumeModelInstall}
+            variant="ghost"
+          />
+        )}
+        {showPause && (
+          <IconButton
+            size="xs"
+            tooltip={t('modelManager.pause')}
+            aria-label={t('modelManager.pause')}
+            icon={<PiPauseBold />}
+            onClick={handlePauseModelInstall}
+            variant="ghost"
+          />
+        )}
+        {showCancel && (
+          <IconButton
+            size="xs"
+            tooltip={t('modelManager.cancel')}
+            aria-label={t('modelManager.cancel')}
+            icon={<PiXBold />}
+            onClick={handleDeleteModelImport}
+            variant="ghost"
+          />
+        )}
+        {!showResume && !showPause && !showCancel && <Box w="24px" />}
+      </Flex>
     </Flex>
   );
 });

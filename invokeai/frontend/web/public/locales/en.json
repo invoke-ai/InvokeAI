@@ -26,6 +26,8 @@
         "selectedForAutoAdd": "Selected for Auto-Add",
         "bottomMessage": "Deleting images will reset any features currently using them.",
         "cancel": "Cancel",
+        "pause": "Pause",
+        "resume": "Resume",
         "changeBoard": "Change Board",
         "clearSearch": "Clear Search",
         "deleteBoard": "Delete Board",
