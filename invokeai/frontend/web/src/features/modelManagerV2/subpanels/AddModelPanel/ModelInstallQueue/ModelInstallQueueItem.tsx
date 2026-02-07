@@ -222,96 +222,98 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     installJob.status === 'paused';
 
   return (
-    <Flex gap={1} w="full" alignItems="center">
-      <Tooltip maxW={600} label={<TooltipLabel name={modelName} source={sourceLocation} installJob={installJob} />}>
-        <Flex gap={3} w="full" alignItems="center">
-          <Text w={96} whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
-            {modelName}
-          </Text>
-          <Progress
-            w="full"
-            flexGrow={1}
-            value={progressValue ?? 0}
-            isIndeterminate={progressValue === null}
-            aria-label={t('accessibility.invokeProgressBar')}
-            h={2}
-          />
-          <ModelInstallQueueBadge status={installJob.status} />
+    <>
+      <Flex gap={1} w="full" alignItems="center">
+        <Tooltip maxW={600} label={<TooltipLabel name={modelName} source={sourceLocation} installJob={installJob} />}>
+          <Flex gap={3} w="full" alignItems="center">
+            <Text w={96} whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
+              {modelName}
+            </Text>
+            <Progress
+              w="full"
+              flexGrow={1}
+              value={progressValue ?? 0}
+              isIndeterminate={progressValue === null}
+              aria-label={t('accessibility.invokeProgressBar')}
+              h={2}
+            />
+            <ModelInstallQueueBadge status={installJob.status} />
+          </Flex>
+        </Tooltip>
+        <Flex gap={1} alignItems="center" justifyContent="flex-end" minW="90px">
+          {showResume && (
+            <IconButton
+              size="xs"
+              tooltip={t('modelManager.resume')}
+              aria-label={t('modelManager.resume')}
+              icon={<PiPlayBold />}
+              onClick={handleResumeModelInstall}
+              variant="ghost"
+            />
+          )}
+          {showPause && (
+            <IconButton
+              size="xs"
+              tooltip={t('modelManager.pause')}
+              aria-label={t('modelManager.pause')}
+              icon={<PiPauseBold />}
+              onClick={handlePauseModelInstall}
+              variant="ghost"
+            />
+          )}
+          {hasRestartRequired && (
+            <IconButton
+              size="xs"
+              tooltip={t('modelManager.restartFailed')}
+              aria-label={t('modelManager.restartFailed')}
+              icon={<PiArrowClockwiseBold />}
+              onClick={handleRestartFailed}
+              variant="ghost"
+            />
+          )}
+          {showCancel && (
+            <IconButton
+              size="xs"
+              tooltip={t('modelManager.cancel')}
+              aria-label={t('modelManager.cancel')}
+              icon={<PiXBold />}
+              onClick={handleDeleteModelImport}
+              variant="ghost"
+            />
+          )}
+          {!showResume && !showPause && !showCancel && <Box w="24px" />}
         </Flex>
-      </Tooltip>
-      <Flex gap={1} alignItems="center" justifyContent="flex-end" minW="90px">
-        {showResume && (
-          <IconButton
-            size="xs"
-            tooltip={t('modelManager.resume')}
-            aria-label={t('modelManager.resume')}
-            icon={<PiPlayBold />}
-            onClick={handleResumeModelInstall}
-            variant="ghost"
-          />
-        )}
-        {showPause && (
-          <IconButton
-            size="xs"
-            tooltip={t('modelManager.pause')}
-            aria-label={t('modelManager.pause')}
-            icon={<PiPauseBold />}
-            onClick={handlePauseModelInstall}
-            variant="ghost"
-          />
-        )}
-        {hasRestartRequired && (
-          <IconButton
-            size="xs"
-            tooltip={t('modelManager.restartFailed')}
-            aria-label={t('modelManager.restartFailed')}
-            icon={<PiArrowClockwiseBold />}
-            onClick={handleRestartFailed}
-            variant="ghost"
-          />
-        )}
-        {showCancel && (
-          <IconButton
-            size="xs"
-            tooltip={t('modelManager.cancel')}
-            aria-label={t('modelManager.cancel')}
-            icon={<PiXBold />}
-            onClick={handleDeleteModelImport}
-            variant="ghost"
-          />
-        )}
-        {!showResume && !showPause && !showCancel && <Box w="24px" />}
       </Flex>
-    </Flex>
-    {hasRestartRequired && (
-      <Flex direction="column" gap={1} w="full" mt={1}>
-        {restartRequiredParts.map((part) => {
-          const fileName = part.source.split('/').slice(-1)[0] ?? t('common.unknown');
-          const isResumeRequired = part.resume_required;
-          return (
-            <Flex key={part.source} gap={2} alignItems="center" wrap="wrap">
-              <Text fontSize="xs" color="base.200" maxW="200px" noOfLines={1}>
-                {fileName}
-              </Text>
-              <Badge colorScheme={isResumeRequired ? 'orange' : 'red'} fontSize="10px">
-                {isResumeRequired ? t('modelManager.restartRequired') : t('queue.failed')}
-              </Badge>
-              <Text fontSize="xs" color="warning.400">
-                {isResumeRequired ? t('modelManager.resumeRefused') : t('queue.failed')}
-              </Text>
-              <IconButton
-                size="xs"
-                tooltip={t('modelManager.restartFile')}
-                aria-label={t('modelManager.restartFile')}
-                icon={<PiArrowClockwiseBold />}
-                onClick={() => handleRestartFile(part.source)}
-                variant="ghost"
-              />
-            </Flex>
-          );
-        })}
-      </Flex>
-    )}
+      {hasRestartRequired && (
+        <Flex direction="column" gap={1} w="full" mt={1}>
+          {restartRequiredParts.map((part) => {
+            const fileName = part.source.split('/').slice(-1)[0] ?? t('common.unknown');
+            const isResumeRequired = part.resume_required;
+            return (
+              <Flex key={part.source} gap={2} alignItems="center" wrap="wrap">
+                <Text fontSize="xs" color="base.200" maxW="200px" noOfLines={1}>
+                  {fileName}
+                </Text>
+                <Badge colorScheme={isResumeRequired ? 'orange' : 'red'} fontSize="10px">
+                  {isResumeRequired ? t('modelManager.restartRequired') : t('queue.failed')}
+                </Badge>
+                <Text fontSize="xs" color="warning.400">
+                  {isResumeRequired ? t('modelManager.resumeRefused') : t('queue.failed')}
+                </Text>
+                <IconButton
+                  size="xs"
+                  tooltip={t('modelManager.restartFile')}
+                  aria-label={t('modelManager.restartFile')}
+                  icon={<PiArrowClockwiseBold />}
+                  onClick={() => handleRestartFile(part.source)}
+                  variant="ghost"
+                />
+              </Flex>
+            );
+          })}
+        </Flex>
+      )}
+    </>
   );
 });
 
