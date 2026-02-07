@@ -26,6 +26,7 @@ const getInitialState = (): SystemState => ({
   logNamespaces: [...zLogNamespace.options],
   shouldShowInvocationProgressDetail: false,
   shouldHighlightFocusedRegions: false,
+  prefersNumericAttentionWeights: false,
 });
 
 const slice = createSlice({
@@ -69,6 +70,9 @@ const slice = createSlice({
     shouldConfirmOnNewSessionToggled(state) {
       state.shouldConfirmOnNewSession = !state.shouldConfirmOnNewSession;
     },
+    setPrefersNumericAttentionStyle(state, action: PayloadAction<boolean>) {
+      state.prefersNumericAttentionWeights = action.payload;
+    },
     setShouldShowInvocationProgressDetail(state, action: PayloadAction<boolean>) {
       state.shouldShowInvocationProgressDetail = action.payload;
     },
@@ -91,6 +95,7 @@ export const {
   setShouldEnableModelDescriptions,
   shouldConfirmOnNewSessionToggled,
   setShouldShowInvocationProgressDetail,
+  setPrefersNumericAttentionStyle,
   setShouldHighlightFocusedRegions,
 } = slice.actions;
 
@@ -135,6 +140,9 @@ export const selectSystemShouldEnableModelDescriptions = createSystemSelector(
 );
 export const selectSystemShouldEnableHighlightFocusedRegions = createSystemSelector(
   (system) => system.shouldHighlightFocusedRegions
+);
+export const selectSystemPrefersNumericAttentionWeights = createSystemSelector(
+  (system) => system.prefersNumericAttentionWeights
 );
 export const selectSystemShouldConfirmOnNewSession = createSystemSelector((system) => system.shouldConfirmOnNewSession);
 export const selectSystemShouldShowInvocationProgressDetail = createSystemSelector(
