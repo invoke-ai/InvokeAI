@@ -1494,6 +1494,8 @@
         "general": "General",
         "generation": "Generation",
         "models": "Models",
+        "preferAttentionStyleNumeric": "Prefer Numeric Attention Style",
+        "prompt": "Prompt",
         "resetComplete": "Web UI has been reset.",
         "resetWebUI": "Reset Web UI",
         "resetWebUIDesc1": "Resetting the web UI only resets the browser's local cache of your images and remembered settings. It does not delete any images from disk.",

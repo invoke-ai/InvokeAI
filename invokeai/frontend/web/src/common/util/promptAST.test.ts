@@ -78,6 +78,26 @@ describe('promptAST', () => {
         { type: 'rembed', start: 15, end: 16 },
       ]);
     });
+
+    it('should tokenize prompt function syntax', () => {
+      const tokens = tokenize("('a', 'b').and()");
+      expect(tokens).toEqual([
+        { type: 'lparen', start: 0, end: 1 },
+        { type: 'punct', value: "'", start: 1, end: 2 },
+        { type: 'word', value: 'a', start: 2, end: 3 },
+        { type: 'punct', value: "'", start: 3, end: 4 },
+        { type: 'punct', value: ',', start: 4, end: 5 },
+        { type: 'whitespace', value: ' ', start: 5, end: 6 },
+        { type: 'punct', value: "'", start: 6, end: 7 },
+        { type: 'word', value: 'b', start: 7, end: 8 },
+        { type: 'punct', value: "'", start: 8, end: 9 },
+        { type: 'rparen', start: 9, end: 10 },
+        { type: 'punct', value: '.', start: 10, end: 11 },
+        { type: 'word', value: 'and', start: 11, end: 14 },
+        { type: 'lparen', start: 14, end: 15 },
+        { type: 'rparen', start: 15, end: 16 },
+      ]);
+    });
   });
 
   describe('parseTokens', () => {
@@ -167,6 +187,158 @@ describe('promptAST', () => {
       const ast = parseTokens(tokens);
       expect(ast).toEqual([{ type: 'embedding', value: 'embedding_name', range: { start: 0, end: 16 } }]);
     });
+
+    describe('prompt functions', () => {
+      it('should parse .and() prompt function with single-quoted args', () => {
+        const tokens = tokenize("('one two', 'three four').and()");
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.name).toBe('and');
+        expect(pf.functionParams).toBe('');
+        expect(pf.promptArgs).toHaveLength(2);
+
+        // First arg: 'one two'
+        expect(pf.promptArgs[0]!.quote).toBe("'");
+        expect(pf.promptArgs[0]!.nodes).toHaveLength(3); // word, ws, word
+        expect(pf.promptArgs[0]!.nodes[0]).toMatchObject({ type: 'word', text: 'one' });
+        expect(pf.promptArgs[0]!.nodes[2]).toMatchObject({ type: 'word', text: 'two' });
+
+        // Second arg: 'three four'
+        expect(pf.promptArgs[1]!.quote).toBe("'");
+        expect(pf.promptArgs[1]!.nodes).toHaveLength(3);
+        expect(pf.promptArgs[1]!.nodes[0]).toMatchObject({ type: 'word', text: 'three' });
+        expect(pf.promptArgs[1]!.nodes[2]).toMatchObject({ type: 'word', text: 'four' });
+      });
+
+      it('should parse .or() prompt function', () => {
+        const tokens = tokenize("('one', 'two three. four.').or()");
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.name).toBe('or');
+        expect(pf.promptArgs).toHaveLength(2);
+
+        // First arg: 'one'
+        expect(pf.promptArgs[0]!.nodes).toHaveLength(1);
+        expect(pf.promptArgs[0]!.nodes[0]).toMatchObject({ type: 'word', text: 'one' });
+
+        // Second arg: 'two three. four.'
+        expect(pf.promptArgs[1]!.nodes.length).toBeGreaterThanOrEqual(5);
+      });
+
+      it('should parse .blend() prompt function with params', () => {
+        const tokens = tokenize("('one', 'two').blend(0.7, 0.3)");
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.name).toBe('blend');
+        expect(pf.functionParams).toBe('0.7, 0.3');
+        expect(pf.promptArgs).toHaveLength(2);
+      });
+
+      it('should parse prompt function with double-quoted args', () => {
+        const tokens = tokenize('("one", "two").and()');
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.name).toBe('and');
+        expect(pf.promptArgs[0]!.quote).toBe('"');
+      });
+
+      it('should parse prompt function with attention inside args', () => {
+        const tokens = tokenize("('hello+', '(world)-').and()");
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+
+        // First arg: hello+
+        const arg0Word = pf.promptArgs[0]!.nodes[0]!;
+        expect(arg0Word).toMatchObject({ type: 'word', text: 'hello', attention: '+' });
+
+        // Second arg: (world)-
+        const arg1Group = pf.promptArgs[1]!.nodes[0]!;
+        expect(arg1Group.type).toBe('group');
+        if (arg1Group.type === 'group') {
+          expect(arg1Group.attention).toBe('-');
+        }
+      });
+
+      it('should preserve content range for each arg', () => {
+        const tokens = tokenize("('one two', 'three four').and()");
+        const ast = parseTokens(tokens);
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+
+        // 'one two' content is between quotes at positions 1 and 9
+        expect(pf.promptArgs[0]!.contentRange.start).toBe(2);
+        expect(pf.promptArgs[0]!.contentRange.end).toBe(9);
+
+        // 'three four' content is between quotes at positions 12 and 23
+        expect(pf.promptArgs[1]!.contentRange.start).toBe(13);
+        expect(pf.promptArgs[1]!.contentRange.end).toBe(23);
+      });
+
+      it('should parse prompt function embedded in larger prompt', () => {
+        const tokens = tokenize("some text, ('a', 'b').and(), more text");
+        const ast = parseTokens(tokens);
+
+        // Should have: word, ws, word, punct, ws, prompt_function, punct, ws, word, ws, word
+        const pfNodes = ast.filter((n) => n.type === 'prompt_function');
+        expect(pfNodes).toHaveLength(1);
+        expect(pfNodes[0]!.type).toBe('prompt_function');
+      });
+
+      it('should fall back to regular group when no method call follows', () => {
+        const tokens = tokenize("('a', 'b')");
+        const ast = parseTokens(tokens);
+
+        // Without .method(), this should be parsed as a regular group
+        expect(ast[0]!.type).toBe('group');
+      });
+
+      it('should parse three-arg prompt function', () => {
+        const tokens = tokenize("('a', 'b', 'c').blend(0.5, 0.3, 0.2)");
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.promptArgs).toHaveLength(3);
+        expect(pf.functionParams).toBe('0.5, 0.3, 0.2');
+      });
+    });
   });
 
   describe('serialize', () => {
@@ -217,6 +389,92 @@ describe('promptAST', () => {
       const ast = parseTokens(tokens);
       const result = serialize(ast);
       expect(result).toBe('<embedding_name>');
+    });
+
+    describe('prompt functions', () => {
+      it('should serialize .and() prompt function', () => {
+        const tokens = tokenize("('one two', 'three four').and()");
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe("('one two', 'three four').and()");
+      });
+
+      it('should serialize .or() prompt function', () => {
+        const tokens = tokenize("('one', 'two three. four.').or()");
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe("('one', 'two three. four.').or()");
+      });
+
+      it('should serialize .blend() with params', () => {
+        const tokens = tokenize("('one', 'two').blend(0.7, 0.3)");
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe("('one', 'two').blend(0.7, 0.3)");
+      });
+
+      it('should serialize prompt function with attention inside args', () => {
+        const tokens = tokenize("('hello+', '(world)-').and()");
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe("('hello+', '(world)-').and()");
+      });
+
+      it('should serialize prompt function embedded in larger prompt', () => {
+        const prompt = "some text, ('a', 'b').and(), more text";
+        const tokens = tokenize(prompt);
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe(prompt);
+      });
+
+      it('should serialize three-arg blend', () => {
+        const tokens = tokenize("('a', 'b', 'c').blend(0.5, 0.3, 0.2)");
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe("('a', 'b', 'c').blend(0.5, 0.3, 0.2)");
+      });
+
+      it('should serialize double-quoted prompt function', () => {
+        const tokens = tokenize('("one", "two").and()');
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe('("one", "two").and()');
+      });
+    });
+  });
+
+  describe('round-trip (tokenize → parse → serialize)', () => {
+    const roundTrip = (prompt: string) => {
+      const tokens = tokenize(prompt);
+      const ast = parseTokens(tokens);
+      return serialize(ast);
+    };
+
+    it.each([
+      'a cat',
+      '(a cat)',
+      '(a cat)1.2',
+      'cat+',
+      'cat++',
+      'cat-',
+      '(hello world)+',
+      '(hello world)++',
+      '(hello world)-',
+      '\\(medium\\)',
+      'colored pencil \\(medium\\) (enhanced)',
+      '<embedding_name>',
+      'portrait \\(realistic\\) (high quality)1.2',
+      '(masterpiece)1.3, best quality, (high detail)1.2',
+      "('one two', 'three four').and()",
+      "('one', 'two three. four.').or()",
+      "('one', 'two').blend(0.7, 0.3)",
+      "('hello+', '(world)-').and()",
+      "some text, ('a', 'b').and(), more text",
+      "('a', 'b', 'c').blend(0.5, 0.3, 0.2)",
+      '("one", "two").and()',
+    ])('should round-trip: %s', (prompt) => {
+      expect(roundTrip(prompt)).toBe(prompt);
     });
   });
 
