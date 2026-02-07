@@ -807,7 +807,9 @@
         "actions": "Azioni in blocco",
         "zImageVae": "VAE (opzionale)",
         "missingFiles": "File mancanti",
-        "missingFilesTooltip": "I file del modello sono mancanti dal disco"
+        "missingFilesTooltip": "I file del modello sono mancanti dal disco",
+        "cpuOnly": "Solo CPU",
+        "runOnCpu": "Esegui il modello di codifica del testo solo sulla CPU"
     },
     "parameters": {
         "images": "Immagini",
@@ -1966,6 +1968,12 @@
                 "1.0: Buon punto di partenza per risoluzioni ~2K-3K.",
                 "0.5: Programma più delicato per risoluzioni appena superiori a quelle native (1024px)."
             ]
+        },
+        "cpuOnly": {
+            "paragraphs": [
+                "Se abilitato, solo il componente codificatore del testo verrà eseguito sulla CPU anziché sulla GPU.",
+                "Ciò consente di risparmiare VRAM per il denoiser, con un impatto minimo sulle prestazioni. Le uscite di condizionamento vengono automaticamente trasferite alla GPU per il denoiser."
+            ]
         }
     },
     "sdxl": {
@@ -2317,7 +2325,8 @@
             "bbox": "Riquadro di delimitazione",
             "move": "Sposta",
             "brush": "Pennello",
-            "eraser": "Cancellino"
+            "eraser": "Cancellino",
+            "gradient": "Gradiente"
         },
         "filter": {
             "apply": "Applica",
