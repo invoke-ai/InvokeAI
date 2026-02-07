@@ -195,3 +195,8 @@ installer/InvokeAI-Installer/
 
 # Weblate configuration file
 weblate.ini
+
+models/
+databases/
+configs/
+outputs/

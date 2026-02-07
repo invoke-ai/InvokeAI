@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
 import torch
 import yaml
-from huggingface_hub import HfFolder
+from huggingface_hub import get_token as hf_get_token
 from pydantic.networks import AnyHttpUrl
 from pydantic_core import Url
 from requests import Session
@@ -750,7 +750,7 @@ class ModelInstallService(ModelInstallServiceBase):
     ) -> ModelInstallJob:
         # Add user's cached access token to HuggingFace requests
         if source.access_token is None:
-            source.access_token = HfFolder.get_token()
+            source.access_token = hf_get_token()
         remote_files, metadata = self._remote_files_from_source(source)
         return self._import_remote_model(
             source=source,

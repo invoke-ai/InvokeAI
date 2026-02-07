@@ -1043,10 +1043,14 @@ class HFTokenHelper:
     @classmethod
     def get_status(cls) -> HFTokenStatus:
         try:
-            if huggingface_hub.get_token_permission(huggingface_hub.get_token()):
+            token = huggingface_hub.get_token()
+            if token is None:
+                # No token set
+                return HFTokenStatus.INVALID
+            if huggingface_hub.get_token_permission(token):
                 # Valid token!
                 return HFTokenStatus.VALID
-            # No token set
+            # Token exists but has no permissions (shouldn't normally happen)
             return HFTokenStatus.INVALID
         except Exception:
             return HFTokenStatus.UNKNOWN
