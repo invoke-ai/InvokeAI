@@ -22,6 +22,17 @@ type Token =
   | { type: 'rembed'; start: number; end: number }
   | { type: 'escaped_paren'; value: '(' | ')'; start: number; end: number };
 
+/**
+ * A single argument in a prompt function like .and(), .or(), or .blend().
+ * Contains the parsed AST nodes of the argument content and metadata about quoting/range.
+ */
+export type PromptFunctionArg = {
+  nodes: ASTNode[];
+  quote: string;
+  /** Range of the content between the quotes (exclusive of quotes themselves) in original prompt coordinates. */
+  contentRange: { start: number; end: number };
+};
+
 export type ASTNode =
   | { type: 'word'; text: Word; attention?: Attention; range: { start: number; end: number }; isSelection?: boolean }
   | {
@@ -34,17 +45,25 @@ export type ASTNode =
   | { type: 'embedding'; value: Embedding; range: { start: number; end: number }; isSelection?: boolean }
   | { type: 'whitespace'; value: Whitespace; range: { start: number; end: number }; isSelection?: boolean }
   | { type: 'punct'; value: Punct; range: { start: number; end: number }; isSelection?: boolean }
-  | { type: 'escaped_paren'; value: '(' | ')'; range: { start: number; end: number }; isSelection?: boolean };
+  | { type: 'escaped_paren'; value: '(' | ')'; range: { start: number; end: number }; isSelection?: boolean }
+  | {
+      type: 'prompt_function';
+      name: string;
+      promptArgs: PromptFunctionArg[];
+      functionParams: string;
+      range: { start: number; end: number };
+      isSelection?: boolean;
+    };
 
 const WEIGHT_PATTERN = /^[+-]?(\d+(\.\d+)?|[+-]+)/;
 const WHITESPACE_PATTERN = /^\s+/;
-const PUNCTUATION_PATTERN = /^[.,/!?;:'"“”‘’`~@#$%^&*=_|]/;
+const PUNCTUATION_PATTERN = /^[.,/!?;:'"""''`~@#$%^&*=_|]/;
 const OTHER_PATTERN = /\s/;
 
 /**
- * Convert a prompt string into an AST.
+ * Convert a prompt string into a token stream.
  * @param prompt string
- * @returns ASTNode[]
+ * @returns Token[]
  */
 export function tokenize(prompt: string): Token[] {
   if (!prompt) {
@@ -52,7 +71,7 @@ export function tokenize(prompt: string): Token[] {
   }
 
   const len = prompt.length;
-  let tokens: Token[] = [];
+  const tokens: Token[] = [];
   let i = 0;
 
   while (i < len) {
@@ -233,8 +252,186 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
     return tokens[pos];
   }
 
+  function peekAt(offset: number): Token | undefined {
+    return tokens[pos + offset];
+  }
+
   function consume(): Token | undefined {
     return tokens[pos++];
+  }
+
+  /**
+   * Quick lookahead check: does the current lparen (already consumed) start a prompt function?
+   * A prompt function looks like ('...', '...').method(...)
+   * We check if the first non-whitespace token after lparen is a quote character.
+   */
+  function isPromptFunctionAhead(): boolean {
+    let p = 0;
+    while (peekAt(p)?.type === 'whitespace') {
+      p++;
+    }
+    const t = peekAt(p);
+    return t?.type === 'punct' && (t.value === "'" || t.value === '"');
+  }
+
+  /**
+   * Try to parse a prompt function starting after the opening lparen.
+   * Returns the PromptFunctionNode if successful, or null if the pattern doesn't match
+   * (in which case `pos` is restored to `savedPos`).
+   */
+  function tryParsePromptFunction(lparenToken: Token & { type: 'lparen' }, savedPos: number): ASTNode | null {
+    const args: PromptFunctionArg[] = [];
+    let quoteChar: string | null = null;
+
+    while (pos < tokens.length) {
+      // Skip whitespace before arg or closing paren
+      while (peek()?.type === 'whitespace') {
+        consume();
+      }
+
+      // Check for rparen (end of prompt function args)
+      if (peek()?.type === 'rparen') {
+        break;
+      }
+
+      // Expect comma separator between args
+      if (args.length > 0) {
+        if (peek()?.type === 'punct' && (peek() as Token & { type: 'punct' }).value === ',') {
+          consume();
+          while (peek()?.type === 'whitespace') {
+            consume();
+          }
+        } else {
+          pos = savedPos;
+          return null;
+        }
+      }
+
+      // Expect opening quote
+      const openQuoteTok = peek();
+      if (
+        !openQuoteTok ||
+        openQuoteTok.type !== 'punct' ||
+        ((openQuoteTok as Token & { type: 'punct' }).value !== "'" &&
+          (openQuoteTok as Token & { type: 'punct' }).value !== '"')
+      ) {
+        pos = savedPos;
+        return null;
+      }
+
+      const thisQuote = (openQuoteTok as Token & { type: 'punct' }).value;
+      if (quoteChar === null) {
+        quoteChar = thisQuote;
+      } else if (thisQuote !== quoteChar) {
+        // Mismatched quote style between args
+        pos = savedPos;
+        return null;
+      }
+
+      consume(); // consume opening quote
+      const contentStart = openQuoteTok.end;
+
+      // Collect tokens until closing quote
+      const argTokens: Token[] = [];
+      let contentEnd = contentStart;
+      while (pos < tokens.length) {
+        const t = peek();
+        if (t?.type === 'punct' && (t as Token & { type: 'punct' }).value === quoteChar) {
+          contentEnd = t.start;
+          break;
+        }
+        const consumed = consume()!;
+        argTokens.push(consumed);
+        contentEnd = consumed.end;
+      }
+
+      // Expect closing quote
+      const closeQuoteTok = peek();
+      if (
+        !closeQuoteTok ||
+        closeQuoteTok.type !== 'punct' ||
+        (closeQuoteTok as Token & { type: 'punct' }).value !== quoteChar
+      ) {
+        pos = savedPos;
+        return null;
+      }
+      consume(); // consume closing quote
+
+      // Parse sub-tokens as AST
+      const argNodes = parseTokens(argTokens);
+
+      args.push({
+        nodes: argNodes,
+        quote: quoteChar,
+        contentRange: { start: contentStart, end: contentEnd },
+      });
+    }
+
+    if (args.length === 0) {
+      pos = savedPos;
+      return null;
+    }
+
+    // Expect rparen
+    if (peek()?.type !== 'rparen') {
+      pos = savedPos;
+      return null;
+    }
+    consume(); // consume rparen
+
+    // Expect .methodName(params)
+    if (peek()?.type !== 'punct' || (peek() as Token & { type: 'punct' }).value !== '.') {
+      pos = savedPos;
+      return null;
+    }
+    consume(); // consume dot
+
+    if (peek()?.type !== 'word') {
+      pos = savedPos;
+      return null;
+    }
+    const methodName = (consume() as Token & { type: 'word' }).value;
+
+    // Expect opening paren for method call
+    if (peek()?.type !== 'lparen') {
+      pos = savedPos;
+      return null;
+    }
+    consume(); // consume method open paren
+
+    // Collect method params until closing rparen
+    let functionParams = '';
+    while (pos < tokens.length) {
+      const t = peek()!;
+      if (t.type === 'rparen') {
+        break;
+      }
+      const tok = consume()!;
+      if (tok.type === 'word') {
+        functionParams += (tok as Token & { type: 'word' }).value;
+      } else if (tok.type === 'punct') {
+        functionParams += (tok as Token & { type: 'punct' }).value;
+      } else if (tok.type === 'whitespace') {
+        functionParams += (tok as Token & { type: 'whitespace' }).value;
+      } else if (tok.type === 'weight') {
+        functionParams += String((tok as Token & { type: 'weight' }).value);
+      }
+    }
+
+    // Expect closing rparen for method call
+    if (peek()?.type !== 'rparen') {
+      pos = savedPos;
+      return null;
+    }
+    const methodCloseParen = consume()!; // consume method close paren
+
+    return {
+      type: 'prompt_function',
+      name: methodName,
+      promptArgs: args,
+      functionParams,
+      range: { start: lparenToken.start, end: methodCloseParen.end },
+    };
   }
 
   function parseGroup(): ASTNode[] {
@@ -254,6 +451,19 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
         }
         case 'lparen': {
           const lparen = consume() as Token & { type: 'lparen' };
+
+          // Try to parse as a prompt function first
+          if (isPromptFunctionAhead()) {
+            const savedPos = pos;
+            const pfResult = tryParsePromptFunction(lparen, savedPos);
+            if (pfResult) {
+              nodes.push(pfResult);
+              break;
+            }
+            // pos was restored by tryParsePromptFunction on failure
+          }
+
+          // Regular group parsing
           const groupChildren = parseGroup();
 
           let attention: Attention | undefined;
@@ -285,7 +495,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
             const embedToken = consume()!;
             embedValue +=
               embedToken.type === 'word' || embedToken.type === 'punct' || embedToken.type === 'whitespace'
-                ? embedToken.value
+                ? (embedToken as Token & { type: 'word' | 'punct' | 'whitespace' }).value
                 : '';
             end = embedToken.end;
           }
@@ -378,6 +588,24 @@ export function serialize(ast: ASTNode[]): string {
       }
       case 'embedding': {
         prompt += `<${node.value}>`;
+        break;
+      }
+      case 'prompt_function': {
+        prompt += '(';
+        for (let i = 0; i < node.promptArgs.length; i++) {
+          if (i > 0) {
+            prompt += ', ';
+          }
+          const arg = node.promptArgs[i]!;
+          prompt += arg.quote;
+          prompt += serialize(arg.nodes);
+          prompt += arg.quote;
+        }
+        prompt += ').';
+        prompt += node.name;
+        prompt += '(';
+        prompt += node.functionParams;
+        prompt += ')';
         break;
       }
     }
