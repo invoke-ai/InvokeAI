@@ -6,6 +6,7 @@ The CythonSolver ships wheels for CPython 3.10–3.13 on macOS x86_64 (10.9+), m
 The PythonSolver is not considered a viable fallback because it is ~20x slower.
 """
 
+import cv2
 import numpy as np
 from PIL import Image
 
@@ -33,8 +34,8 @@ class PatchMatch:
         try:
             from patchmatch_cython import CythonSolver, inpaint_pyramid
 
-            def _inpaint(image, mask):
-                return inpaint_pyramid(image, mask, solver_class=CythonSolver, patch_size=cls._PATCH_SIZE, seed=0)
+            def _inpaint(bgr_image, mask):
+                return inpaint_pyramid(bgr_image, mask, solver_class=CythonSolver, patch_size=cls._PATCH_SIZE, seed=0)
 
             cls._inpaint_fn = _inpaint
             logger.info("PatchMatch loaded")
@@ -58,9 +59,10 @@ class PatchMatch:
             logger.warning("PatchMatch requires an RGBA image; received %s channels", np_image.shape[2])
             return image
 
-        mask = 255 - np_image[:, :, 3]
-        infilled = cls._inpaint_fn(np_image[:, :, :3], mask)
-        return Image.fromarray(infilled, mode="RGB")
+        bgr_image = cv2.cvtColor(np_image, cv2.COLOR_RGBA2BGR)
+        mask = np_image[:, :, 3] < 128
+        infilled = cls._inpaint_fn(bgr_image, mask)
+        return Image.fromarray(cv2.cvtColor(infilled, cv2.COLOR_BGR2RGB))
 
 
 def infill_patchmatch(image: Image.Image) -> Image.Image:
