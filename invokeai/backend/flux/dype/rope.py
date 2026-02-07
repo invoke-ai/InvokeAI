@@ -8,6 +8,7 @@ from invokeai.backend.flux.dype.base import (
     FLUX_BASE_PE_LEN,
     DyPEConfig,
     compute_ntk_freqs,
+    compute_timestep_mscale,
     compute_vision_yarn_freqs,
     compute_yarn_freqs,
 )
@@ -78,6 +79,8 @@ def rope_dype(
     method = dype_config.method
 
     if method == "vision_yarn":
+        # Compute timestep-dependent mscale (matches ComfyUI-DyPE's _get_mscale)
+        mscale = compute_timestep_mscale(ntk_scale, current_sigma, dype_config)
         cos, sin = compute_vision_yarn_freqs(
             pos=pos,
             dim=dim,
@@ -87,6 +90,7 @@ def rope_dype(
             current_sigma=current_sigma,
             dype_config=dype_config,
             ori_max_pe_len=ori_max_pe_len,
+            mscale_override=mscale,
         )
     elif method == "yarn":
         cos, sin = compute_yarn_freqs(

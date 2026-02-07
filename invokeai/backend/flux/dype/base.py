@@ -222,12 +222,22 @@ def compute_vision_yarn_freqs(
     current_sigma: float,
     dype_config: DyPEConfig,
     ori_max_pe_len: int = FLUX_BASE_PE_LEN,
+    mscale_override: float | None = None,
 ) -> tuple[Tensor, Tensor]:
     """Compute RoPE frequencies using DyPE-modulated YaRN 3-band blending.
 
-    Uses three frequency bands (base, linear, NTK) blended via beta/gamma masks.
-    DyPE modulates the correction ranges so early denoising steps use stronger
-    extrapolation (global structure) and late steps use weaker (fine details).
+    Implements the Vision YaRN method from ComfyUI-DyPE: three frequency bands
+    (base, linear, NTK) are blended using beta and gamma correction masks.
+    DyPE modulates the correction parameters via k_t = scale * (sigma ^ exponent).
+
+    The three bands:
+    - freqs_base: Original RoPE frequencies (unchanged)
+    - freqs_linear: Position Interpolation (freqs_base / linear_scale)
+    - freqs_ntk: NTK-scaled (theta * ntk_alpha for new base)
+
+    Blending order:
+    1. Beta mask blends linear <-> NTK (low freqs -> NTK, high freqs -> linear)
+    2. Gamma mask blends result <-> base (low freqs -> base, high freqs -> keep blend)
 
     Args:
         pos: Position tensor
@@ -237,13 +247,13 @@ def compute_vision_yarn_freqs(
         ntk_scale: Global NTK scaling factor (max of height/width ratios)
         current_sigma: Current noise level (1.0 = full noise, 0.0 = clean)
         dype_config: DyPE configuration
-        ori_max_pe_len: Original maximum position embedding length for YaRN correction
+        ori_max_pe_len: Original maximum position embedding length
+        mscale_override: Optional timestep-dependent mscale (from compute_timestep_mscale)
 
     Returns:
         Tuple of (cos, sin) frequency tensors
     """
     assert dim % 2 == 0
-    n_freqs = dim // 2
 
     device = pos.device
     dtype = torch.float64 if device.type != "mps" else torch.float32
@@ -258,61 +268,69 @@ def compute_vision_yarn_freqs(
         angles = torch.einsum("...n,d->...nd", pos.to(dtype), freqs)
         return torch.cos(angles).to(pos.dtype), torch.sin(angles).to(pos.dtype)
 
-    # === Step 1: Compute DyPE modulation factor k_t ===
-    k_t = compute_dype_k_t(
-        current_sigma=current_sigma,
-        dype_scale=dype_config.dype_scale,
-        dype_exponent=dype_config.dype_exponent,
-        dype_start_sigma=dype_config.dype_start_sigma,
-    )
+    half_dim = dim // 2
 
-    # === Step 2: DyPE-modulate YaRN correction parameters ===
-    beta_0: float = YARN_BETA_0
-    beta_1: float = YARN_BETA_1
-    gamma_0: float = YARN_GAMMA_0
-    gamma_1: float = YARN_GAMMA_1
+    # === Step 1: YaRN correction parameters, modulated by DyPE k_t ===
+    beta_0: float = YARN_BETA_0  # 1.25
+    beta_1: float = YARN_BETA_1  # 0.75
+    gamma_0: float = YARN_GAMMA_0  # 16.0
+    gamma_1: float = YARN_GAMMA_1  # 2.0
 
     if dype_config.enable_dype:
+        k_t = compute_dype_k_t(
+            current_sigma=current_sigma,
+            dype_scale=dype_config.dype_scale,
+            dype_exponent=dype_config.dype_exponent,
+            dype_start_sigma=dype_config.dype_start_sigma,
+        )
         beta_0 = beta_0**k_t
         beta_1 = beta_1**k_t
         gamma_0 = gamma_0**k_t
         gamma_1 = gamma_1**k_t
 
-    # === Step 3: Compute three frequency bands ===
+    # === Step 2: Three frequency bands ===
     freq_seq = torch.arange(0, dim, 2, dtype=dtype, device=device) / dim
 
-    # Band 1: Base frequencies (original, unscaled)
+    # Band 1: Base frequencies (original RoPE)
     freqs_base = 1.0 / (theta**freq_seq)
 
-    # Band 2: Linearly scaled frequencies (per-axis)
+    # Band 2: Linear interpolation (Position Interpolation)
     freqs_linear = freqs_base / linear_scale
 
-    # Band 3: NTK-scaled frequencies (global)
+    # Band 3: NTK-scaled frequencies
     new_base = theta * (ntk_scale ** (dim / (dim - 2)))
     freqs_ntk = 1.0 / (new_base**freq_seq)
 
-    # === Step 4: Beta mask - blend linear <-> NTK ===
+    # === Step 3: Beta blending (linear <-> NTK) ===
+    # Low-frequency components -> NTK, high-frequency -> linear
     low, high = find_correction_range(beta_0, beta_1, dim, theta, ori_max_pe_len)
-    low = max(0, low)
-    high = min(n_freqs, high)
-    mask_beta = 1.0 - linear_ramp_mask(low, high, n_freqs, device, dtype)
+    low, high = max(0, low), min(half_dim, high)
+    ramp_beta = linear_ramp_mask(low, high, half_dim, device, dtype)
+    mask_beta = 1.0 - ramp_beta
     freqs = freqs_linear * (1.0 - mask_beta) + freqs_ntk * mask_beta
 
-    # === Step 5: Gamma mask - blend result <-> base ===
+    # === Step 4: Gamma blending (result <-> base) ===
+    # Low-frequency components -> base (unchanged), high-frequency -> keep blend
     low, high = find_correction_range(gamma_0, gamma_1, dim, theta, ori_max_pe_len)
-    low = max(0, low)
-    high = min(n_freqs, high)
-    mask_gamma = 1.0 - linear_ramp_mask(low, high, n_freqs, device, dtype)
+    low, high = max(0, low), min(half_dim, high)
+    ramp_gamma = linear_ramp_mask(low, high, half_dim, device, dtype)
+    mask_gamma = 1.0 - ramp_gamma
     freqs = freqs * (1.0 - mask_gamma) + freqs_base * mask_gamma
 
-    # === Step 6: Compute angles ===
+    # === Step 5: Compute angles ===
     angles = torch.einsum("...n,d->...nd", pos.to(dtype), freqs)
 
-    # === Step 7: Apply timestep-dependent mscale ===
-    mscale = compute_timestep_mscale(ntk_scale, current_sigma, dype_config)
+    cos = torch.cos(angles)
+    sin = torch.sin(angles)
 
-    cos = torch.cos(angles) * mscale
-    sin = torch.sin(angles) * mscale
+    # === Step 6: Apply mscale ===
+    if mscale_override is not None:
+        mscale = mscale_override
+    else:
+        mscale = 1.0 + 0.1 * math.log(ntk_scale) / math.sqrt(ntk_scale)
+
+    cos = cos * mscale
+    sin = sin * mscale
 
     return cos.to(pos.dtype), sin.to(pos.dtype)
 
