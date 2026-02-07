@@ -16,7 +16,7 @@ from invokeai.app.services.config.config_default import get_config
 class PatchMatch:
     """Thin wrapper with explicit state; keeps legacy imports working."""
 
-    _PATCH_SIZE = 3
+    _PATCH_SIZE = 5
     _tried = False
     _inpaint_fn = None
 
@@ -34,7 +34,7 @@ class PatchMatch:
             from patchmatch_cython import CythonSolver, inpaint_pyramid
 
             def _inpaint(image, mask):
-                return inpaint_pyramid(image, mask, solver_class=CythonSolver, patch_size=cls._PATCH_SIZE)
+                return inpaint_pyramid(image, mask, solver_class=CythonSolver, patch_size=cls._PATCH_SIZE, seed=0)
 
             cls._inpaint_fn = _inpaint
             logger.info("PatchMatch loaded")
