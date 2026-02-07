@@ -168,4 +168,108 @@ describe('adjustPromptAttention', () => {
       expect(result.prompt.slice(result.selectionStart, result.selectionEnd)).toBe('a+');
     });
   });
+
+  describe('numeric attention weights', () => {
+    it('should preserve parentheses for single word with numeric weight when incrementing elsewhere', () => {
+      const prompt = '(masterpiece)1.3, best quality';
+      const len = prompt.length;
+      // Select "best quality" and increment
+      const bestQualityStart = prompt.indexOf('best quality');
+      const result = adjustPromptAttention(prompt, bestQualityStart, len, 'increment');
+
+      // masterpiece should keep its parens and exact weight
+      expect(result.prompt).toContain('(masterpiece)1.3');
+      expect(result.prompt).not.toContain('masterpiece1.3');
+    });
+
+    it('should not produce long floating point numbers for numeric weights', () => {
+      const prompt = '(high detail)1.2, oil painting';
+      const len = prompt.length;
+      // Select "oil painting" and increment
+      const oilStart = prompt.indexOf('oil painting');
+      const result = adjustPromptAttention(prompt, oilStart, len, 'increment');
+
+      // high detail should keep its exact weight, no floating point garbage
+      expect(result.prompt).toContain('(high detail)1.2');
+      expect(result.prompt).not.toMatch(/1\.19999/);
+      expect(result.prompt).not.toMatch(/1\.20000/);
+    });
+
+    it('should preserve numeric weight 1.15 without floating point corruption', () => {
+      const prompt = '(sunny midday light)1.15, landscape';
+      const len = prompt.length;
+      const landscapeStart = prompt.indexOf('landscape');
+      const result = adjustPromptAttention(prompt, landscapeStart, len, 'increment');
+
+      expect(result.prompt).toContain('(sunny midday light)1.15');
+      expect(result.prompt).not.toMatch(/1\.15005/);
+    });
+
+    it('should normalize numeric 1.1 weight to + syntax', () => {
+      const prompt = '(lush rolling hills)1.1, landscape';
+      const len = prompt.length;
+      const landscapeStart = prompt.indexOf('landscape');
+      const result = adjustPromptAttention(prompt, landscapeStart, len, 'increment');
+
+      // 1.1 is equivalent to +, normalization is acceptable
+      expect(result.prompt).toMatch(/\(lush rolling hills\)(\+|1\.1)/);
+    });
+
+    it('should increment numeric weight correctly for single word', () => {
+      const prompt = '(masterpiece)1.3';
+      const result = adjustPromptAttention(prompt, 0, prompt.length, 'increment');
+
+      // 1.3 + 0.1 = 1.4
+      expect(result.prompt).toBe('(masterpiece)1.4');
+    });
+
+    it('should increment numeric weight correctly for multi-word group', () => {
+      const prompt = '(high detail)1.2';
+      const result = adjustPromptAttention(prompt, 0, prompt.length, 'increment');
+
+      // 1.2 + 0.1 = 1.3
+      expect(result.prompt).toBe('(high detail)1.3');
+    });
+
+    it('should decrement numeric weight correctly', () => {
+      const prompt = '(masterpiece)1.3';
+      const result = adjustPromptAttention(prompt, 0, prompt.length, 'decrement');
+
+      // 1.3 - 0.1 = 1.2
+      expect(result.prompt).toBe('(masterpiece)1.2');
+    });
+
+    it('should increment numeric weight 1.15 with additive step', () => {
+      const prompt = '(sunny midday light)1.15';
+      const result = adjustPromptAttention(prompt, 0, prompt.length, 'increment');
+
+      // 1.15 + 0.1 = 1.25
+      expect(result.prompt).toBe('(sunny midday light)1.25');
+    });
+
+    it('should decrement numeric weight 1.15 with additive step', () => {
+      const prompt = '(sunny midday light)1.15';
+      const result = adjustPromptAttention(prompt, 0, prompt.length, 'decrement');
+
+      // 1.15 - 0.1 = 1.05
+      expect(result.prompt).toBe('(sunny midday light)1.05');
+    });
+
+    it('should handle the full bug report prompt without corrupting non-selected weights', () => {
+      const prompt =
+        '(masterpiece)1.3, best quality, (high detail)1.2, oil painting, (sunny midday light)1.15, an old stone castle standing on a hill, medieval architecture, weathered stone walls, (lush rolling hills)1.1, expansive landscape, clear blue sky';
+      const selStart = prompt.indexOf('clear blue sky');
+      const selEnd = selStart + 'clear blue sky'.length;
+      const result = adjustPromptAttention(prompt, selStart, selEnd, 'increment');
+
+      // Non-selected numeric weights must be preserved exactly
+      expect(result.prompt).toContain('(masterpiece)1.3');
+      expect(result.prompt).toContain('(high detail)1.2');
+      expect(result.prompt).toContain('(sunny midday light)1.15');
+      // Selected text should be incremented
+      expect(result.prompt).toContain('(clear blue sky)+');
+      // No floating point garbage anywhere
+      expect(result.prompt).not.toMatch(/\d\.\d{5,}/);
+    });
+  });
 });

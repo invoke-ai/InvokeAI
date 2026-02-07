@@ -9,6 +9,29 @@ type AttentionDirection = 'increment' | 'decrement';
 type AdjustmentResult = { prompt: string; selectionStart: number; selectionEnd: number };
 
 const ATTENTION_STEP = 1.1;
+const NUMERIC_ATTENTION_STEP = 0.1;
+
+/**
+ * Check if a weight is approximately ATTENTION_STEP^n for some integer n.
+ * Returns n if so, or null if the weight is not a power of ATTENTION_STEP.
+ */
+function getAttentionStepCount(weight: number): number | null {
+  if (weight <= 0) {
+    return null;
+  }
+  if (Math.abs(weight - 1.0) < 0.001) {
+    return 0;
+  }
+  const n = Math.round(Math.log(weight) / Math.log(ATTENTION_STEP));
+  if (n === 0) {
+    return null;
+  }
+  const expected = Math.pow(ATTENTION_STEP, n);
+  if (Math.abs(expected - weight) < 0.005) {
+    return n;
+  }
+  return null;
+}
 
 /**
  * Adjusts the attention of the prompt at the current cursor/selection position.
@@ -68,10 +91,20 @@ export function adjustPromptAttention(
     }
 
     for (const terminal of selectedTerminals) {
-      if (direction === 'increment') {
-        terminal.weight *= ATTENTION_STEP;
+      if (terminal.hasNumericAttention) {
+        // Additive step for explicit numeric weights (e.g. 1.15 → 1.25 / 1.05)
+        if (direction === 'increment') {
+          terminal.weight = Number((terminal.weight + NUMERIC_ATTENTION_STEP).toFixed(4));
+        } else {
+          terminal.weight = Number((terminal.weight - NUMERIC_ATTENTION_STEP).toFixed(4));
+        }
       } else {
-        terminal.weight /= ATTENTION_STEP;
+        // Multiplicative step for +/- syntax weights
+        if (direction === 'increment') {
+          terminal.weight *= ATTENTION_STEP;
+        } else {
+          terminal.weight /= ATTENTION_STEP;
+        }
       }
     }
 
@@ -97,21 +130,29 @@ type Terminal = {
   weight: number;
   range: { start: number; end: number };
   hasExplicitAttention: boolean;
+  hasNumericAttention: boolean;
   parentRange?: { start: number; end: number };
   isSelected: boolean;
 };
 
-function flattenAST(ast: ASTNode[], currentWeight = 1.0, parentRange?: { start: number; end: number }): Terminal[] {
+function flattenAST(
+  ast: ASTNode[],
+  currentWeight = 1.0,
+  parentRange?: { start: number; end: number },
+  numericAttention = false
+): Terminal[] {
   let terminals: Terminal[] = [];
 
   for (const node of ast) {
     let nodeWeight = currentWeight;
+    let nodeNumericAttention = numericAttention;
     if ('attention' in node && node.attention) {
       nodeWeight *= parseAttention(node.attention);
+      nodeNumericAttention = typeof node.attention === 'number';
     }
 
     if (node.type === 'group') {
-      terminals.push(...flattenAST(node.children, nodeWeight, node.range));
+      terminals.push(...flattenAST(node.children, nodeWeight, node.range, nodeNumericAttention));
     } else {
       terminals.push({
         text: node.type === 'word' ? node.text : node.value,
@@ -119,6 +160,7 @@ function flattenAST(ast: ASTNode[], currentWeight = 1.0, parentRange?: { start: 
         weight: nodeWeight,
         range: node.range,
         hasExplicitAttention: 'attention' in node && !!node.attention,
+        hasNumericAttention: nodeNumericAttention,
         parentRange: parentRange,
         isSelected: false,
       });
@@ -234,9 +276,14 @@ function groupTerminals(terminals: Terminal[]): ASTNode[] {
       return j;
     };
 
-    // Check for + (>= 1.1)
-    if (weight >= ATTENTION_STEP - 0.001) {
-      const j = findRunEnd((w) => w >= ATTENTION_STEP - 0.001);
+    const stepCount = getAttentionStepCount(weight);
+
+    // Check for + (positive power of ATTENTION_STEP)
+    if (stepCount !== null && stepCount > 0) {
+      const j = findRunEnd((w) => {
+        const sc = getAttentionStepCount(w);
+        return sc !== null && sc > 0;
+      });
 
       let runStart = i;
       let runEnd = j;
@@ -277,9 +324,12 @@ function groupTerminals(terminals: Terminal[]): ASTNode[] {
       continue;
     }
 
-    // Check for - (<= 0.909)
-    if (weight <= 1 / ATTENTION_STEP + 0.001) {
-      const j = findRunEnd((w) => w <= 1 / ATTENTION_STEP + 0.001);
+    // Check for - (negative power of ATTENTION_STEP)
+    if (stepCount !== null && stepCount < 0) {
+      const j = findRunEnd((w) => {
+        const sc = getAttentionStepCount(w);
+        return sc !== null && sc < 0;
+      });
 
       let runStart = i;
       let runEnd = j;
@@ -336,16 +386,8 @@ function groupTerminals(terminals: Terminal[]): ASTNode[] {
 
       const weightStr = Number(weight.toFixed(4));
 
-      if (children.length === 1) {
-        const child = children[0]!;
-        if (child.type === 'word' || child.type === 'group') {
-          nodes.push({ ...child, attention: weightStr });
-        } else {
-          nodes.push({ type: 'group', children, attention: weightStr, range: { start: 0, end: 0 }, isSelection });
-        }
-      } else {
-        nodes.push({ type: 'group', children, attention: weightStr, range: { start: 0, end: 0 }, isSelection });
-      }
+      // Always create a group for numeric weights to preserve parentheses in output
+      nodes.push({ type: 'group', children, attention: weightStr, range: { start: 0, end: 0 }, isSelection });
       i = j;
     }
   }
@@ -377,10 +419,10 @@ function addAttention(current: Attention | undefined, added: string): Attention 
   }
   if (typeof current === 'number') {
     if (added === '+') {
-      return current * ATTENTION_STEP;
+      return Number((current * ATTENTION_STEP).toFixed(4));
     }
     if (added === '-') {
-      return current / ATTENTION_STEP;
+      return Number((current / ATTENTION_STEP).toFixed(4));
     }
     return current;
   }
