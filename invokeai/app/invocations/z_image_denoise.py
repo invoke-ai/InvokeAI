@@ -107,8 +107,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
     # Scheduler selection for the denoising process
     scheduler: ZIMAGE_SCHEDULER_NAME_VALUES = InputField(
         default="euler",
-        description="Scheduler (sampler) for the denoising process. Euler is the default and recommended for "
-        "Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.",
+        description="Scheduler (sampler) for the denoising process. Euler is the default and recommended. "
+        "Heun is 2nd-order (better quality, 2x slower). LCM works with Turbo only (not Base).",
         ui_choice_labels=ZIMAGE_SCHEDULER_LABELS,
     )
 
@@ -387,12 +387,11 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 num_train_timesteps=1000,
                 shift=1.0,
             )
-            # Set timesteps - LCM should use num_inference_steps (it has its own sigma schedule),
+            # Set timesteps - LCM uses its own sigma schedule (num_inference_steps),
             # while other schedulers can use custom sigmas if supported
             is_lcm = self.scheduler == "lcm"
             set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
             if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
-                # Convert sigmas list to tensor for scheduler
                 scheduler.set_timesteps(sigmas=sigmas, device=device)
             else:
                 # LCM or scheduler doesn't support custom sigmas - use num_inference_steps
@@ -644,10 +643,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                                     ),
                                 )
                     else:
-                        # For LCM and other first-order schedulers
+                        # For first-order schedulers (Euler, LCM)
                         user_step += 1
-                        # Only call step_callback if we haven't exceeded total_steps
-                        # (LCM scheduler may have more internal steps than user-facing steps)
                         if user_step <= total_steps:
                             pbar.update(1)
                             step_callback(
