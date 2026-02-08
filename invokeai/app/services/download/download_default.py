@@ -435,8 +435,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
             status = resp.status_code
             reason = resp.reason
             if status >= 500:
-                raise HTTPError(f"Remote server error from {host}: HTTP {status} {reason}")
-            raise HTTPError(f"Download failed from {host}: HTTP {status} {reason}")
+                self._logger.error(f"Remote server error from {host}: HTTP {status} {reason}")
+                raise HTTPError(reason)
+            self._logger.error(f"Download failed from {host}: HTTP {status} {reason}")
+            raise HTTPError(reason)
 
         job.content_type = resp.headers.get("Content-Type")
         job.etag = resp.headers.get("ETag") or job.etag
@@ -533,8 +535,10 @@ class DownloadQueueService(DownloadQueueServiceBase):
             status = resp.status_code
             reason = resp.reason
             if status >= 500:
-                raise HTTPError(f"Remote server error from {host}: HTTP {status} {reason}")
-            raise HTTPError(f"Download failed from {host}: HTTP {status} {reason}")
+                self._logger.error(f"Remote server error from {host}: HTTP {status} {reason}")
+                raise HTTPError(reason)
+            self._logger.error(f"Download failed from {host}: HTTP {status} {reason}")
+            raise HTTPError(reason)
 
         self._logger.debug(f"{job.source}: Downloading {job.download_path}")
         report_delta = job.total_bytes / 100  # report every 1% change
@@ -688,7 +692,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
         with self._lock:
             mf_job = self._download_part2parent[download_job.source]
             self._mfd_active.pop(mf_job.id, None)
-            pending = self._mfd_pending.get(mf_job.id, [])
+            mf_job.total_bytes = sum(x.total_bytes for x in mf_job.download_parts)
+            mf_job.bytes = sum(x.bytes for x in mf_job.download_parts)
 
             # are there any more active jobs left in this task?
             if all(x.complete for x in mf_job.download_parts):
