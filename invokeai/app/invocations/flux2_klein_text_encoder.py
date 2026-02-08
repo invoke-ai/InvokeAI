@@ -73,140 +73,111 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> FluxConditioningOutput:
-        qwen3_embeds, pooled_embeds = self._encode_prompt(context)
+        # Open the exitstack here to lock models for the duration of the node
+        with ExitStack() as exit_stack:
+            # Pass the locked stack down to the helper function
+            qwen3_embeds, pooled_embeds = self._encode_prompt(context, exit_stack)
 
-        # Use FLUXConditioningInfo for compatibility with existing Flux denoiser
-        # t5_embeds -> qwen3 stacked embeddings
-        # clip_embeds -> pooled qwen3 embedding
-        conditioning_data = ConditioningFieldData(
-            conditionings=[FLUXConditioningInfo(clip_embeds=pooled_embeds, t5_embeds=qwen3_embeds)]
-        )
+            conditioning_data = ConditioningFieldData(
+                conditionings=[FLUXConditioningInfo(clip_embeds=pooled_embeds, t5_embeds=qwen3_embeds)]
+            )
 
-        conditioning_name = context.conditioning.save(conditioning_data)
-        return FluxConditioningOutput(
-            conditioning=FluxConditioningField(conditioning_name=conditioning_name, mask=self.mask)
-        )
+            # The models are still locked while we save the data
+            conditioning_name = context.conditioning.save(conditioning_data)
+            return FluxConditioningOutput(
+                conditioning=FluxConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+            )
 
-    def _encode_prompt(self, context: InvocationContext) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Encode prompt using Qwen3 text encoder with Klein-style layer extraction.
-
-        This matches the diffusers Flux2KleinPipeline._get_qwen3_prompt_embeds() exactly.
-
-        Returns:
-            Tuple of (stacked_embeddings, pooled_embedding):
-            - stacked_embeddings: Hidden states from layers (9, 18, 27) stacked together.
-              Shape: (1, seq_len, hidden_size * 3)
-            - pooled_embedding: Pooled representation for global conditioning.
-              Shape: (1, hidden_size)
-        """
+    def _encode_prompt(self, context: InvocationContext, exit_stack: ExitStack) -> Tuple[torch.Tensor, torch.Tensor]:
         prompt = self.prompt
 
+        # Reordered loading to prevent the annoying cache drop issue
+        # This prevents it from being evicted while we look up the tokenizer
         text_encoder_info = context.models.load(self.qwen3_encoder.text_encoder)
+        (cached_weights, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
+
+        # Now it is safe to load and lock the tokenizer
         tokenizer_info = context.models.load(self.qwen3_encoder.tokenizer)
+        (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
-        with ExitStack() as exit_stack:
-            (cached_weights, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
-            (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
+        device = text_encoder.device
 
-            # you can now define the device, as the text_encoder exists here
-            device = text_encoder.device
+        # Apply LoRA models
+        lora_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+        exit_stack.enter_context(
+            LayerPatcher.apply_smart_model_patches(
+                model=text_encoder,
+                patches=self._lora_iterator(context),
+                prefix=FLUX_LORA_T5_PREFIX,
+                dtype=lora_dtype,
+                cached_weights=cached_weights,
+            )
+        )
 
-            # Apply LoRA models to the text encoder
-            lora_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
-            exit_stack.enter_context(
-                LayerPatcher.apply_smart_model_patches(
-                    model=text_encoder,
-                    patches=self._lora_iterator(context),
-                    prefix=FLUX_LORA_T5_PREFIX,  # Reuse T5 prefix for Qwen3 LoRAs
-                    dtype=lora_dtype,
-                    cached_weights=cached_weights,
-                )
+        context.util.signal_progress("Running Qwen3 text encoder (Klein)")
+
+        if not isinstance(text_encoder, PreTrainedModel):
+            raise TypeError(
+                f"Expected PreTrainedModel for text encoder, got {type(text_encoder).__name__}. "
+                "The Qwen3 encoder model may be corrupted or incompatible."
+            )
+        if not isinstance(tokenizer, PreTrainedTokenizerBase):
+            raise TypeError(
+                f"Expected PreTrainedTokenizerBase for tokenizer, got {type(tokenizer).__name__}. "
+                "The Qwen3 tokenizer may be corrupted or incompatible."
             )
 
-            context.util.signal_progress("Running Qwen3 text encoder (Klein)")
+        messages = [{"role": "user", "content": prompt}]
 
-            if not isinstance(text_encoder, PreTrainedModel):
-                raise TypeError(
-                    f"Expected PreTrainedModel for text encoder, got {type(text_encoder).__name__}. "
-                    "The Qwen3 encoder model may be corrupted or incompatible."
-                )
-            if not isinstance(tokenizer, PreTrainedTokenizerBase):
-                raise TypeError(
-                    f"Expected PreTrainedTokenizerBase for tokenizer, got {type(tokenizer).__name__}. "
-                    "The Qwen3 tokenizer may be corrupted or incompatible."
-                )
+        text: str = tokenizer.apply_chat_template(  # type: ignore[assignment]
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=False,
+        )
 
-            # Format messages exactly like diffusers Flux2KleinPipeline:
-            # - Only user message, NO system message
-            # - add_generation_prompt=True (adds assistant prefix)
-            # - enable_thinking=False
-            messages = [{"role": "user", "content": prompt}]
+        inputs = tokenizer(
+            text,
+            return_tensors="pt",
+            padding="max_length",
+            truncation=True,
+            max_length=self.max_seq_len,
+        )
 
-            # Step 1: Apply chat template to get formatted text (tokenize=False)
-            text: str = tokenizer.apply_chat_template(  # type: ignore[assignment]
-                messages,
-                tokenize=False,
-                add_generation_prompt=True,  # Adds assistant prefix like diffusers
-                enable_thinking=False,  # Disable thinking mode
+        input_ids = inputs["input_ids"].to(device)
+        attention_mask = inputs["attention_mask"].to(device)
+
+        # Forward pass through the model
+        outputs = text_encoder(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            output_hidden_states=True,
+            use_cache=False,
+        )
+        if not hasattr(outputs, "hidden_states") or outputs.hidden_states is None:
+            raise RuntimeError(
+                "Text encoder did not return hidden_states. "
+                "Ensure output_hidden_states=True is supported by this model."
             )
+        num_hidden_layers = len(outputs.hidden_states)
 
-            # Step 2: Tokenize the formatted text
-            inputs = tokenizer(
-                text,
-                return_tensors="pt",
-                padding="max_length",
-                truncation=True,
-                max_length=self.max_seq_len,
-            )
+        hidden_states_list = []
+        for layer_idx in KLEIN_EXTRACTION_LAYERS:
+            if layer_idx >= num_hidden_layers:
+                layer_idx = num_hidden_layers - 1
+            hidden_states_list.append(outputs.hidden_states[layer_idx])
 
-            input_ids = inputs["input_ids"].to(device)
-            attention_mask = inputs["attention_mask"].to(device)
+        out = torch.stack(hidden_states_list, dim=1)
+        out = out.to(dtype=text_encoder.dtype, device=device)
 
-            # Move to device
-            input_ids = input_ids.to(device)
-            attention_mask = attention_mask.to(device)
+        batch_size, num_channels, seq_len, hidden_dim = out.shape
+        prompt_embeds = out.permute(0, 2, 1, 3).reshape(batch_size, seq_len, num_channels * hidden_dim)
 
-            # Forward pass through the model - matching diffusers exactly
-            # Explicitly move inputs to the same device as the text_encoder
-            outputs = text_encoder(
-                input_ids=input_ids,
-                attention_mask=attention_mask,
-                output_hidden_states=True,
-                use_cache=False,
-            )
-            # Validate hidden_states output
-            if not hasattr(outputs, "hidden_states") or outputs.hidden_states is None:
-                raise RuntimeError(
-                    "Text encoder did not return hidden_states. "
-                    "Ensure output_hidden_states=True is supported by this model."
-                )
-            num_hidden_layers = len(outputs.hidden_states)
-
-            # Extract and stack hidden states - EXACTLY like diffusers:
-            # out = torch.stack([output.hidden_states[k] for k in hidden_states_layers], dim=1)
-            # prompt_embeds = out.permute(0, 2, 1, 3).reshape(batch_size, seq_len, num_channels * hidden_dim)
-            hidden_states_list = []
-            for layer_idx in KLEIN_EXTRACTION_LAYERS:
-                if layer_idx >= num_hidden_layers:
-                    layer_idx = num_hidden_layers - 1
-                hidden_states_list.append(outputs.hidden_states[layer_idx])
-
-            # Stack along dim=1, then permute and reshape - exactly like diffusers
-            out = torch.stack(hidden_states_list, dim=1)
-            out = out.to(dtype=text_encoder.dtype, device=device)
-
-            batch_size, num_channels, seq_len, hidden_dim = out.shape
-            prompt_embeds = out.permute(0, 2, 1, 3).reshape(batch_size, seq_len, num_channels * hidden_dim)
-
-            # Create pooled embedding for global conditioning
-            # Use mean pooling over the sequence (excluding padding)
-            # This serves a similar role to CLIP's pooled output in standard FLUX
-            last_hidden_state = outputs.hidden_states[-1]  # Use last layer for pooling
-            # Expand mask to match hidden state dimensions
-            expanded_mask = attention_mask.unsqueeze(-1).expand_as(last_hidden_state).float()
-            sum_embeds = (last_hidden_state * expanded_mask).sum(dim=1)
-            num_tokens = expanded_mask.sum(dim=1).clamp(min=1)
-            pooled_embeds = sum_embeds / num_tokens
+        last_hidden_state = outputs.hidden_states[-1]
+        expanded_mask = attention_mask.unsqueeze(-1).expand_as(last_hidden_state).float()
+        sum_embeds = (last_hidden_state * expanded_mask).sum(dim=1)
+        num_tokens = expanded_mask.sum(dim=1).clamp(min=1)
+        pooled_embeds = sum_embeds / num_tokens
 
         return prompt_embeds, pooled_embeds
 
