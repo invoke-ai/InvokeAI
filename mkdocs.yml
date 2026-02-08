@@ -139,6 +139,7 @@ nav:
   - Features:
       - Low VRAM mode: 'features/low-vram.md'
       - Database: 'features/database.md'
+      - HiDiffusion: 'features/hidiffusion.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
   - Contributing:
       - Overview: 'contributing/index.md'
