@@ -479,6 +479,8 @@ class ModelInstallService(ModelInstallServiceBase):
         if dj := job._multifile_job:
             self._download_queue.cancel_job(dj)
         if job._install_tmpdir is not None:
+            # Mark cancelled before cleanup so we don't reuse the folder if deletion fails.
+            self._write_install_marker(job, status=InstallStatus.CANCELLED)
             self._delete_install_marker(job._install_tmpdir)
             self._safe_rmtree(job._install_tmpdir, self._logger)
 
@@ -1220,7 +1222,9 @@ class ModelInstallService(ModelInstallServiceBase):
                     install_job.local_path = download_job.download_path
                 install_job.download_parts = download_job.download_parts
                 install_job.bytes = sum(x.bytes for x in download_job.download_parts)
-                install_job.total_bytes = download_job.total_bytes
+                total_parts = sum(x.total_bytes for x in download_job.download_parts)
+                if total_parts > 0:
+                    install_job.total_bytes = max(install_job.total_bytes or 0, total_parts)
                 self._signal_job_download_started(install_job)
 
     def _download_progress_callback(self, download_job: MultiFileDownloadJob) -> None:
@@ -1231,7 +1235,9 @@ class ModelInstallService(ModelInstallServiceBase):
                 else:
                     # update sizes
                     install_job.bytes = sum(x.bytes for x in download_job.download_parts)
-                    install_job.total_bytes = sum(x.total_bytes for x in download_job.download_parts)
+                    total_parts = sum(x.total_bytes for x in download_job.download_parts)
+                    if total_parts > 0:
+                        install_job.total_bytes = max(install_job.total_bytes or 0, total_parts)
                     self._signal_job_downloading(install_job)
 
     def _download_complete_callback(self, download_job: MultiFileDownloadJob) -> None:
@@ -1268,6 +1274,9 @@ class ModelInstallService(ModelInstallServiceBase):
                 if not install_job.errored and not install_job.paused:
                     install_job.cancel()
                     if install_job._install_tmpdir is not None:
+                        # Mark cancelled before cleanup so we don't reuse the folder if deletion fails.
+                        self._write_install_marker(install_job, status=InstallStatus.CANCELLED)
+                        self._delete_install_marker(install_job._install_tmpdir)
                         self._safe_rmtree(install_job._install_tmpdir, self._logger)
 
                 # Let other threads know that the number of downloads has changed

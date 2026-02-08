@@ -67,7 +67,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       .then(() => {
         toast({
           id: 'MODEL_INSTALL_PAUSED',
-          title: t('modelManager.pause'),
+          title: t('toast.modelDownloadPaused'),
           status: 'success',
         });
       })
@@ -88,7 +88,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       .then(() => {
         toast({
           id: 'MODEL_INSTALL_RESUMED',
-          title: t('modelManager.resume'),
+          title: t('toast.modelDownloadResumed'),
           status: 'success',
         });
       })
@@ -109,7 +109,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       .then(() => {
         toast({
           id: 'MODEL_INSTALL_RESTART_FAILED',
-          title: t('modelManager.restartFailed'),
+          title: t('toast.modelDownloadRestartFailed'),
           status: 'success',
         });
       })
@@ -131,7 +131,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
         .then(() => {
           toast({
             id: 'MODEL_INSTALL_RESTART_FILE',
-            title: t('modelManager.restartFile'),
+            title: t('toast.modelDownloadRestartFile'),
             status: 'success',
           });
         })
@@ -191,23 +191,21 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
 
     const parts = installJob.download_parts;
     if (parts && parts.length > 0) {
-      const totalBytes = parts.reduce((sum, part) => sum + (part.total_bytes ?? 0), 0);
-      const currentBytes = parts.reduce((sum, part) => sum + (part.bytes ?? 0), 0);
+      const totalBytesFromParts = parts.reduce((sum, part) => sum + (part.total_bytes ?? 0), 0);
+      const currentBytesFromParts = parts.reduce((sum, part) => sum + (part.bytes ?? 0), 0);
+      const totalBytes = Math.max(totalBytesFromParts, installJob.total_bytes ?? 0);
+      const currentBytes = Math.max(currentBytesFromParts, installJob.bytes ?? 0);
       if (totalBytes > 0) {
         return (currentBytes / totalBytes) * 100;
       }
       return 0;
     }
 
-    if (isNil(installJob.bytes) || isNil(installJob.total_bytes)) {
-      return null;
+    if (!isNil(installJob.bytes) && !isNil(installJob.total_bytes) && installJob.total_bytes > 0) {
+      return (installJob.bytes / installJob.total_bytes) * 100;
     }
 
-    if (installJob.total_bytes === 0) {
-      return 0;
-    }
-
-    return (installJob.bytes / installJob.total_bytes) * 100;
+    return null;
   }, [installJob.bytes, installJob.download_parts, installJob.status, installJob.total_bytes]);
 
   const restartRequiredParts = useMemo(() => {
@@ -335,17 +333,19 @@ const TooltipLabel = memo(({ name, source, installJob }: TooltipLabelProps) => {
     }
     const parts = installJob.download_parts;
     if (parts && parts.length > 0) {
-      const totalBytes = parts.reduce((sum, part) => sum + (part.total_bytes ?? 0), 0);
-      const currentBytes = parts.reduce((sum, part) => sum + (part.bytes ?? 0), 0);
+      const totalBytesFromParts = parts.reduce((sum, part) => sum + (part.total_bytes ?? 0), 0);
+      const currentBytesFromParts = parts.reduce((sum, part) => sum + (part.bytes ?? 0), 0);
+      const totalBytes = Math.max(totalBytesFromParts, installJob.total_bytes ?? 0);
+      const currentBytes = Math.max(currentBytesFromParts, installJob.bytes ?? 0);
       if (totalBytes > 0) {
         return `${formatBytes(currentBytes)} / ${formatBytes(totalBytes)}`;
       }
       return '';
     }
-    if (installJob.bytes === undefined || installJob.total_bytes === undefined) {
-      return '';
+    if (!isNil(installJob.bytes) && !isNil(installJob.total_bytes) && installJob.total_bytes > 0) {
+      return `${formatBytes(installJob.bytes)} / ${formatBytes(installJob.total_bytes)}`;
     }
-    return `${formatBytes(installJob.bytes)} / ${formatBytes(installJob.total_bytes)}`;
+    return '';
   }, [installJob.bytes, installJob.download_parts, installJob.total_bytes, installJob.status]);
 
   return (
