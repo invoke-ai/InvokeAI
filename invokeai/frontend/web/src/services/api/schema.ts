@@ -15451,6 +15451,7 @@ export type components = {
              * @constant
              */
             base: "flux2";
+            variant: components["schemas"]["Flux2VariantType"] | null;
         };
         /** LoRA_Diffusers_SD1_Config */
         LoRA_Diffusers_SD1_Config: {
@@ -15907,6 +15908,7 @@ export type components = {
              * @constant
              */
             base: "flux2";
+            variant: components["schemas"]["Flux2VariantType"] | null;
         };
         /** LoRA_LyCORIS_SD1_Config */
         LoRA_LyCORIS_SD1_Config: {

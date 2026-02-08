@@ -68,6 +68,18 @@ class Flux2KleinLoRALoaderInvocation(BaseInvocation):
         if not context.models.exists(lora_key):
             raise ValueError(f"Unknown lora: {lora_key}!")
 
+        # Warn if LoRA variant doesn't match transformer variant
+        lora_config = context.models.get_config(lora_key)
+        lora_variant = getattr(lora_config, "variant", None)
+        if lora_variant and self.transformer is not None:
+            transformer_config = context.models.get_config(self.transformer.transformer.key)
+            transformer_variant = getattr(transformer_config, "variant", None)
+            if transformer_variant and lora_variant != transformer_variant:
+                context.logger.warning(
+                    f"LoRA variant mismatch: LoRA '{lora_config.name}' is for {lora_variant.value} "
+                    f"but transformer is {transformer_variant.value}. This may cause shape errors."
+                )
+
         # Check for existing LoRAs with the same key.
         if self.transformer and any(lora.lora.key == lora_key for lora in self.transformer.loras):
             raise ValueError(f'LoRA "{lora_key}" already applied to transformer.')
@@ -146,6 +158,18 @@ class Flux2KleinLoRACollectionLoader(BaseInvocation):
                 raise Exception(f"Unknown lora: {lora.lora.key}!")
 
             assert lora.lora.base in (BaseModelType.Flux, BaseModelType.Flux2)
+
+            # Warn if LoRA variant doesn't match transformer variant
+            lora_config = context.models.get_config(lora.lora.key)
+            lora_variant = getattr(lora_config, "variant", None)
+            if lora_variant and self.transformer is not None:
+                transformer_config = context.models.get_config(self.transformer.transformer.key)
+                transformer_variant = getattr(transformer_config, "variant", None)
+                if transformer_variant and lora_variant != transformer_variant:
+                    context.logger.warning(
+                        f"LoRA variant mismatch: LoRA '{lora_config.name}' is for {lora_variant.value} "
+                        f"but transformer is {transformer_variant.value}. This may cause shape errors."
+                    )
 
             added_loras.append(lora.lora.key)
 

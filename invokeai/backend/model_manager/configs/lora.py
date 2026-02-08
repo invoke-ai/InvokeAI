@@ -24,6 +24,7 @@ from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.omi import flux_dev_1_lora, stable_diffusion_xl_1_lora
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
+    Flux2VariantType,
     FluxLoRAFormat,
     ModelFormat,
     ModelType,
@@ -155,6 +156,112 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
                 return state_dict[key].shape[1] in _FLUX2_VEC_IN_DIMS
 
     return False
+
+
+def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
+    """Determine FLUX.2 Klein variant (4B vs 9B) from a LoRA state dict.
+
+    Detection is based on tensor dimensions that differ between Klein 4B and Klein 9B:
+    - hidden_size from attention projection: 3072 = Klein 4B, 4096 = Klein 9B
+    - context_in_dim from context embedder: 7680 = Klein 4B, 12288 = Klein 9B
+    - vec_in_dim from vector embedder: 2560 = Klein 4B, 4096 = Klein 9B
+
+    Returns None if the variant cannot be determined (e.g. LoRA only targets layers
+    with identical dimensions across variants).
+    """
+    KLEIN_4B_CONTEXT_DIM = 7680  # 3 * 2560
+    KLEIN_9B_CONTEXT_DIM = 12288  # 3 * 4096
+    KLEIN_4B_VEC_DIM = 2560
+    KLEIN_9B_VEC_DIM = 4096
+    KLEIN_4B_HIDDEN_SIZE = 3072
+    KLEIN_9B_HIDDEN_SIZE = 4096
+
+    # Check diffusers/PEFT format keys
+    for prefix in ["transformer.", "base_model.model.", ""]:
+        # Context embedder (txt_in) dimensions
+        ctx_key_a = f"{prefix}context_embedder.lora_A.weight"
+        if ctx_key_a in state_dict:
+            dim = state_dict[ctx_key_a].shape[1]
+            if dim == KLEIN_4B_CONTEXT_DIM:
+                return Flux2VariantType.Klein4B
+            if dim == KLEIN_9B_CONTEXT_DIM:
+                return Flux2VariantType.Klein9B
+            return None
+
+        # Vector embedder dimensions
+        vec_key_a = f"{prefix}time_text_embed.text_embedder.linear_1.lora_A.weight"
+        if vec_key_a in state_dict:
+            dim = state_dict[vec_key_a].shape[1]
+            if dim == KLEIN_4B_VEC_DIM:
+                return Flux2VariantType.Klein4B
+            if dim == KLEIN_9B_VEC_DIM:
+                return Flux2VariantType.Klein9B
+            return None
+
+        # Attention projection hidden_size
+        attn_key_a = f"{prefix}transformer_blocks.0.attn.to_out.0.lora_A.weight"
+        if attn_key_a in state_dict:
+            dim = state_dict[attn_key_a].shape[1]
+            if dim == KLEIN_4B_HIDDEN_SIZE:
+                return Flux2VariantType.Klein4B
+            if dim == KLEIN_9B_HIDDEN_SIZE:
+                return Flux2VariantType.Klein9B
+            return None
+
+    # Check BFL PEFT format (diffusion_model.* prefix)
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+
+        # BFL PEFT: context embedder (txt_in)
+        if key.startswith("diffusion_model.") and "txt_in" in key and key.endswith("lora_A.weight"):
+            dim = state_dict[key].shape[1]
+            if dim == KLEIN_4B_CONTEXT_DIM:
+                return Flux2VariantType.Klein4B
+            if dim == KLEIN_9B_CONTEXT_DIM:
+                return Flux2VariantType.Klein9B
+            return None
+
+        # BFL PEFT: vector embedder (vector_in)
+        if key.startswith("diffusion_model.") and "vector_in" in key and key.endswith("lora_A.weight"):
+            dim = state_dict[key].shape[1]
+            if dim == KLEIN_4B_VEC_DIM:
+                return Flux2VariantType.Klein4B
+            if dim == KLEIN_9B_VEC_DIM:
+                return Flux2VariantType.Klein9B
+            return None
+
+        # BFL PEFT: attention projection
+        if key.startswith("diffusion_model.") and key.endswith(".img_attn.proj.lora_A.weight"):
+            dim = state_dict[key].shape[1]
+            if dim == KLEIN_4B_HIDDEN_SIZE:
+                return Flux2VariantType.Klein4B
+            if dim == KLEIN_9B_HIDDEN_SIZE:
+                return Flux2VariantType.Klein9B
+            return None
+
+    # Check kohya format
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+        if key.startswith("lora_unet_txt_in.") or key.startswith("lora_unet_context_embedder."):
+            if key.endswith("lora_down.weight"):
+                dim = state_dict[key].shape[1]
+                if dim == KLEIN_4B_CONTEXT_DIM:
+                    return Flux2VariantType.Klein4B
+                if dim == KLEIN_9B_CONTEXT_DIM:
+                    return Flux2VariantType.Klein9B
+                return None
+        if key.startswith("lora_unet_vector_in.") or key.startswith("lora_unet_time_text_embed_text_embedder_"):
+            if key.endswith("lora_down.weight"):
+                dim = state_dict[key].shape[1]
+                if dim == KLEIN_4B_VEC_DIM:
+                    return Flux2VariantType.Klein4B
+                if dim == KLEIN_9B_VEC_DIM:
+                    return Flux2VariantType.Klein9B
+                return None
+
+    return None
 
 
 class LoRA_OMI_Config_Base(LoRA_Config_Base):
@@ -325,6 +432,16 @@ class LoRA_LyCORIS_Flux2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for FLUX.2 (Klein) LoRA models in LyCORIS format."""
 
     base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    variant: Flux2VariantType | None = Field(default=None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+        cls._validate_looks_like_lora(mod)
+        cls._validate_base(mod)
+        override_fields.setdefault("variant", _get_flux2_lora_variant(mod.load_state_dict()))
+        return cls(**override_fields)
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
@@ -511,6 +628,17 @@ class LoRA_Diffusers_Flux2_Config(LoRA_Diffusers_Config_Base, Config_Base):
     """Model config for FLUX.2 (Klein) LoRA models in Diffusers format."""
 
     base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
+    variant: Flux2VariantType | None = Field(default=None)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+        cls._validate_base(mod)
+        path_to_weight_file = cls._get_weight_file_or_raise(mod)
+        state_dict = mod.load_state_dict(path_to_weight_file)
+        override_fields.setdefault("variant", _get_flux2_lora_variant(state_dict))
+        return cls(**override_fields)
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
