@@ -199,6 +199,7 @@ class FluxLoRAFormat(str, Enum):
     Control = "flux.control"
     AIToolkit = "flux.aitoolkit"
     XLabs = "flux.xlabs"
+    BflPeft = "flux.bfl_peft"
 
 
 AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, FluxVariantType, Flux2VariantType, Qwen3VariantType]
