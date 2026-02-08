@@ -73,7 +73,7 @@ export const zFluxSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 
 // Flux DyPE (Dynamic Position Extrapolation) preset options for high-resolution generation
-export const zFluxDypePresetField = z.enum(['off', 'manual', 'auto', '4k']);
+export const zFluxDypePresetField = z.enum(['off', 'manual', 'auto', 'area', '4k']);
 
 // Flux DyPE scale (magnitude λs) - 0.0-8.0, default 2.0
 export const zFluxDypeScaleField = z.number().min(0).max(8);

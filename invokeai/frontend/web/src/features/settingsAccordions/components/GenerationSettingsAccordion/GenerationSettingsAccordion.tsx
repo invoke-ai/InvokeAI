@@ -84,7 +84,6 @@ export const GenerationSettingsAccordion = memo(() => {
             <FormControlGroup formLabelProps={formLabelProps}>
               {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && <ParamScheduler />}
               {isFLUX && <ParamFluxScheduler />}
-              {isFLUX && <ParamFluxDypePreset />}
               {isZImage && <ParamZImageScheduler />}
               <ParamSteps />
               {(isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}

@@ -6,14 +6,14 @@ import { fluxVAESelected, selectFLUXVAE } from 'features/controlLayers/store/par
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFluxVAEModels } from 'services/api/hooks/modelsByType';
+import { useFlux1VAEModels } from 'services/api/hooks/modelsByType';
 import type { VAEModelConfig } from 'services/api/types';
 
 const ParamFLUXVAEModelSelect = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const vae = useAppSelector(selectFLUXVAE);
-  const [modelConfigs, { isLoading }] = useFluxVAEModels();
+  const [modelConfigs, { isLoading }] = useFlux1VAEModels();
 
   const _onChange = useCallback(
     (vae: VAEModelConfig | null) => {
