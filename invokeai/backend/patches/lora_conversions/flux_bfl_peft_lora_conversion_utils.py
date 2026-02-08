@@ -267,7 +267,8 @@ def convert_bfl_lora_patch_to_diffusers(patch: ModelPatchRaw) -> ModelPatchRaw:
 
     # Check if any layer keys are in BFL format (contain double_blocks or single_blocks)
     has_bfl_keys = any(
-        k.startswith(prefix) and (k[prefix_len:].startswith("double_blocks.") or k[prefix_len:].startswith("single_blocks."))
+        k.startswith(prefix)
+        and (k[prefix_len:].startswith("double_blocks.") or k[prefix_len:].startswith("single_blocks."))
         for k in patch.layers
     )
     if not has_bfl_keys:
@@ -287,9 +288,7 @@ def convert_bfl_lora_patch_to_diffusers(patch: ModelPatchRaw) -> ModelPatchRaw:
     return ModelPatchRaw(layers=new_layers)
 
 
-def _convert_bfl_layer_patch_to_diffusers(
-    bfl_key: str, layer: BaseLayerPatch
-) -> list[tuple[str, BaseLayerPatch]]:
+def _convert_bfl_layer_patch_to_diffusers(bfl_key: str, layer: BaseLayerPatch) -> list[tuple[str, BaseLayerPatch]]:
     """Convert a single BFL-named LoRA layer patch to one or more diffusers-named patches.
 
     For simple renames, the layer object is reused. For QKV splits, new LoRALayer objects
