@@ -84,7 +84,6 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
 
             # The models are still locked while we save the data
             conditioning_name = context.conditioning.save(conditioning_data)
-            
             return FluxConditioningOutput(
                 conditioning=FluxConditioningField(conditioning_name=conditioning_name, mask=self.mask)
             )
@@ -155,7 +154,6 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
             output_hidden_states=True,
             use_cache=False,
         )
-        
         if not hasattr(outputs, "hidden_states") or outputs.hidden_states is None:
             raise RuntimeError(
                 "Text encoder did not return hidden_states. "
