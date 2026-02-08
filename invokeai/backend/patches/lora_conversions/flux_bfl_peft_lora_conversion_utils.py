@@ -17,6 +17,8 @@ from typing import Dict
 
 import torch
 
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -248,5 +250,113 @@ def _split_qkv_lora(
         if alpha is not None:
             sd["alpha"] = alpha
         result.append((key, sd))
+
+    return result
+
+
+def convert_bfl_lora_patch_to_diffusers(patch: ModelPatchRaw) -> ModelPatchRaw:
+    """Convert a ModelPatchRaw with BFL-format layer keys to diffusers-format keys.
+
+    This handles LoRAs that were loaded with the FLUX.1 BFL PEFT converter (which keeps BFL keys)
+    but need to be applied to a FLUX.2 Klein model (which uses diffusers module names).
+
+    If the patch doesn't contain BFL-format keys, it is returned unchanged.
+    """
+    prefix = FLUX_LORA_TRANSFORMER_PREFIX
+    prefix_len = len(prefix)
+
+    # Check if any layer keys are in BFL format (contain double_blocks or single_blocks)
+    has_bfl_keys = any(
+        k.startswith(prefix) and (k[prefix_len:].startswith("double_blocks.") or k[prefix_len:].startswith("single_blocks."))
+        for k in patch.layers
+    )
+    if not has_bfl_keys:
+        return patch
+
+    new_layers: dict[str, BaseLayerPatch] = {}
+    for layer_key, layer in patch.layers.items():
+        if not layer_key.startswith(prefix):
+            new_layers[layer_key] = layer
+            continue
+
+        bfl_key = layer_key[prefix_len:]
+        converted = _convert_bfl_layer_patch_to_diffusers(bfl_key, layer)
+        for diff_key, diff_layer in converted:
+            new_layers[f"{prefix}{diff_key}"] = diff_layer
+
+    return ModelPatchRaw(layers=new_layers)
+
+
+def _convert_bfl_layer_patch_to_diffusers(
+    bfl_key: str, layer: BaseLayerPatch
+) -> list[tuple[str, BaseLayerPatch]]:
+    """Convert a single BFL-named LoRA layer patch to one or more diffusers-named patches.
+
+    For simple renames, the layer object is reused. For QKV splits, new LoRALayer objects
+    are created with split up-weights and cloned down-weights.
+    """
+    # Double blocks
+    m = _DOUBLE_BLOCK_RE.match(bfl_key)
+    if m:
+        idx, rest = m.group(1), m.group(2)
+        diff_prefix = f"transformer_blocks.{idx}"
+
+        # Fused QKV → split into separate Q, K, V
+        if rest == "img_attn.qkv" and isinstance(layer, LoRALayer):
+            return _split_qkv_lora_layer(
+                layer,
+                q_key=f"{diff_prefix}.attn.to_q",
+                k_key=f"{diff_prefix}.attn.to_k",
+                v_key=f"{diff_prefix}.attn.to_v",
+            )
+        if rest == "txt_attn.qkv" and isinstance(layer, LoRALayer):
+            return _split_qkv_lora_layer(
+                layer,
+                q_key=f"{diff_prefix}.attn.add_q_proj",
+                k_key=f"{diff_prefix}.attn.add_k_proj",
+                v_key=f"{diff_prefix}.attn.add_v_proj",
+            )
+        # Simple renames
+        if rest in _DOUBLE_BLOCK_RENAMES:
+            return [(f"{diff_prefix}.{_DOUBLE_BLOCK_RENAMES[rest]}", layer)]
+        return [(f"{diff_prefix}.{rest}", layer)]
+
+    # Single blocks
+    m = _SINGLE_BLOCK_RE.match(bfl_key)
+    if m:
+        idx, rest = m.group(1), m.group(2)
+        diff_prefix = f"single_transformer_blocks.{idx}"
+
+        if rest in _SINGLE_BLOCK_RENAMES:
+            return [(f"{diff_prefix}.{_SINGLE_BLOCK_RENAMES[rest]}", layer)]
+        return [(f"{diff_prefix}.{rest}", layer)]
+
+    # Non-block keys - pass through
+    return [(bfl_key, layer)]
+
+
+def _split_qkv_lora_layer(
+    layer: LoRALayer,
+    q_key: str,
+    k_key: str,
+    v_key: str,
+) -> list[tuple[str, LoRALayer]]:
+    """Split a fused QKV LoRALayer into separate Q, K, V LoRALayers.
+
+    The up weight [3*hidden, rank] is split into 3 parts.
+    The down weight [rank, hidden] is cloned for each.
+    """
+    up_q, up_k, up_v = layer.up.chunk(3, dim=0)
+
+    result = []
+    for key, up_part in [(q_key, up_q), (k_key, up_k), (v_key, up_v)]:
+        split_layer = LoRALayer(
+            up=up_part,
+            mid=None,
+            down=layer.down.clone(),
+            alpha=layer._alpha,
+            bias=None,
+        )
+        result.append((key, split_layer))
 
     return result

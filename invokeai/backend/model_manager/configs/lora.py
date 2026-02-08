@@ -72,6 +72,10 @@ _FLUX2_VEC_IN_DIMS = {2560, 4096}
 # Klein 4B also uses 3072, so hidden_size alone can't distinguish Klein 4B from FLUX.1.
 _FLUX1_HIDDEN_SIZE = 3072
 
+# FLUX.1 uses mlp_ratio=4 (ffn_dim=12288 for hidden_size=3072).
+# Klein 4B uses mlp_ratio=6 (ffn_dim=18432 for hidden_size=3072).
+_FLUX1_MLP_RATIO = 4
+
 
 def _is_flux2_lora(mod: ModelOnDisk) -> bool:
     """Check if a FLUX-format LoRA is specifically for FLUX.2 (Klein) rather than FLUX.1.
@@ -105,14 +109,16 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
     # Check BFL PEFT format (diffusion_model.* prefix)
     # Klein 9B has hidden_size=4096 (vs 3072 for FLUX.1 and Klein 4B).
     # We can detect Klein 9B by checking attention projection dimensions.
+    # Klein 4B has same hidden_size as FLUX.1 (3072) but different mlp_ratio (6 vs 4).
+    bfl_hidden_size: int | None = None
     for key in state_dict:
         if not isinstance(key, str):
             continue
 
         # BFL PEFT format: diffusion_model.double_blocks.X.img_attn.proj.lora_A.weight
         if key.startswith("diffusion_model.") and key.endswith(".img_attn.proj.lora_A.weight"):
-            hidden_size = state_dict[key].shape[1]
-            if hidden_size != _FLUX1_HIDDEN_SIZE:
+            bfl_hidden_size = state_dict[key].shape[1]
+            if bfl_hidden_size != _FLUX1_HIDDEN_SIZE:
                 return True
             break  # Found the key but it's FLUX.1-sized, check other indicators
 
@@ -123,6 +129,18 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
         # BFL PEFT format: vector_in
         if key.startswith("diffusion_model.") and "vector_in" in key and key.endswith("lora_A.weight"):
             return state_dict[key].shape[1] in _FLUX2_VEC_IN_DIMS
+
+    # BFL PEFT: hidden_size matches FLUX.1. Check MLP ratio to distinguish Klein 4B.
+    # Klein 4B uses mlp_ratio=6 (ffn_dim=18432), FLUX.1 uses mlp_ratio=4 (ffn_dim=12288).
+    if bfl_hidden_size == _FLUX1_HIDDEN_SIZE:
+        for key in state_dict:
+            if not isinstance(key, str):
+                continue
+            if key.startswith("diffusion_model.") and key.endswith(".img_mlp.0.lora_B.weight"):
+                ffn_dim = state_dict[key].shape[0]
+                if ffn_dim != bfl_hidden_size * _FLUX1_MLP_RATIO:
+                    return True
+                break
 
     # Check kohya format: look for context_embedder or vector_in keys
     # Kohya format uses lora_unet_ prefix with underscores instead of dots
