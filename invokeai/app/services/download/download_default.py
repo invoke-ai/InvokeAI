@@ -388,8 +388,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 resume_from = candidates[0].stat().st_size
                 job.bytes = resume_from
                 self._logger.debug(
-                    "Resume check (dir): inferred in-progress file "
-                    f"path={candidates[0]} size={resume_from} bytes"
+                    f"Resume check (dir): inferred in-progress file path={candidates[0]} size={resume_from} bytes"
                 )
                 if resume_from > 0:
                     if job.etag:
