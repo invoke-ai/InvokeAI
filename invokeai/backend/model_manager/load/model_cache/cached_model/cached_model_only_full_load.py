@@ -60,6 +60,11 @@ class CachedModelOnlyFullLoad:
         """Return true if the model is currently in VRAM."""
         return self._is_in_vram
 
+    @property
+    def compute_device(self) -> torch.device:
+        """Return the compute device for this model."""
+        return self._compute_device
+
     def full_load_to_vram(self) -> int:
         """Load all weights into VRAM (if supported by the model).
         Returns:
