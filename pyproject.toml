@@ -89,8 +89,8 @@ dependencies = [
 "cpu" = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
 "cuda" = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
 "rocm" = [
-  "torch==2.7.1+rocm6.3",
-  "torchvision==0.22.1+rocm6.3",
+  "torch==2.10.0+rocm7.1",
+  "torchvision==0.25.0+rocm7.1",
   "pytorch-triton-rocm",
 ]
 
@@ -154,7 +154,7 @@ explicit = true
 
 [[tool.uv.index]]
 name = "torch-rocm"
-url = "https://download.pytorch.org/whl/rocm6.3"
+url = "https://download.pytorch.org/whl/rocm7.1"
 explicit = true
 
 [project.scripts]
