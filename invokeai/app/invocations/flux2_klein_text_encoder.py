@@ -100,7 +100,6 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
               Shape: (1, hidden_size)
         """
         prompt = self.prompt
-        device = TorchDevice.choose_torch_device()
 
         text_encoder_info = context.models.load(self.qwen3_encoder.text_encoder)
         tokenizer_info = context.models.load(self.qwen3_encoder.tokenizer)
@@ -108,6 +107,9 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
         with ExitStack() as exit_stack:
             (cached_weights, text_encoder) = exit_stack.enter_context(text_encoder_info.model_on_device())
             (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
+
+            # you can now define the device, as the text_encoder exists here
+            device = text_encoder.device
 
             # Apply LoRA models to the text encoder
             lora_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
@@ -157,28 +159,27 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
                 max_length=self.max_seq_len,
             )
 
-            input_ids = inputs["input_ids"]
-            attention_mask = inputs["attention_mask"]
+            input_ids = inputs["input_ids"].to(device)
+            attention_mask = inputs["attention_mask"].to(device)
 
             # Move to device
             input_ids = input_ids.to(device)
             attention_mask = attention_mask.to(device)
 
             # Forward pass through the model - matching diffusers exactly
+            # Explicitly move inputs to the same device as the text_encoder
             outputs = text_encoder(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
                 output_hidden_states=True,
                 use_cache=False,
             )
-
             # Validate hidden_states output
             if not hasattr(outputs, "hidden_states") or outputs.hidden_states is None:
                 raise RuntimeError(
                     "Text encoder did not return hidden_states. "
                     "Ensure output_hidden_states=True is supported by this model."
                 )
-
             num_hidden_layers = len(outputs.hidden_states)
 
             # Extract and stack hidden states - EXACTLY like diffusers:
