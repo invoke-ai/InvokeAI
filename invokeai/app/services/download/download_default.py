@@ -337,6 +337,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         url = job.canonical_url or str(job.source)
         header = {"Authorization": f"Bearer {job.access_token}"} if job.access_token else {}
+        had_resume_metadata = bool(job.etag or job.last_modified)
         open_mode = "wb"
         resume_from = 0
 
@@ -402,6 +403,12 @@ class DownloadQueueService(DownloadQueueServiceBase):
                     "Resume check (dir): no prior download_path available; cannot resume from disk "
                     f"(candidates={len(candidates)})"
                 )
+
+        if resume_from == 0:
+            job.bytes = 0
+            if had_resume_metadata:
+                job.resume_from_scratch = True
+                job.resume_message = "Partial file missing. Restarted download from the beginning."
 
         # Make a streaming request. This will retrieve headers including
         # content-length and content-disposition, but not fetch any content itself

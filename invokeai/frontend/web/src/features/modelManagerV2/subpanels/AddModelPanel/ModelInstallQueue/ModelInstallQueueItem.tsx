@@ -2,7 +2,7 @@ import { Badge, Box, Flex, IconButton, Progress, Text, Tooltip } from '@invoke-a
 import { isNil } from 'es-toolkit/compat';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import { PiArrowClockwiseBold, PiPauseBold, PiPlayBold, PiXBold } from 'react-icons/pi';
 import {
   useCancelModelInstallMutation,
@@ -39,6 +39,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
   const [resumeModelInstall] = useResumeModelInstallMutation();
   const [restartFailedModelInstall] = useRestartFailedModelInstallMutation();
   const [restartModelInstallFile] = useRestartModelInstallFileMutation();
+  const resumeFromScratchShown = useRef(false);
 
   const handleDeleteModelImport = useCallback(() => {
     deleteImportModel(installJob.id)
@@ -85,7 +86,17 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
   const handleResumeModelInstall = useCallback(() => {
     resumeModelInstall(installJob.id)
       .unwrap()
-      .then(() => {
+      .then((job) => {
+        const restartedFromScratch = job.download_parts?.some((part) => part.resume_from_scratch) ?? false;
+        if (restartedFromScratch && !resumeFromScratchShown.current) {
+          resumeFromScratchShown.current = true;
+          toast({
+            id: 'MODEL_INSTALL_RESTARTED_FROM_SCRATCH',
+            title: t('toast.modelDownloadRestartedFromScratch'),
+            status: 'warning',
+          });
+          return;
+        }
         toast({
           id: 'MODEL_INSTALL_RESUMED',
           title: t('toast.modelDownloadResumed'),
@@ -210,6 +221,21 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
 
   const restartRequiredParts = useMemo(() => {
     return installJob.download_parts?.filter((part) => part.resume_required || part.status === 'error') ?? [];
+  }, [installJob.download_parts]);
+
+  useEffect(() => {
+    if (resumeFromScratchShown.current) {
+      return;
+    }
+    const restartedFromScratch = installJob.download_parts?.some((part) => part.resume_from_scratch) ?? false;
+    if (restartedFromScratch) {
+      resumeFromScratchShown.current = true;
+      toast({
+        id: 'MODEL_INSTALL_RESTARTED_FROM_SCRATCH_AUTO',
+        title: t('toast.modelDownloadRestartedFromScratch'),
+        status: 'warning',
+      });
+    }
   }, [installJob.download_parts]);
 
   const hasRestartRequired = restartRequiredParts.length > 0;

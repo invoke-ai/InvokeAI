@@ -1533,6 +1533,7 @@
         "modelDownloadResumed": "Model download resumed",
         "modelDownloadRestartFailed": "Restart failed downloads",
         "modelDownloadRestartFile": "Restarting file download",
+        "modelDownloadRestartedFromScratch": "Partial file missing. Restarted download from the beginning.",
         "baseModelChangedCleared_one": "Updated, cleared or disabled {{count}} incompatible submodel",
         "baseModelChangedCleared_other": "Updated, cleared or disabled {{count}} incompatible submodels",
         "kleinEncoderCleared": "Qwen3 Encoder Cleared",

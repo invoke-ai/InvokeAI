@@ -181,6 +181,10 @@ class DownloadJob(DownloadJobBase):
     expected_total_bytes: Optional[int] = Field(default=None, description="Expected total size of the download")
     resume_required: bool = Field(default=False, description="True if server refused resume; restart required")
     resume_message: Optional[str] = Field(default=None, description="Message explaining why resume is required")
+    resume_from_scratch: bool = Field(
+        default=False,
+        description="True if resume metadata existed but the partial file was missing and the download restarted from the beginning",
+    )
 
     def __hash__(self) -> int:
         """Return hash of the string representation of this object, for indexing."""

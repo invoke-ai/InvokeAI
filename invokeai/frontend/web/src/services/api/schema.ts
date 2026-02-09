@@ -7152,6 +7152,12 @@ export type components = {
              * @description Message explaining why resume is required
              */
             resume_message?: string | null;
+            /**
+             * Resume From Scratch
+             * @description True if resume metadata existed but the partial file was missing and the download restarted from the beginning
+             * @default false
+             */
+            resume_from_scratch?: boolean;
         };
         /**
          * DownloadJobStatus

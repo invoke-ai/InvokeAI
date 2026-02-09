@@ -247,6 +247,18 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _resume_remote_download(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.WAITING
+        if job.download_parts:
+            for part in job.download_parts:
+                if part.complete or part.bytes <= 0:
+                    continue
+                if not part.download_path:
+                    continue
+                in_progress_path = part.download_path.with_name(part.download_path.name + ".downloading")
+                if not in_progress_path.exists():
+                    part.bytes = 0
+                    part.resume_from_scratch = True
+                    part.resume_message = "Partial file missing. Restarted download from the beginning."
+            job.bytes = sum(p.bytes for p in job.download_parts)
         remote_files, metadata = self._remote_files_from_source(job.source)
         subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
         self._enqueue_remote_download(
