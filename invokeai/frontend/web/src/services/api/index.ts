@@ -38,6 +38,7 @@ const tagTypes = [
   'ModelInstalls',
   'ModelRelationships',
   'ModelScanFolderResults',
+  'OrphanedModels',
   'T2IAdapterModel',
   'MainModel',
   'VaeModel',

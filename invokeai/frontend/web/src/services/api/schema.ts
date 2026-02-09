@@ -426,6 +426,43 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/sync/orphaned": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Orphaned Models
+         * @description Find orphaned model directories.
+         *
+         *     Orphaned models are directories in the models folder that contain model files
+         *     but are not referenced in the database. This can happen when models are deleted
+         *     from the database but the files remain on disk.
+         *
+         *     Returns:
+         *         List of orphaned model directory information
+         */
+        get: operations["get_orphaned_models"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Orphaned Models
+         * @description Delete specified orphaned model directories.
+         *
+         *     Args:
+         *         request: Request containing list of relative paths to delete
+         *
+         *     Returns:
+         *         Response indicating which paths were deleted and which had errors
+         */
+        delete: operations["delete_orphaned_models"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/download_queue/": {
         parameters: {
             query?: never;
@@ -3255,6 +3292,11 @@ export type components = {
              */
             type: "clip_embed";
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
+            /**
              * Variant
              * @default gigantic
              * @constant
@@ -3330,6 +3372,11 @@ export type components = {
              * @constant
              */
             type: "clip_embed";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /**
              * Variant
              * @default large
@@ -3502,6 +3549,11 @@ export type components = {
              * @constant
              */
             type: "clip_vision";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * CV2 Infill
@@ -6443,6 +6495,35 @@ export type components = {
             deleted_images: string[];
         };
         /**
+         * DeleteOrphanedModelsRequest
+         * @description Request to delete specific orphaned model directories.
+         */
+        DeleteOrphanedModelsRequest: {
+            /**
+             * Paths
+             * @description List of relative paths to delete
+             */
+            paths: string[];
+        };
+        /**
+         * DeleteOrphanedModelsResponse
+         * @description Response from deleting orphaned models.
+         */
+        DeleteOrphanedModelsResponse: {
+            /**
+             * Deleted
+             * @description Paths that were successfully deleted
+             */
+            deleted: string[];
+            /**
+             * Errors
+             * @description Paths that had errors, with error messages
+             */
+            errors: {
+                [key: string]: string;
+            };
+        };
+        /**
          * Denoise - SD1.5, SDXL
          * @description Denoises noisy latents to decodable images
          */
@@ -8766,11 +8847,11 @@ export type components = {
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
              * Dype Preset
-             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
+             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. 'area' enables automatically based on image area. '4k' uses optimized settings for 4K output.
              * @default off
              * @enum {string}
              */
-            dype_preset?: "off" | "manual" | "auto" | "4k";
+            dype_preset?: "off" | "manual" | "auto" | "area" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
@@ -8960,11 +9041,11 @@ export type components = {
             kontext_conditioning?: components["schemas"]["FluxKontextConditioningField"] | components["schemas"]["FluxKontextConditioningField"][] | null;
             /**
              * Dype Preset
-             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.
+             * @description DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. 'area' enables automatically based on image area. '4k' uses optimized settings for 4K output.
              * @default off
              * @enum {string}
              */
-            dype_preset?: "off" | "manual" | "auto" | "4k";
+            dype_preset?: "off" | "manual" | "auto" | "area" | "4k";
             /**
              * Dype Scale
              * @description DyPE magnitude (λs). Higher values = stronger extrapolation. Only used when dype_preset is not 'off'.
@@ -14967,6 +15048,11 @@ export type components = {
              * @constant
              */
             base: "any";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * Apply LoRA Collection - SD1.5
@@ -16255,6 +16341,11 @@ export type components = {
              * @description Default Guidance for this model
              */
             guidance?: number | null;
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only?: boolean | null;
         };
         /**
          * Main Model - SD1.5, SD2
@@ -20125,6 +20216,11 @@ export type components = {
              */
             default_settings?: components["schemas"]["MainModelDefaultSettings"] | components["schemas"]["LoraModelDefaultSettings"] | components["schemas"]["ControlAdapterDefaultSettings"] | null;
             /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only?: boolean | null;
+            /**
              * Variant
              * @description The variant of the model.
              */
@@ -20420,6 +20516,32 @@ export type components = {
              * @description Items
              */
             items: components["schemas"]["ImageDTO"][];
+        };
+        /**
+         * OrphanedModelInfo
+         * @description Information about an orphaned model directory.
+         */
+        OrphanedModelInfo: {
+            /**
+             * Path
+             * @description Relative path to the orphaned directory from models root
+             */
+            path: string;
+            /**
+             * Absolute Path
+             * @description Absolute path to the orphaned directory
+             */
+            absolute_path: string;
+            /**
+             * Files
+             * @description List of model files in this directory
+             */
+            files: string[];
+            /**
+             * Size Bytes
+             * @description Total size of all files in bytes
+             */
+            size_bytes: number;
         };
         /**
          * OutputFieldJSONSchemaExtra
@@ -21112,6 +21234,11 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /** @description Qwen3 model size variant (4B or 8B) */
             variant: components["schemas"]["Qwen3VariantType"];
         };
@@ -21190,6 +21317,11 @@ export type components = {
              * @constant
              */
             format: "gguf_quantized";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /** @description Qwen3 model size variant (4B or 8B) */
             variant: components["schemas"]["Qwen3VariantType"];
         };
@@ -21266,6 +21398,11 @@ export type components = {
              * @constant
              */
             format: "qwen3_encoder";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
             /** @description Qwen3 model size variant (4B or 8B) */
             variant: components["schemas"]["Qwen3VariantType"];
         };
@@ -23193,6 +23330,11 @@ export type components = {
              * @constant
              */
             base: "any";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * Image-to-Image (Autoscale)
@@ -24384,6 +24526,11 @@ export type components = {
              * @constant
              */
             format: "bnb_quantized_int8b";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /**
          * T5Encoder_T5Encoder_Config
@@ -24456,6 +24603,11 @@ export type components = {
              * @constant
              */
             format: "t5_encoder";
+            /**
+             * Cpu Only
+             * @description Whether this model should run on CPU only
+             */
+            cpu_only: boolean | null;
         };
         /** TBLR */
         TBLR: {
@@ -28199,6 +28351,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HFTokenStatus"];
+                };
+            };
+        };
+    };
+    get_orphaned_models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrphanedModelInfo"][];
+                };
+            };
+        };
+    };
+    delete_orphaned_models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteOrphanedModelsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteOrphanedModelsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
