@@ -1530,7 +1530,7 @@
         "addedToUncategorized": "Added to board $t(boards.uncategorized)'s assets",
         "baseModelChanged": "Base Model Changed",
         "modelDownloadPaused": "Model download paused",
-        "modelDownloadResumed": "Model download resumed",
+        "modelDownloadResumed": "Resuming download",
         "modelDownloadRestartFailed": "Restart failed downloads",
         "modelDownloadRestartFile": "Restarting file download",
         "modelDownloadRestartedFromScratch": "Partial file missing. Restarted download from the beginning.",

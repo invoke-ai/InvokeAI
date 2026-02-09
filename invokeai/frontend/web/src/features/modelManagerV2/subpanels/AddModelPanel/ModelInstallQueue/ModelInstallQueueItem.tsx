@@ -83,11 +83,20 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       });
   }, [installJob, pauseModelInstall]);
 
+  const hasRestartedFromScratch = useCallback((job: ModelInstallJob) => {
+    return (
+      job.download_parts?.some(
+        (part) =>
+          part.resume_from_scratch || (part.resume_message?.toLowerCase().includes('partial file missing') ?? false)
+      ) ?? false
+    );
+  }, []);
+
   const handleResumeModelInstall = useCallback(() => {
     resumeModelInstall(installJob.id)
       .unwrap()
       .then((job) => {
-        const restartedFromScratch = job.download_parts?.some((part) => part.resume_from_scratch) ?? false;
+        const restartedFromScratch = hasRestartedFromScratch(job);
         if (restartedFromScratch && !resumeFromScratchShown.current) {
           resumeFromScratchShown.current = true;
           toast({
@@ -112,7 +121,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
           });
         }
       });
-  }, [installJob, resumeModelInstall]);
+  }, [hasRestartedFromScratch, installJob, resumeModelInstall]);
 
   const handleRestartFailed = useCallback(() => {
     restartFailedModelInstall(installJob.id)
@@ -227,7 +236,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     if (resumeFromScratchShown.current) {
       return;
     }
-    const restartedFromScratch = installJob.download_parts?.some((part) => part.resume_from_scratch) ?? false;
+    const restartedFromScratch = hasRestartedFromScratch(installJob);
     if (restartedFromScratch) {
       resumeFromScratchShown.current = true;
       toast({
@@ -236,7 +245,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
         status: 'warning',
       });
     }
-  }, [installJob.download_parts]);
+  }, [hasRestartedFromScratch, installJob]);
 
   const hasRestartRequired = restartRequiredParts.length > 0;
 
