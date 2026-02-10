@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { chakra, Checkbox, Flex, Spacer, Text } from '@invoke-ai/ui-library';
+import { Badge, chakra, Checkbox, Flex, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
@@ -15,8 +15,10 @@ import { filesize } from 'filesize';
 import type { ChangeEvent, MouseEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiWarningBold } from 'react-icons/pi';
 import type { AnyModelConfig } from 'services/api/types';
 
+import { useIsModelMissing } from './MissingModelsContext';
 import ModelImage from './ModelImage';
 
 const StyledLabel = chakra('label');
@@ -58,6 +60,7 @@ const sx: SystemStyleObject = {
 const ModelListItem = ({ model }: ModelListItemProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const isMissing = useIsModelMissing(model.key);
   const selectIsSelected = useMemo(
     () =>
       createSelector(
@@ -139,6 +142,14 @@ const ModelListItem = ({ model }: ModelListItemProps) => {
             <Flex gap={1} mt={1}>
               <ModelBaseBadge base={model.base} />
               <ModelFormatBadge format={model.format} />
+              {isMissing && (
+                <Tooltip label={t('modelManager.missingFilesTooltip')}>
+                  <Badge colorScheme="warning" display="flex" alignItems="center" gap={1}>
+                    <PiWarningBold />
+                    {t('modelManager.missingFiles')}
+                  </Badge>
+                </Tooltip>
+              )}
             </Flex>
           </Flex>
         </Flex>

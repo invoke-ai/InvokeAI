@@ -162,7 +162,7 @@ class FLUXLoRACollectionLoader(BaseInvocation):
             if not context.models.exists(lora.lora.key):
                 raise Exception(f"Unknown lora: {lora.lora.key}!")
 
-            assert lora.lora.base is BaseModelType.Flux
+            assert lora.lora.base in (BaseModelType.Flux, BaseModelType.Flux2)
 
             added_loras.append(lora.lora.key)
 

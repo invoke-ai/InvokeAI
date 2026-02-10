@@ -19,11 +19,13 @@ from invokeai.backend.model_manager.configs.main import MainModelDefaultSettings
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ClipVariantType,
+    Flux2VariantType,
     FluxVariantType,
     ModelFormat,
     ModelSourceType,
     ModelType,
     ModelVariantType,
+    Qwen3VariantType,
     SchedulerPredictionType,
 )
 
@@ -86,11 +88,12 @@ class ModelRecordChanges(BaseModelExcludeNull):
     default_settings: Optional[MainModelDefaultSettings | LoraModelDefaultSettings | ControlAdapterDefaultSettings] = (
         Field(description="Default settings for this model", default=None)
     )
+    cpu_only: Optional[bool] = Field(description="Whether this model should run on CPU only", default=None)
 
     # Checkpoint-specific changes
     # TODO(MM2): Should we expose these? Feels footgun-y...
-    variant: Optional[ModelVariantType | ClipVariantType | FluxVariantType] = Field(
-        description="The variant of the model.", default=None
+    variant: Optional[ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | Qwen3VariantType] = (
+        Field(description="The variant of the model.", default=None)
     )
     prediction_type: Optional[SchedulerPredictionType] = Field(
         description="The prediction type of the model.", default=None

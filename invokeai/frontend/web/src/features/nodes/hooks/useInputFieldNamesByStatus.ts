@@ -1,9 +1,28 @@
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector } from 'app/store/storeHooks';
+import { isNil } from 'es-toolkit/compat';
 import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import type { FieldInputTemplate } from 'features/nodes/types/field';
 import { isSingleOrCollection, isStatefulFieldType } from 'features/nodes/types/field';
 import { useMemo } from 'react';
+
+/**
+ * Sort input fields: unordered fields first (preserving original order),
+ * then explicitly ordered fields sorted by ui_order ascending.
+ */
+const sortInputFields = (fields: FieldInputTemplate[]): string[] => {
+  const visibleFields = fields.filter((field) => !field.ui_hidden);
+
+  const unorderedFields = visibleFields.filter((f) => isNil(f.ui_order));
+  const orderedFields = visibleFields
+    .filter((f) => !isNil(f.ui_order))
+    .sort((a, b) => (a.ui_order ?? 0) - (b.ui_order ?? 0));
+
+  return unorderedFields
+    .concat(orderedFields)
+    .map((f) => f.name)
+    .filter((fieldName) => fieldName !== 'is_intermediate');
+};
 
 const isConnectionInputField = (field: FieldInputTemplate) => {
   return (field.input === 'connection' && !isSingleOrCollection(field.type)) || !isStatefulFieldType(field.type);
@@ -34,13 +53,13 @@ export const useInputFieldNamesAnyOrDirect = () => {
   const selector = useMemo(
     () =>
       createSelector([ctx.selectNodeTemplateSafe], (template) => {
-        const fieldNames: string[] = [];
-        for (const [fieldName, fieldTemplate] of Object.entries(template?.inputs ?? {})) {
+        const fields: FieldInputTemplate[] = [];
+        for (const fieldTemplate of Object.values(template?.inputs ?? {})) {
           if (isAnyOrDirectInputField(fieldTemplate)) {
-            fieldNames.push(fieldName);
+            fields.push(fieldTemplate);
           }
         }
-        return fieldNames;
+        return sortInputFields(fields);
       }),
     [ctx]
   );
@@ -52,13 +71,13 @@ export const useInputFieldNamesConnection = () => {
   const selector = useMemo(
     () =>
       createSelector([ctx.selectNodeTemplateSafe], (template) => {
-        const fieldNames: string[] = [];
-        for (const [fieldName, fieldTemplate] of Object.entries(template?.inputs ?? {})) {
+        const fields: FieldInputTemplate[] = [];
+        for (const fieldTemplate of Object.values(template?.inputs ?? {})) {
           if (isConnectionInputField(fieldTemplate)) {
-            fieldNames.push(fieldName);
+            fields.push(fieldTemplate);
           }
         }
-        return fieldNames;
+        return sortInputFields(fields);
       }),
     [ctx]
   );
