@@ -86,7 +86,7 @@ class SqliteDatabase:
             try:
                 yield cursor
                 self._conn.commit()
-            except:
+            except Exception:
                 self._conn.rollback()
                 raise
             finally:
