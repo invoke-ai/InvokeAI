@@ -476,7 +476,7 @@ const ImageFieldComponent = memo(
     }, [handleChange]);
 
     return (
-      <FormControl>
+      <FormControl overflow="hidden">
         <Flex alignItems="center" gap={2} mb={2}>
           <Radio isChecked={isSelected} onChange={handleImageFieldSelect} />
           <FormLabel mb={0} cursor="pointer" onClick={handleImageFieldSelect}>
@@ -491,7 +491,7 @@ const ImageFieldComponent = memo(
 
         {/* Show image upload/preview for non-selected fields */}
         {!isSelected && (
-          <Flex ml={6} position="relative" w="full" h={32} alignItems="stretch">
+          <Flex ml={6} position="relative" h={32} alignItems="stretch" maxW="calc(100% - 1.5rem)">
             {!imageDTO && (
               <UploadImageIconButton
                 w="full"
@@ -503,8 +503,16 @@ const ImageFieldComponent = memo(
               />
             )}
             {imageDTO && (
-              <Flex gap={2} alignItems="center">
-                <Flex borderRadius="base" borderWidth={1} borderStyle="solid" overflow="hidden" position="relative">
+              <Flex gap={2} alignItems="center" maxW="full">
+                <Flex
+                  borderRadius="base"
+                  borderWidth={1}
+                  borderStyle="solid"
+                  overflow="hidden"
+                  position="relative"
+                  h={32}
+                  maxH={32}
+                >
                   <DndImage imageDTO={imageDTO} asThumbnail />
                   <Text
                     position="absolute"

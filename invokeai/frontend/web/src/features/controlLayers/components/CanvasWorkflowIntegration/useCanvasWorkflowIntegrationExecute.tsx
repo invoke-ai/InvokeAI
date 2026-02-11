@@ -4,6 +4,7 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
   canvasWorkflowIntegrationClosed,
+  canvasWorkflowIntegrationProcessingCompleted,
   canvasWorkflowIntegrationProcessingStarted,
   selectCanvasWorkflowIntegrationFieldValues,
   selectCanvasWorkflowIntegrationSelectedImageFieldKey,
@@ -280,6 +281,7 @@ export const useCanvasWorkflowIntegrationExecute = () => {
       dispatch(canvasWorkflowIntegrationClosed());
     } catch (error) {
       log.error('Error executing workflow');
+      dispatch(canvasWorkflowIntegrationProcessingCompleted());
       toast({
         status: 'error',
         title: t('controlLayers.workflowIntegration.executionFailed', 'Failed to execute workflow'),

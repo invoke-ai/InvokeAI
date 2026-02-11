@@ -1,9 +1,15 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Spinner, Text } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
-import { useAppSelector } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { WorkflowFieldRenderer } from 'features/controlLayers/components/CanvasWorkflowIntegration/WorkflowFieldRenderer';
-import { selectCanvasWorkflowIntegrationSelectedWorkflowId } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
+import {
+  canvasWorkflowIntegrationImageFieldSelected,
+  selectCanvasWorkflowIntegrationFieldValues,
+  selectCanvasWorkflowIntegrationSelectedImageFieldKey,
+  selectCanvasWorkflowIntegrationSelectedWorkflowId,
+} from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import {
   ContainerContextProvider,
   DepthContextProvider,
@@ -13,6 +19,7 @@ import {
 import { DividerElement } from 'features/nodes/components/sidePanel/builder/DividerElement';
 import { HeadingElement } from 'features/nodes/components/sidePanel/builder/HeadingElement';
 import { TextElement } from 'features/nodes/components/sidePanel/builder/TextElement';
+import { $templates } from 'features/nodes/store/nodesSlice';
 import type { FormElement } from 'features/nodes/types/workflow';
 import {
   CONTAINER_CLASS_NAME,
@@ -23,7 +30,7 @@ import {
   isTextElement,
   ROOT_CONTAINER_CLASS_NAME,
 } from 'features/nodes/types/workflow';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 
@@ -73,7 +80,11 @@ const containerViewModeSx: SystemStyleObject = {
 
 export const WorkflowFormPreview = memo(() => {
   const { t } = useTranslation();
+  const dispatch = useAppDispatch();
   const selectedWorkflowId = useAppSelector(selectCanvasWorkflowIntegrationSelectedWorkflowId);
+  const selectedImageFieldKey = useAppSelector(selectCanvasWorkflowIntegrationSelectedImageFieldKey);
+  const fieldValues = useAppSelector(selectCanvasWorkflowIntegrationFieldValues);
+  const templates = useStore($templates);
 
   const { data: workflow, isLoading } = useGetWorkflowQuery(selectedWorkflowId!, {
     skip: !selectedWorkflowId,
@@ -96,6 +107,63 @@ export const WorkflowFormPreview = memo(() => {
     log.debug({ rootElementId: rootId }, 'Root element ID');
     return rootId;
   }, [workflow]);
+
+  // Auto-select the image field if there's only one unfilled ImageField
+  useEffect(() => {
+    // Don't auto-select if user already selected one
+    if (selectedImageFieldKey) {
+      return;
+    }
+    if (!workflow?.workflow.nodes || Object.keys(elements).length === 0) {
+      return;
+    }
+
+    const unfilledImageFieldKeys: string[] = [];
+
+    for (const element of Object.values(elements)) {
+      if (!isNodeFieldElement(element)) {
+        continue;
+      }
+
+      const { fieldIdentifier } = element.data;
+      const fieldKey = `${fieldIdentifier.nodeId}.${fieldIdentifier.fieldName}`;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const node = workflow.workflow.nodes.find((n: any) => n.data?.id === fieldIdentifier.nodeId);
+      if (!node) {
+        continue;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const nodeType = (node.data as any)?.type;
+      const template = templates[nodeType];
+      if (!template?.inputs) {
+        continue;
+      }
+
+      const fieldTemplate = template.inputs[fieldIdentifier.fieldName];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fieldType = (fieldTemplate as any)?.type?.name;
+      if (fieldType !== 'ImageField') {
+        continue;
+      }
+
+      // Check if the field already has a value
+      const hasReduxValue = fieldValues && fieldKey in fieldValues && fieldValues[fieldKey]?.image_name;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fieldInstance = (node.data as any)?.inputs?.[fieldIdentifier.fieldName];
+      const hasWorkflowValue = fieldInstance?.value?.image_name;
+
+      if (!hasReduxValue && !hasWorkflowValue) {
+        unfilledImageFieldKeys.push(fieldKey);
+      }
+    }
+
+    if (unfilledImageFieldKeys.length === 1) {
+      log.debug({ fieldKey: unfilledImageFieldKeys[0] }, 'Auto-selecting the only unfilled ImageField');
+      dispatch(canvasWorkflowIntegrationImageFieldSelected({ fieldKey: unfilledImageFieldKeys[0]! }));
+    }
+  }, [workflow, elements, templates, selectedImageFieldKey, fieldValues, dispatch]);
 
   if (isLoading) {
     return (
