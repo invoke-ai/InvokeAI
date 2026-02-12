@@ -131,14 +131,14 @@ export const useCanvasWorkflowIntegrationExecute = () => {
         throw new Error('Workflow does not have an image input field in the Form Builder');
       }
 
-      // Update the workflow nodes with our values
+      // Update the workflow nodes with canvas image and user field values
       const updatedWorkflow = {
         ...workflow.workflow,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         nodes: workflow.workflow.nodes.map((node: any) => {
           const nodeId = node.data.id;
           let updatedInputs = { ...node.data.inputs };
-          let updatedData = { ...node.data };
+          const updatedData = { ...node.data };
           let hasChanges = false;
 
           // Apply image field if this is the image node
@@ -164,23 +164,6 @@ export const useCanvasWorkflowIntegrationExecute = () => {
             });
           }
 
-          // Configure output nodes to go to staging area
-          // board_id field determines where images are saved
-          if (updatedInputs.board !== undefined) {
-            updatedInputs.board = {
-              ...updatedInputs.board,
-              value: undefined,
-            };
-            hasChanges = true;
-          }
-
-          // Set isIntermediate to true (like normal canvas operations)
-          // This is a node-level property, not an input field
-          if (updatedData.isIntermediate !== undefined) {
-            updatedData.isIntermediate = true;
-            hasChanges = true;
-          }
-
           // If anything was modified, return updated node
           if (hasChanges) {
             updatedData.inputs = updatedInputs;
@@ -194,34 +177,49 @@ export const useCanvasWorkflowIntegrationExecute = () => {
         }),
       };
 
+      // Validate that the workflow has a canvas_output node
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hasCanvasOutputNode = updatedWorkflow.nodes.some((node: any) => node.data?.type === 'canvas_output');
+      if (!hasCanvasOutputNode) {
+        throw new Error('Workflow does not have a Canvas Output node');
+      }
+
       // 4. Convert workflow to graph format
-      // We need to manually convert the workflow nodes to invocation graph nodes
       const graphNodes: Record<string, unknown> = {};
       const nodeIdMapping: Record<string, string> = {}; // Map original IDs to new IDs
 
       for (const node of updatedWorkflow.nodes) {
         const nodeData = node.data;
+        const isCanvasOutputNode = nodeData.type === 'canvas_output';
 
-        // Check if this is an output node (has a board input)
-        const isOutputNode = nodeData.inputs.board !== undefined;
-
-        // Use canvas output prefix for output nodes, otherwise keep original ID
-        const nodeId = isOutputNode ? getPrefixedId(CANVAS_OUTPUT_PREFIX) : nodeData.id;
+        // Prefix canvas_output node IDs so the staging area can find them
+        const nodeId = isCanvasOutputNode ? getPrefixedId(CANVAS_OUTPUT_PREFIX) : nodeData.id;
         nodeIdMapping[nodeData.id] = nodeId;
 
         const invocation: Record<string, unknown> = {
           id: nodeId,
           type: nodeData.type,
-          is_intermediate: nodeData.isIntermediate ?? true,
+          // Canvas output nodes are always intermediate (they go to the staging area, not gallery)
+          is_intermediate: isCanvasOutputNode ? true : (nodeData.isIntermediate ?? false),
           use_cache: nodeData.useCache ?? true,
         };
 
         // Add input values to the invocation
         for (const [fieldName, fieldData] of Object.entries(nodeData.inputs)) {
           const fieldValue = (fieldData as { value?: unknown }).value;
-          if (fieldValue !== undefined) {
-            invocation[fieldName] = fieldValue;
+          if (fieldValue === undefined) {
+            continue;
           }
+
+          // The frontend stores board fields as 'auto', 'none', or { board_id: string }.
+          // The backend expects null or { board_id: string }. Translate accordingly.
+          if (fieldName === 'board') {
+            if (fieldValue === 'auto' || fieldValue === 'none' || fieldValue === null) {
+              continue;
+            }
+          }
+
+          invocation[fieldName] = fieldValue;
         }
 
         graphNodes[nodeId] = invocation;

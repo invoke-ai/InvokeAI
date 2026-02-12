@@ -68,7 +68,7 @@ export const CanvasWorkflowIntegrationWorkflowSelector = memo(() => {
           ? t('controlLayers.workflowIntegration.noWorkflowsFound', 'No workflows found.')
           : t(
               'controlLayers.workflowIntegration.noWorkflowsWithImageField',
-              'No workflows with Form Builder and image input fields found. Create a workflow with the Form Builder and add an image field.'
+              'No compatible workflows found. A workflow needs a Form Builder with an image input field and a Canvas Output node.'
             )}
       </Text>
     );

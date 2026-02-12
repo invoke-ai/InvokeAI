@@ -156,8 +156,8 @@ export class CanvasStagingAreaModule extends CanvasModuleBase {
         return;
       }
 
-      if (selectedItem.progressData.imageDTO) {
-        this.$imageSrc.set({ type: 'imageName', data: selectedItem.progressData.imageDTO.image_name });
+      if (selectedItem.imageDTO) {
+        this.$imageSrc.set({ type: 'imageName', data: selectedItem.imageDTO.image_name });
         return;
       } else if (selectedItem.progressData?.progressImage) {
         this.$imageSrc.set({ type: 'dataURL', data: selectedItem.progressData.progressImage.dataURL });

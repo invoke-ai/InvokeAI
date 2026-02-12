@@ -9,11 +9,13 @@ type WorkflowResponse =
   paths['/api/v1/workflows/i/{workflow_id}']['get']['responses']['200']['content']['application/json'];
 
 /**
- * Checks if a workflow has at least one ImageField input exposed in the Form Builder.
- * Only workflows with Form Builder are supported, as they allow users to modify
- * models and other parameters. Workflows without Form Builder are excluded.
+ * Checks if a workflow is compatible with canvas workflow integration.
+ * Requirements:
+ * 1. Has a Form Builder (allows users to modify parameters)
+ * 2. Has a canvas_output node (explicit canvas output target)
+ * 3. Has at least one ImageField in the Form Builder (receives the canvas image)
  * @param workflow The workflow to check
- * @returns true if the workflow has a Form Builder with at least one ImageField, false otherwise
+ * @returns true if the workflow meets all requirements, false otherwise
  */
 export function workflowHasImageField(workflow: WorkflowResponse | undefined): boolean {
   if (!workflow?.workflow) {
@@ -28,10 +30,18 @@ export function workflowHasImageField(workflow: WorkflowResponse | undefined): b
     return false;
   }
 
+  // Must have a canvas_output node to define where the output image goes
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hasCanvasOutputNode = workflow.workflow.nodes?.some((n: any) => (n.data as any)?.type === 'canvas_output');
+  if (!hasCanvasOutputNode) {
+    log.debug('Workflow has no canvas_output node - excluding from list');
+    return false;
+  }
+
   const templates = $templates.get();
   const elements = workflow.workflow.form.elements;
 
-  log.debug('Workflow has form builder, checking form elements for ImageField');
+  log.debug('Workflow has form builder and canvas_output node, checking form elements for ImageField');
 
   for (const [elementId, element] of Object.entries(elements)) {
     if (isNodeFieldElement(element)) {
