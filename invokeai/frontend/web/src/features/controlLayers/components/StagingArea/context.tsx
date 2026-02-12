@@ -79,9 +79,7 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
           position: { x, y },
           objects: [imageObject],
         };
-        store.dispatch(
-          rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' })
-        );
+        store.dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));
 
         store.dispatch(canvasSessionReset());
         store.dispatch(
