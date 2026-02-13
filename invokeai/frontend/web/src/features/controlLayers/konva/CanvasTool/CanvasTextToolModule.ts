@@ -1,9 +1,10 @@
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { getPrefixedId } from 'features/controlLayers/konva/util';
+import { canvasToBlob, getPrefixedId } from 'features/controlLayers/konva/util';
 import { type CanvasTextSettingsState, selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
-import type { CanvasImageState, Coordinate, RgbaColor } from 'features/controlLayers/store/types';
+import type { Coordinate, RgbaColor } from 'features/controlLayers/store/types';
+import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
 import {
   buildFontDescriptor,
@@ -19,6 +20,7 @@ import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { atom } from 'nanostores';
 import type { Logger } from 'roarr';
+import { uploadImage } from 'services/api/endpoints/images';
 
 type CanvasTextSessionState = {
   id: string;
@@ -409,16 +411,14 @@ export class CanvasTextToolModule extends CanvasModuleBase {
       totalHeight = rotated.height;
     }
 
-    const dataURL = renderCanvas.toDataURL('image/png');
-    const imageState: CanvasImageState = {
-      id: getPrefixedId('image'),
-      type: 'image',
-      image: {
-        dataURL,
-        width: totalWidth,
-        height: totalHeight,
-      },
-    };
+    const blob = await canvasToBlob(renderCanvas);
+    const imageDTO = await uploadImage({
+      file: new File([blob], 'canvas-text.png', { type: 'image/png' }),
+      image_category: 'other',
+      is_intermediate: true,
+      silent: true,
+    });
+    const imageState = imageDTOToImageObject(imageDTO);
 
     const extraLeftPadding = Math.ceil(textSettings.fontSize * 0.12);
     const fallbackPosition = calculateLayerPosition(
