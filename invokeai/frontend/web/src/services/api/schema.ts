@@ -15636,6 +15636,7 @@ export type components = {
              * @constant
              */
             base: "z-image";
+            variant: components["schemas"]["ZImageVariantType"] | null;
         };
         /** LoRA_LyCORIS_FLUX_Config */
         LoRA_LyCORIS_FLUX_Config: {
@@ -16014,6 +16015,7 @@ export type components = {
              * @constant
              */
             base: "z-image";
+            variant: components["schemas"]["ZImageVariantType"] | null;
         };
         /** LoRA_OMI_FLUX_Config */
         LoRA_OMI_FLUX_Config: {
@@ -17043,7 +17045,6 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
-            /** @default turbo */
             variant: components["schemas"]["ZImageVariantType"];
         };
         /** Main_Diffusers_CogView4_Config */
@@ -18016,7 +18017,6 @@ export type components = {
              * @constant
              */
             format: "gguf_quantized";
-            /** @default turbo */
             variant: components["schemas"]["ZImageVariantType"];
         };
         /**
