@@ -35,6 +35,12 @@ const getTargetEqualityPredicate =
     return e.target === c.target && e.targetHandle === c.targetHandle;
   };
 
+const IF_INPUT_HANDLES = ['true_input', 'false_input'] as const;
+
+const isIfInputHandle = (handle: string): handle is (typeof IF_INPUT_HANDLES)[number] => {
+  return IF_INPUT_HANDLES.includes(handle as (typeof IF_INPUT_HANDLES)[number]);
+};
+
 /**
  * Validates a connection between two fields
  * @returns A translation key for an error if the connection is invalid, otherwise null
@@ -105,6 +111,44 @@ export const validateConnection: ValidateConnectionFunc = (
       const collectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
       if (collectItemType && !areTypesEqual(sourceFieldTemplate.type, collectItemType)) {
         return 'nodes.cannotMixAndMatchCollectionItemTypes';
+      }
+    }
+
+    if (targetNode.data.type === 'if' && isIfInputHandle(c.targetHandle)) {
+      const siblingHandle = c.targetHandle === 'true_input' ? 'false_input' : 'true_input';
+      const siblingInputEdge = filteredEdges.find((e) => e.target === c.target && e.targetHandle === siblingHandle);
+
+      if (siblingInputEdge) {
+        if (siblingInputEdge.source === null || siblingInputEdge.source === undefined) {
+          return 'nodes.missingNode';
+        }
+
+        if (siblingInputEdge.sourceHandle === null || siblingInputEdge.sourceHandle === undefined) {
+          return 'nodes.missingFieldTemplate';
+        }
+
+        const siblingSourceNode = nodes.find((n) => n.id === siblingInputEdge.source);
+        if (!siblingSourceNode) {
+          return 'nodes.missingNode';
+        }
+
+        const siblingSourceTemplate = templates[siblingSourceNode.data.type];
+        if (!siblingSourceTemplate) {
+          return 'nodes.missingInvocationTemplate';
+        }
+
+        const siblingSourceFieldTemplate = siblingSourceTemplate.outputs[siblingInputEdge.sourceHandle];
+        if (!siblingSourceFieldTemplate) {
+          return 'nodes.missingFieldTemplate';
+        }
+
+        const areIfInputTypesCompatible =
+          validateConnectionTypes(sourceFieldTemplate.type, siblingSourceFieldTemplate.type) ||
+          validateConnectionTypes(siblingSourceFieldTemplate.type, sourceFieldTemplate.type);
+
+        if (!areIfInputTypesCompatible) {
+          return 'nodes.fieldTypesMustMatch';
+        }
       }
     }
 
