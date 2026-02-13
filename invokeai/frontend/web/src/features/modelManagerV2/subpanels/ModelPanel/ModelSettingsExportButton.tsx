@@ -20,7 +20,7 @@ const buildExportData = (modelConfig: AnyModelConfig): Record<string, unknown> =
     data.trigger_phrases = modelConfig.trigger_phrases;
   }
 
-  if ('cpu_only' in modelConfig && modelConfig.cpu_only != null) {
+  if ('cpu_only' in modelConfig && modelConfig.cpu_only !== null) {
     data.cpu_only = modelConfig.cpu_only;
   }
 

@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { toast } from 'features/toast/toast';
+import type { ChangeEvent } from 'react';
 import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiUploadSimpleBold } from 'react-icons/pi';
@@ -19,7 +20,7 @@ export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {
     async (data: Record<string, unknown>) => {
       const body: Record<string, unknown> = {};
 
-      if ('default_settings' in data && data.default_settings != null) {
+      if ('default_settings' in data && data.default_settings !== null) {
         body.default_settings = data.default_settings;
       }
 
@@ -27,7 +28,7 @@ export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {
         body.trigger_phrases = data.trigger_phrases;
       }
 
-      if ('cpu_only' in data && data.cpu_only != null) {
+      if ('cpu_only' in data && data.cpu_only !== null) {
         body.cpu_only = data.cpu_only;
       }
 
@@ -59,7 +60,7 @@ export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {
   );
 
   const handleFileChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    (e: ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) {
         return;
@@ -99,13 +100,7 @@ export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {
         tooltip={t('modelManager.importSettings')}
         onClick={handleClick}
       />
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json"
-        onChange={handleFileChange}
-        style={{ display: 'none' }}
-      />
+      <input ref={fileInputRef} type="file" accept=".json" onChange={handleFileChange} style={{ display: 'none' }} />
     </>
   );
 });

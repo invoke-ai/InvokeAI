@@ -6,7 +6,7 @@ import { selectSelectedModelKey } from 'features/modelManagerV2/store/modelManag
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
 import { toast } from 'features/toast/toast';
 import type { ChangeEvent } from 'react';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import type { Control, SubmitHandler } from 'react-hook-form';
 import { useController, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -79,6 +79,10 @@ export const EncoderModelSettings = memo(({ modelConfig }: Props) => {
   const { handleSubmit, control, formState, reset } = useForm<EncoderModelSettingsFormData>({
     defaultValues: settingsDefaults,
   });
+
+  useEffect(() => {
+    reset(settingsDefaults);
+  }, [settingsDefaults, reset]);
 
   const onSubmit = useCallback<SubmitHandler<EncoderModelSettingsFormData>>(
     (data) => {
