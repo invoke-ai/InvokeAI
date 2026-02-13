@@ -1138,8 +1138,7 @@ class Main_Checkpoint_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Co
 
     base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
-    # Default to Turbo for checkpoint models (Base is currently only available in diffusers format)
-    variant: ZImageVariantType = Field(default=ZImageVariantType.Turbo)
+    variant: ZImageVariantType = Field()
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -1173,8 +1172,7 @@ class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
 
     base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
     format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
-    # Default to Turbo for GGUF models (Base is currently only available in diffusers format)
-    variant: ZImageVariantType = Field(default=ZImageVariantType.Turbo)
+    variant: ZImageVariantType = Field()
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
