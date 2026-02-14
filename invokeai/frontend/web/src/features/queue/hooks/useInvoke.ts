@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react';
 import { logger } from 'app/logging/logger';
 import { useAppSelector } from 'app/store/storeHooks';
+import { setFocusedRegion } from 'common/hooks/focus';
 import { withResultAsync } from 'common/util/result';
 import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
 import { useEnqueueWorkflows } from 'features/queue/hooks/useEnqueueWorkflows';
@@ -60,10 +61,20 @@ export const useInvoke = () => {
     [enqueueCanvas, enqueueGenerate, enqueueUpscaling, enqueueWorkflows, isReady, tabName]
   );
 
+  const setViewerFocusForGalleryNavigation = useCallback(() => {
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+    setFocusedRegion('viewer');
+  }, []);
+
   const enqueueBack = useCallback(() => {
     enqueue(false);
     if (tabName === 'generate' || tabName === 'upscaling' || (tabName === 'canvas' && saveAllImagesToGallery)) {
       navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
+      if (tabName === 'generate' || tabName === 'upscaling') {
+        setViewerFocusForGalleryNavigation();
+      }
     } else if (tabName === 'workflows') {
       // Only switch to viewer if the workflow editor is not currently active
       const workspace = navigationApi.getPanel('workflows', WORKSPACE_PANEL_ID);
@@ -73,12 +84,15 @@ export const useInvoke = () => {
     } else if (tabName === 'canvas') {
       navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
-  }, [enqueue, saveAllImagesToGallery, tabName]);
+  }, [enqueue, saveAllImagesToGallery, setViewerFocusForGalleryNavigation, tabName]);
 
   const enqueueFront = useCallback(() => {
     enqueue(true);
     if (tabName === 'generate' || tabName === 'upscaling' || (tabName === 'canvas' && saveAllImagesToGallery)) {
       navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
+      if (tabName === 'generate' || tabName === 'upscaling') {
+        setViewerFocusForGalleryNavigation();
+      }
     } else if (tabName === 'workflows') {
       // Only switch to viewer if the workflow editor is not currently active
       const workspace = navigationApi.getPanel('workflows', WORKSPACE_PANEL_ID);
@@ -88,7 +102,7 @@ export const useInvoke = () => {
     } else if (tabName === 'canvas') {
       navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
-  }, [enqueue, saveAllImagesToGallery, tabName]);
+  }, [enqueue, saveAllImagesToGallery, setViewerFocusForGalleryNavigation, tabName]);
 
   return { enqueueBack, enqueueFront, isLoading, isDisabled: !isReady, enqueue };
 };
