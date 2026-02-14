@@ -13,6 +13,8 @@ import {
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { MutableRefObject } from 'react';
 import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
 import type {
@@ -84,16 +86,23 @@ const computeItemKey: GridComputeItemKey<string, GridContext> = (index, imageNam
  * Handles keyboard navigation for the gallery.
  */
 const useKeyboardNavigation = (
-  imageNames: string[],
+  navigationImageNames: string[],
   virtuosoRef: React.RefObject<VirtuosoGridHandle>,
   rootRef: React.RefObject<HTMLDivElement>
 ) => {
   const { dispatch, getState } = useAppStore();
+  const activeTab = useAppSelector(selectActiveTab);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
-      if (getFocusedRegion() !== 'gallery') {
-        // Only handle keyboard navigation when the gallery is focused
+      if (navigationApi.isViewerArrowNavigationMode(activeTab)) {
+        // When gallery is not effectively available, viewer hotkeys own left/right navigation.
+        return;
+      }
+
+      const focusedRegion = getFocusedRegion();
+      if (focusedRegion !== 'gallery' && focusedRegion !== 'viewer') {
+        // Allow navigation from both gallery and viewer-focused states.
         return;
       }
       // Only handle arrow keys
@@ -112,7 +121,7 @@ const useKeyboardNavigation = (
         return;
       }
 
-      if (imageNames.length === 0) {
+      if (navigationImageNames.length === 0) {
         return;
       }
 
@@ -132,7 +141,7 @@ const useKeyboardNavigation = (
           (selectImageToCompare(state) ?? selectLastSelectedItem(state))
         : selectLastSelectedItem(state);
 
-      const currentIndex = getItemIndex(imageName ?? null, imageNames);
+      const currentIndex = getItemIndex(imageName ?? null, navigationImageNames);
 
       let newIndex = currentIndex;
 
@@ -146,7 +155,7 @@ const useKeyboardNavigation = (
           }
           break;
         case 'ArrowRight':
-          if (currentIndex < imageNames.length - 1) {
+          if (currentIndex < navigationImageNames.length - 1) {
             newIndex = currentIndex + 1;
             // } else {
             //   // Wrap to first image
@@ -163,16 +172,16 @@ const useKeyboardNavigation = (
           break;
         case 'ArrowDown':
           // If no images below, stay on current image
-          if (currentIndex >= imageNames.length - imagesPerRow) {
+          if (currentIndex >= navigationImageNames.length - imagesPerRow) {
             newIndex = currentIndex;
           } else {
-            newIndex = Math.min(imageNames.length - 1, currentIndex + imagesPerRow);
+            newIndex = Math.min(navigationImageNames.length - 1, currentIndex + imagesPerRow);
           }
           break;
       }
 
-      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < imageNames.length) {
-        const newImageName = imageNames[newIndex];
+      if (newIndex !== currentIndex && newIndex >= 0 && newIndex < navigationImageNames.length) {
+        const newImageName = navigationImageNames[newIndex];
         if (newImageName) {
           if (event.altKey) {
             dispatch(imageToCompareChanged(newImageName));
@@ -182,7 +191,7 @@ const useKeyboardNavigation = (
         }
       }
     },
-    [rootRef, virtuosoRef, imageNames, getState, dispatch]
+    [activeTab, rootRef, virtuosoRef, navigationImageNames, getState, dispatch]
   );
 
   useRegisteredHotkeys({
@@ -316,13 +325,14 @@ const useStarImageHotkey = () => {
 
 type GalleryImageGridContentProps = {
   imageNames: string[];
+  navigationImageNames?: string[];
   isLoading: boolean;
   queryArgs: ListImageNamesQueryArgs;
   rootRef?: React.RefObject<HTMLDivElement>;
 };
 
 export const GalleryImageGridContent = memo(
-  ({ imageNames, isLoading, queryArgs, rootRef: rootRefProp }: GalleryImageGridContentProps) => {
+  ({ imageNames, navigationImageNames, isLoading, queryArgs, rootRef: rootRefProp }: GalleryImageGridContentProps) => {
     const virtuosoRef = useRef<VirtuosoGridHandle>(null);
     const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
     const internalRootRef = useRef<HTMLDivElement>(null);
@@ -336,7 +346,7 @@ export const GalleryImageGridContent = memo(
 
     useStarImageHotkey();
     useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
-    useKeyboardNavigation(imageNames, virtuosoRef, rootRef);
+    useKeyboardNavigation(navigationImageNames ?? imageNames, virtuosoRef, rootRef);
     const scrollerRef = useScrollableGallery(rootRef);
 
     /*

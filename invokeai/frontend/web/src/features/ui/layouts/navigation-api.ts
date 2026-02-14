@@ -9,6 +9,7 @@ import type { Atom } from 'nanostores';
 import { atom } from 'nanostores';
 
 import {
+  GALLERY_PANEL_ID,
   LAUNCHPAD_PANEL_ID,
   LEFT_PANEL_ID,
   LEFT_PANEL_MIN_SIZE_PX,
@@ -713,6 +714,49 @@ export class NavigationApi {
     return Array.from(this.panels.keys())
       .filter((key) => key.startsWith(prefix))
       .map((key) => key.substring(prefix.length));
+  };
+
+  /**
+   * Returns true when both side panels are collapsed in the provided tab.
+   */
+  isFullscreen = (tab: TabName): boolean => {
+    const leftPanel = this.getPanel(tab, LEFT_PANEL_ID);
+    const rightPanel = this.getPanel(tab, RIGHT_PANEL_ID);
+
+    if (!(leftPanel instanceof GridviewPanel) || !(rightPanel instanceof GridviewPanel)) {
+      return false;
+    }
+
+    return leftPanel.width === 0 && rightPanel.width === 0;
+  };
+
+  /**
+   * Returns true when the gallery panel is collapsed in the provided tab.
+   */
+  isGalleryPanelCollapsed = (tab: TabName): boolean => {
+    const galleryPanel = this.getPanel(tab, GALLERY_PANEL_ID);
+    if (!(galleryPanel instanceof GridviewPanel)) {
+      return false;
+    }
+    return galleryPanel.height <= (galleryPanel.minimumHeight ?? 0);
+  };
+
+  /**
+   * Returns true when the right panel is collapsed in the provided tab.
+   */
+  isRightPanelCollapsed = (tab: TabName): boolean => {
+    const rightPanel = this.getPanel(tab, RIGHT_PANEL_ID);
+    if (!(rightPanel instanceof GridviewPanel)) {
+      return false;
+    }
+    return rightPanel.width === 0;
+  };
+
+  /**
+   * Returns true when viewer-level left/right arrow navigation should be active for gallery browsing.
+   */
+  isViewerArrowNavigationMode = (tab: TabName): boolean => {
+    return this.isFullscreen(tab) || this.isRightPanelCollapsed(tab) || this.isGalleryPanelCollapsed(tab);
   };
 
   /**

@@ -5,7 +5,14 @@ import { CanvasAlertsInvocationProgress } from 'features/controlLayers/component
 import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
-import { selectShouldShowItemDetails, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
+import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
+import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+import { navigationApi } from 'features/ui/layouts/navigation-api';
+import {
+  selectActiveTab,
+  selectShouldShowItemDetails,
+  selectShouldShowProgressInViewer,
+} from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useRef, useState } from 'react';
@@ -17,8 +24,10 @@ import { ProgressImage } from './ProgressImage2';
 import { ProgressIndicator } from './ProgressIndicator2';
 
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
+  const activeTab = useAppSelector(selectActiveTab);
   const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
+  const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
   const { onLoadImage, $progressEvent, $progressImage } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
@@ -35,6 +44,50 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       setShouldShowNextPrevButtons(false);
     }, 500);
   }, []);
+
+  const onHotkeyPrevImage = useCallback(
+    (event: KeyboardEvent) => {
+      if (!navigationApi.isViewerArrowNavigationMode(activeTab) || !imageDTO || isFetching) {
+        return;
+      }
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      event.preventDefault();
+      goToPreviousImage();
+    },
+    [activeTab, goToPreviousImage, imageDTO, isFetching]
+  );
+
+  const onHotkeyNextImage = useCallback(
+    (event: KeyboardEvent) => {
+      if (!navigationApi.isViewerArrowNavigationMode(activeTab) || !imageDTO || isFetching) {
+        return;
+      }
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      event.preventDefault();
+      goToNextImage();
+    },
+    [activeTab, goToNextImage, imageDTO, isFetching]
+  );
+
+  useRegisteredHotkeys({
+    id: 'galleryNavLeft',
+    category: 'gallery',
+    callback: onHotkeyPrevImage,
+    options: { preventDefault: true },
+    dependencies: [onHotkeyPrevImage],
+  });
+
+  useRegisteredHotkeys({
+    id: 'galleryNavRight',
+    category: 'gallery',
+    callback: onHotkeyNextImage,
+    options: { preventDefault: true },
+    dependencies: [onHotkeyNextImage],
+  });
 
   const withProgress = shouldShowProgressInViewer && progressImage !== null;
 
