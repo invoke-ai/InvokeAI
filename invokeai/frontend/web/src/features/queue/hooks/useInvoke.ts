@@ -68,13 +68,21 @@ export const useInvoke = () => {
     setFocusedRegion('viewer');
   }, []);
 
+  const focusViewerAfterInvoke = useCallback(
+    (tab: typeof tabName) => {
+      void navigationApi.focusPanel(tab, VIEWER_PANEL_ID).then((didFocus) => {
+        if (didFocus && (tab === 'generate' || tab === 'upscaling')) {
+          setViewerFocusForGalleryNavigation();
+        }
+      });
+    },
+    [setViewerFocusForGalleryNavigation]
+  );
+
   const enqueueBack = useCallback(() => {
     enqueue(false);
     if (tabName === 'generate' || tabName === 'upscaling' || (tabName === 'canvas' && saveAllImagesToGallery)) {
-      navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
-      if (tabName === 'generate' || tabName === 'upscaling') {
-        setViewerFocusForGalleryNavigation();
-      }
+      focusViewerAfterInvoke(tabName);
     } else if (tabName === 'workflows') {
       // Only switch to viewer if the workflow editor is not currently active
       const workspace = navigationApi.getPanel('workflows', WORKSPACE_PANEL_ID);
@@ -84,15 +92,12 @@ export const useInvoke = () => {
     } else if (tabName === 'canvas') {
       navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
-  }, [enqueue, saveAllImagesToGallery, setViewerFocusForGalleryNavigation, tabName]);
+  }, [enqueue, focusViewerAfterInvoke, saveAllImagesToGallery, tabName]);
 
   const enqueueFront = useCallback(() => {
     enqueue(true);
     if (tabName === 'generate' || tabName === 'upscaling' || (tabName === 'canvas' && saveAllImagesToGallery)) {
-      navigationApi.focusPanel(tabName, VIEWER_PANEL_ID);
-      if (tabName === 'generate' || tabName === 'upscaling') {
-        setViewerFocusForGalleryNavigation();
-      }
+      focusViewerAfterInvoke(tabName);
     } else if (tabName === 'workflows') {
       // Only switch to viewer if the workflow editor is not currently active
       const workspace = navigationApi.getPanel('workflows', WORKSPACE_PANEL_ID);
@@ -102,7 +107,7 @@ export const useInvoke = () => {
     } else if (tabName === 'canvas') {
       navigationApi.focusPanel(tabName, WORKSPACE_PANEL_ID);
     }
-  }, [enqueue, saveAllImagesToGallery, setViewerFocusForGalleryNavigation, tabName]);
+  }, [enqueue, focusViewerAfterInvoke, saveAllImagesToGallery, tabName]);
 
   return { enqueueBack, enqueueFront, isLoading, isDisabled: !isReady, enqueue };
 };

@@ -1,4 +1,5 @@
 import { logger } from 'app/logging/logger';
+import { type FocusRegionName, setFocusedRegion } from 'common/hooks/focus';
 import { createDeferredPromise, type Deferred } from 'common/util/createDeferredPromise';
 import { parseify } from 'common/util/serialize';
 import type { GridviewApi, IDockviewPanel, IGridviewPanel } from 'dockview';
@@ -22,6 +23,7 @@ import {
 const log = logger('system');
 
 type PanelType = IGridviewPanel | IDockviewPanel;
+type PanelWithFocusRegion = { params?: { focusRegion?: FocusRegionName } };
 
 /**
  * An object that represents a promise that is waiting for a panel to be registered and ready.
@@ -255,10 +257,18 @@ export class NavigationApi {
     if (api instanceof DockviewApi) {
       this._currentActiveDockviewPanel.set(tab, api.activePanel?.id ?? null);
       this._prevActiveDockviewPanel.set(tab, null);
+      const initialFocusRegion = (api.activePanel as PanelWithFocusRegion | null)?.params?.focusRegion;
+      if (initialFocusRegion && this._app?.activeTab.get() === tab) {
+        setFocusedRegion(initialFocusRegion);
+      }
       const { dispose } = api.onDidActivePanelChange((panel) => {
         const previousPanelId = this._currentActiveDockviewPanel.get(tab);
         this._prevActiveDockviewPanel.set(tab, previousPanelId ?? null);
         this._currentActiveDockviewPanel.set(tab, panel?.id ?? null);
+        const focusRegion = (panel as PanelWithFocusRegion | null)?.params?.focusRegion;
+        if (focusRegion && this._app?.activeTab.get() === tab) {
+          setFocusedRegion(focusRegion);
+        }
       });
       this._addDisposeForTab(tab, dispose);
     }
@@ -714,6 +724,13 @@ export class NavigationApi {
     return Array.from(this.panels.keys())
       .filter((key) => key.startsWith(prefix))
       .map((key) => key.substring(prefix.length));
+  };
+
+  /**
+   * Returns true when a specific dockview panel is the currently active panel for the tab.
+   */
+  isDockviewPanelActive = (tab: TabName, panelId: string): boolean => {
+    return this._currentActiveDockviewPanel.get(tab) === panelId;
   };
 
   /**

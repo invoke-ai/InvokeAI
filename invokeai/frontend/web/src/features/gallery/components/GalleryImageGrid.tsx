@@ -14,6 +14,7 @@ import {
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
+import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { MutableRefObject } from 'react';
 import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
@@ -101,8 +102,10 @@ const useKeyboardNavigation = (
       }
 
       const focusedRegion = getFocusedRegion();
-      if (focusedRegion !== 'gallery' && focusedRegion !== 'viewer') {
-        // Allow navigation from both gallery and viewer-focused states.
+      const isFocusRegionEligible = focusedRegion === 'gallery' || focusedRegion === 'viewer';
+      const isViewerDockTabActive = navigationApi.isDockviewPanelActive(activeTab, VIEWER_PANEL_ID);
+      if (!isFocusRegionEligible && !isViewerDockTabActive) {
+        // Fallback for tab-switch edge case: allow nav when viewer dock tab is active before first click.
         return;
       }
       // Only handle arrow keys
