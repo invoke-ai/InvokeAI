@@ -8,6 +8,7 @@ import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { galleryViewChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
+import { selectShouldUsePagedGalleryView } from 'features/ui/store/uiSelectors';
 import type { CSSProperties } from 'react';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +16,7 @@ import { PiCaretDownBold, PiCaretUpBold, PiMagnifyingGlassBold } from 'react-ico
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 import { GalleryImageGrid } from './GalleryImageGrid';
+import { GalleryImageGridPaged } from './GalleryImageGridPaged';
 import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettingsPopover';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GallerySearch } from './ImageGrid/GallerySearch';
@@ -32,6 +34,7 @@ export const GalleryPanel = memo(() => {
   const isCollapsed = useStore(galleryPanel.$isCollapsed);
   const galleryView = useAppSelector(selectGalleryView);
   const initialSearchTerm = useAppSelector(selectSearchTerm);
+  const shouldUsePagedGalleryView = useAppSelector(selectShouldUsePagedGalleryView);
   const searchDisclosure = useDisclosure(!!initialSearchTerm);
   const [searchTerm, onChangeSearchTerm, onResetSearchTerm] = useGallerySearchTerm();
   const handleClickImages = useCallback(() => {
@@ -110,7 +113,7 @@ export const GalleryPanel = memo(() => {
       </Collapse>
       <Divider pt={2} />
       <Flex w="full" h="full" pt={2}>
-        <GalleryImageGrid />
+        {shouldUsePagedGalleryView ? <GalleryImageGridPaged /> : <GalleryImageGrid />}
       </Flex>
     </Flex>
   );

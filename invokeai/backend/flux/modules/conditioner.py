@@ -3,8 +3,6 @@
 from torch import Tensor, nn
 from transformers import PreTrainedModel, PreTrainedTokenizer, PreTrainedTokenizerFast
 
-from invokeai.backend.util.devices import TorchDevice
-
 
 class HFEncoder(nn.Module):
     def __init__(
@@ -33,8 +31,11 @@ class HFEncoder(nn.Module):
             return_tensors="pt",
         )
 
+        # Move inputs to the same device as the model to support cpu_only models
+        model_device = next(self.hf_module.parameters()).device
+
         outputs = self.hf_module(
-            input_ids=batch_encoding["input_ids"].to(TorchDevice.choose_torch_device()),
+            input_ids=batch_encoding["input_ids"].to(model_device),
             attention_mask=None,
             output_hidden_states=False,
         )
