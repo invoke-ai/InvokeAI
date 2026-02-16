@@ -29,6 +29,7 @@ import type {
   ParameterCLIPGEmbedModel,
   ParameterCLIPLEmbedModel,
   ParameterControlLoRAModel,
+  ParameterFluxDypePreset,
   ParameterGuidance,
   ParameterModel,
   ParameterNegativePrompt,
@@ -72,7 +73,7 @@ const slice = createSlice({
     setFluxScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
       state.fluxScheduler = action.payload;
     },
-    setFluxDypePreset: (state, action: PayloadAction<'off' | 'manual' | 'auto' | '4k'>) => {
+    setFluxDypePreset: (state, action: PayloadAction<ParameterFluxDypePreset>) => {
       state.fluxDypePreset = action.payload;
     },
     setFluxDypeScale: (state, action: PayloadAction<number>) => {

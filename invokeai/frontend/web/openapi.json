@@ -16987,7 +16987,7 @@
       },
       "DyPEPreset": {
         "description": "Predefined DyPE configurations.",
-        "enum": ["off", "auto", "4k"],
+        "enum": ["off", "auto", "area", "4k"],
         "title": "DyPEPreset",
         "type": "string"
       },
