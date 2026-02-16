@@ -1306,7 +1306,9 @@
             "alignmentDL": "Bottom Left",
             "alignmentUR": "Top Right",
             "alignmentDR": "Bottom Right"
-        }
+        },
+        "help": "Help",
+        "noDocsAvailable": "No documentation available for this node."
     },
     "parameters": {
         "aspect": "Aspect",
