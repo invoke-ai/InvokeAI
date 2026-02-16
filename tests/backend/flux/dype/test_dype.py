@@ -13,10 +13,12 @@ from invokeai.backend.flux.dype.base import (
 from invokeai.backend.flux.dype.embed import DyPEEmbedND
 from invokeai.backend.flux.dype.presets import (
     DYPE_PRESET_4K,
+    DYPE_PRESET_AREA,
     DYPE_PRESET_AUTO,
     DYPE_PRESET_MANUAL,
     DYPE_PRESET_OFF,
     DYPE_PRESETS,
+    get_dype_config_for_area,
     get_dype_config_for_resolution,
     get_dype_config_from_preset,
 )
@@ -263,6 +265,35 @@ class TestDyPEPresets:
         assert config_2k is not None
         assert config_4k is not None
         assert config_4k.dype_scale > config_2k.dype_scale
+
+    def test_get_dype_config_for_area_below_threshold(self):
+        """When area is below threshold area, should return None."""
+        config = get_dype_config_for_area(
+            width=1024,
+            height=1024,
+        )
+        assert config is None
+
+    def test_get_dype_config_for_area_above_threshold(self):
+        """When area is above threshold area, should return config."""
+        config = get_dype_config_for_area(
+            width=2048,
+            height=1536,
+            base_resolution=1024,
+        )
+        assert config is not None
+        assert config.enable_dype is True
+        assert config.method == "vision_yarn"
+
+    def test_get_dype_config_from_preset_area(self):
+        """Preset AREA should use area-based config."""
+        config = get_dype_config_from_preset(
+            preset=DYPE_PRESET_AREA,
+            width=2048,
+            height=1536,
+        )
+        assert config is not None
+        assert config.enable_dype is True
 
     def test_get_dype_config_from_preset_off(self):
         """Preset OFF should return None."""

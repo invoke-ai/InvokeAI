@@ -329,15 +329,13 @@ class Flux2DenoiseInvocation(BaseInvocation):
         noise_packed = pack_flux2(noise)
         x = pack_flux2(x)
 
-        # Apply BN normalization BEFORE denoising (as per diffusers Flux2KleinPipeline)
-        # BN normalization: y = (x - mean) / std
-        # This transforms latents to normalized space for the transformer
-        # IMPORTANT: Also normalize init_latents and noise for inpainting to maintain consistency
-        if bn_mean is not None and bn_std is not None:
-            x = self._bn_normalize(x, bn_mean, bn_std)
-            if init_latents_packed is not None:
-                init_latents_packed = self._bn_normalize(init_latents_packed, bn_mean, bn_std)
-            noise_packed = self._bn_normalize(noise_packed, bn_mean, bn_std)
+        # BN normalization for txt2img:
+        # - DO NOT normalize random noise (it's already N(0,1) distributed)
+        # - Diffusers only normalizes image latents from VAE (for img2img/kontext)
+        # - Output MUST be denormalized after denoising before VAE decode
+        #
+        # For img2img with init_latents, we should normalize init_latents on unpacked
+        # shape (B, 128, H/16, W/16) - this is handled by _bn_normalize_unpacked below
 
         # Verify packed dimensions
         assert packed_h * packed_w == x.shape[1]
