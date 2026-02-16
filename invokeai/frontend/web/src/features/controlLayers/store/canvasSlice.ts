@@ -1791,7 +1791,7 @@ export const {
   rasterLayerConvertedToRegionalGuidance,
   // Control layers
   controlLayerAdded,
-  // controlLayerRecalled,
+  controlLayerRecalled,
   controlLayerConvertedToRasterLayer,
   controlLayerConvertedToInpaintMask,
   controlLayerConvertedToRegionalGuidance,
