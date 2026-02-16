@@ -1,5 +1,6 @@
-import { FormControl, FormLabel, Switch, Tooltip } from '@invoke-ai/ui-library';
+import { FormControl, FormLabel, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import {
   selectIsolatedLayerPreview,
   settingsIsolatedLayerPreviewToggled,
@@ -16,12 +17,12 @@ export const CanvasOperationIsolatedLayerPreviewSwitch = memo(() => {
   }, [dispatch]);
 
   return (
-    <Tooltip label={t('controlLayers.settings.isolatedLayerPreviewDesc')}>
+    <IAITooltip label={t('controlLayers.settings.isolatedLayerPreviewDesc')}>
       <FormControl w="min-content">
         <FormLabel m={0}>{t('controlLayers.settings.isolatedPreview')}</FormLabel>
         <Switch size="sm" isChecked={isolatedLayerPreview} onChange={onChangeIsolatedPreview} />
       </FormControl>
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

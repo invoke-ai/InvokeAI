@@ -1,4 +1,5 @@
-import { Flex, Icon, ListItem, Text, Tooltip, UnorderedList } from '@invoke-ai/ui-library';
+import { Flex, Icon, ListItem, Text, UnorderedList } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 import { Trans } from 'react-i18next';
@@ -48,11 +49,11 @@ SelectObjectHelpTooltipContent.displayName = 'SelectObjectHelpTooltipContent';
 
 export const SelectObjectInfoTooltip = memo(() => {
   return (
-    <Tooltip label={<SelectObjectHelpTooltipContent />} minW={420}>
+    <IAITooltip label={<SelectObjectHelpTooltipContent />} minW={420}>
       <Flex alignItems="center">
         <Icon as={PiInfoBold} color="base.500" />
       </Flex>
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

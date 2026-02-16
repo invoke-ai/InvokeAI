@@ -1,6 +1,7 @@
 import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useReactFlow } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import {
   selectShouldShowMinimapPanel,
   shouldShowMinimapPanelChanged,
@@ -40,32 +41,36 @@ const ViewportControls = () => {
 
   return (
     <ButtonGroup orientation="vertical">
-      <IconButton
-        tooltip={t('nodes.zoomInNodes')}
-        aria-label={t('nodes.zoomInNodes')}
-        onClick={handleClickedZoomIn}
-        icon={<PiMagnifyingGlassPlusBold />}
-      />
-      <IconButton
-        tooltip={t('nodes.zoomOutNodes')}
-        aria-label={t('nodes.zoomOutNodes')}
-        onClick={handleClickedZoomOut}
-        icon={<PiMagnifyingGlassMinusBold />}
-      />
-      <IconButton
-        tooltip={t('nodes.fitViewportNodes')}
-        aria-label={t('nodes.fitViewportNodes')}
-        onClick={handleClickedFitView}
-        icon={<PiFrameCornersBold />}
-      />
+      <IAITooltip label={t('nodes.zoomInNodes')}>
+        <IconButton
+          aria-label={t('nodes.zoomInNodes')}
+          onClick={handleClickedZoomIn}
+          icon={<PiMagnifyingGlassPlusBold />}
+        />
+      </IAITooltip>
+      <IAITooltip label={t('nodes.zoomOutNodes')}>
+        <IconButton
+          aria-label={t('nodes.zoomOutNodes')}
+          onClick={handleClickedZoomOut}
+          icon={<PiMagnifyingGlassMinusBold />}
+        />
+      </IAITooltip>
+      <IAITooltip label={t('nodes.fitViewportNodes')}>
+        <IconButton
+          aria-label={t('nodes.fitViewportNodes')}
+          onClick={handleClickedFitView}
+          icon={<PiFrameCornersBold />}
+        />
+      </IAITooltip>
       <AutoLayoutPopover />
-      <IconButton
-        tooltip={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
-        aria-label={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
-        isChecked={shouldShowMinimapPanel}
-        onClick={handleClickedToggleMiniMapPanel}
-        icon={<PiMapPinBold />}
-      />
+      <IAITooltip label={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}>
+        <IconButton
+          aria-label={shouldShowMinimapPanel ? t('nodes.hideMinimapnodes') : t('nodes.showMinimapnodes')}
+          isChecked={shouldShowMinimapPanel}
+          onClick={handleClickedToggleMiniMapPanel}
+          icon={<PiMapPinBold />}
+        />
+      </IAITooltip>
     </ButtonGroup>
   );
 };

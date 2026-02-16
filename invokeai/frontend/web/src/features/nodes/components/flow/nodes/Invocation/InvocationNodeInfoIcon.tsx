@@ -1,4 +1,5 @@
-import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, Icon, Text } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { compare } from 'compare-versions';
 import { useInvocationNodeNotes } from 'features/nodes/hooks/useNodeNotes';
 import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
@@ -14,9 +15,9 @@ interface Props {
 
 export const InvocationNodeInfoIcon = memo(({ nodeId }: Props) => {
   return (
-    <Tooltip label={<TooltipContent nodeId={nodeId} />} placement="top" shouldWrapChildren>
+    <IAITooltip label={<TooltipContent nodeId={nodeId} />} placement="top" shouldWrapChildren>
       <Icon as={PiInfoBold} display="block" boxSize={4} w={8} />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

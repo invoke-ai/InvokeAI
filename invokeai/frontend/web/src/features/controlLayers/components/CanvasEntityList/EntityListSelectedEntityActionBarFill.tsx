@@ -6,9 +6,9 @@ import {
   PopoverContent,
   PopoverTrigger,
   Portal,
-  Tooltip,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import RgbColorPicker from 'common/components/ColorPicker/RgbColorPicker';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { MaskFillStyle } from 'features/controlLayers/components/common/MaskFillStyle';
@@ -56,8 +56,8 @@ export const EntityListSelectedEntityActionBarFill = memo(() => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <Flex role="button" aria-label={t('controlLayers.maskFill')} tabIndex={-1} w={8} h={8}>
-          <Tooltip label={t('controlLayers.maskFill')}>
+        <IAITooltip label={t('controlLayers.maskFill')}>
+          <Flex role="button" aria-label={t('controlLayers.maskFill')} tabIndex={-1} w={8} h={8}>
             <Flex w="full" h="full" alignItems="center" justifyContent="center">
               <Box
                 borderRadius="full"
@@ -68,8 +68,8 @@ export const EntityListSelectedEntityActionBarFill = memo(() => {
                 bg={rgbColorToString(fill.color)}
               />
             </Flex>
-          </Tooltip>
-        </Flex>
+          </Flex>
+        </IAITooltip>
       </PopoverTrigger>
       <Portal>
         <PopoverContent>

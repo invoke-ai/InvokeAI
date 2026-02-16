@@ -1,5 +1,6 @@
-import { Box, Combobox, Flex, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import { selectUpscaleModel, upscaleModelChanged } from 'features/parameters/store/upscaleSlice';
@@ -42,7 +43,7 @@ const ParamSpandrelModel = () => {
         <FormLabel>{t('upscaling.upscaleModel')}</FormLabel>
       </InformationalPopover>
       <Flex w="full" alignItems="center" gap={2}>
-        <Tooltip label={tooltipLabel}>
+        <IAITooltip label={tooltipLabel}>
           <Box w="full">
             <Combobox
               value={value}
@@ -53,7 +54,7 @@ const ParamSpandrelModel = () => {
               isDisabled={options.length === 0}
             />
           </Box>
-        </Tooltip>
+        </IAITooltip>
       </Flex>
     </FormControl>
   );

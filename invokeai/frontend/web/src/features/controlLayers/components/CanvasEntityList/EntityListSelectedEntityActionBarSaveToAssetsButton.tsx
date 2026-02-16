@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useSaveLayerToAssets } from 'features/controlLayers/hooks/useSaveLayerToAssets';
@@ -28,16 +29,17 @@ export const EntityListSelectedEntityActionBarSaveToAssetsButton = memo(() => {
   }
 
   return (
-    <IconButton
-      onClick={onClick}
-      isDisabled={!selectedEntityIdentifier || isBusy}
-      minW={8}
-      variant="link"
-      alignSelf="stretch"
-      aria-label={t('controlLayers.saveLayerToAssets')}
-      tooltip={t('controlLayers.saveLayerToAssets')}
-      icon={<PiFloppyDiskBold />}
-    />
+    <IAITooltip label={t('controlLayers.saveLayerToAssets')}>
+      <IconButton
+        onClick={onClick}
+        isDisabled={!selectedEntityIdentifier || isBusy}
+        minW={8}
+        variant="link"
+        alignSelf="stretch"
+        aria-label={t('controlLayers.saveLayerToAssets')}
+        icon={<PiFloppyDiskBold />}
+      />
+    </IAITooltip>
   );
 });
 

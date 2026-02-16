@@ -1,4 +1,5 @@
 import { IconButton, Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import {
   useAddControlLayer,
   useAddInpaintMask,
@@ -26,17 +27,18 @@ export const EntityListGlobalActionBarAddLayerMenu = memo(() => {
 
   return (
     <Menu>
-      <MenuButton
-        as={IconButton}
-        minW={8}
-        variant="link"
-        alignSelf="stretch"
-        tooltip={t('controlLayers.addLayer')}
-        aria-label={t('controlLayers.addLayer')}
-        icon={<PiPlusBold />}
-        data-testid="control-layers-add-layer-menu-button"
-        isDisabled={isBusy}
-      />
+      <IAITooltip label={t('controlLayers.addLayer')}>
+        <MenuButton
+          as={IconButton}
+          minW={8}
+          variant="link"
+          alignSelf="stretch"
+          aria-label={t('controlLayers.addLayer')}
+          icon={<PiPlusBold />}
+          data-testid="control-layers-add-layer-menu-button"
+          isDisabled={isBusy}
+        />
+      </IAITooltip>
       <MenuList>
         <MenuGroup title={t('controlLayers.regional')}>
           <MenuItem icon={<PiPlusBold />} onClick={addInpaintMask} isDisabled={!isInpaintLayerEnabled}>

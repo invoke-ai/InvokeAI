@@ -8,12 +8,12 @@ import {
   PopoverContent,
   PopoverTrigger,
   Portal,
-  Tooltip,
   useDisclosure,
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import RgbaColorPicker from 'common/components/ColorPicker/RgbaColorPicker';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import {
   selectCanvasSettingsSlice,
@@ -102,7 +102,7 @@ export const ToolFillColorPicker = memo(() => {
     >
       <PopoverTrigger>
         <Flex role="button" aria-label={t('controlLayers.fill.fillColor')} tabIndex={-1} minW={8} w={8} h={8}>
-          <Tooltip label={tooltip}>
+          <IAITooltip label={tooltip}>
             <Flex alignItems="center" justifyContent="center" position="relative" w="full" h="full">
               <Box
                 borderRadius="full"
@@ -129,7 +129,7 @@ export const ToolFillColorPicker = memo(() => {
                 zIndex={fgColorzIndex}
               />
             </Flex>
-          </Tooltip>
+          </IAITooltip>
         </Flex>
       </PopoverTrigger>
       <Portal>
@@ -138,14 +138,15 @@ export const ToolFillColorPicker = memo(() => {
           <PopoverBody minH={64}>
             <Flex direction="column" gap={2}>
               <Flex justifyContent="flex-end" alignItems="center">
-                <IconButton
-                  aria-label={isPinned ? 'Unpin color picker' : 'Pin color picker'}
-                  tooltip={isPinned ? 'Unpin' : 'Pin'}
-                  size="sm"
-                  variant={isPinned ? 'solid' : 'ghost'}
-                  onClick={handlePinClick}
-                  icon={<PiPushPinBold />}
-                />
+                <IAITooltip label={isPinned ? 'Unpin' : 'Pin'}>
+                  <IconButton
+                    aria-label={isPinned ? 'Unpin color picker' : 'Pin color picker'}
+                    size="sm"
+                    variant={isPinned ? 'solid' : 'ghost'}
+                    onClick={handlePinClick}
+                    icon={<PiPushPinBold />}
+                  />
+                </IAITooltip>
               </Flex>
               <RgbaColorPicker color={activeColor} onChange={onColorChange} withNumberInput withSwatches />
             </Flex>

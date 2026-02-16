@@ -10,6 +10,7 @@ import {
   Portal,
   Text,
 } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import BoardAutoAddSelect from 'features/gallery/components/Boards/BoardAutoAddSelect';
 import AutoAssignBoardCheckbox from 'features/gallery/components/GallerySettingsPopover/AutoAssignBoardCheckbox';
 import ShowArchivedBoardsCheckbox from 'features/gallery/components/GallerySettingsPopover/ShowArchivedBoardsCheckbox';
@@ -25,14 +26,15 @@ export const BoardsSettingsPopover = memo(() => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <IconButton
-          size="sm"
-          variant="link"
-          alignSelf="stretch"
-          aria-label={t('gallery.boardsSettings')}
-          icon={<PiGearSixFill />}
-          tooltip={t('gallery.boardsSettings')}
-        />
+        <IAITooltip label={t('gallery.boardsSettings')}>
+          <IconButton
+            size="sm"
+            variant="link"
+            alignSelf="stretch"
+            aria-label={t('gallery.boardsSettings')}
+            icon={<PiGearSixFill />}
+          />
+        </IAITooltip>
       </PopoverTrigger>
       <Portal>
         <PopoverContent>

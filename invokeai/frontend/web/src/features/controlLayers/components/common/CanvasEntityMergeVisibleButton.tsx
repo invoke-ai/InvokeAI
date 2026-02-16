@@ -1,4 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useVisibleEntityCountByType } from 'features/controlLayers/hooks/useVisibleEntityCountByType';
@@ -21,16 +22,17 @@ export const CanvasEntityMergeVisibleButton = memo(({ type }: Props) => {
   }, [canvasManager.compositor, type]);
 
   return (
-    <IconButton
-      size="sm"
-      aria-label={t('controlLayers.mergeVisible')}
-      tooltip={t('controlLayers.mergeVisible')}
-      variant="link"
-      icon={<PiStackBold />}
-      onClick={mergeVisible}
-      alignSelf="stretch"
-      isDisabled={entityCount <= 1 || isBusy}
-    />
+    <IAITooltip label={t('controlLayers.mergeVisible')}>
+      <IconButton
+        size="sm"
+        aria-label={t('controlLayers.mergeVisible')}
+        variant="link"
+        icon={<PiStackBold />}
+        onClick={mergeVisible}
+        alignSelf="stretch"
+        isDisabled={entityCount <= 1 || isBusy}
+      />
+    </IAITooltip>
   );
 });
 

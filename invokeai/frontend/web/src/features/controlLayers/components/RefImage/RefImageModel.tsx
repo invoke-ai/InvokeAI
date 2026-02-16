@@ -1,5 +1,6 @@
-import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
+import { Combobox, FormControl } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { areBasesCompatibleForRefImage } from 'features/controlLayers/store/validators';
@@ -73,7 +74,7 @@ export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
   });
 
   return (
-    <Tooltip label={selectedModel?.description}>
+    <IAITooltip label={selectedModel?.description}>
       <FormControl
         isInvalid={!value || !areBasesCompatibleForRefImage(mainModelConfig, selectedModel)}
         w="full"
@@ -87,7 +88,7 @@ export const RefImageModel = memo(({ modelKey, onChangeModel }: Props) => {
           noOptionsMessage={noOptionsMessage}
         />
       </FormControl>
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

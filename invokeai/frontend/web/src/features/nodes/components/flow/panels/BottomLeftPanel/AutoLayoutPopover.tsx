@@ -18,6 +18,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useReactFlow } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { useAutoLayout } from 'features/nodes/hooks/useAutoLayout';
 import {
@@ -114,12 +115,9 @@ export const AutoLayoutPopover = memo(() => {
   return (
     <Popover isOpen={popover.isTrue} onClose={popover.setFalse} placement="top">
       <PopoverTrigger>
-        <IconButton
-          tooltip={t('nodes.layout.autoLayout')}
-          aria-label={t('nodes.layout.autoLayout')}
-          icon={<PiMagicWandBold />}
-          onClick={popover.toggle}
-        />
+        <IAITooltip label={t('nodes.layout.autoLayout')}>
+          <IconButton aria-label={t('nodes.layout.autoLayout')} icon={<PiMagicWandBold />} onClick={popover.toggle} />
+        </IAITooltip>
       </PopoverTrigger>
       <Portal>
         <PopoverContent>

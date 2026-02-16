@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Tooltip } from '@invoke-ai/ui-library';
+import { Box } from '@invoke-ai/ui-library';
 import { Handle, Position } from '@xyflow/react';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import {
   useConnectionErrorTKey,
@@ -106,7 +107,7 @@ type HandleCommonProps = {
 
 const IdleHandle = memo(({ fieldTemplate, fieldTypeName, fieldColor, isModelField }: HandleCommonProps) => {
   return (
-    <Tooltip label={fieldTypeName} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
+    <IAITooltip label={fieldTypeName} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
       <Handle type="target" id={fieldTemplate.name} position={Position.Left} style={handleStyles}>
         <Box
           sx={sx}
@@ -120,7 +121,7 @@ const IdleHandle = memo(({ fieldTemplate, fieldTypeName, fieldColor, isModelFiel
           borderColor={fieldColor}
         />
       </Handle>
-    </Tooltip>
+    </IAITooltip>
   );
 });
 IdleHandle.displayName = 'IdleHandle';
@@ -139,7 +140,7 @@ const ConnectionInProgressHandle = memo(
     }, [fieldTypeName, t, connectionError]);
 
     return (
-      <Tooltip label={tooltip} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
+      <IAITooltip label={tooltip} placement="start" openDelay={HANDLE_TOOLTIP_OPEN_DELAY}>
         <Handle type="target" id={fieldTemplate.name} position={Position.Left} style={handleStyles}>
           <Box
             sx={sx}
@@ -153,7 +154,7 @@ const ConnectionInProgressHandle = memo(
             borderColor={fieldColor}
           />
         </Handle>
-      </Tooltip>
+      </IAITooltip>
     );
   }
 );

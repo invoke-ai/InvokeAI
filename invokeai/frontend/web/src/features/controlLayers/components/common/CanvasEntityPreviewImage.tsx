@@ -1,6 +1,7 @@
-import { Box, chakra, Flex, Tooltip } from '@invoke-ai/ui-library';
+import { Box, chakra, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { debounce } from 'es-toolkit/compat';
 import { useEntityAdapter } from 'features/controlLayers/contexts/EntityAdapterContext';
@@ -93,7 +94,7 @@ export const CanvasEntityPreviewImage = memo(() => {
   useEffect(updatePreview, [updatePreview, canvasCache, nodeRect, pixelRect]);
 
   return (
-    <Tooltip label={<TooltipContent canvasRef={canvasRef} />} p={2} closeOnScroll>
+    <IAITooltip label={<TooltipContent canvasRef={canvasRef} />} p={2} closeOnScroll>
       <Flex
         position="relative"
         alignItems="center"
@@ -116,7 +117,7 @@ export const CanvasEntityPreviewImage = memo(() => {
         />
         <ChakraCanvas position="relative" ref={canvasRef} objectFit="contain" maxW="full" maxH="full" />
       </Flex>
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

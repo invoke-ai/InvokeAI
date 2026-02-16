@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
@@ -53,41 +54,44 @@ export const RefImageHeader = memo(() => {
       </Text>
       <Flex alignItems="center" gap={1}>
         {warnings.length > 0 && (
-          <IconButton
-            as="span"
-            size="sm"
-            variant="link"
-            alignSelf="stretch"
-            aria-label="warnings"
-            tooltip={<RefImageWarningTooltipContent warnings={warnings} />}
-            icon={<PiWarningBold />}
-            colorScheme="warning"
-          />
+          <IAITooltip label={<RefImageWarningTooltipContent warnings={warnings} />}>
+            <IconButton
+              as="span"
+              size="sm"
+              variant="link"
+              alignSelf="stretch"
+              aria-label="warnings"
+              icon={<PiWarningBold />}
+              colorScheme="warning"
+            />
+          </IAITooltip>
         )}
         {!entity.isEnabled && (
           <Text fontSize="xs" fontStyle="italic" color="base.400">
             Disabled
           </Text>
         )}
-        <IconButton
-          tooltip={entity.isEnabled ? 'Disable Reference Image' : 'Enable Reference Image'}
-          size="xs"
-          variant="link"
-          alignSelf="stretch"
-          aria-label={entity.isEnabled ? 'Disable ref image' : 'Enable ref image'}
-          onClick={toggleIsEnabled}
-          icon={entity.isEnabled ? <PiCircleFill /> : <PiCircleBold />}
-        />
-        <IconButton
-          tooltip="Delete Reference Image"
-          size="xs"
-          variant="link"
-          alignSelf="stretch"
-          aria-label="Delete ref image"
-          onClick={deleteRefImage}
-          icon={<PiTrashBold />}
-          colorScheme="error"
-        />
+        <IAITooltip label={entity.isEnabled ? 'Disable Reference Image' : 'Enable Reference Image'}>
+          <IconButton
+            size="xs"
+            variant="link"
+            alignSelf="stretch"
+            aria-label={entity.isEnabled ? 'Disable ref image' : 'Enable ref image'}
+            onClick={toggleIsEnabled}
+            icon={entity.isEnabled ? <PiCircleFill /> : <PiCircleBold />}
+          />
+        </IAITooltip>
+        <IAITooltip label="Delete Reference Image">
+          <IconButton
+            size="xs"
+            variant="link"
+            alignSelf="stretch"
+            aria-label="Delete ref image"
+            onClick={deleteRefImage}
+            icon={<PiTrashBold />}
+            colorScheme="error"
+          />
+        </IAITooltip>
       </Flex>
     </Flex>
   );

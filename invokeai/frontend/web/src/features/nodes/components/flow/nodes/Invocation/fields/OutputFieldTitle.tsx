@@ -1,5 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Text, Tooltip } from '@invoke-ai/ui-library';
+import { Text } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { OutputFieldTooltipContent } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldTooltipContent';
 import {
   useConnectionErrorTKey,
@@ -34,7 +35,7 @@ export const OutputFieldTitle = memo(({ nodeId, fieldName }: Props) => {
   const connectionErrorTKey = useConnectionErrorTKey(nodeId, fieldName, 'source');
 
   return (
-    <Tooltip
+    <IAITooltip
       label={<OutputFieldTooltipContent nodeId={nodeId} fieldName={fieldName} />}
       openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
       placement="top"
@@ -47,7 +48,7 @@ export const OutputFieldTitle = memo(({ nodeId, fieldName }: Props) => {
       >
         {fieldTemplate.title}
       </Text>
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

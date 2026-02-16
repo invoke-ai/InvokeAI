@@ -1,4 +1,5 @@
-import { Box, Button, Flex, Icon, IconButton, Image, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, Icon, IconButton, Image } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { dropzoneAccept } from 'common/hooks/useImageUploadButton';
 import { convertImageUrlToBlob } from 'common/util/convertImageUrlToBlob';
 import { useCallback, useEffect, useState } from 'react';
@@ -88,7 +89,7 @@ export const WorkflowThumbnailField = ({
 
   return (
     <>
-      <Tooltip label={t('stylePresets.uploadImage')}>
+      <IAITooltip label={t('stylePresets.uploadImage')}>
         <Flex
           as={Button}
           w={100}
@@ -102,7 +103,7 @@ export const WorkflowThumbnailField = ({
         >
           <Icon as={PiUploadSimpleBold} w={8} h={8} />
         </Flex>
-      </Tooltip>
+      </IAITooltip>
       <input {...getInputProps()} />
     </>
   );
