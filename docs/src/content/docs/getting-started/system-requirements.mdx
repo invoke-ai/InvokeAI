@@ -1,0 +1,130 @@
+---
+title: Hardware Requirements
+sidebar:
+  order: 1
+---
+
+import { Aside, Tabs, TabItem, Steps } from '@astrojs/starlight/components'
+
+import { externalLinks, internalLinks } from '@utils/links'
+
+import Link from '@components/Link.astro'
+
+Invoke runs on Windows 10+, macOS 14+ and Linux (Ubuntu 20.04+ is well-tested).
+
+## Hardware
+
+Hardware requirements vary significantly depending on model and image output size.
+
+The requirements below are rough guidelines for best performance. GPUs with less VRAM typically still work, if a bit slower. Follow the <Link href={internalLinks.lowVram}>Low-VRAM mode guide</Link> to optimize performance.
+
+- All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
+- AMD GPUs are supported on Linux only. The VRAM requirements are the same as Nvidia GPUs.
+
+### Windows/Linux
+
+| Model Family | Best resolution | GPU (series) | VRAM (min) | RAM (min) | Notes |
+|---|---:|---|---:|---:|---|
+| SD1.5 | 512x512 | Nvidia 10xx+ | 4GB | 8GB |  |
+| SDXL | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB |  |
+| FLUX.1 | 1024x1024 | Nvidia 20xx+ | 10GB | 32GB |  |
+| FLUX.2 Klein 4B | 1024x1024 | Nvidia 30xx+ | 12GB | 16GB | FP8 works with 8GB+; Diffusers + encoder |
+| FLUX.2 Klein 9B | 1024x1024 | Nvidia 40xx | 24GB | 32GB | FP8 works with 12GB+; Diffusers + encoder |
+| Z-Image Turbo | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB | Q4_K 8GB; Q8/BF16 16GB+ |
+
+<Aside type="tip" title="`tmpfs` on Linux">
+  If your temporary directory is mounted as a `tmpfs`, ensure it has sufficient space.
+</Aside>
+
+## Python
+
+<Aside type="tip" title="The launcher installs python for you">
+  You don't need to do this if you are installing with the <Link label="Invoke Launcher" href="./installation#launcher" />.
+</Aside>
+
+Invoke requires python `3.11` through `3.12`. If you don't already have one of these versions installed, we suggest installing `3.12`, as it will be supported for longer.
+
+Check that your system has an up-to-date Python installed by running `python3 --version` in the terminal (Linux, macOS) or cmd/powershell (Windows).
+
+<Aside type="tip" title="Installing Python">
+  <Tabs syncKey="operatingSystem">
+    <TabItem label="Windows" icon="seti:windows">
+      <Steps>
+        1. Install python with <Link href={externalLinks.launcher}>an official installer</Link>.
+        2. The installer includes an option to add python to your PATH. Be sure to enable this. If you missed it, re-run the installer, choose to modify an existing installation, and tick that checkbox.
+        3. You may need to install <Link href={externalLinks.msvcRedist}>Microsoft Visual C++ Redistributable</Link>.
+      </Steps>
+    </TabItem>
+    <TabItem label="MacOS" icon="apple">
+      <Steps>
+        1. Install python with <Link href={externalLinks.launcher}>an official installer</Link>.
+        2. If model installs fail with a certificate error, you may need to run this command (changing the python version to match what you have installed): `/Applications/Python\ 3.11/Install\ Certificates.command`
+        3. If you haven't already, you will need to install the XCode CLI Tools by running `xcode-select --install` in a terminal.
+      </Steps>
+    </TabItem>
+    <TabItem label="Linux" icon="linux">
+      <Steps>
+        1. Installing python varies depending on your system. We recommend <Link label="using `uv` to manage your python installation" href="https://docs.astral.sh/uv/concepts/python-versions/#installing-a-python-version" />.
+        2. You'll need to install `libglib2.0-0` and `libgl1-mesa-glx` for OpenCV to work. For example, on a Debian system: `sudo apt update && sudo apt install -y libglib2.0-0 libgl1-mesa-glx`
+      </Steps>
+    </TabItem>
+  </Tabs>
+</Aside>
+
+## Drivers
+
+If you have an Nvidia or AMD GPU, you may need to manually install drivers or other support packages for things to work well or at all.
+
+### Nvidia
+
+Run `nvidia-smi` on your system's command line to verify that drivers and CUDA are installed. If this command fails, or doesn't report versions, you will need to install drivers.
+
+Go to the <Link label="CUDA Toolkit Downloads" href={externalLinks.cudnnDownload} /> and carefully follow the instructions for your system to get everything installed.
+
+Confirm that `nvidia-smi` displays driver and CUDA versions after installation.
+
+#### Linux - via Nvidia Container Runtime
+
+An alternative to installing CUDA locally is to use the <Link label="Nvidia Container Runtime" href={externalLinks.nvidiaRuntime} /> to run the application in a container.
+
+#### Windows - Nvidia cuDNN DLLs
+
+An out-of-date cuDNN library can greatly hamper performance on 30-series and 40-series cards. Check with the community on discord to compare your `it/s` if you think you may need this fix.
+
+First, locate the destination for the DLL files and make a quick back up:
+
+1. Find your InvokeAI installation folder, e.g. `C:\Users\Username\InvokeAI\`.
+1. Open the `.venv` folder, e.g. `C:\Users\Username\InvokeAI\.venv` (you may need to show hidden files to see it).
+1. Navigate deeper to the `torch` package, e.g. `C:\Users\Username\InvokeAI\.venv\Lib\site-packages\torch`.
+1. Copy the `lib` folder inside `torch` and back it up somewhere.
+
+Next, download and copy the updated cuDNN DLLs:
+
+1. Go to <Link href={externalLinks.cudnnDocs}>the Cuda Docs</Link>.
+1. Create an account if needed and log in.
+1. Choose the newest version of cuDNN that works with your GPU architecture. Consult the <Link label="cuDNN support matrix" href={externalLinks.cudnnSupport} /> to determine the correct version for your GPU.
+1. Download the latest version and extract it.
+1. Find the `bin` folder, e.g. `cudnn-windows-x86_64-SOME_VERSION\bin`.
+1. Copy and paste the `.dll` files into the `lib` folder you located earlier. Replace files when prompted.
+
+If, after restarting the app, this doesn't improve your performance, either restore your back up or re-run the installer to reset `torch` back to its original state.
+
+### AMD
+
+<Aside type="tip" title="Linux Only">
+  AMD GPUs are supported on Linux only, due to ROCm (the AMD equivalent of CUDA) support being Linux only.
+</Aside>
+
+<Aside type="caution" title="Bumps Ahead">
+  While the application does run on AMD GPUs, there are occasional bumps related to spotty torch support.
+</Aside>
+
+Run `rocm-smi` on your system's command line verify that drivers and ROCm are installed. If this command fails, or doesn't report versions, you will need to install them.
+
+Go to the <Link label="ROCm Documentation" href={externalLinks.rocmDocs} /> and carefully follow the instructions for your system to get everything installed.
+
+Confirm that `rocm-smi` displays driver and CUDA versions after installation.
+
+#### Linux - via Docker Container
+
+An alternative to installing ROCm locally is to use a [ROCm docker container] to run the application in a container.
