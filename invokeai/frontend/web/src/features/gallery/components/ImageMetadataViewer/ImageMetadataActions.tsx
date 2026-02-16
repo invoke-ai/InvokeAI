@@ -44,6 +44,9 @@ export const ImageMetadataActions = memo((props: Props) => {
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CFGScale} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CFGRescaleMultiplier} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.Guidance} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.FluxDypePreset} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.FluxDypeScale} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.FluxDypeExponent} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.DenoisingStrength} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.SeamlessX} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.SeamlessY} />

@@ -228,6 +228,42 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
 
     @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Z-Image LoRAs have different key patterns than SD/SDXL LoRAs.
+
+        Z-Image LoRAs use keys like:
+        - diffusion_model.layers.X.attention.to_k.lora_down.weight (DoRA format)
+        - diffusion_model.layers.X.attention.to_k.lora_A.weight (PEFT format)
+        - diffusion_model.layers.X.attention.to_k.dora_scale (DoRA scale)
+        """
+        state_dict = mod.load_state_dict()
+
+        # Check for Z-Image specific LoRA patterns
+        has_z_image_lora_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "diffusion_model.layers.",  # Z-Image S3-DiT layer pattern
+            },
+        )
+
+        # Also check for LoRA weight suffixes (various formats)
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+                "dora_scale",
+            },
+        )
+
+        if has_z_image_lora_keys and has_lora_suffix:
+            return
+
+        raise NotAMatchError("model does not match Z-Image LoRA heuristics")
+
+    @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
         """Z-Image LoRAs are identified by their diffusion_model.layers structure.
 

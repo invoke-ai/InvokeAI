@@ -27,6 +27,7 @@ from invokeai.app.services.model_records import (
     ModelRecordChanges,
     UnknownModelException,
 )
+from invokeai.app.services.orphaned_models import OrphanedModelInfo
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.main import (
@@ -149,6 +150,28 @@ async def list_model_records(
 
 
 @model_manager_router.get(
+    "/missing",
+    operation_id="list_missing_models",
+    responses={200: {"description": "List of models with missing files"}},
+)
+async def list_missing_models() -> ModelsList:
+    """Get models whose files are missing from disk.
+
+    These are models that have database entries but their corresponding
+    weight files have been deleted externally (not via Model Manager).
+    """
+    record_store = ApiDependencies.invoker.services.model_manager.store
+    models_path = ApiDependencies.invoker.services.configuration.models_path
+
+    missing_models: list[AnyModelConfig] = []
+    for model_config in record_store.all_models():
+        if not (models_path / model_config.path).resolve().exists():
+            missing_models.append(model_config)
+
+    return ModelsList(models=missing_models)
+
+
+@model_manager_router.get(
     "/get_by_attrs",
     operation_id="get_model_records_by_attrs",
     response_model=AnyModelConfig,
@@ -219,7 +242,16 @@ async def reidentify_model(
         result = ModelConfigFactory.from_model_on_disk(mod)
         if result.config is None:
             raise InvalidModelException("Unable to identify model format")
-        result.config.key = config.key  # retain the same key
+
+        # Retain user-editable fields from the original config
+        result.config.key = config.key
+        result.config.name = config.name
+        result.config.description = config.description
+        result.config.cover_image = config.cover_image
+        result.config.trigger_phrases = config.trigger_phrases
+        result.config.source = config.source
+        result.config.source_type = config.source_type
+
         new_config = ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
         return new_config
     except UnknownModelException as e:
@@ -905,15 +937,48 @@ class StarterModelResponse(BaseModel):
 def get_is_installed(
     starter_model: StarterModel | StarterModelWithoutDependencies, installed_models: list[AnyModelConfig]
 ) -> bool:
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
     for model in installed_models:
+        # Check if source matches exactly
         if model.source == starter_model.source:
             return True
+        # Check if name (or previous names), base and type match
         if (
             (model.name == starter_model.name or model.name in starter_model.previous_names)
             and model.base == starter_model.base
             and model.type == starter_model.type
         ):
             return True
+
+    # Special handling for Qwen3Encoder models - check by type and variant
+    # This allows renamed models to still be detected as installed
+    if starter_model.type == ModelType.Qwen3Encoder:
+        from invokeai.backend.model_manager.taxonomy import Qwen3VariantType
+
+        # Determine expected variant from source pattern
+        expected_variant: Qwen3VariantType | None = None
+        if "klein-9B" in starter_model.source or "qwen3_8b" in starter_model.source.lower():
+            expected_variant = Qwen3VariantType.Qwen3_8B
+        elif (
+            "klein-4B" in starter_model.source
+            or "qwen3_4b" in starter_model.source.lower()
+            or "Z-Image" in starter_model.source
+        ):
+            expected_variant = Qwen3VariantType.Qwen3_4B
+
+        if expected_variant is not None:
+            for model in installed_models:
+                if model.type == ModelType.Qwen3Encoder and hasattr(model, "variant"):
+                    model_variant = model.variant
+                    # Handle both enum and string values
+                    if isinstance(model_variant, Qwen3VariantType):
+                        if model_variant == expected_variant:
+                            return True
+                    elif isinstance(model_variant, str):
+                        if model_variant == expected_variant.value:
+                            return True
+
     return False
 
 
@@ -1026,3 +1091,79 @@ async def do_hf_login(
 @model_manager_router.delete("/hf_login", operation_id="reset_hf_token", response_model=HFTokenStatus)
 async def reset_hf_token() -> HFTokenStatus:
     return HFTokenHelper.reset_token()
+
+
+# Orphaned Models Management Routes
+
+
+class DeleteOrphanedModelsRequest(BaseModel):
+    """Request to delete specific orphaned model directories."""
+
+    paths: list[str] = Field(description="List of relative paths to delete")
+
+
+class DeleteOrphanedModelsResponse(BaseModel):
+    """Response from deleting orphaned models."""
+
+    deleted: list[str] = Field(description="Paths that were successfully deleted")
+    errors: dict[str, str] = Field(description="Paths that had errors, with error messages")
+
+
+@model_manager_router.get(
+    "/sync/orphaned",
+    operation_id="get_orphaned_models",
+    response_model=list[OrphanedModelInfo],
+)
+async def get_orphaned_models() -> list[OrphanedModelInfo]:
+    """Find orphaned model directories.
+
+    Orphaned models are directories in the models folder that contain model files
+    but are not referenced in the database. This can happen when models are deleted
+    from the database but the files remain on disk.
+
+    Returns:
+        List of orphaned model directory information
+    """
+    from invokeai.app.services.orphaned_models import OrphanedModelsService
+
+    # Access the database through the model records service
+    model_records_service = ApiDependencies.invoker.services.model_manager.store
+
+    service = OrphanedModelsService(
+        config=ApiDependencies.invoker.services.configuration,
+        db=model_records_service._db,  # Access the database from model records service
+    )
+    return service.find_orphaned_models()
+
+
+@model_manager_router.delete(
+    "/sync/orphaned",
+    operation_id="delete_orphaned_models",
+    response_model=DeleteOrphanedModelsResponse,
+)
+async def delete_orphaned_models(request: DeleteOrphanedModelsRequest) -> DeleteOrphanedModelsResponse:
+    """Delete specified orphaned model directories.
+
+    Args:
+        request: Request containing list of relative paths to delete
+
+    Returns:
+        Response indicating which paths were deleted and which had errors
+    """
+    from invokeai.app.services.orphaned_models import OrphanedModelsService
+
+    # Access the database through the model records service
+    model_records_service = ApiDependencies.invoker.services.model_manager.store
+
+    service = OrphanedModelsService(
+        config=ApiDependencies.invoker.services.configuration,
+        db=model_records_service._db,  # Access the database from model records service
+    )
+
+    results = service.delete_orphaned_models(request.paths)
+
+    # Separate successful deletions from errors
+    deleted = [path for path, status in results.items() if status == "deleted"]
+    errors = {path: status for path, status in results.items() if status != "deleted"}
+
+    return DeleteOrphanedModelsResponse(deleted=deleted, errors=errors)

@@ -1,7 +1,15 @@
 import { NUMPY_RAND_MAX } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
-import { zModelIdentifierField, zSchedulerField } from 'features/nodes/types/common';
+import {
+  zFluxDypeExponentField,
+  zFluxDypePresetField,
+  zFluxDypeScaleField,
+  zFluxSchedulerField,
+  zModelIdentifierField,
+  zSchedulerField,
+  zZImageSchedulerField,
+} from 'features/nodes/types/common';
 import { z } from 'zod';
 
 /**
@@ -59,6 +67,31 @@ export type ParameterCFGRescaleMultiplier = z.infer<typeof zParameterCFGRescaleM
 // #region Scheduler
 export const [zParameterScheduler, isParameterScheduler] = buildParameter(zSchedulerField);
 export type ParameterScheduler = z.infer<typeof zParameterScheduler>;
+// #endregion
+
+// #region Flux Scheduler
+export const [zParameterFluxScheduler, isParameterFluxScheduler] = buildParameter(zFluxSchedulerField);
+export type ParameterFluxScheduler = z.infer<typeof zParameterFluxScheduler>;
+// #endregion
+
+// #region Z-Image Scheduler
+export const [zParameterZImageScheduler, isParameterZImageScheduler] = buildParameter(zZImageSchedulerField);
+export type ParameterZImageScheduler = z.infer<typeof zParameterZImageScheduler>;
+// #endregion
+
+// #region Flux DyPE Preset
+export const [zParameterFluxDypePreset, isParameterFluxDypePreset] = buildParameter(zFluxDypePresetField);
+export type ParameterFluxDypePreset = z.infer<typeof zParameterFluxDypePreset>;
+// #endregion
+
+// #region Flux DyPE Scale (magnitude λs)
+export const [zParameterFluxDypeScale, isParameterFluxDypeScale] = buildParameter(zFluxDypeScaleField);
+export type ParameterFluxDypeScale = z.infer<typeof zParameterFluxDypeScale>;
+// #endregion
+
+// #region Flux DyPE Exponent (decay speed λt)
+export const [zParameterFluxDypeExponent, isParameterFluxDypeExponent] = buildParameter(zFluxDypeExponentField);
+export type ParameterFluxDypeExponent = z.infer<typeof zParameterFluxDypeExponent>;
 // #endregion
 
 // #region seed
