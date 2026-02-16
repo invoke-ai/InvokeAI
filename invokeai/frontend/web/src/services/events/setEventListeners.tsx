@@ -4,8 +4,28 @@ import { socketConnected } from 'app/store/middleware/listenerMiddleware/listene
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, isNil, round } from 'es-toolkit/compat';
+import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
+import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
+import {
+  heightChanged,
+  negativePromptChanged,
+  positivePromptChanged,
+  setCfgScale,
+  setSeed,
+  setSteps,
+  widthChanged,
+} from 'features/controlLayers/store/paramsSlice';
+import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
+import type {
+  ControlModeV2,
+  FLUXReduxImageInfluence,
+  IPMethodV2,
+  RefImageState,
+} from 'features/controlLayers/store/types';
+import { getControlLayerState, getReferenceImageState } from 'features/controlLayers/store/util';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
+import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -13,6 +33,7 @@ import { LRUCache } from 'lru-cache';
 import { Trans } from 'react-i18next';
 import type { ApiTagDescription } from 'services/api';
 import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
+import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
@@ -451,6 +472,321 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('queue_items_retried', (data) => {
     log.debug({ data }, 'Queue items retried');
+  });
+
+  socket.on('recall_parameters_updated', (data) => {
+    log.debug('Recall parameters updated');
+
+    // Apply the recall parameters to the store
+    if (data.parameters) {
+      let appliedCount = 0;
+
+      // Map the recall parameter names to store actions
+      if (data.parameters.positive_prompt !== undefined && typeof data.parameters.positive_prompt === 'string') {
+        dispatch(positivePromptChanged(data.parameters.positive_prompt));
+        appliedCount++;
+      }
+      if (data.parameters.negative_prompt !== undefined && typeof data.parameters.negative_prompt === 'string') {
+        dispatch(negativePromptChanged(data.parameters.negative_prompt));
+        appliedCount++;
+      }
+      if (data.parameters.width !== undefined && typeof data.parameters.width === 'number') {
+        dispatch(widthChanged({ width: data.parameters.width }));
+        appliedCount++;
+      }
+      if (data.parameters.height !== undefined && typeof data.parameters.height === 'number') {
+        dispatch(heightChanged({ height: data.parameters.height }));
+        appliedCount++;
+      }
+      if (data.parameters.seed !== undefined && typeof data.parameters.seed === 'number') {
+        dispatch(setSeed(data.parameters.seed));
+        appliedCount++;
+      }
+      if (data.parameters.steps !== undefined && typeof data.parameters.steps === 'number') {
+        dispatch(setSteps(data.parameters.steps));
+        appliedCount++;
+      }
+      if (data.parameters.cfg_scale !== undefined && typeof data.parameters.cfg_scale === 'number') {
+        dispatch(setCfgScale(data.parameters.cfg_scale));
+        appliedCount++;
+      }
+
+      // Handle model - requires looking up the full model config
+      if (data.parameters.model !== undefined && typeof data.parameters.model === 'string') {
+        dispatch(modelsApi.endpoints.getModelConfig.initiate(data.parameters.model))
+          .unwrap()
+          .then((modelConfig) => {
+            if (modelConfig.type === 'main') {
+              dispatch(modelSelected(modelConfig));
+              log.debug(`Applied model: ${modelConfig.name}`);
+            } else {
+              log.warn(`Model ${data.parameters.model} is not a main model, skipping`);
+            }
+          })
+          .catch((error) => {
+            log.error(`Failed to load model ${data.parameters.model}: ${error}`);
+          });
+        appliedCount++;
+      }
+
+      if (appliedCount > 0) {
+        log.info(`Applied ${appliedCount} recall parameters to store`);
+      }
+
+      // Handle LoRAs
+      if (data.parameters.loras !== undefined && Array.isArray(data.parameters.loras)) {
+        log.debug(`Processing ${data.parameters.loras.length} LoRA(s)`);
+
+        // Clear existing LoRAs first
+        dispatch(loraAllDeleted());
+
+        // Add each LoRA
+        for (const loraConfig of data.parameters.loras) {
+          if (loraConfig.model_key && typeof loraConfig.model_key === 'string') {
+            dispatch(modelsApi.endpoints.getModelConfig.initiate(loraConfig.model_key))
+              .unwrap()
+              .then((modelConfig) => {
+                if (modelConfig.type === 'lora') {
+                  const lora = {
+                    id: `recalled-${Date.now()}-${Math.random()}`,
+                    model: {
+                      key: modelConfig.key,
+                      hash: modelConfig.hash,
+                      name: modelConfig.name,
+                      base: modelConfig.base,
+                      type: modelConfig.type,
+                    },
+                    weight: typeof loraConfig.weight === 'number' ? loraConfig.weight : 0.75,
+                    isEnabled: typeof loraConfig.is_enabled === 'boolean' ? loraConfig.is_enabled : true,
+                  };
+                  dispatch(loraRecalled({ lora }));
+                  log.debug(`Applied LoRA: ${modelConfig.name} (weight: ${lora.weight})`);
+                } else {
+                  log.warn(`Model ${loraConfig.model_key} is not a LoRA, skipping`);
+                }
+              })
+              .catch((error) => {
+                log.error(`Failed to load LoRA ${loraConfig.model_key}: ${error}`);
+              });
+          }
+        }
+        log.info(`Initiated loading of ${data.parameters.loras.length} LoRA(s)`);
+      }
+
+      // Handle Control Layers
+      if (data.parameters.control_layers !== undefined && Array.isArray(data.parameters.control_layers)) {
+        log.debug(`Processing ${data.parameters.control_layers.length} control layer(s)`);
+
+        // If the list is explicitly empty, clear all existing control layers
+        if (data.parameters.control_layers.length === 0) {
+          dispatch(allEntitiesDeleted());
+          log.info('Cleared all control layers');
+        } else {
+          // Replace existing control layers by first clearing them
+          dispatch(allEntitiesDeleted());
+
+          // Then add each new control layer
+          data.parameters.control_layers.forEach(
+            (controlConfig: {
+              model_key: string;
+              weight?: number;
+              begin_step_percent?: number;
+              end_step_percent?: number;
+              control_mode?: ControlModeV2;
+              image?: { image_name: string; width: number; height: number };
+              processed_image?: { image_name: string; width: number; height: number };
+            }) => {
+              if (controlConfig.model_key && typeof controlConfig.model_key === 'string') {
+                dispatch(modelsApi.endpoints.getModelConfig.initiate(controlConfig.model_key))
+                  .unwrap()
+                  .then(async (modelConfig) => {
+                    // Pre-fetch the image DTO if an image is provided, to avoid validation errors
+                    let imageObjects: Array<{
+                      id: string;
+                      type: 'image';
+                      image: { image_name: string; width: number; height: number };
+                    }> = [];
+                    if (controlConfig.image?.image_name) {
+                      try {
+                        // Use the processed image if available, otherwise use the original
+                        const imageToUse = controlConfig.processed_image || controlConfig.image;
+                        await dispatch(imagesApi.endpoints.getImageDTO.initiate(imageToUse.image_name)).unwrap();
+                        // Add the image to the control layer's objects array
+                        imageObjects = [
+                          {
+                            id: `recalled-image-${Date.now()}-${Math.random()}`,
+                            type: 'image' as const,
+                            image: {
+                              image_name: imageToUse.image_name,
+                              width: imageToUse.width,
+                              height: imageToUse.height,
+                            },
+                          },
+                        ];
+                        if (controlConfig.processed_image) {
+                          log.debug(
+                            `Pre-fetched processed control layer image: ${imageToUse.image_name} (${imageToUse.width}x${imageToUse.height})`
+                          );
+                        } else {
+                          log.debug(
+                            `Pre-fetched control layer image: ${imageToUse.image_name} (${imageToUse.width}x${imageToUse.height})`
+                          );
+                        }
+                      } catch (imageError) {
+                        log.warn(
+                          `Could not pre-fetch control layer image ${controlConfig.image.image_name}, continuing without image: ${imageError}`
+                        );
+                      }
+                    }
+
+                    // Build a valid CanvasControlLayerState using helper function
+                    const controlLayerState = getControlLayerState(`recalled-control-${Date.now()}-${Math.random()}`, {
+                      objects: imageObjects,
+                      controlAdapter: {
+                        type: 'controlnet',
+                        model: {
+                          key: modelConfig.key,
+                          hash: modelConfig.hash,
+                          name: modelConfig.name,
+                          base: modelConfig.base,
+                          type: modelConfig.type,
+                        },
+                        weight: typeof controlConfig.weight === 'number' ? controlConfig.weight : 1.0,
+                        beginEndStepPct: [
+                          typeof controlConfig.begin_step_percent === 'number' ? controlConfig.begin_step_percent : 0,
+                          typeof controlConfig.end_step_percent === 'number' ? controlConfig.end_step_percent : 1,
+                        ] as [number, number],
+                        controlMode: controlConfig.control_mode || 'balanced',
+                      },
+                    });
+
+                    dispatch(controlLayerRecalled({ data: controlLayerState }));
+                    log.debug(
+                      `Applied control layer: ${modelConfig.name} (weight: ${controlLayerState.controlAdapter.weight})`
+                    );
+                    if (imageObjects.length > 0) {
+                      log.info(`Control layer image loaded: ${controlConfig.image?.image_name}`);
+                    }
+                  })
+                  .catch((error) => {
+                    log.error(`Failed to load control layer ${controlConfig.model_key}: ${error}`);
+                  });
+              }
+            }
+          );
+          log.info(`Initiated loading of ${data.parameters.control_layers.length} control layer(s)`);
+        }
+      }
+
+      // Handle IP Adapters as Reference Images
+      if (data.parameters.ip_adapters !== undefined && Array.isArray(data.parameters.ip_adapters)) {
+        log.debug(`Processing ${data.parameters.ip_adapters.length} IP adapter(s)`);
+
+        // If the list is explicitly empty, clear existing reference images
+        if (data.parameters.ip_adapters.length === 0) {
+          dispatch(refImagesRecalled({ entities: [], replace: true }));
+          log.info('Cleared all IP adapter reference images');
+        } else {
+          // Build promises for all IP adapters, then dispatch once with replace: true
+          const ipAdapterPromises = data.parameters.ip_adapters
+            .filter((cfg) => cfg.model_key && typeof cfg.model_key === 'string')
+            .map(async (adapterConfig) => {
+              try {
+                const modelConfig = await dispatch(
+                  modelsApi.endpoints.getModelConfig.initiate(adapterConfig.model_key!)
+                ).unwrap();
+
+                // Pre-fetch the image DTO if an image is provided, to avoid validation errors
+                if (adapterConfig.image?.image_name) {
+                  try {
+                    await dispatch(imagesApi.endpoints.getImageDTO.initiate(adapterConfig.image.image_name)).unwrap();
+                  } catch (imageError) {
+                    log.warn(
+                      `Could not pre-fetch image ${adapterConfig.image.image_name}, continuing anyway: ${imageError}`
+                    );
+                  }
+                }
+
+                // Build RefImageState using helper function - supports both ip_adapter and flux_redux
+                const imageData = adapterConfig.image
+                  ? {
+                      original: {
+                        image: {
+                          image_name: adapterConfig.image.image_name,
+                          width: adapterConfig.image.width ?? 512,
+                          height: adapterConfig.image.height ?? 512,
+                        },
+                      },
+                    }
+                  : null;
+
+                const isFluxRedux = modelConfig.type === 'flux_redux';
+                const refImageState = getReferenceImageState(`recalled-ref-image-${Date.now()}-${Math.random()}`, {
+                  isEnabled: true,
+                  config: isFluxRedux
+                    ? {
+                        type: 'flux_redux',
+                        image: imageData,
+                        model: {
+                          key: modelConfig.key,
+                          hash: modelConfig.hash,
+                          name: modelConfig.name,
+                          base: modelConfig.base,
+                          type: modelConfig.type,
+                        },
+                        imageInfluence: (adapterConfig.image_influence as FLUXReduxImageInfluence) || 'highest',
+                      }
+                    : {
+                        type: 'ip_adapter',
+                        image: imageData,
+                        model: {
+                          key: modelConfig.key,
+                          hash: modelConfig.hash,
+                          name: modelConfig.name,
+                          base: modelConfig.base,
+                          type: modelConfig.type,
+                        },
+                        weight: typeof adapterConfig.weight === 'number' ? adapterConfig.weight : 1.0,
+                        beginEndStepPct: [
+                          typeof adapterConfig.begin_step_percent === 'number' ? adapterConfig.begin_step_percent : 0,
+                          typeof adapterConfig.end_step_percent === 'number' ? adapterConfig.end_step_percent : 1,
+                        ] as [number, number],
+                        method: (adapterConfig.method as IPMethodV2) || 'full',
+                        clipVisionModel: 'ViT-H',
+                      },
+                });
+
+                if (isFluxRedux) {
+                  log.debug(`Built FLUX Redux ref image state: ${modelConfig.name}`);
+                } else {
+                  log.debug(
+                    `Built IP adapter ref image state: ${modelConfig.name} (weight: ${typeof adapterConfig.weight === 'number' ? adapterConfig.weight : 1.0})`
+                  );
+                }
+                if (adapterConfig.image?.image_name) {
+                  log.debug(
+                    `IP adapter image: outputs/images/${adapterConfig.image.image_name} (${adapterConfig.image.width}x${adapterConfig.image.height})`
+                  );
+                }
+
+                return refImageState;
+              } catch (error) {
+                log.error(`Failed to load IP adapter ${adapterConfig.model_key}: ${error}`);
+                return null;
+              }
+            });
+
+          // Wait for all IP adapters to load, then dispatch with replace: true
+          Promise.all(ipAdapterPromises).then((refImageStates) => {
+            const validStates = refImageStates.filter((state): state is RefImageState => state !== null);
+            if (validStates.length > 0) {
+              dispatch(refImagesRecalled({ entities: validStates, replace: true }));
+              log.info(`Applied ${validStates.length} IP adapter(s), replacing existing list`);
+            }
+          });
+        }
+      }
+    }
   });
 
   socket.on('bulk_download_started', (data) => {
