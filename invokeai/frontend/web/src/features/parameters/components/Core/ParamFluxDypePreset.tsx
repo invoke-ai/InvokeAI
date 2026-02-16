@@ -12,6 +12,7 @@ const FLUX_DYPE_PRESET_OPTIONS: ComboboxOption[] = [
   { value: 'off', label: 'Off' },
   { value: 'manual', label: 'Manual' },
   { value: 'auto', label: 'Auto (> 1536px)' },
+  { value: 'area', label: 'Area (auto)' },
   { value: '4k', label: '4K Optimized' },
 ];
 

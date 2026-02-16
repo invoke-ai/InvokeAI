@@ -71,7 +71,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="4.5.0",
+    version="4.5.1",
 )
 class FluxDenoiseInvocation(BaseInvocation):
     """Run denoising process with a FLUX transformer model."""
@@ -176,7 +176,10 @@ class FluxDenoiseInvocation(BaseInvocation):
     # DyPE (Dynamic Position Extrapolation) for high-resolution generation
     dype_preset: DyPEPreset = InputField(
         default=DYPE_PRESET_OFF,
-        description="DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.",
+        description=(
+            "DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. "
+            "'area' enables automatically based on image area. '4k' uses optimized settings for 4K output."
+        ),
         ui_order=100,
         ui_choice_labels=DYPE_PRESET_LABELS,
     )
