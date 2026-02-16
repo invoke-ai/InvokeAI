@@ -132,7 +132,9 @@ export const EntityListSelectedEntityActionBarOpacity = memo(() => {
   return (
     <Popover>
       <FormControl w="min-content" gap={2} isDisabled={selectedEntityIdentifier === null}>
-        <FormLabel m={0}>{t('controlLayers.opacity')}</FormLabel>
+        <FormLabel m={0} mt={1}>
+          {t('controlLayers.opacity')}
+        </FormLabel>
         <PopoverAnchor>
           <NumberInput
             display="flex"

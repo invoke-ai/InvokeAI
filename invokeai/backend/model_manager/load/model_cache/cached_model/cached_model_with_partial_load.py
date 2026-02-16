@@ -136,6 +136,11 @@ class CachedModelWithPartialLoad:
             )
         return self._cur_vram_bytes
 
+    @property
+    def compute_device(self) -> torch.device:
+        """Return the compute device for this model."""
+        return self._compute_device
+
     def full_load_to_vram(self) -> int:
         """Load all weights into VRAM."""
         return self.partial_load_to_vram(self.total_bytes())

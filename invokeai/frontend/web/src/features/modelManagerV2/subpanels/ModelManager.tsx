@@ -8,6 +8,7 @@ import { PiPlusBold } from 'react-icons/pi';
 
 import ModelList from './ModelManagerPanel/ModelList';
 import { ModelListNavigation } from './ModelManagerPanel/ModelListNavigation';
+import { SyncModelsButton } from './ModelManagerPanel/SyncModelsButton';
 
 const modelManagerSx: SystemStyleObject = {
   flexDir: 'column',
@@ -33,11 +34,14 @@ export const ModelManager = memo(() => {
         <Heading fontSize="xl" py={1}>
           {t('common.modelManager')}
         </Heading>
-        {!!selectedModelKey && (
-          <Button size="sm" colorScheme="invokeYellow" leftIcon={<PiPlusBold />} onClick={handleClickAddModel}>
-            {t('modelManager.addModels')}
-          </Button>
-        )}
+        <Flex gap={2}>
+          <SyncModelsButton />
+          {!!selectedModelKey && (
+            <Button size="sm" colorScheme="invokeYellow" leftIcon={<PiPlusBold />} onClick={handleClickAddModel}>
+              {t('modelManager.addModels')}
+            </Button>
+          )}
+        </Flex>
       </Flex>
       <Flex flexDir="column" gap={4} w="full" h="full">
         <ModelListNavigation />

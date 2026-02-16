@@ -21,6 +21,7 @@ class T5Encoder_T5Encoder_Config(Config_Base):
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
     type: Literal[ModelType.T5Encoder] = Field(default=ModelType.T5Encoder)
     format: Literal[ModelFormat.T5Encoder] = Field(default=ModelFormat.T5Encoder)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -50,6 +51,7 @@ class T5Encoder_BnBLLMint8_Config(Config_Base):
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
     type: Literal[ModelType.T5Encoder] = Field(default=ModelType.T5Encoder)
     format: Literal[ModelFormat.BnbQuantizedLlmInt8b] = Field(default=ModelFormat.BnbQuantizedLlmInt8b)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
