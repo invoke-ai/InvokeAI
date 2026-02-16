@@ -4,6 +4,9 @@ from invokeai.backend.model_manager.taxonomy import FluxLoRAFormat
 from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_utils import (
     is_state_dict_likely_in_flux_aitoolkit_format,
 )
+from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_bfl_peft_format,
+)
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
 from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
     is_state_dict_likely_in_flux_diffusers_format,
@@ -35,5 +38,7 @@ def flux_format_from_state_dict(
         return FluxLoRAFormat.AIToolkit
     elif is_state_dict_likely_in_flux_xlabs_format(state_dict):
         return FluxLoRAFormat.XLabs
+    elif is_state_dict_likely_in_flux_bfl_peft_format(state_dict):
+        return FluxLoRAFormat.BflPeft
     else:
         return None
