@@ -809,7 +809,20 @@
         "missingFiles": "File mancanti",
         "missingFilesTooltip": "I file del modello sono mancanti dal disco",
         "cpuOnly": "Solo CPU",
-        "runOnCpu": "Esegui il modello di codifica del testo solo sulla CPU"
+        "runOnCpu": "Esegui il modello di codifica del testo solo sulla CPU",
+        "syncModelsTooltip": "Identificare e rimuovere i file modello non utilizzati nella cartella radice di InvokeAI.",
+        "syncModelsDirectory": "Sincronizza la cartella dei modelli",
+        "noOrphanedModels": "La cartella dei modelli è sincronizzata. Nessun file orfano trovato.",
+        "orphanedModelsFound": "Modelli orfani trovati",
+        "orphanedModelsDescription": "Le seguenti cartelle dei modelli non sono referenziate nel database e possono essere eliminate in sicurezza:",
+        "foundOrphanedModels": "Trovata {{count}} cartella di modello orfana",
+        "filesCount": "{{count}} file",
+        "deleteSelected": "Elimina {{count}} selezionati",
+        "deselectAll": "Deseleziona tutto",
+        "orphanedModelsDeleted": "Eliminato con successo {{count}} modello orfano",
+        "orphanedModelsDeleteErrors": "Alcuni modelli non possono essere eliminati",
+        "orphanedModelsDeleteFailed": "Impossibile eliminare i modelli orfani",
+        "errorLoadingOrphanedModels": "Errore durante il caricamento dei modelli orfani. Riprova."
     },
     "parameters": {
         "images": "Immagini",
@@ -1973,7 +1986,8 @@
             "paragraphs": [
                 "Se abilitato, solo il componente codificatore del testo verrà eseguito sulla CPU anziché sulla GPU.",
                 "Ciò consente di risparmiare VRAM per il denoiser, con un impatto minimo sulle prestazioni. Le uscite di condizionamento vengono automaticamente trasferite alla GPU per il denoiser."
-            ]
+            ],
+            "heading": "Solo CPU"
         }
     },
     "sdxl": {
