@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useStagingAreaContext } from 'features/controlLayers/components/StagingArea/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
@@ -30,15 +31,16 @@ export const StagingAreaToolbarAcceptButton = memo(() => {
   );
 
   return (
-    <IconButton
-      tooltip={`${t('common.accept')} (Enter)`}
-      aria-label={`${t('common.accept')} (Enter)`}
-      icon={<PiCheckBold />}
-      onClick={ctx.acceptSelected}
-      colorScheme="invokeBlue"
-      isDisabled={!acceptSelectedIsEnabled || !shouldShowStagedImage || cancelQueueItemsByDestination.isDisabled}
-      isLoading={cancelQueueItemsByDestination.isLoading}
-    />
+    <IAITooltip label={`${t('common.accept')} (Enter)`}>
+      <IconButton
+        aria-label={`${t('common.accept')} (Enter)`}
+        icon={<PiCheckBold />}
+        onClick={ctx.acceptSelected}
+        colorScheme="invokeBlue"
+        isDisabled={!acceptSelectedIsEnabled || !shouldShowStagedImage || cancelQueueItemsByDestination.isDisabled}
+        isLoading={cancelQueueItemsByDestination.isLoading}
+      />
+    </IAITooltip>
   );
 });
 

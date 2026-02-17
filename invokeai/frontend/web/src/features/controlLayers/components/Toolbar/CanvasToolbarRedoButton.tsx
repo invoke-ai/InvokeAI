@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { canvasRedo } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasMayRedo } from 'features/controlLayers/store/selectors';
@@ -17,15 +18,16 @@ export const CanvasToolbarRedoButton = memo(() => {
   }, [dispatch]);
 
   return (
-    <IconButton
-      aria-label={t('hotkeys.canvas.redo.title')}
-      tooltip={t('hotkeys.canvas.redo.title')}
-      onClick={onClick}
-      icon={<PiArrowClockwiseBold />}
-      variant="link"
-      alignSelf="stretch"
-      isDisabled={isBusy || !mayRedo}
-    />
+    <IAITooltip label={t('hotkeys.canvas.redo.title')}>
+      <IconButton
+        aria-label={t('hotkeys.canvas.redo.title')}
+        onClick={onClick}
+        icon={<PiArrowClockwiseBold />}
+        variant="link"
+        alignSelf="stretch"
+        isDisabled={isBusy || !mayRedo}
+      />
+    </IAITooltip>
   );
 });
 

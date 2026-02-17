@@ -1,5 +1,6 @@
 import { ConfirmationAlertDialog, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { nodeEditorReset } from 'features/nodes/store/nodesSlice';
 import { toast } from 'features/toast/toast';
@@ -35,13 +36,14 @@ const ClearFlowButton = () => {
 
   return (
     <>
-      <IconButton
-        tooltip={t('nodes.clearWorkflow')}
-        aria-label={t('nodes.clearWorkflow')}
-        icon={<PiTrashSimpleFill />}
-        onClick={onClick}
-        pointerEvents="auto"
-      />
+      <IAITooltip label={t('nodes.clearWorkflow')}>
+        <IconButton
+          aria-label={t('nodes.clearWorkflow')}
+          icon={<PiTrashSimpleFill />}
+          onClick={onClick}
+          pointerEvents="auto"
+        />
+      </IAITooltip>
       <ConfirmationAlertDialog
         isOpen={isOpen}
         onClose={onClose}

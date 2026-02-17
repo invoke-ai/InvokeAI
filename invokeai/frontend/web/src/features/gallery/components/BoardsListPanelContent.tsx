@@ -1,6 +1,7 @@
 import { Box, Button, Collapse, Divider, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { BoardsListWrapper } from 'features/gallery/components/Boards/BoardsList/BoardsListWrapper';
 import { BoardsSearch } from 'features/gallery/components/Boards/BoardsList/BoardsSearch';
@@ -63,16 +64,19 @@ export const BoardsPanel = memo(() => {
         </Flex>
         <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
           <BoardsSettingsPopover />
-          <IconButton
-            size="sm"
-            variant="link"
-            alignSelf="stretch"
-            onClick={onClickBoardSearch}
-            tooltip={searchDisclosure.isOpen ? `${t('gallery.exitBoardSearch')}` : `${t('gallery.displayBoardSearch')}`}
-            aria-label={t('gallery.displayBoardSearch')}
-            icon={<PiMagnifyingGlassBold />}
-            colorScheme={searchDisclosure.isOpen ? 'invokeBlue' : 'base'}
-          />
+          <IAITooltip
+            label={searchDisclosure.isOpen ? `${t('gallery.exitBoardSearch')}` : `${t('gallery.displayBoardSearch')}`}
+          >
+            <IconButton
+              size="sm"
+              variant="link"
+              alignSelf="stretch"
+              onClick={onClickBoardSearch}
+              aria-label={t('gallery.displayBoardSearch')}
+              icon={<PiMagnifyingGlassBold />}
+              colorScheme={searchDisclosure.isOpen ? 'invokeBlue' : 'base'}
+            />
+          </IAITooltip>
         </Flex>
       </Flex>
       <Collapse in={searchDisclosure.isOpen} style={COLLAPSE_STYLES}>

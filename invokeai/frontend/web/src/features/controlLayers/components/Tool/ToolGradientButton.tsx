@@ -1,4 +1,5 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { GradientToolIcon } from 'features/controlLayers/components/Tool/GradientIcons';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { memo, useCallback } from 'react';
@@ -14,7 +15,7 @@ export const ToolGradientButton = memo(() => {
   const gradientLabel = t('controlLayers.tool.gradient', { defaultValue: 'Gradient' });
 
   return (
-    <Tooltip label={gradientLabel} placement="end">
+    <IAITooltip label={gradientLabel} placement="end">
       <IconButton
         aria-label={gradientLabel}
         icon={<GradientToolIcon />}
@@ -23,7 +24,7 @@ export const ToolGradientButton = memo(() => {
         variant="solid"
         onClick={handleClick}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

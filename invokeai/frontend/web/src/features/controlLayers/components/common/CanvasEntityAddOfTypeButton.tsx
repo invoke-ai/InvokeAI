@@ -1,4 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
 import {
   useAddControlLayer,
@@ -54,16 +55,17 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
   }, [type, t]);
 
   return (
-    <IconButton
-      size="sm"
-      aria-label={label}
-      tooltip={label}
-      variant="link"
-      icon={<NewLayerIcon />}
-      onClick={onClick}
-      alignSelf="stretch"
-      isDisabled={isBusy}
-    />
+    <IAITooltip label={label}>
+      <IconButton
+        size="sm"
+        aria-label={label}
+        variant="link"
+        icon={<NewLayerIcon />}
+        onClick={onClick}
+        alignSelf="stretch"
+        isDisabled={isBusy}
+      />
+    </IAITooltip>
   );
 });
 

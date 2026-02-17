@@ -1,4 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { $addNodeCmdk } from 'features/nodes/store/nodesSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,13 +13,9 @@ const AddNodeButton = () => {
   }, []);
 
   return (
-    <IconButton
-      tooltip={t('nodes.addNodeToolTip')}
-      aria-label={t('nodes.addNode')}
-      icon={<PiPlusBold />}
-      onClick={onClick}
-      pointerEvents="auto"
-    />
+    <IAITooltip label={t('nodes.addNodeToolTip')}>
+      <IconButton aria-label={t('nodes.addNode')} icon={<PiPlusBold />} onClick={onClick} pointerEvents="auto" />
+    </IAITooltip>
   );
 };
 

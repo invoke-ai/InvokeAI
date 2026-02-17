@@ -1,4 +1,5 @@
-import { Flex, IconButton, Progress, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, IconButton, Progress, Text } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { isNil } from 'es-toolkit/compat';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
@@ -100,7 +101,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
 
   return (
     <Flex gap={3} w="full" alignItems="center">
-      <Tooltip maxW={600} label={<TooltipLabel name={modelName} source={sourceLocation} installJob={installJob} />}>
+      <IAITooltip maxW={600} label={<TooltipLabel name={modelName} source={sourceLocation} installJob={installJob} />}>
         <Flex gap={3} w="full" alignItems="center">
           <Text w={96} whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
             {modelName}
@@ -115,7 +116,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
           />
           <ModelInstallQueueBadge status={installJob.status} />
         </Flex>
-      </Tooltip>
+      </IAITooltip>
       <IconButton
         isDisabled={
           installJob.status !== 'downloading' && installJob.status !== 'waiting' && installJob.status !== 'running'

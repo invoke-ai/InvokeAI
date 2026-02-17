@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTypeIsHidden';
 import { useEntityTypeString } from 'features/controlLayers/hooks/useEntityTypeString';
 import { allEntitiesOfTypeIsHiddenToggled } from 'features/controlLayers/store/canvasSlice';
@@ -27,15 +28,16 @@ export const CanvasEntityTypeIsHiddenToggle = memo(({ type }: Props) => {
   );
 
   return (
-    <IconButton
-      size="sm"
-      aria-label={t(isHidden ? 'controlLayers.hidingType' : 'controlLayers.showingType', { type: typeString })}
-      tooltip={t(isHidden ? 'controlLayers.hidingType' : 'controlLayers.showingType', { type: typeString })}
-      variant="link"
-      icon={isHidden ? <PiEyeClosedBold /> : <PiEyeBold />}
-      onClick={onClick}
-      alignSelf="stretch"
-    />
+    <IAITooltip label={t(isHidden ? 'controlLayers.hidingType' : 'controlLayers.showingType', { type: typeString })}>
+      <IconButton
+        size="sm"
+        aria-label={t(isHidden ? 'controlLayers.hidingType' : 'controlLayers.showingType', { type: typeString })}
+        variant="link"
+        icon={isHidden ? <PiEyeClosedBold /> : <PiEyeBold />}
+        onClick={onClick}
+        alignSelf="stretch"
+      />
+    </IAITooltip>
   );
 });
 

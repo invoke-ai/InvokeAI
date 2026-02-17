@@ -1,5 +1,6 @@
 import type { CircularProgressProps, SystemStyleObject } from '@invoke-ai/ui-library';
-import { CircularProgress, Tooltip } from '@invoke-ai/ui-library';
+import { CircularProgress } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { getProgressMessage } from 'features/controlLayers/components/StagingArea/shared';
 import { memo } from 'react';
 import type { S } from 'services/api/types';
@@ -26,7 +27,7 @@ export const QueueItemCircularProgress = memo(({ itemId, status, ...rest }: Prop
   }
 
   return (
-    <Tooltip label={getProgressMessage(progressEvent)}>
+    <IAITooltip label={getProgressMessage(progressEvent)}>
       <CircularProgress
         size="14px"
         color="invokeBlue.500"
@@ -36,7 +37,7 @@ export const QueueItemCircularProgress = memo(({ itemId, status, ...rest }: Prop
         sx={circleStyles}
         {...rest}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 QueueItemCircularProgress.displayName = 'QueueItemCircularProgress';

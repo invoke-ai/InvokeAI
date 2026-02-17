@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useStagingAreaContext } from 'features/controlLayers/components/StagingArea/context';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCancelQueueItem } from 'features/queue/hooks/useCancelQueueItem';
@@ -18,15 +19,16 @@ export const StagingAreaToolbarDiscardSelectedButton = memo(() => {
   const { t } = useTranslation();
 
   return (
-    <IconButton
-      tooltip={t('controlLayers.stagingArea.discard')}
-      aria-label={t('controlLayers.stagingArea.discard')}
-      icon={<PiXBold />}
-      onClick={ctx.discardSelected}
-      colorScheme="invokeBlue"
-      isDisabled={!discardSelectedIsEnabled || cancelQueueItem.isDisabled || !shouldShowStagedImage}
-      isLoading={cancelQueueItem.isLoading}
-    />
+    <IAITooltip label={t('controlLayers.stagingArea.discard')}>
+      <IconButton
+        aria-label={t('controlLayers.stagingArea.discard')}
+        icon={<PiXBold />}
+        onClick={ctx.discardSelected}
+        colorScheme="invokeBlue"
+        isDisabled={!discardSelectedIsEnabled || cancelQueueItem.isDisabled || !shouldShowStagedImage}
+        isLoading={cancelQueueItem.isLoading}
+      />
+    </IAITooltip>
   );
 });
 

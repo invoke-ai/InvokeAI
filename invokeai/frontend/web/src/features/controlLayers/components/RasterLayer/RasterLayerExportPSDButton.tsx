@@ -1,4 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useExportCanvasToPSD } from 'features/controlLayers/hooks/useExportCanvasToPSD';
 import { memo, useCallback } from 'react';
@@ -15,16 +16,17 @@ export const RasterLayerExportPSDButton = memo(() => {
   }, [exportCanvasToPSD]);
 
   return (
-    <IconButton
-      onClick={onClick}
-      isDisabled={isBusy}
-      size="sm"
-      variant="link"
-      alignSelf="stretch"
-      aria-label={t('controlLayers.exportCanvasToPSD')}
-      tooltip={t('controlLayers.exportCanvasToPSD')}
-      icon={<PiFileArrowDownBold />}
-    />
+    <IAITooltip label={t('controlLayers.exportCanvasToPSD')}>
+      <IconButton
+        onClick={onClick}
+        isDisabled={isBusy}
+        size="sm"
+        variant="link"
+        alignSelf="stretch"
+        aria-label={t('controlLayers.exportCanvasToPSD')}
+        icon={<PiFileArrowDownBold />}
+      />
+    </IAITooltip>
   );
 });
 

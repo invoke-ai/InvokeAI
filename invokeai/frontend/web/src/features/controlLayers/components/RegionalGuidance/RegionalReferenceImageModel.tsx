@@ -1,5 +1,6 @@
-import { Combobox, FormControl, Tooltip } from '@invoke-ai/ui-library';
+import { Combobox, FormControl } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useGroupedModelCombobox } from 'common/hooks/useGroupedModelCombobox';
 import { selectBase } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -54,7 +55,7 @@ export const RegionalReferenceImageModel = memo(({ modelKey, onChangeModel }: Pr
   });
 
   return (
-    <Tooltip label={selectedModel?.description}>
+    <IAITooltip label={selectedModel?.description}>
       <FormControl isInvalid={!value || currentBaseModel !== selectedModel?.base} w="full">
         <Combobox
           options={options}
@@ -64,7 +65,7 @@ export const RegionalReferenceImageModel = memo(({ modelKey, onChangeModel }: Pr
           noOptionsMessage={noOptionsMessage}
         />
       </FormControl>
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

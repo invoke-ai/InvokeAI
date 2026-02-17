@@ -1,4 +1,5 @@
-import { Button, Tooltip, useDisclosure } from '@invoke-ai/ui-library';
+import { Button, useDisclosure } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsClockwiseBold } from 'react-icons/pi';
@@ -15,7 +16,7 @@ export const SyncModelsButton = memo(() => {
 
   return (
     <>
-      <Tooltip label={t('modelManager.syncModelsTooltip')}>
+      <IAITooltip label={t('modelManager.syncModelsTooltip')}>
         <Button
           size="sm"
           colorScheme="error"
@@ -25,7 +26,7 @@ export const SyncModelsButton = memo(() => {
         >
           {t('modelManager.syncModels')}
         </Button>
-      </Tooltip>
+      </IAITooltip>
       <SyncModelsDialog isOpen={isOpen} onClose={onClose} />
     </>
   );

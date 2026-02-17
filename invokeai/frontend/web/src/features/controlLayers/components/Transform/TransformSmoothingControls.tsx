@@ -1,5 +1,6 @@
-import { Flex, FormControl, FormLabel, Select, Switch, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, FormControl, FormLabel, Select, Switch } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import {
   selectTransformSmoothingEnabled,
   selectTransformSmoothingMode,
@@ -30,12 +31,12 @@ export const TransformSmoothingControls = memo(() => {
 
   return (
     <Flex w="full" gap={4} alignItems="center" flexWrap="wrap">
-      <Tooltip label={t('controlLayers.transform.smoothingDesc')}>
+      <IAITooltip label={t('controlLayers.transform.smoothingDesc')}>
         <FormControl w="min-content">
           <FormLabel m={0}>{t('controlLayers.transform.smoothing')}</FormLabel>
           <Switch size="sm" isChecked={smoothingEnabled} onChange={onToggle} />
         </FormControl>
-      </Tooltip>
+      </IAITooltip>
       <FormControl flex={1} minW={200} maxW={280}>
         <FormLabel m={0}>{t('controlLayers.transform.smoothingMode')}</FormLabel>
         <Select size="sm" value={smoothingMode} onChange={onModeChange} isDisabled={!smoothingEnabled}>

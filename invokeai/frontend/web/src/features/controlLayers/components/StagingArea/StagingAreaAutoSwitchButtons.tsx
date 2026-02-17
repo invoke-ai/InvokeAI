@@ -1,6 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import {
   selectStagingAreaAutoSwitch,
@@ -28,30 +29,33 @@ export const StagingAreaAutoSwitchButtons = memo(() => {
 
   return (
     <>
-      <IconButton
-        aria-label="Do not auto-switch"
-        tooltip="Do not auto-switch"
-        icon={<PiMoonBold />}
-        colorScheme={autoSwitch === 'off' ? 'invokeBlue' : 'base'}
-        onClick={onClickOff}
-        isDisabled={!shouldShowStagedImage}
-      />
-      <IconButton
-        aria-label="Switch on start"
-        tooltip="Switch on start"
-        icon={<PiCaretRightBold />}
-        colorScheme={autoSwitch === 'switch_on_start' ? 'invokeBlue' : 'base'}
-        onClick={onClickSwitchOnStart}
-        isDisabled={!shouldShowStagedImage}
-      />
-      <IconButton
-        aria-label="Switch on finish"
-        tooltip="Switch on finish"
-        icon={<PiCaretLineRightBold />}
-        colorScheme={autoSwitch === 'switch_on_finish' ? 'invokeBlue' : 'base'}
-        onClick={onClickSwitchOnFinished}
-        isDisabled={!shouldShowStagedImage}
-      />
+      <IAITooltip label="Do not auto-switch">
+        <IconButton
+          aria-label="Do not auto-switch"
+          icon={<PiMoonBold />}
+          colorScheme={autoSwitch === 'off' ? 'invokeBlue' : 'base'}
+          onClick={onClickOff}
+          isDisabled={!shouldShowStagedImage}
+        />
+      </IAITooltip>
+      <IAITooltip label="Switch on start">
+        <IconButton
+          aria-label="Switch on start"
+          icon={<PiCaretRightBold />}
+          colorScheme={autoSwitch === 'switch_on_start' ? 'invokeBlue' : 'base'}
+          onClick={onClickSwitchOnStart}
+          isDisabled={!shouldShowStagedImage}
+        />
+      </IAITooltip>
+      <IAITooltip label="Switch on finish">
+        <IconButton
+          aria-label="Switch on finish"
+          icon={<PiCaretLineRightBold />}
+          colorScheme={autoSwitch === 'switch_on_finish' ? 'invokeBlue' : 'base'}
+          onClick={onClickSwitchOnFinished}
+          isDisabled={!shouldShowStagedImage}
+        />
+      </IAITooltip>
     </>
   );
 });

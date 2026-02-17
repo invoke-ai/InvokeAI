@@ -10,6 +10,7 @@ import {
   Portal,
   Text,
 } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import AlwaysShowImageSizeCheckbox from 'features/gallery/components/GallerySettingsPopover/AlwaysShowImageSizeCheckbox';
 import AutoSwitchCheckbox from 'features/gallery/components/GallerySettingsPopover/AutoSwitchCheckbox';
 import ImageMinimumWidthSlider from 'features/gallery/components/GallerySettingsPopover/ImageMinimumWidthSlider';
@@ -26,14 +27,15 @@ export const GallerySettingsPopover = memo(() => {
   return (
     <Popover isLazy>
       <PopoverTrigger>
-        <IconButton
-          size="sm"
-          variant="link"
-          alignSelf="stretch"
-          aria-label={t('gallery.imagesSettings')}
-          icon={<PiGearSixFill />}
-          tooltip={t('gallery.imagesSettings')}
-        />
+        <IAITooltip label={t('gallery.imagesSettings')}>
+          <IconButton
+            size="sm"
+            variant="link"
+            alignSelf="stretch"
+            aria-label={t('gallery.imagesSettings')}
+            icon={<PiGearSixFill />}
+          />
+        </IAITooltip>
       </PopoverTrigger>
       <Portal>
         <PopoverContent>

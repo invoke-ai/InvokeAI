@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { canvasUndo } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasMayUndo } from 'features/controlLayers/store/selectors';
@@ -17,15 +18,16 @@ export const CanvasToolbarUndoButton = memo(() => {
   }, [dispatch]);
 
   return (
-    <IconButton
-      aria-label={t('hotkeys.canvas.undo.title')}
-      tooltip={t('hotkeys.canvas.undo.title')}
-      onClick={onClick}
-      icon={<PiArrowCounterClockwiseBold />}
-      variant="link"
-      alignSelf="stretch"
-      isDisabled={isBusy || !mayUndo}
-    />
+    <IAITooltip label={t('hotkeys.canvas.undo.title')}>
+      <IconButton
+        aria-label={t('hotkeys.canvas.undo.title')}
+        onClick={onClick}
+        icon={<PiArrowCounterClockwiseBold />}
+        variant="link"
+        alignSelf="stretch"
+        isDisabled={isBusy || !mayUndo}
+      />
+    </IAITooltip>
   );
 });
 

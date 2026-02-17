@@ -1,5 +1,6 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import type { MouseEvent } from 'react';
@@ -27,7 +28,7 @@ export const ViewWorkflow = ({ workflowId }: { workflowId: string }) => {
   );
 
   return (
-    <Tooltip label={t('workflows.view')} closeOnScroll>
+    <IAITooltip label={t('workflows.view')} closeOnScroll>
       <IconButton
         size="sm"
         variant="link"
@@ -36,6 +37,6 @@ export const ViewWorkflow = ({ workflowId }: { workflowId: string }) => {
         onClick={handleClickLoad}
         icon={<PiEyeBold />}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 };

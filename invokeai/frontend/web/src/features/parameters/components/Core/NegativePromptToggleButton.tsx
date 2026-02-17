@@ -1,5 +1,6 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { negativePromptChanged, selectHasNegativePrompt } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,7 @@ export const NegativePromptToggleButton = memo(() => {
   );
 
   return (
-    <Tooltip label={label}>
+    <IAITooltip label={label}>
       <IconButton
         aria-label={label}
         onClick={onClick}
@@ -35,7 +36,7 @@ export const NegativePromptToggleButton = memo(() => {
         px={0.5}
         colorScheme={hasNegativePrompt ? 'invokeBlue' : 'base'}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

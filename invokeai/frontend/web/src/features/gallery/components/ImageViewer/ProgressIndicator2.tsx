@@ -1,5 +1,6 @@
 import type { CircularProgressProps, SystemStyleObject } from '@invoke-ai/ui-library';
-import { CircularProgress, Tooltip } from '@invoke-ai/ui-library';
+import { CircularProgress } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { memo } from 'react';
 import type { S } from 'services/api/types';
 import { formatProgressMessage } from 'services/events/stores';
@@ -14,7 +15,7 @@ const circleStyles: SystemStyleObject = {
 export const ProgressIndicator = memo(
   ({ progressEvent, ...rest }: { progressEvent: S['InvocationProgressEvent'] } & CircularProgressProps) => {
     return (
-      <Tooltip label={formatProgressMessage(progressEvent)}>
+      <IAITooltip label={formatProgressMessage(progressEvent)}>
         <CircularProgress
           size="14px"
           color="invokeBlue.500"
@@ -24,7 +25,7 @@ export const ProgressIndicator = memo(
           sx={circleStyles}
           {...rest}
         />
-      </Tooltip>
+      </IAITooltip>
     );
   }
 );

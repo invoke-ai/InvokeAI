@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { entityDeleted } from 'features/controlLayers/store/canvasSlice';
@@ -17,17 +18,18 @@ export const CanvasEntityDeleteButton = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   return (
-    <IconButton
-      size="sm"
-      aria-label={t('common.delete')}
-      tooltip={t('common.delete')}
-      variant="link"
-      alignSelf="stretch"
-      icon={<PiTrashSimpleFill />}
-      onClick={onClick}
-      colorScheme="error"
-      isDisabled={isBusy}
-    />
+    <IAITooltip label={t('common.delete')}>
+      <IconButton
+        size="sm"
+        aria-label={t('common.delete')}
+        variant="link"
+        alignSelf="stretch"
+        icon={<PiTrashSimpleFill />}
+        onClick={onClick}
+        colorScheme="error"
+        isDisabled={isBusy}
+      />
+    </IAITooltip>
   );
 });
 

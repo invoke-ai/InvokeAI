@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Flex, Icon, IconButton, Skeleton, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, Icon, IconButton, Skeleton, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { round } from 'es-toolkit/compat';
 import { useRefImageEntity } from 'features/controlLayers/components/RefImage/useRefImageEntity';
 import { useRefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
@@ -125,7 +126,7 @@ export const RefImagePreview = memo(() => {
     );
   }
   return (
-    <Tooltip label={warnings.length > 0 ? <RefImageWarningTooltipContent warnings={warnings} /> : undefined}>
+    <IAITooltip label={warnings.length > 0 ? <RefImageWarningTooltipContent warnings={warnings} /> : undefined}>
       <Flex
         position="relative"
         borderWidth={1}
@@ -195,7 +196,7 @@ export const RefImagePreview = memo(() => {
           />
         )}
       </Flex>
-    </Tooltip>
+    </IAITooltip>
   );
 });
 RefImagePreview.displayName = 'RefImagePreview';

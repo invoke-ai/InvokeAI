@@ -12,6 +12,7 @@ import type { BatchSizeResult } from 'features/nodes/util/node/resolveBatchValue
 import { getBatchSize } from 'features/nodes/util/node/resolveBatchValue';
 import type { Reason } from 'features/queue/store/readiness';
 import { $isReadyToEnqueue, $reasonsWhyCannotEnqueue, selectPromptsCount } from 'features/queue/store/readiness';
+import { selectSystemShouldEnableInformationalPopovers } from 'features/system/store/systemSlice';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { PropsWithChildren } from 'react';
 import { memo, useEffect, useMemo, useState } from 'react';
@@ -24,6 +25,12 @@ type Props = TooltipProps & {
 };
 
 export const InvokeButtonTooltip = ({ prepend, children, ...rest }: PropsWithChildren<Props>) => {
+  const shouldEnableInformationalPopovers = useAppSelector(selectSystemShouldEnableInformationalPopovers);
+
+  if (!shouldEnableInformationalPopovers) {
+    return children;
+  }
+
   return (
     <Tooltip label={<TooltipContent prepend={prepend} />} maxW={512} {...rest}>
       {children}

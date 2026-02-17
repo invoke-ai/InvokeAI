@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Icon, Input, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Icon, Input, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useEditable } from 'common/hooks/useEditable';
 import { InputFieldTooltipContent } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldTooltipContent';
 import {
@@ -90,7 +91,7 @@ export const InputFieldTitle = memo((props: Props) => {
 
   if (!editable.isEditing) {
     return (
-      <Tooltip
+      <IAITooltip
         label={<InputFieldTooltipContent nodeId={nodeId} fieldName={fieldName} />}
         openDelay={HANDLE_TOOLTIP_OPEN_DELAY}
         placement="top"
@@ -108,7 +109,7 @@ export const InputFieldTitle = memo((props: Props) => {
           {editable.value}
           {isAddedToForm && <Icon as={PiLinkBold} color={isInvalid ? 'error.300' : 'blue.200'} ml={1} />}
         </Text>
-      </Tooltip>
+      </IAITooltip>
     );
   }
 

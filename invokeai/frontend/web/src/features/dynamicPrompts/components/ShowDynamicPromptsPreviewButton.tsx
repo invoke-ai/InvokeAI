@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { IconButton, spinAnimation, Tooltip } from '@invoke-ai/ui-library';
+import { IconButton, spinAnimation } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useDynamicPromptsModal } from 'features/dynamicPrompts/hooks/useDynamicPromptsModal';
 import {
   selectDynamicPromptsIsError,
@@ -21,7 +22,7 @@ export const ShowDynamicPromptsPreviewButton = memo(() => {
   const { isOpen, onOpen } = useDynamicPromptsModal();
 
   return (
-    <Tooltip label={isLoading ? t('dynamicPrompts.loading') : t('dynamicPrompts.showDynamicPrompts')}>
+    <IAITooltip label={isLoading ? t('dynamicPrompts.loading') : t('dynamicPrompts.showDynamicPrompts')}>
       <IconButton
         size="sm"
         variant="promptOverlay"
@@ -32,7 +33,7 @@ export const ShowDynamicPromptsPreviewButton = memo(() => {
         sx={isLoading ? loadingStyles : undefined}
         colorScheme={isError && !isLoading ? 'error' : 'base'}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

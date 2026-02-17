@@ -1,4 +1,5 @@
 import { IconButton, useShiftModifier } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useSaveBboxToGallery, useSaveCanvasToGallery } from 'features/controlLayers/hooks/saveCanvasHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { memo } from 'react';
@@ -13,16 +14,17 @@ export const CanvasToolbarSaveToGalleryButton = memo(() => {
   const saveBboxToGallery = useSaveBboxToGallery();
 
   return (
-    <IconButton
-      variant="link"
-      alignSelf="stretch"
-      onClick={shift ? saveBboxToGallery : saveCanvasToGallery}
-      icon={<PiFloppyDiskBold />}
-      aria-label={shift ? t('controlLayers.saveBboxToGallery') : t('controlLayers.saveCanvasToGallery')}
-      colorScheme="invokeBlue"
-      tooltip={shift ? t('controlLayers.saveBboxToGallery') : t('controlLayers.saveCanvasToGallery')}
-      isDisabled={isBusy}
-    />
+    <IAITooltip label={shift ? t('controlLayers.saveBboxToGallery') : t('controlLayers.saveCanvasToGallery')}>
+      <IconButton
+        variant="link"
+        alignSelf="stretch"
+        onClick={shift ? saveBboxToGallery : saveCanvasToGallery}
+        icon={<PiFloppyDiskBold />}
+        aria-label={shift ? t('controlLayers.saveBboxToGallery') : t('controlLayers.saveCanvasToGallery')}
+        colorScheme="invokeBlue"
+        isDisabled={isBusy}
+      />
+    </IAITooltip>
   );
 });
 

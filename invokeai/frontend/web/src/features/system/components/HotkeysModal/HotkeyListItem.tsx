@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Button, Flex, IconButton, Kbd, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Button, Flex, IconButton, Kbd, Text } from '@invoke-ai/ui-library';
 import type { AppThunkDispatch } from 'app/store/store';
+import { IAITooltip } from 'common/components/IAITooltip';
 import type { Hotkey, HotkeyConflictInfo } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { IS_MAC_OS } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { hotkeyChanged, hotkeyReset } from 'features/system/store/hotkeysSlice';
@@ -263,7 +264,7 @@ const HotkeyItem = memo(
         const hasConflict = conflict !== null;
 
         return (
-          <Tooltip
+          <IAITooltip
             isOpen={hasConflict}
             label={hasConflict ? t('hotkeys.conflictWarning', { hotkeyTitle: conflict?.title }) : undefined}
             bg="error.900"
@@ -293,12 +294,12 @@ const HotkeyItem = memo(
                 </Text>
               )}
             </Flex>
-          </Tooltip>
+          </IAITooltip>
         );
       }
 
       return (
-        <Tooltip label={t('hotkeys.editHotkey')}>
+        <IAITooltip label={t('hotkeys.editHotkey')}>
           <Button
             variant="ghost"
             size="sm"
@@ -321,7 +322,7 @@ const HotkeyItem = memo(
               </Fragment>
             ))}
           </Button>
-        </Tooltip>
+        </IAITooltip>
       );
     };
 
@@ -332,7 +333,7 @@ const HotkeyItem = memo(
           {isEditing && (
             <>
               {!isNewHotkey && (
-                <Tooltip label={t('common.delete')}>
+                <IAITooltip label={t('common.delete')}>
                   <IconButton
                     aria-label={t('common.delete')}
                     icon={<PiTrashBold />}
@@ -341,9 +342,9 @@ const HotkeyItem = memo(
                     colorScheme="error"
                     onClick={onDeleteEdit}
                   />
-                </Tooltip>
+                </IAITooltip>
               )}
-              <Tooltip label={t('hotkeys.cancel')}>
+              <IAITooltip label={t('hotkeys.cancel')}>
                 <IconButton
                   aria-label={t('hotkeys.cancel')}
                   icon={<PiXBold />}
@@ -351,8 +352,8 @@ const HotkeyItem = memo(
                   variant="ghost"
                   onClick={onCancelEdit}
                 />
-              </Tooltip>
-              <Tooltip label={t('hotkeys.save')}>
+              </IAITooltip>
+              <IAITooltip label={t('hotkeys.save')}>
                 <IconButton
                   aria-label={t('hotkeys.save')}
                   icon={<PiCheckBold />}
@@ -361,7 +362,7 @@ const HotkeyItem = memo(
                   onClick={onSaveEdit}
                   disabled={!canSaveEdit}
                 />
-              </Tooltip>
+              </IAITooltip>
             </>
           )}
         </Flex>
@@ -449,7 +450,7 @@ const HotkeyItemsDisplay = memo(
         )}
         <Flex>
           {isCustomized && (
-            <Tooltip label={t('hotkeys.resetToDefault')}>
+            <IAITooltip label={t('hotkeys.resetToDefault')}>
               <IconButton
                 aria-label={t('hotkeys.resetToDefault')}
                 icon={<PiArrowCounterClockwiseBold />}
@@ -458,10 +459,10 @@ const HotkeyItemsDisplay = memo(
                 colorScheme="warning"
                 onClick={onReset}
               />
-            </Tooltip>
+            </IAITooltip>
           )}
           {!isAddingNew && (
-            <Tooltip label={t('hotkeys.addHotkey')}>
+            <IAITooltip label={t('hotkeys.addHotkey')}>
               <IconButton
                 aria-label={t('hotkeys.addHotkey')}
                 icon={<PiPlusBold />}
@@ -469,7 +470,7 @@ const HotkeyItemsDisplay = memo(
                 size="sm"
                 onClick={onAddHotkey}
               />
-            </Tooltip>
+            </IAITooltip>
           )}
         </Flex>
       </Flex>
