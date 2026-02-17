@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 
 import requests
+from PIL.Image import Image as PILImageType
 
 from invokeai.app.services.external_generation.errors import ExternalProviderRequestError
 from invokeai.app.services.external_generation.external_generation_base import ExternalProvider
@@ -29,7 +30,9 @@ class OpenAIProvider(ExternalProvider):
         base_url = (self._app_config.external_openai_base_url or "https://api.openai.com").rstrip("/")
         headers = {"Authorization": f"Bearer {api_key}"}
 
-        if request.mode == "txt2img":
+        use_edits_endpoint = request.mode != "txt2img" or bool(request.reference_images)
+
+        if not use_edits_endpoint:
             payload: dict[str, object] = {
                 "prompt": request.prompt,
                 "n": request.num_images,
@@ -45,20 +48,28 @@ class OpenAIProvider(ExternalProvider):
                 timeout=120,
             )
         else:
-            files: dict[str, tuple[str, io.BytesIO, str]] = {}
-            if request.init_image is None:
-                raise ExternalProviderRequestError("OpenAI img2img/inpaint requires an init image")
+            images: list[PILImageType] = []
+            if request.init_image is not None:
+                images.append(request.init_image)
+            images.extend(reference.image for reference in request.reference_images)
+            if not images:
+                raise ExternalProviderRequestError(
+                    "OpenAI image edits require at least one image (init image or reference image)"
+                )
 
-            image_buffer = io.BytesIO()
-            request.init_image.save(image_buffer, format="PNG")
-            image_buffer.seek(0)
-            files["image"] = ("image.png", image_buffer, "image/png")
+            files: list[tuple[str, tuple[str, io.BytesIO, str]]] = []
+            image_field_name = "image" if len(images) == 1 else "image[]"
+            for index, image in enumerate(images):
+                image_buffer = io.BytesIO()
+                image.save(image_buffer, format="PNG")
+                image_buffer.seek(0)
+                files.append((image_field_name, (f"image_{index}.png", image_buffer, "image/png")))
 
             if request.mask_image is not None:
                 mask_buffer = io.BytesIO()
                 request.mask_image.save(mask_buffer, format="PNG")
                 mask_buffer.seek(0)
-                files["mask"] = ("mask.png", mask_buffer, "image/png")
+                files.append(("mask", ("mask.png", mask_buffer, "image/png")))
 
             data: dict[str, object] = {
                 "prompt": request.prompt,

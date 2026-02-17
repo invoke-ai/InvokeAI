@@ -320,7 +320,13 @@ def test_openai_generate_inpaint_uses_edit_endpoint(monkeypatch: pytest.MonkeyPa
     encoded = encode_image_base64(_make_image("orange"))
     captured: dict[str, object] = {}
 
-    def fake_post(url: str, headers: dict, data: dict, files: dict, timeout: int) -> DummyResponse:
+    def fake_post(
+        url: str,
+        headers: dict,
+        data: dict,
+        files: list[tuple[str, tuple[str, io.BytesIO, str]]],
+        timeout: int,
+    ) -> DummyResponse:
         captured["url"] = url
         captured["data"] = data
         captured["files"] = files
@@ -336,11 +342,56 @@ def test_openai_generate_inpaint_uses_edit_endpoint(monkeypatch: pytest.MonkeyPa
     assert isinstance(data_payload, dict)
     assert data_payload["prompt"] == request.prompt
     files = captured["files"]
-    assert isinstance(files, dict)
-    assert "image" in files
-    assert "mask" in files
-    image_tuple = files["image"]
+    assert isinstance(files, list)
+    image_file = next((file for file in files if file[0] == "image"), None)
+    mask_file = next((file for file in files if file[0] == "mask"), None)
+    assert image_file is not None
+    assert mask_file is not None
+    image_tuple = image_file[1]
     assert isinstance(image_tuple, tuple)
-    assert image_tuple[0] == "image.png"
+    assert image_tuple[0] == "image_0.png"
     assert isinstance(image_tuple[1], io.BytesIO)
+    assert result.images
+
+
+def test_openai_generate_txt2img_with_references_uses_edit_endpoint(monkeypatch: pytest.MonkeyPatch) -> None:
+    config = InvokeAIAppConfig(external_openai_api_key="openai-key")
+    provider = OpenAIProvider(config, logging.getLogger("test"))
+    model = _build_model("openai", "gpt-image-1")
+    request = _build_request(
+        model,
+        reference_images=[
+            ExternalReferenceImage(image=_make_image("red")),
+            ExternalReferenceImage(image=_make_image("blue")),
+        ],
+    )
+    encoded = encode_image_base64(_make_image("orange"))
+    captured: dict[str, object] = {}
+
+    def fake_post(
+        url: str,
+        headers: dict,
+        data: dict,
+        files: list[tuple[str, tuple[str, io.BytesIO, str]]],
+        timeout: int,
+    ) -> DummyResponse:
+        captured["url"] = url
+        captured["data"] = data
+        captured["files"] = files
+        return DummyResponse(ok=True, json_data={"data": [{"b64_json": encoded}]})
+
+    monkeypatch.setattr("requests.post", fake_post)
+
+    result = provider.generate(request)
+
+    assert captured["url"] == "https://api.openai.com/v1/images/edits"
+    data_payload = captured["data"]
+    assert isinstance(data_payload, dict)
+    assert data_payload["prompt"] == request.prompt
+    files = captured["files"]
+    assert isinstance(files, list)
+    image_files = [file for file in files if file[0] == "image[]"]
+    assert len(image_files) == 2
+    assert image_files[0][1][0] == "image_0.png"
+    assert image_files[1][1][0] == "image_1.png"
     assert result.images
