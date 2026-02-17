@@ -241,3 +241,26 @@ def test_generate_happy_path() -> None:
 
     assert response is result
     assert provider.last_request == request
+
+
+def test_generate_resizes_inpaint_result_to_original_init_size() -> None:
+    model = _build_model(ExternalModelCapabilities(modes=["inpaint"]))
+    request = _build_request(
+        model=model,
+        mode="inpaint",
+        width=128,
+        height=128,
+        init_image=_make_image(),
+        mask_image=_make_image(),
+    )
+    generated_large = Image.new("RGB", (128, 128), color="black")
+    result = ExternalGenerationResult(images=[ExternalGeneratedImage(image=generated_large, seed=1)])
+    provider = DummyProvider("openai", configured=True, result=result)
+    service = ExternalGenerationService({"openai": provider}, logging.getLogger("test"))
+
+    response = service.generate(request)
+
+    assert request.init_image is not None
+    assert response.images[0].image.width == request.init_image.width
+    assert response.images[0].image.height == request.init_image.height
+    assert response.images[0].seed == 1

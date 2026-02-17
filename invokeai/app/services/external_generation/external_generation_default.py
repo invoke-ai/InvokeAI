@@ -15,6 +15,7 @@ from invokeai.app.services.external_generation.external_generation_base import (
     ExternalProvider,
 )
 from invokeai.app.services.external_generation.external_generation_common import (
+    ExternalGeneratedImage,
     ExternalGenerationRequest,
     ExternalGenerationResult,
     ExternalProviderStatus,
@@ -37,10 +38,17 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
             raise ExternalProviderNotConfiguredError(f"Provider '{request.model.provider_id}' is missing credentials")
 
         request = self._refresh_model_capabilities(request)
+        resize_to_original_inpaint_size = _get_resize_target_for_inpaint(request)
         request = self._bucket_request(request)
 
         self._validate_request(request)
-        return provider.generate(request)
+        result = provider.generate(request)
+
+        if resize_to_original_inpaint_size is None:
+            return result
+
+        width, height = resize_to_original_inpaint_size
+        return _resize_result_images(result, width, height)
 
     def get_provider_statuses(self) -> dict[str, ExternalProviderStatus]:
         return {provider_id: provider.get_status() for provider_id, provider in self._providers.items()}
@@ -274,6 +282,31 @@ def _resize_image(image: PILImageType | None, width: int, height: int, mode: str
     if image.width == width and image.height == height:
         return image
     return image.convert(mode).resize((width, height), Image.Resampling.LANCZOS)
+
+
+def _get_resize_target_for_inpaint(request: ExternalGenerationRequest) -> tuple[int, int] | None:
+    if request.mode != "inpaint" or request.init_image is None:
+        return None
+    return request.init_image.width, request.init_image.height
+
+
+def _resize_result_images(result: ExternalGenerationResult, width: int, height: int) -> ExternalGenerationResult:
+    resized_images = [
+        ExternalGeneratedImage(
+            image=generated.image
+            if generated.image.width == width and generated.image.height == height
+            else generated.image.resize((width, height), Image.Resampling.LANCZOS),
+            seed=generated.seed,
+        )
+        for generated in result.images
+    ]
+    return ExternalGenerationResult(
+        images=resized_images,
+        seed_used=result.seed_used,
+        provider_request_id=result.provider_request_id,
+        provider_metadata=result.provider_metadata,
+        content_filters=result.content_filters,
+    )
 
 
 def _apply_starter_overrides(model: ExternalApiModelConfig) -> ExternalApiModelConfig:

@@ -964,7 +964,7 @@ openai_gpt_image_1 = StarterModel(
         supports_negative_prompt=True,
         supports_seed=True,
         supports_guidance=True,
-        supports_reference_images=False,
+        supports_reference_images=True,
         max_images_per_request=1,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),

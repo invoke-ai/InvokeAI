@@ -6,7 +6,7 @@ import type {
   RefImageState,
 } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
-import type { AnyModelConfig, MainOrExternalModelConfig } from 'services/api/types';
+import { type AnyModelConfig, isExternalApiModelConfig, type MainOrExternalModelConfig } from 'services/api/types';
 
 const WARNINGS = {
   UNSUPPORTED_MODEL: 'controlLayers.warnings.unsupportedModel',
@@ -117,6 +117,14 @@ export const getGlobalReferenceImageWarnings = (
   const warnings: WarningTKey[] = [];
 
   if (model) {
+    if (isExternalApiModelConfig(model)) {
+      if (!entity.config.image) {
+        // No image selected
+        warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+      }
+      return warnings;
+    }
+
     if (model.base === 'sd-3' || model.base === 'sd-2') {
       // Unsupported model architecture
       warnings.push(WARNINGS.UNSUPPORTED_MODEL);
