@@ -35,6 +35,10 @@ export default defineConfig({
           label: 'Configuration',
           autogenerate: { directory: 'configuration' },
         },
+        {
+          label: 'Contributing',
+          autogenerate: { directory: 'contributing' },
+        },
       ],
     }),
   ],
