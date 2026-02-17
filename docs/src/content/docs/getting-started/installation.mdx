@@ -7,6 +7,19 @@ import { externalLinks } from '@lib/utils/links'
 import Link from '@components/Link.astro'
 import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
 
+export const alternateLaunchers = [
+  {
+    title: 'Stability Matrix',
+    description: 'Get the latest version of Stability Matrix for your platform.',
+    href: 'https://github.com/LykosAI/StabilityMatrix'
+  },
+  {
+    title: 'LynxHub',
+    description: 'Get the latest version of Stability Matrix for your platform.',
+    href: 'https://github.com/KindaBrazy/LynxHub'
+  },
+]
+
 <SystemRequirementsLink />
 
 ## Invoke Launcher
@@ -57,30 +70,16 @@ If you have an existing Invoke installation, you can select it and let the launc
   - When the Launcher detects an update for Invoke, you'll see a small green alert in the Launcher. Click that and follow the instructions to update Invoke.
 </Aside>
 
-## Stability Matrix
-
-Stability Matrix is an all-in-one manager for many image generation packages, including Invoke.
+## Alternative Launchers
 
 <Aside type="caution">
-  The Stability Matrix installation is not managed by Invoke, so we cannot guarantee it will work correctly. If you want a more stable experience, we recommend using the [official Invoke Launcher](#invoke-launcher).
+  Installations from alternate launchers are not managed by Invoke, so we cannot guarantee it will work correctly. If you want a more stable experience, we recommend using the [official Invoke Launcher](#invoke-launcher).
 </Aside>
 
-### Install Stability Matrix
-
-<LinkCard
-  title="Download & Install Stability Matrix"
-  description="Get the latest version of Stability Matrix for your platform."
-  href="https://github.com/LykosAI/StabilityMatrix/releases"
-/>
-
-### Install Invoke
-
-<Steps>
-  1. Open Stability Matrix, and click the **Add Package** button.
-  2. Select **InvokeAI** from the list of packages.
-  3. Follow the on-screen instructions to install InvokeAI.
-</Steps>
-
-### Troubleshooting
-
-For issues related to Stability Matrix, please refer to their support channels.
+{alternateLaunchers.map(({title, description, href}) => (
+  <LinkCard
+    title={title}
+    description={description}
+    href={href}
+  />
+))}
