@@ -10,10 +10,10 @@ import { filesize } from 'filesize';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  isExternalApiModelConfig,
   type AnyModelConfig,
   type CLIPEmbedModelConfig,
   type CLIPVisionModelConfig,
+  isExternalApiModelConfig,
   type LlavaOnevisionModelConfig,
   type Qwen3EncoderModelConfig,
   type SigLIPModelConfig,
