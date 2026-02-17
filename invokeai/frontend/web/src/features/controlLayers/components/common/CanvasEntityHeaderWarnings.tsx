@@ -2,8 +2,8 @@ import { Flex, IconButton, ListItem, Text, UnorderedList } from '@invoke-ai/ui-l
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
-import { upperFirst } from 'es-toolkit/compat';
 import { IAITooltip } from 'common/components/IAITooltip';
+import { upperFirst } from 'es-toolkit/compat';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnabled';
 import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';

@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { IAITooltip } from 'common/components/IAITooltip';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTypeIsHidden';
 import { useEntityTypeString } from 'features/controlLayers/hooks/useEntityTypeString';
 import { allEntitiesOfTypeIsHiddenToggled } from 'features/controlLayers/store/canvasSlice';

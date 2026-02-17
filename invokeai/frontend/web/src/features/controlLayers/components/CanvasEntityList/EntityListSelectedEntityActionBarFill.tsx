@@ -1,15 +1,7 @@
-import {
-  Box,
-  Flex,
-  Popover,
-  PopoverBody,
-  PopoverContent,
-  PopoverTrigger,
-  Portal,
-} from '@invoke-ai/ui-library';
+import { Box, Flex, Popover, PopoverBody, PopoverContent, PopoverTrigger, Portal } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { IAITooltip } from 'common/components/IAITooltip';
 import RgbColorPicker from 'common/components/ColorPicker/RgbColorPicker';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { rgbColorToString } from 'common/util/colorCodeTransformers';
 import { MaskFillStyle } from 'features/controlLayers/components/common/MaskFillStyle';
 import { entityFillColorChanged, entityFillStyleChanged } from 'features/controlLayers/store/canvasSlice';

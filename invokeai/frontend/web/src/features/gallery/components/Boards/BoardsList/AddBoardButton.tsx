@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { IAITooltip } from 'common/components/IAITooltip';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { boardIdSelected, boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';

@@ -64,7 +64,9 @@ export const BoardsPanel = memo(() => {
         </Flex>
         <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
           <BoardsSettingsPopover />
-          <IAITooltip label={searchDisclosure.isOpen ? `${t('gallery.exitBoardSearch')}` : `${t('gallery.displayBoardSearch')}`}>
+          <IAITooltip
+            label={searchDisclosure.isOpen ? `${t('gallery.exitBoardSearch')}` : `${t('gallery.displayBoardSearch')}`}
+          >
             <IconButton
               size="sm"
               variant="link"
