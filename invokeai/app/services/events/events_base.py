@@ -30,6 +30,7 @@ from invokeai.app.services.events.events_common import (
     QueueClearedEvent,
     QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
+    RecallParametersUpdatedEvent,
 )
 
 if TYPE_CHECKING:
@@ -109,6 +110,10 @@ class EventServiceBase:
     def emit_queue_cleared(self, queue_id: str) -> None:
         """Emitted when a queue is cleared"""
         self.dispatch(QueueClearedEvent.build(queue_id))
+
+    def emit_recall_parameters_updated(self, queue_id: str, parameters: dict) -> None:
+        """Emitted when recall parameters are updated"""
+        self.dispatch(RecallParametersUpdatedEvent.build(queue_id, parameters))
 
     # endregion
 
