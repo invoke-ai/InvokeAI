@@ -1,7 +1,6 @@
 ---
-title: Getting Started
-sidebar:
-  order: 1
+title: Invoke AI
+tableOfContents: false
 ---
 
 <div align="center" markdown>

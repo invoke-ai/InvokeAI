@@ -9,7 +9,7 @@ import markdoc from '@astrojs/markdoc';
 
 // https://astro.build/config
 export default defineConfig({
-  // markdown: {},
+  // site: 'https://docs.invoke.ai', // TODO: When docs are ready
 
   integrations: [
     starlight({
@@ -38,8 +38,8 @@ export default defineConfig({
       },
       sidebar: [
         {
-          label: 'Getting Started',
-          autogenerate: { directory: 'getting-started' },
+          label: 'Start Here',
+          autogenerate: { directory: 'start-here' },
         },
         {
           label: 'Configuration',
