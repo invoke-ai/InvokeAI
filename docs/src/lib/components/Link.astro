@@ -2,9 +2,10 @@
 type Props = {
   href: string;
   label?: string;
+  [key: string]: any;
 };
 
-const { href, label } = Astro.props as Props;
+const { href, label, ...rest } = Astro.props as Props;
 
 const useSlot = !!Astro.slots.has('default');
 const isExternal = /^https?:\/\//.test(href);
@@ -16,6 +17,7 @@ const isExternal = /^https?:\/\//.test(href);
   rel={isExternal ? 'noopener noreferrer' : undefined}
   aria-label={label ?? undefined}
   title={label ?? undefined}
+  {...rest}
 >
-  {useSlot ? (<slot />) : label}
+  {useSlot ? <slot /> : label}
 </a>

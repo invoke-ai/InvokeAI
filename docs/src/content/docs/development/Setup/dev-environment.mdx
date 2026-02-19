@@ -1,0 +1,130 @@
+---
+title: Development Environment
+---
+
+import { LinkCard, Steps, Tabs, TabItem, Aside, FileTree, LinkButton } from '@astrojs/starlight/components'
+import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
+
+<Aside type="caution">
+  Invoke uses a SQLite database. When you run the application as a dev install, you accept responsibility for your database. This means making regular backups (especially before pulling) and/or fixing it yourself in the event that a PR introduces a schema change.
+
+  If you don't need to persist your db, you can use an ephemeral in-memory database by setting `use_memory_db: true` in your `invokeai.yaml` file. You'll also want to set `scan_models_on_startup: true` so that your models are registered on startup.
+</Aside>
+
+## Setup
+
+
+<Steps>
+  1. Refer to the system requirements.
+
+      <SystemRequirementsLink />
+
+  2. Fork and clone the InvokeAI git repository.
+
+      <LinkButton
+        icon="github"
+        iconPlacement="start"
+        href="https://github.com/invoke-ai/InvokeAI/fork"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Fork Repository
+      </LinkButton>
+
+      Next, clone your fork to your local machine. You can use either HTTPS or SSH, depending on your git configuration.
+
+  3. This repository uses Git LFS to manage large files. To ensure all assets are downloaded:
+        - Install git-lfs → [Download here](https://git-lfs.com/)
+        - Enable automatic LFS fetching for this repository:
+          ```shell
+          git config lfs.fetchinclude "*"
+          ```
+          - Fetch files from LFS (only needs to be done once; subsequent `git pull` will fetch changes automatically):
+          ```
+          git lfs pull
+          ```
+  4. Create a directory for user data (images, models, db, etc). This is typically at `~/invokeai`, but if you already have a non-dev install, you may want to create a separate directory for the dev install.
+  5. Follow the [manual install][manual install link] guide, with some modifications to the install command:
+
+        - Use `.` instead of `invokeai` to install from the current directory. You don't need to specify the version.
+
+        - Add `-e` after the `install` operation to make this an [editable install][editable install link]. That means your changes to the python code will be reflected when you restart the Invoke server.
+
+        - When installing the `invokeai` package, add the `dev`, `test` and `docs` package options to the package specifier. You may or may not need the `xformers` option - follow the manual install guide to figure that out. So, your package specifier will be either `".[dev,test,docs]"` or `".[dev,test,docs,xformers]"`. Note the quotes!
+
+       With the modifications made, the install command should look something like this:
+
+        ```sh
+        uv pip install -e ".[dev,test,docs,xformers]" --python 3.12 --python-preference only-managed --index=https://download.pytorch.org/whl/cu128 --reinstall
+        ```
+  6. At this point, you should have Invoke installed, a venv set up and activated, and the server running. But you will see a warning in the terminal that no UI was found. If you go to the URL for the server, you won't get a UI.
+
+        This is because the UI build is not distributed with the source code. You need to build it manually. End the running server instance.
+
+        If you only want to edit the docs, you can stop here and skip to the **Documentation** section below.
+
+  7. Install the frontend dev toolchain, paying attention to versions:
+
+        - [`nodejs`](https://nodejs.org/) (tested on LTS, v22)
+        - [`pnpm`](https://pnpm.io/installation) (tested on v10)
+
+  8. Do a production build of the frontend:
+
+        ```sh
+        cd <PATH_TO_INVOKEAI_REPO>/invokeai/frontend/web
+        pnpm i
+        pnpm build
+        ```
+
+  9. Restart the server and navigate to the URL. You should get a UI. After making changes to the python code, restart the server to see those changes.
+</Steps>
+
+## Updating the UI
+
+You'll need to run `pnpm build` every time you pull in new changes.
+
+Another option is to skip the build and instead run the UI in dev mode:
+
+```sh
+pnpm dev
+```
+
+This starts a vite dev server for the UI at `127.0.0.1:5173`, which you will use instead of `127.0.0.1:9090`.
+
+The dev mode is substantially slower than the production build but may be more convenient if you just need to test things out. It will hot-reload the UI as you make changes to the frontend code. Sometimes the hot-reload doesn't work, and you need to manually refresh the browser tab.
+
+## Documentation
+
+This documentation is built on [Astro Starlight](https://starlight.astro.build/). It provides a pleasant developer environment for writing engaging documentation, and is built on top of the Astro static site generator, which provides a powerful and flexible framework for building fast, modern websites.
+
+To contribute to the documentation, simply edit the markdown files in the `./docs` directory. You can run a local dev server with hot-reloading for changes made to the docs.
+
+<FileTree>
+  - **docs**
+    - public/
+    - src
+      - content docs content lives here
+        - docs
+      - lib
+        - components/
+        - utils/
+      - content.config.ts
+  - scripts/
+  - tests/
+  - invokeai/
+  - docker/
+  - coverage/
+</FileTree>
+
+<Steps>
+  1. Navigate to the `docs` directory and install the dependencies:
+
+      ```sh
+      pnpm install
+      ```
+  2. Start the dev server:
+
+      ```sh
+      pnpm run dev
+      ```
+</Steps>
