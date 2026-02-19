@@ -14,7 +14,7 @@ class NoCacheStaticFiles(StaticFiles):
 
     Static files include the javascript bundles, fonts, locales, and some images. Generated
     images are not included, as they are served by a router.
-    
+
     This class also implements proper SPA (Single Page Application) routing by serving index.html
     for any routes that don't match static files, enabling client-side routing to work correctly
     in production builds.
@@ -36,7 +36,7 @@ class NoCacheStaticFiles(StaticFiles):
     async def get_response(self, path: str, scope: Scope) -> Response:
         """
         Override get_response to implement SPA routing.
-        
+
         When a file is not found and html mode is enabled, serve index.html instead of raising a 404.
         This allows client-side routing to work correctly in SPAs.
         """
