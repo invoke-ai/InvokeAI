@@ -298,14 +298,14 @@ def test_idempotent_migrations(migrator: SqliteMigrator, migration_create_test_t
     assert migrator._get_current_version(cursor) == 1
 
 
-def test_migration_26_creates_users_table(logger: Logger) -> None:
-    """Test that migration 26 creates the users table and related tables."""
-    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_26 import Migration26Callback
+def test_migration_29_creates_users_table(logger: Logger) -> None:
+    """Test that migration 29 creates the users table and related tables."""
+    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_29 import Migration29Callback
 
     db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
     cursor = db._conn.cursor()
 
-    # Create minimal tables that migration 26 expects to exist
+    # Create minimal tables that migration 29 expects to exist
     cursor.execute("CREATE TABLE IF NOT EXISTS boards (board_id TEXT PRIMARY KEY);")
     cursor.execute("CREATE TABLE IF NOT EXISTS images (image_name TEXT PRIMARY KEY);")
     cursor.execute("CREATE TABLE IF NOT EXISTS workflows (workflow_id TEXT PRIMARY KEY);")
@@ -313,7 +313,7 @@ def test_migration_26_creates_users_table(logger: Logger) -> None:
     db._conn.commit()
 
     # Run migration callback directly (not through migrator to avoid chain validation)
-    migration_callback = Migration26Callback()
+    migration_callback = Migration29Callback()
     migration_callback(cursor)
     db._conn.commit()
 

@@ -227,8 +227,13 @@ class SocketIO:
                 # Emit to the user's room
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
 
-                # Also emit to admin room so admins can see all events
-                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+                # Also emit to admin room so admins can see all events, but strip image preview data
+                # from InvocationProgressEvent to prevent admins from seeing other users' image content
+                if isinstance(event_data, InvocationProgressEvent):
+                    admin_event_data = event_data.model_copy(update={"image": None})
+                    await self._sio.emit(event=event_name, data=admin_event_data.model_dump(mode="json"), room="admin")
+                else:
+                    await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
 
                 logger.debug(f"Emitted private invocation event {event_name} to user room {user_room} and admin room")
 
