@@ -27,6 +27,7 @@ from invokeai.backend.model_manager.taxonomy import (
     FluxLoRAFormat,
     ModelFormat,
     ModelType,
+    ZImageVariantType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
@@ -226,6 +227,7 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Z-Image LoRA models in LyCORIS format."""
 
     base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+    variant: ZImageVariantType | None = Field(default=None)
 
     @classmethod
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
@@ -398,3 +400,4 @@ class LoRA_Diffusers_ZImage_Config(LoRA_Diffusers_Config_Base, Config_Base):
     """Model config for Z-Image LoRA models in Diffusers format."""
 
     base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
+    variant: ZImageVariantType | None = Field(default=None)
