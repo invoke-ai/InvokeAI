@@ -33,9 +33,9 @@ import {
   textUnderlineToggled,
 } from 'features/controlLayers/store/canvasTextSlice';
 import {
-  getAllTextFontStacks,
   resolveAvailableFont,
   setCustomTextFontStacks,
+  TEXT_FONT_STACKS,
   TEXT_MAX_FONT_SIZE,
   TEXT_MIN_FONT_SIZE,
   type TextFontId,
@@ -54,9 +54,17 @@ import {
   PiTextUnderlineBold,
 } from 'react-icons/pi';
 import { useListUserFontsQuery } from 'services/api/endpoints/utilities';
+import type { ComboboxOption } from '@invoke-ai/ui-library';
+import type { GroupBase } from 'chakra-react-select';
 
 const formatSliderValue = (value: number) => String(value);
 const loadedUserFontFamilies = new Set<string>();
+const truncateLabel = (value: string, maxLength: number = 36): string => {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 3)}...`;
+};
 
 export const TextToolOptions = () => {
   return (
@@ -111,15 +119,48 @@ const FontSelect = () => {
   }, [userFonts]);
 
   const options = useMemo(() => {
-    return getAllTextFontStacks().map(({ id, label, stack }) => {
+    const customStacks = (userFonts ?? []).map((font) => ({
+      id: font.id,
+      label: font.label,
+      stack: `"${font.family}",sans-serif`,
+    }));
+    const customOptions: ComboboxOption[] = customStacks.map(({ id, label, stack }) => {
       const resolved = resolveAvailableFont(stack);
+      const display = truncateLabel(`${label} (${resolved})`);
       return {
         value: id,
-        label: `${label} (${resolved})`,
+        label: display,
       };
     });
+    const builtInOptions: ComboboxOption[] = TEXT_FONT_STACKS.map(({ id, label, stack }) => {
+      const resolved = resolveAvailableFont(stack);
+      const display = truncateLabel(`${label} (${resolved})`);
+      return {
+        value: id,
+        label: display,
+      };
+    });
+    if (customOptions.length === 0) {
+      return builtInOptions;
+    }
+    const separatorOption: ComboboxOption = {
+      value: '__fonts-separator__',
+      label: '────────────',
+      isDisabled: true,
+    };
+    return [
+      { label: 'Custom Fonts', options: [...customOptions, separatorOption] },
+      { label: 'Built-in Fonts', options: builtInOptions },
+    ] as GroupBase<ComboboxOption>[];
   }, [userFonts]);
-  const selectedOption = options.find((option) => option.value === fontId) ?? null;
+  const selectedOption = useMemo(() => {
+    const firstOption = options[0];
+    const flattened =
+      firstOption && 'options' in firstOption
+        ? (options as GroupBase<ComboboxOption>[]).flatMap((group) => group.options)
+        : (options as ComboboxOption[]);
+    return flattened.find((option) => option.value === fontId) ?? null;
+  }, [fontId, options]);
   const handleFontChange = useCallback(
     (option: { value: string } | null) => {
       if (!option) {
@@ -131,7 +172,7 @@ const FontSelect = () => {
   );
 
   return (
-    <Flex w="200px" minW="200px" alignItems="center" gap={2}>
+    <Flex w="280px" minW="280px" alignItems="center" gap={2}>
       <Text fontSize="sm" lineHeight="1" whiteSpace="nowrap">
         {t('controlLayers.text.font', { defaultValue: 'Font' })}
       </Text>

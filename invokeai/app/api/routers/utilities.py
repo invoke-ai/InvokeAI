@@ -5,6 +5,7 @@ from urllib.parse import quote
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 from fastapi import Body, HTTPException
 from fastapi.routing import APIRouter
+from PIL import ImageFont
 from pydantic import BaseModel
 from pyparsing import ParseException
 from starlette.responses import FileResponse
@@ -67,6 +68,24 @@ def _get_fonts_dir() -> Path:
     return (root / "Fonts").resolve()
 
 
+def _get_font_display_names(font_file: Path) -> tuple[str, str]:
+    fallback_family = font_file.stem
+    fallback_label = font_file.stem.replace("_", " ").replace("-", " ").strip() or font_file.stem
+
+    try:
+        font = ImageFont.truetype(font_file.as_posix(), size=16)
+        family_name, style_name = font.getname()
+        family_name = family_name.strip()
+        style_name = style_name.strip()
+        if not family_name:
+            return fallback_family, fallback_label
+        if style_name and style_name.lower() not in {"regular", "normal", "roman", "book"}:
+            return family_name, f"{family_name} {style_name}"
+        return family_name, family_name
+    except Exception:
+        return fallback_family, fallback_label
+
+
 @utilities_router.get(
     "/fonts",
     operation_id="list_user_fonts",
@@ -77,16 +96,36 @@ async def list_user_fonts() -> UserFontsResponse:
     if not fonts_dir.exists() or not fonts_dir.is_dir():
         return UserFontsResponse(fonts=[])
 
-    fonts: list[UserFont] = []
-    seen_ids: set[str] = set()
-
+    family_candidates: dict[str, list[tuple[Path, str, str, str]]] = {}
+    # key -> [(font_file, relative, family, label)]
     for font_file in sorted(fonts_dir.rglob("*")):
         if not font_file.is_file() or font_file.suffix.lower() not in SUPPORTED_FONT_EXTENSIONS:
             continue
         relative = font_file.relative_to(fonts_dir).as_posix()
-        family = font_file.stem
-        label = font_file.stem.replace("_", " ").replace("-", " ").strip() or font_file.stem
-        base_id = f"user:{relative.lower()}"
+        family, label = _get_font_display_names(font_file)
+        family_key = family.strip().lower()
+        family_candidates.setdefault(family_key, []).append((font_file, relative, family, label))
+
+    def _candidate_score(label_text: str, path: Path) -> tuple[int, int]:
+        """Lower score is better. Prefer regular/normal names, then shorter names."""
+        combined = f"{label_text} {path.stem}".lower()
+        preferred = any(token in combined for token in (" regular", " normal", " roman", " book"))
+        has_variant = any(token in combined for token in (" bold", " italic", " oblique", " black", " light", " medium"))
+        if preferred:
+            tier = 0
+        elif has_variant:
+            tier = 2
+        else:
+            tier = 1
+        return (tier, len(path.stem))
+
+    fonts: list[UserFont] = []
+    seen_ids: set[str] = set()
+    for _, candidates in sorted(family_candidates.items(), key=lambda kv: kv[0]):
+        selected_file, selected_relative, selected_family, _selected_label = min(
+            candidates, key=lambda c: _candidate_score(c[3], c[0])
+        )
+        base_id = f"user:{selected_relative.lower()}"
         font_id = base_id
         i = 1
         while font_id in seen_ids:
@@ -96,10 +135,10 @@ async def list_user_fonts() -> UserFontsResponse:
         fonts.append(
             UserFont(
                 id=font_id,
-                family=family,
-                label=label,
-                path=relative,
-                url=f"/api/v1/utilities/fonts/{quote(relative)}",
+                family=selected_family,
+                label=selected_family,
+                path=selected_relative,
+                url=f"/api/v1/utilities/fonts/{quote(selected_relative)}",
             )
         )
 
