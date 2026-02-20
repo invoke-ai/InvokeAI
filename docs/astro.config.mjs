@@ -14,7 +14,9 @@ export default defineConfig({
   integrations: [
     starlight({
       // Content
-      title: 'Invoke',
+      title: {
+        en: 'InvokeAI Documentation',
+      },
       logo: {
         src: './src/assets/invoke-icon-wide.svg',
         alt: 'InvokeAI Logo',
@@ -24,11 +26,13 @@ export default defineConfig({
       editLink: {
         baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
       },
-      // locales: {
-      //   en: {
-      //     label: 'English',
-      //   },
-      // },
+      defaultLocale: 'root',
+      locales: {
+        root: {
+          label: 'English',
+          lang: 'en',
+        },
+      },
       social: [
         { icon: 'github', label: 'GitHub', href: 'https://github.com/invoke-ai/InvokeAI' },
         { icon: 'discord', label: 'Discord', href: 'https://discord.gg/ZmtBAhwWhy' },
