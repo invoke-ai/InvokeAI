@@ -84,7 +84,7 @@ export const appInfoApi = api.injectEndpoints({
       invalidatesTags: ['InvocationCacheStatus'],
     }),
     getOpenAPISchema: build.query<OpenAPIV3_1.Document, void>({
-      query: () => `${window.location.href.replace(/\/$/, '')}/openapi.json`,
+      query: () => `${window.location.origin}/openapi.json`,
       providesTags: ['Schema'],
     }),
   }),
