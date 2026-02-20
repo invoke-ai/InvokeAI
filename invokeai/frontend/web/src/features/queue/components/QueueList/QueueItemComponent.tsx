@@ -174,7 +174,7 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
                 ))}
             </Flex>
           )}
-          {!item.field_values && item.user_id !== SYSTEM_USER_ID && (
+          {!item.field_values && !currentUser?.is_admin && item.user_id !== currentUser?.user_id && (
             <Text as="span" color="base.500" fontStyle="italic">
               {t('queue.fieldValuesHidden')}
             </Text>

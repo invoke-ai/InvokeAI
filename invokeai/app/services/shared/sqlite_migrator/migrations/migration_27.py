@@ -97,7 +97,6 @@ class Migration27Callback:
         )
 
         # Migrate existing data to 'system' user
-        # The 'system' user is created by migration 25, so it's guaranteed to exist at this point
         for key, value in existing_data.items():
             cursor.execute(
                 """

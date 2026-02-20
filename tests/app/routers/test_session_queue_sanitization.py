@@ -124,3 +124,36 @@ def test_sanitize_preserves_non_sensitive_fields(sample_session_queue_item):
     assert result.user_id == "user_123"
     assert result.user_display_name == "Test User"
     assert result.user_email == "test@example.com"
+
+
+def test_sanitize_system_user_item_for_non_admin(sample_session_queue_item):
+    """Test that non-admin users cannot see sensitive data from System user's queue items."""
+    # Simulate a legacy System user queue item
+    system_item = sample_session_queue_item.model_copy(update={"user_id": "system"})
+
+    result = sanitize_queue_item_for_user(
+        queue_item=system_item,
+        current_user_id="non_admin_user",
+        is_admin=False,
+    )
+
+    # System user's sensitive fields should be sanitized for non-admin users
+    assert result.field_values is None
+    assert result.workflow is None
+    assert len(result.session.graph.nodes) == 0
+
+
+def test_sanitize_system_user_item_for_admin(sample_session_queue_item):
+    """Test that admin users can see full data from System user's queue items."""
+    system_item = sample_session_queue_item.model_copy(update={"user_id": "system"})
+
+    result = sanitize_queue_item_for_user(
+        queue_item=system_item,
+        current_user_id="admin_user",
+        is_admin=True,
+    )
+
+    # Admin should see everything including System user's data
+    assert result.field_values is not None
+    assert len(result.field_values) == 1
+    assert len(result.session.graph.nodes) == 1
