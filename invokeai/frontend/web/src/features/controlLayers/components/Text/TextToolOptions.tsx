@@ -33,8 +33,9 @@ import {
   textUnderlineToggled,
 } from 'features/controlLayers/store/canvasTextSlice';
 import {
+  getAllTextFontStacks,
   resolveAvailableFont,
-  TEXT_FONT_STACKS,
+  setCustomTextFontStacks,
   TEXT_MAX_FONT_SIZE,
   TEXT_MIN_FONT_SIZE,
   type TextFontId,
@@ -52,8 +53,10 @@ import {
   PiTextStrikethroughBold,
   PiTextUnderlineBold,
 } from 'react-icons/pi';
+import { useListUserFontsQuery } from 'services/api/endpoints/utilities';
 
 const formatSliderValue = (value: number) => String(value);
+const loadedUserFontFamilies = new Set<string>();
 
 export const TextToolOptions = () => {
   return (
@@ -71,15 +74,51 @@ const FontSelect = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const fontId = useAppSelector(selectTextFontId);
+  const { data: userFonts } = useListUserFontsQuery();
+
+  useEffect(() => {
+    if (!userFonts || userFonts.length === 0) {
+      setCustomTextFontStacks([]);
+      return;
+    }
+    const customStacks = userFonts.map((font) => ({
+      id: font.id,
+      label: font.label,
+      stack: `"${font.family}",sans-serif`,
+    }));
+    setCustomTextFontStacks(customStacks);
+  }, [userFonts]);
+
+  useEffect(() => {
+    if (!userFonts || userFonts.length === 0 || typeof document === 'undefined' || typeof FontFace === 'undefined') {
+      return;
+    }
+    void Promise.all(
+      userFonts.map(async (font) => {
+        if (loadedUserFontFamilies.has(font.family)) {
+          return;
+        }
+        try {
+          const fontFace = new FontFace(font.family, `url("${font.url}")`);
+          await fontFace.load();
+          document.fonts.add(fontFace);
+          loadedUserFontFamilies.add(font.family);
+        } catch {
+          // Ignore failures and let browser fallback fonts render.
+        }
+      })
+    );
+  }, [userFonts]);
+
   const options = useMemo(() => {
-    return TEXT_FONT_STACKS.map(({ id, label, stack }) => {
+    return getAllTextFontStacks().map(({ id, label, stack }) => {
       const resolved = resolveAvailableFont(stack);
       return {
         value: id,
         label: `${label} (${resolved})`,
       };
     });
-  }, []);
+  }, [userFonts]);
   const selectedOption = options.find((option) => option.value === fontId) ?? null;
   const handleFontChange = useCallback(
     (option: { value: string } | null) => {

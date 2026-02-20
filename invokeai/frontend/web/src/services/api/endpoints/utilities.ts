@@ -2,6 +2,18 @@ import type { paths } from 'services/api/schema';
 
 import { api, buildV1Url } from '..';
 
+type UserFont = {
+  id: string;
+  family: string;
+  label: string;
+  path: string;
+  url: string;
+};
+
+type UserFontsResponse = {
+  fonts: UserFont[];
+};
+
 /**
  * Builds an endpoint URL for the utilities router
  * @example
@@ -25,5 +37,14 @@ export const utilitiesApi = api.injectEndpoints({
       // disconnected.
       providesTags: ['FetchOnReconnect'],
     }),
+    listUserFonts: build.query<UserFont[], void>({
+      query: () => ({
+        url: buildUtilitiesUrl('fonts'),
+      }),
+      transformResponse: (response: UserFontsResponse) => response.fonts,
+      providesTags: ['FetchOnReconnect'],
+    }),
   }),
 });
+
+export const { useListUserFontsQuery } = utilitiesApi;
