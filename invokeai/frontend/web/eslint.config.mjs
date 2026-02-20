@@ -57,6 +57,7 @@ export default [
         'error',
         {
           allowBind: true,
+          allowArrowFunctions: true,
         },
       ],
 
