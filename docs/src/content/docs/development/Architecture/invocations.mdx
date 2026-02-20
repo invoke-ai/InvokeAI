@@ -1,8 +1,9 @@
 ---
 title: Invocations
+lastUpdated: 2026-02-18
 ---
 
-import { FileTree, Code, Steps, Aside } from '@astrojs/starlight/components'
+import { FileTree, Code, Steps } from '@astrojs/starlight/components'
 
 # Nodes
 
@@ -43,11 +44,9 @@ Each node folder must have an `__init__.py` file that imports its nodes. Only
 nodes imported in the `__init__.py` file are loaded. See the README in the nodes
 folder for more examples:
 
-<Code
-  lang="python"
-  title="__init__.py"
-  code={`from .cool_node import ResizeInvocation`}
-/>
+```py title="__init__.py"
+from .cool_node import ResizeInvocation
+````
 
 ## Creating A New Invocation
 
@@ -69,20 +68,16 @@ The first set of things we need to do when creating a new Invocation are -
 
 So let us do that.
 
-<Code
-  lang="python"
-  title="resize.py"
-  code={`
-  from invokeai.invocation_api import (
-    BaseInvocation,
-    invocation,
-  )
+```py title="resize.py"
+from invokeai.invocation_api import (
+  BaseInvocation,
+  invocation,
+)
 
-  @invocation('resize')
-  class ResizeInvocation(BaseInvocation):
-      '''Resizes an image'''
-`}
-/>
+@invocation('resize')
+class ResizeInvocation(BaseInvocation):
+    '''Resizes an image'''
+```
 
 That's great.
 
@@ -110,24 +105,20 @@ written to handle how images are dealt with in InvokeAI. We will cover how to
 create your own custom field types later in this guide. For now, let's go ahead
 and use it.
 
-<Code
-  lang="python"
-  title="resize.py"
-  code={`
-  from invokeai.invocation_api import (
-      BaseInvocation,
-      ImageField,
-      InputField,
-      invocation,
-  )
+```py title="resize.py"
+from invokeai.invocation_api import (
+    BaseInvocation,
+    ImageField,
+    InputField,
+    invocation,
+)
 
-  @invocation('resize')
-  class ResizeInvocation(BaseInvocation):
+@invocation('resize')
+class ResizeInvocation(BaseInvocation):
 
-      # Inputs
-      image: ImageField = InputField(description="The input image")
-  `}
-/>
+    # Inputs
+    image: ImageField = InputField(description="The input image")
+```
 
 Let us break down our input code.
 
@@ -143,26 +134,22 @@ image: ImageField = InputField(description="The input image")
 
 Great. Now let us create our other inputs for `width` and `height`
 
-<Code
-  lang="python"
-  title="resize.py"
-  code={`
-  from invokeai.invocation_api import (
-      BaseInvocation,
-      ImageField,
-      InputField,
-      invocation,
-  )
+```py title="resize.py"
+from invokeai.invocation_api import (
+    BaseInvocation,
+    ImageField,
+    InputField,
+    invocation,
+)
 
-  @invocation('resize')
-  class ResizeInvocation(BaseInvocation):
+@invocation('resize')
+class ResizeInvocation(BaseInvocation):
 
-      # Inputs
-      image: ImageField = InputField(description="The input image")
-      width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
-      height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
-  `}
-/>
+    # Inputs
+    image: ImageField = InputField(description="The input image")
+    width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
+    height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
+```
 
 As you might have noticed, we added two new arguments to the `InputField`
 definition for `width` and `height`, called `gt` and `le`. They stand for
@@ -186,30 +173,26 @@ that are provided by it by InvokeAI.
 
 Let us create this function first.
 
-<Code
-  lang="python"
-  title="resize.py"
-  code={`
-  from invokeai.invocation_api import (
-      BaseInvocation,
-      ImageField,
-      InputField,
-      InvocationContext,
-      invocation,
-  )
+```py title="resize.py"
+from invokeai.invocation_api import (
+    BaseInvocation,
+    ImageField,
+    InputField,
+    InvocationContext,
+    invocation,
+)
 
-  @invocation('resize')
-  class ResizeInvocation(BaseInvocation):
-      '''Resizes an image'''
+@invocation('resize')
+class ResizeInvocation(BaseInvocation):
+    '''Resizes an image'''
 
-      image: ImageField = InputField(description="The input image")
-      width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
-      height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
+    image: ImageField = InputField(description="The input image")
+    width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
+    height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
 
-      def invoke(self, context: InvocationContext):
-          pass
-  `}
-/>
+    def invoke(self, context: InvocationContext):
+        pass
+```
 
 ### Outputs
 
@@ -223,32 +206,28 @@ all the necessary info related to image outputs. So let us use that.
 
 We will cover how to create your own output types later in this guide.
 
-<Code
-  lang="python"
-  title="resize.py"
-  code={`
-  from invokeai.invocation_api import (
-      BaseInvocation,
-      ImageField,
-      InputField,
-      InvocationContext,
-      invocation,
-  )
+```py title="resize.py"
+from invokeai.invocation_api import (
+    BaseInvocation,
+    ImageField,
+    InputField,
+    InvocationContext,
+    invocation,
+)
 
-  from invokeai.app.invocations.image import ImageOutput
+from invokeai.app.invocations.image import ImageOutput
 
-  @invocation('resize')
-  class ResizeInvocation(BaseInvocation):
-      '''Resizes an image'''
+@invocation('resize')
+class ResizeInvocation(BaseInvocation):
+    '''Resizes an image'''
 
-      image: ImageField = InputField(description="The input image")
-      width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
-      height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
+    image: ImageField = InputField(description="The input image")
+    width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
+    height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
 
-      def invoke(self, context: InvocationContext) -> ImageOutput:
-          pass
-  `}
-/>
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        pass
+```
 
 Perfect. Now that we have our Invocation setup, let us do what we want to do.
 
@@ -259,43 +238,38 @@ Perfect. Now that we have our Invocation setup, let us do what we want to do.
 
 So let's do that.
 
-<Code
-  lang="python"
-  title="resize.py"
-  code={`
-  from invokeai.invocation_api import (
-      BaseInvocation,
-      ImageField,
-      InputField,
-      InvocationContext,
-      invocation,
-  )
+```py title="resize.py"
+from invokeai.invocation_api import (
+    BaseInvocation,
+    ImageField,
+    InputField,
+    InvocationContext,
+    invocation,
+)
 
-  from invokeai.app.invocations.image import ImageOutput
+from invokeai.app.invocations.image import ImageOutput
 
-  @invocation("resize")
-  class ResizeInvocation(BaseInvocation):
-      """Resizes an image"""
+@invocation("resize")
+class ResizeInvocation(BaseInvocation):
+    """Resizes an image"""
 
-      image: ImageField = InputField(description="The input image")
-      width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
-      height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
+    image: ImageField = InputField(description="The input image")
+    width: int = InputField(default=512, ge=64, le=2048, description="Width of the new image")
+    height: int = InputField(default=512, ge=64, le=2048, description="Height of the new image")
 
-      def invoke(self, context: InvocationContext) -> ImageOutput:
-          # Load the input image as a PIL image
-          image = context.images.get_pil(self.image.image_name)
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        # Load the input image as a PIL image
+        image = context.images.get_pil(self.image.image_name)
 
-          # Resize the image
-          resized_image = image.resize((self.width, self.height))
+        # Resize the image
+        resized_image = image.resize((self.width, self.height))
 
-          # Save the image
-          image_dto = context.images.save(image=resized_image)
+        # Save the image
+        image_dto = context.images.save(image=resized_image)
 
-          # Return an ImageOutput
-          return ImageOutput.build(image_dto)
-
-  `}
-/>
+        # Return an ImageOutput
+        return ImageOutput.build(image_dto)
+```
 
 **Note:** Do not be overwhelmed by the `ImageOutput` process. InvokeAI has a
 certain way that the images need to be dispatched in order to be stored and read
@@ -311,19 +285,15 @@ We also encourage providing a version. This must be a
 [semver](https://semver.org/) version string ("`$MAJOR`.`$MINOR`.`$PATCH`"). The UI
 will let users know if their workflow is using a mismatched version of the node.
 
-<Code
-  lang="python"
-  title="resize.py"
-  code={`
-  @invocation("resize", title="My Resizer", tags=["resize", "image"], category="My Invocations", version="1.0.0")
-  class ResizeInvocation(BaseInvocation):
-      """Resizes an image"""
+```py title="resize.py"
+@invocation("resize", title="My Resizer", tags=["resize", "image"], category="My Invocations", version="1.0.0")
+class ResizeInvocation(BaseInvocation):
+    """Resizes an image"""
 
-      image: ImageField = InputField(description="The input image")
+    image: ImageField = InputField(description="The input image")
 
-      # Rest of the code
-  `}
-/>
+    # Rest of the code
+```
 
 That's it. You made your own **Resize Invocation**.
 
@@ -375,22 +345,18 @@ field.
 Now that we know the basic rules for creating a new output type, let us go ahead
 and make it.
 
-<Code
-  lang="python"
-  title="custom_output.py"
-  code={`
-  from .baseinvocation import BaseInvocationOutput, OutputField, invocation_output
-  from .primitives import ImageField, ColorField
+```py title="custom_output.py"
+from .baseinvocation import BaseInvocationOutput, OutputField, invocation_output
+from .primitives import ImageField, ColorField
 
-  @invocation_output('image_color_string_output')
-  class ImageColorStringOutput(BaseInvocationOutput):
-      '''Base class for nodes that output a single image'''
+@invocation_output('image_color_string_output')
+class ImageColorStringOutput(BaseInvocationOutput):
+    '''Base class for nodes that output a single image'''
 
-      image: ImageField = OutputField(description="The image")
-      color: ColorField = OutputField(description="The color")
-      text: str = OutputField(description="The string")
-  `}
-/>
+    image: ImageField = OutputField(description="The image")
+    color: ColorField = OutputField(description="The color")
+    text: str = OutputField(description="The string")
+```
 
 That's all there is to it.
 
@@ -419,39 +385,31 @@ general good practices to keep in mind.
 All input types are a class that derive from the `BaseModel` type from `pydantic`.
 So let's create one.
 
-<Code
-  lang="python"
-  title="color_field.py"
-  code={`
+```py title="color_field.py"
   from pydantic import BaseModel
 
   class ColorField(BaseModel):
       '''A field that holds the rgba values of a color'''
       pass
-  `}
-/>
+```
 
 Perfect. Now let us create the properties for our field. This is similar to how
 you created input fields for your Invocation. All the same rules apply. Let us
 create four fields representing the _red(r)_, _blue(b)_, _green(g)_ and
 _alpha(a)_ channel of the color.
 
-<Aside type="note">
+:::note
   Technically, the properties are _also_ called fields - but in this case, it refers to a `pydantic` field.
-</Aside>
+:::
 
-<Code
-  lang="python"
-  title="color_field.py"
-  code={`
-  class ColorField(BaseModel):
-      '''A field that holds the rgba values of a color'''
-      r: int = Field(ge=0, le=255, description="The red channel")
-      g: int = Field(ge=0, le=255, description="The green channel")
-      b: int = Field(ge=0, le=255, description="The blue channel")
-      a: int = Field(ge=0, le=255, description="The alpha channel")
-  `}
-/>
+```py title="color_field.py"
+class ColorField(BaseModel):
+    '''A field that holds the rgba values of a color'''
+    r: int = Field(ge=0, le=255, description="The red channel")
+    g: int = Field(ge=0, le=255, description="The green channel")
+    b: int = Field(ge=0, le=255, description="The blue channel")
+    a: int = Field(ge=0, le=255, description="The alpha channel")
+```
 
 That's it. We now have a new input field type that we can use in our Invocations
 like this.

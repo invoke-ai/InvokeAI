@@ -2,9 +2,10 @@
 title: Hardware Requirements
 sidebar:
   order: 1
+lastUpdated: 2026-02-18
 ---
 
-import { Aside, Tabs, TabItem, Steps } from '@astrojs/starlight/components'
+import { Tabs, TabItem, Steps } from '@astrojs/starlight/components'
 
 import { externalLinks, internalLinks } from '@utils/links'
 
@@ -32,21 +33,21 @@ The requirements below are rough guidelines for best performance. GPUs with less
 | FLUX.2 Klein 9B | 1024x1024 | Nvidia 40xx | 24GB | 32GB | FP8 works with 12GB+; Diffusers + encoder |
 | Z-Image Turbo | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB | Q4_K 8GB; Q8/BF16 16GB+ |
 
-<Aside type="tip" title="`tmpfs` on Linux">
+:::tip[`tmpfs` on Linux]
   If your temporary directory is mounted as a `tmpfs`, ensure it has sufficient space.
-</Aside>
+:::
 
 ## Python
 
-<Aside type="tip" title="The launcher installs python for you">
+:::tip[The launcher installs python for you]
   You don't need to do this if you are installing with the <Link label="Invoke Launcher" href="./installation#launcher" />.
-</Aside>
+:::
 
 Invoke requires python `3.11` through `3.12`. If you don't already have one of these versions installed, we suggest installing `3.12`, as it will be supported for longer.
 
 Check that your system has an up-to-date Python installed by running `python3 --version` in the terminal (Linux, macOS) or cmd/powershell (Windows).
 
-<Aside type="tip" title="Installing Python">
+:::tip[Installing Python]
   <Tabs syncKey="operatingSystem">
     <TabItem label="Windows" icon="seti:windows">
       <Steps>
@@ -69,7 +70,7 @@ Check that your system has an up-to-date Python installed by running `python3 --
       </Steps>
     </TabItem>
   </Tabs>
-</Aside>
+:::
 
 ## Drivers
 
@@ -111,13 +112,13 @@ If, after restarting the app, this doesn't improve your performance, either rest
 
 ### AMD
 
-<Aside type="tip" title="Linux Only">
+:::tip[Linux Only]
   AMD GPUs are supported on Linux only, due to ROCm (the AMD equivalent of CUDA) support being Linux only.
-</Aside>
+:::
 
-<Aside type="caution" title="Bumps Ahead">
+:::caution[Bumps Ahead]
   While the application does run on AMD GPUs, there are occasional bumps related to spotty torch support.
-</Aside>
+:::
 
 Run `rocm-smi` on your system's command line verify that drivers and ROCm are installed. If this command fails, or doesn't report versions, you will need to install them.
 

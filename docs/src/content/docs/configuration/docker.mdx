@@ -8,7 +8,7 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
 
 <SystemRequirementsLink />
 
-<Aside type="note" title="Operating Systems and GPU Support">
+:::note[Operating Systems and GPU Support]
   <Tabs syncKey="operatingSystem">
     <TabItem label="Windows" icon="seti:windows">
       Docker Desktop on Windows [includes GPU support](https://www.docker.com/blog/wsl-2-gpu-support-for-docker-desktop-on-nvidia-gpus/).
@@ -21,7 +21,7 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
       Follow the [NVIDIA](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) or [AMD](https://rocm.docs.amd.com/projects/install-on-linux/en/latest/how-to/docker.html) documentation.
     </TabItem>
   </Tabs>
-</Aside>
+:::
 
 ## TL;DR
 

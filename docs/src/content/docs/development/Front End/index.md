@@ -1,5 +1,6 @@
 ---
 title: Frontend Development
+lastUpdated: 2026-02-18
 ---
 
 Invoke's UI is made possible by many contributors and open-source libraries. Thank you!

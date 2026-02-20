@@ -1,8 +1,9 @@
 ---
 title: Simple Installation
+lastUpdated: 2026-02-18
 ---
 
-import { LinkCard, Tabs, TabItem, Steps, Aside } from '@astrojs/starlight/components'
+import { LinkCard, Tabs, TabItem, Steps } from '@astrojs/starlight/components'
 import { externalLinks } from '@lib/utils/links'
 import Link from '@components/Link.astro'
 import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
@@ -63,18 +64,18 @@ Run the Launcher you just set up if you haven't already. Click **Install** and f
 
 If you have an existing Invoke installation, you can select it and let the launcher manage the install. You'll be able to update or launch the installation.
 
-<Aside type="note" title="Updating">
+:::note[Updating]
   The Launcher will check for updates for itself _and_ Invoke.
 
   - When the Launcher detects an update is available for itself, you'll get a small popup window. Click through this and the Launcher will update itself.
   - When the Launcher detects an update for Invoke, you'll see a small green alert in the Launcher. Click that and follow the instructions to update Invoke.
-</Aside>
+:::
 
 ## Alternative Launchers
 
-<Aside type="caution">
+:::caution">
   Installations from alternate launchers are not managed by Invoke, so we cannot guarantee it will work correctly. If you want a more stable experience, we recommend using the [official Invoke Launcher](#invoke-launcher).
-</Aside>
+:::
 
 {alternateLaunchers.map(({title, description, href}) => (
   <LinkCard

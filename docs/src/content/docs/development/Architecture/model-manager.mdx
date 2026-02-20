@@ -2,9 +2,10 @@
 title: Introduction to the Model Manager
 sidebar:
   label: Model Manager
+lastUpdated: 2026-02-18
 ---
 
-import { FileTree, Code, Steps, Aside } from '@astrojs/starlight/components';
+import { FileTree, Code, Steps } from '@astrojs/starlight/components';
 
 The Model Manager is responsible for organizing the various machine
 learning models used by InvokeAI. It consists of a series of
@@ -62,13 +63,9 @@ The `path` field can be absolute or relative. If relative, it is taken to be rel
 
 `ModelType`, `ModelFormat` and `BaseModelType` are string enums that are defined in `invokeai.backend.model_manager.config`. They are also imported by, and can be reexported from, `invokeai.app.services.model_manager.model_records`:
 
-<Code
-  lang="python"
-  title="invokeai.backend.model_manager.config"
-  code={`
-  from invokeai.app.services.model_records import ModelType, ModelFormat, BaseModelType
-  `}
-/>
+```py title="invokeai.backend.model_manager.config"
+from invokeai.app.services.model_records import ModelType, ModelFormat, BaseModelType
+````
 
 ### CheckpointConfig
 
@@ -1086,11 +1083,11 @@ class GenericDiffusersLoader(ModelLoader):
         return result
 ```
 
-<Aside type="note">
+:::note
   A loader can register itself to handle several different
   model types. An exception will be raised if more than one loader tries
   to register the same model type.
-</Aside>
+:::
 
 #### Conversion
 

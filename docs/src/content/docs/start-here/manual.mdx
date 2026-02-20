@@ -1,8 +1,9 @@
 ---
 title: Manual Installation
+lastUpdated: 2026-02-18
 ---
 
-import { LinkCard, Tabs, TabItem, Steps, Aside, LinkButton } from '@astrojs/starlight/components'
+import { LinkCard, Tabs, TabItem, Steps, LinkButton } from '@astrojs/starlight/components'
 import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
 
 <SystemRequirementsLink />
@@ -91,11 +92,9 @@ The following commands vary depending on the version of Invoke being installed a
 
   7. Determine the torch backend to use for installation, if any. This is necessary to get the right version of torch installed. This is acheived by using [UV's built in torch support.](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection)
 
-      <Aside>
-        <strong>Torch backend selection</strong>
-        <br />
+      :::note[Torch Backend Selection]
         Pick a torch backend only when it applies to your system. In all other cases, do not use a torch backend.
-      </Aside>
+      :::
 
       <Tabs syncKey="operatingSystem">
         <TabItem label="Windows" icon="seti:windows">

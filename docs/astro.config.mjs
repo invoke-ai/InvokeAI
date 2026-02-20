@@ -22,7 +22,7 @@ export default defineConfig({
       },
       favicon: './src/assets/invoke-icon.svg',
       editLink: {
-        baseUrl: 'https://github.com/invoke-ai/InvokeAI/tree/main/docs',
+        baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
       },
       // locales: {
       //   en: {
@@ -46,12 +46,29 @@ export default defineConfig({
           autogenerate: { directory: 'configuration' },
         },
         {
+          label: 'Concepts',
+          autogenerate: { directory: 'concepts' },
+        },
+        {
+          label: 'Features',
+          autogenerate: { directory: 'features' },
+        },
+        {
+          label: 'Workflows',
+          autogenerate: { directory: 'workflows' },
+        },
+        {
           label: 'Development',
-          autogenerate: { directory: 'development' },
+          autogenerate: { directory: 'development', collapsed: true },
         },
         {
           label: 'Contributing',
           autogenerate: { directory: 'contributing' },
+          collapsed: true,
+        },
+        {
+          label: 'Troubleshooting',
+          autogenerate: { directory: 'troubleshooting' },
         },
       ],
     }),
