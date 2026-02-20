@@ -53,16 +53,20 @@ class Migration28Callback:
             return
 
         # Table exists with old schema - migrate it
-        # Get existing data
-        cursor.execute("SELECT data FROM client_state WHERE id = 1;")
-        row = cursor.fetchone()
+        # Get existing data if the data column is present (it may be absent if an older
+        # version of migration 21 was deployed without the column)
+        cursor.execute("PRAGMA table_info(client_state);")
+        columns = [row[1] for row in cursor.fetchall()]
         existing_data = {}
-        if row is not None:
-            try:
-                existing_data = json.loads(row[0])
-            except (json.JSONDecodeError, TypeError):
-                # If data is corrupt, just start fresh
-                pass
+        if "data" in columns:
+            cursor.execute("SELECT data FROM client_state WHERE id = 1;")
+            row = cursor.fetchone()
+            if row is not None:
+                try:
+                    existing_data = json.loads(row[0])
+                except (json.JSONDecodeError, TypeError):
+                    # If data is corrupt, just start fresh
+                    pass
 
         # Drop the old table
         cursor.execute("DROP TABLE IF EXISTS client_state;")

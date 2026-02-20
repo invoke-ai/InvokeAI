@@ -358,3 +358,104 @@ def test_migration_27_creates_users_table(logger: Logger) -> None:
     assert "is_public" in columns
 
     db._conn.close()
+
+
+def test_migration_28_with_existing_data_column(logger: Logger) -> None:
+    """Test that migration 28 correctly migrates existing data from the old schema with data column."""
+    import json
+
+    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_21 import Migration21Callback
+    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_27 import Migration27Callback
+    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_28 import Migration28Callback
+
+    db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
+    cursor = db._conn.cursor()
+
+    # Run migration 21 to create old-style client_state with data column
+    Migration21Callback()(cursor)
+    # Insert some test data
+    cursor.execute(
+        "INSERT INTO client_state (id, data) VALUES (1, ?);",
+        (json.dumps({"galleryView": "images", "lastBoardId": "board123"}),),
+    )
+    db._conn.commit()
+
+    # Run migration 27 pre-reqs
+    cursor.execute("CREATE TABLE IF NOT EXISTS boards (board_id TEXT PRIMARY KEY);")
+    cursor.execute("CREATE TABLE IF NOT EXISTS images (image_name TEXT PRIMARY KEY);")
+    cursor.execute("CREATE TABLE IF NOT EXISTS workflows (workflow_id TEXT PRIMARY KEY);")
+    cursor.execute("CREATE TABLE IF NOT EXISTS session_queue (item_id INTEGER PRIMARY KEY);")
+    cursor.execute("CREATE TABLE IF NOT EXISTS style_presets (id TEXT PRIMARY KEY);")
+    db._conn.commit()
+    Migration27Callback()(cursor)
+    db._conn.commit()
+
+    # Run migration 28
+    Migration28Callback()(cursor)
+    db._conn.commit()
+
+    # Verify new schema
+    cursor.execute("PRAGMA table_info(client_state);")
+    columns = [row[1] for row in cursor.fetchall()]
+    assert "user_id" in columns
+    assert "key" in columns
+    assert "value" in columns
+    assert "updated_at" in columns
+    assert "data" not in columns
+
+    # Verify data was migrated to 'system' user
+    cursor.execute("SELECT user_id, key, value FROM client_state ORDER BY key;")
+    rows = [tuple(row) for row in cursor.fetchall()]
+    assert len(rows) == 2
+    assert ("system", "galleryView", "images") in rows
+    assert ("system", "lastBoardId", "board123") in rows
+
+    db._conn.close()
+
+
+def test_migration_28_without_data_column(logger: Logger) -> None:
+    """Test that migration 28 handles old client_state table without the data column."""
+    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_27 import Migration27Callback
+    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_28 import Migration28Callback
+
+    db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
+    cursor = db._conn.cursor()
+
+    # Create old client_state WITHOUT data column (simulating an older migration 21)
+    cursor.execute(
+        """
+        CREATE TABLE client_state (
+          id          INTEGER PRIMARY KEY CHECK(id = 1),
+          updated_at  DATETIME NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+        );
+        """
+    )
+    db._conn.commit()
+
+    # Run migration 27 pre-reqs
+    cursor.execute("CREATE TABLE IF NOT EXISTS boards (board_id TEXT PRIMARY KEY);")
+    cursor.execute("CREATE TABLE IF NOT EXISTS images (image_name TEXT PRIMARY KEY);")
+    cursor.execute("CREATE TABLE IF NOT EXISTS workflows (workflow_id TEXT PRIMARY KEY);")
+    cursor.execute("CREATE TABLE IF NOT EXISTS session_queue (item_id INTEGER PRIMARY KEY);")
+    cursor.execute("CREATE TABLE IF NOT EXISTS style_presets (id TEXT PRIMARY KEY);")
+    db._conn.commit()
+    Migration27Callback()(cursor)
+    db._conn.commit()
+
+    # Run migration 28 - should not raise even without data column
+    Migration28Callback()(cursor)
+    db._conn.commit()
+
+    # Verify new schema
+    cursor.execute("PRAGMA table_info(client_state);")
+    columns = [row[1] for row in cursor.fetchall()]
+    assert "user_id" in columns
+    assert "key" in columns
+    assert "value" in columns
+    assert "updated_at" in columns
+
+    # No rows should be migrated (nothing to migrate)
+    cursor.execute("SELECT COUNT(*) FROM client_state;")
+    assert cursor.fetchone()[0] == 0
+
+    db._conn.close()
