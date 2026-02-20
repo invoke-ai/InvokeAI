@@ -66,6 +66,18 @@ class ZImageLoRALoaderInvocation(BaseInvocation):
         if self.qwen3_encoder and any(lora.lora.key == lora_key for lora in self.qwen3_encoder.loras):
             raise ValueError(f'LoRA "{lora_key}" already applied to Qwen3 encoder.')
 
+        # Warn on variant mismatch between LoRA and transformer.
+        lora_config = context.models.get_config(lora_key)
+        lora_variant = getattr(lora_config, "variant", None)
+        if lora_variant and self.transformer is not None:
+            transformer_config = context.models.get_config(self.transformer.transformer.key)
+            transformer_variant = getattr(transformer_config, "variant", None)
+            if transformer_variant and lora_variant != transformer_variant:
+                context.logger.warning(
+                    f"LoRA variant mismatch: LoRA '{lora_config.name}' is for {lora_variant.value} "
+                    f"but transformer is {transformer_variant.value}. This may cause unexpected results."
+                )
+
         output = ZImageLoRALoaderOutput()
 
         # Attach LoRA layers to the models.
@@ -141,6 +153,18 @@ class ZImageLoRACollectionLoader(BaseInvocation):
                     f"LoRA '{lora.lora.key}' is for {lora.lora.base.value if lora.lora.base else 'unknown'} models, "
                     "not Z-Image models. Ensure you are using a Z-Image compatible LoRA."
                 )
+
+            # Warn on variant mismatch between LoRA and transformer.
+            lora_config = context.models.get_config(lora.lora.key)
+            lora_variant = getattr(lora_config, "variant", None)
+            if lora_variant and self.transformer is not None:
+                transformer_config = context.models.get_config(self.transformer.transformer.key)
+                transformer_variant = getattr(transformer_config, "variant", None)
+                if transformer_variant and lora_variant != transformer_variant:
+                    context.logger.warning(
+                        f"LoRA variant mismatch: LoRA '{lora_config.name}' is for {lora_variant.value} "
+                        f"but transformer is {transformer_variant.value}. This may cause unexpected results."
+                    )
 
             added_loras.append(lora.lora.key)
 
