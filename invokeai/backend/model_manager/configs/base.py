@@ -128,7 +128,7 @@ class Config_Base(ABC, BaseModel):
                 # defaults. variant does not require a default, but if it has one, we need to add it to the tag. We can
                 # check for the presence of a default by seeing if it's not PydanticUndefined, a sentinel value used by
                 # pydantic to indicate that no default was provided.
-                if field.default is not PydanticUndefined:
+                if field.default is not PydanticUndefined and field.default is not None:
                     # We expect each of these fields has an Enum for its default; we want the value of the enum.
                     tag_strings.append(field.default.value)
         return Tag(".".join(tag_strings))
