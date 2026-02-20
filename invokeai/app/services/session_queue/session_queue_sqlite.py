@@ -45,10 +45,19 @@ class SqliteSessionQueue(SessionQueueBase):
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
         self._set_in_progress_to_canceled()
-        if self.__invoker.services.configuration.clear_queue_on_startup:
+        config = self.__invoker.services.configuration
+        if config.clear_queue_on_startup:
             clear_result = self.clear(DEFAULT_QUEUE_ID)
             if clear_result.deleted > 0:
                 self.__invoker.services.logger.info(f"Cleared all {clear_result.deleted} queue items")
+            return
+
+        if config.max_queue_history is not None:
+            deleted = self._prune_terminal_to_limit(DEFAULT_QUEUE_ID, config.max_queue_history)
+            if deleted > 0:
+                self.__invoker.services.logger.info(
+                    f"Pruned {deleted} completed/failed/canceled queue items (kept up to {config.max_queue_history})"
+                )
 
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
@@ -67,6 +76,51 @@ class SqliteSessionQueue(SessionQueueBase):
                 WHERE status = 'in_progress';
                 """
             )
+
+    def _prune_terminal_to_limit(self, queue_id: str, keep: int) -> int:
+        """Prune terminal items (completed/failed/canceled) to keep at most N most-recent items."""
+        with self._db.transaction() as cursor:
+            where = """--sql
+                WHERE
+                queue_id = ?
+                AND (
+                    status = 'completed'
+                    OR status = 'failed'
+                    OR status = 'canceled'
+                )
+                """
+            cursor.execute(
+                f"""--sql
+                SELECT COUNT(*)
+                FROM session_queue
+                {where}
+                AND item_id NOT IN (
+                    SELECT item_id
+                    FROM session_queue
+                    {where}
+                    ORDER BY COALESCE(completed_at, updated_at, created_at) DESC, item_id DESC
+                    LIMIT ?
+                );
+                """,
+                (queue_id, queue_id, keep),
+            )
+            count = cursor.fetchone()[0]
+            cursor.execute(
+                f"""--sql
+                DELETE
+                FROM session_queue
+                {where}
+                AND item_id NOT IN (
+                    SELECT item_id
+                    FROM session_queue
+                    {where}
+                    ORDER BY COALESCE(completed_at, updated_at, created_at) DESC, item_id DESC
+                    LIMIT ?
+                );
+                """,
+                (queue_id, queue_id, keep),
+            )
+        return count
 
     def _get_current_queue_size(self, queue_id: str) -> int:
         """Gets the current number of pending queue items"""
