@@ -50,5 +50,6 @@ Old Location** | **New Location** | **Action** |
 
 ## Todo
 
-- [ ] Write new CI docstrings generator, but to json instead of markdown.
-- [ ] CI Workflow for testing md links.
+- [ ] CI workflow docstrings generator, but to json instead of markdown.
+- [ ] CI workflow for api reference generation.
+- [ ] CI workflow for testing md links.
