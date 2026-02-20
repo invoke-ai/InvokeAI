@@ -1,4 +1,4 @@
-"""Migration 27: Add multi-user support.
+"""Migration 27: Add multi-user support, per-user client state, and app settings.
 
 This migration adds the database schema for multi-user support, including:
 - users table for user accounts
@@ -6,15 +6,19 @@ This migration adds the database schema for multi-user support, including:
 - user_invitations table for invitation system
 - shared_boards table for board sharing
 - Adding user_id columns to existing tables for data ownership
+- Restructuring client_state table to support per-user storage
+- app_settings table for storing JWT secret and other app-level settings
 """
 
+import json
+import secrets
 import sqlite3
 
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
 
 
 class Migration27Callback:
-    """Migration to add multi-user support."""
+    """Migration to add multi-user support, per-user client state, and app settings."""
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
         self._create_users_table(cursor)
@@ -27,6 +31,9 @@ class Migration27Callback:
         self._update_session_queue_table(cursor)
         self._update_style_presets_table(cursor)
         self._create_system_user(cursor)
+        self._update_client_state_table(cursor)
+        self._create_app_settings_table(cursor)
+        self._generate_jwt_secret(cursor)
 
     def _create_users_table(self, cursor: sqlite3.Cursor) -> None:
         """Create users table."""
@@ -209,11 +216,148 @@ class Migration27Callback:
             VALUES ('system', 'system@system.invokeai', 'System', '', FALSE, TRUE);
         """)
 
+    def _update_client_state_table(self, cursor: sqlite3.Cursor) -> None:
+        """Restructure client_state table to support per-user storage."""
+        # Check if client_state table exists
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='client_state';")
+        if cursor.fetchone() is None:
+            # Table doesn't exist, create it with the new schema
+            cursor.execute(
+                """
+                CREATE TABLE client_state (
+                  user_id     TEXT NOT NULL,
+                  key         TEXT NOT NULL,
+                  value       TEXT NOT NULL,
+                  updated_at  DATETIME NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+                  PRIMARY KEY (user_id, key),
+                  FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+                );
+                """
+            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_client_state_user_id ON client_state(user_id);")
+            cursor.execute(
+                """
+                CREATE TRIGGER tg_client_state_updated_at
+                AFTER UPDATE ON client_state
+                FOR EACH ROW
+                BEGIN
+                  UPDATE client_state
+                    SET updated_at = CURRENT_TIMESTAMP
+                  WHERE user_id = OLD.user_id AND key = OLD.key;
+                END;
+                """
+            )
+            return
+
+        # Table exists with old schema - migrate it
+        # Get existing data if the data column is present (it may be absent if an older
+        # version of migration 21 was deployed without the column)
+        cursor.execute("PRAGMA table_info(client_state);")
+        columns = [row[1] for row in cursor.fetchall()]
+        existing_data = {}
+        if "data" in columns:
+            cursor.execute("SELECT data FROM client_state WHERE id = 1;")
+            row = cursor.fetchone()
+            if row is not None:
+                try:
+                    existing_data = json.loads(row[0])
+                except (json.JSONDecodeError, TypeError):
+                    # If data is corrupt, just start fresh
+                    pass
+
+        # Drop the old table
+        cursor.execute("DROP TABLE IF EXISTS client_state;")
+
+        # Create new table with per-user schema
+        cursor.execute(
+            """
+            CREATE TABLE client_state (
+              user_id     TEXT NOT NULL,
+              key         TEXT NOT NULL,
+              value       TEXT NOT NULL,
+              updated_at  DATETIME NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+              PRIMARY KEY (user_id, key),
+              FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+            );
+            """
+        )
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_client_state_user_id ON client_state(user_id);")
+
+        cursor.execute(
+            """
+            CREATE TRIGGER tg_client_state_updated_at
+            AFTER UPDATE ON client_state
+            FOR EACH ROW
+            BEGIN
+              UPDATE client_state
+                SET updated_at = CURRENT_TIMESTAMP
+              WHERE user_id = OLD.user_id AND key = OLD.key;
+            END;
+            """
+        )
+
+        # Migrate existing data to 'system' user
+        for key, value in existing_data.items():
+            cursor.execute(
+                """
+                INSERT INTO client_state (user_id, key, value)
+                VALUES ('system', ?, ?);
+                """,
+                (key, value),
+            )
+
+    def _create_app_settings_table(self, cursor: sqlite3.Cursor) -> None:
+        """Create app_settings table for storing application-level configuration."""
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT NOT NULL PRIMARY KEY,
+                value TEXT NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
+                updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW'))
+            );
+            """
+        )
+
+        cursor.execute(
+            """
+            CREATE TRIGGER IF NOT EXISTS tg_app_settings_updated_at
+            AFTER UPDATE ON app_settings
+            FOR EACH ROW
+            BEGIN
+                UPDATE app_settings SET updated_at = STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')
+                WHERE key = OLD.key;
+            END;
+            """
+        )
+
+    def _generate_jwt_secret(self, cursor: sqlite3.Cursor) -> None:
+        """Generate and store a cryptographically secure JWT secret key.
+
+        The secret is a 64-character hexadecimal string (256 bits of entropy),
+        which is suitable for HS256 JWT signing.
+        """
+        # Check if JWT secret already exists
+        cursor.execute("SELECT value FROM app_settings WHERE key = 'jwt_secret';")
+        existing_secret = cursor.fetchone()
+
+        if existing_secret is None:
+            # Generate a new cryptographically secure secret (256 bits)
+            jwt_secret = secrets.token_hex(32)  # 32 bytes = 256 bits = 64 hex characters
+
+            # Store in database
+            cursor.execute(
+                "INSERT INTO app_settings (key, value) VALUES ('jwt_secret', ?);",
+                (jwt_secret,),
+            )
+
 
 def build_migration_27() -> Migration:
-    """Builds the migration object for migrating from version 25 to version 27.
+    """Builds the migration object for migrating from version 26 to version 27.
 
-    This migration adds multi-user support to the database schema.
+    This migration adds multi-user support, per-user client state, and app settings
+    (including a JWT secret) to the database schema.
     """
     return Migration(
         from_version=26,

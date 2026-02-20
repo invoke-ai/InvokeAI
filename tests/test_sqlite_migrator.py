@@ -357,16 +357,30 @@ def test_migration_27_creates_users_table(logger: Logger) -> None:
     assert "user_id" in columns
     assert "is_public" in columns
 
+    # Verify client_state table has the new per-user schema
+    cursor.execute("PRAGMA table_info(client_state);")
+    columns = [row[1] for row in cursor.fetchall()]
+    assert "user_id" in columns
+    assert "key" in columns
+    assert "value" in columns
+
+    # Verify app_settings table exists and contains a JWT secret
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='app_settings';")
+    assert cursor.fetchone() is not None
+    cursor.execute("SELECT value FROM app_settings WHERE key = 'jwt_secret';")
+    jwt_row = cursor.fetchone()
+    assert jwt_row is not None
+    assert len(jwt_row[0]) == 64  # 32 bytes = 64 hex characters
+
     db._conn.close()
 
 
-def test_migration_28_with_existing_data_column(logger: Logger) -> None:
-    """Test that migration 28 correctly migrates existing data from the old schema with data column."""
+def test_migration_27_with_existing_client_state_data(logger: Logger) -> None:
+    """Test that migration 27 correctly migrates existing data from the old client_state schema."""
     import json
 
     from invokeai.app.services.shared.sqlite_migrator.migrations.migration_21 import Migration21Callback
     from invokeai.app.services.shared.sqlite_migrator.migrations.migration_27 import Migration27Callback
-    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_28 import Migration28Callback
 
     db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
     cursor = db._conn.cursor()
@@ -387,14 +401,12 @@ def test_migration_28_with_existing_data_column(logger: Logger) -> None:
     cursor.execute("CREATE TABLE IF NOT EXISTS session_queue (item_id INTEGER PRIMARY KEY);")
     cursor.execute("CREATE TABLE IF NOT EXISTS style_presets (id TEXT PRIMARY KEY);")
     db._conn.commit()
+
+    # Run migration 27
     Migration27Callback()(cursor)
     db._conn.commit()
 
-    # Run migration 28
-    Migration28Callback()(cursor)
-    db._conn.commit()
-
-    # Verify new schema
+    # Verify new client_state schema
     cursor.execute("PRAGMA table_info(client_state);")
     columns = [row[1] for row in cursor.fetchall()]
     assert "user_id" in columns
@@ -413,10 +425,9 @@ def test_migration_28_with_existing_data_column(logger: Logger) -> None:
     db._conn.close()
 
 
-def test_migration_28_without_data_column(logger: Logger) -> None:
-    """Test that migration 28 handles old client_state table without the data column."""
+def test_migration_27_without_client_state_data_column(logger: Logger) -> None:
+    """Test that migration 27 handles old client_state table without the data column."""
     from invokeai.app.services.shared.sqlite_migrator.migrations.migration_27 import Migration27Callback
-    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_28 import Migration28Callback
 
     db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
     cursor = db._conn.cursor()
@@ -439,14 +450,12 @@ def test_migration_28_without_data_column(logger: Logger) -> None:
     cursor.execute("CREATE TABLE IF NOT EXISTS session_queue (item_id INTEGER PRIMARY KEY);")
     cursor.execute("CREATE TABLE IF NOT EXISTS style_presets (id TEXT PRIMARY KEY);")
     db._conn.commit()
+
+    # Run migration 27 - should not raise even without data column
     Migration27Callback()(cursor)
     db._conn.commit()
 
-    # Run migration 28 - should not raise even without data column
-    Migration28Callback()(cursor)
-    db._conn.commit()
-
-    # Verify new schema
+    # Verify new client_state schema
     cursor.execute("PRAGMA table_info(client_state);")
     columns = [row[1] for row in cursor.fetchall()]
     assert "user_id" in columns
