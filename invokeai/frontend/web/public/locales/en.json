@@ -1565,6 +1565,8 @@
         "baseModelChangedCleared_other": "Updated, cleared or disabled {{count}} incompatible submodels",
         "kleinEncoderCleared": "Qwen3 Encoder Cleared",
         "kleinEncoderClearedDescription": "Please select a compatible Qwen3 encoder for the new Klein model variant",
+        "schedulerReset": "Scheduler Reset",
+        "schedulerResetZImageBase": "LCM scheduler is not compatible with Z-Image Base models. Reset to Euler.",
         "canceled": "Processing Canceled",
         "connected": "Connected to Server",
         "imageCopied": "Image Copied",
@@ -2383,6 +2385,14 @@
         "sendToGalleryDesc": "Pressing Invoke generates and saves a unique image to your gallery.",
         "sendToCanvas": "Send To Canvas",
         "newLayerFromImage": "New Layer from Image",
+        "text": {
+            "font": "Font",
+            "size": "Size",
+            "lineHeight": "Spacing",
+            "lineHeightDense": "Dense",
+            "lineHeightNormal": "Normal",
+            "lineHeightSpacious": "Spacious"
+        },
         "newCanvasFromImage": "New Canvas from Image",
         "newImg2ImgCanvasFromImage": "New Img2Img from Image",
         "copyToClipboard": "Copy to Clipboard",
@@ -2543,7 +2553,20 @@
             "bbox": "Bbox",
             "move": "Move",
             "view": "View",
-            "colorPicker": "Color Picker"
+            "colorPicker": "Color Picker",
+            "text": "Text"
+        },
+        "text": {
+            "font": "Font",
+            "size": "Size",
+            "bold": "Bold",
+            "italic": "Italic",
+            "underline": "Underline",
+            "strikethrough": "Strikethrough",
+            "alignLeft": "Align Left",
+            "alignCenter": "Align Center",
+            "alignRight": "Align Right",
+            "px": "px"
         },
         "filter": {
             "filter": "Filter",
@@ -2749,6 +2772,7 @@
         "HUD": {
             "bbox": "Bbox",
             "scaledBbox": "Scaled Bbox",
+            "textSessionActive": "Text input is active",
             "entityStatus": {
                 "isFiltering": "{{title}} is filtering",
                 "isTransforming": "{{title}} is transforming",

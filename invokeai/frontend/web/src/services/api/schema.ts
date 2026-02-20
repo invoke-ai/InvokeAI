@@ -15982,6 +15982,7 @@ export type components = {
              * @constant
              */
             base: "z-image";
+            variant: components["schemas"]["ZImageVariantType"] | null;
         };
         /** LoRA_LyCORIS_FLUX_Config */
         LoRA_LyCORIS_FLUX_Config: {
@@ -16360,6 +16361,7 @@ export type components = {
              * @constant
              */
             base: "z-image";
+            variant: components["schemas"]["ZImageVariantType"] | null;
         };
         /** LoRA_OMI_FLUX_Config */
         LoRA_OMI_FLUX_Config: {
@@ -17440,6 +17442,7 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            variant: components["schemas"]["ZImageVariantType"];
         };
         /** Main_Diffusers_CogView4_Config */
         Main_Diffusers_CogView4_Config: {
@@ -18082,7 +18085,7 @@ export type components = {
         };
         /**
          * Main_Diffusers_ZImage_Config
-         * @description Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base, Z-Image-Edit).
+         * @description Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base).
          */
         Main_Diffusers_ZImage_Config: {
             /**
@@ -18159,6 +18162,7 @@ export type components = {
              * @constant
              */
             base: "z-image";
+            variant: components["schemas"]["ZImageVariantType"];
         };
         /**
          * Main_GGUF_FLUX_Config
@@ -18410,6 +18414,7 @@ export type components = {
              * @constant
              */
             format: "gguf_quantized";
+            variant: components["schemas"]["ZImageVariantType"];
         };
         /**
          * Combine Masks
@@ -20621,7 +20626,7 @@ export type components = {
              * Variant
              * @description The variant of the model.
              */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["Qwen3VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
             /** @description The prediction type of the model. */
             prediction_type?: components["schemas"]["SchedulerPredictionType"] | null;
             /**
@@ -24744,7 +24749,7 @@ export type components = {
             path_or_prefix: string;
             model_type: components["schemas"]["ModelType"];
             /** Variant */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["Qwen3VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
         };
         /**
          * Subtract Integers
@@ -27428,7 +27433,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Scheduler
-             * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended for Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.
+             * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended. Heun is 2nd-order (better quality, 2x slower). LCM works with Turbo only (not Base).
              * @default euler
              * @enum {string}
              */
@@ -27555,7 +27560,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Scheduler
-             * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended for Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.
+             * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended. Heun is 2nd-order (better quality, 2x slower). LCM works with Turbo only (not Base).
              * @default euler
              * @enum {string}
              */
@@ -27982,6 +27987,12 @@ export type components = {
              */
             type: "z_image_text_encoder";
         };
+        /**
+         * ZImageVariantType
+         * @description Z-Image model variants.
+         * @enum {string}
+         */
+        ZImageVariantType: "turbo" | "zbase";
     };
     responses: never;
     parameters: never;
