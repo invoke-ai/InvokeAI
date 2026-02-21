@@ -5,8 +5,10 @@ from einops import rearrange
 from torch import Tensor
 
 from invokeai.backend.flux.dype.base import (
+    FLUX_BASE_PE_LEN,
     DyPEConfig,
     compute_ntk_freqs,
+    compute_timestep_mscale,
     compute_vision_yarn_freqs,
     compute_yarn_freqs,
 )
@@ -20,11 +22,16 @@ def rope_dype(
     target_height: int,
     target_width: int,
     dype_config: DyPEConfig,
+    axis_index: int = 0,
+    ori_max_pe_len: int = FLUX_BASE_PE_LEN,
 ) -> Tensor:
     """Compute RoPE with Dynamic Position Extrapolation.
 
     This is the core DyPE function that replaces the standard rope() function.
     It applies resolution-aware and timestep-aware scaling to position embeddings.
+
+    DyPE scaling is only applied to spatial axes (axis_index > 0). Axis 0
+    (time/channel) always uses plain RoPE to avoid distorting temporal attention.
 
     Args:
         pos: Position indices tensor
@@ -34,11 +41,18 @@ def rope_dype(
         target_height: Target image height in pixels
         target_width: Target image width in pixels
         dype_config: DyPE configuration
+        axis_index: Which axis this is (0=time/channel, 1=height, 2=width).
+            Axis 0 always uses plain RoPE without DyPE scaling.
+        ori_max_pe_len: Original maximum position embedding length for YaRN correction
 
     Returns:
         Rotary position embedding tensor with shape suitable for FLUX attention
     """
     assert dim % 2 == 0
+
+    # Axis 0 (time/channel) never gets DyPE scaling - only spatial axes do
+    if axis_index == 0:
+        return _rope_base(pos, dim, theta)
 
     # Calculate scaling factors
     base_res = dype_config.base_resolution
@@ -50,18 +64,33 @@ def rope_dype(
     if not dype_config.enable_dype or scale <= 1.0:
         return _rope_base(pos, dim, theta)
 
+    # Compute per-axis linear_scale and global ntk_scale
+    # linear_scale: the scale for THIS specific axis (height or width)
+    # ntk_scale: the global scale = max(scale_h, scale_w)
+    if axis_index == 1:
+        linear_scale = scale_h
+    elif axis_index == 2:
+        linear_scale = scale_w
+    else:
+        linear_scale = scale
+    ntk_scale = scale
+
     # Select method and compute frequencies
     method = dype_config.method
 
     if method == "vision_yarn":
+        # Compute timestep-dependent mscale (matches ComfyUI-DyPE's _get_mscale)
+        mscale = compute_timestep_mscale(ntk_scale, current_sigma, dype_config)
         cos, sin = compute_vision_yarn_freqs(
             pos=pos,
             dim=dim,
             theta=theta,
-            scale_h=scale_h,
-            scale_w=scale_w,
+            linear_scale=linear_scale,
+            ntk_scale=ntk_scale,
             current_sigma=current_sigma,
             dype_config=dype_config,
+            ori_max_pe_len=ori_max_pe_len,
+            mscale_override=mscale,
         )
     elif method == "yarn":
         cos, sin = compute_yarn_freqs(
@@ -71,6 +100,7 @@ def rope_dype(
             scale=scale,
             current_sigma=current_sigma,
             dype_config=dype_config,
+            ori_max_pe_len=ori_max_pe_len,
         )
     elif method == "ntk":
         cos, sin = compute_ntk_freqs(
