@@ -2018,6 +2018,61 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recall/{queue_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Recall Parameters
+         * @description Retrieve all stored recall parameters for a given queue.
+         *
+         *     Returns a dictionary of all recall parameters that have been set for the queue.
+         *
+         *     Args:
+         *         queue_id: The queue ID to retrieve parameters for
+         *
+         *     Returns:
+         *         A dictionary containing all stored recall parameters
+         */
+        get: operations["get_recall_parameters"];
+        put?: never;
+        /**
+         * Update Recall Parameters
+         * @description Update recallable parameters that can be recalled on the frontend.
+         *
+         *     This endpoint allows updating parameters such as prompt, model, steps, and other
+         *     generation settings. These parameters are stored in client state and can be
+         *     accessed by the frontend to populate UI elements.
+         *
+         *     Args:
+         *         queue_id: The queue ID to associate these parameters with
+         *         parameters: The RecallParameter object containing the parameters to update
+         *
+         *     Returns:
+         *         A dictionary containing the updated parameters and status
+         *
+         *     Example:
+         *         POST /api/v1/recall/{queue_id}
+         *         {
+         *             "positive_prompt": "a beautiful landscape",
+         *             "model": "sd-1.5",
+         *             "steps": 20,
+         *             "cfg_scale": 7.5,
+         *             "width": 512,
+         *             "height": 512,
+         *             "seed": 12345
+         *         }
+         */
+        post: operations["update_recall_parameters"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -5171,6 +5226,43 @@ export type components = {
              * @enum {string}
              */
             resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+        };
+        /**
+         * ControlNetRecallParameter
+         * @description ControlNet configuration for recall
+         */
+        ControlNetRecallParameter: {
+            /**
+             * Model Name
+             * @description The name of the ControlNet/T2I Adapter/Control LoRA model
+             */
+            model_name: string;
+            /**
+             * Image Name
+             * @description The filename of the control image in outputs/images
+             */
+            image_name?: string | null;
+            /**
+             * Weight
+             * @description The weight for the control adapter
+             * @default 1
+             */
+            weight?: number;
+            /**
+             * Begin Step Percent
+             * @description When the control adapter is first applied (% of total steps)
+             */
+            begin_step_percent?: number | null;
+            /**
+             * End Step Percent
+             * @description When the control adapter is last applied (% of total steps)
+             */
+            end_step_percent?: number | null;
+            /**
+             * Control Mode
+             * @description The control mode (ControlNet only)
+             */
+            control_mode?: ("balanced" | "more_prompt" | "more_control") | null;
         };
         /** ControlNet_Checkpoint_FLUX_Config */
         ControlNet_Checkpoint_FLUX_Config: {
@@ -10404,6 +10496,48 @@ export type components = {
              */
             type: "ip_adapter_output";
         };
+        /**
+         * IPAdapterRecallParameter
+         * @description IP Adapter configuration for recall
+         */
+        IPAdapterRecallParameter: {
+            /**
+             * Model Name
+             * @description The name of the IP Adapter model
+             */
+            model_name: string;
+            /**
+             * Image Name
+             * @description The filename of the reference image in outputs/images
+             */
+            image_name?: string | null;
+            /**
+             * Weight
+             * @description The weight for the IP Adapter
+             * @default 1
+             */
+            weight?: number;
+            /**
+             * Begin Step Percent
+             * @description When the IP Adapter is first applied (% of total steps)
+             */
+            begin_step_percent?: number | null;
+            /**
+             * End Step Percent
+             * @description When the IP Adapter is last applied (% of total steps)
+             */
+            end_step_percent?: number | null;
+            /**
+             * Method
+             * @description The IP Adapter method
+             */
+            method?: ("full" | "style" | "composition") | null;
+            /**
+             * Image Influence
+             * @description FLUX Redux image influence (if model is flux_redux)
+             */
+            image_influence?: ("lowest" | "low" | "medium" | "high" | "highest") | null;
+        };
         /** IPAdapter_Checkpoint_FLUX_Config */
         IPAdapter_Checkpoint_FLUX_Config: {
             /**
@@ -15202,6 +15336,29 @@ export type components = {
             weight: number;
         };
         /**
+         * LoRARecallParameter
+         * @description LoRA configuration for recall
+         */
+        LoRARecallParameter: {
+            /**
+             * Model Name
+             * @description The name of the LoRA model
+             */
+            model_name: string;
+            /**
+             * Weight
+             * @description The weight for the LoRA
+             * @default 0.75
+             */
+            weight?: number;
+            /**
+             * Is Enabled
+             * @description Whether the LoRA is enabled
+             * @default true
+             */
+            is_enabled?: boolean;
+        };
+        /**
          * Select LoRA
          * @description Selects a LoRA model and weight.
          */
@@ -15636,6 +15793,7 @@ export type components = {
              * @constant
              */
             base: "z-image";
+            variant: components["schemas"]["ZImageVariantType"] | null;
         };
         /** LoRA_LyCORIS_FLUX_Config */
         LoRA_LyCORIS_FLUX_Config: {
@@ -16014,6 +16172,7 @@ export type components = {
              * @constant
              */
             base: "z-image";
+            variant: components["schemas"]["ZImageVariantType"] | null;
         };
         /** LoRA_OMI_FLUX_Config */
         LoRA_OMI_FLUX_Config: {
@@ -17043,6 +17202,7 @@ export type components = {
              * @constant
              */
             format: "checkpoint";
+            variant: components["schemas"]["ZImageVariantType"];
         };
         /** Main_Diffusers_CogView4_Config */
         Main_Diffusers_CogView4_Config: {
@@ -17685,7 +17845,7 @@ export type components = {
         };
         /**
          * Main_Diffusers_ZImage_Config
-         * @description Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base, Z-Image-Edit).
+         * @description Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base).
          */
         Main_Diffusers_ZImage_Config: {
             /**
@@ -17762,6 +17922,7 @@ export type components = {
              * @constant
              */
             base: "z-image";
+            variant: components["schemas"]["ZImageVariantType"];
         };
         /**
          * Main_GGUF_FLUX_Config
@@ -18013,6 +18174,7 @@ export type components = {
              * @constant
              */
             format: "gguf_quantized";
+            variant: components["schemas"]["ZImageVariantType"];
         };
         /**
          * Combine Masks
@@ -20224,7 +20386,7 @@ export type components = {
              * Variant
              * @description The variant of the model.
              */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["Qwen3VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
             /** @description The prediction type of the model. */
             prediction_type?: components["schemas"]["SchedulerPredictionType"] | null;
             /**
@@ -21646,6 +21808,160 @@ export type components = {
              * @constant
              */
             type: "range_of_size";
+        };
+        /**
+         * RecallParameter
+         * @description Request model for updating recallable parameters.
+         */
+        RecallParameter: {
+            /**
+             * Positive Prompt
+             * @description Positive prompt text
+             */
+            positive_prompt?: string | null;
+            /**
+             * Negative Prompt
+             * @description Negative prompt text
+             */
+            negative_prompt?: string | null;
+            /**
+             * Model
+             * @description Main model name/identifier
+             */
+            model?: string | null;
+            /**
+             * Refiner Model
+             * @description Refiner model name/identifier
+             */
+            refiner_model?: string | null;
+            /**
+             * Vae Model
+             * @description VAE model name/identifier
+             */
+            vae_model?: string | null;
+            /**
+             * Scheduler
+             * @description Scheduler name
+             */
+            scheduler?: string | null;
+            /**
+             * Steps
+             * @description Number of generation steps
+             */
+            steps?: number | null;
+            /**
+             * Refiner Steps
+             * @description Number of refiner steps
+             */
+            refiner_steps?: number | null;
+            /**
+             * Cfg Scale
+             * @description CFG scale for guidance
+             */
+            cfg_scale?: number | null;
+            /**
+             * Cfg Rescale Multiplier
+             * @description CFG rescale multiplier
+             */
+            cfg_rescale_multiplier?: number | null;
+            /**
+             * Refiner Cfg Scale
+             * @description Refiner CFG scale
+             */
+            refiner_cfg_scale?: number | null;
+            /**
+             * Guidance
+             * @description Guidance scale
+             */
+            guidance?: number | null;
+            /**
+             * Width
+             * @description Image width in pixels
+             */
+            width?: number | null;
+            /**
+             * Height
+             * @description Image height in pixels
+             */
+            height?: number | null;
+            /**
+             * Seed
+             * @description Random seed
+             */
+            seed?: number | null;
+            /**
+             * Denoise Strength
+             * @description Denoising strength
+             */
+            denoise_strength?: number | null;
+            /**
+             * Refiner Denoise Start
+             * @description Refiner denoising start
+             */
+            refiner_denoise_start?: number | null;
+            /**
+             * Clip Skip
+             * @description CLIP skip layers
+             */
+            clip_skip?: number | null;
+            /**
+             * Seamless X
+             * @description Enable seamless X tiling
+             */
+            seamless_x?: boolean | null;
+            /**
+             * Seamless Y
+             * @description Enable seamless Y tiling
+             */
+            seamless_y?: boolean | null;
+            /**
+             * Refiner Positive Aesthetic Score
+             * @description Refiner positive aesthetic score
+             */
+            refiner_positive_aesthetic_score?: number | null;
+            /**
+             * Refiner Negative Aesthetic Score
+             * @description Refiner negative aesthetic score
+             */
+            refiner_negative_aesthetic_score?: number | null;
+            /**
+             * Loras
+             * @description List of LoRAs with their weights
+             */
+            loras?: components["schemas"]["LoRARecallParameter"][] | null;
+            /**
+             * Control Layers
+             * @description List of control adapters (ControlNet, T2I Adapter, Control LoRA) with their settings
+             */
+            control_layers?: components["schemas"]["ControlNetRecallParameter"][] | null;
+            /**
+             * Ip Adapters
+             * @description List of IP Adapters with their settings
+             */
+            ip_adapters?: components["schemas"]["IPAdapterRecallParameter"][] | null;
+        };
+        /**
+         * RecallParametersUpdatedEvent
+         * @description Event model for recall_parameters_updated
+         */
+        RecallParametersUpdatedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Queue Id
+             * @description The ID of the queue
+             */
+            queue_id: string;
+            /**
+             * Parameters
+             * @description The recall parameters that were updated
+             */
+            parameters: {
+                [key: string]: unknown;
+            };
         };
         /**
          * Create Rectangle Mask
@@ -24111,7 +24427,7 @@ export type components = {
             path_or_prefix: string;
             model_type: components["schemas"]["ModelType"];
             /** Variant */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["Qwen3VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
         };
         /**
          * Subtract Integers
@@ -26745,7 +27061,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Scheduler
-             * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended for Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.
+             * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended. Heun is 2nd-order (better quality, 2x slower). LCM works with Turbo only (not Base).
              * @default euler
              * @enum {string}
              */
@@ -26872,7 +27188,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Scheduler
-             * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended for Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.
+             * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended. Heun is 2nd-order (better quality, 2x slower). LCM works with Turbo only (not Base).
              * @default euler
              * @enum {string}
              */
@@ -27299,6 +27615,12 @@ export type components = {
              */
             type: "z_image_text_encoder";
         };
+        /**
+         * ZImageVariantType
+         * @description Z-Image model variants.
+         * @enum {string}
+         */
+        ZImageVariantType: "turbo" | "zbase";
     };
     responses: never;
     parameters: never;
@@ -31643,6 +31965,78 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_recall_parameters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to retrieve parameters for */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_recall_parameters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecallParameter"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
             };
             /** @description Validation Error */
             422: {

@@ -18,6 +18,7 @@ import type {
   zModelVariantType,
   zQwen3VariantType,
   zSubModelType,
+  zZImageVariantType,
 } from 'features/nodes/types/common';
 import type { Invocation, S } from 'services/api/types';
 import type { Equals, Extends } from 'tsafe';
@@ -50,6 +51,7 @@ describe('Common types', () => {
   test('ModelVariantType', () => assert<Equals<z.infer<typeof zModelVariantType>, S['ModelVariantType']>>());
   test('FluxVariantType', () => assert<Equals<z.infer<typeof zFluxVariantType>, S['FluxVariantType']>>());
   test('Flux2VariantType', () => assert<Equals<z.infer<typeof zFlux2VariantType>, S['Flux2VariantType']>>());
+  test('ZImageVariantType', () => assert<Equals<z.infer<typeof zZImageVariantType>, S['ZImageVariantType']>>());
   test('Qwen3VariantType', () => assert<Equals<z.infer<typeof zQwen3VariantType>, S['Qwen3VariantType']>>());
   test('ModelFormat', () => assert<Equals<z.infer<typeof zModelFormat>, S['ModelFormat']>>());
 
