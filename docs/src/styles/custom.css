@@ -180,7 +180,7 @@ article.card {
   }
 }
 
-.expressive-code {
+.expressive-code .has-title {
   .header {
     border-bottom: var(--ec-brdWd) solid var(--ec-brdCol);
   }
