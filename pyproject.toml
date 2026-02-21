@@ -159,6 +159,7 @@ explicit = true
 
 [project.scripts]
 "invokeai-web" = "invokeai.app.run_app:run_app"
+"invoke-readwatermark" = "invokeai.app.util.read_watermark:read_watermark"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"
