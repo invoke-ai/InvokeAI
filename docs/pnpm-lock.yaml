@@ -17,6 +17,12 @@ importers:
       '@astrojs/starlight-markdoc':
         specifier: ^0.5.1
         version: 0.5.1(@astrojs/markdoc@0.15.10(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))(@astrojs/starlight@0.37.6(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))
+      '@fontsource-variable/inter':
+        specifier: ^5.2.8
+        version: 5.2.8
+      '@fontsource-variable/roboto-mono':
+        specifier: ^5.2.8
+        version: 5.2.8
       astro:
         specifier: ^5.6.1
         version: 5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
@@ -458,6 +464,12 @@ packages:
 
   '@expressive-code/plugin-text-markers@0.41.6':
     resolution: {integrity: sha512-PBFa1wGyYzRExMDzBmAWC6/kdfG1oLn4pLpBeTfIRrALPjcGA/59HP3e7q9J0Smk4pC7U+lWkA2LHR8FYV8U7Q==}
+
+  '@fontsource-variable/inter@5.2.8':
+    resolution: {integrity: sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ==}
+
+  '@fontsource-variable/roboto-mono@5.2.8':
+    resolution: {integrity: sha512-6M2U3wGIUxYNKRrUoKls8BRRIPDA57T8J0agqwyDkiEHrLEEAqptsxcUl3eTm6tnRNEn6yEm4pCefvtnujebDA==}
 
   '@iconify/types@2.0.0':
     resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
@@ -3052,6 +3064,10 @@ snapshots:
   '@expressive-code/plugin-text-markers@0.41.6':
     dependencies:
       '@expressive-code/core': 0.41.6
+
+  '@fontsource-variable/inter@5.2.8': {}
+
+  '@fontsource-variable/roboto-mono@5.2.8': {}
 
   '@iconify/types@2.0.0': {}
 

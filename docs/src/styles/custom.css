@@ -1,0 +1,20 @@
+:root {
+  /* Colors */
+  --sl-color-bg: #1c1f23;
+  --sl-color-bg-nav: #272a2f;
+  --sl-color-bg-sidebar: #272a2f;
+
+  --sl-color-gray-7: #272a2f;
+
+  --sl-color-hairline: rgba(255, 255, 255, 0.08);
+  --sl-color-hairline-light: rgba(255, 255, 255, 0.16);
+  --sl-color-hairline-shade: rgba(255, 255, 255, 0.04);
+
+  --sl-color-text-accent: #97d2ee;
+
+  /* Typography */
+  --__sl-font: 'Inter', sans-serif;
+  --__sl-font-mono:
+    'Roboto Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+}

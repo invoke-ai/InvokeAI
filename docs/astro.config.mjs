@@ -34,12 +34,25 @@ export default defineConfig({
         },
       },
       social: [
-        { icon: 'github', label: 'GitHub', href: 'https://github.com/invoke-ai/InvokeAI' },
-        { icon: 'discord', label: 'Discord', href: 'https://discord.gg/ZmtBAhwWhy' },
+        {
+          icon: 'github',
+          label: 'GitHub',
+          href: 'https://github.com/invoke-ai/InvokeAI',
+        },
+        {
+          icon: 'discord',
+          label: 'Discord',
+          href: 'https://discord.gg/ZmtBAhwWhy',
+        },
       ],
       tableOfContents: {
         maxHeadingLevel: 4,
       },
+      customCss: [
+        '@fontsource-variable/inter',
+        '@fontsource-variable/roboto-mono',
+        './src/styles/custom.css',
+      ],
       sidebar: [
         {
           label: 'Start Here',
