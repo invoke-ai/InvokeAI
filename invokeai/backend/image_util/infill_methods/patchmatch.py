@@ -1,10 +1,12 @@
 """
-This module defines a singleton object, "patchmatch" that
-wraps the actual patchmatch object. It respects the global
-"try_patchmatch" attribute, so that patchmatch loading can
-be suppressed or deferred
+PatchMatch integration using patchmatch-cython.
+
+Attempt to load the CythonSolver once; if it's missing we report PatchMatch as unavailable.
+The CythonSolver ships wheels for CPython 3.10–3.13 on macOS x86_64 (10.9+), macOS arm64 (11+), manylinux/musllinux x86_64, and Windows (win32 & win_amd64).
+The PythonSolver is not considered a viable fallback because it is ~20x slower.
 """
 
+import cv2
 import numpy as np
 from PIL import Image
 
@@ -13,55 +15,55 @@ from invokeai.app.services.config.config_default import get_config
 
 
 class PatchMatch:
-    """
-    Thin class wrapper around the patchmatch function.
-    """
+    """Thin wrapper with explicit state; keeps legacy imports working."""
 
-    patch_match = None
-    tried_load: bool = False
-
-    def __init__(self):
-        super().__init__()
+    _PATCH_SIZE = 5
+    _tried = False
+    _inpaint_fn = None
 
     @classmethod
-    def _load_patch_match(cls):
-        if cls.tried_load:
+    def _load_patch_match(cls) -> None:
+        if cls._tried:
             return
-        if get_config().patchmatch:
-            from patchmatch import patch_match as pm
+        cls._tried = True
 
-            if pm.patchmatch_available:
-                logger.info("Patchmatch initialized")
-                cls.patch_match = pm
-            else:
-                logger.info("Patchmatch not loaded (nonfatal)")
-        else:
-            logger.info("Patchmatch loading disabled")
-        cls.tried_load = True
+        if not get_config().patchmatch:
+            logger.info("PatchMatch disabled via config")
+            return
+
+        try:
+            from patchmatch_cython import CythonSolver, inpaint_pyramid
+
+            def _inpaint(bgr_image, mask):
+                return inpaint_pyramid(bgr_image, mask, solver_class=CythonSolver, patch_size=cls._PATCH_SIZE, seed=0)
+
+            cls._inpaint_fn = _inpaint
+            logger.info("PatchMatch loaded")
+        except Exception as exc:
+            logger.warning("PatchMatch unavailable: %s", exc)
 
     @classmethod
     def patchmatch_available(cls) -> bool:
         cls._load_patch_match()
-        if not cls.patch_match:
-            return False
-        return cls.patch_match.patchmatch_available
+        return cls._inpaint_fn is not None
 
     @classmethod
     def inpaint(cls, image: Image.Image) -> Image.Image:
-        if cls.patch_match is None or not cls.patchmatch_available():
+        cls._load_patch_match()
+        if cls._inpaint_fn is None:
+            logger.warning("PatchMatch is unavailable; returning original image")
             return image
 
         np_image = np.array(image)
-        mask = 255 - np_image[:, :, 3]
-        infilled = cls.patch_match.inpaint(np_image[:, :, :3], mask, patch_size=3)
-        return Image.fromarray(infilled, mode="RGB")
+        if np_image.shape[2] < 4:
+            logger.warning("PatchMatch requires an RGBA image; received %s channels", np_image.shape[2])
+            return image
+
+        bgr_image = cv2.cvtColor(np_image, cv2.COLOR_RGBA2BGR)
+        mask = np_image[:, :, 3] < 128
+        infilled = cls._inpaint_fn(bgr_image, mask)
+        return Image.fromarray(cv2.cvtColor(infilled, cv2.COLOR_BGR2RGB))
 
 
 def infill_patchmatch(image: Image.Image) -> Image.Image:
-    IS_PATCHMATCH_AVAILABLE = PatchMatch.patchmatch_available()
-
-    if not IS_PATCHMATCH_AVAILABLE:
-        logger.warning("PatchMatch is not available on this system")
-        return image
-
     return PatchMatch.inpaint(image)
