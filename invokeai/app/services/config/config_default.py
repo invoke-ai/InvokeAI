@@ -229,6 +229,12 @@ class InvokeAIAppConfig(BaseSettings):
     external_openai_base_url: Optional[str] = Field(
         default=None, description="Base URL override for OpenAI image generation."
     )
+    external_seedream_api_key: Optional[str] = Field(
+        default=None, description="API key for Seedream image generation."
+    )
+    external_seedream_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Seedream image generation."
+    )
 
     # fmt: on
 
