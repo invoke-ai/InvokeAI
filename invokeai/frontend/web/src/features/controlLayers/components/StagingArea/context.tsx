@@ -72,14 +72,15 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
       onAccept: (item, imageDTO) => {
         const bboxRect = selectBboxRect(store.getState());
         const { x, y } = bboxRect;
-        const imageObject = imageDTOToImageObject(imageDTO);
         const selectedEntityIdentifier = selectSelectedEntityIdentifier(store.getState());
+
+        const imageObject = imageDTOToImageObject(imageDTO);
         const overrides: Partial<CanvasRasterLayerState> = {
           position: { x, y },
           objects: [imageObject],
         };
-
         store.dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));
+
         store.dispatch(canvasSessionReset());
         store.dispatch(
           queueApi.endpoints.cancelQueueItemsByDestination.initiate({ destination: sessionId }, { track: false })
@@ -122,7 +123,7 @@ export const useStagingAreaContext = () => {
 export const useOutputImageDTO = (itemId: number) => {
   const ctx = useStagingAreaContext();
   const allProgressData = useStore(ctx.$progressData, { keys: [itemId] });
-  return allProgressData[itemId]?.imageDTO ?? null;
+  return allProgressData[itemId]?.imageDTOs[0] ?? null;
 };
 
 export const useProgressDatum = (itemId: number): ProgressData => {

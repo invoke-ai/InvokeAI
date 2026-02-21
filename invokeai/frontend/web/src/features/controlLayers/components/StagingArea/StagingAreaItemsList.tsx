@@ -8,10 +8,10 @@ import type { CSSProperties, RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { Components, ComputeItemKey, ItemContent, ListRange, VirtuosoHandle, VirtuosoProps } from 'react-virtuoso';
 import { Virtuoso } from 'react-virtuoso';
-import type { S } from 'services/api/types';
 
 import { useStagingAreaContext } from './context';
 import { getQueueItemElementId } from './shared';
+import type { StagingEntry } from './state';
 
 const log = logger('system');
 
@@ -137,7 +137,7 @@ export const StagingAreaItemsList = memo(() => {
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const items = useStore(ctx.$items);
+  const entries = useStore(ctx.$entries);
 
   const scrollerRef = useScrollableStagingArea(rootRef);
 
@@ -168,9 +168,9 @@ export const StagingAreaItemsList = memo(() => {
 
   return (
     <Box data-overlayscrollbars-initialize="" ref={rootRef} position="relative" w="full" h="full">
-      <Virtuoso<S['SessionQueueItem']>
+      <Virtuoso<StagingEntry>
         ref={virtuosoRef}
-        data={items}
+        data={entries}
         horizontalDirection
         style={virtuosoStyles}
         computeItemKey={computeItemKey}
@@ -179,19 +179,19 @@ export const StagingAreaItemsList = memo(() => {
         components={components}
         rangeChanged={onRangeChanged}
         // Virtuoso expects the ref to be of HTMLElement | null | Window, but overlayscrollbars doesn't allow Window
-        scrollerRef={scrollerRef as VirtuosoProps<S['SessionQueueItem'], void>['scrollerRef']}
+        scrollerRef={scrollerRef as VirtuosoProps<StagingEntry, void>['scrollerRef']}
       />
     </Box>
   );
 });
 StagingAreaItemsList.displayName = 'StagingAreaItemsList';
 
-const computeItemKey: ComputeItemKey<S['SessionQueueItem'], void> = (_, item: S['SessionQueueItem']) => {
-  return item.item_id;
+const computeItemKey: ComputeItemKey<StagingEntry, void> = (_, entry: StagingEntry) => {
+  return `${entry.item.item_id}-${entry.imageIndex}`;
 };
 
-const itemContent: ItemContent<S['SessionQueueItem'], void> = (index, item) => (
-  <QueueItemPreviewMini key={`${item.item_id}-mini`} item={item} index={index} />
+const itemContent: ItemContent<StagingEntry, void> = (index, entry) => (
+  <QueueItemPreviewMini key={`${entry.item.item_id}-${entry.imageIndex}-mini`} entry={entry} index={index} />
 );
 
 const listSx = {
@@ -203,7 +203,7 @@ const listSx = {
   },
 };
 
-const components: Components<S['SessionQueueItem']> = {
+const components: Components<StagingEntry> = {
   List: forwardRef(({ context: _, ...rest }, ref) => {
     const canvasManager = useCanvasManager();
     const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);

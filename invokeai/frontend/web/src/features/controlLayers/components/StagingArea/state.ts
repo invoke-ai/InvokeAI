@@ -6,7 +6,7 @@ import { atom, computed, map } from 'nanostores';
 import type { ImageDTO, S } from 'services/api/types';
 import { objectEntries } from 'tsafe';
 
-import { getOutputImageName } from './shared';
+import { getOutputImageNames } from './shared';
 
 /**
  * Interface for the app-level API that the StagingAreaApi depends on.
@@ -34,14 +34,23 @@ export type ProgressData = {
   itemId: number;
   progressEvent: S['InvocationProgressEvent'] | null;
   progressImage: ProgressImage | null;
-  imageDTO: ImageDTO | null;
+  imageDTOs: ImageDTO[];
   imageLoaded: boolean;
 };
 
-/** Combined data for the currently selected item */
+/** A single entry in the staging area. Each canvas_output image is a separate entry. */
+export type StagingEntry = {
+  item: S['SessionQueueItem'];
+  imageDTO: ImageDTO | null;
+  imageIndex: number;
+  progressData: ProgressData;
+};
+
+/** Combined data for the currently selected entry */
 export type SelectedItemData = {
   item: S['SessionQueueItem'];
   index: number;
+  imageDTO: ImageDTO | null;
   progressData: ProgressData;
 };
 
@@ -50,7 +59,7 @@ export const getInitialProgressData = (itemId: number): ProgressData => ({
   itemId,
   progressEvent: null,
   progressImage: null,
-  imageDTO: null,
+  imageDTOs: [],
   imageLoaded: false,
 });
 type ProgressDataMap = Record<number, ProgressData | undefined>;
@@ -58,8 +67,7 @@ type ProgressDataMap = Record<number, ProgressData | undefined>;
 /**
  * API for managing the Canvas Staging Area - a view of the image generation queue.
  * Provides reactive state management for pending, in-progress, and completed images.
- * Users can accept images to place on canvas, discard them, navigate between items,
- * and configure auto-switching behavior.
+ * Each canvas_output node produces a separate entry that can be individually navigated and accepted.
  */
 export class StagingAreaApi {
   /** The current session ID. */
@@ -70,6 +78,9 @@ export class StagingAreaApi {
 
   /** A set of subscriptions to be cleaned up when we are finished with a session */
   _subscriptions = new Set<() => void>();
+
+  /** Generation counter to prevent stale async writes in onItemsChangedEvent */
+  _itemsEventGeneration = 0;
 
   /** Item ID of the last started item. Used for auto-switch on start. */
   $lastStartedItemId = atom<number | null>(null);
@@ -86,8 +97,38 @@ export class StagingAreaApi {
   /** ID of the currently selected queue item, or null if none selected. */
   $selectedItemId = atom<number | null>(null);
 
-  /** Total number of items in the queue. */
-  $itemCount = computed([this.$items], (items) => items.length);
+  /** Index of the selected image within the selected queue item (for multi-output items). */
+  $selectedImageIndex = atom<number>(0);
+
+  /**
+   * Flat list of staging entries. Each canvas_output image from a queue item becomes
+   * a separate entry. Items with 0 or 1 output images produce a single entry.
+   */
+  $entries = computed([this.$items, this.$progressData], (items, progressData) => {
+    const entries: StagingEntry[] = [];
+    for (const item of items) {
+      const datum = progressData[item.item_id] ?? getInitialProgressData(item.item_id);
+      if (datum.imageDTOs.length <= 1) {
+        entries.push({
+          item,
+          imageDTO: datum.imageDTOs[0] ?? null,
+          imageIndex: 0,
+          progressData: datum,
+        });
+      } else {
+        for (let i = 0; i < datum.imageDTOs.length; i++) {
+          const imageDTO = datum.imageDTOs[i];
+          if (imageDTO) {
+            entries.push({ item, imageDTO, imageIndex: i, progressData: datum });
+          }
+        }
+      }
+    }
+    return entries;
+  });
+
+  /** Total number of entries (each canvas_output image counts separately). */
+  $itemCount = computed([this.$entries], (entries) => entries.length);
 
   /** Whether there are any items in the queue. */
   $hasItems = computed([this.$items], (items) => items.length > 0);
@@ -97,113 +138,153 @@ export class StagingAreaApi {
     items.some((item) => item.status === 'pending' || item.status === 'in_progress')
   );
 
-  /** The currently selected queue item with its index and progress data, or null if none selected. */
+  /** The currently selected entry with its global index, or null if none selected. */
   $selectedItem = computed(
-    [this.$items, this.$selectedItemId, this.$progressData],
-    (items, selectedItemId, progressData) => {
-      if (items.length === 0) {
+    [this.$entries, this.$selectedItemId, this.$selectedImageIndex],
+    (entries, selectedItemId, selectedImageIndex) => {
+      if (entries.length === 0 || selectedItemId === null) {
         return null;
       }
-      if (selectedItemId === null) {
-        return null;
+
+      // Find the entry matching (selectedItemId, selectedImageIndex)
+      let targetEntry: StagingEntry | null = null;
+      let globalIndex = -1;
+      let imageIdxWithinItem = 0;
+
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i]!;
+        if (entry.item.item_id === selectedItemId) {
+          if (imageIdxWithinItem === selectedImageIndex) {
+            targetEntry = entry;
+            globalIndex = i;
+            break;
+          }
+          imageIdxWithinItem++;
+        }
       }
-      const item = items.find(({ item_id }) => item_id === selectedItemId);
-      if (!item) {
+
+      // Fallback: select first entry for this item
+      if (!targetEntry) {
+        for (let i = 0; i < entries.length; i++) {
+          const entry = entries[i]!;
+          if (entry.item.item_id === selectedItemId) {
+            targetEntry = entry;
+            globalIndex = i;
+            break;
+          }
+        }
+      }
+
+      if (!targetEntry || globalIndex === -1) {
         return null;
       }
 
       return {
-        item,
-        index: items.findIndex(({ item_id }) => item_id === selectedItemId),
-        progressData: progressData[selectedItemId] || getInitialProgressData(selectedItemId),
+        item: targetEntry.item,
+        index: globalIndex,
+        imageDTO: targetEntry.imageDTO,
+        progressData: targetEntry.progressData,
       };
     }
   );
 
-  /** The ImageDTO of the currently selected item, or null if none available. */
+  /** The ImageDTO of the currently selected entry, or null if none available. */
   $selectedItemImageDTO = computed([this.$selectedItem], (selectedItem) => {
-    return selectedItem?.progressData.imageDTO ?? null;
+    return selectedItem?.imageDTO ?? null;
   });
 
-  /** The index of the currently selected item, or null if none selected. */
+  /** The global entry index of the currently selected entry, or null if none selected. */
   $selectedItemIndex = computed([this.$selectedItem], (selectedItem) => {
     return selectedItem?.index ?? null;
   });
 
-  /** Selects a queue item by ID. */
-  select = (itemId: number) => {
+  /** Selects a queue item by ID, optionally at a specific image index. */
+  select = (itemId: number, imageIndex: number = 0) => {
     this.$selectedItemId.set(itemId);
+    this.$selectedImageIndex.set(imageIndex);
     this._app?.onSelect?.(itemId);
   };
 
-  /** Selects the next item in the queue, wrapping to the first item if at the end. */
+  /** Selects the next entry, cycling through all entries across all items. */
   selectNext = () => {
     const selectedItem = this.$selectedItem.get();
     if (selectedItem === null) {
       return;
     }
-    const items = this.$items.get();
-    const nextIndex = (selectedItem.index + 1) % items.length;
-    const nextItem = items[nextIndex];
-    if (!nextItem) {
+    const entries = this.$entries.get();
+    if (entries.length <= 1) {
       return;
     }
-    this.$selectedItemId.set(nextItem.item_id);
+    const nextIndex = (selectedItem.index + 1) % entries.length;
+    const nextEntry = entries[nextIndex];
+    if (!nextEntry) {
+      return;
+    }
+    this.$selectedItemId.set(nextEntry.item.item_id);
+    this.$selectedImageIndex.set(nextEntry.imageIndex);
     this._app?.onSelectNext?.();
   };
 
-  /** Selects the previous item in the queue, wrapping to the last item if at the beginning. */
+  /** Selects the previous entry, cycling through all entries across all items. */
   selectPrev = () => {
     const selectedItem = this.$selectedItem.get();
     if (selectedItem === null) {
       return;
     }
-    const items = this.$items.get();
-    const prevIndex = (selectedItem.index - 1 + items.length) % items.length;
-    const prevItem = items[prevIndex];
-    if (!prevItem) {
+    const entries = this.$entries.get();
+    if (entries.length <= 1) {
       return;
     }
-    this.$selectedItemId.set(prevItem.item_id);
+    const prevIndex = (selectedItem.index - 1 + entries.length) % entries.length;
+    const prevEntry = entries[prevIndex];
+    if (!prevEntry) {
+      return;
+    }
+    this.$selectedItemId.set(prevEntry.item.item_id);
+    this.$selectedImageIndex.set(prevEntry.imageIndex);
     this._app?.onSelectPrev?.();
   };
 
-  /** Selects the first item in the queue. */
+  /** Selects the first entry. */
   selectFirst = () => {
-    const items = this.$items.get();
-    const first = items.at(0);
+    const entries = this.$entries.get();
+    const first = entries[0];
     if (!first) {
       return;
     }
-    this.$selectedItemId.set(first.item_id);
+    this.$selectedItemId.set(first.item.item_id);
+    this.$selectedImageIndex.set(first.imageIndex);
     this._app?.onSelectFirst?.();
   };
 
-  /** Selects the last item in the queue. */
+  /** Selects the last entry. */
   selectLast = () => {
-    const items = this.$items.get();
-    const last = items.at(-1);
+    const entries = this.$entries.get();
+    const last = entries.at(-1);
     if (!last) {
       return;
     }
-    this.$selectedItemId.set(last.item_id);
+    this.$selectedItemId.set(last.item.item_id);
+    this.$selectedImageIndex.set(last.imageIndex);
     this._app?.onSelectLast?.();
   };
 
-  /** Discards the currently selected item and selects the next available item. */
+  /** Discards the queue item of the currently selected entry and selects the next available entry. */
   discardSelected = () => {
     const selectedItem = this.$selectedItem.get();
     if (selectedItem === null) {
       return;
     }
     const items = this.$items.get();
-    const nextIndex = clamp(selectedItem.index + 1, 0, items.length - 1);
-    const nextItem = items[nextIndex];
+    const itemIndex = items.findIndex((i) => i.item_id === selectedItem.item.item_id);
+    const nextItemIndex = clamp(itemIndex + 1, 0, items.length - 1);
+    const nextItem = items[nextItemIndex];
     if (nextItem) {
       this.$selectedItemId.set(nextItem.item_id);
     } else {
       this.$selectedItemId.set(null);
     }
+    this.$selectedImageIndex.set(0);
     this._app?.onDiscard?.(selectedItem.item);
   };
 
@@ -231,30 +312,22 @@ export class StagingAreaApi {
   /** Discards all items in the queue. */
   discardAll = () => {
     this.$selectedItemId.set(null);
+    this.$selectedImageIndex.set(0);
     this._app?.onDiscardAll?.();
   };
 
-  /** Accepts the currently selected item if an image is available. */
+  /** Accepts the currently selected entry if an image is available. */
   acceptSelected = () => {
     const selectedItem = this.$selectedItem.get();
-    if (selectedItem === null) {
+    if (selectedItem === null || !selectedItem.imageDTO) {
       return;
     }
-    const progressData = this.$progressData.get();
-    const datum = progressData[selectedItem.item.item_id];
-    if (!datum || !datum.imageDTO) {
-      return;
-    }
-    this._app?.onAccept?.(selectedItem.item, datum.imageDTO);
+    this._app?.onAccept?.(selectedItem.item, selectedItem.imageDTO);
   };
 
   /** Whether the accept selected action is enabled. */
-  $acceptSelectedIsEnabled = computed([this.$selectedItem, this.$progressData], (selectedItem, progressData) => {
-    if (selectedItem === null) {
-      return false;
-    }
-    const datum = progressData[selectedItem.item.item_id];
-    return !!datum && !!datum.imageDTO;
+  $acceptSelectedIsEnabled = computed([this.$selectedItem], (selectedItem) => {
+    return selectedItem !== null && selectedItem.imageDTO !== null;
   });
 
   /** Sets the auto-switch mode. */
@@ -297,6 +370,10 @@ export class StagingAreaApi {
    * handles auto-selection, and implements auto-switch behavior.
    */
   onItemsChangedEvent = async (items: S['SessionQueueItem'][]) => {
+    // Increment generation counter. If a newer call starts while we're awaiting,
+    // we'll detect it and avoid overwriting with stale data.
+    const generation = ++this._itemsEventGeneration;
+
     const oldItems = this.$items.get();
 
     if (items === oldItems) {
@@ -306,9 +383,11 @@ export class StagingAreaApi {
     if (items.length === 0) {
       // If there are no items, cannot have a selected item.
       this.$selectedItemId.set(null);
+      this.$selectedImageIndex.set(0);
     } else if (this.$selectedItemId.get() === null && items.length > 0) {
       // If there is no selected item but there are items, select the first one.
       this.$selectedItemId.set(items[0]?.item_id ?? null);
+      this.$selectedImageIndex.set(0);
     }
 
     const progressData = this.$progressData.get();
@@ -328,7 +407,7 @@ export class StagingAreaApi {
           ...(datum ?? getInitialProgressData(item.item_id)),
           progressEvent: null,
           progressImage: null,
-          imageDTO: null,
+          imageDTOs: [],
         });
         continue;
       }
@@ -336,29 +415,55 @@ export class StagingAreaApi {
       if (item.status === 'in_progress') {
         if (this.$lastStartedItemId.get() === item.item_id && this._app?.getAutoSwitch() === 'switch_on_start') {
           this.$selectedItemId.set(item.item_id);
+          this.$selectedImageIndex.set(0);
           this.$lastStartedItemId.set(null);
         }
         continue;
       }
 
       if (item.status === 'completed') {
-        if (datum?.imageDTO) {
+        const outputImageNames = getOutputImageNames(item);
+        if (outputImageNames.length === 0) {
           continue;
         }
-        const outputImageName = getOutputImageName(item);
-        if (!outputImageName) {
+        // Check current progress data (not the snapshot) to account for concurrent updates
+        const currentDatum = this.$progressData.get()[item.item_id];
+        if (currentDatum && currentDatum.imageDTOs.length === outputImageNames.length) {
           continue;
         }
-        const imageDTO = await this._app?.getImageDTO(outputImageName);
-        if (!imageDTO) {
+        const imageDTOs: ImageDTO[] = [];
+        for (const imageName of outputImageNames) {
+          const imageDTO = await this._app?.getImageDTO(imageName);
+          if (imageDTO) {
+            imageDTOs.push(imageDTO);
+          }
+        }
+        if (imageDTOs.length === 0) {
+          continue;
+        }
+
+        // After async work, check if a newer event has started processing.
+        // If so, abort to let the newer call handle the update with fresher data.
+        if (generation !== this._itemsEventGeneration) {
+          return;
+        }
+
+        // Re-read progress data to avoid overwriting a better result from a concurrent call
+        const latestDatum = this.$progressData.get()[item.item_id];
+        if (latestDatum && latestDatum.imageDTOs.length >= imageDTOs.length) {
           continue;
         }
 
         this.$progressData.setKey(item.item_id, {
-          ...(datum ?? getInitialProgressData(item.item_id)),
-          imageDTO,
+          ...(latestDatum ?? getInitialProgressData(item.item_id)),
+          imageDTOs,
         });
       }
+    }
+
+    // After async work, check if a newer event has started processing
+    if (generation !== this._itemsEventGeneration) {
+      return;
     }
 
     const selectedItemId = this.$selectedItemId.get();
@@ -370,15 +475,18 @@ export class StagingAreaApi {
         const nextItem = items[nextItemIndex] ?? items[nextItemIndex - 1];
         if (nextItem) {
           this.$selectedItemId.set(nextItem.item_id);
+          this.$selectedImageIndex.set(0);
         }
       } else {
         // Next, if there is an in-progress item, select that.
         const inProgressItem = items.find(({ status }) => status === 'in_progress');
         if (inProgressItem) {
           this.$selectedItemId.set(inProgressItem.item_id);
+          this.$selectedImageIndex.set(0);
         }
         // Finally just select the first item.
         this.$selectedItemId.set(items[0]?.item_id ?? null);
+        this.$selectedImageIndex.set(0);
       }
     }
 
@@ -393,6 +501,7 @@ export class StagingAreaApi {
     // This is the load logic mentioned in the comment in the QueueItemStatusChangedEvent handler above.
     if (this.$lastCompletedItemId.get() === item.item_id && this._app?.getAutoSwitch() === 'switch_on_finish') {
       this.$selectedItemId.set(item.item_id);
+      this.$selectedImageIndex.set(0);
       this.$lastCompletedItemId.set(null);
     }
     const datum = this.$progressData.get()[item.item_id];
@@ -402,20 +511,22 @@ export class StagingAreaApi {
     });
   };
 
-  /** Creates a computed value that returns true if the given item ID is selected. */
-  buildIsSelectedComputed = (itemId: number) => {
-    return computed([this.$selectedItemId], (selectedItemId) => {
-      return selectedItemId === itemId;
+  /** Creates a computed value that returns true if the given item ID and image index is selected. */
+  buildIsSelectedComputed = (itemId: number, imageIndex: number = 0) => {
+    return computed([this.$selectedItemId, this.$selectedImageIndex], (selectedItemId, selectedImageIndex) => {
+      return selectedItemId === itemId && selectedImageIndex === imageIndex;
     });
   };
 
   /** Cleans up all state and unsubscribes from all events. */
   cleanup = () => {
+    this._itemsEventGeneration++;
     this.$lastStartedItemId.set(null);
     this.$lastCompletedItemId.set(null);
     this.$items.set([]);
     this.$progressData.set({});
     this.$selectedItemId.set(null);
+    this.$selectedImageIndex.set(0);
     this._subscriptions.forEach((unsubscribe) => unsubscribe());
     this._subscriptions.clear();
   };

@@ -4,6 +4,7 @@ import { socketConnected } from 'app/store/middleware/listenerMiddleware/listene
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, isNil, round } from 'es-toolkit/compat';
+import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
@@ -159,6 +160,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         error_traceback,
       };
       upsertExecutionState(nes.nodeId, nes);
+    }
+    // Clear canvas workflow integration processing state on error
+    if (data.origin === 'canvas_workflow_integration') {
+      dispatch(canvasWorkflowIntegrationProcessingCompleted());
     }
   });
 
@@ -406,6 +411,25 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         draft.error_traceback = error_traceback;
       })
     );
+
+    // Optimistically update the listAllQueueItems cache for this destination so the canvas
+    // staging area immediately reflects status changes without waiting for a tag-based refetch
+    if (destination) {
+      dispatch(
+        queueApi.util.updateQueryData('listAllQueueItems', { destination }, (draft) => {
+          const item = draft.find((i) => i.item_id === item_id);
+          if (item) {
+            item.status = status;
+            item.started_at = started_at;
+            item.updated_at = updated_at;
+            item.completed_at = completed_at;
+            item.error_type = error_type;
+            item.error_message = error_message;
+            item.error_traceback = error_traceback;
+          }
+        })
+      );
+    }
 
     // Invalidate caches for things we cannot easily update
     const tagsToInvalidate: ApiTagDescription[] = [

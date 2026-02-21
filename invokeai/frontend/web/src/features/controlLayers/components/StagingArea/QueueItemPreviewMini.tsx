@@ -13,10 +13,10 @@ import {
 import { DndImage } from 'features/dnd/DndImage';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
-import type { S } from 'services/api/types';
 
-import { useOutputImageDTO, useStagingAreaContext } from './context';
+import { useStagingAreaContext } from './context';
 import { QueueItemNumber } from './QueueItemNumber';
+import type { StagingEntry } from './state';
 
 const sx = {
   cursor: 'pointer',
@@ -37,21 +37,23 @@ const sx = {
 } satisfies SystemStyleObject;
 
 type Props = {
-  item: S['SessionQueueItem'];
+  entry: StagingEntry;
   index: number;
 };
 
-export const QueueItemPreviewMini = memo(({ item, index }: Props) => {
+export const QueueItemPreviewMini = memo(({ entry, index }: Props) => {
   const ctx = useStagingAreaContext();
   const dispatch = useAppDispatch();
-  const $isSelected = useMemo(() => ctx.buildIsSelectedComputed(item.item_id), [ctx, item.item_id]);
+  const $isSelected = useMemo(
+    () => ctx.buildIsSelectedComputed(entry.item.item_id, entry.imageIndex),
+    [ctx, entry.item.item_id, entry.imageIndex]
+  );
   const isSelected = useStore($isSelected);
-  const imageDTO = useOutputImageDTO(item.item_id);
   const autoSwitch = useAppSelector(selectStagingAreaAutoSwitch);
 
   const onClick = useCallback(() => {
-    ctx.select(item.item_id);
-  }, [ctx, item.item_id]);
+    ctx.select(entry.item.item_id, entry.imageIndex);
+  }, [ctx, entry.item.item_id, entry.imageIndex]);
 
   const onDoubleClick = useCallback(() => {
     if (autoSwitch !== 'off') {
@@ -63,8 +65,8 @@ export const QueueItemPreviewMini = memo(({ item, index }: Props) => {
   }, [autoSwitch, dispatch]);
 
   const onLoad = useCallback(() => {
-    ctx.onImageLoaded(item.item_id);
-  }, [ctx, item.item_id]);
+    ctx.onImageLoaded(entry.item.item_id);
+  }, [ctx, entry.item.item_id]);
 
   return (
     <Flex
@@ -74,11 +76,17 @@ export const QueueItemPreviewMini = memo(({ item, index }: Props) => {
       onClick={onClick}
       onDoubleClick={onDoubleClick}
     >
-      <QueueItemStatusLabel item={item} position="absolute" margin="auto" />
-      {imageDTO && <DndImage imageDTO={imageDTO} position="absolute" onLoad={onLoad} />}
-      <QueueItemProgressImage itemId={item.item_id} position="absolute" />
+      <QueueItemStatusLabel item={entry.item} position="absolute" margin="auto" />
+      {entry.imageDTO && <DndImage imageDTO={entry.imageDTO} position="absolute" onLoad={onLoad} />}
+      <QueueItemProgressImage itemId={entry.item.item_id} position="absolute" />
       <QueueItemNumber number={index + 1} position="absolute" top={0} left={1} />
-      <QueueItemCircularProgress itemId={item.item_id} status={item.status} position="absolute" top={1} right={2} />
+      <QueueItemCircularProgress
+        itemId={entry.item.item_id}
+        status={entry.item.status}
+        position="absolute"
+        top={1}
+        right={2}
+      />
     </Flex>
   );
 });
