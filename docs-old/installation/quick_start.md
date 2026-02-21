@@ -1,0 +1,154 @@
+# Invoke Community Edition Quick Start
+
+Welcome to Invoke! Follow these steps to install, update, and get started creating.
+
+## Step 1: System Requirements
+
+Invoke runs on Windows 10+, macOS 14+ and Linux (Ubuntu 20.04+ is well-tested).
+
+Hardware requirements vary significantly depending on model and image output size. The requirements below are rough guidelines.
+
+- All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
+- AMD GPUs are supported on Linux only. The VRAM requirements are the same as Nvidia GPUs.
+
+!!! info "Hardware Requirements (Windows/Linux)"
+
+    === "SD1.5 - 512×512"
+
+        - GPU: Nvidia 10xx series or later, 4GB+ VRAM.
+        - Memory: At least 8GB RAM.
+        - Disk: 10GB for base installation plus 30GB for models.
+
+    === "SDXL - 1024×1024"
+
+        - GPU: Nvidia 20xx series or later, 8GB+ VRAM.
+        - Memory: At least 16GB RAM.
+        - Disk: 10GB for base installation plus 100GB for models.
+
+    === "FLUX.1 - 1024×1024"
+
+        - GPU: Nvidia 20xx series or later, 10GB+ VRAM.
+        - Memory: At least 32GB RAM.
+        - Disk: 10GB for base installation plus 200GB for models.
+
+    === "FLUX.2 Klein - 1024×1024"
+
+        - GPU: Nvidia 20xx series or later, 6GB+ VRAM for GGUF Q4 quantized models, 12GB+ for full precision.
+        - Memory: At least 16GB RAM.
+        - Disk: 10GB for base installation plus 20GB for models.
+
+    === "Z-Image Turbo - 1024x1024"
+        - GPU: Nvidia 20xx series or later, 8GB+ VRAM for the Q4_K quantized model. 16GB+ needed for the Q8 or BF16 models.
+        - Memory: At least 16GB RAM.
+        - Disk: 10GB for base installation plus 35GB for models.
+
+
+More detail on system requirements can be found [here](./requirements.md).
+
+## Step 2: Download and Set Up the Launcher
+
+The Launcher manages your Invoke install. Follow these instructions to download and set up the Launcher.
+
+!!! info "Instructions for each OS"
+
+    === "Windows"
+
+        - [Download for Windows](https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition.Setup.latest.exe)
+        - Run the `EXE` to install the Launcher and start it.
+        - A desktop shortcut will be created; use this to run the Launcher in the future.
+        - You can delete the `EXE` file you downloaded.
+
+    === "macOS"
+
+        - [Download for macOS](https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest-arm64.dmg)
+        - Open the `DMG` and drag the app into `Applications`.
+        - Run the Launcher using its entry in `Applications`.
+        - You can delete the `DMG` file you downloaded.
+
+    === "Linux"
+
+        - [Download for Linux](https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest.AppImage)
+        - You may need to edit the `AppImage` file properties and make it executable.
+        - Optionally move the file to a location that does not require admin privileges and add a desktop shortcut for it.
+        - Run the Launcher by double-clicking the `AppImage` or the shortcut you made.
+
+## Step 3: Install Invoke
+
+Run the Launcher you just set up if you haven't already. Click **Install** and follow the instructions to install (or update) Invoke.
+
+If you have an existing Invoke installation, you can select it and let the launcher manage the install. You'll be able to update or launch the installation.
+
+!!! tip "Updating"
+
+    The Launcher will check for updates for itself _and_ Invoke.
+
+    - When the Launcher detects an update is available for itself, you'll get a small popup window. Click through this and the Launcher will update itself.
+    - When the Launcher detects an update for Invoke, you'll see a small green alert in the Launcher. Click that and follow the instructions to update Invoke.
+
+## Step 4: Launch
+
+Once installed, click **Finish**, then **Launch** to start Invoke.
+
+The very first run after an installation or update will take a few extra moments to get ready.
+
+!!! tip "Server Mode"
+
+    The launcher runs Invoke as a desktop application. You can enable **Server Mode** in the launcher's settings to disable this and instead access the UI through your web browser.
+
+## Step 5: Install Models
+
+With Invoke started up, you'll need to install some models.
+
+The quickest way to get started is to install a **Starter Model** bundle. If you already have a model collection, Invoke can use it.
+
+!!! info "Install Models"
+
+    === "Install a Starter Model bundle"
+
+        1. Go to the **Models** tab.
+        2. Click **Starter Models** on the right.
+        3. Click one of the bundles to install its models. Refer to the [system requirements](#step-1-confirm-system-requirements) if you're unsure which model architecture will work for your system.
+
+    === "Use my model collection"
+
+        4. Go to the **Models** tab.
+        5. Click **Scan Folder** on the right.
+        6. Paste the path to your models collection and click **Scan Folder**.
+        7. With **In-place install** enabled, Invoke will leave the model files where they are. If you disable this, **Invoke will move the models into its own folders**.
+
+You’re now ready to start creating!
+
+## Step 6: Learn the Basics
+
+We recommend watching our [Getting Started Playlist](https://www.youtube.com/playlist?list=PLvWK1Kc8iXGrQy8r9TYg6QdUuJ5MMx-ZO). It covers essential features and workflows, including:
+
+- Generating your first image.
+- Using control layers and reference guides.
+- Refining images with advanced workflows.
+
+## Troubleshooting
+
+If installation fails, retrying the install in Repair Mode may fix it. There's a checkbox to enable this on the Review step of the install flow.
+
+If that doesn't fix it, [clearing the `uv` cache](https://docs.astral.sh/uv/reference/cli/#uv-cache-clean) might do the trick:
+
+- Open and start the dev console (button at the bottom-left of the launcher).
+- Run `uv cache clean`.
+- Retry the installation. Enable Repair Mode for good measure.
+
+If you are still unable to install, try installing to a different location and see if that works.
+
+If you still have problems, ask for help on the Invoke [discord](https://discord.gg/ZmtBAhwWhy).
+
+## Other Installation Methods
+
+- You can install the Invoke application as a python package. See our [manual install](./manual.md) docs.
+- You can run Invoke with docker. See our [docker install](./docker.md) docs.
+
+## Need Help?
+
+- Visit our [Support Portal](https://support.invoke.ai).
+- Watch the [Getting Started Playlist](https://www.youtube.com/playlist?list=PLvWK1Kc8iXGrQy8r9TYg6QdUuJ5MMx-ZO).
+- Join the conversation on [Discord][discord link].
+
+[discord link]: https://discord.gg/ZmtBAhwWhy

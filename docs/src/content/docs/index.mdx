@@ -1,0 +1,52 @@
+---
+title: AI Image Generation<br /> for Creatives
+description: A leading creative engine built to empower professionals and enthusiasts alike.
+template: splash
+hero:
+  tagline: Invoke is a free and open-source creative engine for AI-powered image generation. Built by creatives, for creatives. Self-hosted, fully customizable, and Apache 2.0 licensed.
+  actions:
+    - text: Get Started
+      link: start-here/installation
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/invoke-ai/InvokeAI
+      icon: github
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+![Invoke Web UI](./assets/invoke-web-server-1.png)
+
+<div align="center">
+
+## Used by Professionals & Hobbyists Alike
+
+</div>
+
+<CardGrid>
+  <Card title="Installation" icon="laptop">
+    The [Invoke Launcher](installation/quick_start.md) is the easiest way to install, update and run Invoke on Windows, macOS and Linux.
+
+    You can also install Invoke as a [python package](installation/manual.md) or with [docker](installation/docker.md).
+  </Card>
+
+  <Card title="Help & Support" icon="discord">
+    Please first check the [FAQ](./faq.md) to see if there is a fix for your issue or answer to your question.
+
+    If you still have a problem, [create an issue](https://github.com/invoke-ai/InvokeAI/issues) or ask for help on [Discord](https://discord.gg/ZmtBAhwWhy).
+  </Card>
+
+  <Card title="Training" icon="setting">
+    Invoke Training has moved to its own repository, with a dedicated UI for accessing common scripts like Textual Inversion and LoRA training.
+
+    You can find more by visiting the repo at [https://github.com/invoke-ai/invoke-training](https://github.com/invoke-ai/invoke-training).
+  </Card>
+
+  <Card title="Contributing" icon="github">
+    We welcome contributions, big and small. Please review our [contributing guide](contributing/index.md) if you'd like make a contribution.
+
+    This software is a combined effort of [people across the world](contributing/contributors.md). We thank them for their time, hard work and effort!
+  </Card>
+</CardGrid>

@@ -1,0 +1,42 @@
+---
+title: Creating Nodes
+---
+
+import { Steps, LinkCard } from '@astrojs/starlight/components';
+
+<Steps>
+  1. Learn about the specifics of creating a new node in our Node Creation Documentation.
+
+      <LinkCard
+        title="Invocations"
+        description="Learn about the invocation system, which is the foundation for creating nodes in InvokeAI."
+        href="/development/architecture/invocations" />
+
+  2. Make sure the node is contained in a new Python (.py) file. Preferably, the node is in a repo with a README detailing the nodes usage & examples to help others more easily use your node. Including the tag "invokeai-node" in your repository's README can also help other users find it more easily.
+
+  3. Submit a pull request with a link to your node(s) repo in GitHub against the `main` branch to add the node to the [Community Nodes](communityNodes.md) list
+
+      Make sure you are following the template below and have provided all relevant details about the node and what it does. Example output images and workflows are very helpful for other users looking to use your node.
+
+  4. A maintainer will review the pull request and node. If the node is aligned with the direction of the project, you may be asked for permission to include it in the core project.
+</Steps>
+
+### Community Node Template
+
+Append the following template to your pull request and the [Community Nodes](/workflows/community-nodes) page when submitting a node to be added to the community nodes list:
+
+```md
+---
+
+### Super Cool Node Template
+
+**Description:** This node allows you to do super cool things with InvokeAI.
+
+**Node Link:** https://github.com/invoke-ai/InvokeAI/fake_node.py
+
+**Example Node Graph:**  https://github.com/invoke-ai/InvokeAI/fake_node_graph.json
+
+**Output Examples**
+
+![InvokeAI](https://invoke-ai.github.io/InvokeAI/assets/invoke_ai_banner.png)
+```

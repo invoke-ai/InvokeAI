@@ -1,0 +1,86 @@
+---
+title: Simple Installation
+lastUpdated: 2026-02-18
+---
+
+import { LinkCard, Tabs, TabItem, Steps } from '@astrojs/starlight/components'
+import { externalLinks } from '@lib/utils/links'
+import Link from '@components/Link.astro'
+import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
+
+export const alternateLaunchers = [
+  {
+    title: 'Stability Matrix',
+    description: 'Get the latest version of Stability Matrix for your platform.',
+    href: 'https://github.com/LykosAI/StabilityMatrix'
+  },
+  {
+    title: 'LynxHub',
+    description: 'Get the latest version of LynxHub for your platform.',
+    href: 'https://github.com/KindaBrazy/LynxHub'
+  },
+]
+
+<SystemRequirementsLink />
+
+## Invoke Launcher
+
+The Invoke launcher is the official launcher to install, update and manage your invoke installation.
+
+### Download and Set Up the Launcher
+
+The Launcher manages your Invoke install. Follow these instructions to download and set up the Launcher.
+
+<Tabs syncKey="operatingSystem">
+  <TabItem label="Windows" icon="seti:windows">
+    <Steps>
+      1. <Link label="Download for Windows" href={externalLinks.launcherWindows} />
+      2. Run the `EXE` to install the Launcher and start it.
+      3. A desktop shortcut will be created; use this to run the Launcher in the future.
+      4. You can delete the `EXE` file you downloaded.
+    </Steps>
+  </TabItem>
+  <TabItem label="MacOS" icon="apple">
+    <Steps>
+      1. <Link label="Download for MacOS" href={externalLinks.launcherMacOS} />
+      2. Open the `DMG` and drag the app into `Applications`.
+      3. Run the launcher from `Applications`.
+      4. You can delete the `DMG` file you downloaded.
+    </Steps>
+  </TabItem>
+  <TabItem label="Linux" icon="linux">
+    <Steps>
+      1. <Link label="Download for Linux" href={externalLinks.launcherLinux} />
+      2. You may need to edit the `AppImage` file properties and make it executable.
+      3. Optionally move the file to a location that does not require admin privileges and add a desktop shortcut for it.
+      4. Run the Launcher by double-clicking the `AppImage` or the shortcut you made.
+    </Steps>
+  </TabItem>
+</Tabs>
+
+### Install Invoke
+
+Run the Launcher you just set up if you haven't already. Click **Install** and follow the instructions to install (or update) Invoke.
+
+If you have an existing Invoke installation, you can select it and let the launcher manage the install. You'll be able to update or launch the installation.
+
+:::note[Updating]
+  The Launcher will check for updates for itself _and_ Invoke.
+
+  - When the Launcher detects an update is available for itself, you'll get a small popup window. Click through this and the Launcher will update itself.
+  - When the Launcher detects an update for Invoke, you'll see a small green alert in the Launcher. Click that and follow the instructions to update Invoke.
+:::
+
+## Alternative Launchers
+
+:::caution
+  Installations from alternate launchers are not managed by Invoke, so we cannot guarantee it will work correctly. If you want a more stable experience, we recommend using the [official Invoke Launcher](#invoke-launcher).
+:::
+
+{alternateLaunchers.map(({title, description, href}) => (
+  <LinkCard
+    title={title}
+    description={description}
+    href={href}
+  />
+))}
