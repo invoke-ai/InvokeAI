@@ -46,7 +46,7 @@ dependencies = [
   "safetensors",
   "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
   "spandrel",
-  "torch~=2.7.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
+  "torch>=2.7.0,<3.0",                    # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
   "transformers>=4.56.0",
@@ -89,8 +89,9 @@ dependencies = [
 "cpu" = ["torch==2.7.1+cpu", "torchvision==0.22.1+cpu"]
 "cuda" = ["torch==2.7.1+cu128", "torchvision==0.22.1+cu128"]
 "rocm" = [
-  "torch==2.7.1+rocm6.3",
-  "torchvision==0.22.1+rocm6.3",
+  "torch==2.10.0+rocm7.1",
+  "torchvision==0.25.0+rocm7.1",
+  "triton-rocm==3.6.0; sys_platform == 'linux'",
   "pytorch-triton-rocm",
 ]
 
@@ -126,6 +127,8 @@ dependencies = [
 override-dependencies = ["opencv-python; sys_platform=='never'"]
 conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
 index-strategy = "unsafe-best-match"
+# Limit environment resolution to supported platforms (ROCm requires x86_64)
+environments = ["sys_platform == 'win32' or sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'x86_64')"]
 
 [tool.uv.sources]
 torch = [
@@ -141,6 +144,9 @@ torchvision = [
 pytorch-triton-rocm = [
   { index = "torch-rocm", extra = "rocm", marker = "sys_platform == 'linux'" },
 ]
+triton-rocm = [
+  { index = "torch-rocm", marker = "sys_platform == 'linux'" },
+]
 
 [[tool.uv.index]]
 name = "torch-cpu"
@@ -154,7 +160,7 @@ explicit = true
 
 [[tool.uv.index]]
 name = "torch-rocm"
-url = "https://download.pytorch.org/whl/rocm6.3"
+url = "https://download.pytorch.org/whl/rocm7.1"
 explicit = true
 
 [project.scripts]
