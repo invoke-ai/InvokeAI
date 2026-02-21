@@ -3,7 +3,7 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useInvertMask } from 'features/controlLayers/hooks/useInvertMask';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
-import { isInpaintMaskEntityIdentifier } from 'features/controlLayers/store/types';
+import { isMaskEntityIdentifier } from 'features/controlLayers/store/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useMemo } from 'react';
 
@@ -17,7 +17,7 @@ export const useCanvasInvertMaskHotkey = () => {
     if (!selectedEntityIdentifier) {
       return false;
     }
-    if (!isInpaintMaskEntityIdentifier(selectedEntityIdentifier)) {
+    if (!isMaskEntityIdentifier(selectedEntityIdentifier)) {
       return false;
     }
     if (isBusy) {

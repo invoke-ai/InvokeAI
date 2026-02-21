@@ -3,6 +3,7 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { canvasToBlob, canvasToImageData } from 'features/controlLayers/konva/util';
 import { entityRasterized } from 'features/controlLayers/store/canvasSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
+import { isMaskEntityIdentifier } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
 import { toast } from 'features/toast/toast';
 import { useCallback } from 'react';
@@ -17,9 +18,14 @@ export const useInvertMask = () => {
 
   const invertMask = useCallback(async () => {
     try {
-      const bboxRect = canvasManager.stateApi.getBbox().rect;
+      if (!selectedEntityIdentifier || !isMaskEntityIdentifier(selectedEntityIdentifier)) {
+        return;
+      }
 
-      const adapters = canvasManager.compositor.getVisibleAdaptersOfType('inpaint_mask');
+      const bboxRect = canvasManager.stateApi.getBbox().rect;
+      const maskType = selectedEntityIdentifier.type;
+
+      const adapters = canvasManager.compositor.getVisibleAdaptersOfType(maskType);
 
       if (adapters.length === 0) {
         toast({
@@ -43,7 +49,7 @@ export const useInvertMask = () => {
       fullCtx.fillStyle = 'rgba(0, 0, 0, 0)';
       fullCtx.fillRect(0, 0, bboxRect.width, bboxRect.height);
 
-      const visibleMasksRect = canvasManager.compositor.getVisibleRectOfType('inpaint_mask');
+      const visibleMasksRect = canvasManager.compositor.getVisibleRectOfType(maskType);
 
       if (visibleMasksRect.width > 0 && visibleMasksRect.height > 0) {
         const compositeCanvas = canvasManager.compositor.getCompositeCanvas(adapters, visibleMasksRect);
