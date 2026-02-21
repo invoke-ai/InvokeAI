@@ -6715,6 +6715,36 @@ export type components = {
              */
             cfg_rescale_multiplier?: number;
             /**
+             * HiDiffusion
+             * @description Apply HiDiffusion (RAU-Net + MSW-MSA) for higher-resolution denoising
+             * @default false
+             */
+            hidiffusion?: boolean;
+            /**
+             * HiDiffusion: RAU-Net
+             * @description Apply HiDiffusion RAU-Net blocks
+             * @default true
+             */
+            hidiffusion_raunet?: boolean;
+            /**
+             * HiDiffusion: Window Attention
+             * @description Apply HiDiffusion window attention blocks
+             * @default true
+             */
+            hidiffusion_window_attn?: boolean;
+            /**
+             * HiDiffusion: T1 Ratio
+             * @description Override HiDiffusion early switch threshold (T1 ratio)
+             * @default 0.4
+             */
+            hidiffusion_t1_ratio?: number;
+            /**
+             * HiDiffusion: T2 Ratio
+             * @description Override HiDiffusion late switch threshold (T2 ratio)
+             * @default 0
+             */
+            hidiffusion_t2_ratio?: number;
+            /**
              * @description Latents tensor
              * @default null
              */
@@ -6832,6 +6862,36 @@ export type components = {
              * @default 0
              */
             cfg_rescale_multiplier?: number;
+            /**
+             * HiDiffusion
+             * @description Apply HiDiffusion (RAU-Net + MSW-MSA) for higher-resolution denoising
+             * @default false
+             */
+            hidiffusion?: boolean;
+            /**
+             * HiDiffusion: RAU-Net
+             * @description Apply HiDiffusion RAU-Net blocks
+             * @default true
+             */
+            hidiffusion_raunet?: boolean;
+            /**
+             * HiDiffusion: Window Attention
+             * @description Apply HiDiffusion window attention blocks
+             * @default true
+             */
+            hidiffusion_window_attn?: boolean;
+            /**
+             * HiDiffusion: T1 Ratio
+             * @description Override HiDiffusion early switch threshold (T1 ratio)
+             * @default 0.4
+             */
+            hidiffusion_t1_ratio?: number;
+            /**
+             * HiDiffusion: T2 Ratio
+             * @description Override HiDiffusion late switch threshold (T2 ratio)
+             * @default 0
+             */
+            hidiffusion_t2_ratio?: number;
             /**
              * @description Latents tensor
              * @default null

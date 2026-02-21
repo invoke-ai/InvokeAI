@@ -23,6 +23,11 @@ import {
   setFluxDypeScale,
   setFluxScheduler,
   setGuidance,
+  setHiDiffusionEnabled,
+  setHiDiffusionRauNetEnabled,
+  setHiDiffusionT1Ratio,
+  setHiDiffusionT2Ratio,
+  setHiDiffusionWindowAttnEnabled,
   setImg2imgStrength,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
@@ -618,6 +623,96 @@ const SeamlessY: SingleMetadataHandler<ParameterSeamlessY> = {
 };
 //#endregion SeamlessY
 
+//#region HiDiffusion
+const HiDiffusion: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusion',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusion',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusion
+
+//#region HiDiffusionRAUNet
+const HiDiffusionRauNet: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionRauNet',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_raunet');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionRauNetEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusionRauNet',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionRAUNet
+
+//#region HiDiffusionWindowAttn
+const HiDiffusionWindowAttn: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionWindowAttn',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_window_attn');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionWindowAttnEnabled(value));
+  },
+  i18nKey: 'metadata.hiDiffusionWindowAttn',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionWindowAttn
+
+//#region HiDiffusionT1Ratio
+const HiDiffusionT1Ratio: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionT1Ratio',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_t1_ratio');
+    const parsed = z.number().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionT1Ratio(value));
+  },
+  i18nKey: 'metadata.hiDiffusionT1Ratio',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionT1Ratio
+
+//#region HiDiffusionT2Ratio
+const HiDiffusionT2Ratio: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HiDiffusionT2Ratio',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hidiffusion_t2_ratio');
+    const parsed = z.number().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHiDiffusionT2Ratio(value));
+  },
+  i18nKey: 'metadata.hiDiffusionT2Ratio',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion HiDiffusionT2Ratio
+
 //#region ZImageSeedVarianceEnabled
 const ZImageSeedVarianceEnabled: SingleMetadataHandler<boolean> = {
   [SingleMetadataKey]: true,
@@ -1210,6 +1305,11 @@ export const ImageMetadataHandlers = {
   DenoisingStrength,
   SeamlessX,
   SeamlessY,
+  HiDiffusion,
+  HiDiffusionRauNet,
+  HiDiffusionWindowAttn,
+  HiDiffusionT1Ratio,
+  HiDiffusionT2Ratio,
   RefinerModel,
   RefinerSteps,
   RefinerCFGScale,
