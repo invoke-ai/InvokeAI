@@ -408,10 +408,13 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     );
 
     // Invalidate caches for things we cannot easily update
+    // Invalidate SessionQueueStatus to refetch with user-specific counts
     const tagsToInvalidate: ApiTagDescription[] = [
       'CurrentSessionQueueItem',
       'NextSessionQueueItem',
       'InvocationCacheStatus',
+      'SessionQueueStatus',
+      'SessionQueueItemIdList',
       { type: 'SessionQueueItem', id: item_id },
       { type: 'SessionQueueItem', id: LIST_TAG },
       { type: 'SessionQueueItem', id: LIST_ALL_TAG },
@@ -421,16 +424,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       tagsToInvalidate.push({ type: 'QueueCountsByDestination', id: destination });
     }
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
-    dispatch(
-      queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) => {
-        draft.queue = data.queue_status;
-      })
-    );
-    dispatch(
-      queueApi.util.updateQueryData('getBatchStatus', { batch_id: data.batch_id }, (draft) => {
-        Object.assign(draft, data.batch_status);
-      })
-    );
 
     if (status === 'in_progress') {
       forEach($nodeExecutionStates.get(), (nes) => {
@@ -464,14 +457,55 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
   socket.on('queue_cleared', (data) => {
     log.debug({ data }, 'Queue cleared');
+    dispatch(
+      queueApi.util.invalidateTags([
+        'SessionQueueStatus',
+        'SessionProcessorStatus',
+        'BatchStatus',
+        'CurrentSessionQueueItem',
+        'NextSessionQueueItem',
+        'QueueCountsByDestination',
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ])
+    );
   });
 
   socket.on('batch_enqueued', (data) => {
     log.debug({ data }, 'Batch enqueued');
+    dispatch(
+      queueApi.util.invalidateTags([
+        'SessionQueueStatus',
+        'CurrentSessionQueueItem',
+        'NextSessionQueueItem',
+        'QueueCountsByDestination',
+        'SessionQueueItemIdList',
+        { type: 'SessionQueueItem', id: LIST_TAG },
+        { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+      ])
+    );
   });
 
   socket.on('queue_items_retried', (data) => {
     log.debug({ data }, 'Queue items retried');
+    const tagsToInvalidate: ApiTagDescription[] = [
+      'SessionQueueStatus',
+      'BatchStatus',
+      'CurrentSessionQueueItem',
+      'NextSessionQueueItem',
+      'QueueCountsByDestination',
+      'SessionQueueItemIdList',
+      { type: 'SessionQueueItem', id: LIST_TAG },
+      { type: 'SessionQueueItem', id: LIST_ALL_TAG },
+    ];
+    // Invalidate each retried item specifically
+    if (data.retried_item_ids) {
+      for (const itemId of data.retried_item_ids) {
+        tagsToInvalidate.push({ type: 'SessionQueueItem', id: itemId });
+      }
+    }
+    dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
   });
 
   socket.on('recall_parameters_updated', (data) => {

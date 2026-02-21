@@ -1,4 +1,5 @@
 import { Box, Divider, Flex, SimpleGrid } from '@invoke-ai/ui-library';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { ControlAdapterModelDefaultSettings } from 'features/modelManagerV2/subpanels/ModelPanel/ControlAdapterModelDefaultSettings/ControlAdapterModelDefaultSettings';
 import { EncoderModelSettings } from 'features/modelManagerV2/subpanels/ModelPanel/EncoderModelSettings/EncoderModelSettings';
 import { LoRAModelDefaultSettings } from 'features/modelManagerV2/subpanels/ModelPanel/LoRAModelDefaultSettings/LoRAModelDefaultSettings';
@@ -52,6 +53,7 @@ type Props = {
 
 export const ModelView = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
+  const canManageModels = useIsModelManagerEnabled();
 
   // Only allow path updates for external models (not Invoke-controlled)
   const canUpdatePath = useMemo(() => isExternalModel(modelConfig.path), [modelConfig.path]);
@@ -81,13 +83,13 @@ export const ModelView = memo(({ modelConfig }: Props) => {
   return (
     <Flex flexDir="column" gap={4} h="full">
       <ModelHeader modelConfig={modelConfig}>
-        {canUpdatePath && <ModelUpdatePathButton modelConfig={modelConfig} />}
-        <ModelReidentifyButton modelConfig={modelConfig} />
-        {modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
+        {canManageModels && canUpdatePath && <ModelUpdatePathButton modelConfig={modelConfig} />}
+        {canManageModels && <ModelReidentifyButton modelConfig={modelConfig} />}
+        {canManageModels && modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />
         )}
-        <ModelEditButton />
-        <ModelDeleteButton modelConfig={modelConfig} />
+        {canManageModels && <ModelEditButton />}
+        {canManageModels && <ModelDeleteButton modelConfig={modelConfig} />}
       </ModelHeader>
       <Divider />
       <Flex flexDir="column" gap={4}>

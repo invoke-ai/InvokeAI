@@ -5,6 +5,8 @@ from logging import Logger
 
 import torch
 
+from invokeai.app.services.app_settings import AppSettingsService
+from invokeai.app.services.auth.token_service import set_jwt_secret
 from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
 from invokeai.app.services.board_images.board_images_default import BoardImagesService
 from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
@@ -40,6 +42,7 @@ from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
 from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
+from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -101,6 +104,12 @@ class ApiDependencies:
 
         db = init_db(config=config, logger=logger, image_files=image_files)
 
+        # Initialize JWT secret from database
+        app_settings = AppSettingsService(db=db)
+        jwt_secret = app_settings.get_jwt_secret()
+        set_jwt_secret(jwt_secret)
+        logger.info("JWT secret loaded from database")
+
         configuration = config
         logger = logger
 
@@ -155,6 +164,7 @@ class ApiDependencies:
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
         workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
         client_state_persistence = ClientStatePersistenceSqlite(db=db)
+        users = UserService(db=db)
 
         services = InvocationServices(
             board_image_records=board_image_records,
@@ -186,6 +196,7 @@ class ApiDependencies:
             style_preset_image_files=style_preset_image_files,
             workflow_thumbnails=workflow_thumbnails,
             client_state_persistence=client_state_persistence,
+            users=users,
         )
 
         ApiDependencies.invoker = Invoker(services)

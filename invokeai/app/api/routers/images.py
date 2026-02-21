@@ -9,6 +9,7 @@ from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, model_validator
 
+from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
 from invokeai.app.invocations.fields import MetadataField
@@ -61,6 +62,7 @@ class ResizeToDimensions(BaseModel):
     response_model=ImageDTO,
 )
 async def upload_image(
+    current_user: CurrentUserOrDefault,
     file: UploadFile,
     request: Request,
     response: Response,
@@ -80,7 +82,7 @@ async def upload_image(
         embed=True,
     ),
 ) -> ImageDTO:
-    """Uploads an image"""
+    """Uploads an image for the current user"""
     if not file.content_type or not file.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
 
@@ -133,6 +135,7 @@ async def upload_image(
             workflow=extracted_metadata.invokeai_workflow,
             graph=extracted_metadata.invokeai_graph,
             is_intermediate=is_intermediate,
+            user_id=current_user.user_id,
         )
 
         response.status_code = 201
@@ -373,6 +376,7 @@ async def get_image_urls(
     response_model=OffsetPaginatedResults[ImageDTO],
 )
 async def list_image_dtos(
+    current_user: CurrentUserOrDefault,
     image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
     categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
@@ -386,10 +390,19 @@ async def list_image_dtos(
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
 ) -> OffsetPaginatedResults[ImageDTO]:
-    """Gets a list of image DTOs"""
+    """Gets a list of image DTOs for the current user"""
 
     image_dtos = ApiDependencies.invoker.services.images.get_many(
-        offset, limit, starred_first, order_dir, image_origin, categories, is_intermediate, board_id, search_term
+        offset,
+        limit,
+        starred_first,
+        order_dir,
+        image_origin,
+        categories,
+        is_intermediate,
+        board_id,
+        search_term,
+        current_user.user_id,
     )
 
     return image_dtos
@@ -567,6 +580,7 @@ async def get_bulk_download_item(
 
 @images_router.get("/names", operation_id="get_image_names")
 async def get_image_names(
+    current_user: CurrentUserOrDefault,
     image_origin: Optional[ResourceOrigin] = Query(default=None, description="The origin of images to list."),
     categories: Optional[list[ImageCategory]] = Query(default=None, description="The categories of image to include."),
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
@@ -589,6 +603,8 @@ async def get_image_names(
             is_intermediate=is_intermediate,
             board_id=board_id,
             search_term=search_term,
+            user_id=current_user.user_id,
+            is_admin=current_user.is_admin,
         )
         return result
     except Exception:

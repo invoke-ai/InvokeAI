@@ -124,7 +124,6 @@ nav:
       - Docker: 'installation/docker.md'
       - PatchMatch: 'installation/patchmatch.md'
       - Models: 'installation/models.md'
-      - Legacy Scripts: 'installation/legacy_scripts.md'
   - Workflows & Nodes:
       - Nodes Overview: 'nodes/overview.md'
       - Workflow Editor Basics: 'nodes/NODES.md'
@@ -137,9 +136,16 @@ nav:
       - Invocation API: 'nodes/invocation-api.md'
   - Configuration: 'configuration.md'
   - Features:
+      - New to InvokeAI?: 'help/gettingStartedWithAI.md'
       - Low VRAM mode: 'features/low-vram.md'
       - Database: 'features/database.md'
-      - New to InvokeAI?: 'help/gettingStartedWithAI.md'
+      - Gallery: 'features/gallery.md'
+      - Hot Keys: 'features/hotkeys.md'
+  - Multi-User Mode:
+      - User Guide: 'multiuser/user_guide.md'
+      - Administrator Guide: 'multiuser/admin_guide.md'
+      - API Guide: 'multiuser/api_guide.md'
+      - Specification: 'multiuser/specification.md'
   - Contributing:
       - Overview: 'contributing/index.md'
       - Code of Conduct: 'CODE_OF_CONDUCT.md'
@@ -148,7 +154,10 @@ nav:
           - Overview: 'contributing/contribution_guides/development.md'
           - New Contributors: 'contributing/contribution_guides/newContributorChecklist.md'
           - Model Manager v2: 'contributing/MODEL_MANAGER.md'
+          - Multiuser Mode: 'multiuser/specification.md'
           - Local Development: 'contributing/LOCAL_DEVELOPMENT.md'
+          - System Architecture: 'contributing/ARCHITECTURE.md'
+          - Hotkeys: 'contributing/HOTKEYS.md'
           - Testing: 'contributing/TESTS.md'
       - Frontend:
           - Overview: 'contributing/frontend/index.md'

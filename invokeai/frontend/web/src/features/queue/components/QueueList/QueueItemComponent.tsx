@@ -1,5 +1,7 @@
 import type { ChakraProps, CollapseProps, FlexProps } from '@invoke-ai/ui-library';
 import { ButtonGroup, Collapse, Flex, IconButton, Text } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import QueueStatusBadge from 'features/queue/components/common/QueueStatusBadge';
 import { useDestinationText } from 'features/queue/components/QueueList/useDestinationText';
 import { useOriginText } from 'features/queue/components/QueueList/useOriginText';
@@ -12,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiXBold } from 'react-icons/pi';
 import type { S } from 'services/api/types';
 
-import { COLUMN_WIDTHS } from './constants';
+import { COLUMN_WIDTHS, SYSTEM_USER_ID } from './constants';
 import QueueItemDetail from './QueueItemDetail';
 
 const selectedStyles = { bg: 'base.700' };
@@ -30,7 +32,44 @@ const sx: ChakraProps['sx'] = {
 const QueueItemComponent = ({ index, item }: InnerItemProps) => {
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
-  const handleToggle = useCallback(() => setIsOpen((s) => !s), [setIsOpen]);
+  const currentUser = useAppSelector(selectCurrentUser);
+
+  // Check if current user can manage this queue item
+  const canManageItem = useMemo(() => {
+    if (!currentUser) {
+      return false;
+    }
+    // Admin users can manage all items
+    if (currentUser.is_admin) {
+      return true;
+    }
+    // Non-admin users can only manage their own items
+    return item.user_id === currentUser.user_id;
+  }, [currentUser, item.user_id]);
+
+  // Check if the current user can view this queue item's details
+  const canViewDetails = useMemo(() => {
+    // Admins can view all items
+    if (currentUser?.is_admin) {
+      return true;
+    }
+    // Users can view their own items
+    if (currentUser?.user_id === item.user_id) {
+      return true;
+    }
+    // System items can be viewed by anyone
+    if (item.user_id === SYSTEM_USER_ID) {
+      return true;
+    }
+    return false;
+  }, [currentUser, item.user_id]);
+
+  const handleToggle = useCallback(() => {
+    if (canViewDetails) {
+      setIsOpen((s) => !s);
+    }
+  }, [canViewDetails]);
+
   const cancelQueueItem = useCancelQueueItem();
   const onClickCancelQueueItem = useCallback(
     (e: MouseEvent<HTMLButtonElement>) => {
@@ -61,6 +100,17 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
   const originText = useOriginText(item.origin);
   const destinationText = useDestinationText(item.destination);
 
+  // Display user name - prefer display_name, fallback to email, then user_id
+  const userText = useMemo(() => {
+    if (item.user_display_name) {
+      return item.user_display_name;
+    }
+    if (item.user_email) {
+      return item.user_email;
+    }
+    return item.user_id || SYSTEM_USER_ID;
+  }, [item.user_display_name, item.user_email, item.user_id]);
+
   return (
     <Flex
       flexDir="column"
@@ -71,7 +121,16 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
       sx={sx}
       data-testid="queue-item"
     >
-      <Flex minH={9} alignItems="center" gap={4} p={1.5} cursor="pointer" onClick={handleToggle}>
+      <Flex
+        minH={9}
+        alignItems="center"
+        gap={4}
+        p={1.5}
+        cursor={canViewDetails ? 'pointer' : 'not-allowed'}
+        onClick={handleToggle}
+        title={!canViewDetails ? t('queue.cannotViewDetails') : undefined}
+        opacity={canViewDetails ? 1 : 0.7}
+      >
         <Flex w={COLUMN_WIDTHS.number} alignItems="center" flexShrink={0}>
           <Text variant="subtext">{index + 1}</Text>
         </Flex>
@@ -95,6 +154,11 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
             {item.batch_id}
           </Text>
         </Flex>
+        <Flex w={COLUMN_WIDTHS.user} flexShrink={0}>
+          <Text overflow="hidden" textOverflow="ellipsis" whiteSpace="nowrap" alignItems="center" title={userText}>
+            {userText}
+          </Text>
+        </Flex>
         <Flex overflow="hidden" flexGrow={1}>
           {item.field_values && (
             <Flex gap={2} w="full" whiteSpace="nowrap" textOverflow="ellipsis" overflow="hidden">
@@ -110,6 +174,11 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
                 ))}
             </Flex>
           )}
+          {!item.field_values && !currentUser?.is_admin && item.user_id !== currentUser?.user_id && (
+            <Text as="span" color="base.500" fontStyle="italic">
+              {t('queue.fieldValuesHidden')}
+            </Text>
+          )}
         </Flex>
 
         <Flex alignItems="center" w={COLUMN_WIDTHS.actions} pe={3}>
@@ -117,7 +186,7 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
             {!isFailed && (
               <IconButton
                 onClick={onClickCancelQueueItem}
-                isDisabled={isCanceled}
+                isDisabled={isCanceled || !canManageItem}
                 isLoading={cancelQueueItem.isLoading}
                 aria-label={t('queue.cancelItem')}
                 icon={<PiXBold />}
@@ -126,6 +195,7 @@ const QueueItemComponent = ({ index, item }: InnerItemProps) => {
             {isFailed && (
               <IconButton
                 onClick={onClickRetryQueueItem}
+                isDisabled={!canManageItem}
                 isLoading={retryQueueItem.isLoading}
                 aria-label={t('queue.retryItem')}
                 icon={<PiArrowCounterClockwiseBold />}

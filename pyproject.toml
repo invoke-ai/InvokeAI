@@ -65,14 +65,18 @@ dependencies = [
 
   # Auxiliary dependencies, pinned only if necessary.
   "blake3",
+  "bcrypt<4.0.0",
   "Deprecated",
   "dnspython",
   "dynamicprompts",
   "einops",
+  "email-validator>=2.0.0",
+  "passlib[bcrypt]>=1.7.4",
   "picklescan",
   "pillow",
   "prompt-toolkit",
   "pypatchmatch",
+  "python-jose[cryptography]>=3.3.0",
   "python-multipart",
   "requests",
   "semver~=3.0.1",
@@ -159,6 +163,10 @@ explicit = true
 
 [project.scripts]
 "invokeai-web" = "invokeai.app.run_app:run_app"
+"invoke-useradd" = "invokeai.app.util.user_management:useradd"
+"invoke-userdel" = "invokeai.app.util.user_management:userdel"
+"invoke-userlist" = "invokeai.app.util.user_management:userlist"
+"invoke-usermod" = "invokeai.app.util.user_management:usermod"
 
 [project.urls]
 "Homepage" = "https://invoke-ai.github.io/InvokeAI/"
