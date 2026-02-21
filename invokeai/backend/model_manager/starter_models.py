@@ -2,6 +2,11 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from invokeai.backend.model_manager.configs.external_api import (
+    ExternalApiModelDefaultSettings,
+    ExternalImageSize,
+    ExternalModelCapabilities,
+)
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 
@@ -13,6 +18,8 @@ class StarterModelWithoutDependencies(BaseModel):
     type: ModelType
     format: Optional[ModelFormat] = None
     is_installed: bool = False
+    capabilities: ExternalModelCapabilities | None = None
+    default_settings: ExternalApiModelDefaultSettings | None = None
     # allows us to track what models a user has installed across name changes within starter models
     # if you update a starter model name, please add the old one to this list for that starter model
     previous_names: list[str] = []
@@ -862,6 +869,108 @@ z_image_controlnet_tile = StarterModel(
 )
 # endregion
 
+# region External API
+gemini_flash_image = StarterModel(
+    name="Gemini 2.5 Flash Image",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-2.5-flash-image",
+    description="Google Gemini 2.5 Flash image generation model (external API).",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img", "inpaint"],
+        supports_negative_prompt=True,
+        supports_seed=True,
+        supports_guidance=True,
+        supports_reference_images=True,
+        max_images_per_request=1,
+        allowed_aspect_ratios=[
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9",
+        ],
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "2:3": ExternalImageSize(width=832, height=1248),
+            "3:2": ExternalImageSize(width=1248, height=832),
+            "3:4": ExternalImageSize(width=864, height=1184),
+            "4:3": ExternalImageSize(width=1184, height=864),
+            "4:5": ExternalImageSize(width=896, height=1152),
+            "5:4": ExternalImageSize(width=1152, height=896),
+            "9:16": ExternalImageSize(width=768, height=1344),
+            "16:9": ExternalImageSize(width=1344, height=768),
+            "21:9": ExternalImageSize(width=1536, height=672),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+)
+gemini_pro_image_preview = StarterModel(
+    name="Gemini 3 Pro Image Preview",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-3-pro-image-preview",
+    description="Google Gemini 3 Pro image generation preview model (external API).",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img", "inpaint"],
+        supports_negative_prompt=True,
+        supports_seed=True,
+        supports_guidance=True,
+        supports_reference_images=True,
+        max_images_per_request=1,
+        allowed_aspect_ratios=[
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9",
+        ],
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "2:3": ExternalImageSize(width=832, height=1248),
+            "3:2": ExternalImageSize(width=1248, height=832),
+            "3:4": ExternalImageSize(width=864, height=1184),
+            "4:3": ExternalImageSize(width=1184, height=864),
+            "4:5": ExternalImageSize(width=896, height=1152),
+            "5:4": ExternalImageSize(width=1152, height=896),
+            "9:16": ExternalImageSize(width=768, height=1344),
+            "16:9": ExternalImageSize(width=1344, height=768),
+            "21:9": ExternalImageSize(width=1536, height=672),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+)
+openai_gpt_image_1 = StarterModel(
+    name="ChatGPT Image",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1",
+    description="OpenAI GPT-Image-1 image generation model (external API).",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img", "inpaint"],
+        supports_negative_prompt=True,
+        supports_seed=True,
+        supports_guidance=True,
+        supports_reference_images=True,
+        max_images_per_request=1,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+)
+# endregion
+
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
@@ -957,6 +1066,9 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
+    gemini_flash_image,
+    gemini_pro_image_preview,
+    openai_gpt_image_1,
 ]
 
 sd1_bundle: list[StarterModel] = [

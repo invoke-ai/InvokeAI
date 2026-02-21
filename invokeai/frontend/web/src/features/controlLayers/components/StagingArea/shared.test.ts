@@ -181,6 +181,33 @@ describe('StagingAreaApi Utility Functions', () => {
       expect(result).toBe('first-image.png');
     });
 
+    it('should return first image from image collections', () => {
+      const queueItem: S['SessionQueueItem'] = {
+        item_id: 1,
+        status: 'completed',
+        priority: 0,
+        destination: 'test-session',
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+        started_at: '2024-01-01T00:00:01Z',
+        completed_at: '2024-01-01T00:01:00Z',
+        error: null,
+        session: {
+          id: 'test-session',
+          source_prepared_mapping: {
+            canvas_output: ['output-node-id'],
+          },
+          results: {
+            'output-node-id': {
+              images: [{ image_name: 'first.png' }, { image_name: 'second.png' }],
+            },
+          },
+        },
+      } as unknown as S['SessionQueueItem'];
+
+      expect(getOutputImageName(queueItem)).toBe('first.png');
+    });
+
     it('should handle empty session mapping', () => {
       const queueItem: S['SessionQueueItem'] = {
         item_id: 1,

@@ -33,6 +33,7 @@ from invokeai.app.services.model_install.model_install_common import (
     URLModelSource,
 )
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
+from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -211,6 +212,21 @@ def test_inplace_install(
     # Model file should still exist after install
     assert embedding_file.exists()
     assert Path(job.config_out.path).exists()
+
+
+def test_external_install(mm2_installer: ModelInstallServiceBase) -> None:
+    config = ModelRecordChanges(name="ChatGPT Image", description="External model", key="chatgpt_image")
+    job = mm2_installer.heuristic_import("external://openai/gpt-image-1", config=config)
+
+    mm2_installer.wait_for_installs()
+
+    assert job.status == InstallStatus.COMPLETED
+    assert job.config_out is not None
+    assert isinstance(job.config_out, ExternalApiModelConfig)
+    assert job.config_out.provider_id == "openai"
+    assert job.config_out.provider_model_id == "gpt-image-1"
+    assert job.config_out.base == BaseModelType.External
+    assert job.config_out.type == ModelType.ExternalImageGenerator
 
 
 def test_delete_install(

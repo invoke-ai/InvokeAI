@@ -6,7 +6,7 @@ import { StarterBundleButton } from 'features/modelManagerV2/subpanels/AddModelP
 import { StarterBundleTooltipContentCompact } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterBundleTooltipContentCompact';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiFolderOpenBold, PiLinkBold, PiStarBold } from 'react-icons/pi';
+import { PiFolderOpenBold, PiLinkBold, PiPlugBold, PiStarBold } from 'react-icons/pi';
 import { SiHuggingface } from 'react-icons/si';
 import { useGetStarterModelsQuery } from 'services/api/endpoints/models';
 
@@ -26,6 +26,10 @@ export const LaunchpadForm = memo(() => {
 
   const navigateToScanFolderTab = useCallback(() => {
     setInstallModelsTabByName('scanFolder');
+  }, []);
+
+  const navigateToExternalTab = useCallback(() => {
+    setInstallModelsTabByName('external');
   }, []);
 
   const navigateToStarterModelsTab = useCallback(() => {
@@ -62,6 +66,12 @@ export const LaunchpadForm = memo(() => {
                 icon={PiFolderOpenBold}
                 title={t('modelManager.scanFolder')}
                 description={t('modelManager.launchpad.scanFolderDescription')}
+              />
+              <LaunchpadButton
+                onClick={navigateToExternalTab}
+                icon={PiPlugBold}
+                title={t('modelManager.externalProviders')}
+                description={t('modelManager.launchpad.externalDescription')}
               />
             </Grid>
           </Flex>

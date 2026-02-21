@@ -8,6 +8,10 @@ We welcome contributions, whether features, bug fixes, code cleanup, testing, co
 
 If you’d like to help with development, please see our [development guide](contribution_guides/development.md).
 
+## External Providers
+
+If you are adding external image generation providers or configs, see our [external provider integration guide](EXTERNAL_PROVIDERS.md).
+
 **New Contributors:** If you’re unfamiliar with contributing to open source projects, take a look at our [new contributor guide](contribution_guides/newContributorChecklist.md).
 
 ## Nodes

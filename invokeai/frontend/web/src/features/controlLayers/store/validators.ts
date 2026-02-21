@@ -6,7 +6,7 @@ import type {
   RefImageState,
 } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
-import type { AnyModelConfig, MainModelConfig } from 'services/api/types';
+import { type AnyModelConfig, isExternalApiModelConfig, type MainOrExternalModelConfig } from 'services/api/types';
 
 const WARNINGS = {
   UNSUPPORTED_MODEL: 'controlLayers.warnings.unsupportedModel',
@@ -28,7 +28,7 @@ type WarningTKey = (typeof WARNINGS)[keyof typeof WARNINGS];
 
 export const getRegionalGuidanceWarnings = (
   entity: CanvasRegionalGuidanceState,
-  model: MainModelConfig | null | undefined
+  model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
@@ -112,11 +112,19 @@ export const areBasesCompatibleForRefImage = (
 
 export const getGlobalReferenceImageWarnings = (
   entity: RefImageState,
-  model: MainModelConfig | null | undefined
+  model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
   if (model) {
+    if (isExternalApiModelConfig(model)) {
+      if (!entity.config.image) {
+        // No image selected
+        warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+      }
+      return warnings;
+    }
+
     if (model.base === 'sd-3' || model.base === 'sd-2') {
       // Unsupported model architecture
       warnings.push(WARNINGS.UNSUPPORTED_MODEL);
@@ -147,7 +155,7 @@ export const getGlobalReferenceImageWarnings = (
 
 export const getControlLayerWarnings = (
   entity: CanvasControlLayerState,
-  model: MainModelConfig | null | undefined
+  model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
@@ -181,7 +189,7 @@ export const getControlLayerWarnings = (
 
 export const getRasterLayerWarnings = (
   _entity: CanvasRasterLayerState,
-  _model: MainModelConfig | null | undefined
+  _model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 
@@ -192,7 +200,7 @@ export const getRasterLayerWarnings = (
 
 export const getInpaintMaskWarnings = (
   _entity: CanvasInpaintMaskState,
-  _model: MainModelConfig | null | undefined
+  _model: MainOrExternalModelConfig | null | undefined
 ): WarningTKey[] => {
   const warnings: WarningTKey[] = [];
 

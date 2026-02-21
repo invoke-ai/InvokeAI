@@ -19,6 +19,7 @@ const FORMAT_NAME_MAP: Record<ModelFormat, string> = {
   bnb_quantized_nf4b: 'quantized',
   gguf_quantized: 'gguf',
   omi: 'omi',
+  external_api: 'external_api',
   unknown: 'unknown',
   olive: 'olive',
   onnx: 'onnx',
@@ -40,6 +41,7 @@ const FORMAT_COLOR_MAP: Record<ModelFormat, string> = {
   unknown: 'red',
   olive: 'base',
   onnx: 'base',
+  external_api: 'base',
 };
 
 const ModelFormatBadge = ({ format }: Props) => {
