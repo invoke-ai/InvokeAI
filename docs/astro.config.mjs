@@ -88,6 +88,10 @@ export default defineConfig({
           autogenerate: { directory: 'troubleshooting' },
         },
       ],
+      components: {
+        ThemeProvider: './src/lib/components/ForceDarkTheme.astro',
+        ThemeSelect: './src/lib/components/EmptyComponent.astro',
+      },
     }),
     markdoc(),
   ],
