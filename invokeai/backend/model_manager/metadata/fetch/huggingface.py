@@ -16,10 +16,11 @@ print(metadata.tags)
 import json
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Optional
 
 import requests
-from huggingface_hub import HfApi, configure_http_backend, hf_hub_url
+from huggingface_hub import HfApi, hf_hub_url
 from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
@@ -47,13 +48,37 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         this module without an internet connection.
         """
         self._requests = session or requests.Session()
-        configure_http_backend(backend_factory=lambda: self._requests)
+        self._has_custom_session = session is not None
 
     @classmethod
     def from_json(cls, json: str) -> HuggingFaceMetadata:
         """Given the JSON representation of the metadata, return the corresponding Pydantic object."""
         metadata = HuggingFaceMetadata.model_validate_json(json)
         return metadata
+
+    def _model_info_via_session(self, repo_id: str, variant: Optional[ModelRepoVariant] = None) -> SimpleNamespace:
+        """Fetch model info using the injected requests session (for testing/custom backends)."""
+        params = {"blobs": "true"}
+        url = f"https://huggingface.co/api/models/{repo_id}"
+        if variant is not None:
+            url += f"/revision/{variant}"
+        resp = self._requests.get(url, params=params)
+        if resp.status_code == 404:
+            error_code = resp.headers.get("X-Error-Code", "")
+            if error_code == "RevisionNotFound" or (variant is not None):
+                raise RevisionNotFoundError(f"Revision '{variant}' not found for repo '{repo_id}'.")
+            raise RepositoryNotFoundError(f"Repository '{repo_id}' not found.")
+        resp.raise_for_status()
+        data = resp.json()
+        # Convert siblings dicts to SimpleNamespace objects matching HfApi.model_info() shape
+        siblings = []
+        for s in data.get("siblings", []):
+            siblings.append(SimpleNamespace(
+                rfilename=s.get("rfilename"),
+                size=s.get("size") or (s.get("lfs", {}) or {}).get("size"),
+                lfs=s.get("lfs"),
+            ))
+        return SimpleNamespace(id=data["id"], siblings=siblings)
 
     def from_id(self, id: str, variant: Optional[ModelRepoVariant] = None) -> AnyModelRepoMetadata:
         """Return a HuggingFaceMetadata object given the model's repo_id."""
@@ -67,7 +92,12 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         repo_id = id.split("::")[0] or id
         while not model_info:
             try:
-                model_info = HfApi().model_info(repo_id=repo_id, files_metadata=True, revision=variant)
+                # Use the injected session when provided (supports testing with mock adapters).
+                # Otherwise use HfApi which uses httpx internally.
+                if self._has_custom_session:
+                    model_info = self._model_info_via_session(repo_id, variant)
+                else:
+                    model_info = HfApi().model_info(repo_id=repo_id, files_metadata=True, revision=variant)
             except RepositoryNotFoundError as excp:
                 raise UnknownMetadataException(f"'{repo_id}' not found. See trace for details.") from excp
             except RevisionNotFoundError:

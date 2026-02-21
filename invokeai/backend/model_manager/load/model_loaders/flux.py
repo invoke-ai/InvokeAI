@@ -13,7 +13,7 @@ from transformers import (
     CLIPTextModel,
     CLIPTokenizer,
     T5EncoderModel,
-    T5TokenizerFast,
+    T5Tokenizer,
 )
 
 from invokeai.app.services.config.config_default import get_config
@@ -409,7 +409,7 @@ class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
             )
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
-                return T5TokenizerFast.from_pretrained(
+                return T5Tokenizer.from_pretrained(
                     Path(config.path) / "tokenizer_2", max_length=512, local_files_only=True
                 )
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
@@ -437,8 +437,11 @@ class BnbQuantizedLlmInt8bCheckpointModel(ModelLoader):
         missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False, assign=True)
         assert len(unexpected_keys) == 0
         assert set(missing_keys) == {"encoder.embed_tokens.weight"}
-        # Assert that the layers we expect to be shared are actually shared.
-        assert model.encoder.embed_tokens.weight is model.shared.weight
+        # Re-tie shared weights. In transformers 5.x, weight tying is implemented at the
+        # parameter level (via _tie_weights / tie_weights) rather than as a Python object
+        # alias.  load_state_dict(assign=True) replaces parameters in-place, which severs
+        # the parameter-level tie.  Calling tie_weights() re-establishes it.
+        model.tie_weights()
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.T5Encoder)
@@ -455,7 +458,7 @@ class T5EncoderCheckpointModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
-                return T5TokenizerFast.from_pretrained(
+                return T5Tokenizer.from_pretrained(
                     Path(config.path) / "tokenizer_2", max_length=512, local_files_only=True
                 )
             case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:

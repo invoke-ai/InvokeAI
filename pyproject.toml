@@ -49,7 +49,7 @@ dependencies = [
   "torch~=2.7.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
-  "transformers>=4.56.0",
+  "transformers>=5.1.0",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
@@ -123,7 +123,8 @@ dependencies = [
 [tool.uv]
 # Prevent opencv-python from ever being chosen during dependency resolution.
 # This prevents conflicts with opencv-contrib-python, which Invoke requires.
-override-dependencies = ["opencv-python; sys_platform=='never'"]
+# Force transformers>=5.1.0 past compel==2.1.1's ~=4.25 (<5.0) constraint.
+override-dependencies = ["opencv-python; sys_platform=='never'", "transformers>=5.1.0"]
 conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
 index-strategy = "unsafe-best-match"
 
