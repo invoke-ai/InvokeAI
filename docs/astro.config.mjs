@@ -9,8 +9,8 @@ import markdoc from '@astrojs/markdoc';
 
 // https://astro.build/config
 export default defineConfig({
-  // site: 'https://docs.invoke.ai', // TODO: When docs are ready
-
+  site: 'https://invoke-ai.github.io',
+  base: '/InvokeAI',
   integrations: [
     starlight({
       // Content
