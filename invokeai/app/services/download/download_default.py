@@ -480,7 +480,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         if resume_from > 0 and resp.status_code == 206:
             content_range = resp.headers.get("Content-Range", "")
             total_from_range = None
-            if match := re.match(r"bytes\\s+\\d+-\\d+/(\\d+)", content_range):
+            if match := re.match(r"bytes\s+\d+-\d+/(\d+)", content_range):
                 total_from_range = int(match.group(1))
             if total_from_range is not None:
                 job.total_bytes = total_from_range
