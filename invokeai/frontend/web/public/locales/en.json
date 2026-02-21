@@ -1100,7 +1100,13 @@
         "installingXModels_other": "Installing {{count}} models",
         "skippingXDuplicates_one": ", skipping {{count}} duplicate",
         "skippingXDuplicates_other": ", skipping {{count}} duplicates",
-        "manageModels": "Manage Models"
+        "manageModels": "Manage Models",
+        "exportSettings": "Export Settings",
+        "importSettings": "Import Settings",
+        "settingsExported": "Model settings exported",
+        "settingsImported": "Model settings imported",
+        "settingsImportFailed": "Failed to import model settings",
+        "settingsImportInvalidFile": "Invalid settings file"
     },
     "models": {
         "addLora": "Add LoRA",
