@@ -1,9 +1,115 @@
 import { deepClone } from 'common/util/deepClone';
 import { set } from 'es-toolkit/compat';
+import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import { describe, expect, it } from 'vitest';
 
 import { add, buildEdge, buildNode, collect, img_resize, main_model_loader, sub, templates } from './testUtils';
 import { validateConnection } from './validateConnection';
+
+const ifTemplate: InvocationTemplate = {
+  title: 'If',
+  type: 'if',
+  version: '1.0.0',
+  tags: [],
+  description: 'Selects between two inputs based on a boolean condition',
+  outputType: 'if_output',
+  inputs: {
+    condition: {
+      name: 'condition',
+      title: 'Condition',
+      required: true,
+      description: 'The condition used to select an input',
+      fieldKind: 'input',
+      input: 'connection',
+      ui_hidden: false,
+      ui_type: 'BooleanField',
+      type: {
+        name: 'BooleanField',
+        cardinality: 'SINGLE',
+        batch: false,
+      },
+      default: false,
+    },
+    true_input: {
+      name: 'true_input',
+      title: 'True Input',
+      required: false,
+      description: 'Selected when condition is true',
+      fieldKind: 'input',
+      input: 'connection',
+      ui_hidden: false,
+      ui_type: 'AnyField',
+      type: {
+        name: 'AnyField',
+        cardinality: 'SINGLE',
+        batch: false,
+      },
+      default: undefined,
+    },
+    false_input: {
+      name: 'false_input',
+      title: 'False Input',
+      required: false,
+      description: 'Selected when condition is false',
+      fieldKind: 'input',
+      input: 'connection',
+      ui_hidden: false,
+      ui_type: 'AnyField',
+      type: {
+        name: 'AnyField',
+        cardinality: 'SINGLE',
+        batch: false,
+      },
+      default: undefined,
+    },
+  },
+  outputs: {
+    value: {
+      fieldKind: 'output',
+      name: 'value',
+      title: 'Output',
+      description: 'The selected value',
+      type: {
+        name: 'AnyField',
+        cardinality: 'SINGLE',
+        batch: false,
+      },
+      ui_hidden: false,
+      ui_type: 'AnyField',
+    },
+  },
+  useCache: true,
+  nodePack: 'invokeai',
+  classification: 'stable',
+};
+
+const floatOutputTemplate: InvocationTemplate = {
+  title: 'Float Output',
+  type: 'float_output',
+  version: '1.0.0',
+  tags: [],
+  description: 'Outputs a float',
+  outputType: 'float_output',
+  inputs: {},
+  outputs: {
+    value: {
+      fieldKind: 'output',
+      name: 'value',
+      title: 'Value',
+      description: 'Float value',
+      type: {
+        name: 'FloatField',
+        cardinality: 'SINGLE',
+        batch: false,
+      },
+      ui_hidden: false,
+      ui_type: 'FloatField',
+    },
+  },
+  useCache: true,
+  nodePack: 'invokeai',
+  classification: 'stable',
+};
 
 describe(validateConnection.name, () => {
   it('should reject invalid connection to self', () => {
@@ -153,6 +259,60 @@ describe(validateConnection.name, () => {
     const c = { source: n1.id, sourceHandle: 'value', target: n2.id, targetHandle: 'image' };
     const r = validateConnection(c, nodes, [], templates, null);
     expect(r).toEqual('nodes.fieldTypesMustMatch');
+  });
+
+  it('should reject mismatched types between if node branch inputs', () => {
+    const n1 = buildNode(add);
+    const n2 = buildNode(img_resize);
+    const n3 = buildNode(ifTemplate);
+    const nodes = [n1, n2, n3];
+    const e1 = buildEdge(n1.id, 'value', n3.id, 'true_input');
+    const edges = [e1];
+    const c = { source: n2.id, sourceHandle: 'image', target: n3.id, targetHandle: 'false_input' };
+    const r = validateConnection(c, nodes, edges, { ...templates, if: ifTemplate }, null);
+    expect(r).toEqual('nodes.fieldTypesMustMatch');
+  });
+
+  it('should reject mismatched types between if node branch inputs regardless of branch order', () => {
+    const n1 = buildNode(add);
+    const n2 = buildNode(img_resize);
+    const n3 = buildNode(ifTemplate);
+    const nodes = [n1, n2, n3];
+    const e1 = buildEdge(n1.id, 'value', n3.id, 'false_input');
+    const edges = [e1];
+    const c = { source: n2.id, sourceHandle: 'image', target: n3.id, targetHandle: 'true_input' };
+    const r = validateConnection(c, nodes, edges, { ...templates, if: ifTemplate }, null);
+    expect(r).toEqual('nodes.fieldTypesMustMatch');
+  });
+
+  it('should accept convertible types between if node branch inputs', () => {
+    const n1 = buildNode(add);
+    const n2 = buildNode(sub);
+    const n3 = buildNode(ifTemplate);
+    const nodes = [n1, n2, n3];
+    const e1 = buildEdge(n1.id, 'value', n3.id, 'true_input');
+    const edges = [e1];
+    const c = { source: n2.id, sourceHandle: 'value', target: n3.id, targetHandle: 'false_input' };
+    const r = validateConnection(c, nodes, edges, { ...templates, if: ifTemplate }, null);
+    expect(r).toEqual(null);
+  });
+
+  it('should accept one-way-convertible types between if node branch inputs in either connection order', () => {
+    const n1 = buildNode(add);
+    const n2 = buildNode(floatOutputTemplate);
+    const n3 = buildNode(ifTemplate);
+    const nodes = [n1, n2, n3];
+    const e1 = buildEdge(n1.id, 'value', n3.id, 'false_input');
+    const edges = [e1];
+    const c = { source: n2.id, sourceHandle: 'value', target: n3.id, targetHandle: 'true_input' };
+    const r = validateConnection(
+      c,
+      nodes,
+      edges,
+      { ...templates, if: ifTemplate, float_output: floatOutputTemplate },
+      null
+    );
+    expect(r).toEqual(null);
   });
 
   it('should reject connections that would create cycles', () => {
