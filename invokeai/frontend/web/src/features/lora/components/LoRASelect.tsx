@@ -5,7 +5,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import type { GroupStatusMap } from 'common/components/Picker/Picker';
 import { loraAdded, selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
-import { selectBase } from 'features/controlLayers/store/paramsSlice';
+import { selectBase, selectMainModelConfig } from 'features/controlLayers/store/paramsSlice';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,14 +23,31 @@ const LoRASelect = () => {
   const addedLoRAModelKeys = useAppSelector(selectLoRAModelKeys);
 
   const currentBaseModel = useAppSelector(selectBase);
+  const currentMainModelConfig = useAppSelector(selectMainModelConfig);
 
-  // Filter to only show compatible LoRAs
+  // Filter to only show compatible LoRAs (by base model and variant)
   const compatibleLoRAs = useMemo(() => {
     if (!currentBaseModel) {
       return EMPTY_ARRAY;
     }
-    return modelConfigs.filter((model) => model.base === currentBaseModel);
-  }, [modelConfigs, currentBaseModel]);
+    return modelConfigs.filter((model) => {
+      if (model.base !== currentBaseModel) {
+        return false;
+      }
+      // For models with variant support: filter by variant when both main model and LoRA have variant info.
+      // LoRAs with no variant (null) are always shown (compatible with all variants).
+      if (
+        currentMainModelConfig &&
+        'variant' in currentMainModelConfig &&
+        currentMainModelConfig.variant &&
+        'variant' in model &&
+        model.variant
+      ) {
+        return model.variant === currentMainModelConfig.variant;
+      }
+      return true;
+    });
+  }, [modelConfigs, currentBaseModel, currentMainModelConfig]);
 
   const getIsDisabled = useCallback(
     (model: LoRAModelConfig): boolean => {

@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useInvertMask } from 'features/controlLayers/hooks/useInvertMask';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
-import { isInpaintMaskEntityIdentifier } from 'features/controlLayers/store/types';
+import { isMaskEntityIdentifier } from 'features/controlLayers/store/types';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSelectionInverseBold } from 'react-icons/pi';
@@ -18,9 +18,14 @@ export const EntityListSelectedEntityActionBarInvertMaskButton = memo(() => {
     return null;
   }
 
-  if (!isInpaintMaskEntityIdentifier(selectedEntityIdentifier)) {
+  if (!isMaskEntityIdentifier(selectedEntityIdentifier)) {
     return null;
   }
+
+  const label =
+    selectedEntityIdentifier.type === 'regional_guidance'
+      ? t('controlLayers.invertRegion', { defaultValue: 'Invert Region' })
+      : t('controlLayers.invertMask');
 
   return (
     <IconButton
@@ -29,8 +34,8 @@ export const EntityListSelectedEntityActionBarInvertMaskButton = memo(() => {
       minW={8}
       variant="link"
       alignSelf="stretch"
-      aria-label={t('controlLayers.invertMask')}
-      tooltip={t('controlLayers.invertMask')}
+      aria-label={label}
+      tooltip={label}
       icon={<PiSelectionInverseBold />}
     />
   );

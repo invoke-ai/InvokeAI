@@ -809,7 +809,20 @@
         "missingFiles": "File mancanti",
         "missingFilesTooltip": "I file del modello sono mancanti dal disco",
         "cpuOnly": "Solo CPU",
-        "runOnCpu": "Esegui il modello di codifica del testo solo sulla CPU"
+        "runOnCpu": "Esegui il modello di codifica del testo solo sulla CPU",
+        "syncModelsTooltip": "Identificare e rimuovere i file modello non utilizzati nella cartella radice di InvokeAI.",
+        "syncModelsDirectory": "Sincronizza la cartella dei modelli",
+        "noOrphanedModels": "La cartella dei modelli è sincronizzata. Nessun file orfano trovato.",
+        "orphanedModelsFound": "Modelli orfani trovati",
+        "orphanedModelsDescription": "Le seguenti cartelle dei modelli non sono referenziate nel database e possono essere eliminate in sicurezza:",
+        "foundOrphanedModels": "Trovata {{count}} cartella di modello orfana",
+        "filesCount": "{{count}} file",
+        "deleteSelected": "Elimina {{count}} selezionati",
+        "deselectAll": "Deseleziona tutto",
+        "orphanedModelsDeleted": "Eliminato con successo {{count}} modello orfano",
+        "orphanedModelsDeleteErrors": "Alcuni modelli non possono essere eliminati",
+        "orphanedModelsDeleteFailed": "Impossibile eliminare i modelli orfani",
+        "errorLoadingOrphanedModels": "Errore durante il caricamento dei modelli orfani. Riprova."
     },
     "parameters": {
         "images": "Immagini",
@@ -1108,7 +1121,7 @@
         "zoomInNodes": "Ingrandire",
         "fitViewportNodes": "Adatta vista",
         "reloadNodeTemplates": "Ricarica i modelli di nodo",
-        "loadWorkflow": "Importa flusso di lavoro JSON",
+        "loadWorkflow": "Importa flusso di lavoro",
         "downloadWorkflow": "Esporta flusso di lavoro JSON",
         "scheduler": "Campionatore",
         "addNode": "Aggiungi nodo",
@@ -1959,7 +1972,8 @@
             "paragraphs": [
                 "Controlla l'entità della modulazione DyPE. Valori più alti = estrapolazione più forte.",
                 "Predefinito: 2.0. Intervallo: 0.0-8.0."
-            ]
+            ],
+            "heading": "DyPE Scala (λs)"
         },
         "fluxDypeExponent": {
             "paragraphs": [
@@ -1967,13 +1981,15 @@
                 "2.0: Consigliato per risoluzioni 4K+. Programmazione aggressiva con transizioni rapide per la pulizia degli artefatti.",
                 "1.0: Buon punto di partenza per risoluzioni ~2K-3K.",
                 "0.5: Programma più delicato per risoluzioni appena superiori a quelle native (1024px)."
-            ]
+            ],
+            "heading": "DyPE Esponente (λt)"
         },
         "cpuOnly": {
             "paragraphs": [
                 "Se abilitato, solo il componente codificatore del testo verrà eseguito sulla CPU anziché sulla GPU.",
                 "Ciò consente di risparmiare VRAM per il denoiser, con un impatto minimo sulle prestazioni. Le uscite di condizionamento vengono automaticamente trasferite alla GPU per il denoiser."
-            ]
+            ],
+            "heading": "Solo CPU"
         }
     },
     "sdxl": {
@@ -2721,7 +2737,41 @@
         "extractMaskedAreaMissingData": "Impossibile estrarre: mancano i dati dell'immagine o della maschera.",
         "extractMaskedAreaFailed": "Impossibile estrarre l'area mascherata.",
         "maskLayerEmpty": "Il livello maschera è vuoto",
-        "extractRegion": "Estrai regione"
+        "extractRegion": "Estrai regione",
+        "compositeOperation": {
+            "label": "Modalità di fusione",
+            "add": "Aggiungi modalità di fusione",
+            "remove": "Rimuovi modalità di fusione",
+            "blendModes": {
+                "color": "Colore",
+                "hue": "Tonalità",
+                "source-over": "Normale",
+                "overlay": "Sovrapponi",
+                "soft-light": "Luce soffusa",
+                "hard-light": "Luce intensa",
+                "screen": "Schermo",
+                "color-burn": "Brucia colore",
+                "color-dodge": "Schiarisci colore",
+                "multiply": "Moltiplica",
+                "darken": "Scurisci",
+                "lighten": "Schiarisci",
+                "difference": "Differenza",
+                "luminosity": "Luminosità",
+                "saturation": "Saturazione"
+            }
+        },
+        "booleanOps": {
+            "label": "Operazioni booleane",
+            "intersect": "Intersezione",
+            "cutout": "Ritaglia",
+            "cutaway": "Taglia via",
+            "exclude": "Escludi"
+        },
+        "gradient": {
+            "linear": "Lineare",
+            "radial": "Radiale",
+            "clip": "Ritaglia gradiente"
+        }
     },
     "ui": {
         "tabs": {
