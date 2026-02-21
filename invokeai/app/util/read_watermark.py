@@ -18,9 +18,9 @@ def read_watermark() -> None:
     parser.add_argument(
         "--length",
         type=int,
-        default=32,
+        default=8,
         metavar="BYTES",
-        help="Expected watermark length in bytes (default: %(default)s).",
+        help="Expected watermark length in bytes (default: %(default)s, matching the default 'InvokeAI' watermark text).",
     )
     args = parser.parse_args()
 

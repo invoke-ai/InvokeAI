@@ -27,12 +27,12 @@ class InvisibleWatermark:
         return Image.fromarray(cv2.cvtColor(bgr_encoded, cv2.COLOR_BGR2RGB)).convert("RGBA")
 
     @classmethod
-    def decode_watermark(cls, image: Image.Image, watermark_length: int = 32) -> str:
+    def decode_watermark(cls, image: Image.Image, watermark_length: int = 8) -> str:
         """Decode an invisible watermark from an image.
 
         Args:
             image: The PIL image to decode the watermark from.
-            watermark_length: The length of the watermark in bytes (default 32).
+            watermark_length: The length of the watermark in bytes (default 8, matching the default "InvokeAI" watermark text).
 
         Returns:
             The decoded watermark text, or an empty string if decoding fails.
