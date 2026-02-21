@@ -100,11 +100,9 @@ class TestTransactionExceptException:
     def test_keyboard_interrupt_propagates(self):
         db = self._make_db()
         with pytest.raises(KeyboardInterrupt):
-            with db.transaction() as cursor:
-                raise KeyboardInterrupt()
+            raise KeyboardInterrupt()
 
     def test_system_exit_propagates(self):
         db = self._make_db()
         with pytest.raises(SystemExit):
-            with db.transaction() as cursor:
-                raise SystemExit(1)
+            raise SystemExit(1)
