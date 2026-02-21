@@ -98,11 +98,9 @@ class TestTransactionExceptException:
             assert cursor.fetchone() is None
 
     def test_keyboard_interrupt_propagates(self):
-        db = self._make_db()
         with pytest.raises(KeyboardInterrupt):
             raise KeyboardInterrupt()
 
     def test_system_exit_propagates(self):
-        db = self._make_db()
         with pytest.raises(SystemExit):
             raise SystemExit(1)
