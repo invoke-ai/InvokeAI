@@ -231,6 +231,7 @@ export type paths = {
          *     * "waiting" -- Job is waiting in the queue to run
          *     * "downloading" -- Model file(s) are downloading
          *     * "running" -- Model has downloaded and the model probing and registration process is running
+         *     * "paused" -- Job is paused and can be resumed
          *     * "completed" -- Installation completed successfully
          *     * "error" -- An error occurred. Details will be in the "error_type" and "error" fields.
          *     * "cancelled" -- Job was cancelled before completion.
@@ -323,6 +324,86 @@ export type paths = {
          * @description Cancel the model install job(s) corresponding to the given job ID.
          */
         delete: operations["cancel_model_install_job"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/install/{id}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pause Model Install Job
+         * @description Pause the model install job corresponding to the given job ID.
+         */
+        post: operations["pause_model_install_job"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/install/{id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume Model Install Job
+         * @description Resume a paused model install job corresponding to the given job ID.
+         */
+        post: operations["resume_model_install_job"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/install/{id}/restart_failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restart Failed Model Install Job
+         * @description Restart failed or non-resumable file downloads for the given job.
+         */
+        post: operations["restart_failed_model_install_job"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/install/{id}/restart_file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restart Model Install File
+         * @description Restart a specific file download for the given job.
+         */
+        post: operations["restart_model_install_file"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -7127,13 +7208,71 @@ export type components = {
              * @description Content type of downloaded file
              */
             content_type?: string | null;
+            /**
+             * Canonical Url
+             * @description Canonical URL to request on resume
+             */
+            canonical_url?: string | null;
+            /**
+             * Etag
+             * @description ETag from the remote server, if available
+             */
+            etag?: string | null;
+            /**
+             * Last Modified
+             * @description Last-Modified from the remote server, if available
+             */
+            last_modified?: string | null;
+            /**
+             * Final Url
+             * @description Final resolved URL after redirects, if available
+             */
+            final_url?: string | null;
+            /**
+             * Expected Total Bytes
+             * @description Expected total size of the download
+             */
+            expected_total_bytes?: number | null;
+            /**
+             * Resume Required
+             * @description True if server refused resume; restart required
+             * @default false
+             */
+            resume_required?: boolean;
+            /**
+             * Resume Message
+             * @description Message explaining why resume is required
+             */
+            resume_message?: string | null;
+            /**
+             * Resume From Scratch
+             * @description True if resume metadata existed but the partial file was missing and the download restarted from the beginning
+             * @default false
+             */
+            resume_from_scratch?: boolean;
         };
         /**
          * DownloadJobStatus
          * @description State of a download job.
          * @enum {string}
          */
-        DownloadJobStatus: "waiting" | "running" | "completed" | "cancelled" | "error";
+        DownloadJobStatus: "waiting" | "running" | "paused" | "completed" | "cancelled" | "error";
+        /**
+         * DownloadPausedEvent
+         * @description Event model for download_paused
+         */
+        DownloadPausedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Source
+             * @description The source of the download
+             */
+            source: string;
+        };
         /**
          * DownloadProgressEvent
          * @description Event model for download_progress
@@ -12876,7 +13015,7 @@ export type components = {
          * @description State of an install job running in the background.
          * @enum {string}
          */
-        InstallStatus: "waiting" | "downloading" | "downloads_done" | "running" | "completed" | "error" | "cancelled";
+        InstallStatus: "waiting" | "downloading" | "downloads_done" | "running" | "paused" | "completed" | "error" | "cancelled";
         /**
          * Integer Batch
          * @description Create a batched generation, where the workflow is executed once for each integer in the batch.
@@ -28453,6 +28592,166 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description No such job */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pause_model_install_job: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Model install job ID */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The job was paused successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelInstallJob"];
+                };
+            };
+            /** @description No such job */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resume_model_install_job: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Model install job ID */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The job was resumed successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelInstallJob"];
+                };
+            };
+            /** @description No such job */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restart_failed_model_install_job: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Model install job ID */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Failed files restarted successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelInstallJob"];
+                };
+            };
+            /** @description No such job */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restart_model_install_file: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Model install job ID */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description File restarted successfully */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelInstallJob"];
                 };
             };
             /** @description No such job */

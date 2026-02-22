@@ -11,6 +11,7 @@ from invokeai.app.services.events.events_common import (
     DownloadCancelledEvent,
     DownloadCompleteEvent,
     DownloadErrorEvent,
+    DownloadPausedEvent,
     DownloadProgressEvent,
     DownloadStartedEvent,
     EventBase,
@@ -134,6 +135,10 @@ class EventServiceBase:
     def emit_download_cancelled(self, job: "DownloadJob") -> None:
         """Emitted when a download is cancelled"""
         self.dispatch(DownloadCancelledEvent.build(job))
+
+    def emit_download_paused(self, job: "DownloadJob") -> None:
+        """Emitted when a download is paused"""
+        self.dispatch(DownloadPausedEvent.build(job))
 
     def emit_download_error(self, job: "DownloadJob") -> None:
         """Emitted when a download encounters an error"""
