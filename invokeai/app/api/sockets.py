@@ -35,6 +35,7 @@ from invokeai.app.services.events.events_common import (
     QueueClearedEvent,
     QueueEventBase,
     QueueItemStatusChangedEvent,
+    RecallParametersUpdatedEvent,
     register_events,
 )
 
@@ -61,6 +62,7 @@ QUEUE_EVENTS = {
     QueueItemStatusChangedEvent,
     BatchEnqueuedEvent,
     QueueClearedEvent,
+    RecallParametersUpdatedEvent,
 }
 
 MODEL_EVENTS = {

@@ -68,7 +68,8 @@ export type SchedulerField = z.infer<typeof zSchedulerField>;
 // Flux-specific scheduler options (Flow Matching schedulers)
 export const zFluxSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 
-// Z-Image scheduler options (Flow Matching schedulers, same as Flux)
+// Z-Image scheduler options (Flow Matching schedulers)
+// Note: LCM is only supported for Z-Image Turbo, not for Z-Image Base (undistilled)
 export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 
 // Flux DyPE (Dynamic Position Extrapolation) preset options for high-resolution generation
@@ -140,12 +141,14 @@ export const zClipVariantType = z.enum(['large', 'gigantic']);
 export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
 export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
 export const zFlux2VariantType = z.enum(['klein_4b', 'klein_9b', 'klein_9b_base']);
+export const zZImageVariantType = z.enum(['turbo', 'zbase']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b']);
 export const zAnyModelVariant = z.union([
   zModelVariantType,
   zClipVariantType,
   zFluxVariantType,
   zFlux2VariantType,
+  zZImageVariantType,
   zQwen3VariantType,
 ]);
 export type AnyModelVariant = z.infer<typeof zAnyModelVariant>;
