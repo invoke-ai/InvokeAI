@@ -16,6 +16,7 @@ import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { ExpandPromptButton } from 'features/prompt/ExpandPromptButton';
 import { ImageToPromptButton } from 'features/prompt/ImageToPromptButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
+import { clearPromptUndo, consumePromptUndo } from 'features/prompt/promptUndo';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { usePromptAttentionHotkeys } from 'features/prompt/usePromptAttentionHotkeys';
 import {
@@ -138,14 +139,40 @@ export const ParamPositivePrompt = memo(() => {
       // When the user changes the prompt, reset the prompt history state. This event is not fired when the prompt is
       // changed via the prompt history navigation.
       promptHistoryApi.reset();
+      // Clear LLM undo state when the user types manually
+      clearPromptUndo();
     },
     [dispatch, promptHistoryApi]
   );
-  const { onChange, isOpen, onClose, onOpen, onSelect, onKeyDown, onFocus } = usePrompt({
+  const {
+    onChange,
+    isOpen,
+    onClose,
+    onOpen,
+    onSelect,
+    onKeyDown: onKeyDownPrompt,
+    onFocus,
+  } = usePrompt({
     prompt,
     textareaRef: textareaRef,
     onChange: handleChange,
   });
+
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      // Intercept Ctrl+Z to undo LLM prompt changes
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        const previousPrompt = consumePromptUndo();
+        if (previousPrompt !== null) {
+          e.preventDefault();
+          dispatch(positivePromptChanged(previousPrompt));
+          return;
+        }
+      }
+      onKeyDownPrompt(e);
+    },
+    [dispatch, onKeyDownPrompt]
+  );
 
   // When the user clicks away from the textarea, reset the prompt history state.
   useClickAway(textareaRef, promptHistoryApi.reset);

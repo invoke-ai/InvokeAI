@@ -17,6 +17,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { positivePromptChanged, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
+import { setPromptUndo } from 'features/prompt/promptUndo';
 import { memo, useCallback, useState } from 'react';
 import { PiSparkleBold } from 'react-icons/pi';
 import { useExpandPromptMutation } from 'services/api/endpoints/utilities';
@@ -49,6 +50,7 @@ export const ExpandPromptButton = memo(() => {
         model_key: selectedModel.key,
       }).unwrap();
       if (result.expanded_prompt) {
+        setPromptUndo(prompt);
         dispatch(positivePromptChanged(result.expanded_prompt));
       }
       popover.close();

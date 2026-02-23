@@ -14,11 +14,12 @@ import {
   Text,
   Tooltip,
 } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
-import { positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
+import { positivePromptChanged, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
+import { setPromptUndo } from 'features/prompt/promptUndo';
 import { memo, useCallback, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import { useImageToPromptMutation } from 'services/api/endpoints/utilities';
@@ -31,6 +32,7 @@ const loadingStyles: SystemStyleObject = {
 
 export const ImageToPromptButton = memo(() => {
   const dispatch = useAppDispatch();
+  const currentPrompt = useAppSelector(selectPositivePrompt);
   const [modelConfigs] = useLlavaModels();
   const popover = useDisclosure(false);
   const [selectedModel, setSelectedModel] = useState<AnyModelConfig | undefined>(undefined);
@@ -60,6 +62,7 @@ export const ImageToPromptButton = memo(() => {
         model_key: selectedModel.key,
       }).unwrap();
       if (result.prompt) {
+        setPromptUndo(currentPrompt);
         dispatch(positivePromptChanged(result.prompt));
       }
       popover.close();
@@ -67,7 +70,7 @@ export const ImageToPromptButton = memo(() => {
     } catch {
       // Error is handled by RTK Query
     }
-  }, [selectedModel, uploadedImage, imageToPrompt, dispatch, popover]);
+  }, [selectedModel, uploadedImage, imageToPrompt, dispatch, popover, currentPrompt]);
 
   const handleClose = useCallback(() => {
     popover.close();

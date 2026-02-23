@@ -1,6 +1,6 @@
 """Tests for the TextLLMPipeline class."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import torch
 
