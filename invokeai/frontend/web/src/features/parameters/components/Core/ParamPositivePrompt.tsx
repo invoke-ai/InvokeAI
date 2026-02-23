@@ -13,6 +13,8 @@ import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel'
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
+import { ExpandPromptButton } from 'features/prompt/ExpandPromptButton';
+import { ImageToPromptButton } from 'features/prompt/ImageToPromptButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { usePromptAttentionHotkeys } from 'features/prompt/usePromptAttentionHotkeys';
@@ -224,6 +226,8 @@ export const ParamPositivePrompt = memo(() => {
             <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">
               <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
               <ShowDynamicPromptsPreviewButton />
+              <ExpandPromptButton />
+              <ImageToPromptButton />
               <PositivePromptHistoryIconButton />
               {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
             </Flex>

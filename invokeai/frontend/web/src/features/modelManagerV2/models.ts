@@ -16,6 +16,7 @@ import {
   isSpandrelImageToImageModelConfig,
   isT2IAdapterModelConfig,
   isT5EncoderModelConfig,
+  isTextLLMModelConfig,
   isTIModelConfig,
   isUnknownModelConfig,
   isVAEModelConfig,
@@ -121,6 +122,11 @@ export const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
     i18nKey: 'modelManager.llavaOnevision',
     filter: isLLaVAModelConfig,
   },
+  text_llm: {
+    category: 'text_llm',
+    i18nKey: 'modelManager.textLLM',
+    filter: isTextLLMModelConfig,
+  },
 };
 
 export const MODEL_CATEGORIES_AS_LIST = objectEntries(MODEL_CATEGORIES).map(([category, { i18nKey, filter }]) => ({
@@ -167,6 +173,7 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   clip_embed: 'CLIP Embed',
   siglip: 'SigLIP',
   flux_redux: 'FLUX Redux',
+  text_llm: 'Text LLM',
   unknown: 'Unknown',
 };
 

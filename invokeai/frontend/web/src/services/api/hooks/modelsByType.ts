@@ -20,12 +20,14 @@ import {
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
+  isLLaVAModelConfig,
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
   isQwen3EncoderModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
+  isTextLLMModelConfig,
   isTIModelConfig,
   isVAEModelConfigOrSubmodel,
   isZImageDiffusersMainModelConfig,
@@ -106,3 +108,5 @@ export const selectRegionalRefImageModels = buildModelsSelector(
 export const selectQwen3EncoderModels = buildModelsSelector(isQwen3EncoderModelConfig);
 export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
+export const useTextLLMModels = () => buildModelsHook(isTextLLMModelConfig)();
+export const useLlavaModels = () => buildModelsHook(isLLaVAModelConfig)();
