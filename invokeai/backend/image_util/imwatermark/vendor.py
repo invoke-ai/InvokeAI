@@ -50,7 +50,9 @@ class WatermarkEncoder(object):
         self.set_by_bytes(content)
         self._wmType = "b16"
 
-    def set_by_bits(self, bits=[]):
+    def set_by_bits(self, bits=None):
+        if bits is None:
+            bits = []
         self._watermarks = [int(bit) % 2 for bit in bits]
         self._wmLen = len(self._watermarks)
         self._wmType = "bits"
@@ -177,7 +179,11 @@ class WatermarkDecoder(object):
 
 
 class EmbedMaxDct(object):
-    def __init__(self, watermarks=[], wmLen=8, scales=[0, 36, 36], block=4):
+    def __init__(self, watermarks=None, wmLen=8, scales=None, block=4):
+        if watermarks is None:
+            watermarks = []
+        if scales is None:
+            scales = [0, 36, 36]
         self._watermarks = watermarks
         self._wmLen = wmLen
         self._scales = scales
