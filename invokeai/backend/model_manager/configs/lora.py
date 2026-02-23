@@ -94,7 +94,8 @@ def _is_flux2_lora(mod: ModelOnDisk) -> bool:
 
 def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
     """Check state dict tensor shapes for FLUX.2 Klein-specific dimensions."""
-    # Check diffusers/PEFT format keys (with various prefixes)
+    # Check diffusers/PEFT format keys (with various prefixes).
+    # This covers both Flux.1 diffusers naming AND Flux2 Klein diffusers naming.
     for prefix in ["transformer.", "base_model.model.", ""]:
         # Check context_embedder (txt_in) dimensions
         # FLUX.1: context_in_dim=4096, FLUX.2 Klein 4B: 7680, Klein 9B: 12288
@@ -108,28 +109,42 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
         if vec_key_a in state_dict:
             return state_dict[vec_key_a].shape[1] in _FLUX2_VEC_IN_DIMS
 
-    # Check BFL PEFT format (diffusion_model.* prefix)
+        # Check Flux2 Klein diffusers naming: fused QKV+MLP in single blocks.
+        # This key only exists in Flux2 models (Flux.1 uses separate to_q/to_k/to_v + proj_mlp).
+        fused_key_a = f"{prefix}single_transformer_blocks.0.attn.to_qkv_mlp_proj.lora_A.weight"
+        if fused_key_a in state_dict:
+            return True
+
+        # Check Flux2 Klein diffusers naming: ff.linear_in (Flux.1 uses ff.net.0.proj).
+        ff_key_a = f"{prefix}transformer_blocks.0.ff.linear_in.lora_A.weight"
+        if ff_key_a in state_dict:
+            return True
+
+    # Check BFL PEFT format (diffusion_model.* or base_model.model.* prefix with BFL layer names).
     # Klein 9B has hidden_size=4096 (vs 3072 for FLUX.1 and Klein 4B).
-    # We can detect Klein 9B by checking attention projection dimensions.
-    # Klein 4B has same hidden_size as FLUX.1 (3072) but different mlp_ratio (6 vs 4).
+    # Klein 4B has same hidden_size as FLUX.1 (3072) but different mlp_ratio (6 vs 4),
+    # and different txt_in/vector_in dimensions.
+    _bfl_prefixes = ("diffusion_model.", "base_model.model.")
     bfl_hidden_size: int | None = None
     for key in state_dict:
         if not isinstance(key, str):
             continue
+        if not key.startswith(_bfl_prefixes):
+            continue
 
-        # BFL PEFT format: diffusion_model.double_blocks.X.img_attn.proj.lora_A.weight
-        if key.startswith("diffusion_model.") and key.endswith(".img_attn.proj.lora_A.weight"):
+        # BFL PEFT: attention projection → check hidden_size
+        if key.endswith(".img_attn.proj.lora_A.weight"):
             bfl_hidden_size = state_dict[key].shape[1]
             if bfl_hidden_size != _FLUX1_HIDDEN_SIZE:
                 return True
-            break  # Found the key but it's FLUX.1-sized, check other indicators
+            # hidden_size=3072 is ambiguous (could be Klein 4B or FLUX.1), keep checking
 
-        # BFL PEFT format: context_embedder/txt_in
-        if key.startswith("diffusion_model.") and "txt_in" in key and key.endswith("lora_A.weight"):
+        # BFL PEFT: context_embedder/txt_in
+        elif "txt_in" in key and key.endswith("lora_A.weight"):
             return state_dict[key].shape[1] in _FLUX2_CONTEXT_IN_DIMS
 
-        # BFL PEFT format: vector_in
-        if key.startswith("diffusion_model.") and "vector_in" in key and key.endswith("lora_A.weight"):
+        # BFL PEFT: vector_in
+        elif "vector_in" in key and key.endswith("lora_A.weight"):
             return state_dict[key].shape[1] in _FLUX2_VEC_IN_DIMS
 
     # BFL PEFT: hidden_size matches FLUX.1. Check MLP ratio to distinguish Klein 4B.
@@ -138,7 +153,7 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
         for key in state_dict:
             if not isinstance(key, str):
                 continue
-            if key.startswith("diffusion_model.") and key.endswith(".img_mlp.0.lora_B.weight"):
+            if key.startswith(_bfl_prefixes) and key.endswith(".img_mlp.0.lora_B.weight"):
                 ffn_dim = state_dict[key].shape[0]
                 if ffn_dim != bfl_hidden_size * _FLUX1_MLP_RATIO:
                     return True
@@ -199,7 +214,7 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
                 return Flux2VariantType.Klein9B
             return None
 
-        # Attention projection hidden_size
+        # Attention projection hidden_size (Flux.1 diffusers naming)
         attn_key_a = f"{prefix}transformer_blocks.0.attn.to_out.0.lora_A.weight"
         if attn_key_a in state_dict:
             dim = state_dict[attn_key_a].shape[1]
@@ -209,13 +224,36 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
                 return Flux2VariantType.Klein9B
             return None
 
-    # Check BFL PEFT format (diffusion_model.* prefix)
+        # Attention projection hidden_size (Flux2 Klein diffusers naming)
+        attn_key_a2 = f"{prefix}transformer_blocks.0.attn.to_add_out.lora_A.weight"
+        if attn_key_a2 in state_dict:
+            dim = state_dict[attn_key_a2].shape[1]
+            if dim == KLEIN_4B_HIDDEN_SIZE:
+                return Flux2VariantType.Klein4B
+            if dim == KLEIN_9B_HIDDEN_SIZE:
+                return Flux2VariantType.Klein9B
+            return None
+
+        # Fused QKV+MLP hidden_size (Flux2 Klein diffusers naming)
+        fused_key_a = f"{prefix}single_transformer_blocks.0.attn.to_qkv_mlp_proj.lora_A.weight"
+        if fused_key_a in state_dict:
+            dim = state_dict[fused_key_a].shape[1]
+            if dim == KLEIN_4B_HIDDEN_SIZE:
+                return Flux2VariantType.Klein4B
+            if dim == KLEIN_9B_HIDDEN_SIZE:
+                return Flux2VariantType.Klein9B
+            return None
+
+    # Check BFL PEFT format (diffusion_model.* or base_model.model.* prefix with BFL names)
+    _bfl_prefixes = ("diffusion_model.", "base_model.model.")
     for key in state_dict:
         if not isinstance(key, str):
             continue
+        if not key.startswith(_bfl_prefixes):
+            continue
 
         # BFL PEFT: context embedder (txt_in)
-        if key.startswith("diffusion_model.") and "txt_in" in key and key.endswith("lora_A.weight"):
+        if "txt_in" in key and key.endswith("lora_A.weight"):
             dim = state_dict[key].shape[1]
             if dim == KLEIN_4B_CONTEXT_DIM:
                 return Flux2VariantType.Klein4B
@@ -224,7 +262,7 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
             return None
 
         # BFL PEFT: vector embedder (vector_in)
-        if key.startswith("diffusion_model.") and "vector_in" in key and key.endswith("lora_A.weight"):
+        if "vector_in" in key and key.endswith("lora_A.weight"):
             dim = state_dict[key].shape[1]
             if dim == KLEIN_4B_VEC_DIM:
                 return Flux2VariantType.Klein4B
@@ -233,7 +271,7 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
             return None
 
         # BFL PEFT: attention projection
-        if key.startswith("diffusion_model.") and key.endswith(".img_attn.proj.lora_A.weight"):
+        if key.endswith(".img_attn.proj.lora_A.weight"):
             dim = state_dict[key].shape[1]
             if dim == KLEIN_4B_HIDDEN_SIZE:
                 return Flux2VariantType.Klein4B

@@ -35,7 +35,9 @@ from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import (
     lora_model_from_flux_control_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
+    is_state_dict_flux2_diffusers_format,
     is_state_dict_likely_in_flux_diffusers_format,
+    lora_model_from_flux2_diffusers_state_dict,
     lora_model_from_flux_diffusers_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
@@ -118,7 +120,12 @@ class LoRALoader(ModelLoader):
                 model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
             elif config.format is ModelFormat.LyCORIS:
                 if is_state_dict_likely_in_flux_diffusers_format(state_dict=state_dict):
-                    model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
+                    if is_state_dict_flux2_diffusers_format(state_dict=state_dict):
+                        # Flux2 Klein native diffusers naming (to_qkv_mlp_proj, ff.linear_in, etc.)
+                        model = lora_model_from_flux2_diffusers_state_dict(state_dict=state_dict, alpha=None)
+                    else:
+                        # Flux.1 diffusers naming (to_q/to_k/to_v, ff.net.0.proj, etc.)
+                        model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
                 elif is_state_dict_likely_in_flux_kohya_format(state_dict=state_dict):
                     model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_in_flux_onetrainer_format(state_dict=state_dict):

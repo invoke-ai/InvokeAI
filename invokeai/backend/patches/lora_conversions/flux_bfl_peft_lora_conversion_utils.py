@@ -23,13 +23,18 @@ from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
-# The prefix used in BFL PEFT format LoRAs
+# The prefixes used in BFL PEFT format LoRAs.
+# Most commonly "diffusion_model.", but some PEFT-wrapped variants use "base_model.model.".
 _BFL_PEFT_PREFIX = "diffusion_model."
+_PEFT_BASE_MODEL_PREFIX = "base_model.model."
+_BFL_PEFT_PREFIXES = (_BFL_PEFT_PREFIX, _PEFT_BASE_MODEL_PREFIX)
 
 # Key patterns that identify FLUX architecture in BFL format
 _BFL_FLUX_BLOCK_PREFIXES = (
     f"{_BFL_PEFT_PREFIX}double_blocks.",
     f"{_BFL_PEFT_PREFIX}single_blocks.",
+    f"{_PEFT_BASE_MODEL_PREFIX}double_blocks.",
+    f"{_PEFT_BASE_MODEL_PREFIX}single_blocks.",
 )
 
 # Regex patterns for converting BFL layer names to diffusers naming (for FLUX.2 Klein).
@@ -57,7 +62,9 @@ _SINGLE_BLOCK_RENAMES: dict[str, str] = {
 def is_state_dict_likely_in_flux_bfl_peft_format(state_dict: dict[str | int, torch.Tensor]) -> bool:
     """Checks if the provided state dict is likely in the BFL PEFT FLUX LoRA format.
 
-    This format uses 'diffusion_model.' prefix with BFL key names and PEFT LoRA suffixes.
+    This format uses BFL key names (double_blocks, single_blocks, img_attn, etc.) with PEFT LoRA
+    suffixes (lora_A.weight, lora_B.weight). The keys may be prefixed with either 'diffusion_model.'
+    (common for ComfyUI/SimpleTuner) or 'base_model.model.' (PEFT-wrapped variant).
     """
     str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
     if not str_keys:
@@ -68,15 +75,23 @@ def is_state_dict_likely_in_flux_bfl_peft_format(state_dict: dict[str | int, tor
     if not all_peft:
         return False
 
-    # Must have at least some keys with the diffusion_model. prefix and FLUX block structure
+    # Must have at least some keys with FLUX block structure (double_blocks/single_blocks)
     has_flux_blocks = any(k.startswith(_BFL_FLUX_BLOCK_PREFIXES) for k in str_keys)
     if not has_flux_blocks:
         return False
 
-    # All keys should start with the diffusion_model. prefix
-    all_have_prefix = all(k.startswith(_BFL_PEFT_PREFIX) for k in str_keys)
+    # All keys should share the same recognized prefix
+    all_have_prefix = all(k.startswith(_BFL_PEFT_PREFIXES) for k in str_keys)
 
     return all_have_prefix
+
+
+def _strip_bfl_peft_prefix(key: str) -> str:
+    """Strip the BFL PEFT prefix ('diffusion_model.' or 'base_model.model.') from a key."""
+    for prefix in _BFL_PEFT_PREFIXES:
+        if key.startswith(prefix):
+            return key[len(prefix) :]
+    return key
 
 
 def lora_model_from_flux_bfl_peft_state_dict(
@@ -84,15 +99,15 @@ def lora_model_from_flux_bfl_peft_state_dict(
 ) -> ModelPatchRaw:
     """Convert a BFL PEFT format FLUX LoRA state dict to a ModelPatchRaw.
 
-    The conversion is straightforward: strip the 'diffusion_model.' prefix to get
-    the BFL internal key names, which are already the format used by InvokeAI internally.
+    The conversion is straightforward: strip the prefix ('diffusion_model.' or 'base_model.model.')
+    to get the BFL internal key names, which are already the format used by InvokeAI internally.
     """
     # Group keys by layer
     grouped_state_dict: dict[str, dict[str, torch.Tensor]] = {}
     for key, value in state_dict.items():
-        # Strip the diffusion_model. prefix
-        if isinstance(key, str) and key.startswith(_BFL_PEFT_PREFIX):
-            key = key[len(_BFL_PEFT_PREFIX) :]
+        # Strip the prefix
+        if isinstance(key, str):
+            key = _strip_bfl_peft_prefix(key)
 
         # Split off the lora_A.weight / lora_B.weight suffix
         parts = key.rsplit(".", maxsplit=2)
@@ -137,11 +152,11 @@ def lora_model_from_flux2_bfl_peft_state_dict(
     This function converts BFL PEFT keys to diffusers naming and splits fused QKV LoRAs
     into separate Q/K/V LoRA layers.
     """
-    # First, strip the diffusion_model. prefix and group by BFL layer name with PEFT→InvokeAI naming.
+    # First, strip the prefix and group by BFL layer name with PEFT→InvokeAI naming.
     grouped_state_dict: dict[str, dict[str, torch.Tensor]] = {}
     for key, value in state_dict.items():
-        if isinstance(key, str) and key.startswith(_BFL_PEFT_PREFIX):
-            key = key[len(_BFL_PEFT_PREFIX) :]
+        if isinstance(key, str):
+            key = _strip_bfl_peft_prefix(key)
 
         parts = key.rsplit(".", maxsplit=2)
         layer_name = parts[0]
