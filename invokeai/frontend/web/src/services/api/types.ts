@@ -92,7 +92,7 @@ export type CLIPLEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_e
 export type CLIPGEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_embed'; variant: 'gigantic' }>;
 export type CLIPEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_embed' }>;
 export type LlavaOnevisionModelConfig = Extract<S['AnyModelConfig'], { type: 'llava_onevision' }>;
-type TextLLMModelConfig = Extract<S['AnyModelConfig'], { type: 'text_llm' }>;
+export type TextLLMModelConfig = Extract<S['AnyModelConfig'], { type: 'text_llm' }>;
 export type T5EncoderModelConfig = Extract<S['AnyModelConfig'], { type: 't5_encoder' }>;
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
   S['AnyModelConfig'],

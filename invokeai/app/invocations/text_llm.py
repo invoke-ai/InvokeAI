@@ -53,11 +53,12 @@ class TextLLMInvocation(BaseInvocation):
             tokenizer = AutoTokenizer.from_pretrained(model_abs_path, local_files_only=True)
 
             pipeline = TextLLMPipeline(model, tokenizer)
+            model_device = next(model.parameters()).device
             output = pipeline.run(
                 prompt=self.prompt,
                 system_prompt=self.system_prompt,
                 max_new_tokens=self.max_tokens,
-                device=TorchDevice.choose_torch_device(),
+                device=model_device,
                 dtype=TorchDevice.choose_torch_dtype(),
             )
 

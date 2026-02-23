@@ -91,11 +91,12 @@ def _run_expand_prompt(prompt: str, model_key: str, max_tokens: int, system_prom
         tokenizer = AutoTokenizer.from_pretrained(model_abs_path, local_files_only=True)
 
         pipeline = TextLLMPipeline(model, tokenizer)
+        model_device = next(model.parameters()).device
         output = pipeline.run(
             prompt=prompt,
             system_prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
             max_new_tokens=max_tokens,
-            device=TorchDevice.choose_torch_device(),
+            device=model_device,
             dtype=TorchDevice.choose_torch_dtype(),
         )
 
@@ -158,10 +159,11 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
         assert isinstance(processor, LlavaOnevisionProcessor)
 
         pipeline = LlavaOnevisionPipeline(model, processor)
+        model_device = next(model.parameters()).device
         output = pipeline.run(
             prompt=instruction,
             images=[image],
-            device=TorchDevice.choose_torch_device(),
+            device=model_device,
             dtype=TorchDevice.choose_torch_dtype(),
         )
 
