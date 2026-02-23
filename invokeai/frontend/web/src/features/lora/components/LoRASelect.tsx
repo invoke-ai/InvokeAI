@@ -25,7 +25,7 @@ const LoRASelect = () => {
   const currentBaseModel = useAppSelector(selectBase);
   const currentMainModelConfig = useAppSelector(selectMainModelConfig);
 
-  // Filter to only show compatible LoRAs
+  // Filter to only show compatible LoRAs (by base model and variant)
   const compatibleLoRAs = useMemo(() => {
     if (!currentBaseModel) {
       return EMPTY_ARRAY;

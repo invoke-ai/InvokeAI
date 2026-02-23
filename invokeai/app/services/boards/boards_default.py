@@ -17,7 +17,7 @@ class BoardService(BoardServiceABC):
         board_name: str,
     ) -> BoardDTO:
         board_record = self.__invoker.services.board_records.save(board_name)
-        return board_record_to_dto(board_record, None, 0, 0, 0)
+        return board_record_to_dto(board_record, None, 0, 0)
 
     def get_dto(self, board_id: str) -> BoardDTO:
         board_record = self.__invoker.services.board_records.get(board_id)

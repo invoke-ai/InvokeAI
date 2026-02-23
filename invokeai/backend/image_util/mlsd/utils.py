@@ -569,13 +569,13 @@ def pred_squares(image,
         new_segments[:, 1] = new_segments[:, 1] * 2 / input_shape[0] * original_shape[0]
         new_segments[:, 2] = new_segments[:, 2] * 2 / input_shape[1] * original_shape[1]
         new_segments[:, 3] = new_segments[:, 3] * 2 / input_shape[0] * original_shape[0]
-    except:
+    except Exception:
         new_segments = []
 
     try:
         squares[:, :, 0] = squares[:, :, 0] * 2 / input_shape[1] * original_shape[1]
         squares[:, :, 1] = squares[:, :, 1] * 2 / input_shape[0] * original_shape[0]
-    except:
+    except Exception:
         squares = []
         score_array = []
 
@@ -583,7 +583,7 @@ def pred_squares(image,
         inter_points = np.array(inter_points)
         inter_points[:, 0] = inter_points[:, 0] * 2 / input_shape[1] * original_shape[1]
         inter_points[:, 1] = inter_points[:, 1] * 2 / input_shape[0] * original_shape[0]
-    except:
+    except Exception:
         inter_points = []
 
     return new_segments, squares, score_array, inter_points
