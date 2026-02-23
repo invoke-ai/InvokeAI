@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional
 
+import torch
 from transformers import AutoModelForCausalLM
 
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -21,6 +22,11 @@ class TextLLMModelLoader(ModelLoader):
         if submodel_type is not None:
             raise ValueError("Unexpected submodel requested for TextLLM model.")
 
+        # Use float32 for CPU-only models since CPU fp16 is emulated and slow.
+        dtype = self._torch_dtype
+        if getattr(config, "cpu_only", False) is True:
+            dtype = torch.float32
+
         model_path = Path(config.path)
-        model = AutoModelForCausalLM.from_pretrained(model_path, local_files_only=True, torch_dtype=self._torch_dtype)
+        model = AutoModelForCausalLM.from_pretrained(model_path, local_files_only=True, torch_dtype=dtype)
         return model

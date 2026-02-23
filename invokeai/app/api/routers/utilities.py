@@ -7,12 +7,14 @@ import torch
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 from fastapi import Body, HTTPException
 from fastapi.routing import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pyparsing import ParseException
 from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
+from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline
 from invokeai.backend.util.devices import TorchDevice
 
@@ -62,7 +64,7 @@ async def parse_dynamicprompts(
 class ExpandPromptRequest(BaseModel):
     prompt: str
     model_key: str
-    max_tokens: int = 300
+    max_tokens: int = Field(default=300, ge=1, le=2048)
     system_prompt: str | None = None
 
 
@@ -84,6 +86,10 @@ def _run_expand_prompt(prompt: str, model_key: str, max_tokens: int, system_prom
     """Run text LLM inference synchronously (called from thread)."""
     model_manager = ApiDependencies.invoker.services.model_manager
     model_config = model_manager.store.get_model(model_key)
+
+    if model_config.type != ModelType.TextLLM:
+        raise ValueError(f"Model '{model_key}' is not a TextLLM model (got {model_config.type})")
+
     loaded_model = model_manager.load.load_model(model_config)
 
     with loaded_model.model_on_device() as (_, model):
@@ -122,6 +128,10 @@ async def expand_prompt(body: ExpandPromptRequest) -> ExpandPromptResponse:
                 body.system_prompt,
             )
         return ExpandPromptResponse(expanded_prompt=expanded)
+    except UnknownModelException:
+        raise HTTPException(status_code=404, detail=f"Model '{body.model_key}' not found")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.error(f"Error expanding prompt: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -145,6 +155,10 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
     """Run LLaVA OneVision inference synchronously (called from thread)."""
     model_manager = ApiDependencies.invoker.services.model_manager
     model_config = model_manager.store.get_model(model_key)
+
+    if model_config.type != ModelType.LlavaOnevision:
+        raise ValueError(f"Model '{model_key}' is not a LLaVA OneVision model (got {model_config.type})")
+
     loaded_model = model_manager.load.load_model(model_config)
 
     # Load the image from InvokeAI's image store
@@ -152,11 +166,13 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
     image = image.convert("RGB")
 
     with loaded_model.model_on_device() as (_, model):
-        assert isinstance(model, LlavaOnevisionForConditionalGeneration)
+        if not isinstance(model, LlavaOnevisionForConditionalGeneration):
+            raise TypeError(f"Expected LlavaOnevisionForConditionalGeneration, got {type(model).__name__}")
 
         model_abs_path = _resolve_model_path(model_config.path)
         processor = AutoProcessor.from_pretrained(model_abs_path, local_files_only=True)
-        assert isinstance(processor, LlavaOnevisionProcessor)
+        if not isinstance(processor, LlavaOnevisionProcessor):
+            raise TypeError(f"Expected LlavaOnevisionProcessor, got {type(processor).__name__}")
 
         pipeline = LlavaOnevisionPipeline(model, processor)
         model_device = next(model.parameters()).device
@@ -188,6 +204,10 @@ async def image_to_prompt(body: ImageToPromptRequest) -> ImageToPromptResponse:
                 body.instruction,
             )
         return ImageToPromptResponse(prompt=prompt)
+    except UnknownModelException:
+        raise HTTPException(status_code=404, detail=f"Model '{body.model_key}' not found")
+    except (ValueError, TypeError) as e:
+        raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
         logger.error(f"Error generating prompt from image: {e}")
         raise HTTPException(status_code=500, detail=str(e))
