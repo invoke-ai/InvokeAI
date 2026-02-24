@@ -676,17 +676,12 @@ describe('adjustPromptAttention', () => {
       });
 
       it('should merge inside prompt function args', () => {
-        const prompt = '("high detail, (cinematic)1.25 (lighting)1.25, soft volumetric light", "other arg").and()';
-        // Select both words and increment — they should stay merged
-        const lightingIdx = prompt.indexOf('lighting');
-        const result = adj(prompt, 'lighting', 'increment');
-        // After incrementing lighting, it has a different weight — but if we select both:
-        const prompt2 = '("(cinematic)1.25 (lighting)1.25", "other").and()';
-        const start = prompt2.indexOf('cinematic');
-        const end = prompt2.indexOf('lighting') + 'lighting'.length;
-        const result2 = adj(prompt2, [start, end], 'increment');
+        const prompt = '("(cinematic)1.25 (lighting)1.25", "other").and()';
+        const start = prompt.indexOf('cinematic');
+        const end = prompt.indexOf('lighting') + 'lighting'.length;
+        const result = adj(prompt, [start, end], 'increment');
         // Both get incremented to same weight, should be one group
-        expect(result2.prompt).not.toMatch(/\)\d[.\d]* \(/);
+        expect(result.prompt).not.toMatch(/\)\d[.\d]* \(/);
       });
     });
 
