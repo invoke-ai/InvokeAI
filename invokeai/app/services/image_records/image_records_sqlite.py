@@ -143,20 +143,20 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
     ) -> tuple[str, list[Union[int, str, bool]]]:
         if board_ids:
             normalized_board_ids = list(dict.fromkeys(board_ids))
-            include_none = 'none' in normalized_board_ids
-            explicit_board_ids = [b for b in normalized_board_ids if b != 'none']
+            include_none = "none" in normalized_board_ids
+            explicit_board_ids = [b for b in normalized_board_ids if b != "none"]
             board_subconditions: list[str] = []
             if explicit_board_ids:
-                placeholders = ','.join('?' * len(explicit_board_ids))
+                placeholders = ",".join("?" * len(explicit_board_ids))
                 board_subconditions.append(f"board_images.board_id IN ({placeholders})")
                 query_params.extend(explicit_board_ids)
             if include_none:
-                board_subconditions.append('board_images.board_id IS NULL')
+                board_subconditions.append("board_images.board_id IS NULL")
             if board_subconditions:
                 query_conditions += f"""--sql
-                AND ({' OR '.join(board_subconditions)})
+                AND ({" OR ".join(board_subconditions)})
                 """
-        elif board_id == 'none':
+        elif board_id == "none":
             query_conditions += """--sql
                 AND board_images.board_id IS NULL
                 """
@@ -188,7 +188,6 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 AND images.metadata LIKE ?
                 """
             query_params.append(f"%{metadata_term.lower()}%")
-
 
         if starred_mode == "only":
             query_conditions += """--sql

@@ -407,7 +407,9 @@ async def list_image_dtos(
     height_max: Optional[int] = Query(default=None, description="Maximum image height"),
     height_exact: Optional[int] = Query(default=None, description="Exact image height"),
     board_ids: Optional[list[str]] = Query(default=None, description="Boards to include, supports 'none'"),
-    starred_mode: Literal["include", "exclude", "only"] = Query(default="include", description="How to handle starred images"),
+    starred_mode: Literal["include", "exclude", "only"] = Query(
+        default="include", description="How to handle starred images"
+    ),
 ) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of image DTOs"""
 
@@ -627,7 +629,9 @@ async def get_image_names(
     height_max: Optional[int] = Query(default=None, description="Maximum image height"),
     height_exact: Optional[int] = Query(default=None, description="Exact image height"),
     board_ids: Optional[list[str]] = Query(default=None, description="Boards to include, supports 'none'"),
-    starred_mode: Literal["include", "exclude", "only"] = Query(default="include", description="How to handle starred images"),
+    starred_mode: Literal["include", "exclude", "only"] = Query(
+        default="include", description="How to handle starred images"
+    ),
 ) -> ImageNamesResult:
     """Gets ordered list of image names with metadata for optimistic updates"""
 
