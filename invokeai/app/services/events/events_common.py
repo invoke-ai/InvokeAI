@@ -383,6 +383,17 @@ class DownloadCancelledEvent(DownloadEventBase):
 
 
 @payload_schema.register
+class DownloadPausedEvent(DownloadEventBase):
+    """Event model for download_paused"""
+
+    __event_name__ = "download_paused"
+
+    @classmethod
+    def build(cls, job: "DownloadJob") -> "DownloadPausedEvent":
+        return cls(source=str(job.source))
+
+
+@payload_schema.register
 class DownloadErrorEvent(DownloadEventBase):
     """Event model for download_error"""
 
