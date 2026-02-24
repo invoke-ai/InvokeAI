@@ -125,8 +125,8 @@ def test_search_image_names_endpoint(monkeypatch: Any, mock_invoker: Invoker, cl
     captured: dict[str, Any] = {}
 
     def mock_get_image_names(**kwargs):
-      captured.update(kwargs)
-      return {"image_names": ["test.png"], "starred_count": 0, "total_count": 1}
+        captured.update(kwargs)
+        return {"image_names": ["test.png"], "starred_count": 0, "total_count": 1}
 
     monkeypatch.setattr(mock_invoker.services.images, "get_image_names", mock_get_image_names)
 
