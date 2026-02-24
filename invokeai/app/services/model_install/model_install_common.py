@@ -28,6 +28,7 @@ class InstallStatus(str, Enum):
     DOWNLOADING = "downloading"  # downloading of model files in process
     DOWNLOADS_DONE = "downloads_done"  # downloading done, waiting to run
     RUNNING = "running"  # being processed
+    PAUSED = "paused"  # paused, can be resumed
     COMPLETED = "completed"  # finished running
     ERROR = "error"  # terminated with an error message
     CANCELLED = "cancelled"  # terminated with an error message
@@ -185,6 +186,7 @@ class ModelInstallJob(BaseModel):
     _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
     _multifile_job: Optional[MultiFileDownloadJob] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
+    _resume_metadata: Optional[dict] = PrivateAttr(default=None)
 
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""
@@ -231,6 +233,11 @@ class ModelInstallJob(BaseModel):
     def downloads_done(self) -> bool:
         """Return true if job's downloads ae done."""
         return self.status == InstallStatus.DOWNLOADS_DONE
+
+    @property
+    def paused(self) -> bool:
+        """Return true if job is paused."""
+        return self.status == InstallStatus.PAUSED
 
     @property
     def running(self) -> bool:
