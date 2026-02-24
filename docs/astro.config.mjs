@@ -3,9 +3,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 // Plugins
-import markdoc from '@astrojs/markdoc';
-// import { strategy } from 'sharp';
-// import rehypeExternalLinks from 'rehype-external-links';
+import starlightLlmsText from 'starlight-llms-txt';
 
 // https://astro.build/config
 export default defineConfig({
@@ -43,6 +41,11 @@ export default defineConfig({
           icon: 'discord',
           label: 'Discord',
           href: 'https://discord.gg/ZmtBAhwWhy',
+        },
+        {
+          icon: 'youtube',
+          label: 'YouTube',
+          href: 'https://www.youtube.com/@invokeai',
         },
       ],
       tableOfContents: {
@@ -91,8 +94,10 @@ export default defineConfig({
       components: {
         ThemeProvider: './src/lib/components/ForceDarkTheme.astro',
         ThemeSelect: './src/lib/components/EmptyComponent.astro',
+        Footer: './src/lib/components/Footer.astro',
+        PageFrame: './src/layouts/PageFrameExtended.astro',
       },
+      plugins: [starlightLlmsText()],
     }),
-    markdoc(),
   ],
 });

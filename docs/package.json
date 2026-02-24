@@ -18,7 +18,8 @@
     "astro": "^5.17.3",
     "mermaid": "^11.12.3",
     "rehype-external-links": "^3.0.0",
-    "sharp": "^0.34.2"
+    "sharp": "^0.34.2",
+    "starlight-llms-txt": "^0.7.0"
   },
   "devDependencies": {
     "node-addon-api": "^8.5.0",

@@ -2,21 +2,19 @@
   /* Typography */
   --__sl-font: 'Inter', sans-serif;
   --__sl-font-mono:
-    'Roboto Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
+    'Roboto Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
   --radius: 0.35rem;
 
   /* Colors */
   --sl-color-bg: #1c1f23;
-  --sl-color-bg-nav: #272a2f;
+  --sl-color-bg-nav: #31343b;
   --sl-color-bg-sidebar: #272a2f;
 
   --sl-color-gray-7: #272a2f;
 
   --sl-color-hairline: rgba(255, 255, 255, 0.08);
   --sl-color-hairline-light: rgba(255, 255, 255, 0.16);
-  --sl-color-hairline-shade: rgba(255, 255, 255, 0.04);
 
   --sl-color-text-accent: #97d2ee;
   --sl-color-text-accent-2: #e4fd1d;
@@ -33,9 +31,20 @@ body {
     border-color: transparent;
 
     .header {
-      max-width: var(--sl-content-width);
+      max-width: calc(var(--sl-content-width) + 8rem);
       margin-inline: auto;
     }
+  }
+}
+
+.site-title {
+  transition: transform 100ms ease-in-out;
+
+  &:hover {
+    transform: scale(1.02);
+  }
+  &:active {
+    transform: scale(0.98);
   }
 }
 
@@ -85,16 +94,31 @@ body {
 }
 
 .page {
-  background-image: radial-gradient(
-    circle,
-    var(--sl-color-hairline) 1px,
-    transparent 1px
-  );
+  background-image: radial-gradient(circle, var(--sl-color-hairline) 1px, transparent 1px);
   background-size: 20px 20px;
 }
 
 .right-sidebar-container {
   background: var(--sl-color-bg);
+}
+
+#starlight__sidebar .sidebar-content {
+  a {
+    transition:
+      background 50ms ease-in-out,
+      color 50ms ease-in-out;
+
+    &:not([aria-current='page']):hover {
+      background: var(--sl-color-hairline);
+    }
+    &:not([aria-current='page']):active {
+      background: var(--sl-color-hairline-light);
+    }
+  }
+}
+
+site-search > button {
+  transition: border-color 100ms ease-in-out;
 }
 
 .sl-link-button {
@@ -104,6 +128,10 @@ body {
 .sl-link-card {
   background: var(--sl-color-bg);
   transition: border-color 100ms ease-in-out;
+
+  &:active {
+    border-color: var(--sl-color-hairline-light);
+  }
 
   svg {
     transition: color 100ms ease-in-out;
@@ -127,6 +155,7 @@ a[role='tab'] {
   border-bottom-right-radius: 0;
   border-bottom-width: 2px;
   border-bottom-style: solid;
+  box-shadow: none;
 
   &:not([aria-selected='true']) {
     border-color: transparent;
@@ -137,10 +166,22 @@ a[role='tab'] {
     background: var(--sl-color-hairline);
   }
 
+  &:not([aria-selected='true']):active {
+    background: var(--sl-color-hairline-light);
+  }
+
   &[aria-selected='true'] {
     font-weight: normal;
-    border-bottom-color: var(--sl-color-text-accent);
+    --sl-tab-color-border: var(--sl-color-text-accent);
     color: var(--sl-color-text-accent);
+  }
+}
+
+/* Decorate tabs with parent aside colors */
+aside a[role='tab'] {
+  &[aria-selected='true'] {
+    --sl-tab-color-border: var(--sl-color-asides-border);
+    color: var(--sl-color-asides-text-accent);
   }
 }
 
@@ -190,8 +231,7 @@ article.card {
     background: var(--sl-color-bg-sidebar);
     font-family: var(--__sl-font-mono);
     font-size: var(--sl-text-xs);
-    padding: calc(var(--ec-uiPadBlk) + var(--ec-frm-edActTabIndHt))
-      var(--ec-uiPadInl);
+    padding: calc(var(--ec-uiPadBlk) + var(--ec-frm-edActTabIndHt)) var(--ec-uiPadInl);
     cursor: pointer;
 
     &::after {
@@ -213,4 +253,63 @@ article.card {
   }
 }
 
+.hero .actions {
+  gap: 1.5rem;
+}
+
+.card .sl-link-button {
+  margin-bottom: 0;
+}
+
+.sl-link-button {
+  position: relative;
+  overflow: hidden;
+  transition: transform 100ms ease-in-out;
+
+  &:not(.minimal) {
+    padding: 0.65rem 0.85rem;
+
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--sl-color-hairline);
+      opacity: 0;
+      transition: opacity 75ms ease-in-out;
+      pointer-events: none;
+    }
+  }
+
+  &:hover::before {
+    opacity: 1;
+  }
+
+  &:hover,
+  &:focus-visible {
+    transform: scale(1.02);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+
+  &.primary::before {
+    background: rgba(0, 0, 0, 0.12);
+  }
+
+  &.secondary {
+    border-color: var(--sl-color-gray-5);
+  }
+}
+
 /* TODO: Custom markdown content styles */
+.sl-markdown-content {
+  table {
+    :is(th:first-child, td:first-child):not(:where(.not-content *)) {
+      padding: 0.5rem 1rem;
+    }
+    tr:hover {
+      background-color: var(--sl-color-bg-sidebar);
+    }
+  }
+}
