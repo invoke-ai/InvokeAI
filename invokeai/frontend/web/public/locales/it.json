@@ -822,7 +822,20 @@
         "orphanedModelsDeleted": "Eliminato con successo {{count}} modello orfano",
         "orphanedModelsDeleteErrors": "Alcuni modelli non possono essere eliminati",
         "orphanedModelsDeleteFailed": "Impossibile eliminare i modelli orfani",
-        "errorLoadingOrphanedModels": "Errore durante il caricamento dei modelli orfani. Riprova."
+        "errorLoadingOrphanedModels": "Errore durante il caricamento dei modelli orfani. Riprova.",
+        "pause": "Pausa",
+        "pauseAll": "Metti in pausa tutto",
+        "pauseAllTooltip": "Metti in pausa tutti i download attivi",
+        "resume": "Riprendi",
+        "resumeAll": "Riprendi tutto",
+        "resumeAllTooltip": "Riprendi tutti i download in pausa",
+        "restartFailed": "Riavvio non riuscito",
+        "restartFile": "Riavvia il file",
+        "restartRequired": "Riavvio richiesto",
+        "resumeRefused": "Ripristino rifiutato dal server. Riavvio richiesto.",
+        "backendDisconnected": "Backend disconnesso",
+        "cancelAll": "Annulla tutto",
+        "cancelAllTooltip": "Annulla tutti i download attivi"
     },
     "parameters": {
         "images": "Immagini",
@@ -1098,7 +1111,12 @@
         "kleinEncoderClearedDescription": "Selezionare un encoder Qwen3 compatibile per la nuova variante del modello Klein",
         "kleinEncoderCleared": "Encoder Qwen3 cancellato",
         "schedulerReset": "Ripristino campionatore",
-        "schedulerResetZImageBase": "Il campionatore LCM non è compatibile con i modelli Z-Image Base. Reimpostare su Euler."
+        "schedulerResetZImageBase": "Il campionatore LCM non è compatibile con i modelli Z-Image Base. Reimpostare su Euler.",
+        "modelDownloadPaused": "Download del modello in pausa",
+        "modelDownloadResumed": "Ripresa del download",
+        "modelDownloadRestartFailed": "Riavvia i download non riusciti",
+        "modelDownloadRestartFile": "Riavvio del download del file",
+        "modelDownloadRestartedFromScratch": "Manca una parte del file. Riavviato il download dall'inizio."
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1357,7 +1375,13 @@
         "locateInGalery": "Trova nella Galleria",
         "deletedImagesCannotBeRestored": "Le immagini eliminate non possono essere ripristinate.",
         "hideBoards": "Nascondi bacheche",
-        "viewBoards": "Visualizza le bacheche"
+        "viewBoards": "Visualizza le bacheche",
+        "pause": "Pausa",
+        "resume": "Riprendi",
+        "restartFailed": "Riavvio non riuscito",
+        "restartFile": "Riavvia il file",
+        "restartRequired": "Riavvio richiesto",
+        "resumeRefused": "Ripristino rifiutato dal server. Riavvio richiesto."
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1449,7 +1473,8 @@
         "sortOrderDescending": "Discendente",
         "createdAt": "Creato",
         "completedAt": "Completato",
-        "batchFieldValues": "Valori del campo Lotto"
+        "batchFieldValues": "Valori del campo Lotto",
+        "paused": "In pausa"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -2557,7 +2582,8 @@
                 "isEmpty": "{{title}} è vuoto",
                 "isDisabled": "{{title}} è disabilitato"
             },
-            "scaledBbox": "Riquadro scalato"
+            "scaledBbox": "Riquadro scalato",
+            "textSessionActive": "L'inserimento del testo è attivo"
         },
         "canvasContextMenu": {
             "newControlLayer": "Nuovo Livello di Controllo",
