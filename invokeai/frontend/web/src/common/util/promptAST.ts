@@ -3,18 +3,10 @@
  */
 export type Attention = string | number;
 
-type Word = string;
-
-type Punct = string;
-
-type Whitespace = string;
-
-type Embedding = string;
-
 type Token =
-  | { type: 'word'; value: Word; start: number; end: number }
-  | { type: 'whitespace'; value: Whitespace; start: number; end: number }
-  | { type: 'punct'; value: Punct; start: number; end: number }
+  | { type: 'word'; value: string; start: number; end: number }
+  | { type: 'whitespace'; value: string; start: number; end: number }
+  | { type: 'punct'; value: string; start: number; end: number }
   | { type: 'lparen'; start: number; end: number }
   | { type: 'rparen'; start: number; end: number }
   | { type: 'weight'; value: Attention; start: number; end: number }
@@ -34,7 +26,7 @@ export type PromptFunctionArg = {
 };
 
 export type ASTNode =
-  | { type: 'word'; text: Word; attention?: Attention; range: { start: number; end: number }; isSelection?: boolean }
+  | { type: 'word'; text: string; attention?: Attention; range: { start: number; end: number }; isSelection?: boolean }
   | {
       type: 'group';
       children: ASTNode[];
@@ -42,9 +34,9 @@ export type ASTNode =
       range: { start: number; end: number };
       isSelection?: boolean;
     }
-  | { type: 'embedding'; value: Embedding; range: { start: number; end: number }; isSelection?: boolean }
-  | { type: 'whitespace'; value: Whitespace; range: { start: number; end: number }; isSelection?: boolean }
-  | { type: 'punct'; value: Punct; range: { start: number; end: number }; isSelection?: boolean }
+  | { type: 'embedding'; value: string; range: { start: number; end: number }; isSelection?: boolean }
+  | { type: 'whitespace'; value: string; range: { start: number; end: number }; isSelection?: boolean }
+  | { type: 'punct'; value: string; range: { start: number; end: number }; isSelection?: boolean }
   | { type: 'escaped_paren'; value: '(' | ')'; range: { start: number; end: number }; isSelection?: boolean }
   | {
       type: 'prompt_function';
@@ -57,9 +49,9 @@ export type ASTNode =
 
 const WEIGHT_PATTERN = /^[+-]?(\d+(\.\d+)?|[+-]+)/;
 const WHITESPACE_PATTERN = /^\s+/;
+const WORD_CHAR_PATTERN = /[a-zA-Z0-9_]/;
 // prettier-ignore
 const PUNCTUATION_PATTERN = /^[.,/!?;:'"""''\u2018\u2019\u201c\u201d`~@#$%^&*=_|]/;
-const OTHER_PATTERN = /\s/;
 
 /** All characters that can serve as an opening quote in a prompt function argument. */
 const OPEN_QUOTE_CHARS = new Set(["'", '"', '\u2018', '\u201c']);
@@ -71,6 +63,26 @@ export const CLOSE_QUOTE_MAP: Record<string, string> = {
   '\u2018': '\u2019', // ' → '
   '\u201c': '\u201d', // " → "
 };
+
+// #region Token Helpers
+
+/** Get the string value of a token, if it has one. */
+function tokenValue(t: Token | undefined): string | undefined {
+  if (!t) {
+    return undefined;
+  }
+  if ('value' in t) {
+    return String(t.value);
+  }
+  return undefined;
+}
+
+/** Check if a token is a punct token with a specific value. */
+function isPunctValue(t: Token | undefined, value: string): boolean {
+  return t?.type === 'punct' && tokenValue(t) === value;
+}
+
+// #region Tokenizer
 
 /**
  * Convert a prompt string into a token stream.
@@ -100,7 +112,7 @@ export function tokenize(prompt: string): Token[] {
       tokenizeEmbedding(char, i) ||
       tokenizeWord(prompt, i) ||
       tokenizePunctuation(char, i) ||
-      tokenizeOther(char, i);
+      tokenizeFallback(char, i);
 
     if (result) {
       if (result.token) {
@@ -199,15 +211,15 @@ function tokenizeWord(prompt: string, i: number): TokenizeResult {
     return null;
   }
 
-  if (/[a-zA-Z0-9_]/.test(char)) {
+  if (WORD_CHAR_PATTERN.test(char)) {
     let j = i;
-    while (j < prompt.length && /[a-zA-Z0-9_]/.test(prompt[j]!)) {
+    while (j < prompt.length && WORD_CHAR_PATTERN.test(prompt[j]!)) {
       j++;
     }
     const word = prompt.slice(i, j);
 
     // Check for weight immediately after word (e.g., "Lorem+", "consectetur-")
-    const weightMatch = prompt.slice(j).match(/^[+-]?(\d+(\.\d+)?|[+-]+)/);
+    const weightMatch = prompt.slice(j).match(WEIGHT_PATTERN);
     if (weightMatch && weightMatch[0]) {
       const weightEnd = j + weightMatch[0].length;
       return {
@@ -241,16 +253,19 @@ function tokenizeEmbedding(char: string, i: number): TokenizeResult {
   return null;
 }
 
-function tokenizeOther(char: string, i: number): TokenizeResult {
-  // Any other single character punctuation
-  if (OTHER_PATTERN.test(char)) {
-    return {
-      token: { type: 'punct', value: char, start: i, end: i + 1 },
-      nextIndex: i + 1,
-    };
-  }
-  return null;
+/**
+ * Fallback tokenizer for characters not matched by any other tokenizer.
+ * Emits them as word tokens so they are preserved in the AST rather than silently dropped.
+ * This handles non-Latin Unicode text (CJK, emoji, etc.) and any other unrecognized characters.
+ */
+function tokenizeFallback(char: string, i: number): TokenizeResult {
+  return {
+    token: { type: 'word', value: char, start: i, end: i + 1 },
+    nextIndex: i + 1,
+  };
 }
+
+// #region Parser
 
 /**
  * Convert tokens into an AST.
@@ -283,7 +298,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
       p++;
     }
     const t = peekAt(p);
-    return t?.type === 'punct' && OPEN_QUOTE_CHARS.has((t as Token & { type: 'punct' }).value);
+    return t?.type === 'punct' && OPEN_QUOTE_CHARS.has(tokenValue(t)!);
   }
 
   /**
@@ -313,24 +328,73 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
           while (peekAt(next)?.type === 'whitespace') {
             next++;
           }
-          const dot = peekAt(next);
-          const methodName = peekAt(next + 1);
-          const methodParen = peekAt(next + 2);
           return (
-            dot?.type === 'punct' &&
-            (dot as Token & { type: 'punct' }).value === '.' &&
-            methodName?.type === 'word' &&
-            methodParen?.type === 'lparen'
+            isPunctValue(peekAt(next), '.') && peekAt(next + 1)?.type === 'word' && peekAt(next + 2)?.type === 'lparen'
           );
         }
         depth--;
-      } else if (t.type === 'punct' && (t as Token & { type: 'punct' }).value === ',' && depth === 0) {
+      } else if (isPunctValue(t, ',') && depth === 0) {
         hasComma = true;
       }
 
       p++;
     }
     return false;
+  }
+
+  /**
+   * Parse the `.methodName(params)` suffix that follows the closing rparen of a prompt function.
+   * Assumes whitespace has already been skipped. Returns null and restores pos if the pattern
+   * doesn't match.
+   */
+  function tryParseMethodTail(savedPos: number): { name: string; functionParams: string; endPos: number } | null {
+    // Skip whitespace between ) and .methodName (allows newlines)
+    while (peek()?.type === 'whitespace') {
+      consume();
+    }
+
+    // Expect .methodName(params)
+    if (!isPunctValue(peek(), '.')) {
+      pos = savedPos;
+      return null;
+    }
+    consume(); // consume dot
+
+    if (peek()?.type !== 'word') {
+      pos = savedPos;
+      return null;
+    }
+    const methodName = tokenValue(consume())!;
+
+    // Expect opening paren for method call
+    if (peek()?.type !== 'lparen') {
+      pos = savedPos;
+      return null;
+    }
+    consume(); // consume method open paren
+
+    // Collect method params until closing rparen
+    let functionParams = '';
+    while (pos < tokens.length) {
+      const t = peek()!;
+      if (t.type === 'rparen') {
+        break;
+      }
+      const tok = consume()!;
+      const v = tokenValue(tok);
+      if (v !== undefined) {
+        functionParams += v;
+      }
+    }
+
+    // Expect closing rparen for method call
+    if (peek()?.type !== 'rparen') {
+      pos = savedPos;
+      return null;
+    }
+    const methodCloseParen = consume()!; // consume method close paren
+
+    return { name: methodName, functionParams, endPos: methodCloseParen.end };
   }
 
   /**
@@ -356,7 +420,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
 
       // Expect comma separator between args
       if (args.length > 0) {
-        if (peek()?.type === 'punct' && (peek() as Token & { type: 'punct' }).value === ',') {
+        if (isPunctValue(peek(), ',')) {
           consume();
           while (peek()?.type === 'whitespace') {
             consume();
@@ -373,7 +437,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
         pos = savedPos;
         return null;
       }
-      const thisOpenQuote = (openQuoteTok as Token & { type: 'punct' }).value;
+      const thisOpenQuote = tokenValue(openQuoteTok)!;
       if (!OPEN_QUOTE_CHARS.has(thisOpenQuote)) {
         pos = savedPos;
         return null;
@@ -397,8 +461,8 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
       let contentEnd = contentStart;
       while (pos < tokens.length) {
         const t = peek();
-        if (t?.type === 'punct' && (t as Token & { type: 'punct' }).value === closeQuoteChar) {
-          contentEnd = t.start;
+        if (isPunctValue(t, closeQuoteChar!)) {
+          contentEnd = t!.start;
           break;
         }
         const consumed = consume()!;
@@ -407,12 +471,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
       }
 
       // Expect closing quote
-      const closeQuoteTok = peek();
-      if (
-        !closeQuoteTok ||
-        closeQuoteTok.type !== 'punct' ||
-        (closeQuoteTok as Token & { type: 'punct' }).value !== closeQuoteChar
-      ) {
+      if (!isPunctValue(peek(), closeQuoteChar!)) {
         pos = savedPos;
         return null;
       }
@@ -440,63 +499,18 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
     }
     consume(); // consume rparen
 
-    // Skip whitespace between ) and .methodName (allows newlines)
-    while (peek()?.type === 'whitespace') {
-      consume();
+    // Parse .methodName(params) suffix
+    const methodTail = tryParseMethodTail(savedPos);
+    if (!methodTail) {
+      return null; // pos already restored by tryParseMethodTail
     }
-
-    // Expect .methodName(params)
-    if (peek()?.type !== 'punct' || (peek() as Token & { type: 'punct' }).value !== '.') {
-      pos = savedPos;
-      return null;
-    }
-    consume(); // consume dot
-
-    if (peek()?.type !== 'word') {
-      pos = savedPos;
-      return null;
-    }
-    const methodName = (consume() as Token & { type: 'word' }).value;
-
-    // Expect opening paren for method call
-    if (peek()?.type !== 'lparen') {
-      pos = savedPos;
-      return null;
-    }
-    consume(); // consume method open paren
-
-    // Collect method params until closing rparen
-    let functionParams = '';
-    while (pos < tokens.length) {
-      const t = peek()!;
-      if (t.type === 'rparen') {
-        break;
-      }
-      const tok = consume()!;
-      if (tok.type === 'word') {
-        functionParams += (tok as Token & { type: 'word' }).value;
-      } else if (tok.type === 'punct') {
-        functionParams += (tok as Token & { type: 'punct' }).value;
-      } else if (tok.type === 'whitespace') {
-        functionParams += (tok as Token & { type: 'whitespace' }).value;
-      } else if (tok.type === 'weight') {
-        functionParams += String((tok as Token & { type: 'weight' }).value);
-      }
-    }
-
-    // Expect closing rparen for method call
-    if (peek()?.type !== 'rparen') {
-      pos = savedPos;
-      return null;
-    }
-    const methodCloseParen = consume()!; // consume method close paren
 
     return {
       type: 'prompt_function',
-      name: methodName,
+      name: methodTail.name,
       promptArgs: args,
-      functionParams,
-      range: { start: lparenToken.start, end: methodCloseParen.end },
+      functionParams: methodTail.functionParams,
+      range: { start: lparenToken.start, end: methodTail.endPos },
     };
   }
 
@@ -518,7 +532,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
 
       // Expect comma separator between args (consume the comma)
       if (args.length > 0) {
-        if (peek()?.type === 'punct' && (peek() as Token & { type: 'punct' }).value === ',') {
+        if (isPunctValue(peek(), ',')) {
           consume(); // consume comma
         } else {
           pos = savedPos;
@@ -542,7 +556,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
             break; // End of all args
           }
           depth--;
-        } else if (t.type === 'punct' && (t as Token & { type: 'punct' }).value === ',' && depth === 0) {
+        } else if (isPunctValue(t, ',') && depth === 0) {
           break; // End of this arg
         }
 
@@ -596,63 +610,18 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
     }
     consume(); // consume rparen
 
-    // Skip whitespace between ) and .methodName (allows newlines)
-    while (peek()?.type === 'whitespace') {
-      consume();
+    // Parse .methodName(params) suffix
+    const methodTail = tryParseMethodTail(savedPos);
+    if (!methodTail) {
+      return null; // pos already restored by tryParseMethodTail
     }
-
-    // Expect .methodName(params)
-    if (peek()?.type !== 'punct' || (peek() as Token & { type: 'punct' }).value !== '.') {
-      pos = savedPos;
-      return null;
-    }
-    consume(); // consume dot
-
-    if (peek()?.type !== 'word') {
-      pos = savedPos;
-      return null;
-    }
-    const methodName = (consume() as Token & { type: 'word' }).value;
-
-    // Expect opening paren for method call
-    if (peek()?.type !== 'lparen') {
-      pos = savedPos;
-      return null;
-    }
-    consume(); // consume method open paren
-
-    // Collect method params until closing rparen
-    let functionParams = '';
-    while (pos < tokens.length) {
-      const t = peek()!;
-      if (t.type === 'rparen') {
-        break;
-      }
-      const tok = consume()!;
-      if (tok.type === 'word') {
-        functionParams += (tok as Token & { type: 'word' }).value;
-      } else if (tok.type === 'punct') {
-        functionParams += (tok as Token & { type: 'punct' }).value;
-      } else if (tok.type === 'whitespace') {
-        functionParams += (tok as Token & { type: 'whitespace' }).value;
-      } else if (tok.type === 'weight') {
-        functionParams += String((tok as Token & { type: 'weight' }).value);
-      }
-    }
-
-    // Expect closing rparen for method call
-    if (peek()?.type !== 'rparen') {
-      pos = savedPos;
-      return null;
-    }
-    const methodCloseParen = consume()!; // consume method close paren
 
     return {
       type: 'prompt_function',
-      name: methodName,
+      name: methodTail.name,
       promptArgs: args,
-      functionParams,
-      range: { start: lparenToken.start, end: methodCloseParen.end },
+      functionParams: methodTail.functionParams,
+      range: { start: lparenToken.start, end: methodTail.endPos },
     };
   }
 
@@ -726,10 +695,10 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
           let end = lembed.end;
           while (peek() && peek()!.type !== 'rembed') {
             const embedToken = consume()!;
-            embedValue +=
-              embedToken.type === 'word' || embedToken.type === 'punct' || embedToken.type === 'whitespace'
-                ? (embedToken as Token & { type: 'word' | 'punct' | 'whitespace' }).value
-                : '';
+            const v = tokenValue(embedToken);
+            if (v !== undefined) {
+              embedValue += v;
+            }
             end = embedToken.end;
           }
           if (peek()?.type === 'rembed') {
@@ -784,65 +753,130 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
   return parseGroup();
 }
 
+// #region Serialization
+
+/**
+ * Visitor callbacks for AST serialization. All callbacks are optional.
+ * Called during traversal to allow tracking node positions in the output string.
+ */
+export type SerializeVisitor = {
+  /** Called after a node has been fully serialized, with its start and end positions in the output. */
+  onNode?: (node: ASTNode, start: number, end: number) => void;
+};
+
+/** Mutable buffer used by serializeCore so all recursive calls share the same position tracking. */
+type SerializeBuffer = { prompt: string };
+
+/**
+ * Shared serialization core. Converts an AST back into a prompt string,
+ * optionally calling visitor hooks for position tracking.
+ *
+ * Uses a shared mutable buffer so that node positions reported via
+ * `visitor.onNode` are always absolute offsets in the final output string,
+ * even for nodes nested inside groups or prompt function args.
+ */
+function serializeCore(ast: ASTNode[], visitor: SerializeVisitor | undefined, buf: SerializeBuffer): void {
+  for (const node of ast) {
+    const nodeStart = buf.prompt.length;
+
+    switch (node.type) {
+      case 'punct':
+      case 'whitespace': {
+        buf.prompt += node.value;
+        break;
+      }
+      case 'escaped_paren': {
+        buf.prompt += `\\${node.value}`;
+        break;
+      }
+      case 'word': {
+        buf.prompt += node.text;
+        if (node.attention) {
+          buf.prompt += String(node.attention);
+        }
+        break;
+      }
+      case 'group': {
+        buf.prompt += '(';
+        serializeCore(node.children, visitor, buf);
+        buf.prompt += ')';
+        if (node.attention) {
+          buf.prompt += String(node.attention);
+        }
+        break;
+      }
+      case 'embedding': {
+        buf.prompt += `<${node.value}>`;
+        break;
+      }
+      case 'prompt_function': {
+        buf.prompt += '(';
+        for (let i = 0; i < node.promptArgs.length; i++) {
+          if (i > 0) {
+            buf.prompt += ', ';
+          }
+          const arg = node.promptArgs[i]!;
+          buf.prompt += arg.quote;
+          serializeCore(arg.nodes, visitor, buf);
+          buf.prompt += CLOSE_QUOTE_MAP[arg.quote] ?? arg.quote;
+        }
+        buf.prompt += ').';
+        buf.prompt += node.name;
+        buf.prompt += '(';
+        buf.prompt += node.functionParams;
+        buf.prompt += ')';
+        break;
+      }
+    }
+
+    visitor?.onNode?.(node, nodeStart, buf.prompt.length);
+  }
+}
+
 /**
  * Convert an AST back into a prompt string.
  * @param ast ASTNode[]
  * @returns string
  */
 export function serialize(ast: ASTNode[]): string {
-  let prompt = '';
+  const buf: SerializeBuffer = { prompt: '' };
+  serializeCore(ast, undefined, buf);
+  return buf.prompt;
+}
 
-  for (const node of ast) {
-    switch (node.type) {
-      case 'punct':
-      case 'whitespace': {
-        prompt += node.value;
-        break;
-      }
-      case 'escaped_paren': {
-        prompt += `\\${node.value}`;
-        break;
-      }
-      case 'word': {
-        prompt += node.text;
-        if (node.attention) {
-          prompt += String(node.attention);
+/**
+ * Serialize an AST to a prompt string while simultaneously computing the
+ * selection range from `isSelection` flags on nodes.
+ *
+ * This is more reliable than separate serialize + selection computation because
+ * the position tracking is guaranteed to match the serialized output.
+ */
+export function serializeWithSelection(ast: ASTNode[]): {
+  prompt: string;
+  selectionStart: number;
+  selectionEnd: number;
+} {
+  let selStart = Infinity;
+  let selEnd = -1;
+
+  const buf: SerializeBuffer = { prompt: '' };
+  serializeCore(
+    ast,
+    {
+      onNode(node, start, end) {
+        if (node.isSelection) {
+          selStart = Math.min(selStart, start);
+          selEnd = Math.max(selEnd, end);
         }
-        break;
-      }
-      case 'group': {
-        prompt += '(';
-        prompt += serialize(node.children);
-        prompt += ')';
-        if (node.attention) {
-          prompt += String(node.attention);
-        }
-        break;
-      }
-      case 'embedding': {
-        prompt += `<${node.value}>`;
-        break;
-      }
-      case 'prompt_function': {
-        prompt += '(';
-        for (let i = 0; i < node.promptArgs.length; i++) {
-          if (i > 0) {
-            prompt += ', ';
-          }
-          const arg = node.promptArgs[i]!;
-          prompt += arg.quote;
-          prompt += serialize(arg.nodes);
-          prompt += CLOSE_QUOTE_MAP[arg.quote] ?? arg.quote;
-        }
-        prompt += ').';
-        prompt += node.name;
-        prompt += '(';
-        prompt += node.functionParams;
-        prompt += ')';
-        break;
-      }
-    }
+      },
+    },
+    buf
+  );
+
+  if (selStart === Infinity) {
+    selStart = 0;
+    selEnd = buf.prompt.length;
   }
 
-  return prompt;
+  return { prompt: buf.prompt, selectionStart: selStart, selectionEnd: selEnd };
 }

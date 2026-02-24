@@ -48,6 +48,30 @@ describe('adjustPromptAttention', () => {
     });
   });
 
+  describe('cursor at word-punctuation boundary', () => {
+    it('should select word, not punctuation, when cursor is between word and comma', () => {
+      // "one|, two" — cursor at position 3, between "one" (0-3) and "," (3-4)
+      expect(adj('one, two', [3, 3], 'increment').prompt).toBe('one+, two');
+    });
+
+    it('should select word, not punctuation, when cursor is between word and period', () => {
+      expect(adj('one. two', [3, 3], 'increment').prompt).toBe('one+. two');
+    });
+
+    it('should select word when cursor is at start of word after punctuation', () => {
+      // "one, |two" — cursor at position 5, between " " (4-5) and "two" (5-8)
+      expect(adj('one, two', [5, 5], 'increment').prompt).toBe('one, two+');
+    });
+
+    it('should still select punctuation when cursor is only touching punctuation', () => {
+      // Cursor in the middle of a run of punctuation with no adjacent word
+      // e.g. "one ,, two" cursor at position 5 — between "," (4-5) and "," (5-6)
+      // Both neighbors are punct, so no word to prefer — should still work
+      const result = adj('one ,, two', [5, 5], 'increment');
+      expect(result).toBeDefined();
+    });
+  });
+
   // Existing Groups
 
   describe('existing groups', () => {
@@ -581,6 +605,88 @@ describe('adjustPromptAttention', () => {
         const end = prompt.indexOf('three') + 'three'.length;
         const result = adjustPromptAttention(prompt, start, end, 'increment', true);
         expect(result.prompt).toBe("('one (two)1.1', '(three)1.1 four').and()");
+      });
+    });
+
+    describe('group splitting inside prompt function args', () => {
+      it('should correctly split weighted group when decrementing a single word inside it', () => {
+        const prompt =
+          '("high detail, (cinematic lighting)1.25, soft volumetric light, (sharp focus)+, professional photography", "a young woman with balanced natural proportions, medium length brown hair, neutral expression, casual modern clothing", "subtle rim light, shallow depth of field, natural skin texture, clean background").and()';
+        const result = adj(prompt, 'lighting', 'decrement');
+        // "lighting" gets decremented from 1.25 → 1.25/1.1 ≈ 1.1364
+        // "cinematic" stays at 1.25
+        // The key thing: no space should be lost/misplaced
+        expect(result.prompt).toContain('(cinematic)1.25');
+        expect(result.prompt).toContain('lighting)');
+        // Verify there's a space between the cinematic group and lighting group
+        const cinIdx = result.prompt.indexOf('(cinematic)1.25');
+        const afterCinematic = result.prompt.substring(
+          cinIdx + '(cinematic)1.25'.length,
+          cinIdx + '(cinematic)1.25'.length + 2
+        );
+        expect(afterCinematic).toMatch(/^ /); // Should start with a space
+      });
+
+      it('should rejoin groups when incrementing back to the same weight', () => {
+        const prompt =
+          '("high detail, (cinematic lighting)1.25, soft volumetric light, (sharp focus)+, professional photography", "a young woman with balanced natural proportions, medium length brown hair, neutral expression, casual modern clothing", "subtle rim light, shallow depth of field, natural skin texture, clean background").and()';
+        // Decrement "lighting" to split the group
+        const step1 = adj(prompt, 'lighting', 'decrement');
+        expect(step1.prompt).toContain('(cinematic)1.25');
+        // Now increment "lighting" back — should rejoin into (cinematic lighting)1.25
+        const step2 = adj(step1.prompt, 'lighting', 'increment');
+        expect(step2.prompt).toContain('(cinematic lighting)1.25');
+      });
+    });
+
+    describe('numeric group whitespace trimming', () => {
+      it('should not capture trailing whitespace inside numeric weighted groups', () => {
+        // (foo bar)1.3 → decrement "bar" → (foo)1.3 (bar)X, with space between
+        const result = adj('(foo bar)1.3', 'bar', 'decrement');
+        expect(result.prompt).toContain('(foo)1.3');
+        // Space should be outside the group, not inside
+        expect(result.prompt).not.toContain('(foo )');
+        expect(result.prompt).toMatch(/\(foo\)1\.3 /);
+      });
+
+      it('should not capture leading whitespace inside numeric weighted groups', () => {
+        // (foo bar)1.3 → decrement "foo" → (foo)X (bar)1.3, with space between
+        const result = adj('(foo bar)1.3', 'foo', 'decrement');
+        expect(result.prompt).toContain('(bar)1.3');
+        // Space should be outside the group, not inside
+        expect(result.prompt).not.toContain('( bar)');
+        expect(result.prompt).toMatch(/ \(bar\)1\.3/);
+      });
+    });
+
+    describe('numeric group conjoining', () => {
+      it('should merge adjacent same-weight numeric groups back together', () => {
+        // Two separate groups with same weight should conjoin into one
+        const result = adj('(foo)1.25 (bar)1.25', [0, 19], 'increment');
+        // Both words get the same increment, so they should stay in one group
+        expect(result.prompt).not.toContain(') (');
+      });
+
+      it('should merge adjacent same-weight groups when incrementing to match', () => {
+        // Start with (foo bar)1.3, decrement "bar", then increment it back
+        const step1 = adj('(foo bar)1.3', 'bar', 'decrement');
+        // Now increment "bar" back — it should rejoin into a single group
+        const step2 = adj(step1.prompt, 'bar', 'increment');
+        expect(step2.prompt).toBe('(foo bar)1.3');
+      });
+
+      it('should merge inside prompt function args', () => {
+        const prompt = '("high detail, (cinematic)1.25 (lighting)1.25, soft volumetric light", "other arg").and()';
+        // Select both words and increment — they should stay merged
+        const lightingIdx = prompt.indexOf('lighting');
+        const result = adj(prompt, 'lighting', 'increment');
+        // After incrementing lighting, it has a different weight — but if we select both:
+        const prompt2 = '("(cinematic)1.25 (lighting)1.25", "other").and()';
+        const start = prompt2.indexOf('cinematic');
+        const end = prompt2.indexOf('lighting') + 'lighting'.length;
+        const result2 = adj(prompt2, [start, end], 'increment');
+        // Both get incremented to same weight, should be one group
+        expect(result2.prompt).not.toMatch(/\)\d[.\d]* \(/);
       });
     });
 

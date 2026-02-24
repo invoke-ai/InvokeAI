@@ -4,19 +4,25 @@ import { serializeError } from 'serialize-error';
 import {
   type ASTNode,
   type Attention,
-  CLOSE_QUOTE_MAP,
   parseTokens,
   type PromptFunctionArg,
+  serializeWithSelection,
   tokenize,
 } from './promptAST';
 
-const log = logger('events');
+const log = logger('generation');
 
 type AttentionDirection = 'increment' | 'decrement';
 type AdjustmentResult = { prompt: string; selectionStart: number; selectionEnd: number };
 
 const ATTENTION_STEP = 1.1;
 const NUMERIC_ATTENTION_STEP = 0.1;
+
+/** Tolerance for floating-point weight comparisons. */
+const WEIGHT_TOLERANCE = 0.001;
+
+/** Tolerance for checking if a weight is a power of ATTENTION_STEP. */
+const STEP_COUNT_TOLERANCE = 0.005;
 
 // #region Weight Helpers
 
@@ -28,7 +34,7 @@ function getAttentionStepCount(weight: number): number | null {
   if (weight <= 0) {
     return null;
   }
-  if (Math.abs(weight - 1.0) < 0.001) {
+  if (Math.abs(weight - 1.0) < WEIGHT_TOLERANCE) {
     return 0;
   }
   const n = Math.round(Math.log(weight) / Math.log(ATTENTION_STEP));
@@ -36,7 +42,7 @@ function getAttentionStepCount(weight: number): number | null {
     return null;
   }
   const expected = Math.pow(ATTENTION_STEP, n);
-  if (Math.abs(expected - weight) < 0.005) {
+  if (Math.abs(expected - weight) < STEP_COUNT_TOLERANCE) {
     return n;
   }
   return null;
@@ -73,22 +79,16 @@ function addAttention(current: Attention | undefined, added: '+' | '-'): Attenti
     }
     return Number((current / ATTENTION_STEP).toFixed(4));
   }
-  if (added === '+') {
-    if (current.startsWith('-')) {
-      const res = current.substring(1);
-      return res === '' ? undefined : res;
-    }
-    return `${current}+`;
-  }
-  // added === '-'
-  if (current.startsWith('+')) {
+  // Check if the added direction cancels the current one
+  const isCancel = (current.startsWith('+') && added === '-') || (current.startsWith('-') && added === '+');
+  if (isCancel) {
     const res = current.substring(1);
     return res === '' ? undefined : res;
   }
-  return `${current}-`;
+  return `${current}${added}`;
 }
 
-// #reigion Terminal Type
+// #region Terminal Type
 
 type Terminal = {
   text: string;
@@ -129,17 +129,11 @@ export function adjustPromptAttention(
       if (region.type === 'normal') {
         const clipped = clipSelection(selectionStart, selectionEnd, region.range);
         if (clipped) {
-          const adjusted = adjustRegionNodes(
-            region.nodes,
-            clipped.start,
-            clipped.end,
-            direction,
-            prefersNumericWeights
-          );
-          if (adjusted !== region.nodes) {
+          const result = adjustRegionNodes(region.nodes, clipped.start, clipped.end, direction, prefersNumericWeights);
+          if (result.modified) {
             anyModified = true;
           }
-          processedNodes.push(...adjusted);
+          processedNodes.push(...result.nodes);
         } else {
           processedNodes.push(...region.nodes);
         }
@@ -148,17 +142,11 @@ export function adjustPromptAttention(
         const pfNode = region.node;
         const clipped = clipSelection(selectionStart, selectionEnd, pfNode.range);
         if (clipped) {
-          const adjusted = adjustPromptFunctionNode(
-            pfNode,
-            clipped.start,
-            clipped.end,
-            direction,
-            prefersNumericWeights
-          );
-          if (adjusted !== pfNode) {
+          const result = adjustPromptFunctionNode(pfNode, clipped.start, clipped.end, direction, prefersNumericWeights);
+          if (result.modified) {
             anyModified = true;
           }
-          processedNodes.push(adjusted);
+          processedNodes.push(result.node);
         } else {
           processedNodes.push(pfNode);
         }
@@ -169,12 +157,7 @@ export function adjustPromptAttention(
       return { prompt, selectionStart, selectionEnd };
     }
 
-    const result = serializeWithSelection(processedNodes);
-    return {
-      prompt: result.prompt,
-      selectionStart: result.selectionStart,
-      selectionEnd: result.selectionEnd,
-    };
+    return serializeWithSelection(processedNodes);
   } catch (e) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     log.error({ error: serializeError(e) as any }, 'Failed to adjust prompt attention');
@@ -182,7 +165,7 @@ export function adjustPromptAttention(
   }
 }
 
-// ─── Region Extraction ─────────────────────────────────────────────────────────
+// #region Region Extraction
 
 type Region =
   | { type: 'normal'; nodes: ASTNode[]; range: { start: number; end: number } }
@@ -251,6 +234,7 @@ function clipSelection(
 /**
  * Adjust attention within a prompt function node by processing each argument
  * whose content range overlaps the selection independently.
+ * Returns the (possibly updated) node and whether any modification was made.
  */
 function adjustPromptFunctionNode(
   pf: ASTNode & { type: 'prompt_function' },
@@ -258,32 +242,33 @@ function adjustPromptFunctionNode(
   selEnd: number,
   direction: AttentionDirection,
   prefersNumericWeights = false
-): ASTNode & { type: 'prompt_function' } {
+): { node: ASTNode & { type: 'prompt_function' }; modified: boolean } {
   let modified = false;
   const newArgs: PromptFunctionArg[] = pf.promptArgs.map((arg) => {
     const clipped = clipSelection(selStart, selEnd, arg.contentRange);
     if (clipped) {
-      const adjusted = adjustRegionNodes(arg.nodes, clipped.start, clipped.end, direction, prefersNumericWeights);
-      if (adjusted !== arg.nodes) {
+      const result = adjustRegionNodes(arg.nodes, clipped.start, clipped.end, direction, prefersNumericWeights);
+      if (result.modified) {
         modified = true;
-        return { ...arg, nodes: adjusted };
+        return { ...arg, nodes: result.nodes };
       }
     }
     return arg;
   });
 
   if (!modified) {
-    return pf;
+    return { node: pf, modified: false };
   }
 
-  return { ...pf, promptArgs: newArgs };
+  return { node: { ...pf, promptArgs: newArgs }, modified: true };
 }
 
-// #region Core Attention Adjustment ─────────────────────────────────────────────────
+// #region Core Attention Adjustment
 
 /**
  * Adjust attention for a set of AST nodes (a "region") given a selection range.
  * This is the core flatten → select → adjust → regroup pipeline.
+ * Returns the adjusted nodes and whether any modification was made.
  */
 function adjustRegionNodes(
   nodes: ASTNode[],
@@ -291,7 +276,7 @@ function adjustRegionNodes(
   selEnd: number,
   direction: AttentionDirection,
   prefersNumericWeights = false
-): ASTNode[] {
+): { nodes: ASTNode[]; modified: boolean } {
   const terminals = flattenAST(nodes);
 
   let selectedTerminals = selectTerminals(terminals, selStart, selEnd);
@@ -305,7 +290,7 @@ function adjustRegionNodes(
   }
 
   if (selectedTerminals.length === 0) {
-    return nodes;
+    return { nodes, modified: false };
   }
 
   for (const t of selectedTerminals) {
@@ -320,7 +305,7 @@ function adjustRegionNodes(
 
   adjustWeights(selectedTerminals, direction);
 
-  return groupTerminals(terminals);
+  return { nodes: groupTerminals(terminals), modified: true };
 }
 
 // #region Flatten AST to Terminals
@@ -340,7 +325,7 @@ function flattenAST(
   for (const node of ast) {
     let nodeWeight = currentWeight;
     let nodeNumericAttention = numericAttention;
-    if ('attention' in node && node.attention) {
+    if ((node.type === 'word' || node.type === 'group') && node.attention) {
       nodeWeight *= parseAttention(node.attention);
       nodeNumericAttention = typeof node.attention === 'number';
     }
@@ -357,7 +342,7 @@ function flattenAST(
         type: node.type,
         weight: nodeWeight,
         range: node.range,
-        hasExplicitAttention: 'attention' in node && !!node.attention,
+        hasExplicitAttention: node.type === 'word' && !!node.attention,
         hasNumericAttention: nodeNumericAttention,
         parentRange,
         isSelected: false,
@@ -367,16 +352,22 @@ function flattenAST(
   return terminals;
 }
 
-// #reigion Terminal Selection
+// #region Terminal Selection
 
 /**
  * Find terminals that overlap the selection range and should be affected
  * by the attention adjustment. Handles partial group overlap carefully:
  * terminals with explicit attention inside partially-overlapping groups
  * are excluded to avoid corrupting explicit weights.
+ *
+ * When the cursor is at a boundary between two tokens (e.g. "word|,"),
+ * both tokens technically overlap the cursor position. In this case we
+ * prefer word/embedding terminals over punctuation/whitespace so that
+ * adjusting attention at a word boundary doesn't accidentally include
+ * adjacent punctuation.
  */
 function selectTerminals(terminals: Terminal[], selStart: number, selEnd: number): Terminal[] {
-  return terminals.filter((t) => {
+  const result = terminals.filter((t) => {
     const isOverlapping =
       (t.range.start < selEnd && t.range.end > selStart) ||
       (selStart === selEnd && t.range.start <= selStart && t.range.end >= selStart);
@@ -398,6 +389,17 @@ function selectTerminals(terminals: Terminal[], selStart: number, selEnd: number
     }
     return true;
   });
+
+  // When the cursor is at a token boundary (no selection range), multiple tokens
+  // can match. Prefer word/embedding terminals over punctuation/whitespace.
+  if (selStart === selEnd && result.length > 1) {
+    const contentTerminals = result.filter((t) => t.type === 'word' || t.type === 'embedding');
+    if (contentTerminals.length > 0) {
+      return contentTerminals;
+    }
+  }
+
+  return result;
 }
 
 // #region Weight Adjustment
@@ -405,6 +407,7 @@ function selectTerminals(terminals: Terminal[], selStart: number, selEnd: number
 /**
  * Apply weight changes to the selected terminals based on direction.
  * Numeric weights use additive steps; +/- syntax uses multiplicative steps.
+ * All results are rounded to 4 decimal places to prevent floating-point drift.
  */
 function adjustWeights(terminals: Terminal[], direction: AttentionDirection): void {
   for (const terminal of terminals) {
@@ -416,11 +419,11 @@ function adjustWeights(terminals: Terminal[], direction: AttentionDirection): vo
         terminal.weight = Number((terminal.weight - NUMERIC_ATTENTION_STEP).toFixed(4));
       }
     } else {
-      // Multiplicative step for +/- syntax weights
+      // Multiplicative step for +/- syntax weights, rounded to prevent drift
       if (direction === 'increment') {
-        terminal.weight *= ATTENTION_STEP;
+        terminal.weight = Number((terminal.weight * ATTENTION_STEP).toFixed(4));
       } else {
-        terminal.weight /= ATTENTION_STEP;
+        terminal.weight = Number((terminal.weight / ATTENTION_STEP).toFixed(4));
       }
     }
   }
@@ -452,11 +455,18 @@ function findSelectedGroup(nodes: ASTNode[], start: number, end: number): ASTNod
 /**
  * Reconstruct an AST from a flat list of terminals with adjusted weights.
  * Groups consecutive terminals with compatible weights using +/- or numeric syntax.
+ *
+ * Note: Reconstructed group nodes use `range: { start: 0, end: 0 }` as a sentinel
+ * value since the original source positions are no longer meaningful after regrouping.
+ * These nodes are only used for serialization output, never for source-position lookups.
  */
 function groupTerminals(terminals: Terminal[]): ASTNode[] {
   if (terminals.length === 0) {
     return [];
   }
+
+  /** Sentinel range for reconstructed nodes whose original positions are not applicable. */
+  const NO_RANGE = { start: 0, end: 0 };
 
   const nodes: ASTNode[] = [];
   let i = 0;
@@ -510,10 +520,10 @@ function groupTerminals(terminals: Terminal[]): ASTNode[] {
             const newAttention = addAttention(child.attention, sign);
             nodes.push({ ...child, attention: newAttention, isSelection: isSelection || undefined });
           } else {
-            nodes.push({ type: 'group', children, attention: sign, range: { start: 0, end: 0 }, isSelection });
+            nodes.push({ type: 'group', children, attention: sign, range: NO_RANGE, isSelection });
           }
         } else {
-          nodes.push({ type: 'group', children, attention: sign, range: { start: 0, end: 0 }, isSelection });
+          nodes.push({ type: 'group', children, attention: sign, range: NO_RANGE, isSelection });
         }
       }
 
@@ -527,7 +537,7 @@ function groupTerminals(terminals: Terminal[]): ASTNode[] {
     }
 
     // ── Neutral weight (≈ 1.0) ──
-    if (Math.abs(weight - 1.0) < 0.001) {
+    if (Math.abs(weight - 1.0) < WEIGHT_TOLERANCE) {
       nodes.push(createNodeFromTerminal(t));
       i++;
       continue;
@@ -535,17 +545,37 @@ function groupTerminals(terminals: Terminal[]): ASTNode[] {
 
     // ── Numeric weight (not a power of ATTENTION_STEP) ──
     {
-      let j = i;
-      while (j < terminals.length && Math.abs(terminals[j]!.weight - weight) < 0.001) {
-        j++;
+      const j = findRunEnd(terminals, i, (t) => Math.abs(t.weight - weight) < WEIGHT_TOLERANCE);
+
+      // Trim whitespace from the content run boundaries (same as +/- branch)
+      let runStart = i;
+      let runEnd = j;
+      while (runStart < runEnd && terminals[runStart]!.type === 'whitespace') {
+        runStart++;
+      }
+      while (runEnd > runStart && terminals[runEnd - 1]!.type === 'whitespace') {
+        runEnd--;
       }
 
-      const groupSlice = terminals.slice(i, j).map((t) => ({ ...t, weight: 1.0 }));
-      const children = groupTerminals(groupSlice);
-      const isSelection = groupSlice.every((t) => t.isSelected);
-      const weightNum = Number(weight.toFixed(4));
+      // Emit leading whitespace as standalone nodes
+      for (let k = i; k < runStart; k++) {
+        nodes.push(createNodeFromTerminal(terminals[k]!));
+      }
 
-      nodes.push({ type: 'group', children, attention: weightNum, range: { start: 0, end: 0 }, isSelection });
+      if (runStart < runEnd) {
+        const groupSlice = terminals.slice(runStart, runEnd).map((t) => ({ ...t, weight: 1.0 }));
+        const children = groupTerminals(groupSlice);
+        const isSelection = groupSlice.every((t) => t.isSelected);
+        const weightNum = Number(weight.toFixed(4));
+
+        nodes.push({ type: 'group', children, attention: weightNum, range: NO_RANGE, isSelection });
+      }
+
+      // Emit trailing whitespace as standalone nodes
+      for (let k = runEnd; k < j; k++) {
+        nodes.push(createNodeFromTerminal(terminals[k]!));
+      }
+
       i = j;
     }
   }
@@ -555,6 +585,8 @@ function groupTerminals(terminals: Terminal[]): ASTNode[] {
 /**
  * Find the end of a "run" of terminals whose weights satisfy a predicate.
  * Whitespace terminals are included if the next non-whitespace terminal also satisfies the predicate.
+ * Note: The returned index may point to a whitespace token that is NOT included in the run;
+ * the caller is responsible for trimming trailing whitespace from the run boundaries.
  */
 function findRunEnd(terminals: Terminal[], start: number, predicate: (t: Terminal) => boolean): number {
   let j = start;
@@ -603,93 +635,4 @@ function createNodeFromTerminal(t: Terminal): ASTNode {
     default:
       return { type: 'word', text: t.text, range: t.range, isSelection: t.isSelected || undefined };
   }
-}
-
-// #region Serialize with Selection Tracking
-
-/**
- * Serialize an AST to a prompt string while simultaneously computing the
- * selection range from `isSelection` flags on nodes.
- *
- * This is more reliable than separate serialize + selection computation because
- * the position tracking is guaranteed to match the serialized output.
- */
-function serializeWithSelection(ast: ASTNode[]): { prompt: string; selectionStart: number; selectionEnd: number } {
-  let prompt = '';
-  let selStart = Infinity;
-  let selEnd = -1;
-
-  function markSelected(nodeStart: number, nodeEnd: number) {
-    selStart = Math.min(selStart, nodeStart);
-    selEnd = Math.max(selEnd, nodeEnd);
-  }
-
-  function visit(nodes: ASTNode[]) {
-    for (const node of nodes) {
-      const nodeStart = prompt.length;
-
-      switch (node.type) {
-        case 'punct':
-        case 'whitespace': {
-          prompt += node.value;
-          break;
-        }
-        case 'escaped_paren': {
-          prompt += `\\${node.value}`;
-          break;
-        }
-        case 'word': {
-          prompt += node.text;
-          if (node.attention) {
-            prompt += String(node.attention);
-          }
-          break;
-        }
-        case 'group': {
-          prompt += '(';
-          visit(node.children);
-          prompt += ')';
-          if (node.attention) {
-            prompt += String(node.attention);
-          }
-          break;
-        }
-        case 'embedding': {
-          prompt += `<${node.value}>`;
-          break;
-        }
-        case 'prompt_function': {
-          prompt += '(';
-          for (let idx = 0; idx < node.promptArgs.length; idx++) {
-            if (idx > 0) {
-              prompt += ', ';
-            }
-            const arg = node.promptArgs[idx]!;
-            prompt += arg.quote;
-            visit(arg.nodes);
-            prompt += CLOSE_QUOTE_MAP[arg.quote] ?? arg.quote;
-          }
-          prompt += ').';
-          prompt += node.name;
-          prompt += '(';
-          prompt += node.functionParams;
-          prompt += ')';
-          break;
-        }
-      }
-
-      if (node.isSelection) {
-        markSelected(nodeStart, prompt.length);
-      }
-    }
-  }
-
-  visit(ast);
-
-  if (selStart === Infinity) {
-    selStart = 0;
-    selEnd = prompt.length;
-  }
-
-  return { prompt, selectionStart: selStart, selectionEnd: selEnd };
 }
