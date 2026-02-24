@@ -1,11 +1,30 @@
-import { Box, Button, Flex, Heading } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import {
+  Badge,
+  Box,
+  Button,
+  ButtonGroup,
+  Flex,
+  Heading,
+  IconButton,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+  Table,
+  TableContainer,
+  Tbody,
+  Th,
+  Thead,
+  Tr,
+} from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { getApiErrorDetail } from 'features/modelManagerV2/util/getApiErrorDetail';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { PiPauseBold, PiPlayBold, PiXBold } from 'react-icons/pi';
+import { PiBroomBold, PiCaretDownBold, PiPauseBold, PiPlayBold, PiXBold } from 'react-icons/pi';
 import {
   useCancelModelInstallMutation,
   useListModelInstallsQuery,
@@ -20,6 +39,18 @@ import { ModelInstallQueueItem } from './ModelInstallQueueItem';
 
 const hasRestartRequired = (job: ModelInstallJob) => {
   return job.download_parts?.some((part) => part.resume_required || part.status === 'error') ?? false;
+};
+
+const ModelQueueTableSx: SystemStyleObject = {
+  '& tbody tr:nth-of-type(odd)': {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  '& tbody tr:nth-of-type(even)': {
+    backgroundColor: 'transparent',
+  },
+  'td, th': {
+    borderColor: 'base.700',
+  },
 };
 
 export const ModelInstallQueue = memo(() => {
@@ -158,7 +189,6 @@ export const ModelInstallQueue = memo(() => {
   }, [data]);
 
   const pauseResumeLabel = showResumeAll ? t('modelManager.resumeAll') : t('modelManager.pauseAll');
-  const pauseResumeTooltip = showResumeAll ? t('modelManager.resumeAllTooltip') : t('modelManager.pauseAllTooltip');
 
   const pauseOrResumeAll = useCallback(() => {
     if (showResumeAll) {
@@ -176,41 +206,19 @@ export const ModelInstallQueue = memo(() => {
   const isBulkActionRunning = bulkActionInProgress !== null;
 
   return (
-    <Flex flexDir="column" p={3} h="full" gap={3}>
+    <Flex flexDir="column" h="full" gap={4}>
+      {/* Model Queue Header */}
       <Flex justifyContent="space-between" alignItems="center">
         <Flex alignItems="center" gap={2}>
-          <Heading size="sm">{t('modelManager.installQueue')}</Heading>
-          {!isConnected && (
-            <Box layerStyle="first" px={2} py={0.5} borderRadius="base">
-              <Heading size="sm" color="error.300">
-                {t('modelManager.backendDisconnected')}
-              </Heading>
-            </Box>
-          )}
+          <Heading size="md">{t('modelManager.installQueue')}</Heading>
+          {!isConnected && <Badge colorScheme="red">{t('modelManager.backendDisconnected')}</Badge>}
         </Flex>
-        <Flex gap={2} alignItems="center">
+
+        {/* Bulk Actions */}
+        <ButtonGroup>
           <Button
             size="sm"
-            leftIcon={showResumeAll ? <PiPlayBold /> : <PiPauseBold />}
-            isDisabled={!pauseResumeAvailable || isBulkActionRunning || isPruning}
-            isLoading={bulkActionInProgress === 'pause' || bulkActionInProgress === 'resume'}
-            onClick={pauseOrResumeAll}
-            tooltip={pauseResumeTooltip}
-          >
-            {pauseResumeLabel}
-          </Button>
-          <Button
-            size="sm"
-            leftIcon={<PiXBold />}
-            isDisabled={!hasCancelableInstalls || isBulkActionRunning || isPruning}
-            isLoading={bulkActionInProgress === 'cancel'}
-            onClick={cancelAll}
-            tooltip={t('modelManager.cancelAllTooltip')}
-          >
-            {t('modelManager.cancelAll')}
-          </Button>
-          <Button
-            size="sm"
+            leftIcon={<PiBroomBold />}
             isDisabled={!pruneAvailable || isBulkActionRunning}
             isLoading={isPruning}
             onClick={pruneCompletedModelInstalls}
@@ -218,15 +226,48 @@ export const ModelInstallQueue = memo(() => {
           >
             {t('modelManager.prune')}
           </Button>
-        </Flex>
+          <Menu>
+            <MenuButton as={IconButton} size="sm" icon={<PiCaretDownBold />} />
+            <MenuList>
+              <MenuItem
+                icon={showResumeAll ? <PiPlayBold /> : <PiPauseBold />}
+                isDisabled={!pauseResumeAvailable || isBulkActionRunning || isPruning}
+                onClick={pauseOrResumeAll}
+              >
+                {pauseResumeLabel}
+              </MenuItem>
+              <MenuItem
+                icon={<PiXBold />}
+                isDisabled={!hasCancelableInstalls || isBulkActionRunning || isPruning}
+                onClick={cancelAll}
+              >
+                {t('modelManager.cancelAll')}
+              </MenuItem>
+            </MenuList>
+          </Menu>
+        </ButtonGroup>
       </Flex>
-      <Box layerStyle="first" p={3} borderRadius="base" w="full" h="full">
+
+      {/* Model Queue List */}
+      <Box layerStyle="second" py={4} borderRadius="base" w="full" h="full">
         <ScrollableContent>
-          <Flex flexDir="column-reverse" gap="2" w="full">
-            {data?.map((model) => (
-              <ModelInstallQueueItem key={model.id} installJob={model} />
-            ))}
-          </Flex>
+          <TableContainer>
+            <Table size="sm" sx={ModelQueueTableSx}>
+              <Thead>
+                <Tr>
+                  <Th></Th>
+                  <Th>Name</Th>
+                  <Th>Status</Th>
+                  <Th textAlign="right">Actions</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {data?.map((model) => (
+                  <ModelInstallQueueItem key={model.id} installJob={model} />
+                ))}
+              </Tbody>
+            </Table>
+          </TableContainer>
         </ScrollableContent>
       </Box>
     </Flex>

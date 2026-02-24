@@ -23,7 +23,7 @@ const ModelInstallQueueBadge = ({ status }: { status?: ModelInstallStatus }) => 
   }
 
   return (
-    <Badge textAlign="center" w="134px" colorScheme={statusConfig.colorScheme}>
+    <Badge textAlign="center" colorScheme={statusConfig.colorScheme}>
       {t(statusConfig.translationKey)}
     </Badge>
   );

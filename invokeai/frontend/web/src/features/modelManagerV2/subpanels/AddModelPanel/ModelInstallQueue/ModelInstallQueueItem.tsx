@@ -1,10 +1,34 @@
-import { Badge, Box, Flex, IconButton, Progress, Text, Tooltip } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import {
+  Badge,
+  Box,
+  Button,
+  CircularProgress,
+  Flex,
+  Icon,
+  IconButton,
+  Td,
+  Text,
+  Tooltip,
+  Tr,
+} from '@invoke-ai/ui-library';
 import { isNil } from 'es-toolkit/compat';
 import { getApiErrorDetail } from 'features/modelManagerV2/util/getApiErrorDetail';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
-import { PiArrowClockwiseBold, PiPauseBold, PiPlayBold, PiXBold } from 'react-icons/pi';
+import {
+  PiArrowClockwiseBold,
+  PiCheckCircleFill,
+  PiLineVerticalBold,
+  PiPauseBold,
+  PiPlayBold,
+  PiWarningBold,
+  PiWarningDiamondBold,
+  PiWarningFill,
+  PiXBold,
+  PiXCircleBold,
+} from 'react-icons/pi';
 import {
   useCancelModelInstallMutation,
   usePauseModelInstallMutation,
@@ -30,6 +54,34 @@ const formatBytes = (bytes: number) => {
   }
 
   return `${bytes.toFixed(2)} ${units[i]}`;
+};
+
+const ProgressColumnSx: SystemStyleObject = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const ModelNameColumnSx: SystemStyleObject = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 1,
+};
+
+const BadgesColumnSx: SystemStyleObject = {
+  display: 'flex',
+  gap: 1,
+  alignItems: 'flex-start',
+  flexWrap: 'wrap',
+};
+
+const ActionsColumnSx: SystemStyleObject = {
+  display: 'flex',
+  gap: 2,
+  alignItems: 'flex-start',
+  justifyContent: 'flex-end',
+  minWidth: '90px',
 };
 
 export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
@@ -249,98 +301,147 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     installJob.status === 'paused';
 
   return (
-    <>
-      <Flex gap={1} w="full" alignItems="center">
-        <Tooltip maxW={600} label={<TooltipLabel name={modelName} source={sourceLocation} installJob={installJob} />}>
-          <Flex gap={3} w="full" alignItems="center">
-            <Text w={96} whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
-              {modelName}
-            </Text>
-            <Progress
-              w="full"
-              flexGrow={1}
+    <Tr>
+      {/* Progress */}
+      <Td>
+        <Box sx={ProgressColumnSx}>
+          {hasRestartRequired ? (
+            <Box sx={{ color: 'orange.300' }}>
+              <PiWarningBold size={20} />
+            </Box>
+          ) : progressValue && progressValue < 100 ? (
+            <CircularProgress
+              size="20px"
               value={progressValue ?? 0}
               isIndeterminate={progressValue === null}
               aria-label={t('accessibility.invokeProgressBar')}
-              h={2}
             />
-            <ModelInstallQueueBadge status={installJob.status} />
-          </Flex>
-        </Tooltip>
-        <Flex gap={1} alignItems="center" justifyContent="flex-end" minW="90px">
-          {showResume && (
-            <IconButton
-              size="xs"
-              tooltip={t('modelManager.resume')}
-              aria-label={t('modelManager.resume')}
-              icon={<PiPlayBold />}
-              onClick={handleResumeModelInstall}
-              variant="ghost"
-            />
+          ) : installJob.status === 'cancelled' ? (
+            <Box sx={{ color: 'orange.200', transform: 'rotate(90deg)' }}>
+              <PiLineVerticalBold size={20} />
+            </Box>
+          ) : (
+            <Box sx={{ color: 'green.300' }}>
+              <PiCheckCircleFill size={24} />
+            </Box>
           )}
-          {showPause && (
-            <IconButton
-              size="xs"
-              tooltip={t('modelManager.pause')}
-              aria-label={t('modelManager.pause')}
-              icon={<PiPauseBold />}
-              onClick={handlePauseModelInstall}
-              variant="ghost"
-            />
-          )}
+        </Box>
+      </Td>
+
+      {/* Model Info */}
+      <Td>
+        <Box sx={ModelNameColumnSx}>
+          <Text fontWeight="semibold">{modelName}</Text>
+          <Box>
+            <Text as="span" fontStyle="italic" wordBreak="break-all">
+              {sourceLocation}
+            </Text>
+            {installJob.error_reason && (
+              <Text as="span" color="error.500" ml={2}>
+                {t('queue.failed')}: {installJob.error}
+              </Text>
+            )}
+          </Box>
           {hasRestartRequired && (
-            <IconButton
-              size="xs"
-              tooltip={t('modelManager.restartFailed')}
-              aria-label={t('modelManager.restartFailed')}
-              icon={<PiArrowClockwiseBold />}
-              onClick={handleRestartFailed}
-              variant="ghost"
-            />
+            <Flex direction="column" gap={1} w="full" mt={1}>
+              {restartRequiredParts.map((part) => {
+                const fileName = part.source.split('/').slice(-1)[0] ?? t('common.unknown');
+                const isResumeRequired = part.resume_required;
+                return (
+                  <Flex key={part.source} gap={2} alignItems="center" wrap="wrap" p={2} bg="base.800" borderRadius="md">
+                    <Icon
+                      as={isResumeRequired ? PiWarningFill : PiWarningDiamondBold}
+                      color={isResumeRequired ? 'orange.500' : 'red.500'}
+                    />
+                    <Text fontSize="xs" color="base.200" maxW="200px" noOfLines={1} title={fileName}>
+                      {fileName}
+                    </Text>
+                    <Badge colorScheme={isResumeRequired ? 'orange' : 'red'} fontSize="10px">
+                      {isResumeRequired ? t('modelManager.restartRequired') : t('queue.failed')}
+                    </Badge>
+                    <Text fontSize="xs" color="warning.400">
+                      {isResumeRequired ? t('modelManager.resumeRefused') : t('queue.failed')}
+                    </Text>
+                    <IconButton
+                      size="xs"
+                      tooltip={t('modelManager.restartFile')}
+                      aria-label={t('modelManager.restartFile')}
+                      icon={<PiArrowClockwiseBold />}
+                      onClick={getRestartFileHandler(part.source)}
+                      variant="ghost"
+                      ml="auto"
+                    />
+                  </Flex>
+                );
+              })}
+            </Flex>
           )}
+        </Box>
+      </Td>
+
+      {/* Status */}
+      <Td>
+        <Box sx={BadgesColumnSx}>
+          <ModelInstallQueueBadge status={installJob.status} />
+          {hasRestartRequired && (
+            <Tooltip label={t('modelManager.restartRequiredTooltip')}>
+              <Badge colorScheme="red">{t('modelManager.restartRequired')}</Badge>
+            </Tooltip>
+          )}
+        </Box>
+      </Td>
+
+      {/* Actions */}
+      <Td textAlign="right" minWidth={130}>
+        <Box sx={ActionsColumnSx}>
+          {showResume ? (
+            <Button
+              size="sm"
+              tooltip={t('modelManager.resume')}
+              leftIcon={<PiPlayBold />}
+              onClick={handleResumeModelInstall}
+            >
+              {t('modelManager.resume')}
+            </Button>
+          ) : showPause ? (
+            <Button
+              size="sm"
+              tooltip={t('modelManager.pause')}
+              leftIcon={<PiPauseBold />}
+              onClick={handlePauseModelInstall}
+            >
+              {t('modelManager.pause')}
+            </Button>
+          ) : null}
+
+          {hasRestartRequired && (
+            <Button
+              tooltip={t('modelManager.restartFailed')}
+              size="sm"
+              leftIcon={<PiArrowClockwiseBold />}
+              onClick={handleRestartFailed}
+              colorScheme="error"
+              variant="ghost"
+            >
+              {t('modelManager.restartFailed')}
+            </Button>
+          )}
+
           {showCancel && (
             <IconButton
-              size="xs"
               tooltip={t('modelManager.cancel')}
-              aria-label={t('modelManager.cancel')}
               icon={<PiXBold />}
+              aria-label={t('modelManager.cancel')}
               onClick={handleDeleteModelImport}
-              variant="ghost"
+              size="sm"
+              colorScheme="error"
             />
           )}
-          {!showResume && !showPause && !showCancel && <Box w="24px" />}
-        </Flex>
-      </Flex>
-      {hasRestartRequired && (
-        <Flex direction="column" gap={1} w="full" mt={1}>
-          {restartRequiredParts.map((part) => {
-            const fileName = part.source.split('/').slice(-1)[0] ?? t('common.unknown');
-            const isResumeRequired = part.resume_required;
-            return (
-              <Flex key={part.source} gap={2} alignItems="center" wrap="wrap">
-                <Text fontSize="xs" color="base.200" maxW="200px" noOfLines={1}>
-                  {fileName}
-                </Text>
-                <Badge colorScheme={isResumeRequired ? 'orange' : 'red'} fontSize="10px">
-                  {isResumeRequired ? t('modelManager.restartRequired') : t('queue.failed')}
-                </Badge>
-                <Text fontSize="xs" color="warning.400">
-                  {isResumeRequired ? t('modelManager.resumeRefused') : t('queue.failed')}
-                </Text>
-                <IconButton
-                  size="xs"
-                  tooltip={t('modelManager.restartFile')}
-                  aria-label={t('modelManager.restartFile')}
-                  icon={<PiArrowClockwiseBold />}
-                  onClick={getRestartFileHandler(part.source)}
-                  variant="ghost"
-                />
-              </Flex>
-            );
-          })}
-        </Flex>
-      )}
-    </>
+
+          {!showCancel && !showPause && !showResume && <Text fontSize="2xs">No actions available</Text>}
+        </Box>
+      </Td>
+    </Tr>
   );
 });
 
