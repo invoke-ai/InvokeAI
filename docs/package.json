@@ -15,7 +15,7 @@
     "@astrojs/starlight-markdoc": "^0.5.1",
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/roboto-mono": "^5.2.8",
-    "astro": "^5.6.1",
+    "astro": "^5.17.3",
     "mermaid": "^11.12.3",
     "rehype-external-links": "^3.0.0",
     "sharp": "^0.34.2"

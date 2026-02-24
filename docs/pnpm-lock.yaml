@@ -10,13 +10,13 @@ importers:
     dependencies:
       '@astrojs/markdoc':
         specifier: ^0.15.10
-        version: 0.15.10(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
+        version: 0.15.10(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
       '@astrojs/starlight':
         specifier: ^0.37.6
-        version: 0.37.6(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
+        version: 0.37.6(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
       '@astrojs/starlight-markdoc':
         specifier: ^0.5.1
-        version: 0.5.1(@astrojs/markdoc@0.15.10(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))(@astrojs/starlight@0.37.6(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))
+        version: 0.5.1(@astrojs/markdoc@0.15.10(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))(@astrojs/starlight@0.37.6(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))
       '@fontsource-variable/inter':
         specifier: ^5.2.8
         version: 5.2.8
@@ -24,8 +24,8 @@ importers:
         specifier: ^5.2.8
         version: 5.2.8
       astro:
-        specifier: ^5.6.1
-        version: 5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
+        specifier: ^5.17.3
+        version: 5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
       mermaid:
         specifier: ^11.12.3
         version: 11.12.3
@@ -1080,8 +1080,8 @@ packages:
     peerDependencies:
       astro: ^4.0.0-beta || ^5.0.0-beta || ^3.3.0 || ^6.0.0-beta
 
-  astro@5.17.2:
-    resolution: {integrity: sha512-7jnMqGo53hOQNwo1N/wqeOvUp8wwW/p+DeerSjSkHNx8L/1mhy6P7rVo7EhdmF8DpKqw0tl/B5Fx1WcIzg1ysA==}
+  astro@5.17.3:
+    resolution: {integrity: sha512-69dcfPe8LsHzklwj+hl+vunWUbpMB6pmg35mACjetxbJeUNNys90JaBM8ZiwsPK689SAj/4Zqb1ayaANls9/MA==}
     engines: {node: 18.20.8 || ^20.3.0 || >=22.0.0, npm: '>=9.6.5', pnpm: '>=7.1.0'}
     hasBin: true
 
@@ -2718,13 +2718,13 @@ snapshots:
 
   '@astrojs/internal-helpers@0.7.5': {}
 
-  '@astrojs/markdoc@0.15.10(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))':
+  '@astrojs/markdoc@0.15.10(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))':
     dependencies:
       '@astrojs/internal-helpers': 0.7.5
       '@astrojs/markdown-remark': 6.3.10
       '@astrojs/prism': 3.3.0
       '@markdoc/markdoc': 0.5.4
-      astro: 5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
+      astro: 5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
       esbuild: 0.25.12
       github-slugger: 2.0.0
       htmlparser2: 10.1.0
@@ -2759,12 +2759,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@astrojs/mdx@4.3.13(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))':
+  '@astrojs/mdx@4.3.13(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))':
     dependencies:
       '@astrojs/markdown-remark': 6.3.10
       '@mdx-js/mdx': 3.1.1
       acorn: 8.15.0
-      astro: 5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
+      astro: 5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
       es-module-lexer: 1.7.0
       estree-util-visit: 2.0.0
       hast-util-to-html: 9.0.5
@@ -2788,22 +2788,22 @@ snapshots:
       stream-replace-string: 2.0.0
       zod: 3.25.76
 
-  '@astrojs/starlight-markdoc@0.5.1(@astrojs/markdoc@0.15.10(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))(@astrojs/starlight@0.37.6(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))':
+  '@astrojs/starlight-markdoc@0.5.1(@astrojs/markdoc@0.15.10(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))(@astrojs/starlight@0.37.6(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))':
     dependencies:
-      '@astrojs/markdoc': 0.15.10(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
-      '@astrojs/starlight': 0.37.6(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
+      '@astrojs/markdoc': 0.15.10(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
+      '@astrojs/starlight': 0.37.6(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
 
-  '@astrojs/starlight@0.37.6(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))':
+  '@astrojs/starlight@0.37.6(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))':
     dependencies:
       '@astrojs/markdown-remark': 6.3.10
-      '@astrojs/mdx': 4.3.13(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
+      '@astrojs/mdx': 4.3.13(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
       '@astrojs/sitemap': 3.7.0
       '@pagefind/default-ui': 1.4.0
       '@types/hast': 3.0.4
       '@types/js-yaml': 4.0.9
       '@types/mdast': 4.0.4
-      astro: 5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
-      astro-expressive-code: 0.41.6(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
+      astro: 5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
+      astro-expressive-code: 0.41.6(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
       bcp-47: 2.1.0
       hast-util-from-html: 2.0.3
       hast-util-select: 6.0.4
@@ -3581,12 +3581,12 @@ snapshots:
 
   astring@1.9.0: {}
 
-  astro-expressive-code@0.41.6(astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)):
+  astro-expressive-code@0.41.6(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)):
     dependencies:
-      astro: 5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
+      astro: 5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
       rehype-expressive-code: 0.41.6
 
-  astro@5.17.2(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3):
+  astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3):
     dependencies:
       '@astrojs/compiler': 2.13.1
       '@astrojs/internal-helpers': 0.7.5
