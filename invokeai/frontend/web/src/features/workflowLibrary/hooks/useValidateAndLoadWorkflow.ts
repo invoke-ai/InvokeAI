@@ -16,7 +16,7 @@ import { useCallback } from 'react';
 import { serializeError } from 'serialize-error';
 import { checkBoardAccess, checkImageAccess, checkModelAccess } from 'services/api/hooks/accessChecks';
 import { z } from 'zod';
-import { fromZodError } from 'zod-validation-error/v4';
+import { fromZodError } from 'zod-validation-error';
 
 const log = logger('workflows');
 
