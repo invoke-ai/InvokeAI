@@ -98,6 +98,24 @@ describe('promptAST', () => {
         { type: 'rparen', start: 15, end: 16 },
       ]);
     });
+
+    it('should tokenize curly/smart quotes as punctuation', () => {
+      const tokens = tokenize('\u201chello\u201d');
+      expect(tokens).toEqual([
+        { type: 'punct', value: '\u201c', start: 0, end: 1 },
+        { type: 'word', value: 'hello', start: 1, end: 6 },
+        { type: 'punct', value: '\u201d', start: 6, end: 7 },
+      ]);
+    });
+
+    it('should tokenize curly single quotes as punctuation', () => {
+      const tokens = tokenize('\u2018hello\u2019');
+      expect(tokens).toEqual([
+        { type: 'punct', value: '\u2018', start: 0, end: 1 },
+        { type: 'word', value: 'hello', start: 1, end: 6 },
+        { type: 'punct', value: '\u2019', start: 6, end: 7 },
+      ]);
+    });
   });
 
   describe('parseTokens', () => {
@@ -266,6 +284,64 @@ describe('promptAST', () => {
         expect(pf.promptArgs[0]!.quote).toBe('"');
       });
 
+      it('should parse prompt function with curly double quotes', () => {
+        const tokens = tokenize('(\u201cone\u201d, \u201ctwo\u201d).and()');
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.name).toBe('and');
+        expect(pf.promptArgs).toHaveLength(2);
+        expect(pf.promptArgs[0]!.quote).toBe('\u201c');
+        expect(pf.promptArgs[0]!.nodes[0]).toMatchObject({ type: 'word', text: 'one' });
+        expect(pf.promptArgs[1]!.nodes[0]).toMatchObject({ type: 'word', text: 'two' });
+      });
+
+      it('should parse prompt function with curly single quotes', () => {
+        const tokens = tokenize('(\u2018one\u2019, \u2018two\u2019).and()');
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.name).toBe('and');
+        expect(pf.promptArgs[0]!.quote).toBe('\u2018');
+      });
+
+      it('should parse prompt function with curly quotes containing commas in args', () => {
+        const prompt = '(\u201chigh detail, cinematic\u201d, \u201csoft light, portrait\u201d).and()';
+        const ast = parseTokens(tokenize(prompt));
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.promptArgs).toHaveLength(2);
+      });
+
+      it('should parse prompt function with newline before .method()', () => {
+        const prompt = '(\u201cone\u201d, \u201ctwo\u201d)\n.and()';
+        const ast = parseTokens(tokenize(prompt));
+        expect(ast).toHaveLength(1);
+        expect(ast[0]!.type).toBe('prompt_function');
+      });
+
+      it('should parse quoted prompt function with newline before .method()', () => {
+        const prompt = "('one', 'two')\n.and()";
+        const ast = parseTokens(tokenize(prompt));
+        expect(ast).toHaveLength(1);
+        expect(ast[0]!.type).toBe('prompt_function');
+      });
+
       it('should parse prompt function with attention inside args', () => {
         const tokens = tokenize("('hello+', '(world)-').and()");
         const ast = parseTokens(tokens);
@@ -337,6 +413,102 @@ describe('promptAST', () => {
         }
         expect(pf.promptArgs).toHaveLength(3);
         expect(pf.functionParams).toBe('0.5, 0.3, 0.2');
+      });
+    });
+
+    describe('unquoted prompt functions', () => {
+      it('should parse unquoted .and() prompt function', () => {
+        const tokens = tokenize('(one,two).and()');
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.name).toBe('and');
+        expect(pf.functionParams).toBe('');
+        expect(pf.promptArgs).toHaveLength(2);
+        expect(pf.promptArgs[0]!.quote).toBe('');
+        expect(pf.promptArgs[0]!.nodes[0]).toMatchObject({ type: 'word', text: 'one' });
+        expect(pf.promptArgs[1]!.quote).toBe('');
+        expect(pf.promptArgs[1]!.nodes[0]).toMatchObject({ type: 'word', text: 'two' });
+      });
+
+      it('should parse unquoted .and() with spaces', () => {
+        const tokens = tokenize('(one two, three four).and()');
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.name).toBe('and');
+        expect(pf.promptArgs).toHaveLength(2);
+        expect(pf.promptArgs[0]!.nodes[0]).toMatchObject({ type: 'word', text: 'one' });
+        expect(pf.promptArgs[0]!.nodes[2]).toMatchObject({ type: 'word', text: 'two' });
+        expect(pf.promptArgs[1]!.nodes[0]).toMatchObject({ type: 'word', text: 'three' });
+        expect(pf.promptArgs[1]!.nodes[2]).toMatchObject({ type: 'word', text: 'four' });
+      });
+
+      it('should parse unquoted .blend() with params', () => {
+        const tokens = tokenize('(one two, three four).blend(0.7, 0.3)');
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.name).toBe('blend');
+        expect(pf.functionParams).toBe('0.7, 0.3');
+        expect(pf.promptArgs).toHaveLength(2);
+      });
+
+      it('should parse unquoted three-arg prompt function', () => {
+        const tokens = tokenize('(a, b, c).blend(0.5, 0.3, 0.2)');
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        expect(pf.promptArgs).toHaveLength(3);
+        expect(pf.functionParams).toBe('0.5, 0.3, 0.2');
+      });
+
+      it('should parse unquoted prompt function with attention inside args', () => {
+        const tokens = tokenize('(hello+, world).and()');
+        const ast = parseTokens(tokens);
+        expect(ast).toHaveLength(1);
+
+        const pf = ast[0]!;
+        expect(pf.type).toBe('prompt_function');
+        if (pf.type !== 'prompt_function') {
+          return;
+        }
+        const arg0Word = pf.promptArgs[0]!.nodes[0]!;
+        expect(arg0Word).toMatchObject({ type: 'word', text: 'hello', attention: '+' });
+      });
+
+      it('should fall back to regular group for single-arg unquoted function', () => {
+        const tokens = tokenize('(hello world).and()');
+        const ast = parseTokens(tokens);
+        // Without a comma, this is not detected as a prompt function
+        expect(ast[0]!.type).toBe('group');
+      });
+
+      it('should parse unquoted prompt function embedded in larger prompt', () => {
+        const tokens = tokenize('some text, (a, b).and(), more text');
+        const ast = parseTokens(tokens);
+        const pfNodes = ast.filter((n) => n.type === 'prompt_function');
+        expect(pfNodes).toHaveLength(1);
       });
     });
   });
@@ -441,6 +613,44 @@ describe('promptAST', () => {
         const result = serialize(ast);
         expect(result).toBe('("one", "two").and()');
       });
+
+      it('should serialize curly double-quoted prompt function', () => {
+        const tokens = tokenize('(\u201cone\u201d, \u201ctwo\u201d).and()');
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe('(\u201cone\u201d, \u201ctwo\u201d).and()');
+      });
+
+      it('should serialize curly single-quoted prompt function', () => {
+        const tokens = tokenize('(\u2018one\u2019, \u2018two\u2019).and()');
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe('(\u2018one\u2019, \u2018two\u2019).and()');
+      });
+    });
+
+    describe('unquoted prompt functions', () => {
+      it('should serialize unquoted .and()', () => {
+        const tokens = tokenize('(one two, three four).and()');
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe('(one two, three four).and()');
+      });
+
+      it('should serialize unquoted .blend() with params', () => {
+        const tokens = tokenize('(one two, three four).blend(0.7, 0.3)');
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe('(one two, three four).blend(0.7, 0.3)');
+      });
+
+      it('should serialize unquoted prompt function embedded in larger prompt', () => {
+        const prompt = 'some text, (a, b).and(), more text';
+        const tokens = tokenize(prompt);
+        const ast = parseTokens(tokens);
+        const result = serialize(ast);
+        expect(result).toBe(prompt);
+      });
     });
   });
 
@@ -473,8 +683,40 @@ describe('promptAST', () => {
       "some text, ('a', 'b').and(), more text",
       "('a', 'b', 'c').blend(0.5, 0.3, 0.2)",
       '("one", "two").and()',
+      // Curly double-quoted prompt functions
+      '(\u201cone\u201d, \u201ctwo\u201d).and()',
+      '(\u201chigh detail, cinematic\u201d, \u201csoft light, portrait\u201d).and()',
+      '(\u201cone\u201d, \u201ctwo\u201d).blend(0.7, 0.3)',
+      // Curly single-quoted prompt functions
+      '(\u2018one\u2019, \u2018two\u2019).and()',
+      '(\u2018one\u2019, \u2018two\u2019).or()',
+      // Unquoted prompt functions
+      '(one two, three four).and()',
+      '(one two, three four).blend(0.7, 0.3)',
+      '(a, b, c).blend(0.5, 0.3, 0.2)',
+      'some text, (a, b).and(), more text',
     ])('should round-trip: %s', (prompt) => {
       expect(roundTrip(prompt)).toBe(prompt);
+    });
+  });
+
+  describe('newline normalization', () => {
+    const roundTrip = (prompt: string) => {
+      const tokens = tokenize(prompt);
+      const ast = parseTokens(tokens);
+      return serialize(ast);
+    };
+
+    it('should normalize newline before .method() in quoted prompt function', () => {
+      expect(roundTrip("('one', 'two')\n.and()")).toBe("('one', 'two').and()");
+    });
+
+    it('should normalize newline before .method() in curly-quoted prompt function', () => {
+      expect(roundTrip('(\u201cone\u201d, \u201ctwo\u201d)\n.and()')).toBe('(\u201cone\u201d, \u201ctwo\u201d).and()');
+    });
+
+    it('should normalize newline before .method() in unquoted prompt function', () => {
+      expect(roundTrip('(one, two)\n.and()')).toBe('(one, two).and()');
     });
   });
 

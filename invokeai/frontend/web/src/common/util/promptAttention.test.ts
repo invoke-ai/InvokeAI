@@ -321,6 +321,121 @@ describe('adjustPromptAttention', () => {
         expect(result.prompt).toBe("('aa bb+', '(cc dd)+', 'ee+ ff').blend(0.5, 0.3, 0.2)");
       });
     });
+
+    describe('unquoted prompt functions', () => {
+      it('should increment a word in unquoted .and()', () => {
+        const prompt = '(one, two).and()';
+        const result = adj(prompt, 'one', 'increment');
+        expect(result.prompt).toBe('(one+, two).and()');
+      });
+
+      it('should decrement a word in unquoted .and()', () => {
+        const prompt = '(one, two).and()';
+        const result = adj(prompt, 'one', 'decrement');
+        expect(result.prompt).toBe('(one-, two).and()');
+      });
+
+      it('should increment a word in unquoted multi-word arg', () => {
+        const prompt = '(hello world, foo bar).and()';
+        const result = adj(prompt, 'hello', 'increment');
+        expect(result.prompt).toBe('(hello+ world, foo bar).and()');
+      });
+
+      it('should increment all args when whole unquoted function is selected', () => {
+        const prompt = '(one, two).and()';
+        const result = adjustPromptAttention(prompt, 0, prompt.length, 'increment');
+        expect(result.prompt).toBe('(one+, two+).and()');
+      });
+
+      it('should preserve unquoted prompt function when adjusting text outside', () => {
+        const prompt = 'prefix (a, b).and() suffix';
+        const result = adj(prompt, 'prefix', 'increment');
+        expect(result.prompt).toContain('(a, b).and()');
+        expect(result.prompt).toContain('prefix+');
+      });
+
+      it('should handle unquoted .blend() with params', () => {
+        const prompt = '(one two, three four).blend(0.7, 0.3)';
+        const result = adj(prompt, 'one', 'increment');
+        expect(result.prompt).toBe('(one+ two, three four).blend(0.7, 0.3)');
+      });
+
+      it('should adjust across separator in unquoted prompt function', () => {
+        const prompt = '(one two, three four).and()';
+        const start = prompt.indexOf('two');
+        const end = prompt.indexOf('three') + 'three'.length;
+        const result = adjustPromptAttention(prompt, start, end, 'increment');
+        expect(result.prompt).toBe('(one two+, three+ four).and()');
+      });
+    });
+
+    describe('curly-quoted prompt functions', () => {
+      it('should increment a word inside curly double-quoted arg', () => {
+        const prompt = '(\u201chello world\u201d, \u201cother\u201d).and()';
+        const result = adj(prompt, 'hello', 'increment');
+        expect(result.prompt).toBe('(\u201chello+ world\u201d, \u201cother\u201d).and()');
+      });
+
+      it('should decrement a word inside curly double-quoted arg', () => {
+        const prompt = '(\u201chello world\u201d, \u201cother\u201d).and()';
+        const result = adj(prompt, 'hello', 'decrement');
+        expect(result.prompt).toBe('(\u201chello- world\u201d, \u201cother\u201d).and()');
+      });
+
+      it('should increment a word inside curly single-quoted arg', () => {
+        const prompt = '(\u2018hello world\u2019, \u2018other\u2019).and()';
+        const result = adj(prompt, 'hello', 'increment');
+        expect(result.prompt).toBe('(\u2018hello+ world\u2019, \u2018other\u2019).and()');
+      });
+
+      it('should increment all args when whole curly-quoted function is selected', () => {
+        const prompt = '(\u201cone\u201d, \u201ctwo\u201d).and()';
+        const result = adjustPromptAttention(prompt, 0, prompt.length, 'increment');
+        expect(result.prompt).toBe('(\u201cone+\u201d, \u201ctwo+\u201d).and()');
+      });
+
+      it('should adjust across separator in curly double-quoted prompt function', () => {
+        const prompt = '(\u201cone two\u201d, \u201cthree four\u201d).and()';
+        const start = prompt.indexOf('two');
+        const end = prompt.indexOf('three') + 'three'.length;
+        const result = adjustPromptAttention(prompt, start, end, 'increment');
+        expect(result.prompt).toBe('(\u201cone two+\u201d, \u201cthree+ four\u201d).and()');
+      });
+
+      it('should preserve curly-quoted function when adjusting text outside', () => {
+        const prompt = 'prefix (\u201ca\u201d, \u201cb\u201d).and() suffix';
+        const result = adj(prompt, 'prefix', 'increment');
+        expect(result.prompt).toContain('(\u201ca\u201d, \u201cb\u201d).and()');
+        expect(result.prompt).toContain('prefix+');
+      });
+
+      it('should handle curly-quoted .blend() with params', () => {
+        const prompt = '(\u201cone two\u201d, \u201cthree four\u201d).blend(0.7, 0.3)';
+        const result = adj(prompt, 'one', 'increment');
+        expect(result.prompt).toBe('(\u201cone+ two\u201d, \u201cthree four\u201d).blend(0.7, 0.3)');
+      });
+    });
+
+    describe('newline before .method()', () => {
+      it('should increment a word in quoted prompt function with newline before .method()', () => {
+        const prompt = "('hello world', 'other')\n.and()";
+        const result = adj(prompt, 'hello', 'increment');
+        // Newline is normalized away in output
+        expect(result.prompt).toBe("('hello+ world', 'other').and()");
+      });
+
+      it('should increment a word in curly-quoted prompt function with newline before .method()', () => {
+        const prompt = '(\u201chello world\u201d, \u201cother\u201d)\n.and()';
+        const result = adj(prompt, 'hello', 'increment');
+        expect(result.prompt).toBe('(\u201chello+ world\u201d, \u201cother\u201d).and()');
+      });
+
+      it('should increment a word in unquoted prompt function with newline before .method()', () => {
+        const prompt = '(hello, other)\n.and()';
+        const result = adj(prompt, 'hello', 'increment');
+        expect(result.prompt).toBe('(hello+, other).and()');
+      });
+    });
   });
 
   // Selection Preservation with Prompt Functions

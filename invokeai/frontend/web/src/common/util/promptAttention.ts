@@ -1,7 +1,14 @@
 import { logger } from 'app/logging/logger';
 import { serializeError } from 'serialize-error';
 
-import { type ASTNode, type Attention, parseTokens, type PromptFunctionArg, tokenize } from './promptAST';
+import {
+  type ASTNode,
+  type Attention,
+  CLOSE_QUOTE_MAP,
+  parseTokens,
+  type PromptFunctionArg,
+  tokenize,
+} from './promptAST';
 
 const log = logger('events');
 
@@ -660,7 +667,7 @@ function serializeWithSelection(ast: ASTNode[]): { prompt: string; selectionStar
             const arg = node.promptArgs[idx]!;
             prompt += arg.quote;
             visit(arg.nodes);
-            prompt += arg.quote;
+            prompt += CLOSE_QUOTE_MAP[arg.quote] ?? arg.quote;
           }
           prompt += ').';
           prompt += node.name;

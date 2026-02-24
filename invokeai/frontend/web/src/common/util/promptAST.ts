@@ -57,8 +57,20 @@ export type ASTNode =
 
 const WEIGHT_PATTERN = /^[+-]?(\d+(\.\d+)?|[+-]+)/;
 const WHITESPACE_PATTERN = /^\s+/;
-const PUNCTUATION_PATTERN = /^[.,/!?;:'"""''`~@#$%^&*=_|]/;
+// prettier-ignore
+const PUNCTUATION_PATTERN = /^[.,/!?;:'"""''\u2018\u2019\u201c\u201d`~@#$%^&*=_|]/;
 const OTHER_PATTERN = /\s/;
+
+/** All characters that can serve as an opening quote in a prompt function argument. */
+const OPEN_QUOTE_CHARS = new Set(["'", '"', '\u2018', '\u201c']);
+
+/** Map from opening curly quote to the matching closing curly quote. Straight quotes match themselves. */
+export const CLOSE_QUOTE_MAP: Record<string, string> = {
+  "'": "'",
+  '"': '"',
+  '\u2018': '\u2019', // ' → '
+  '\u201c': '\u201d', // " → "
+};
 
 /**
  * Convert a prompt string into a token stream.
@@ -261,17 +273,64 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
   }
 
   /**
-   * Quick lookahead check: does the current lparen (already consumed) start a prompt function?
-   * A prompt function looks like ('...', '...').method(...)
+   * Quick lookahead check: does the current lparen (already consumed) start a quoted prompt function?
+   * A quoted prompt function looks like ('...', '...').method(...)
    * We check if the first non-whitespace token after lparen is a quote character.
    */
-  function isPromptFunctionAhead(): boolean {
+  function isQuotedPromptFunctionAhead(): boolean {
     let p = 0;
     while (peekAt(p)?.type === 'whitespace') {
       p++;
     }
     const t = peekAt(p);
-    return t?.type === 'punct' && (t.value === "'" || t.value === '"');
+    return t?.type === 'punct' && OPEN_QUOTE_CHARS.has((t as Token & { type: 'punct' }).value);
+  }
+
+  /**
+   * Lookahead check: does the current lparen (already consumed) start an unquoted prompt function?
+   * An unquoted prompt function looks like (arg1, arg2).method(...) where args are not quoted.
+   * We scan forward looking for a comma at the same nesting depth, then rparen followed by .word(
+   */
+  function isUnquotedPromptFunctionAhead(): boolean {
+    let p = 0;
+    let depth = 0;
+    let hasComma = false;
+
+    // Scan forward through tokens to find the matching rparen
+    while (peekAt(p)) {
+      const t = peekAt(p)!;
+
+      if (t.type === 'lparen') {
+        depth++;
+      } else if (t.type === 'rparen') {
+        if (depth === 0) {
+          // Found matching rparen — now check for .methodName( pattern
+          // (possibly with whitespace between ) and .)
+          if (!hasComma) {
+            return false; // No comma means it's just a regular group
+          }
+          let next = p + 1;
+          while (peekAt(next)?.type === 'whitespace') {
+            next++;
+          }
+          const dot = peekAt(next);
+          const methodName = peekAt(next + 1);
+          const methodParen = peekAt(next + 2);
+          return (
+            dot?.type === 'punct' &&
+            (dot as Token & { type: 'punct' }).value === '.' &&
+            methodName?.type === 'word' &&
+            methodParen?.type === 'lparen'
+          );
+        }
+        depth--;
+      } else if (t.type === 'punct' && (t as Token & { type: 'punct' }).value === ',' && depth === 0) {
+        hasComma = true;
+      }
+
+      p++;
+    }
+    return false;
   }
 
   /**
@@ -281,7 +340,8 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
    */
   function tryParsePromptFunction(lparenToken: Token & { type: 'lparen' }, savedPos: number): ASTNode | null {
     const args: PromptFunctionArg[] = [];
-    let quoteChar: string | null = null;
+    let openQuoteChar: string | null = null;
+    let closeQuoteChar: string | null = null;
 
     while (pos < tokens.length) {
       // Skip whitespace before arg or closing paren
@@ -309,20 +369,21 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
 
       // Expect opening quote
       const openQuoteTok = peek();
-      if (
-        !openQuoteTok ||
-        openQuoteTok.type !== 'punct' ||
-        ((openQuoteTok as Token & { type: 'punct' }).value !== "'" &&
-          (openQuoteTok as Token & { type: 'punct' }).value !== '"')
-      ) {
+      if (!openQuoteTok || openQuoteTok.type !== 'punct') {
+        pos = savedPos;
+        return null;
+      }
+      const thisOpenQuote = (openQuoteTok as Token & { type: 'punct' }).value;
+      if (!OPEN_QUOTE_CHARS.has(thisOpenQuote)) {
         pos = savedPos;
         return null;
       }
 
-      const thisQuote = (openQuoteTok as Token & { type: 'punct' }).value;
-      if (quoteChar === null) {
-        quoteChar = thisQuote;
-      } else if (thisQuote !== quoteChar) {
+      const thisCloseQuote = CLOSE_QUOTE_MAP[thisOpenQuote]!;
+      if (openQuoteChar === null) {
+        openQuoteChar = thisOpenQuote;
+        closeQuoteChar = thisCloseQuote;
+      } else if (thisOpenQuote !== openQuoteChar) {
         // Mismatched quote style between args
         pos = savedPos;
         return null;
@@ -336,7 +397,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
       let contentEnd = contentStart;
       while (pos < tokens.length) {
         const t = peek();
-        if (t?.type === 'punct' && (t as Token & { type: 'punct' }).value === quoteChar) {
+        if (t?.type === 'punct' && (t as Token & { type: 'punct' }).value === closeQuoteChar) {
           contentEnd = t.start;
           break;
         }
@@ -350,7 +411,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
       if (
         !closeQuoteTok ||
         closeQuoteTok.type !== 'punct' ||
-        (closeQuoteTok as Token & { type: 'punct' }).value !== quoteChar
+        (closeQuoteTok as Token & { type: 'punct' }).value !== closeQuoteChar
       ) {
         pos = savedPos;
         return null;
@@ -362,7 +423,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
 
       args.push({
         nodes: argNodes,
-        quote: quoteChar,
+        quote: openQuoteChar,
         contentRange: { start: contentStart, end: contentEnd },
       });
     }
@@ -378,6 +439,167 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
       return null;
     }
     consume(); // consume rparen
+
+    // Skip whitespace between ) and .methodName (allows newlines)
+    while (peek()?.type === 'whitespace') {
+      consume();
+    }
+
+    // Expect .methodName(params)
+    if (peek()?.type !== 'punct' || (peek() as Token & { type: 'punct' }).value !== '.') {
+      pos = savedPos;
+      return null;
+    }
+    consume(); // consume dot
+
+    if (peek()?.type !== 'word') {
+      pos = savedPos;
+      return null;
+    }
+    const methodName = (consume() as Token & { type: 'word' }).value;
+
+    // Expect opening paren for method call
+    if (peek()?.type !== 'lparen') {
+      pos = savedPos;
+      return null;
+    }
+    consume(); // consume method open paren
+
+    // Collect method params until closing rparen
+    let functionParams = '';
+    while (pos < tokens.length) {
+      const t = peek()!;
+      if (t.type === 'rparen') {
+        break;
+      }
+      const tok = consume()!;
+      if (tok.type === 'word') {
+        functionParams += (tok as Token & { type: 'word' }).value;
+      } else if (tok.type === 'punct') {
+        functionParams += (tok as Token & { type: 'punct' }).value;
+      } else if (tok.type === 'whitespace') {
+        functionParams += (tok as Token & { type: 'whitespace' }).value;
+      } else if (tok.type === 'weight') {
+        functionParams += String((tok as Token & { type: 'weight' }).value);
+      }
+    }
+
+    // Expect closing rparen for method call
+    if (peek()?.type !== 'rparen') {
+      pos = savedPos;
+      return null;
+    }
+    const methodCloseParen = consume()!; // consume method close paren
+
+    return {
+      type: 'prompt_function',
+      name: methodName,
+      promptArgs: args,
+      functionParams,
+      range: { start: lparenToken.start, end: methodCloseParen.end },
+    };
+  }
+
+  /**
+   * Try to parse an unquoted prompt function starting after the opening lparen.
+   * Unquoted prompt functions look like (arg1 words, arg2 words).method(params)
+   * where arguments are separated by commas without quotes.
+   * Returns the PromptFunctionNode if successful, or null if the pattern doesn't match
+   * (in which case `pos` is restored to `savedPos`).
+   */
+  function tryParseUnquotedPromptFunction(lparenToken: Token & { type: 'lparen' }, savedPos: number): ASTNode | null {
+    const args: PromptFunctionArg[] = [];
+
+    while (pos < tokens.length) {
+      // Check for rparen (end of prompt function args)
+      if (peek()?.type === 'rparen') {
+        break;
+      }
+
+      // Expect comma separator between args (consume the comma)
+      if (args.length > 0) {
+        if (peek()?.type === 'punct' && (peek() as Token & { type: 'punct' }).value === ',') {
+          consume(); // consume comma
+        } else {
+          pos = savedPos;
+          return null;
+        }
+      }
+
+      // Collect tokens until comma or rparen (at nesting depth 0)
+      const argTokens: Token[] = [];
+      let contentStart: number | null = null;
+      let contentEnd: number | null = null;
+      let depth = 0;
+
+      while (pos < tokens.length) {
+        const t = peek()!;
+
+        if (t.type === 'lparen') {
+          depth++;
+        } else if (t.type === 'rparen') {
+          if (depth === 0) {
+            break; // End of all args
+          }
+          depth--;
+        } else if (t.type === 'punct' && (t as Token & { type: 'punct' }).value === ',' && depth === 0) {
+          break; // End of this arg
+        }
+
+        if (contentStart === null) {
+          contentStart = t.start;
+        }
+        const consumed = consume()!;
+        argTokens.push(consumed);
+        contentEnd = consumed.end;
+      }
+
+      if (argTokens.length === 0) {
+        pos = savedPos;
+        return null;
+      }
+
+      // Trim leading/trailing whitespace tokens from the arg content
+      let firstNonWs = 0;
+      while (firstNonWs < argTokens.length && argTokens[firstNonWs]!.type === 'whitespace') {
+        firstNonWs++;
+      }
+      let lastNonWs = argTokens.length - 1;
+      while (lastNonWs >= 0 && argTokens[lastNonWs]!.type === 'whitespace') {
+        lastNonWs--;
+      }
+
+      const trimmedArgTokens = argTokens.slice(firstNonWs, lastNonWs + 1);
+      const trimmedStart = trimmedArgTokens.length > 0 ? trimmedArgTokens[0]!.start : contentStart!;
+      const trimmedEnd = trimmedArgTokens.length > 0 ? trimmedArgTokens[trimmedArgTokens.length - 1]!.end : contentEnd!;
+
+      // Parse sub-tokens as AST
+      const argNodes = parseTokens(trimmedArgTokens);
+
+      args.push({
+        nodes: argNodes,
+        quote: '', // Unquoted
+        contentRange: { start: trimmedStart, end: trimmedEnd },
+      });
+    }
+
+    if (args.length < 2) {
+      // An unquoted prompt function must have at least 2 args (otherwise it's a regular group)
+      pos = savedPos;
+      return null;
+    }
+
+    // Expect rparen
+    if (peek()?.type !== 'rparen') {
+      pos = savedPos;
+      return null;
+    }
+    consume(); // consume rparen
+
+    // Skip whitespace between ) and .methodName (allows newlines)
+    while (peek()?.type === 'whitespace') {
+      consume();
+    }
 
     // Expect .methodName(params)
     if (peek()?.type !== 'punct' || (peek() as Token & { type: 'punct' }).value !== '.') {
@@ -452,8 +674,8 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
         case 'lparen': {
           const lparen = consume() as Token & { type: 'lparen' };
 
-          // Try to parse as a prompt function first
-          if (isPromptFunctionAhead()) {
+          // Try to parse as a quoted prompt function first
+          if (isQuotedPromptFunctionAhead()) {
             const savedPos = pos;
             const pfResult = tryParsePromptFunction(lparen, savedPos);
             if (pfResult) {
@@ -461,6 +683,17 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
               break;
             }
             // pos was restored by tryParsePromptFunction on failure
+          }
+
+          // Try to parse as an unquoted prompt function
+          if (isUnquotedPromptFunctionAhead()) {
+            const savedPos = pos;
+            const pfResult = tryParseUnquotedPromptFunction(lparen, savedPos);
+            if (pfResult) {
+              nodes.push(pfResult);
+              break;
+            }
+            // pos was restored by tryParseUnquotedPromptFunction on failure
           }
 
           // Regular group parsing
@@ -599,7 +832,7 @@ export function serialize(ast: ASTNode[]): string {
           const arg = node.promptArgs[i]!;
           prompt += arg.quote;
           prompt += serialize(arg.nodes);
-          prompt += arg.quote;
+          prompt += CLOSE_QUOTE_MAP[arg.quote] ?? arg.quote;
         }
         prompt += ').';
         prompt += node.name;
