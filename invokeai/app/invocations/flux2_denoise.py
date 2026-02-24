@@ -38,6 +38,9 @@ from invokeai.backend.flux2.sampling_utils import (
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
+    convert_bfl_lora_patch_to_diffusers,
+)
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
@@ -51,7 +54,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
     category="image",
-    version="1.3.0",
+    version="1.4.0",
     classification=Classification.Prototype,
 )
 class Flux2DenoiseInvocation(BaseInvocation):
@@ -329,13 +332,29 @@ class Flux2DenoiseInvocation(BaseInvocation):
         noise_packed = pack_flux2(noise)
         x = pack_flux2(x)
 
-        # BN normalization for txt2img:
-        # - DO NOT normalize random noise (it's already N(0,1) distributed)
-        # - Diffusers only normalizes image latents from VAE (for img2img/kontext)
+        # BN normalization for img2img/inpainting:
+        # - The init_latents from VAE encode are NOT BN-normalized
+        # - The transformer operates in BN-normalized space
+        # - We must normalize x, init_latents, AND noise for InpaintExtension
         # - Output MUST be denormalized after denoising before VAE decode
         #
-        # For img2img with init_latents, we should normalize init_latents on unpacked
-        # shape (B, 128, H/16, W/16) - this is handled by _bn_normalize_unpacked below
+        # This ensures that:
+        # 1. x starts in the correct normalized space for the transformer
+        # 2. When InpaintExtension merges intermediate_latents with noised_init_latents,
+        #    both are in the same scale/space (noise and init_latents must be in same space
+        #    for the linear interpolation: noised = noise * t + init * (1-t))
+        if bn_mean is not None and bn_std is not None:
+            if init_latents_packed is not None:
+                init_latents_packed = self._bn_normalize(init_latents_packed, bn_mean, bn_std)
+                # Also normalize noise for InpaintExtension - it's used to compute
+                # noised_init_latents = noise * t + init_latents * (1-t)
+                # Both operands must be in the same normalized space
+                noise_packed = self._bn_normalize(noise_packed, bn_mean, bn_std)
+            # For img2img/inpainting, x is computed from init_latents and must also be normalized
+            # For txt2img, x is pure noise (already N(0,1)) - normalizing it would be incorrect
+            # We detect img2img by checking if init_latents was provided
+            if init_latents is not None:
+                x = self._bn_normalize(x, bn_mean, bn_std)
 
         # Verify packed dimensions
         assert packed_h * packed_w == x.shape[1]
@@ -487,11 +506,17 @@ class Flux2DenoiseInvocation(BaseInvocation):
         return mask.expand_as(latents)
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
-        """Iterate over LoRA models to apply."""
+        """Iterate over LoRA models to apply.
+
+        Converts BFL-format LoRA keys to diffusers format if needed, since FLUX.2 Klein
+        uses Flux2Transformer2DModel (diffusers naming) but LoRAs may have been loaded
+        with BFL naming (e.g. when a Klein 4B LoRA is misidentified as FLUX.1).
+        """
         for lora in self.transformer.loras:
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, ModelPatchRaw)
-            yield (lora_info.model, lora.weight)
+            converted = convert_bfl_lora_patch_to_diffusers(lora_info.model)
+            yield (converted, lora.weight)
             del lora_info
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:

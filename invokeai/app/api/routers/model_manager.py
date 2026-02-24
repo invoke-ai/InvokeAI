@@ -765,6 +765,7 @@ async def list_model_installs() -> List[ModelInstallJob]:
     * "waiting" -- Job is waiting in the queue to run
     * "downloading" -- Model file(s) are downloading
     * "running" -- Model has downloaded and the model probing and registration process is running
+    * "paused" -- Job is paused and can be resumed
     * "completed" -- Installation completed successfully
     * "error" -- An error occurred. Details will be in the "error_type" and "error" fields.
     * "cancelled" -- Job was cancelled before completion.
@@ -816,6 +817,89 @@ async def cancel_model_install_job(id: int = Path(description="Model install job
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
     installer.cancel_job(job)
+
+
+@model_manager_router.post(
+    "/install/{id}/pause",
+    operation_id="pause_model_install_job",
+    responses={
+        201: {"description": "The job was paused successfully"},
+        415: {"description": "No such job"},
+    },
+    status_code=201,
+)
+async def pause_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+    """Pause the model install job corresponding to the given job ID."""
+    installer = ApiDependencies.invoker.services.model_manager.install
+    try:
+        job = installer.get_job_by_id(id)
+    except ValueError as e:
+        raise HTTPException(status_code=415, detail=str(e))
+    installer.pause_job(job)
+    return job
+
+
+@model_manager_router.post(
+    "/install/{id}/resume",
+    operation_id="resume_model_install_job",
+    responses={
+        201: {"description": "The job was resumed successfully"},
+        415: {"description": "No such job"},
+    },
+    status_code=201,
+)
+async def resume_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+    """Resume a paused model install job corresponding to the given job ID."""
+    installer = ApiDependencies.invoker.services.model_manager.install
+    try:
+        job = installer.get_job_by_id(id)
+    except ValueError as e:
+        raise HTTPException(status_code=415, detail=str(e))
+    installer.resume_job(job)
+    return job
+
+
+@model_manager_router.post(
+    "/install/{id}/restart_failed",
+    operation_id="restart_failed_model_install_job",
+    responses={
+        201: {"description": "Failed files restarted successfully"},
+        415: {"description": "No such job"},
+    },
+    status_code=201,
+)
+async def restart_failed_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+    """Restart failed or non-resumable file downloads for the given job."""
+    installer = ApiDependencies.invoker.services.model_manager.install
+    try:
+        job = installer.get_job_by_id(id)
+    except ValueError as e:
+        raise HTTPException(status_code=415, detail=str(e))
+    installer.restart_failed(job)
+    return job
+
+
+@model_manager_router.post(
+    "/install/{id}/restart_file",
+    operation_id="restart_model_install_file",
+    responses={
+        201: {"description": "File restarted successfully"},
+        415: {"description": "No such job"},
+    },
+    status_code=201,
+)
+async def restart_model_install_file(
+    id: int = Path(description="Model install job ID"),
+    file_source: AnyHttpUrl = Body(description="File download URL to restart"),
+) -> ModelInstallJob:
+    """Restart a specific file download for the given job."""
+    installer = ApiDependencies.invoker.services.model_manager.install
+    try:
+        job = installer.get_job_by_id(id)
+    except ValueError as e:
+        raise HTTPException(status_code=415, detail=str(e))
+    installer.restart_file(job, str(file_source))
+    return job
 
 
 @model_manager_router.delete(

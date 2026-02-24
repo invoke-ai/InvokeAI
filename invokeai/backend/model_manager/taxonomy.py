@@ -133,6 +133,16 @@ class Flux2VariantType(str, Enum):
     """Flux2 Klein 9B Base variant - undistilled foundation model using Qwen3 8B text encoder."""
 
 
+class ZImageVariantType(str, Enum):
+    """Z-Image model variants."""
+
+    Turbo = "turbo"
+    """Z-Image Turbo - distilled model optimized for 8 steps, no CFG support."""
+
+    ZBase = "zbase"
+    """Z-Image Base - undistilled foundation model with full CFG and negative prompt support."""
+
+
 class Qwen3VariantType(str, Enum):
     """Qwen3 text encoder variants based on model size."""
 
@@ -199,9 +209,12 @@ class FluxLoRAFormat(str, Enum):
     Control = "flux.control"
     AIToolkit = "flux.aitoolkit"
     XLabs = "flux.xlabs"
+    BflPeft = "flux.bfl_peft"
 
 
-AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, FluxVariantType, Flux2VariantType, Qwen3VariantType]
+AnyVariant: TypeAlias = Union[
+    ModelVariantType, ClipVariantType, FluxVariantType, Flux2VariantType, ZImageVariantType, Qwen3VariantType
+]
 variant_type_adapter = TypeAdapter[
-    ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | Qwen3VariantType
-](ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | Qwen3VariantType)
+    ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | ZImageVariantType | Qwen3VariantType
+](ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | ZImageVariantType | Qwen3VariantType)

@@ -153,6 +153,26 @@
         }
       }
     },
+    "/api/v2/models/missing": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "List Missing Models",
+        "description": "Get models whose files are missing from disk.\n\nThese are models that have database entries but their corresponding\nweight files have been deleted externally (not via Model Manager).",
+        "operationId": "list_missing_models",
+        "responses": {
+          "200": {
+            "description": "List of models with missing files",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelsList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/models/get_by_attrs": {
       "get": {
         "tags": ["model_manager"],
@@ -1799,7 +1819,7 @@
       "get": {
         "tags": ["model_manager"],
         "summary": "List Model Installs",
-        "description": "Return the list of model install jobs.\n\nInstall jobs have a numeric `id`, a `status`, and other fields that provide information on\nthe nature of the job and its progress. The `status` is one of:\n\n* \"waiting\" -- Job is waiting in the queue to run\n* \"downloading\" -- Model file(s) are downloading\n* \"running\" -- Model has downloaded and the model probing and registration process is running\n* \"completed\" -- Installation completed successfully\n* \"error\" -- An error occurred. Details will be in the \"error_type\" and \"error\" fields.\n* \"cancelled\" -- Job was cancelled before completion.\n\nOnce completed, information about the model such as its size, base\nmodel and type can be retrieved from the `config_out` field. For multi-file models such as diffusers,\ninformation on individual files can be retrieved from `download_parts`.\n\nSee the example and schema below for more information.",
+        "description": "Return the list of model install jobs.\n\nInstall jobs have a numeric `id`, a `status`, and other fields that provide information on\nthe nature of the job and its progress. The `status` is one of:\n\n* \"waiting\" -- Job is waiting in the queue to run\n* \"downloading\" -- Model file(s) are downloading\n* \"running\" -- Model has downloaded and the model probing and registration process is running\n* \"paused\" -- Job is paused and can be resumed\n* \"completed\" -- Installation completed successfully\n* \"error\" -- An error occurred. Details will be in the \"error_type\" and \"error\" fields.\n* \"cancelled\" -- Job was cancelled before completion.\n\nOnce completed, information about the model such as its size, base\nmodel and type can be retrieved from the `config_out` field. For multi-file models such as diffusers,\ninformation on individual files can be retrieved from `download_parts`.\n\nSee the example and schema below for more information.",
         "operationId": "list_model_installs",
         "responses": {
           "200": {
@@ -1959,6 +1979,204 @@
             "content": {
               "application/json": {
                 "schema": {}
+              }
+            }
+          },
+          "415": {
+            "description": "No such job"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/install/{id}/pause": {
+      "post": {
+        "tags": ["model_manager"],
+        "summary": "Pause Model Install Job",
+        "description": "Pause the model install job corresponding to the given job ID.",
+        "operationId": "pause_model_install_job",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Model install job ID",
+              "title": "Id"
+            },
+            "description": "Model install job ID"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The job was paused successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInstallJob"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "No such job"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/install/{id}/resume": {
+      "post": {
+        "tags": ["model_manager"],
+        "summary": "Resume Model Install Job",
+        "description": "Resume a paused model install job corresponding to the given job ID.",
+        "operationId": "resume_model_install_job",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Model install job ID",
+              "title": "Id"
+            },
+            "description": "Model install job ID"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "The job was resumed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInstallJob"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "No such job"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/install/{id}/restart_failed": {
+      "post": {
+        "tags": ["model_manager"],
+        "summary": "Restart Failed Model Install Job",
+        "description": "Restart failed or non-resumable file downloads for the given job.",
+        "operationId": "restart_failed_model_install_job",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Model install job ID",
+              "title": "Id"
+            },
+            "description": "Model install job ID"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Failed files restarted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInstallJob"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "No such job"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/install/{id}/restart_file": {
+      "post": {
+        "tags": ["model_manager"],
+        "summary": "Restart Model Install File",
+        "description": "Restart a specific file download for the given job.",
+        "operationId": "restart_model_install_file",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "description": "Model install job ID",
+              "title": "Id"
+            },
+            "description": "Model install job ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string",
+                "format": "uri",
+                "minLength": 1,
+                "description": "File download URL to restart",
+                "title": "File Source"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "File restarted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelInstallJob"
+                }
               }
             }
           },
@@ -2415,6 +2633,68 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HFTokenStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v2/models/sync/orphaned": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "Get Orphaned Models",
+        "description": "Find orphaned model directories.\n\nOrphaned models are directories in the models folder that contain model files\nbut are not referenced in the database. This can happen when models are deleted\nfrom the database but the files remain on disk.\n\nReturns:\n    List of orphaned model directory information",
+        "operationId": "get_orphaned_models",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrphanedModelInfo"
+                  },
+                  "type": "array",
+                  "title": "Response Get Orphaned Models"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["model_manager"],
+        "summary": "Delete Orphaned Models",
+        "description": "Delete specified orphaned model directories.\n\nArgs:\n    request: Request containing list of relative paths to delete\n\nReturns:\n    Response indicating which paths were deleted and which had errors",
+        "operationId": "delete_orphaned_models",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteOrphanedModelsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteOrphanedModelsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -15677,6 +15957,46 @@
         "required": ["affected_boards", "deleted_images"],
         "title": "DeleteImagesResult"
       },
+      "DeleteOrphanedModelsRequest": {
+        "properties": {
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Paths",
+            "description": "List of relative paths to delete"
+          }
+        },
+        "type": "object",
+        "required": ["paths"],
+        "title": "DeleteOrphanedModelsRequest",
+        "description": "Request to delete specific orphaned model directories."
+      },
+      "DeleteOrphanedModelsResponse": {
+        "properties": {
+          "deleted": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Deleted",
+            "description": "Paths that were successfully deleted"
+          },
+          "errors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Errors",
+            "description": "Paths that had errors, with error messages"
+          }
+        },
+        "type": "object",
+        "required": ["deleted", "errors"],
+        "title": "DeleteOrphanedModelsResponse",
+        "description": "Response from deleting orphaned models."
+      },
       "DenoiseLatentsInvocation": {
         "category": "latents",
         "class": "invocation",
@@ -16808,6 +17128,90 @@
             ],
             "title": "Content Type",
             "description": "Content type of downloaded file"
+          },
+          "canonical_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Canonical Url",
+            "description": "Canonical URL to request on resume"
+          },
+          "etag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Etag",
+            "description": "ETag from the remote server, if available"
+          },
+          "last_modified": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Modified",
+            "description": "Last-Modified from the remote server, if available"
+          },
+          "final_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Url",
+            "description": "Final resolved URL after redirects, if available"
+          },
+          "expected_total_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Total Bytes",
+            "description": "Expected total size of the download"
+          },
+          "resume_required": {
+            "type": "boolean",
+            "title": "Resume Required",
+            "description": "True if server refused resume; restart required",
+            "default": false
+          },
+          "resume_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resume Message",
+            "description": "Message explaining why resume is required"
+          },
+          "resume_from_scratch": {
+            "type": "boolean",
+            "title": "Resume From Scratch",
+            "description": "True if resume metadata existed but the partial file was missing and the download restarted from the beginning",
+            "default": false
           }
         },
         "type": "object",
@@ -16817,9 +17221,27 @@
       },
       "DownloadJobStatus": {
         "type": "string",
-        "enum": ["waiting", "running", "completed", "cancelled", "error"],
+        "enum": ["waiting", "running", "paused", "completed", "cancelled", "error"],
         "title": "DownloadJobStatus",
         "description": "State of a download job."
+      },
+      "DownloadPausedEvent": {
+        "description": "Event model for download_paused",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "source": {
+            "description": "The source of the download",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": ["timestamp", "source"],
+        "title": "DownloadPausedEvent",
+        "type": "object"
       },
       "DownloadProgressEvent": {
         "description": "Event model for download_progress",
@@ -16876,12 +17298,6 @@
         "required": ["timestamp", "source", "download_path"],
         "title": "DownloadStartedEvent",
         "type": "object"
-      },
-      "DyPEPreset": {
-        "description": "Predefined DyPE configurations.",
-        "enum": ["off", "auto", "area", "4k"],
-        "title": "DyPEPreset",
-        "type": "string"
       },
       "DynamicPromptInvocation": {
         "category": "prompt",
@@ -20222,13 +20638,23 @@
             "title": "Kontext Conditioning"
           },
           "dype_preset": {
-            "$ref": "#/components/schemas/DyPEPreset",
             "default": "off",
-            "description": "DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.",
+            "description": "DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. 'area' enables automatically based on image area. '4k' uses optimized settings for 4K output.",
+            "enum": ["off", "manual", "auto", "area", "4k"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "off",
-            "orig_required": false
+            "orig_required": false,
+            "title": "Dype Preset",
+            "type": "string",
+            "ui_choice_labels": {
+              "4k": "4K Optimized",
+              "area": "Area (auto)",
+              "auto": "Auto (>1536px)",
+              "manual": "Manual",
+              "off": "Off"
+            },
+            "ui_order": 100
           },
           "dype_scale": {
             "anyOf": [
@@ -20247,7 +20673,8 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "Dype Scale"
+            "title": "Dype Scale",
+            "ui_order": 101
           },
           "dype_exponent": {
             "anyOf": [
@@ -20266,7 +20693,8 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "Dype Exponent"
+            "title": "Dype Exponent",
+            "ui_order": 102
           },
           "type": {
             "const": "flux_denoise",
@@ -20280,7 +20708,7 @@
         "tags": ["image", "flux"],
         "title": "FLUX Denoise",
         "type": "object",
-        "version": "4.3.0",
+        "version": "4.5.1",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -20709,13 +21137,23 @@
             "title": "Kontext Conditioning"
           },
           "dype_preset": {
-            "$ref": "#/components/schemas/DyPEPreset",
             "default": "off",
-            "description": "DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. '4k' uses optimized settings for 4K output.",
+            "description": "DyPE preset for high-resolution generation. 'auto' enables automatically for resolutions > 1536px. 'area' enables automatically based on image area. '4k' uses optimized settings for 4K output.",
+            "enum": ["off", "manual", "auto", "area", "4k"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "off",
-            "orig_required": false
+            "orig_required": false,
+            "title": "Dype Preset",
+            "type": "string",
+            "ui_choice_labels": {
+              "4k": "4K Optimized",
+              "area": "Area (auto)",
+              "auto": "Auto (>1536px)",
+              "manual": "Manual",
+              "off": "Off"
+            },
+            "ui_order": 100
           },
           "dype_scale": {
             "anyOf": [
@@ -20734,7 +21172,8 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "Dype Scale"
+            "title": "Dype Scale",
+            "ui_order": 101
           },
           "dype_exponent": {
             "anyOf": [
@@ -20753,7 +21192,8 @@
             "input": "any",
             "orig_default": null,
             "orig_required": false,
-            "title": "Dype Exponent"
+            "title": "Dype Exponent",
+            "ui_order": 102
           },
           "type": {
             "const": "flux_denoise_meta",
@@ -21454,28 +21894,52 @@
             "type": "boolean"
           },
           "model": {
-            "$ref": "#/components/schemas/ModelIdentifierField",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Flux model (Transformer) to load",
             "field_kind": "input",
-            "input": "direct",
+            "input": "any",
             "orig_required": true,
             "ui_model_base": ["flux"],
             "ui_model_type": ["main"]
           },
           "t5_encoder_model": {
-            "$ref": "#/components/schemas/ModelIdentifierField",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "T5 tokenizer and text encoder",
             "field_kind": "input",
-            "input": "direct",
+            "input": "any",
             "orig_required": true,
             "title": "T5 Encoder",
             "ui_model_type": ["t5_encoder"]
           },
           "clip_embed_model": {
-            "$ref": "#/components/schemas/ModelIdentifierField",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "CLIP Embed loader",
             "field_kind": "input",
-            "input": "direct",
+            "input": "any",
             "orig_required": true,
             "title": "CLIP Embed",
             "ui_model_type": ["clip_embed"]
@@ -21506,11 +21970,11 @@
             "type": "string"
           }
         },
-        "required": ["model", "t5_encoder_model", "clip_embed_model", "type", "id"],
+        "required": ["type", "id"],
         "tags": ["model", "flux"],
         "title": "Main Model - FLUX",
         "type": "object",
-        "version": "1.0.6",
+        "version": "1.0.7",
         "output": {
           "$ref": "#/components/schemas/FluxModelLoaderOutput"
         }
@@ -28743,7 +29207,7 @@
       },
       "InstallStatus": {
         "type": "string",
-        "enum": ["waiting", "downloading", "downloads_done", "running", "completed", "error", "cancelled"],
+        "enum": ["waiting", "downloading", "downloads_done", "running", "paused", "completed", "error", "cancelled"],
         "title": "InstallStatus",
         "description": "State of an install job running in the background."
       },
@@ -31765,234 +32229,234 @@
           }
         },
         "required": [
-          "integer_generator",
-          "llava_onevision_vllm",
-          "depth_anything_depth_estimation",
-          "invokeai_img_blend",
-          "metadata_field_extractor",
-          "collect",
-          "integer_collection",
-          "noise",
-          "main_model_loader",
-          "float",
-          "sd3_denoise",
-          "tensor_mask_to_image",
-          "cogview4_text_encoder",
-          "mask_combine",
-          "image",
-          "denoise_latents",
-          "flux2_vae_encode",
-          "img_channel_multiply",
-          "invokeai_img_val_thresholds",
-          "alpha_mask_to_tensor",
-          "string",
-          "metadata_to_controlnets",
-          "lblend",
-          "prompt_template",
-          "core_metadata",
-          "lineart_edge_detection",
-          "pair_tile_image",
-          "compel",
-          "z_image_i2l",
-          "flux_kontext_image_prep",
-          "div",
-          "metadata_to_float",
-          "dw_openpose_detection",
-          "z_image_text_encoder",
-          "mask_edge",
-          "spandrel_image_to_image",
-          "image_batch",
-          "img_hue_adjust",
-          "metadata_to_integer",
-          "save_image",
-          "cogview4_l2i",
-          "canvas_v2_mask_and_crop",
-          "spandrel_image_to_image_autoscale",
-          "flux_lora_loader",
-          "flux_vae_decode",
-          "metadata_to_bool_collection",
-          "img_conv",
-          "hed_edge_detection",
-          "flux_kontext",
-          "tile_to_properties",
-          "expand_mask_with_fade",
-          "flux_controlnet",
-          "esrgan",
-          "sdxl_lora_loader",
-          "heuristic_resize",
-          "range_of_size",
-          "controlnet",
-          "apply_mask_to_image",
-          "img_watermark",
-          "img_channel_offset",
-          "infill_rgba",
-          "metadata_to_scheduler",
-          "pidi_edge_detection",
-          "color_correct",
-          "conditioning",
-          "integer_math",
-          "invokeai_img_composite",
-          "paste_image_into_bounding_box",
-          "metadata",
-          "img_noise",
-          "t2i_adapter",
-          "sdxl_lora_collection_loader",
-          "invokeai_img_dilate_erode",
-          "img_pad_crop",
-          "flux_denoise",
-          "invokeai_img_hue_adjust_plus",
-          "infill_tile",
-          "latents",
-          "float_to_int",
-          "sd3_text_encoder",
-          "flux2_klein_model_loader",
-          "tomask",
-          "ip_adapter",
-          "img_ilerp",
-          "face_mask_detection",
-          "flux2_vae_decode",
-          "get_image_mask_bounding_box",
-          "denoise_latents_meta",
-          "lscale",
-          "img_crop",
-          "rand_int",
-          "metadata_to_bool",
-          "invokeai_img_enhance",
-          "string_split",
-          "lresize",
-          "apply_tensor_mask_to_image",
-          "sdxl_refiner_model_loader",
-          "range",
-          "z_image_lora_loader",
-          "string_batch",
-          "clip_skip",
-          "string_collection",
-          "lora_selector",
-          "metadata_to_model",
-          "model_identifier",
-          "ideal_size",
-          "bounding_box",
-          "rectangle_mask",
-          "img_chan",
-          "flux_fill",
-          "z_image_denoise_meta",
-          "seamless",
-          "image_panel_layout",
-          "pbr_maps",
-          "float_generator",
-          "metadata_from_image",
-          "flux_ip_adapter",
-          "boolean",
-          "prompt_from_file",
-          "float_range",
-          "metadata_to_t2i_adapters",
-          "add",
-          "invokeai_ealightness",
-          "cogview4_model_loader",
-          "calculate_image_tiles_even_split",
-          "tiled_multi_diffusion_denoise_latents",
-          "face_off",
-          "random_range",
-          "flux_text_encoder",
-          "cv_inpaint",
-          "color",
-          "metadata_to_lora_collection",
-          "round_float",
-          "merge_metadata",
-          "img_blur",
-          "lora_loader",
-          "calculate_image_tiles",
-          "image_generator",
           "integer_batch",
-          "freeu",
-          "metadata_to_float_collection",
-          "sd3_l2i",
-          "crop_image_to_bounding_box",
-          "float_collection",
-          "img_scale",
-          "img_nsfw",
-          "boolean_collection",
-          "flux_denoise_meta",
-          "sd3_i2l",
-          "vae_loader",
-          "metadata_to_loras",
-          "create_gradient_mask",
-          "scheduler",
-          "metadata_to_integer_collection",
-          "metadata_item",
-          "float_math",
+          "img_ilerp",
+          "image_panel_layout",
+          "t2i_adapter",
+          "metadata_to_model",
+          "flux2_klein_model_loader",
+          "bounding_box",
+          "integer_generator",
+          "flux_text_encoder",
+          "img_resize",
           "z_image_seed_variance_enhancer",
-          "image_collection",
-          "sd3_model_loader",
+          "metadata_to_integer",
+          "apply_tensor_mask_to_image",
+          "metadata_to_bool_collection",
+          "vae_loader",
+          "float_batch",
+          "paste_image_into_bounding_box",
           "unsharp_mask",
-          "metadata_item_linked",
-          "mediapipe_face_detection",
-          "metadata_to_sdxl_model",
-          "flux2_klein_text_encoder",
-          "sdxl_compel_prompt",
-          "z_image_denoise",
-          "metadata_to_vae",
-          "cogview4_denoise",
-          "image_mask_to_tensor",
-          "sub",
-          "segment_anything",
-          "canvas_paste_back",
-          "content_shuffle",
-          "merge_tiles_to_image",
+          "invokeai_ealightness",
+          "flux_denoise",
+          "color_map",
+          "face_identifier",
+          "float_math",
+          "round_float",
+          "z_image_denoise_meta",
+          "flux_controlnet",
+          "metadata_to_float",
+          "cogview4_text_encoder",
+          "calculate_image_tiles_even_split",
+          "lineart_edge_detection",
+          "img_noise",
+          "color",
+          "i2l",
+          "metadata_item",
+          "metadata_to_string_collection",
           "integer",
-          "normal_map",
-          "z_image_control",
-          "blank_image",
+          "clip_skip",
+          "cogview4_i2l",
+          "image_mask_to_tensor",
+          "dw_openpose_detection",
+          "crop_latents",
+          "img_blur",
+          "invokeai_img_blend",
+          "grounding_dino",
+          "core_metadata",
+          "metadata_to_t2i_adapters",
+          "z_image_lora_loader",
+          "sd3_denoise",
+          "lineart_anime_edge_detection",
+          "lblend",
+          "image_collection",
+          "metadata_to_loras",
+          "flux_fill",
+          "cogview4_l2i",
+          "sdxl_refiner_model_loader",
+          "mediapipe_face_detection",
+          "infill_tile",
+          "alpha_mask_to_tensor",
+          "create_denoise_mask",
+          "noise",
+          "collect",
+          "calculate_image_tiles_min_overlap",
+          "string_join",
+          "div",
+          "invert_tensor_mask",
+          "crop_image_to_bounding_box",
+          "latents",
+          "z_image_text_encoder",
+          "metadata",
+          "flux2_klein_text_encoder",
+          "img_channel_offset",
+          "metadata_to_scheduler",
+          "dynamic_prompt",
+          "seamless",
+          "spandrel_image_to_image",
+          "string_join_three",
+          "depth_anything_depth_estimation",
+          "cv_inpaint",
+          "float_collection",
+          "invokeai_img_dilate_erode",
+          "lresize",
           "iterate",
+          "flux2_vae_decode",
+          "metadata_to_sdxl_model",
+          "apply_mask_to_image",
+          "img_chan",
+          "esrgan",
+          "string_split",
+          "lscale",
+          "image_generator",
+          "img_channel_multiply",
+          "img_pad_crop",
+          "show_image",
+          "range",
+          "calculate_image_tiles",
+          "get_image_mask_bounding_box",
+          "sdxl_model_loader",
+          "metadata_to_integer_collection",
+          "prompt_from_file",
+          "rectangle_mask",
+          "canny_edge_detection",
+          "heuristic_resize",
+          "blank_image",
+          "latents_collection",
+          "flux_model_loader",
+          "denoise_latents_meta",
+          "z_image_model_loader",
+          "rand_float",
+          "l2i",
+          "img_conv",
+          "controlnet",
+          "flux_redux",
+          "boolean_collection",
+          "flux_kontext",
+          "metadata_to_ip_adapters",
+          "metadata_to_string",
+          "cogview4_model_loader",
+          "z_image_l2i",
+          "add",
+          "lora_collection_loader",
+          "string_batch",
+          "img_nsfw",
+          "content_shuffle",
+          "conditioning_collection",
+          "string",
+          "metadata_to_float_collection",
+          "random_range",
+          "flux2_denoise",
+          "tile_to_properties",
+          "mask_edge",
+          "ideal_size",
           "sdxl_refiner_compel_prompt",
           "string_split_neg",
-          "infill_cv2",
-          "sdxl_model_loader",
-          "img_lerp",
+          "sub",
+          "sd3_i2l",
           "string_generator",
-          "dynamic_prompt",
-          "z_image_lora_collection_loader",
-          "string_join",
-          "lora_collection_loader",
-          "flux_lora_collection_loader",
-          "flux_vae_encode",
-          "flux2_denoise",
-          "flux_control_lora_loader",
-          "z_image_model_loader",
-          "l2i",
-          "color_map",
-          "lineart_anime_edge_detection",
-          "flux_model_loader",
-          "invert_tensor_mask",
-          "face_identifier",
-          "img_paste",
-          "img_resize",
-          "infill_lama",
-          "canny_edge_detection",
-          "infill_patchmatch",
-          "string_join_three",
-          "float_batch",
-          "show_image",
-          "z_image_l2i",
           "img_mul",
-          "mul",
-          "conditioning_collection",
-          "calculate_image_tiles_min_overlap",
-          "mlsd_detection",
-          "rand_float",
-          "string_replace",
-          "grounding_dino",
+          "invokeai_img_val_thresholds",
+          "pidi_edge_detection",
+          "flux_lora_loader",
+          "metadata_to_lora_collection",
+          "canvas_paste_back",
+          "tomask",
+          "string_collection",
           "metadata_to_sdlx_loras",
-          "crop_latents",
-          "metadata_to_ip_adapters",
-          "latents_collection",
-          "i2l",
-          "metadata_to_string_collection",
-          "create_denoise_mask",
-          "cogview4_i2l",
-          "metadata_to_string",
+          "compel",
+          "sd3_model_loader",
+          "denoise_latents",
+          "flux_kontext_image_prep",
+          "mlsd_detection",
+          "pair_tile_image",
+          "flux2_vae_encode",
+          "flux_denoise_meta",
+          "float_to_int",
+          "img_lerp",
+          "flux_vae_encode",
+          "mul",
+          "z_image_denoise",
+          "img_crop",
+          "invokeai_img_composite",
+          "prompt_template",
+          "sdxl_compel_prompt",
+          "metadata_to_bool",
+          "sdxl_lora_loader",
+          "lora_loader",
+          "metadata_from_image",
+          "string_replace",
+          "infill_lama",
+          "img_paste",
+          "invokeai_img_enhance",
+          "hed_edge_detection",
+          "merge_metadata",
+          "float_range",
+          "range_of_size",
+          "integer_math",
+          "sd3_text_encoder",
+          "model_identifier",
+          "infill_patchmatch",
+          "img_watermark",
+          "scheduler",
+          "flux_control_lora_loader",
+          "spandrel_image_to_image_autoscale",
+          "image_batch",
+          "image",
+          "flux_vae_decode",
+          "float",
+          "cogview4_denoise",
+          "segment_anything",
           "mask_from_id",
-          "flux_redux"
+          "img_hue_adjust",
+          "normal_map",
+          "flux_lora_collection_loader",
+          "z_image_lora_collection_loader",
+          "metadata_item_linked",
+          "freeu",
+          "face_off",
+          "z_image_control",
+          "lora_selector",
+          "llava_onevision_vllm",
+          "metadata_field_extractor",
+          "metadata_to_vae",
+          "mask_combine",
+          "infill_rgba",
+          "img_scale",
+          "conditioning",
+          "boolean",
+          "rand_int",
+          "sd3_l2i",
+          "expand_mask_with_fade",
+          "create_gradient_mask",
+          "color_correct",
+          "metadata_to_controlnets",
+          "float_generator",
+          "save_image",
+          "invokeai_img_hue_adjust_plus",
+          "flux_ip_adapter",
+          "tiled_multi_diffusion_denoise_latents",
+          "sdxl_lora_collection_loader",
+          "z_image_i2l",
+          "infill_cv2",
+          "ip_adapter",
+          "canvas_v2_mask_and_crop",
+          "pbr_maps",
+          "integer_collection",
+          "merge_tiles_to_image",
+          "face_mask_detection",
+          "tensor_mask_to_image",
+          "main_model_loader"
         ]
       },
       "InvocationProgressEvent": {
@@ -48053,6 +48517,37 @@
         "type": "object",
         "required": ["limit", "offset", "total", "items"],
         "title": "OffsetPaginatedResults[ImageDTO]"
+      },
+      "OrphanedModelInfo": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Relative path to the orphaned directory from models root"
+          },
+          "absolute_path": {
+            "type": "string",
+            "title": "Absolute Path",
+            "description": "Absolute path to the orphaned directory"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "List of model files in this directory"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes",
+            "description": "Total size of all files in bytes"
+          }
+        },
+        "type": "object",
+        "required": ["path", "absolute_path", "files", "size_bytes"],
+        "title": "OrphanedModelInfo",
+        "description": "Information about an orphaned model directory."
       },
       "OutputFieldJSONSchemaExtra": {
         "description": "Extra attributes to be added to input fields and their OpenAPI schema. Used by the workflow editor\nduring schema parsing and UI rendering.",
