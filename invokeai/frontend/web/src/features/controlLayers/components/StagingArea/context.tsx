@@ -120,12 +120,6 @@ export const useStagingAreaContext = () => {
   return ctx;
 };
 
-export const useOutputImageDTO = (itemId: number) => {
-  const ctx = useStagingAreaContext();
-  const allProgressData = useStore(ctx.$progressData, { keys: [itemId] });
-  return allProgressData[itemId]?.imageDTOs[0] ?? null;
-};
-
 export const useProgressDatum = (itemId: number): ProgressData => {
   const ctx = useStagingAreaContext();
   const allProgressData = useStore(ctx.$progressData, { keys: [itemId] });
