@@ -18,6 +18,7 @@ const _zInvocationTemplate = z.object({
   useCache: z.boolean(),
   nodePack: z.string().min(1).default('invokeai'),
   classification: zClassification,
+  category: z.string().default('other'),
 });
 export type InvocationTemplate = z.infer<typeof _zInvocationTemplate>;
 // #endregion

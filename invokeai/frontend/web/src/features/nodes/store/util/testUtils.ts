@@ -70,6 +70,7 @@ export const add: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'math',
 };
 
 export const sub: InvocationTemplate = {
@@ -128,6 +129,7 @@ export const sub: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'math',
 };
 
 export const collect: InvocationTemplate = {
@@ -173,6 +175,7 @@ export const collect: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'collections',
 };
 
 const scheduler: InvocationTemplate = {
@@ -229,6 +232,7 @@ const scheduler: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'other',
 };
 
 export const main_model_loader: InvocationTemplate = {
@@ -297,6 +301,7 @@ export const main_model_loader: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'model',
 };
 
 export const img_resize: InvocationTemplate = {
@@ -441,6 +446,7 @@ export const img_resize: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'image',
 };
 
 const iterate: InvocationTemplate = {
@@ -510,6 +516,7 @@ const iterate: InvocationTemplate = {
   useCache: true,
   nodePack: 'invokeai',
   classification: 'stable',
+  category: 'collections',
 };
 
 export const templates: Templates = {
