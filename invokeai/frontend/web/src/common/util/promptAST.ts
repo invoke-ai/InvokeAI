@@ -57,7 +57,7 @@ const PUNCTUATION_PATTERN = /^[.,/!?;:'"""''\u2018\u2019\u201c\u201d`~@#$%^&*=_|
 const OPEN_QUOTE_CHARS = new Set(["'", '"', '\u2018', '\u201c']);
 
 /** Map from opening curly quote to the matching closing curly quote. Straight quotes match themselves. */
-export const CLOSE_QUOTE_MAP: Record<string, string> = {
+const CLOSE_QUOTE_MAP: Record<string, string> = {
   "'": "'",
   '"': '"',
   '\u2018': '\u2019', // ' → '
@@ -759,7 +759,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
  * Visitor callbacks for AST serialization. All callbacks are optional.
  * Called during traversal to allow tracking node positions in the output string.
  */
-export type SerializeVisitor = {
+type SerializeVisitor = {
   /** Called after a node has been fully serialized, with its start and end positions in the output. */
   onNode?: (node: ASTNode, start: number, end: number) => void;
 };
