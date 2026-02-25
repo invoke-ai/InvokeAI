@@ -81,10 +81,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 RUN mkdir -p "/opt/amdgpu/share/libdrm" &&\
     ln -s "/usr/share/libdrm/amdgpu.ids" "/opt/amdgpu/share/libdrm/amdgpu.ids" && groupadd render
 
-# build patchmatch
-RUN cd /usr/lib/$(uname -p)-linux-gnu/pkgconfig/ && ln -sf opencv4.pc opencv.pc
-RUN python -c "from patchmatch import patch_match"
-
 RUN mkdir -p ${INVOKEAI_ROOT} && chown -R ${CONTAINER_UID}:${CONTAINER_GID} ${INVOKEAI_ROOT}
 
 COPY docker/docker-entrypoint.sh ./
