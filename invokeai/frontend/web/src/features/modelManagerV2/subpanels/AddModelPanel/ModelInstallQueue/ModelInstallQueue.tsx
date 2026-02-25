@@ -1,6 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
-  Badge,
   Box,
   Button,
   ButtonGroup,
@@ -34,7 +33,6 @@ import {
   useResumeModelInstallMutation,
 } from 'services/api/endpoints/models';
 import type { ModelInstallJob } from 'services/api/types';
-import { $isConnected } from 'services/events/stores';
 
 import { ModelInstallQueueItem } from './ModelInstallQueueItem';
 
@@ -77,7 +75,6 @@ const ModelQueueTableSx: SystemStyleObject = {
 
 export const ModelInstallQueue = memo(() => {
   const { t } = useTranslation();
-  const isConnected = useStore($isConnected);
   const { data } = useListModelInstallsQuery();
   const [bulkActionInProgress, setBulkActionInProgress] = useState<'pause' | 'resume' | 'cancel' | null>(null);
   const bulkActionLockRef = useRef(false);
@@ -238,7 +235,6 @@ export const ModelInstallQueue = memo(() => {
       <Flex justifyContent="space-between" alignItems="center">
         <Flex alignItems="center" gap={2}>
           <Heading size="md">{t('modelManager.installQueue')}</Heading>
-          {!isConnected && <Badge colorScheme="red">{t('modelManager.backendDisconnected')}</Badge>}
         </Flex>
 
         {/* Bulk Actions */}
