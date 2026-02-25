@@ -1,17 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import {
-  Badge,
-  Box,
-  Button,
-  CircularProgress,
-  Flex,
-  Icon,
-  IconButton,
-  Td,
-  Text,
-  Tooltip,
-  Tr,
-} from '@invoke-ai/ui-library';
+import { Badge, Button, CircularProgress, Flex, Icon, IconButton, Td, Text, Tooltip, Tr } from '@invoke-ai/ui-library';
 import { isNil } from 'es-toolkit/compat';
 import { getApiErrorDetail } from 'features/modelManagerV2/util/getApiErrorDetail';
 import { toast } from 'features/toast/toast';
@@ -20,12 +8,9 @@ import { useTranslation } from 'react-i18next';
 import {
   PiArrowClockwiseBold,
   PiCheckBold,
-  PiCheckCircleFill,
-  PiLineVerticalBold,
   PiMinusBold,
   PiPauseFill,
   PiPlayFill,
-  PiWarningBold,
   PiWarningDiamondBold,
   PiWarningFill,
   PiXBold,
