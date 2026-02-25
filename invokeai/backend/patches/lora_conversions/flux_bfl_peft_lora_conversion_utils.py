@@ -99,6 +99,20 @@ _SINGLE_BLOCK_RENAMES: dict[str, str] = {
     "linear2": "attn.to_out",
 }
 
+# Mapping of BFL non-block layer names to diffusers equivalents.
+# These are top-level modules (embedders, modulations, output layers) that use different
+# names in BFL's FLUX.2 model vs the diffusers Flux2Transformer2DModel.
+_NON_BLOCK_RENAMES: dict[str, str] = {
+    "img_in": "x_embedder",
+    "txt_in": "context_embedder",
+    "double_stream_modulation_img.lin": "double_stream_modulation_img.linear",
+    "double_stream_modulation_txt.lin": "double_stream_modulation_txt.linear",
+    "single_stream_modulation.lin": "single_stream_modulation.linear",
+    "final_layer.linear": "proj_out",
+    "time_in.in_layer": "time_guidance_embed.timestep_embedder.linear_1",
+    "time_in.out_layer": "time_guidance_embed.timestep_embedder.linear_2",
+}
+
 
 def is_state_dict_likely_in_flux_bfl_peft_format(state_dict: dict[str | int, torch.Tensor]) -> bool:
     """Checks if the provided state dict is likely in the BFL PEFT FLUX LoRA/LyCORIS format.
@@ -311,7 +325,11 @@ def _convert_bfl_layer_to_diffusers(
 
         return [(f"{prefix}.{rest}", layer_sd)]
 
-    # Non-block keys (embedders, etc.) - pass through unchanged
+    # Non-block keys (embedders, modulations, output layers)
+    if bfl_key in _NON_BLOCK_RENAMES:
+        return [(_NON_BLOCK_RENAMES[bfl_key], layer_sd)]
+
+    # Fallback: pass through unchanged
     return [(bfl_key, layer_sd)]
 
 
@@ -486,7 +504,11 @@ def _convert_bfl_layer_patch_to_diffusers(bfl_key: str, layer: BaseLayerPatch) -
             return [(f"{diff_prefix}.{_SINGLE_BLOCK_RENAMES[rest]}", layer)]
         return [(f"{diff_prefix}.{rest}", layer)]
 
-    # Non-block keys - pass through
+    # Non-block keys (embedders, modulations, output layers)
+    if bfl_key in _NON_BLOCK_RENAMES:
+        return [(_NON_BLOCK_RENAMES[bfl_key], layer)]
+
+    # Fallback: pass through unchanged
     return [(bfl_key, layer)]
 
 
