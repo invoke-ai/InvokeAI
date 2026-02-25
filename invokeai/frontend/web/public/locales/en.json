@@ -1092,6 +1092,7 @@
         "triggerPhrases": "Trigger Phrases",
         "loraTriggerPhrases": "LoRA Trigger Phrases",
         "mainModelTriggerPhrases": "Main Model Trigger Phrases",
+        "queueEmpty": "The install queue is empty.",
         "selectAll": "Select All",
         "typePhraseHere": "Type phrase here",
         "t5Encoder": "T5 Encoder",

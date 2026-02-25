@@ -12,8 +12,9 @@ import {
   MenuItem,
   MenuList,
   Table,
-  TableContainer,
   Tbody,
+  Td,
+  Text,
   Th,
   Thead,
   Tr,
@@ -22,9 +23,9 @@ import { useStore } from '@nanostores/react';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { getApiErrorDetail } from 'features/modelManagerV2/util/getApiErrorDetail';
 import { toast } from 'features/toast/toast';
-import { t } from 'i18next';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { PiBroomBold, PiCaretDownBold, PiPauseBold, PiPlayBold, PiXBold } from 'react-icons/pi';
+import { useTranslation } from 'react-i18next';
+import { PiBroomBold, PiCaretDownBold, PiPauseFill, PiPlayFill, PiXBold } from 'react-icons/pi';
 import {
   useCancelModelInstallMutation,
   useListModelInstallsQuery,
@@ -51,13 +52,39 @@ const ModelQueueTableSx: SystemStyleObject = {
   'td, th': {
     borderColor: 'base.700',
   },
+
+  th: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 1,
+    backgroundColor: 'base.800',
+    py: 2,
+  },
+
+  'th:first-of-type': {
+    borderTopLeftRadius: 'base',
+  },
+  'th:last-of-type': {
+    borderTopRightRadius: 'base',
+  },
+  'tr:last-of-type td:first-of-type': {
+    borderBottomLeftRadius: 'base',
+  },
+  'tr:last-of-type td:last-of-type': {
+    borderBottomRightRadius: 'base',
+  },
 };
 
 export const ModelInstallQueue = memo(() => {
+  const { t } = useTranslation();
   const isConnected = useStore($isConnected);
   const { data } = useListModelInstallsQuery();
   const [bulkActionInProgress, setBulkActionInProgress] = useState<'pause' | 'resume' | 'cancel' | null>(null);
   const bulkActionLockRef = useRef(false);
+
+  const reversedData = useMemo(() => {
+    return data?.toReversed() ?? [];
+  }, [data]);
 
   const [cancelModelInstall] = useCancelModelInstallMutation();
   const [pauseModelInstall] = usePauseModelInstallMutation();
@@ -152,7 +179,7 @@ export const ModelInstallQueue = memo(() => {
         setBulkActionInProgress(null);
       }
     },
-    [cancelModelInstall, isPruning, pauseModelInstall, resumeModelInstall]
+    [cancelModelInstall, isPruning, pauseModelInstall, resumeModelInstall, t]
   );
 
   const pruneCompletedModelInstalls = useCallback(async () => {
@@ -174,7 +201,7 @@ export const ModelInstallQueue = memo(() => {
         status: 'error',
       });
     }
-  }, [_pruneCompletedModelInstalls]);
+  }, [_pruneCompletedModelInstalls, t]);
 
   const hasPauseableInstalls = pauseableInstallIds.length > 0;
   const hasResumableInstalls = resumableInstallIds.length > 0;
@@ -230,7 +257,7 @@ export const ModelInstallQueue = memo(() => {
             <MenuButton as={IconButton} size="sm" icon={<PiCaretDownBold />} />
             <MenuList>
               <MenuItem
-                icon={showResumeAll ? <PiPlayBold /> : <PiPauseBold />}
+                icon={showResumeAll ? <PiPlayFill /> : <PiPauseFill />}
                 isDisabled={!pauseResumeAvailable || isBulkActionRunning || isPruning}
                 onClick={pauseOrResumeAll}
               >
@@ -249,25 +276,31 @@ export const ModelInstallQueue = memo(() => {
       </Flex>
 
       {/* Model Queue List */}
-      <Box layerStyle="second" py={4} borderRadius="base" w="full" h="full">
+      <Box layerStyle="second" borderRadius="base" w="full" h="full">
         <ScrollableContent>
-          <TableContainer>
-            <Table size="sm" sx={ModelQueueTableSx}>
-              <Thead>
+          <Table size="sm" sx={ModelQueueTableSx}>
+            <Thead>
+              <Tr>
+                <Th minWidth="50px"></Th>
+                <Th width="80%">Name</Th>
+                <Th minWidth="115px">Status</Th>
+                <Th minWidth="130px" textAlign="right">
+                  Actions
+                </Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {data?.length === 0 ? (
                 <Tr>
-                  <Th></Th>
-                  <Th>Name</Th>
-                  <Th>Status</Th>
-                  <Th textAlign="right">Actions</Th>
+                  <Td colSpan={4} textAlign="center" py={8} color="base.500">
+                    <Text>{t('modelManager.queueEmpty')}</Text>
+                  </Td>
                 </Tr>
-              </Thead>
-              <Tbody>
-                {data?.map((model) => (
-                  <ModelInstallQueueItem key={model.id} installJob={model} />
-                ))}
-              </Tbody>
-            </Table>
-          </TableContainer>
+              ) : (
+                reversedData?.map((model) => <ModelInstallQueueItem key={model.id} installJob={model} />)
+              )}
+            </Tbody>
+          </Table>
         </ScrollableContent>
       </Box>
     </Flex>
