@@ -3,6 +3,7 @@ import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockv
 import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
 import { GalleryPanel } from 'features/gallery/components/GalleryPanel';
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
+import { StageViewerPanel } from 'features/gallery/components/StageViewer/StageViewerPanel';
 import { FloatingLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
 import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
 import type {
@@ -16,7 +17,7 @@ import { AutoLayoutProvider, useAutoLayoutContext, withPanelContainer } from 'fe
 import type { TabName } from 'features/ui/store/uiTypes';
 import { dockviewTheme } from 'features/ui/styles/theme';
 import { t } from 'i18next';
-import { memo, useCallback, useEffect } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 
 import { DockviewTab } from './DockviewTab';
 import { DockviewTabLaunchpad } from './DockviewTabLaunchpad';
@@ -42,6 +43,7 @@ import {
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
+  STAGE_PANEL_ID,
   VIEWER_PANEL_ID,
 } from './shared';
 
@@ -54,10 +56,12 @@ const tabComponents = {
 const mainPanelComponents: AutoLayoutDockviewComponents = {
   [LAUNCHPAD_PANEL_ID]: withPanelContainer(GenerateLaunchpadPanel),
   [VIEWER_PANEL_ID]: withPanelContainer(ImageViewerPanel),
+  [STAGE_PANEL_ID]: withPanelContainer(StageViewerPanel),
 };
 
 const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
   navigationApi.registerContainer(tab, 'main', api, () => {
+    // Launchpad Tab
     const launchpad = api.addPanel<DockviewPanelParameters>({
       id: LAUNCHPAD_PANEL_ID,
       component: LAUNCHPAD_PANEL_ID,
@@ -70,6 +74,7 @@ const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
       },
     });
 
+    // Image Viewer Tab
     api.addPanel<DockviewPanelParameters>({
       id: VIEWER_PANEL_ID,
       component: VIEWER_PANEL_ID,
@@ -86,16 +91,54 @@ const initializeMainPanelLayout = (tab: TabName, api: DockviewApi) => {
       },
     });
 
+    // Stage Viewer Tab
+    api.addPanel<DockviewPanelParameters>({
+      id: STAGE_PANEL_ID,
+      component: STAGE_PANEL_ID,
+      title: t('ui.panels.stageViewer'),
+      tabComponent: DOCKVIEW_TAB_PROGRESS_ID,
+      params: {
+        tab,
+        focusRegion: 'stage',
+        i18nKey: 'ui.panels.stageViewer',
+      },
+      position: {
+        direction: 'within',
+        referencePanel: launchpad.id,
+      },
+    });
+
     launchpad.api.setActive();
   });
 };
 
 const MainPanel = memo(() => {
   const { tab } = useAutoLayoutContext();
+  const wasRightPanelCollapsed = useRef<boolean>(false);
 
   const onReady = useCallback<IDockviewReactProps['onReady']>(
     ({ api }) => {
       initializeMainPanelLayout(tab, api);
+
+      // Automatically collapse right panel when switching to Stage Viewer Tab.
+      // TODO: Hide the right panel completely instead of collapsing it, to avoid duplicating it's functions.
+      // TODO: Fix window losing focus resulting in 'Right panel not found in active tab "generate"' error.
+      api.onDidActivePanelChange((panel) => {
+        if (!panel) {
+          return;
+        }
+
+        if (panel.id === STAGE_PANEL_ID) {
+          wasRightPanelCollapsed.current = navigationApi.isRightPanelCollapsed();
+          if (!wasRightPanelCollapsed.current) {
+            navigationApi.collapseRightPanel();
+          }
+        } else {
+          if (!wasRightPanelCollapsed.current) {
+            navigationApi.expandRightPanel();
+          }
+        }
+      });
     },
     [tab]
   );

@@ -2886,7 +2886,8 @@
             "launchpad": "Launchpad",
             "workflowEditor": "Workflow Editor",
             "imageViewer": "Viewer",
-            "canvas": "Canvas"
+            "canvas": "Canvas",
+            "stageViewer": "Stage"
         },
         "launchpad": {
             "workflowsTitle": "Go deep with Workflows.",
