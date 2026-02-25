@@ -412,8 +412,8 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       <Td textAlign="right" minWidth={130}>
         <Flex sx={ActionsColumnSx}>
           {/* Pause/Resume installatino */}
-          {canResume ||
-            (canPause && (
+          {(canResume ||
+            canPause) && (
               <Button
                 size="sm"
                 tooltip={canResume ? t('modelManager.resume') : t('modelManager.pause')}
@@ -423,7 +423,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
               >
                 {canResume ? t('modelManager.resume') : t('modelManager.pause')}
               </Button>
-            ))}
+            )}
 
           {/* Restart installation if required */}
           {hasRestartRequired && (
