@@ -30,6 +30,7 @@ const zWorkflowSettingsState = z.object({
   shouldColorEdges: z.boolean(),
   shouldShowEdgeLabels: z.boolean(),
   selectionMode: zSelectionMode,
+  shouldGroupNodesByCategory: z.boolean(),
 });
 
 export type WorkflowSettingsState = z.infer<typeof zWorkflowSettingsState>;
@@ -49,6 +50,7 @@ const getInitialState = (): WorkflowSettingsState => ({
   shouldShowEdgeLabels: false,
   nodeOpacity: 1,
   selectionMode: 'partial',
+  shouldGroupNodesByCategory: true,
 });
 
 const slice = createSlice({
@@ -94,6 +96,9 @@ const slice = createSlice({
     selectionModeChanged: (state, action: PayloadAction<boolean>) => {
       state.selectionMode = action.payload ? 'full' : 'partial';
     },
+    shouldGroupNodesByCategoryChanged: (state, action: PayloadAction<boolean>) => {
+      state.shouldGroupNodesByCategory = action.payload;
+    },
   },
 });
 
@@ -111,6 +116,7 @@ export const {
   shouldValidateGraphChanged,
   nodeOpacityChanged,
   selectionModeChanged,
+  shouldGroupNodesByCategoryChanged,
 } = slice.actions;
 
 export const workflowSettingsSliceConfig: SliceConfig<typeof slice> = {
@@ -122,6 +128,9 @@ export const workflowSettingsSliceConfig: SliceConfig<typeof slice> = {
       assert(isPlainObject(state));
       if (!('_version' in state)) {
         state._version = 1;
+      }
+      if (!('shouldGroupNodesByCategory' in state)) {
+        state.shouldGroupNodesByCategory = false;
       }
       return zWorkflowSettingsState.parse(state);
     },
@@ -145,3 +154,4 @@ export const selectNodeSpacing = createWorkflowSettingsSelector((s) => s.nodeSpa
 export const selectLayerSpacing = createWorkflowSettingsSelector((s) => s.layerSpacing);
 export const selectLayoutDirection = createWorkflowSettingsSelector((s) => s.layoutDirection);
 export const selectNodeAlignment = createWorkflowSettingsSelector((s) => s.nodeAlignment);
+export const selectShouldGroupNodesByCategory = createWorkflowSettingsSelector((s) => s.shouldGroupNodesByCategory);

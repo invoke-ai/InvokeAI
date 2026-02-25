@@ -34,6 +34,7 @@ import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupied
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
+import { selectShouldGroupNodesByCategory } from 'features/nodes/store/workflowSettingsSlice';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -348,6 +349,37 @@ const categoryItemSx: SystemStyleObject = {
   },
 };
 
+const NodeCommandItem = memo(
+  ({
+    item,
+    onSelect,
+    isGrouped,
+  }: {
+    item: NodeCommandItemData;
+    onSelect: (value: string) => void;
+    isGrouped?: boolean;
+  }) => (
+    <CommandItem value={item.value} onSelect={onSelect} asChild>
+      <Flex role="button" flexDir="column" sx={cmdkItemSx} py={1} px={2} ps={isGrouped ? 6 : 2} borderRadius="base">
+        <Flex alignItems="center" gap={2}>
+          {item.classification === 'beta' && <Icon boxSize={4} color="invokeYellow.300" as={PiHammerBold} />}
+          {item.classification === 'prototype' && <Icon boxSize={4} color="invokeRed.300" as={PiFlaskBold} />}
+          {item.classification === 'internal' && <Icon boxSize={4} color="invokePurple.300" as={PiCircuitryBold} />}
+          {item.classification === 'special' && <Icon boxSize={4} color="invokeGreen.300" as={PiLightningFill} />}
+          <Text fontWeight="semibold">{item.label}</Text>
+          <Spacer />
+          <Text variant="subtext" fontWeight="semibold">
+            {item.nodePack}
+          </Text>
+        </Flex>
+        {item.description && <Text color="base.200">{item.description}</Text>}
+      </Flex>
+    </CommandItem>
+  )
+);
+
+NodeCommandItem.displayName = 'NodeCommandItem';
+
 const NodeCommandList = memo(
   ({
     searchTerm,
@@ -361,6 +393,7 @@ const NodeCommandList = memo(
     const { t } = useTranslation();
     const templatesArray = useStore($templatesArray);
     const pendingConnection = useStore($pendingConnection);
+    const shouldGroupNodesByCategory = useAppSelector(selectShouldGroupNodesByCategory);
     const currentImageFilterItem = useMemo<FilterableItem>(
       () => ({
         type: 'current_image',
@@ -443,6 +476,22 @@ const NodeCommandList = memo(
         }
       }
 
+      // Sort exact title matches to the top when searching
+      if (searchTerm) {
+        const lowerSearch = searchTerm.toLowerCase();
+        _items.sort((a, b) => {
+          const aExact = a.label.toLowerCase() === lowerSearch;
+          const bExact = b.label.toLowerCase() === lowerSearch;
+          if (aExact && !bExact) {
+            return -1;
+          }
+          if (!aExact && bExact) {
+            return 1;
+          }
+          return 0;
+        });
+      }
+
       return _items;
     }, [pendingConnection, templatesArray, searchTerm, currentImageFilterItem, notesFilterItem]);
 
@@ -455,8 +504,20 @@ const NodeCommandList = memo(
         }
         groups[cat].push(item);
       }
-      // Sort categories alphabetically, but put "other" last
-      return Object.entries(groups).sort(([a], [b]) => {
+      // Sort categories alphabetically, but put "other" last.
+      // When searching, prioritize categories that contain an exact title match.
+      const lowerSearch = searchTerm.toLowerCase();
+      return Object.entries(groups).sort(([a, aItems], [b, bItems]) => {
+        if (searchTerm) {
+          const aHasExact = aItems.some((item) => item.label.toLowerCase() === lowerSearch);
+          const bHasExact = bItems.some((item) => item.label.toLowerCase() === lowerSearch);
+          if (aHasExact && !bHasExact) {
+            return -1;
+          }
+          if (!aHasExact && bHasExact) {
+            return 1;
+          }
+        }
         if (a === 'other') {
           return 1;
         }
@@ -465,10 +526,20 @@ const NodeCommandList = memo(
         }
         return a.localeCompare(b);
       });
-    }, [items]);
+    }, [items, searchTerm]);
 
     // When searching, auto-expand all categories; when not searching, use manual state
     const isSearching = searchTerm.length > 0;
+
+    if (!shouldGroupNodesByCategory) {
+      return (
+        <>
+          {items.map((item) => (
+            <NodeCommandItem key={item.value} item={item} onSelect={onSelect} />
+          ))}
+        </>
+      );
+    }
 
     return (
       <>
@@ -489,30 +560,7 @@ const NodeCommandList = memo(
               </CommandItem>
               {isExpanded &&
                 categoryItems.map((item) => (
-                  <CommandItem key={item.value} value={item.value} onSelect={onSelect} asChild>
-                    <Flex role="button" flexDir="column" sx={cmdkItemSx} py={1} px={2} ps={6} borderRadius="base">
-                      <Flex alignItems="center" gap={2}>
-                        {item.classification === 'beta' && (
-                          <Icon boxSize={4} color="invokeYellow.300" as={PiHammerBold} />
-                        )}
-                        {item.classification === 'prototype' && (
-                          <Icon boxSize={4} color="invokeRed.300" as={PiFlaskBold} />
-                        )}
-                        {item.classification === 'internal' && (
-                          <Icon boxSize={4} color="invokePurple.300" as={PiCircuitryBold} />
-                        )}
-                        {item.classification === 'special' && (
-                          <Icon boxSize={4} color="invokeGreen.300" as={PiLightningFill} />
-                        )}
-                        <Text fontWeight="semibold">{item.label}</Text>
-                        <Spacer />
-                        <Text variant="subtext" fontWeight="semibold">
-                          {item.nodePack}
-                        </Text>
-                      </Flex>
-                      {item.description && <Text color="base.200">{item.description}</Text>}
-                    </Flex>
-                  </CommandItem>
+                  <NodeCommandItem key={item.value} item={item} onSelect={onSelect} isGrouped />
                 ))}
             </Box>
           );

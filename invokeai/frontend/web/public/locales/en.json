@@ -1196,6 +1196,8 @@
         "fullyContainNodesHelp": "Nodes must be fully inside the selection box to be selected",
         "showEdgeLabels": "Show Edge Labels",
         "showEdgeLabelsHelp": "Show labels on edges, indicating the connected nodes",
+        "groupNodesByCategory": "Group Nodes by Category",
+        "groupNodesByCategoryHelp": "Group nodes by category in the add node dialog",
         "hideLegendNodes": "Hide Field Type Legend",
         "hideMinimapnodes": "Hide MiniMap",
         "inputMayOnlyHaveOneConnection": "Input may only have one connection",
