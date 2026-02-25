@@ -23,8 +23,8 @@ import { changeBoardModalSliceConfig } from 'features/changeBoardModal/store/sli
 import { canvasSettingsSliceConfig } from 'features/controlLayers/store/canvasSettingsSlice';
 import { canvasSliceConfig } from 'features/controlLayers/store/canvasSlice';
 import { canvasSessionSliceConfig } from 'features/controlLayers/store/canvasStagingAreaSlice';
-import { canvasWorkflowIntegrationSliceConfig } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import { canvasTextSliceConfig } from 'features/controlLayers/store/canvasTextSlice';
+import { canvasWorkflowIntegrationSliceConfig } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import { lorasSliceConfig } from 'features/controlLayers/store/lorasSlice';
 import { paramsSliceConfig } from 'features/controlLayers/store/paramsSlice';
 import { refImagesSliceConfig } from 'features/controlLayers/store/refImagesSlice';
