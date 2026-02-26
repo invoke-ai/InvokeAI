@@ -427,6 +427,9 @@ const slice = createSlice({
       }
     },
     paramsReset: (state) => resetState(state),
+    paramsRecalled: (_state, action: PayloadAction<ParamsState>) => {
+      return action.payload;
+    },
   },
 });
 
@@ -549,6 +552,7 @@ export const {
   syncedToOptimalDimension,
 
   paramsReset,
+  paramsRecalled,
 } = slice.actions;
 
 export const paramsSliceConfig: SliceConfig<typeof slice> = {

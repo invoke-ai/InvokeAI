@@ -10,6 +10,7 @@ import { ToolWidthPicker } from 'features/controlLayers/components/Tool/ToolWidt
 import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
 import { CanvasToolbarFitBboxToMasksButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToMasksButton';
 import { CanvasToolbarNewSessionMenuButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarNewSessionMenuButton';
+import { CanvasToolbarProjectMenuButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarProjectMenuButton';
 import { CanvasToolbarRedoButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarRedoButton';
 import { CanvasToolbarResetViewButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarResetViewButton';
 import { CanvasToolbarSaveToGalleryButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarSaveToGalleryButton';
@@ -67,6 +68,7 @@ export const CanvasToolbar = memo(() => {
       </Flex>
       <Divider orientation="vertical" />
       <Flex alignItems="center" h="full">
+        <CanvasToolbarProjectMenuButton />
         <CanvasToolbarSaveToGalleryButton />
         <CanvasToolbarUndoButton />
         <CanvasToolbarRedoButton />
