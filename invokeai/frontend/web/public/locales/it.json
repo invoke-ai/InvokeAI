@@ -1096,7 +1096,9 @@
         "invalidBbox": "Riquadro di delimitazione non valido",
         "invalidBboxDesc": "Il riquadro di delimitazione non ha dimensioni valide",
         "kleinEncoderClearedDescription": "Selezionare un encoder Qwen3 compatibile per la nuova variante del modello Klein",
-        "kleinEncoderCleared": "Encoder Qwen3 cancellato"
+        "kleinEncoderCleared": "Encoder Qwen3 cancellato",
+        "schedulerReset": "Ripristino campionatore",
+        "schedulerResetZImageBase": "Il campionatore LCM non è compatibile con i modelli Z-Image Base. Reimpostare su Euler."
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -2342,7 +2344,8 @@
             "move": "Sposta",
             "brush": "Pennello",
             "eraser": "Cancellino",
-            "gradient": "Gradiente"
+            "gradient": "Gradiente",
+            "text": "Testo"
         },
         "filter": {
             "apply": "Applica",
@@ -2771,6 +2774,17 @@
             "linear": "Lineare",
             "radial": "Radiale",
             "clip": "Ritaglia gradiente"
+        },
+        "text": {
+            "font": "Carattere",
+            "size": "Dimensione",
+            "bold": "Grassetto",
+            "italic": "Italico",
+            "underline": "Sottolineato",
+            "strikethrough": "Barrato",
+            "alignLeft": "Allinea a sinistra",
+            "alignCenter": "Allinea al centro",
+            "alignRight": "Allinea a destra"
         }
     },
     "ui": {
