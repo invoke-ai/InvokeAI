@@ -21,7 +21,7 @@
 /invokeai/frontend @blessedcoolant  @lstein  @dunkeroni  
 
 # generation, model management, postprocessing
-/invokeai/backend  @lstein @blessedcoolant @dunkeroni @JPPhoto
+/invokeai/backend  @lstein @blessedcoolant @dunkeroni @JPPhoto @Pfannkuchensack 
 
 # front ends
 /invokeai/frontend/CLI @lstein  
