@@ -186,6 +186,11 @@ class ModelInstallService(ModelInstallServiceBase):
     def _restore_incomplete_installs(self) -> None:
         path = self._app_config.models_path
         seen_sources: set[str] = set()
+        # Collect sources already tracked by active jobs (including those being downloaded right now).
+        # We must not re-queue these or delete their tmpdirs.
+        with self._lock:
+            active_sources = {str(j.source) for j in self._install_jobs if not j.in_terminal_state}
+            active_sources.update(str(j.source) for j in self._download_cache.values() if not j.in_terminal_state)
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
             marker = self._read_install_marker(tmpdir)
             if not marker:
@@ -196,6 +201,10 @@ class ModelInstallService(ModelInstallServiceBase):
 
             try:
                 source_str = marker["source"]
+                if source_str in active_sources:
+                    # This tmpdir belongs to an install already in progress; leave it alone.
+                    self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
+                    continue
                 if source_str in seen_sources:
                     self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
                     self._safe_rmtree(tmpdir, self._logger)
