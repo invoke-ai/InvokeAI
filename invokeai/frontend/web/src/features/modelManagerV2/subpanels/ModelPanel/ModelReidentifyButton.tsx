@@ -4,7 +4,9 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSparkleFill } from 'react-icons/pi';
 import { useReidentifyModelMutation } from 'services/api/endpoints/models';
-import type { AnyModelConfig } from 'services/api/types';
+import { type AnyModelConfig, isExternalApiModelConfig } from 'services/api/types';
+
+import { isExternalModel } from './isExternalModel';
 
 interface Props {
   modelConfig: AnyModelConfig;
@@ -13,6 +15,7 @@ interface Props {
 export const ModelReidentifyButton = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
   const [reidentifyModel, { isLoading }] = useReidentifyModelMutation();
+  const isExternal = isExternalApiModelConfig(modelConfig) || isExternalModel(modelConfig.path);
 
   const onClick = useCallback(() => {
     reidentifyModel({ key: modelConfig.key })
@@ -39,6 +42,10 @@ export const ModelReidentifyButton = memo(({ modelConfig }: Props) => {
         });
       });
   }, [modelConfig.key, reidentifyModel, t]);
+
+  if (isExternal) {
+    return null;
+  }
 
   return (
     <Button
