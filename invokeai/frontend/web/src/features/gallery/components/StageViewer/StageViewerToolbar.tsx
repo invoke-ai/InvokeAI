@@ -9,7 +9,7 @@ export const StageViewerToolbar = memo(() => {
   const { t } = useTranslation();
 
   return (
-    <Flex gap={4} alignItems="center" cursor="default" fontWeight="semibold">
+    <Flex gap={4} alignItems="center" cursor="default" fontWeight="semibold" h={8} w="full" justifyContent="center" px={2}>
       <Text fontSize="sm">{t('common.board')}</Text>
       <BoardsDropdown />
       <Spacer />

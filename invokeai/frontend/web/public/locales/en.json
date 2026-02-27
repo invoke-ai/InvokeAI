@@ -431,6 +431,10 @@
         "move": "Move",
         "useForPromptGeneration": "Use for Prompt Generation"
     },
+    "stageViewer": {
+      "gridView": "Grid View",
+      "linearView": "Linear View"
+    },
     "hotkeys": {
         "hotkeys": "Hotkeys",
         "searchHotkeys": "Search Hotkeys",
