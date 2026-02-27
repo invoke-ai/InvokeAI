@@ -1,5 +1,6 @@
 import { Divider, Flex, type SystemStyleObject } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useStageFeed } from 'features/gallery/hooks/useStageFeed';
 import { selectStageViewerMode } from 'features/ui/store/uiSelectors';
 import { memo } from 'react';
 
@@ -18,13 +19,14 @@ const StageViewerSx: SystemStyleObject = {
 
 export const StageViewer = memo(() => {
   const viewMode = useAppSelector(selectStageViewerMode);
+  const {feed} = useStageFeed();
 
   return (
     <Flex sx={StageViewerSx}>
       <StageViewerToolbar />
       <Divider />
-      <Flex>
-        {viewMode === 'grid' ? <StageViewerGridView /> : viewMode === 'linear' ? <StageViewerLinearView /> : null}
+      <Flex flex={1} overflow="hidden">
+        {viewMode === 'grid' ? <StageViewerGridView feed={feed} /> : viewMode === 'linear' ? <StageViewerLinearView feed={feed} /> : null}
       </Flex>
     </Flex>
   );

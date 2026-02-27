@@ -80,6 +80,7 @@ export const BoardsDropdown = memo(() => {
   );
 
   return (
+    // TODO: Add 'Uncategorized' Board Option
     <Popover
       isOpen={popover.isOpen}
       onOpen={popover.open}
