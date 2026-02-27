@@ -1,8 +1,11 @@
+import locale
 from enum import Enum
 from importlib.metadata import distributions
+from pathlib import Path as FilePath
 from threading import Lock
 
 import torch
+import yaml
 from fastapi import Body, HTTPException, Path
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
@@ -10,8 +13,10 @@ from pydantic import BaseModel, Field
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.config.config_default import (
     DefaultInvokeAIAppConfig,
+    EXTERNAL_API_KEY_FIELDS,
     InvokeAIAppConfig,
     get_config,
+    load_external_api_keys,
     load_and_migrate_config,
 )
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
@@ -186,17 +191,52 @@ def _get_external_provider_fields(provider_id: str) -> tuple[str, str]:
     return EXTERNAL_PROVIDER_FIELDS[provider_id]
 
 
+def _write_external_api_keys_file(api_keys_file_path: FilePath, api_keys: dict[str, str]) -> None:
+    if not api_keys:
+        if api_keys_file_path.exists():
+            api_keys_file_path.unlink()
+        return
+
+    api_keys_file_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(api_keys_file_path, "w", encoding=locale.getpreferredencoding()) as api_keys_file:
+        yaml.safe_dump(api_keys, api_keys_file, sort_keys=False)
+
+
 def _apply_external_provider_update(updates: dict[str, str | None]) -> None:
     with _EXTERNAL_PROVIDER_CONFIG_LOCK:
         runtime_config = get_config()
         config_path = runtime_config.config_file_path
+        api_keys_file_path = runtime_config.api_keys_file_path
         if config_path.exists():
             file_config = load_and_migrate_config(config_path)
         else:
             file_config = DefaultInvokeAIAppConfig()
 
         runtime_config.update_config(updates)
-        file_config.update_config(updates)
+        key_fields = set(EXTERNAL_API_KEY_FIELDS)
+        key_updates = {field: value for field, value in updates.items() if field in key_fields}
+        non_key_updates = {field: value for field, value in updates.items() if field not in key_fields}
+
+        if non_key_updates:
+            file_config.update_config(non_key_updates)
+
+        persisted_api_keys = load_external_api_keys(api_keys_file_path)
+        for field_name in EXTERNAL_API_KEY_FIELDS:
+            file_value = getattr(file_config, field_name, None)
+            if field_name not in persisted_api_keys and isinstance(file_value, str) and file_value.strip():
+                persisted_api_keys[field_name] = file_value
+
+        for field_name, value in key_updates.items():
+            if value is None:
+                persisted_api_keys.pop(field_name, None)
+            else:
+                persisted_api_keys[field_name] = value
+
+        _write_external_api_keys_file(api_keys_file_path, persisted_api_keys)
+
+        for field_name in EXTERNAL_API_KEY_FIELDS:
+            setattr(file_config, field_name, None)
+
         file_config_to_write = type(file_config).model_validate(
             file_config.model_dump(exclude_unset=True, exclude_none=True)
         )
