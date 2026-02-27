@@ -4,6 +4,7 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
+  selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
   selectIsSD3,
@@ -45,6 +46,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isFlux2 = useAppSelector(selectIsFlux2);
   const isSD3 = useAppSelector(selectIsSD3);
   const isZImage = useAppSelector(selectIsZImage);
+  const isExternal = useAppSelector(selectIsExternal);
 
   const selectBadges = useMemo(
     () =>
@@ -90,6 +92,10 @@ export const AdvancedSettingsAccordion = memo(() => {
     id: `'advanced-settings-generate`,
     defaultIsOpen: false,
   });
+
+  if (isExternal) {
+    return null;
+  }
 
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>

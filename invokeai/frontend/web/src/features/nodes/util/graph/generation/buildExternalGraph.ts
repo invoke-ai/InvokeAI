@@ -54,7 +54,7 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
     model,
     mode: requestedMode,
     negative_prompt: model.capabilities.supports_negative_prompt ? prompts.negative : null,
-    steps: params.steps,
+    steps: model.capabilities.supports_steps ? params.steps : null,
     guidance: model.capabilities.supports_guidance ? params.guidance : null,
     num_images: 1,
   });

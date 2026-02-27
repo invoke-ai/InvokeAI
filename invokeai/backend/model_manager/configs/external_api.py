@@ -24,6 +24,7 @@ class ExternalModelCapabilities(BaseModel):
     supports_negative_prompt: bool = Field(default=True)
     supports_seed: bool = Field(default=False)
     supports_guidance: bool = Field(default=False)
+    supports_steps: bool = Field(default=False)
     max_images_per_request: int | None = Field(default=None, gt=0)
     max_image_size: ExternalImageSize | None = Field(default=None)
     allowed_aspect_ratios: list[str] | None = Field(default=None)

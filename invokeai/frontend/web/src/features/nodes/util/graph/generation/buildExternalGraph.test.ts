@@ -22,6 +22,7 @@ const createExternalModel = (overrides: Partial<ExternalApiModelConfig> = {}): E
     supports_reference_images: true,
     supports_seed: true,
     supports_guidance: true,
+    supports_steps: true,
     max_image_size: maxImageSize,
   };
 
@@ -127,12 +128,39 @@ describe('buildExternalGraph', () => {
     expect(externalNode.width).toBe(768);
     expect(externalNode.height).toBe(512);
     expect(externalNode.negative_prompt).toBe('bad prompt');
+    expect(externalNode.steps).toBe(20);
     expect(externalNode.guidance).toBe(4.5);
     expect(externalNode.reference_images?.[0]).toEqual({ image_name: 'ref.png' });
     expect(externalNode.reference_image_weights).toEqual([0.5]);
 
     const seedEdge = graph.edges.find((edge) => edge.destination.field === 'seed');
     expect(seedEdge).toBeDefined();
+  });
+
+  it('does not include steps when model does not support them', async () => {
+    const modelConfig = createExternalModel({
+      capabilities: {
+        modes: ['txt2img'],
+        supports_negative_prompt: true,
+        supports_reference_images: true,
+        supports_seed: true,
+        supports_guidance: true,
+        supports_steps: false,
+      },
+    });
+    mockModelConfig = modelConfig;
+
+    const { g } = await buildExternalGraph({
+      generationMode: 'txt2img',
+      state: {} as RootState,
+      manager: null,
+    });
+    const graph = g.getGraph();
+    const externalNode = Object.values(graph.nodes).find(
+      (node) => node.type === 'external_image_generation'
+    ) as Invocation<'external_image_generation'>;
+
+    expect(externalNode.steps).toBeNull();
   });
 
   it('throws when mode is unsupported', async () => {

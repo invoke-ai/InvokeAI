@@ -7,7 +7,13 @@ import type {
 } from 'services/api/types';
 import { describe, expect, it } from 'vitest';
 
-import { selectModelSupportsNegativePrompt, selectModelSupportsRefImages } from './paramsSlice';
+import {
+  selectModelSupportsGuidance,
+  selectModelSupportsNegativePrompt,
+  selectModelSupportsRefImages,
+  selectModelSupportsSeed,
+  selectModelSupportsSteps,
+} from './paramsSlice';
 
 const createExternalConfig = (capabilities: ExternalModelCapabilities): ExternalApiModelConfig => {
   const maxImageSize: ExternalImageSize = { width: 1024, height: 1024 };
@@ -57,5 +63,41 @@ describe('paramsSlice selectors for external models', () => {
     const model = zModelIdentifierField.parse(config);
 
     expect(selectModelSupportsRefImages.resultFunc(model, config)).toBe(false);
+  });
+
+  it('uses external capabilities for guidance support', () => {
+    const config = createExternalConfig({
+      modes: ['txt2img'],
+      supports_negative_prompt: true,
+      supports_reference_images: false,
+      supports_guidance: true,
+    });
+    const model = zModelIdentifierField.parse(config);
+
+    expect(selectModelSupportsGuidance.resultFunc(model, config)).toBe(true);
+  });
+
+  it('uses external capabilities for seed support', () => {
+    const config = createExternalConfig({
+      modes: ['txt2img'],
+      supports_negative_prompt: true,
+      supports_reference_images: false,
+      supports_seed: false,
+    });
+    const model = zModelIdentifierField.parse(config);
+
+    expect(selectModelSupportsSeed.resultFunc(model, config)).toBe(false);
+  });
+
+  it('uses external capabilities for steps support', () => {
+    const config = createExternalConfig({
+      modes: ['txt2img'],
+      supports_negative_prompt: true,
+      supports_reference_images: false,
+      supports_steps: false,
+    });
+    const model = zModelIdentifierField.parse(config);
+
+    expect(selectModelSupportsSteps.resultFunc(model, config)).toBe(false);
   });
 });

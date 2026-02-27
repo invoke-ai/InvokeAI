@@ -124,6 +124,7 @@ export type ExternalModelCapabilities = {
   supports_negative_prompt?: boolean;
   supports_seed?: boolean;
   supports_guidance?: boolean;
+  supports_steps?: boolean;
   max_images_per_request?: number | null;
   max_image_size?: ExternalImageSize | null;
   allowed_aspect_ratios?: string[] | null;

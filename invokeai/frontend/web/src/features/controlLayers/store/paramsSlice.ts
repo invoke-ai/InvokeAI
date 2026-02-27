@@ -594,6 +594,7 @@ export const selectIsSD3 = createParamsSelector((params) => params.model?.base =
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
+export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -678,6 +679,33 @@ export const selectModelSupportsOptimizedDenoising = createSelector(
   selectModel,
   (model) => !!model && SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS.includes(model.base)
 );
+export const selectModelSupportsGuidance = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+  if (!model) {
+    return false;
+  }
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return modelConfig.capabilities.supports_guidance ?? false;
+  }
+  return true;
+});
+export const selectModelSupportsSeed = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+  if (!model) {
+    return false;
+  }
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return modelConfig.capabilities.supports_seed ?? false;
+  }
+  return true;
+});
+export const selectModelSupportsSteps = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+  if (!model) {
+    return false;
+  }
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return modelConfig.capabilities.supports_steps ?? false;
+  }
+  return true;
+});
 export const selectScheduler = createParamsSelector((params) => params.scheduler);
 export const selectFluxScheduler = createParamsSelector((params) => params.fluxScheduler);
 export const selectFluxDypePreset = createParamsSelector((params) => params.fluxDypePreset);
