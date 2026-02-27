@@ -55,6 +55,7 @@ class ImageServiceABC(ABC):
         metadata: Optional[str] = None,
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
         pass
@@ -135,6 +136,8 @@ class ImageServiceABC(ABC):
         height_exact: Optional[int] = None,
         board_ids: Optional[list[str]] = None,
         starred_mode: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageDTO]:
         """Gets a paginated list of image DTOs with starred images first when starred_first=True."""
         pass
@@ -179,6 +182,8 @@ class ImageServiceABC(ABC):
         height_exact: Optional[int] = None,
         board_ids: Optional[list[str]] = None,
         starred_mode: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> ImageNamesResult:
         """Gets ordered list of image names with metadata for optimistic updates."""
         pass

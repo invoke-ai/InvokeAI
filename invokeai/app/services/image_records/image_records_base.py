@@ -60,8 +60,10 @@ class ImageRecordStorageBase(ABC):
         height_exact: Optional[int] = None,
         board_ids: Optional[list[str]] = None,
         starred_mode: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageRecord]:
-        """Gets a page of image records."""
+        """Gets a page of image records. When board_id is 'none', filters by user_id for per-user uncategorized images unless is_admin is True."""
         pass
 
     # TODO: The database has a nullable `deleted_at` column, currently unused.
@@ -100,6 +102,7 @@ class ImageRecordStorageBase(ABC):
         session_id: Optional[str] = None,
         node_id: Optional[str] = None,
         metadata: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> datetime:
         """Saves an image record."""
         pass
@@ -129,6 +132,8 @@ class ImageRecordStorageBase(ABC):
         height_exact: Optional[int] = None,
         board_ids: Optional[list[str]] = None,
         starred_mode: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> ImageNamesResult:
         """Gets ordered list of image names with metadata for optimistic updates."""
         pass
