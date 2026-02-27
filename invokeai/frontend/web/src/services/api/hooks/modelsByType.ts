@@ -9,7 +9,7 @@ import {
   useGetMissingModelsQuery,
   useGetModelConfigsQuery,
 } from 'services/api/endpoints/models';
-import type { AnyModelConfig, MainOrExternalModelConfig } from 'services/api/types';
+import type { AnyModelConfig, AnyModelConfigWithExternal, MainOrExternalModelConfig } from 'services/api/types';
 import {
   isCLIPEmbedModelConfigOrSubmodel,
   isControlLayerModelConfig,
@@ -48,16 +48,42 @@ const buildModelsHook =
         modelConfigsAdapterSelectors.selectAll(missingModelsData ?? { ids: [], entities: {} }).map((m) => m.key)
       );
 
-      return modelConfigsAdapterSelectors
-        .selectAll(result.data)
-        .filter((config) => typeGuard(config))
-        .filter((config) => !missingModelKeys.has(config.key) || isExternalApiModelConfig(config))
+      return (modelConfigsAdapterSelectors.selectAll(result.data) as AnyModelConfigWithExternal[])
+        .filter((config): config is T => {
+          if (isExternalApiModelConfig(config)) {
+            return false;
+          }
+          return typeGuard(config as AnyModelConfig);
+        })
+        .filter((config) => !missingModelKeys.has(config.key))
         .filter(filter);
     }, [filter, result.data, missingModelsData]);
 
     return [modelConfigs, result] as const;
   };
-export const useMainModels = buildModelsHook<MainOrExternalModelConfig>(isMainOrExternalModelConfig);
+
+export const useMainModels = (filter: (config: MainOrExternalModelConfig) => boolean = () => true) => {
+  const result = useGetModelConfigsQuery(undefined);
+  const { data: missingModelsData } = useGetMissingModelsQuery();
+
+  const modelConfigs = useMemo(() => {
+    if (!result.data) {
+      return EMPTY_ARRAY;
+    }
+
+    const missingModelKeys = new Set(
+      modelConfigsAdapterSelectors.selectAll(missingModelsData ?? { ids: [], entities: {} }).map((m) => m.key)
+    );
+
+    return (modelConfigsAdapterSelectors.selectAll(result.data) as AnyModelConfigWithExternal[])
+      .filter((config): config is MainOrExternalModelConfig => isMainOrExternalModelConfig(config))
+      .filter((config) => !missingModelKeys.has(config.key) || isExternalApiModelConfig(config))
+      .filter(filter);
+  }, [filter, result.data, missingModelsData]);
+
+  return [modelConfigs, result] as const;
+};
+
 export const useRefinerModels = buildModelsHook(isRefinerMainModelModelConfig);
 export const useLoRAModels = buildModelsHook(isLoRAModelConfig);
 export const useControlLayerModels = buildModelsHook(isControlLayerModelConfig);
@@ -95,7 +121,7 @@ const buildModelsSelector =
     return modelConfigsAdapterSelectors
       .selectAll(result.data)
       .filter(typeGuard)
-      .filter((config) => !missingModelKeys.has(config.key) || isExternalApiModelConfig(config));
+      .filter((config) => !missingModelKeys.has(config.key));
   };
 export const selectIPAdapterModels = buildModelsSelector(isIPAdapterModelConfig);
 export const selectGlobalRefImageModels = buildModelsSelector(

@@ -6,7 +6,11 @@ import type {
   RefImageState,
 } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
-import { type AnyModelConfig, isExternalApiModelConfig, type MainOrExternalModelConfig } from 'services/api/types';
+import {
+  type AnyModelConfigWithExternal,
+  isExternalApiModelConfig,
+  type MainOrExternalModelConfig,
+} from 'services/api/types';
 
 const WARNINGS = {
   UNSUPPORTED_MODEL: 'controlLayers.warnings.unsupportedModel',
@@ -90,8 +94,8 @@ export const getRegionalGuidanceWarnings = (
 };
 
 export const areBasesCompatibleForRefImage = (
-  first?: ModelIdentifierField | AnyModelConfig | null,
-  second?: ModelIdentifierField | AnyModelConfig | null
+  first?: ModelIdentifierField | AnyModelConfigWithExternal | null,
+  second?: ModelIdentifierField | AnyModelConfigWithExternal | null
 ): boolean => {
   if (!first || !second) {
     return false;

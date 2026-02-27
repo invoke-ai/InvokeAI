@@ -17,7 +17,14 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const selectBadges = createMemoizedSelector(
-  [selectWidth, selectHeight, selectAspectRatioID, selectAspectRatioIsLocked, selectShouldRandomizeSeed, selectModelSupportsSeed],
+  [
+    selectWidth,
+    selectHeight,
+    selectAspectRatioID,
+    selectAspectRatioIsLocked,
+    selectShouldRandomizeSeed,
+    selectModelSupportsSeed,
+  ],
   (width, height, aspectRatioID, aspectRatioIsLocked, shouldRandomizeSeed, modelSupportsSeed) => {
     const badges: string[] = [];
 

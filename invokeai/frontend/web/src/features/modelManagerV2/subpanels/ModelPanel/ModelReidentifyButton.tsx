@@ -4,12 +4,12 @@ import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiSparkleFill } from 'react-icons/pi';
 import { useReidentifyModelMutation } from 'services/api/endpoints/models';
-import { type AnyModelConfig, isExternalApiModelConfig } from 'services/api/types';
+import { type AnyModelConfigWithExternal, isExternalApiModelConfig } from 'services/api/types';
 
 import { isExternalModel } from './isExternalModel';
 
 interface Props {
-  modelConfig: AnyModelConfig;
+  modelConfig: AnyModelConfigWithExternal;
 }
 
 export const ModelReidentifyButton = memo(({ modelConfig }: Props) => {

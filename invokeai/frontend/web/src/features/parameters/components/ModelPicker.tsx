@@ -34,7 +34,11 @@ import { memo, useCallback, useMemo, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiCaretDownBold, PiLinkSimple } from 'react-icons/pi';
 import { useGetRelatedModelIdsBatchQuery } from 'services/api/endpoints/modelRelationships';
-import { type AnyModelConfig, type ExternalApiModelConfig, isExternalApiModelConfig } from 'services/api/types';
+import {
+  type AnyModelConfigWithExternal,
+  type ExternalApiModelConfig,
+  isExternalApiModelConfig,
+} from 'services/api/types';
 
 const selectSelectedModelKeys = createMemoizedSelector(selectParamsSlice, selectLoRAsSlice, (params, loras) => {
   const keys: string[] = [];
@@ -65,7 +69,7 @@ const selectSelectedModelKeys = createMemoizedSelector(selectParamsSlice, select
 type WithStarred<T> = T & { starred?: boolean };
 
 // Type for models with starred field
-const getOptionId = <T extends AnyModelConfig>(modelConfig: WithStarred<T>) => modelConfig.key;
+const getOptionId = <T extends AnyModelConfigWithExternal>(modelConfig: WithStarred<T>) => modelConfig.key;
 
 const ModelManagerLink = memo((props: ButtonProps) => {
   const onClick = useCallback(() => {
@@ -95,17 +99,17 @@ const NoOptionsFallback = memo(({ noOptionsText }: { noOptionsText?: string }) =
 });
 NoOptionsFallback.displayName = 'NoOptionsFallback';
 
-const getGroupIDFromModelConfig = (modelConfig: AnyModelConfig): string => modelConfig.base;
+const getGroupIDFromModelConfig = (modelConfig: AnyModelConfigWithExternal): string => modelConfig.base;
 
-const getGroupNameFromModelConfig = (modelConfig: AnyModelConfig): string => {
+const getGroupNameFromModelConfig = (modelConfig: AnyModelConfigWithExternal): string => {
   return MODEL_BASE_TO_LONG_NAME[modelConfig.base];
 };
 
-const getGroupShortNameFromModelConfig = (modelConfig: AnyModelConfig): string => {
+const getGroupShortNameFromModelConfig = (modelConfig: AnyModelConfigWithExternal): string => {
   return MODEL_BASE_TO_SHORT_NAME[modelConfig.base];
 };
 
-const getGroupColorSchemeFromModelConfig = (modelConfig: AnyModelConfig): string => {
+const getGroupColorSchemeFromModelConfig = (modelConfig: AnyModelConfigWithExternal): string => {
   return MODEL_BASE_TO_COLOR[modelConfig.base];
 };
 
@@ -132,7 +136,7 @@ const removeStarred = <T,>(obj: WithStarred<T>): T => {
 };
 
 export const ModelPicker = typedMemo(
-  <T extends AnyModelConfig = AnyModelConfig>({
+  <T extends AnyModelConfigWithExternal = AnyModelConfigWithExternal>({
     pickerId,
     modelConfigs,
     selectedModelConfig,
@@ -384,11 +388,9 @@ const optionNameSx: SystemStyleObject = {
 };
 
 const PickerOptionComponent = typedMemo(
-  <T extends AnyModelConfig>({ option, ...rest }: { option: WithStarred<T> } & BoxProps) => {
+  <T extends AnyModelConfigWithExternal>({ option, ...rest }: { option: WithStarred<T> } & BoxProps) => {
     const { isCompactView } = usePickerContext<WithStarred<T>>();
-    const externalOption = isExternalApiModelConfig(option as AnyModelConfig)
-      ? (option as ExternalApiModelConfig)
-      : null;
+    const externalOption = isExternalApiModelConfig(option) ? (option as ExternalApiModelConfig) : null;
     const providerLabel = externalOption ? externalOption.provider_id.toUpperCase() : null;
 
     return (
@@ -435,16 +437,16 @@ const PickerOptionComponent = typedMemo(
 );
 PickerOptionComponent.displayName = 'PickerItemComponent';
 
-const BASE_KEYWORDS: { [key in BaseModelType]?: string[] } = {
+const BASE_KEYWORDS: { [key in BaseModelType | 'external']?: string[] } = {
   'sd-1': ['sd1', 'sd1.4', 'sd1.5', 'sd-1'],
   'sd-2': ['sd2', 'sd2.0', 'sd2.1', 'sd-2'],
   'sd-3': ['sd3', 'sd3.0', 'sd3.5', 'sd-3'],
 };
 
-const isMatch = <T extends AnyModelConfig>(model: WithStarred<T>, searchTerm: string) => {
+const isMatch = <T extends AnyModelConfigWithExternal>(model: WithStarred<T>, searchTerm: string) => {
   const regex = getRegex(searchTerm);
   const bases = BASE_KEYWORDS[model.base] ?? [model.base];
-  const externalModel = isExternalApiModelConfig(model as AnyModelConfig) ? (model as ExternalApiModelConfig) : null;
+  const externalModel = isExternalApiModelConfig(model) ? (model as ExternalApiModelConfig) : null;
   const externalSearch = externalModel ? ` ${externalModel.provider_id} ${externalModel.provider_model_id}` : '';
   const testString =
     `${model.name} ${bases.join(' ')} ${model.type} ${model.description ?? ''} ${model.format}${externalSearch}`.toLowerCase();

@@ -11,7 +11,7 @@ import { filesize } from 'filesize';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  type AnyModelConfig,
+  type AnyModelConfigWithExternal,
   type CLIPEmbedModelConfig,
   type CLIPVisionModelConfig,
   isExternalApiModelConfig,
@@ -37,7 +37,7 @@ type EncoderModelConfig =
   | SigLIPModelConfig
   | LlavaOnevisionModelConfig;
 
-const isEncoderModel = (modelConfig: AnyModelConfig): modelConfig is EncoderModelConfig => {
+const isEncoderModel = (modelConfig: AnyModelConfigWithExternal): modelConfig is EncoderModelConfig => {
   return (
     modelConfig.type === 'clip_embed' ||
     modelConfig.type === 't5_encoder' ||
@@ -49,7 +49,7 @@ const isEncoderModel = (modelConfig: AnyModelConfig): modelConfig is EncoderMode
 };
 
 type Props = {
-  modelConfig: AnyModelConfig;
+  modelConfig: AnyModelConfigWithExternal;
 };
 
 export const ModelView = memo(({ modelConfig }: Props) => {

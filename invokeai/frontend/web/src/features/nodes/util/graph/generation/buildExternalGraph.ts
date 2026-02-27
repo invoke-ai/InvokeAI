@@ -2,7 +2,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { zImageField } from 'features/nodes/types/common';
+import { type ModelIdentifierField, zImageField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   getOriginalAndScaledSizesForOtherModes,
@@ -15,15 +15,16 @@ import {
   type GraphBuilderReturn,
   UnsupportedGenerationModeError,
 } from 'features/nodes/util/graph/types';
-import { type Invocation, isExternalApiModelConfig } from 'services/api/types';
+import { type AnyModelConfigWithExternal, type Invocation, isExternalApiModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
 export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
   const { generationMode, state, manager } = arg;
 
-  const model = selectModelConfig(state);
-  assert(model, 'No model selected');
-  assert(isExternalApiModelConfig(model), 'Selected model is not an external API model');
+  const modelConfig = selectModelConfig(state) as AnyModelConfigWithExternal | null;
+  assert(modelConfig, 'No model selected');
+  assert(isExternalApiModelConfig(modelConfig), 'Selected model is not an external API model');
+  const model = modelConfig;
 
   const requestedMode = generationMode === 'outpaint' ? 'inpaint' : generationMode;
   if (!model.capabilities.modes.includes(requestedMode)) {
@@ -51,7 +52,7 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
   const externalNode = g.addNode({
     id: getPrefixedId('external_image_generation'),
     type: 'external_image_generation',
-    model,
+    model: model as unknown as ModelIdentifierField,
     mode: requestedMode,
     negative_prompt: model.capabilities.supports_negative_prompt ? prompts.negative : null,
     steps: model.capabilities.supports_steps ? params.steps : null,

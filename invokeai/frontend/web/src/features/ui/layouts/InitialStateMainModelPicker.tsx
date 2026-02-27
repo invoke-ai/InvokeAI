@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { MdMoneyOff } from 'react-icons/md';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
-import { type AnyModelConfig, isNonCommercialMainModelConfig } from 'services/api/types';
+import { type AnyModelConfigWithExternal, isNonCommercialMainModelConfig } from 'services/api/types';
 
 export const InitialStateMainModelPicker = memo(() => {
   const { t } = useTranslation();
@@ -19,7 +19,7 @@ export const InitialStateMainModelPicker = memo(() => {
   const [modelConfigs] = useMainModels();
   const selectedModelConfig = useSelectedModelConfig();
   const onChange = useCallback(
-    (modelConfig: AnyModelConfig) => {
+    (modelConfig: AnyModelConfigWithExternal) => {
       dispatch(modelSelected(modelConfig));
     },
     [dispatch]
@@ -31,7 +31,7 @@ export const InitialStateMainModelPicker = memo(() => {
   );
 
   const getIsOptionDisabled = useCallback(
-    (modelConfig: AnyModelConfig) => isExternalModelUnsupportedForTab(modelConfig, activeTab),
+    (modelConfig: AnyModelConfigWithExternal) => isExternalModelUnsupportedForTab(modelConfig, activeTab),
     [activeTab]
   );
 

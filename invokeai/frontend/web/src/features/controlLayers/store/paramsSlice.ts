@@ -21,6 +21,7 @@ import {
   SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS,
   SUPPORTS_REF_IMAGES_BASE_MODELS,
 } from 'features/modelManagerV2/models';
+import type { BaseModelType } from 'features/nodes/types/common';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -43,6 +44,7 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
+import type { AnyModelConfigWithExternal } from 'services/api/types';
 import { isExternalApiModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -317,7 +319,7 @@ const slice = createSlice({
     //#region Dimensions
     sizeRecalled: (state, action: PayloadAction<{ width: number; height: number }>) => {
       const { width, height } = action.payload;
-      const gridSize = getGridSize(state.model?.base);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
       state.dimensions.width = Math.max(roundDownToMultiple(width, gridSize), 64);
       state.dimensions.height = Math.max(roundDownToMultiple(height, gridSize), 64);
       state.dimensions.aspectRatio.value = state.dimensions.width / state.dimensions.height;
@@ -326,7 +328,7 @@ const slice = createSlice({
     },
     widthChanged: (state, action: PayloadAction<{ width: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { width, updateAspectRatio, clamp } = action.payload;
-      const gridSize = getGridSize(state.model?.base);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
       state.dimensions.width = clamp ? Math.max(roundDownToMultiple(width, gridSize), 64) : width;
 
       if (state.dimensions.aspectRatio.isLocked) {
@@ -344,7 +346,7 @@ const slice = createSlice({
     },
     heightChanged: (state, action: PayloadAction<{ height: number; updateAspectRatio?: boolean; clamp?: boolean }>) => {
       const { height, updateAspectRatio, clamp } = action.payload;
-      const gridSize = getGridSize(state.model?.base);
+      const gridSize = getGridSize(state.model?.base as BaseModelType | undefined);
       state.dimensions.height = clamp ? Math.max(roundDownToMultiple(height, gridSize), 64) : height;
 
       if (state.dimensions.aspectRatio.isLocked) {
@@ -374,7 +376,7 @@ const slice = createSlice({
         const { width, height } = calculateNewSize(
           state.dimensions.aspectRatio.value,
           state.dimensions.width * state.dimensions.height,
-          state.model?.base
+          state.model?.base as BaseModelType | undefined
         );
         state.dimensions.width = width;
         state.dimensions.height = height;
@@ -391,7 +393,7 @@ const slice = createSlice({
         const { width, height } = calculateNewSize(
           state.dimensions.aspectRatio.value,
           state.dimensions.width * state.dimensions.height,
-          state.model?.base
+          state.model?.base as BaseModelType | undefined
         );
         state.dimensions.width = width;
         state.dimensions.height = height;
@@ -399,12 +401,12 @@ const slice = createSlice({
       }
     },
     sizeOptimized: (state) => {
-      const optimalDimension = getOptimalDimension(state.model?.base);
+      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined);
       if (state.dimensions.aspectRatio.isLocked) {
         const { width, height } = calculateNewSize(
           state.dimensions.aspectRatio.value,
           optimalDimension * optimalDimension,
-          state.model?.base
+          state.model?.base as BaseModelType | undefined
         );
         state.dimensions.width = width;
         state.dimensions.height = height;
@@ -415,13 +417,19 @@ const slice = createSlice({
       }
     },
     syncedToOptimalDimension: (state) => {
-      const optimalDimension = getOptimalDimension(state.model?.base);
+      const optimalDimension = getOptimalDimension(state.model?.base as BaseModelType | undefined);
 
-      if (!getIsSizeOptimal(state.dimensions.width, state.dimensions.height, state.model?.base)) {
+      if (
+        !getIsSizeOptimal(
+          state.dimensions.width,
+          state.dimensions.height,
+          state.model?.base as BaseModelType | undefined
+        )
+      ) {
         const bboxDims = calculateNewSize(
           state.dimensions.aspectRatio.value,
           optimalDimension * optimalDimension,
-          state.model?.base
+          state.model?.base as BaseModelType | undefined
         );
         state.dimensions.width = bboxDims.width;
         state.dimensions.height = bboxDims.height;
@@ -456,6 +464,9 @@ const hasModelClipSkip = (model: ParameterModel | null) => {
 };
 
 const getModelMaxClipSkip = (model: ParameterModel) => {
+  if (model.base === 'external') {
+    return undefined;
+  }
   if (model.base === 'sdxl') {
     // We don't support user-defined CLIP skip for SDXL because it doesn't do anything useful
     return 0;
@@ -649,7 +660,11 @@ export const selectModelConfig = createSelector(
     if (!model) {
       return null;
     }
-    return modelConfigsAdapterSelectors.selectById(modelConfigs.data, model.key) ?? null;
+    return (
+      (modelConfigsAdapterSelectors.selectById(modelConfigs.data, model.key) as
+        | AnyModelConfigWithExternal
+        | undefined) ?? null
+    );
   }
 );
 export const selectHasNegativePrompt = createParamsSelector((params) => params.negativePrompt !== null);
@@ -663,6 +678,9 @@ export const selectModelSupportsNegativePrompt = createSelector(
     if (modelConfig && isExternalApiModelConfig(modelConfig)) {
       return modelConfig.capabilities.supports_negative_prompt ?? false;
     }
+    if (model.base === 'external') {
+      return false;
+    }
     return SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base);
   }
 );
@@ -673,11 +691,14 @@ export const selectModelSupportsRefImages = createSelector(selectModel, selectMo
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
     return modelConfig.capabilities.supports_reference_images ?? false;
   }
+  if (model.base === 'external') {
+    return false;
+  }
   return SUPPORTS_REF_IMAGES_BASE_MODELS.includes(model.base);
 });
 export const selectModelSupportsOptimizedDenoising = createSelector(
   selectModel,
-  (model) => !!model && SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS.includes(model.base)
+  (model) => !!model && model.base !== 'external' && SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS.includes(model.base)
 );
 export const selectModelSupportsGuidance = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
   if (!model) {

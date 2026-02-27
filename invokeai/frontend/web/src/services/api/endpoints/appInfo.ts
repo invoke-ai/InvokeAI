@@ -1,7 +1,12 @@
 import type { OpenAPIV3_1 } from 'openapi-types';
 import type { stringify } from 'querystring';
 import type { paths } from 'services/api/schema';
-import type { AppVersion, ExternalProviderConfig, ExternalProviderStatus } from 'services/api/types';
+import type {
+  AppVersion,
+  ExternalProviderConfig,
+  ExternalProviderConfigUpdate,
+  ExternalProviderStatus,
+} from 'services/api/types';
 
 import { api, buildV1Url } from '..';
 
@@ -136,7 +141,6 @@ export const {
   useLazyGetOpenAPISchemaQuery,
 } = appInfoApi;
 
-type SetExternalProviderConfigArg =
-  paths['/api/v1/app/external_providers/config/{provider_id}']['post']['requestBody']['content']['application/json'] & {
-    provider_id: paths['/api/v1/app/external_providers/config/{provider_id}']['post']['parameters']['path']['provider_id'];
-  };
+type SetExternalProviderConfigArg = ExternalProviderConfigUpdate & {
+  provider_id: string;
+};

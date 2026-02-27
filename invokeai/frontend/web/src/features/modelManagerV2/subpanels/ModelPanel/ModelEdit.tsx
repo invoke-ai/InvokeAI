@@ -21,7 +21,8 @@ import { useTranslation } from 'react-i18next';
 import { PiCheckBold, PiXBold } from 'react-icons/pi';
 import { type UpdateModelArg, useUpdateModelMutation } from 'services/api/endpoints/models';
 import {
-  type AnyModelConfig,
+  type AnyModelConfigWithExternal,
+  type ExternalApiModelDefaultSettings,
   type ExternalModelCapabilities,
   isExternalApiModelConfig,
   type UpdateModelBody,
@@ -35,10 +36,15 @@ import PredictionTypeSelect from './Fields/PredictionTypeSelect';
 import { ModelFooter } from './ModelFooter';
 
 type Props = {
-  modelConfig: AnyModelConfig;
+  modelConfig: AnyModelConfigWithExternal;
 };
 
-type ModelEditFormValues = UpdateModelBody;
+type ModelEditFormValues = UpdateModelBody & {
+  capabilities?: ExternalModelCapabilities;
+  provider_id?: string;
+  provider_model_id?: string;
+  default_settings?: ExternalApiModelDefaultSettings | null;
+};
 
 const stringFieldOptions = {
   validate: (value?: string | null) => (value && value.trim().length > 3) || 'Must be at least 3 characters',
@@ -51,7 +57,7 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
   const isExternal = useMemo(() => isExternalApiModelConfig(modelConfig), [modelConfig]);
 
   const form = useForm<ModelEditFormValues>({
-    defaultValues: modelConfig,
+    defaultValues: modelConfig as unknown as ModelEditFormValues,
     mode: 'onChange',
   });
 
@@ -94,7 +100,7 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
     (values) => {
       const responseBody: UpdateModelArg = {
         key: modelConfig.key,
-        body: values,
+        body: values as UpdateModelBody,
       };
       updateModel(responseBody)
         .unwrap()

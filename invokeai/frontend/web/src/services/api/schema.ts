@@ -7703,6 +7703,115 @@ export type components = {
              */
             type: "expand_mask_with_fade";
         };
+        /**
+         * External Image Generation
+         * @description Generates an image using an external image generation provider.
+         */
+        ExternalImageGenerationInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description External model identifier.
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description External generation mode.
+             * @default txt2img
+             */
+            mode?: "txt2img" | "img2img" | "inpaint";
+            /**
+             * @description Prompt text.
+             * @default ""
+             */
+            prompt?: string;
+            /**
+             * @description Optional negative prompt text.
+             * @default null
+             */
+            negative_prompt?: string | null;
+            /**
+             * @description Number of inference steps.
+             * @default null
+             */
+            steps?: number | null;
+            /**
+             * @description Guidance scale value.
+             * @default null
+             */
+            guidance?: number | null;
+            /**
+             * @description Random seed.
+             * @default null
+             */
+            seed?: number | null;
+            /**
+             * @description Number of images to generate.
+             * @default 1
+             */
+            num_images?: number;
+            /**
+             * @description Output width.
+             * @default null
+             */
+            width?: number | null;
+            /**
+             * @description Output height.
+             * @default null
+             */
+            height?: number | null;
+            /**
+             * @description Optional init image.
+             * @default null
+             */
+            init_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description Optional mask image.
+             * @default null
+             */
+            mask_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description Optional reference images.
+             * @default null
+             */
+            reference_images?: components["schemas"]["ImageField"][] | null;
+            /**
+             * @description Optional reference image weights.
+             * @default null
+             */
+            reference_image_weights?: number[] | null;
+            /**
+             * type
+             * @default external_image_generation
+             * @constant
+             */
+            type: "external_image_generation";
+        };
         /** ExposedField */
         ExposedField: {
             /** Nodeid */
@@ -13786,6 +13895,7 @@ export type components = {
             dynamic_prompt: components["schemas"]["StringCollectionOutput"];
             esrgan: components["schemas"]["ImageOutput"];
             expand_mask_with_fade: components["schemas"]["ImageOutput"];
+            external_image_generation: components["schemas"]["ImageOutput"];
             face_identifier: components["schemas"]["ImageOutput"];
             face_mask_detection: components["schemas"]["FaceMaskOutput"];
             face_off: components["schemas"]["FaceOffOutput"];

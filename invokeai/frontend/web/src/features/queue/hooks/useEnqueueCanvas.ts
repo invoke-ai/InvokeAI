@@ -7,6 +7,7 @@ import { withResult, withResultAsync } from 'common/util/result';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildExternalGraph } from 'features/nodes/util/graph/generation/buildExternalGraph';
@@ -94,7 +95,7 @@ const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prep
     prepareLinearUIBatch({
       state,
       g,
-      base,
+      base: base as BaseModelType,
       prepend,
       seedNode: seed,
       positivePromptNode: positivePrompt,

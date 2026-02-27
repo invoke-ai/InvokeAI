@@ -5,6 +5,7 @@ import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildExternalGraph } from 'features/nodes/util/graph/generation/buildExternalGraph';
@@ -87,7 +88,7 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
     prepareLinearUIBatch({
       state,
       g,
-      base,
+      base: base as BaseModelType,
       prepend,
       seedNode: seed,
       positivePromptNode: positivePrompt,

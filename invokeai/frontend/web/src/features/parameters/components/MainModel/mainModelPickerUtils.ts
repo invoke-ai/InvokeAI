@@ -1,7 +1,7 @@
 import type { TabName } from 'features/ui/store/uiTypes';
-import { type AnyModelConfig, isExternalApiModelConfig } from 'services/api/types';
+import { type AnyModelConfigWithExternal, isExternalApiModelConfig } from 'services/api/types';
 
-export const isExternalModelUnsupportedForTab = (model: AnyModelConfig, tab: TabName): boolean => {
+export const isExternalModelUnsupportedForTab = (model: AnyModelConfigWithExternal, tab: TabName): boolean => {
   if (!isExternalApiModelConfig(model)) {
     return false;
   }
