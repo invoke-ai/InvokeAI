@@ -179,6 +179,8 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     }
   }, [installJob.source]);
 
+  const configuredName = installJob.config_in?.name;
+
   const modelName = useMemo(() => {
     switch (installJob.source.type) {
       case 'hf': {
@@ -189,15 +191,15 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
         return repo_id;
       }
       case 'url':
-        return installJob.config_in.name ?? installJob.source.url.split('/').slice(-1)[0] ?? t('common.unknown');
+        return configuredName ?? installJob.source.url.split('/').slice(-1)[0] ?? t('common.unknown');
       case 'local':
-        return installJob.config_in.name ?? installJob.source.path.split('\\').slice(-1)[0] ?? t('common.unknown');
+        return configuredName ?? installJob.source.path.split('\\').slice(-1)[0] ?? t('common.unknown');
       case 'external':
-        return installJob.config_in.name ?? `${installJob.source.provider_id}/${installJob.source.provider_model_id}`;
+        return configuredName ?? `${installJob.source.provider_id}/${installJob.source.provider_model_id}`;
       default:
-        return installJob.config_in.name ?? t('common.unknown');
+        return configuredName ?? t('common.unknown');
     }
-  }, [installJob.config_in.name, installJob.source]);
+  }, [configuredName, installJob.source]);
 
   const progressValue = useMemo(() => {
     if (installJob.status === 'completed' || installJob.status === 'error' || installJob.status === 'cancelled') {
