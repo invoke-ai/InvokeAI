@@ -30,6 +30,27 @@ def is_state_dict_likely_in_flux_aitoolkit_format(
     if not _has_flux_layer_structure(state_dict):
         return False
 
+    # AIToolkit only produces standard PEFT LoRA (lora_A.weight / lora_B.weight).
+    # Exclude LyCORIS algorithm variants (LoKR, LoHA, etc.) which use different weight key suffixes.
+    # These are handled by the BFL PEFT converter instead.
+    _LYCORIS_SUFFIXES = (
+        "lokr_w1",
+        "lokr_w2",
+        "lokr_w1_a",
+        "lokr_w1_b",
+        "lokr_w2_a",
+        "lokr_w2_b",
+        "lokr_t2",
+        "hada_w1_a",
+        "hada_w1_b",
+        "hada_w2_a",
+        "hada_w2_b",
+        "hada_t1",
+        "hada_t2",
+    )
+    if any(k.endswith(_LYCORIS_SUFFIXES) for k in state_dict.keys() if isinstance(k, str)):
+        return False
+
     if metadata:
         try:
             software = json.loads(metadata.get("software", "{}"))
