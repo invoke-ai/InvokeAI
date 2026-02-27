@@ -202,6 +202,7 @@ class ModelSourceType(str, Enum):
     Path = "path"
     Url = "url"
     HFRepoID = "hf_repo_id"
+    External = "external"
 
 
 class FluxLoRAFormat(str, Enum):

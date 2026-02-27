@@ -15,9 +15,9 @@ from invokeai.app.services.bulk_download.bulk_download_default import BulkDownlo
 from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.download.download_default import DownloadQueueService
+from invokeai.app.services.events.events_fastapievents import FastAPIEventService
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.app.services.external_generation.providers import GeminiProvider, OpenAIProvider
-from invokeai.app.services.events.events_fastapievents import FastAPIEventService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
@@ -147,20 +147,22 @@ class ApiDependencies:
             ),
         )
         download_queue_service = DownloadQueueService(app_config=configuration, event_bus=events)
+        model_record_service = ModelRecordServiceSQL(db=db, logger=logger)
+        model_manager = ModelManagerService.build_model_manager(
+            app_config=configuration,
+            model_record_service=model_record_service,
+            download_queue=download_queue_service,
+            events=events,
+        )
         external_generation = ExternalGenerationService(
             providers={
                 GeminiProvider.provider_id: GeminiProvider(app_config=configuration, logger=logger),
                 OpenAIProvider.provider_id: OpenAIProvider(app_config=configuration, logger=logger),
             },
             logger=logger,
+            record_store=model_record_service,
         )
         model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
-        model_manager = ModelManagerService.build_model_manager(
-            app_config=configuration,
-            model_record_service=ModelRecordServiceSQL(db=db, logger=logger),
-            download_queue=download_queue_service,
-            events=events,
-        )
         model_relationships = ModelRelationshipsService()
         model_relationship_records = SqliteModelRelationshipRecordStorage(db=db)
         names = SimpleNameService()

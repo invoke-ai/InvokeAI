@@ -76,8 +76,7 @@ class CacheType(str, Enum):
 def add_cover_image_to_model_config(config: AnyModelConfig, dependencies: Type[ApiDependencies]) -> AnyModelConfig:
     """Add a cover image URL to a model configuration."""
     cover_image = dependencies.invoker.services.model_images.get_url(config.key)
-    config.cover_image = cover_image
-    return config
+    return config.model_copy(update={"cover_image": cover_image})
 
 
 ##############################################################################
@@ -151,10 +150,13 @@ async def list_model_records(
         if isinstance(model, ExternalApiModelConfig):
             starter_match = next((starter for starter in STARTER_MODELS if starter.source == model.source), None)
             if starter_match is not None:
+                model_updates: dict[str, object] = {}
                 if starter_match.capabilities is not None:
-                    setattr(model, "capabilities", starter_match.capabilities)
+                    model_updates["capabilities"] = starter_match.capabilities
                 if starter_match.default_settings is not None:
-                    setattr(model, "default_settings", starter_match.default_settings)
+                    model_updates["default_settings"] = starter_match.default_settings
+                if model_updates:
+                    model = model.model_copy(update=model_updates)
         found_models[index] = model
     return ModelsList(models=found_models)
 
@@ -262,7 +264,7 @@ async def reidentify_model(
         result.config.description = config.description
         result.config.cover_image = config.cover_image
         if hasattr(result.config, "trigger_phrases") and hasattr(config, "trigger_phrases"):
-            setattr(result.config, "trigger_phrases", getattr(config, "trigger_phrases"))
+            result.config.trigger_phrases = config.trigger_phrases
         result.config.source = config.source
         result.config.source_type = config.source_type
 

@@ -38,6 +38,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
     ModelRepoVariant,
+    ModelSourceType,
     ModelType,
 )
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa F403
@@ -227,6 +228,35 @@ def test_external_install(mm2_installer: ModelInstallServiceBase) -> None:
     assert job.config_out.provider_model_id == "gpt-image-1"
     assert job.config_out.base == BaseModelType.External
     assert job.config_out.type == ModelType.ExternalImageGenerator
+    assert job.config_out.source_type == ModelSourceType.External
+
+
+def test_external_install_is_idempotent(mm2_installer: ModelInstallServiceBase) -> None:
+    first_job = mm2_installer.heuristic_import(
+        "external://openai/gpt-image-1",
+        config=ModelRecordChanges(name="Initial name"),
+    )
+    mm2_installer.wait_for_installs()
+
+    second_job = mm2_installer.heuristic_import(
+        "external://openai/gpt-image-1",
+        config=ModelRecordChanges(name="Updated name"),
+    )
+    mm2_installer.wait_for_installs()
+
+    assert first_job.status == InstallStatus.COMPLETED
+    assert second_job.status == InstallStatus.COMPLETED
+    assert first_job.config_out is not None
+    assert second_job.config_out is not None
+    assert first_job.config_out.key == second_job.config_out.key
+
+    external_models = mm2_installer.record_store.search_by_attr(
+        base_model=BaseModelType.External,
+        model_type=ModelType.ExternalImageGenerator,
+    )
+    assert len(external_models) == 1
+    assert isinstance(external_models[0], ExternalApiModelConfig)
+    assert external_models[0].name == "Updated name"
 
 
 def test_delete_install(

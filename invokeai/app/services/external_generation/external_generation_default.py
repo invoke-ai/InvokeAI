@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from logging import Logger
+from typing import TYPE_CHECKING
 
 from PIL import Image
 from PIL.Image import Image as PILImageType
@@ -23,11 +24,20 @@ from invokeai.app.services.external_generation.external_generation_common import
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalImageSize
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS
 
+if TYPE_CHECKING:
+    from invokeai.app.services.model_records import ModelRecordServiceBase
+
 
 class ExternalGenerationService(ExternalGenerationServiceBase):
-    def __init__(self, providers: dict[str, ExternalProvider], logger: Logger) -> None:
+    def __init__(
+        self,
+        providers: dict[str, ExternalProvider],
+        logger: Logger,
+        record_store: ModelRecordServiceBase | None = None,
+    ) -> None:
         self._providers = providers
         self._logger = logger
+        self._record_store = record_store
 
     def generate(self, request: ExternalGenerationRequest) -> ExternalGenerationResult:
         provider = self._providers.get(request.model.provider_id)
@@ -120,10 +130,11 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
             )
 
     def _refresh_model_capabilities(self, request: ExternalGenerationRequest) -> ExternalGenerationRequest:
-        try:
-            from invokeai.app.api.dependencies import ApiDependencies
+        if self._record_store is None:
+            return request
 
-            record = ApiDependencies.invoker.services.model_manager.store.get_model(request.model.key)
+        try:
+            record = self._record_store.get_model(request.model.key)
         except Exception:
             record = None
 

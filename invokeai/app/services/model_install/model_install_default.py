@@ -38,18 +38,18 @@ from invokeai.app.services.model_install.model_install_common import (
     StringLikeSource,
     URLModelSource,
 )
-from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase
+from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
-from invokeai.backend.model_manager.configs.factory import (
-    AnyModelConfig,
-    ModelConfigFactory,
-)
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
     ExternalApiModelDefaultSettings,
     ExternalModelCapabilities,
+)
+from invokeai.backend.model_manager.configs.factory import (
+    AnyModelConfig,
+    ModelConfigFactory,
 )
 from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.metadata import (
@@ -61,7 +61,13 @@ from invokeai.backend.model_manager.metadata import (
 )
 from invokeai.backend.model_manager.metadata.metadata_base import HuggingFaceMetadata
 from invokeai.backend.model_manager.search import ModelSearch
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelRepoVariant, ModelSourceType
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    ModelFormat,
+    ModelRepoVariant,
+    ModelSourceType,
+    ModelType,
+)
 from invokeai.backend.model_manager.util.lora_metadata_extractor import apply_lora_metadata
 from invokeai.backend.util import InvokeAILogger
 from invokeai.backend.util.catch_sigint import catch_sigint
@@ -894,9 +900,34 @@ class ModelInstallService(ModelInstallServiceBase):
             else None
         )
         name = job.config_in.name or f"{provider_id} {provider_model_id}"
+        key = job.config_in.key or slugify(f"{provider_id}-{provider_model_id}")
+
+        existing_external = next(
+            (
+                model
+                for model in self.record_store.search_by_attr(
+                    base_model=BaseModelType.External, model_type=ModelType.ExternalImageGenerator
+                )
+                if isinstance(model, ExternalApiModelConfig)
+                and model.provider_id == provider_id
+                and model.provider_model_id == provider_model_id
+            ),
+            None,
+        )
+
+        if existing_external is not None:
+            key = existing_external.key
+        else:
+            try:
+                self.record_store.get_model(key)
+                raise DuplicateModelException(
+                    f"Model key '{key}' already exists. Provide a different key to install this external model."
+                )
+            except UnknownModelException:
+                pass
 
         config = ExternalApiModelConfig(
-            key=job.config_in.key or slugify(f"{provider_id}-{provider_model_id}"),
+            key=key,
             name=name,
             description=job.config_in.description,
             provider_id=provider_id,
@@ -909,7 +940,12 @@ class ModelInstallService(ModelInstallServiceBase):
             hash="",
             file_size=0,
         )
-        self.record_store.add_model(config)
+
+        if existing_external is not None:
+            self.record_store.replace_model(existing_external.key, config)
+        else:
+            self.record_store.add_model(config)
+
         job.config_out = self.record_store.get_model(config.key)
         self._signal_job_completed(job)
 

@@ -57,7 +57,7 @@ class ExternalApiModelConfig(Config_Base):
     tags: list[str] | None = Field(default=None)
     is_default: bool = Field(default=False)
 
-    source_type: ModelSourceType = Field(default=ModelSourceType.Url)
+    source_type: ModelSourceType = Field(default=ModelSourceType.External)
     path: str = Field(default="")
     source: str = Field(default="")
     hash: str = Field(default="")

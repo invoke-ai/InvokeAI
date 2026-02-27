@@ -159,7 +159,7 @@ MODEL_SOURCE_TO_TYPE_MAP = {
     URLModelSource: ModelSourceType.Url,
     HFModelSource: ModelSourceType.HFRepoID,
     LocalModelSource: ModelSourceType.Path,
-    ExternalModelSource: ModelSourceType.Url,
+    ExternalModelSource: ModelSourceType.External,
 }
 
 

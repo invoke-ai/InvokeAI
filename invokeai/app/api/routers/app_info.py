@@ -1,5 +1,6 @@
 from enum import Enum
 from importlib.metadata import distributions
+from threading import Lock
 
 import torch
 from fastapi import Body, HTTPException, Path
@@ -16,8 +17,8 @@ from invokeai.app.services.config.config_default import (
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.util.logging import logging
 from invokeai.version import __version__
 
@@ -93,6 +94,7 @@ EXTERNAL_PROVIDER_FIELDS: dict[str, tuple[str, str]] = {
     "gemini": ("external_gemini_api_key", "external_gemini_base_url"),
     "openai": ("external_openai_api_key", "external_openai_base_url"),
 }
+_EXTERNAL_PROVIDER_CONFIG_LOCK = Lock()
 
 
 @app_router.get(
@@ -185,20 +187,20 @@ def _get_external_provider_fields(provider_id: str) -> tuple[str, str]:
 
 
 def _apply_external_provider_update(updates: dict[str, str | None]) -> None:
-    runtime_config = get_config()
-    config_path = runtime_config.config_file_path
-    if config_path.exists():
-        file_config = load_and_migrate_config(config_path)
-    else:
-        file_config = DefaultInvokeAIAppConfig()
+    with _EXTERNAL_PROVIDER_CONFIG_LOCK:
+        runtime_config = get_config()
+        config_path = runtime_config.config_file_path
+        if config_path.exists():
+            file_config = load_and_migrate_config(config_path)
+        else:
+            file_config = DefaultInvokeAIAppConfig()
 
-    for config in (runtime_config, file_config):
-        config.update_config(updates)
-        for field_name, value in updates.items():
-            if value is None:
-                config.model_fields_set.discard(field_name)
-
-    file_config.write_file(config_path, as_example=False)
+        runtime_config.update_config(updates)
+        file_config.update_config(updates)
+        file_config_to_write = type(file_config).model_validate(
+            file_config.model_dump(exclude_unset=True, exclude_none=True)
+        )
+        file_config_to_write.write_file(config_path, as_example=False)
 
 
 def _build_external_provider_config(provider_id: str, config: InvokeAIAppConfig) -> ExternalProviderConfigModel:
