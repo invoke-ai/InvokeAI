@@ -3,7 +3,7 @@ import { useGalleryImageNames } from 'features/gallery/components/use-gallery-im
 import { useCallback, useMemo, useState } from 'react';
 import { queueApi } from 'services/api/endpoints/queue';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 export const useStageFeed = () => {
   const { imageNames, isLoading: isGalleryLoading } = useGalleryImageNames();
@@ -38,6 +38,12 @@ export const useStageFeed = () => {
     isLoading: isGalleryLoading,
   };
 }
+
+/**
+ * TODO:
+ *
+ * - Tie the page to global state so that it persists across view mode changes and unmounts
+ */
 
 export const useStageFeedPagination = (fullFeed: StageFeed) => {
   const [page, setPage] = useState(1);

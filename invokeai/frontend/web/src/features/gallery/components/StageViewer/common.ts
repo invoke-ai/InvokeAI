@@ -6,16 +6,18 @@ export const STAGE_FEED_QUEUE_ITEM_STATUS = ['pending', 'in_progress', 'failed']
 
 export type StageFeedQueueItemStatus = typeof STAGE_FEED_QUEUE_ITEM_STATUS[number];
 
-type StageFeedQueueItem = {
+export type StageFeedQueueItem = {
   type: 'queue_item';
+  /** queue id */
   id: number;
   status: StageFeedQueueItemStatus;
   createdAt: string;
 }
 
-type StageFeedBoardItem = {
+export type StageFeedBoardItem = {
   type: 'board_item';
-  id: string; // id is the image name
+  /** image_name */
+  id: string;
 }
 
 export type StageFeedItem =
