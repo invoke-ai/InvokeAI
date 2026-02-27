@@ -45,6 +45,7 @@ class ImageService(ImageServiceABC):
         metadata: Optional[str] = None,
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -72,6 +73,7 @@ class ImageService(ImageServiceABC):
                 node_id=node_id,
                 metadata=metadata,
                 session_id=session_id,
+                user_id=user_id,
             )
             if board_id is not None:
                 try:
@@ -215,6 +217,8 @@ class ImageService(ImageServiceABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageDTO]:
         try:
             results = self.__invoker.services.image_records.get_many(
@@ -227,6 +231,8 @@ class ImageService(ImageServiceABC):
                 is_intermediate,
                 board_id,
                 search_term,
+                user_id,
+                is_admin,
             )
 
             image_dtos = [
@@ -320,6 +326,8 @@ class ImageService(ImageServiceABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> ImageNamesResult:
         try:
             return self.__invoker.services.image_records.get_image_names(
@@ -330,6 +338,8 @@ class ImageService(ImageServiceABC):
                 is_intermediate=is_intermediate,
                 board_id=board_id,
                 search_term=search_term,
+                user_id=user_id,
+                is_admin=is_admin,
             )
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting image names")
