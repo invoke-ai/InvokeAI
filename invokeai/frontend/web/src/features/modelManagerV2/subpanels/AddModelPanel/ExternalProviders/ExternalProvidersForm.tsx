@@ -8,7 +8,6 @@ import {
   FormLabel,
   Heading,
   Input,
-  Switch,
   Text,
   Tooltip,
 } from '@invoke-ai/ui-library';
@@ -48,12 +47,7 @@ export const ExternalProvidersForm = memo(() => {
   const { data: starterModels } = useGetStarterModelsQuery();
   const [installModel] = useInstallModel();
   const { getIsInstalled, buildModelInstallArg } = useBuildModelInstallArg();
-  const [installDefaults, setInstallDefaults] = useState(true);
   const tabIndex = useStore($installModelsTabIndex);
-
-  const toggleInstallDefaults = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    setInstallDefaults(event.target.checked);
-  }, []);
 
   const externalModelsByProvider = useMemo(() => {
     const groups = new Map<string, StarterModel[]>();
@@ -80,9 +74,6 @@ export const ExternalProvidersForm = memo(() => {
 
   const handleInstallProviderModels = useCallback(
     (providerId: string) => {
-      if (!installDefaults) {
-        return;
-      }
       const models = externalModelsByProvider.get(providerId);
       if (!models?.length) {
         return;
@@ -90,7 +81,7 @@ export const ExternalProvidersForm = memo(() => {
       const modelsToInstall = models.filter((model) => !getIsInstalled(model)).map(buildModelInstallArg);
       modelsToInstall.forEach((model) => installModel(model));
     },
-    [buildModelInstallArg, externalModelsByProvider, getIsInstalled, installDefaults, installModel]
+    [buildModelInstallArg, externalModelsByProvider, getIsInstalled, installModel]
   );
 
   const sortedProviders = useMemo(() => {
@@ -115,15 +106,9 @@ export const ExternalProvidersForm = memo(() => {
 
   return (
     <Flex flexDir="column" height="100%" gap={4}>
-      <Flex justifyContent="space-between" alignItems="center" gap={4} flexWrap="wrap">
-        <Flex flexDir="column" gap={1}>
-          <Heading size="sm">{t('modelManager.externalSetupTitle')}</Heading>
-          <Text color="base.300">{t('modelManager.externalSetupDescription')}</Text>
-        </Flex>
-        <FormControl display="flex" alignItems="center" gap={3} w="fit-content">
-          <FormLabel m={0}>{t('modelManager.externalInstallDefaults')}</FormLabel>
-          <Switch isChecked={installDefaults} onChange={toggleInstallDefaults} />
-        </FormControl>
+      <Flex flexDir="column" gap={1}>
+        <Heading size="sm">{t('modelManager.externalSetupTitle')}</Heading>
+        <Text color="base.300">{t('modelManager.externalSetupDescription')}</Text>
       </Flex>
       <ScrollableContent>
         <Flex flexDir="column" gap={4}>

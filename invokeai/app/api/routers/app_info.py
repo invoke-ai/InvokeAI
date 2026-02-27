@@ -15,6 +15,8 @@ from invokeai.app.services.config.config_default import (
 )
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
+from invokeai.app.services.model_records.model_records_base import UnknownModelException
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.image_util.infill_methods.patchmatch import PatchMatch
 from invokeai.backend.util.logging import logging
 from invokeai.version import __version__
@@ -146,7 +148,10 @@ async def set_external_provider_config(
     if not updates:
         raise HTTPException(status_code=400, detail="No external provider config fields provided")
 
+    api_key_removed = update.api_key is not None and updates.get(api_key_field) is None
     _apply_external_provider_update(updates)
+    if api_key_removed:
+        _remove_external_models_for_provider(provider_id)
     return _build_external_provider_config(provider_id, get_config())
 
 
@@ -161,6 +166,7 @@ async def reset_external_provider_config(
 ) -> ExternalProviderConfigModel:
     api_key_field, base_url_field = _get_external_provider_fields(provider_id)
     _apply_external_provider_update({api_key_field: None, base_url_field: None})
+    _remove_external_models_for_provider(provider_id)
     return _build_external_provider_config(provider_id, get_config())
 
 
@@ -202,6 +208,24 @@ def _build_external_provider_config(provider_id: str, config: InvokeAIAppConfig)
         api_key_configured=bool(getattr(config, api_key_field)),
         base_url=getattr(config, base_url_field),
     )
+
+
+def _remove_external_models_for_provider(provider_id: str) -> None:
+    model_manager = ApiDependencies.invoker.services.model_manager
+    external_models = model_manager.store.search_by_attr(
+        base_model=BaseModelType.External,
+        model_type=ModelType.ExternalImageGenerator,
+    )
+
+    for model in external_models:
+        if getattr(model, "provider_id", None) != provider_id:
+            continue
+        try:
+            model_manager.install.delete(model.key)
+        except UnknownModelException:
+            logging.warning(f"External model key '{model.key}' was already removed while resetting '{provider_id}'")
+        except Exception as error:
+            logging.warning(f"Failed removing external model key '{model.key}' for '{provider_id}': {error}")
 
 
 @app_router.get(
