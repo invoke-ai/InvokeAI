@@ -162,13 +162,13 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             query_conditions += """--sql
                 AND board_images.board_id IS NULL
                 """
-                # For uncategorized images, filter by user_id to ensure per-user isolation
-                # Admin users can see all uncategorized images from all users
-                if user_id is not None and not is_admin:
-                    query_conditions += """--sql
-                    AND images.user_id = ?
-                    """
-                    query_params.append(user_id)
+            # For uncategorized images, filter by user_id to ensure per-user isolation
+            # Admin users can see all uncategorized images from all users
+            if user_id is not None and not is_admin:
+                query_conditions += """--sql
+                AND images.user_id = ?
+                """
+                query_params.append(user_id)
         elif board_id is not None:
             query_conditions += """--sql
                 AND board_images.board_id = ?
