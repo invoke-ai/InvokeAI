@@ -134,6 +134,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageRecord]:
         with self._db.transaction() as cursor:
             # Manually build two queries - one for the count, one for the records
@@ -186,6 +188,13 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 query_conditions += """--sql
                 AND board_images.board_id IS NULL
                 """
+                # For uncategorized images, filter by user_id to ensure per-user isolation
+                # Admin users can see all uncategorized images from all users
+                if user_id is not None and not is_admin:
+                    query_conditions += """--sql
+                    AND images.user_id = ?
+                    """
+                    query_params.append(user_id)
             elif board_id is not None:
                 query_conditions += """--sql
                 AND board_images.board_id = ?
@@ -305,6 +314,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         session_id: Optional[str] = None,
         node_id: Optional[str] = None,
         metadata: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> datetime:
         with self._db.transaction() as cursor:
             try:
@@ -321,9 +331,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                         metadata,
                         is_intermediate,
                         starred,
-                        has_workflow
+                        has_workflow,
+                        user_id
                         )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                     """,
                     (
                         image_name,
@@ -337,6 +348,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                         is_intermediate,
                         starred,
                         has_workflow,
+                        user_id or "system",
                     ),
                 )
 
@@ -386,6 +398,8 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> ImageNamesResult:
         with self._db.transaction() as cursor:
             # Build query conditions (reused for both starred count and image names queries)
@@ -417,6 +431,13 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 query_conditions += """--sql
                 AND board_images.board_id IS NULL
                 """
+                # For uncategorized images, filter by user_id to ensure per-user isolation
+                # Admin users can see all uncategorized images from all users
+                if user_id is not None and not is_admin:
+                    query_conditions += """--sql
+                    AND images.user_id = ?
+                    """
+                    query_params.append(user_id)
             elif board_id is not None:
                 query_conditions += """--sql
                 AND board_images.board_id = ?
