@@ -100,4 +100,12 @@ def run_app() -> None:
     for hdlr in logger.handlers:
         uvicorn_logger.addHandler(hdlr)
 
-    loop.run_until_complete(server.serve())
+    try:
+        loop.run_until_complete(server.serve())
+    except KeyboardInterrupt:
+        logger.info("InvokeAI shutting down...")
+        # Gracefully shut down services (e.g. model download and install managers) so that any
+        # active work is completed or cleanly cancelled before the process exits.
+        from invokeai.app.api.dependencies import ApiDependencies
+
+        ApiDependencies.shutdown()

@@ -355,6 +355,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
         self._thread = Thread(
             name="session_processor",
             target=self._process,
+            daemon=True,
             kwargs={
                 "stop_event": self._stop_event,
                 "poll_now_event": self._poll_now_event,
@@ -366,6 +367,9 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
     def stop(self, *args, **kwargs) -> None:
         self._stop_event.set()
+        # Wake the thread if it is sleeping in poll_now_event.wait() or blocked in resume_event.wait() (paused).
+        self._poll_now_event.set()
+        self._resume_event.set()
 
     def _poll_now(self) -> None:
         self._poll_now_event.set()
