@@ -253,15 +253,34 @@ class ZImageCheckpointModel(ModelLoader):
         target_device = TorchDevice.choose_torch_device()
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
+        # Filter out keys that don't belong to the ZImageTransformer2DModel.
+        # Merged checkpoints (e.g. LoRA-baked models) may bundle text encoder weights
+        # (text_encoders.*) or other non-transformer keys alongside the transformer weights.
+        # Also filter FP8 quantization metadata (scale_weight, scaled_fp8).
+        valid_prefixes = (
+            "all_x_embedder.",
+            "all_final_layer.",
+            "layers.",
+            "noise_refiner.",
+            "context_refiner.",
+            "t_embedder.",
+            "cap_embedder.",
+            "rope_embedder.",
+        )
+        valid_exact = {"x_pad_token", "cap_pad_token"}
+        keys_to_remove = [
+            k
+            for k in sd.keys()
+            if not (k.startswith(valid_prefixes) or k in valid_exact)
+            or k.endswith(".scale_weight")
+            or k == "scaled_fp8"
+        ]
+        for k in keys_to_remove:
+            del sd[k]
+
         # Handle memory management and dtype conversion
         new_sd_size = sum([ten.nelement() * model_dtype.itemsize for ten in sd.values()])
         self._ram_cache.make_room(new_sd_size)
-
-        # Filter out FP8 scale_weight and scaled_fp8 metadata keys
-        # These are quantization metadata that shouldn't be loaded into the model
-        keys_to_remove = [k for k in sd.keys() if k.endswith(".scale_weight") or k == "scaled_fp8"]
-        for k in keys_to_remove:
-            del sd[k]
 
         # Convert to target dtype
         for k in sd.keys():
