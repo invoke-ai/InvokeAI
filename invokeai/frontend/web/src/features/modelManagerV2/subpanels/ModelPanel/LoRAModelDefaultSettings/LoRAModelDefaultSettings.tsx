@@ -1,4 +1,5 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { useLoRAModelDefaultSettings } from 'features/modelManagerV2/hooks/useLoRAModelDefaultSettings';
 import { DefaultWeight } from 'features/modelManagerV2/subpanels/ModelPanel/LoRAModelDefaultSettings/DefaultWeight';
 import type { FormField } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/MainModelDefaultSettings';
@@ -21,6 +22,7 @@ type Props = {
 
 export const LoRAModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
+  const canManageModels = useIsModelManagerEnabled();
 
   const defaultSettingsDefaults = useLoRAModelDefaultSettings(modelConfig);
 
@@ -66,16 +68,18 @@ export const LoRAModelDefaultSettings = memo(({ modelConfig }: Props) => {
     <>
       <Flex gap="4" justifyContent="space-between" w="full" pb={4}>
         <Heading fontSize="md">{t('modelManager.defaultSettings')}</Heading>
-        <Button
-          size="sm"
-          leftIcon={<PiCheckBold />}
-          colorScheme="invokeYellow"
-          isDisabled={!formState.isDirty}
-          onClick={handleSubmit(onSubmit)}
-          isLoading={isLoadingUpdateModel}
-        >
-          {t('common.save')}
-        </Button>
+        {canManageModels && (
+          <Button
+            size="sm"
+            leftIcon={<PiCheckBold />}
+            colorScheme="invokeYellow"
+            isDisabled={!formState.isDirty}
+            onClick={handleSubmit(onSubmit)}
+            isLoading={isLoadingUpdateModel}
+          >
+            {t('common.save')}
+          </Button>
+        )}
       </Flex>
 
       <SimpleGrid columns={2} gap={8}>
