@@ -1,9 +1,11 @@
 import { Box, Divider, Flex } from '@invoke-ai/ui-library';
 import { CanvasSettingsPopover } from 'features/controlLayers/components/Settings/CanvasSettingsPopover';
+import { TextToolOptions } from 'features/controlLayers/components/Text/TextToolOptions';
 import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { ToolGradientClipToggle } from 'features/controlLayers/components/Tool/ToolGradientClipToggle';
 import { ToolGradientModeToggle } from 'features/controlLayers/components/Tool/ToolGradientModeToggle';
+import { ToolOptionsRowContainer } from 'features/controlLayers/components/Tool/ToolOptionsRowContainer';
 import { ToolWidthPicker } from 'features/controlLayers/components/Tool/ToolWidthPicker';
 import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
 import { CanvasToolbarFitBboxToMasksButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToMasksButton';
@@ -28,10 +30,11 @@ import { memo, useMemo } from 'react';
 export const CanvasToolbar = memo(() => {
   const isBrushSelected = useToolIsSelected('brush');
   const isEraserSelected = useToolIsSelected('eraser');
+  const isTextSelected = useToolIsSelected('text');
   const isGradientSelected = useToolIsSelected('gradient');
   const showToolWithPicker = useMemo(() => {
-    return isBrushSelected || isEraserSelected;
-  }, [isBrushSelected, isEraserSelected]);
+    return !isTextSelected && (isBrushSelected || isEraserSelected);
+  }, [isBrushSelected, isEraserSelected, isTextSelected]);
 
   useCanvasResetLayerHotkey();
   useCanvasDeleteLayerHotkey();
@@ -46,7 +49,7 @@ export const CanvasToolbar = memo(() => {
 
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
-      <Flex alignItems="center" h="full" flexGrow={1}>
+      <ToolOptionsRowContainer gap={4} alignItems="center" h="full">
         <ToolFillColorPicker />
         {isGradientSelected && (
           <Box ms={2} mt="-2px" display="flex" alignItems="center" gap={2}>
@@ -54,8 +57,8 @@ export const CanvasToolbar = memo(() => {
             <ToolGradientModeToggle />
           </Box>
         )}
-        {showToolWithPicker && <ToolWidthPicker />}
-      </Flex>
+        {isTextSelected ? <TextToolOptions /> : showToolWithPicker && <ToolWidthPicker />}
+      </ToolOptionsRowContainer>
       <Flex alignItems="center" h="full">
         <CanvasToolbarScale />
         <CanvasToolbarResetViewButton />

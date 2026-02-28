@@ -6,6 +6,7 @@ import type { operations, paths } from 'services/api/schema';
 import type {
   AnyModelConfig,
   GetHFTokenStatusResponse,
+  ModelInstallJob,
   ResetHFTokenResponse,
   SetHFTokenArg,
   SetHFTokenResponse,
@@ -66,6 +67,10 @@ type ListModelInstallsResponse =
 
 type CancelModelInstallResponse =
   paths['/api/v2/models/install/{id}']['delete']['responses']['201']['content']['application/json'];
+type PauseModelInstallResponse = ModelInstallJob;
+type ResumeModelInstallResponse = ModelInstallJob;
+type RestartFailedModelInstallResponse = ModelInstallJob;
+type RestartModelInstallFileResponse = ModelInstallJob;
 
 type PruneCompletedModelInstallsResponse =
   paths['/api/v2/models/install']['delete']['responses']['200']['content']['application/json'];
@@ -267,6 +272,43 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['ModelInstalls'],
     }),
+    pauseModelInstall: build.mutation<PauseModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/pause`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    resumeModelInstall: build.mutation<ResumeModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/resume`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    restartFailedModelInstall: build.mutation<RestartFailedModelInstallResponse, number>({
+      query: (id) => {
+        return {
+          url: buildModelsUrl(`install/${id}/restart_failed`),
+          method: 'POST',
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
+    restartModelInstallFile: build.mutation<RestartModelInstallFileResponse, { id: number; file_source: string }>({
+      query: ({ id, file_source }) => {
+        return {
+          url: buildModelsUrl(`install/${id}/restart_file`),
+          method: 'POST',
+          body: file_source,
+        };
+      },
+      invalidatesTags: ['ModelInstalls'],
+    }),
     pruneCompletedModelInstalls: build.mutation<PruneCompletedModelInstallsResponse, void>({
       query: () => {
         return {
@@ -410,6 +452,10 @@ export const {
   useLazyGetHuggingFaceModelsQuery,
   useListModelInstallsQuery,
   useCancelModelInstallMutation,
+  usePauseModelInstallMutation,
+  useResumeModelInstallMutation,
+  useRestartFailedModelInstallMutation,
+  useRestartModelInstallFileMutation,
   usePruneCompletedModelInstallsMutation,
   useGetStarterModelsQuery,
   useGetHFTokenStatusQuery,

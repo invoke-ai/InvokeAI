@@ -7,6 +7,7 @@ import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/Canva
 import { selectHasEntities } from 'features/controlLayers/store/selectors';
 import { memo } from 'react';
 
+import { EntityListSelectedEntityOperationsBar } from './CanvasEntityList/EntityListSelectedEntityOperationsBar';
 import { ParamDenoisingStrength } from './ParamDenoisingStrength';
 
 export const CanvasLayersPanel = memo(() => {
@@ -15,12 +16,14 @@ export const CanvasLayersPanel = memo(() => {
   return (
     <CanvasManagerProviderGate>
       <Flex flexDir="column" gap={2} w="full" h="full">
-        <EntityListSelectedEntityActionBar />
-        <Divider py={0} />
         <ParamDenoisingStrength />
+        <Divider py={0} />
+        <EntityListSelectedEntityActionBar />
         <Divider py={0} />
         {!hasEntities && <CanvasAddEntityButtons />}
         {hasEntities && <CanvasEntityList />}
+        <Divider py={0} />
+        <EntityListSelectedEntityOperationsBar />
       </Flex>
     </CanvasManagerProviderGate>
   );

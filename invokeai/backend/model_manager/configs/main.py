@@ -30,6 +30,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelVariantType,
     SchedulerPredictionType,
     SubModelType,
+    ZImageVariantType,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
@@ -57,7 +58,7 @@ class MainModelDefaultSettings(BaseModel):
     def from_base(
         cls,
         base: BaseModelType,
-        variant: Flux2VariantType | FluxVariantType | ModelVariantType | None = None,
+        variant: Flux2VariantType | FluxVariantType | ModelVariantType | ZImageVariantType | None = None,
     ) -> Self | None:
         match base:
             case BaseModelType.StableDiffusion1:
@@ -67,7 +68,14 @@ class MainModelDefaultSettings(BaseModel):
             case BaseModelType.StableDiffusionXL:
                 return cls(width=1024, height=1024)
             case BaseModelType.ZImage:
-                return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
+                # Different defaults based on variant
+                if variant == ZImageVariantType.ZBase:
+                    # Undistilled base model needs more steps and supports CFG
+                    # Recommended: steps=28-50, cfg_scale=3.0-5.0
+                    return cls(steps=50, cfg_scale=4.0, width=1024, height=1024)
+                else:
+                    # Turbo (distilled) uses fewer steps, no CFG
+                    return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
             case BaseModelType.Flux2:
                 # Different defaults based on variant
                 if variant == Flux2VariantType.Klein9BBase:
@@ -1077,9 +1085,10 @@ class Main_Diffusers_CogView4_Config(Diffusers_Config_Base, Main_Config_Base, Co
 
 
 class Main_Diffusers_ZImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
-    """Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base, Z-Image-Edit)."""
+    """Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base)."""
 
     base: Literal[BaseModelType.ZImage] = Field(BaseModelType.ZImage)
+    variant: ZImageVariantType = Field()
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -1095,12 +1104,33 @@ class Main_Diffusers_ZImage_Config(Diffusers_Config_Base, Main_Config_Base, Conf
             },
         )
 
+        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+
         repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
 
         return cls(
             **override_fields,
+            variant=variant,
             repo_variant=repo_variant,
         )
+
+    @classmethod
+    def _get_variant_or_raise(cls, mod: ModelOnDisk) -> ZImageVariantType:
+        """Determine Z-Image variant from the scheduler config.
+
+        Z-Image variants are distinguished by the scheduler shift value:
+        - Turbo (distilled): shift = 3.0
+        - Base (undistilled): shift = 6.0
+        """
+        scheduler_config = get_config_dict_or_raise(mod.path / "scheduler" / "scheduler_config.json")
+
+        shift = scheduler_config.get("shift", 3.0)
+
+        # ZBase (undistilled) uses shift = 6.0, Turbo uses shift = 3.0
+        if shift >= 5.0:
+            return ZImageVariantType.ZBase
+        else:
+            return ZImageVariantType.Turbo
 
 
 class Main_Checkpoint_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
@@ -1108,6 +1138,7 @@ class Main_Checkpoint_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Co
 
     base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: ZImageVariantType = Field()
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -1119,7 +1150,9 @@ class Main_Checkpoint_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Co
 
         cls._validate_does_not_look_like_gguf_quantized(mod)
 
-        return cls(**override_fields)
+        variant = override_fields.get("variant", ZImageVariantType.Turbo)
+
+        return cls(**override_fields, variant=variant)
 
     @classmethod
     def _validate_looks_like_z_image_model(cls, mod: ModelOnDisk) -> None:
@@ -1139,6 +1172,7 @@ class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
 
     base: Literal[BaseModelType.ZImage] = Field(default=BaseModelType.ZImage)
     format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: ZImageVariantType = Field()
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -1150,7 +1184,9 @@ class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
 
         cls._validate_looks_like_gguf_quantized(mod)
 
-        return cls(**override_fields)
+        variant = override_fields.get("variant", ZImageVariantType.Turbo)
+
+        return cls(**override_fields, variant=variant)
 
     @classmethod
     def _validate_looks_like_z_image_model(cls, mod: ModelOnDisk) -> None:
