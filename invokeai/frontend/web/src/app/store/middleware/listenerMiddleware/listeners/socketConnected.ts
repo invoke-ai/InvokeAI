@@ -19,8 +19,10 @@ export const addSocketConnectedEventListener = (startAppListening: AppStartListe
       /**
        * The rest of this listener has recovery logic for when the socket disconnects and reconnects.
        *
-       * We need to re-fetch if something has changed while we were disconnected. In practice, the only
-       * thing that could change while disconnected is a queue item finishes processing.
+       * We need to re-fetch if something has changed while we were disconnected.
+       *
+       * Session queue status is one proxy for disconnected changes. Model installs need explicit recovery
+       * as well because they can transition to paused during backend shutdown while the socket is down.
        *
        * The queue status is a proxy for this - if the queue status has changed, we need to re-fetch
        * the queries that may have changed while we were disconnected.
@@ -39,6 +41,14 @@ export const addSocketConnectedEventListener = (startAppListening: AppStartListe
       if (import.meta.env.MODE === 'development') {
         dispatch(api.util.resetApiState());
       }
+
+      // Always re-sync model installs on reconnect.
+      dispatch(
+        modelsApi.endpoints.listModelInstalls.initiate(undefined, {
+          forceRefetch: true,
+          subscribe: false,
+        })
+      );
 
       // Else, we need to compare the last-known queue status with the current queue status, re-fetching
       // everything if it has changed.
