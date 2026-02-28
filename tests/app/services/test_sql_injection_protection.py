@@ -21,20 +21,20 @@ def test_sql_injection_payload_in_board_name_is_stored_as_plain_text() -> None:
     storage = _create_board_storage()
 
     payload = "name'); DROP TABLE boards; --"
-    injected_board = storage.save(payload)
+    injected_board = storage.save(payload, "0")
 
     fetched = storage.get(injected_board.board_id)
     assert fetched.board_name == payload
 
-    another_board = storage.save("safe board")
+    another_board = storage.save("safe board", "0")
     assert storage.get(another_board.board_id).board_name == "safe board"
 
 
 def test_sql_injection_payload_in_board_id_does_not_bypass_where_clause() -> None:
     storage = _create_board_storage()
 
-    storage.save("first board")
-    storage.save("second board")
+    storage.save("first board", "0")
+    storage.save("second board", "0")
 
     payload = "does-not-exist' OR '1'='1"
 
@@ -45,8 +45,8 @@ def test_sql_injection_payload_in_board_id_does_not_bypass_where_clause() -> Non
 def test_sql_injection_payload_in_delete_does_not_delete_other_rows() -> None:
     storage = _create_board_storage()
 
-    first = storage.save("first board")
-    second = storage.save("second board")
+    first = storage.save("first board", "0")
+    second = storage.save("second board", "0")
 
     payload = f"{first.board_id}' OR '1'='1"
     storage.delete(payload)
@@ -57,6 +57,8 @@ def test_sql_injection_payload_in_delete_does_not_delete_other_rows() -> None:
         limit=10,
         offset=0,
         include_archived=True,
+        user_id="0",
+        is_admin=True
     )
 
     assert {board.board_id for board in remaining.items} == {first.board_id, second.board_id}
