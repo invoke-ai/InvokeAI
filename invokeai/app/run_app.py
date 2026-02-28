@@ -9,8 +9,6 @@ def get_app():
 
 def run_app() -> None:
     """The main entrypoint for the app."""
-    import os
-
     from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
     # Parse the CLI arguments before doing anything else, which ensures CLI args correctly override settings from other
@@ -106,5 +104,8 @@ def run_app() -> None:
         loop.run_until_complete(server.serve())
     except KeyboardInterrupt:
         logger.info("InvokeAI shutting down...")
-        # Force exit to avoid hanging on non-daemon background threads (e.g. model install service).
-        os._exit(0)
+        # Gracefully shut down services (e.g. model download and install managers) so that any
+        # active work is completed or cleanly cancelled before the process exits.
+        from invokeai.app.api.dependencies import ApiDependencies
+
+        ApiDependencies.shutdown()
