@@ -21,7 +21,11 @@ const validateImportData = (data: unknown): data is Record<string, unknown> => {
   }
 
   if ('default_settings' in obj && obj.default_settings !== undefined) {
-    if (typeof obj.default_settings !== 'object' || obj.default_settings === null || Array.isArray(obj.default_settings)) {
+    if (
+      typeof obj.default_settings !== 'object' ||
+      obj.default_settings === null ||
+      Array.isArray(obj.default_settings)
+    ) {
       return false;
     }
   }

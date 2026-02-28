@@ -12,11 +12,19 @@ type Props = {
 const buildExportData = (modelConfig: AnyModelConfig): Record<string, unknown> => {
   const data: Record<string, unknown> = {};
 
-  if ('default_settings' in modelConfig && modelConfig.default_settings !== undefined && modelConfig.default_settings !== null) {
+  if (
+    'default_settings' in modelConfig &&
+    modelConfig.default_settings !== undefined &&
+    modelConfig.default_settings !== null
+  ) {
     data.default_settings = modelConfig.default_settings;
   }
 
-  if ('trigger_phrases' in modelConfig && modelConfig.trigger_phrases !== undefined && modelConfig.trigger_phrases !== null) {
+  if (
+    'trigger_phrases' in modelConfig &&
+    modelConfig.trigger_phrases !== undefined &&
+    modelConfig.trigger_phrases !== null
+  ) {
     data.trigger_phrases = modelConfig.trigger_phrases;
   }
 
