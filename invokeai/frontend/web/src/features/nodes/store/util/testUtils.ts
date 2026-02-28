@@ -704,7 +704,6 @@ export const schema = {
         required: ['type', 'id'],
         title: 'Scheduler',
         description: 'Selects a scheduler.',
-        category: 'latents',
         classification: 'stable',
         node_pack: 'invokeai',
         tags: ['scheduler'],
@@ -1191,6 +1190,7 @@ export const schema = {
         title: 'CollectInvocation',
         node_pack: 'invokeai',
         description: 'Collects values into a collection',
+        category: 'collections',
         classification: 'stable',
         version: '1.0.0',
         output: {
@@ -1550,6 +1550,7 @@ export const schema = {
         required: ['type', 'id'],
         title: 'IterateInvocation',
         description: 'Iterates over a list of items',
+        category: 'collections',
         classification: 'stable',
         node_pack: 'invokeai',
         version: '1.1.0',
