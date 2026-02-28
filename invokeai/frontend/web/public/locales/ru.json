@@ -89,7 +89,16 @@
         "none": "Ничего",
         "new": "Новый",
         "ok": "Ok",
-        "close": "Закрыть"
+        "close": "Закрыть",
+        "error_withCount_one": "{{count}} Ошибка",
+        "error_withCount_few": "{{count}} Ошибки",
+        "error_withCount_many": "{{count}} Ошибок",
+        "model_withCount_one": "{{count}} Модель",
+        "model_withCount_few": "{{count}} Модели",
+        "model_withCount_many": "{{count}} Моделей",
+        "options_withCount_one": "{{count}} Опция",
+        "options_withCount_few": "{{count}} Опции",
+        "options_withCount_many": "{{count}} Опций"
     },
     "gallery": {
         "galleryImageSize": "Размер изображений",
@@ -108,7 +117,7 @@
         "downloadSelection": "Скачать выделенное",
         "currentlyInUse": "В настоящее время это изображение используется в следующих функциях:",
         "unstarImage": "Удалить из избранного",
-        "dropOrUpload": "$t(gallery.drop) или загрузить",
+        "dropOrUpload": "Перетащите или загрузите",
         "copy": "Копировать",
         "download": "Скачать",
         "noImageSelected": "Изображение не выбрано",
@@ -239,7 +248,7 @@
             },
             "filterSelected": {
                 "title": "Filter",
-                "desc": "Filter the selected layer. Only applies to Raster and Control layers."
+                "desc": "Применяет фильтр к выбранному слою. Применимо только к растровым слоям и слоям управления."
             },
             "undo": {
                 "desc": "Отменяет последнее действие на холсте.",
@@ -483,7 +492,7 @@
         "deleteMsg1": "Вы точно хотите удалить модель из InvokeAI?",
         "deleteMsg2": "Это приведет К УДАЛЕНИЮ модели С ДИСКА, если она находится в корневой папке Invoke. Если вы используете пользовательское расположение, то модель НЕ будет удалена с диска.",
         "convertToDiffusersHelpText5": "Пожалуйста, убедитесь, что у вас достаточно места на диске. Модели обычно занимают 2–7 Гб.",
-        "convertToDiffusersHelpText3": "Ваш файл контрольной точки НА ДИСКЕ будет УДАЛЕН, если он находится в корневой папке InvokeAI. Если он находится в пользовательском расположении, то он НЕ будет удален.",
+        "convertToDiffusersHelpText3": "Файл чекпоинта будет удалён с диска, если он находится в корневой папке InvokeAI. Если файл расположен в пользовательской папке, он удалён не будет.",
         "allModels": "Все модели",
         "repo_id": "ID репозитория",
         "convert": "Преобразовать",
@@ -541,7 +550,7 @@
         "pathToConfig": "Путь к конфигурации",
         "loraTriggerPhrases": "Триггерные фразы LoRA",
         "mainModelTriggerPhrases": "Триггерные фразы основной модели",
-        "inplaceInstallDesc": "Устанавливайте модели без копирования файлов. При использовании модели она будет загружаться из этого места. Если этот параметр отключен, файлы модели будут скопированы в каталог моделей, управляемых Invoke, во время установки.",
+        "inplaceInstallDesc": "Устанавливать модели без перемещения файлов. В этом случае модель будет загружаться из исходной папки. Если опция отключена, файлы модели при установке будут перемещены в каталог моделей Invoke.",
         "huggingFaceRepoID": "ID репозитория HuggingFace",
         "installQueue": "Очередь установки",
         "installAll": "Установить все",
@@ -575,8 +584,8 @@
         "skippingXDuplicates_one": ", пропуская {{count}} дубликат",
         "skippingXDuplicates_few": ", пропуская {{count}} дубликата",
         "skippingXDuplicates_many": ", пропуская {{count}} дубликатов",
-        "includesNModels": "Включает в себя {{n}} моделей и их зависимостей",
-        "starterBundleHelpText": "Легко установите все модели, необходимые для начала работы с базовой моделью, включая основную модель, сети управления, IP-адаптеры и многое другое. При выборе комплекта все уже установленные модели будут пропущены."
+        "includesNModels": "Включает в себя {{n}} моделей и их зависимостей.",
+        "starterBundleHelpText": "Легко установите все модели, необходимые для начала работы с базовой моделью, включая основную модель, ControlNet, IP-адаптеры и другие. При выборе набора уже установленные модели будут пропущены."
     },
     "parameters": {
         "images": "Изображения",
@@ -632,8 +641,8 @@
             "canvasIsFiltering": "Холст фильтруется",
             "canvasIsTransforming": "Холст трансформируется",
             "noCLIPEmbedModelSelected": "Для генерации FLUX не выбрана модель CLIP Embed",
-            "canvasIsRasterizing": "Холст растрируется",
-            "canvasIsCompositing": "Холст составляется"
+            "canvasIsRasterizing": "Холст занят (идёт растеризация)",
+            "canvasIsCompositing": "Холст занят (идёт компоновка)"
         },
         "cfgRescaleMultiplier": "Множитель масштабирования CFG",
         "patchmatchDownScaleSize": "уменьшить",
@@ -660,7 +669,10 @@
         "optimizedImageToImage": "Оптимизированное img2img",
         "sendToCanvas": "Отправить на холст",
         "guidance": "Точность",
-        "boxBlur": "Box Blur"
+        "boxBlur": "Box Blur",
+        "images_withCount_one": "Изображение",
+        "images_withCount_few": "Изображения",
+        "images_withCount_many": "Изображений"
     },
     "settings": {
         "models": "Модели",
@@ -690,7 +702,7 @@
         "intermediatesCleared_one": "Очищено {{count}} промежуточное",
         "intermediatesCleared_few": "Очищено {{count}} промежуточных",
         "intermediatesCleared_many": "Очищено {{count}} промежуточных",
-        "clearIntermediatesDesc1": "Очистка промежуточных элементов приведет к сбросу состояния Canvas и ControlNet.",
+        "clearIntermediatesDesc1": "Очистка промежуточных данных приведёт к сбросу состояния холста и ControlNet.",
         "intermediatesClearedFailed": "Проблема очистки промежуточных",
         "reloadingIn": "Перезагрузка через",
         "informationalPopoversDisabled": "Информационные всплывающие окна отключены",
@@ -704,7 +716,7 @@
         "serverError": "Ошибка сервера",
         "connected": "Подключено к серверу",
         "canceled": "Обработка отменена",
-        "uploadFailedInvalidUploadDesc": "Это должны быть изображения PNG или JPEG.",
+        "uploadFailedInvalidUploadDesc": "Допускаются только изображения в формате PNG, JPEG или WEBP.",
         "parameterNotSet": "Параметр не задан",
         "parameterSet": "Параметр задан",
         "problemCopyingImage": "Не удается скопировать изображение",
@@ -747,7 +759,12 @@
         "sentToUpscale": "Отправить на увеличение",
         "linkCopied": "Ссылка скопирована",
         "addedToUncategorized": "Добавлено в активы доски $t(boards.uncategorized)",
-        "imagesWillBeAddedTo": "Загруженные изображения будут добавлены в активы доски {{boardName}}."
+        "imagesWillBeAddedTo": "Загруженные изображения будут добавлены в активы доски {{boardName}}.",
+        "schedulerResetZImageBase": "Планировщик LCM несовместим с моделями Z-Image Base. Переключено на Euler.",
+        "schedulerReset": "Планировщик сброшен",
+        "uploadFailedInvalidUploadDesc_withCount_one": "Допускается не более 1 изображения в формате PNG, JPEG или WEBP.",
+        "uploadFailedInvalidUploadDesc_withCount_few": "Допускается не более {{count}} изображения в формате PNG, JPEG или WEBP.",
+        "uploadFailedInvalidUploadDesc_withCount_many": "Допускается не более {{count}} изображений в формате PNG, JPEG или WEBP."
     },
     "accessibility": {
         "uploadImage": "Загрузить изображение",
@@ -892,7 +909,13 @@
         "saveToGallery": "Сохранить в галерею",
         "noWorkflows": "Нет рабочих процессов",
         "noMatchingWorkflows": "Нет совпадающих рабочих процессов",
-        "workflowHelpText": "Нужна помощь? Ознакомьтесь с нашим руководством <LinkComponent>Getting Started with Workflows</LinkComponent>."
+        "workflowHelpText": "Нужна помощь? Ознакомьтесь с нашим руководством <LinkComponent>Getting Started with Workflows</LinkComponent>.",
+        "generatorImages_one": "{{count}} изображение",
+        "generatorImages_few": "{{count}} изображения",
+        "generatorImages_many": "{{count}} изображений",
+        "generatorNRandomValues_one": "{{count}} случайное значение",
+        "generatorNRandomValues_few": "{{count}} случайных значения",
+        "generatorNRandomValues_many": "{{count}} случайных значений"
     },
     "boards": {
         "autoAddBoard": "Коллекция для автодобавления",
@@ -935,7 +958,19 @@
         "shared": "Общие коллекции",
         "noBoards": "Нет коллекций {{boardType}}",
         "deletedPrivateBoardsCannotbeRestored": "Удалённые коллекции и изображения нельзя восстановить. При выборе «Удалить только коллекцию» изображения будут перемещены в личный раздел «Без категории» автора изображения.",
-        "updateBoardError": "Ошибка обновления коллекции"
+        "updateBoardError": "Ошибка обновления коллекции",
+        "pause": "Пауза",
+        "resume": "Возобновить",
+        "restartFailed": "Ошибка перезапуска",
+        "restartFile": "Перезапустить загрузку",
+        "restartRequired": "Требуется перезапуск",
+        "resumeRefused": "Сервер отклонил попытку возобновления. Требуется перезапуск.",
+        "uncategorizedImages": "Без категории",
+        "deleteAllUncategorizedImages": "Удалить все изображения без категории",
+        "deletedImagesCannotBeRestored": "Удалённые изображения нельзя восстановить.",
+        "hideBoards": "Скрыть коллекции",
+        "locateInGalery": "Показать в галерее",
+        "viewBoards": "Просмотреть коллекции"
     },
     "dynamicPrompts": {
         "seedBehaviour": {
@@ -1031,19 +1066,19 @@
         "controlNetResizeMode": {
             "heading": "Режим изменения размера",
             "paragraphs": [
-                "Метод подгонки размера входного изображения Control Adaptor к размеру выходного изображения."
+                "Метод подгонки размера входного изображения Control Adapter под размер выходного изображения."
             ]
         },
         "controlNetBeginEnd": {
             "paragraphs": [
-                "Часть процесса шумоподавления, к которой будет применен адаптер контроля.",
-                "ControlNet, применяемые в начале процесса, направляют композицию, а ControlNet, применяемые в конце, направляют детали."
+                "Эта настройка определяет, на каком этапе денойзинга (генерации) используется влияние данного слоя.",
+                "• Начальный шаг (%): Определяет, с какого момента в процессе генерации начинает учитываться влияние данного слоя."
             ],
             "heading": "Процент начала/конца шага"
         },
         "dynamicPromptsSeedBehaviour": {
             "paragraphs": [
-                "Управляет использованием сида при создании запросов.",
+                "Определяет, как используется сид при генерации промптов.",
                 "Для каждой итерации будет использоваться уникальный сид. Используйте это, чтобы изучить варианты запросов для одного сида.",
                 "Например, если у вас 5 запросов, каждое изображение будет использовать один и то же сид.",
                 "для каждого изображения будет использоваться уникальный сид. Это обеспечивает большую вариативность."
@@ -1071,8 +1106,8 @@
         },
         "paramDenoisingStrength": {
             "paragraphs": [
-                "Количество шума, добавляемого к входному изображению.",
-                "0 приведет к идентичному изображению, а 1 - к совершенно новому."
+                "Определяет, насколько сгенерированное изображение отличается от растрового слоя (слоёв).",
+                "Меньшее значение сохраняет больше сходства с объединёнными видимыми растровыми слоями. Большее значение усиливает влияние глобального промпта."
             ],
             "heading": "Шумоподавление"
         },
@@ -1111,7 +1146,7 @@
         "controlNetWeight": {
             "heading": "Вес",
             "paragraphs": [
-                "Вес адаптера управления. Более высокий вес приведет к большему воздействию на окончательное изображение."
+                "Определяет, насколько сильно слой влияет на процесс генерации."
             ]
         },
         "controlNet": {
@@ -1123,13 +1158,13 @@
         "paramCFGScale": {
             "heading": "Шкала точности (CFG)",
             "paragraphs": [
-                "Контролирует, насколько запрос влияет на процесс генерации.",
+                "Определяет, насколько сильно промпт влияет на процесс генерации.",
                 "Высокие значения шкалы CFG могут привести к перенасыщению и искажению результатов генерации. "
             ]
         },
         "controlNetControlMode": {
             "paragraphs": [
-                "Придает больший вес либо запросу, либо ControlNet."
+                "Смещает приоритет в сторону промпта или ControlNet."
             ],
             "heading": "Режим управления"
         },
@@ -1181,7 +1216,7 @@
         "refinerCfgScale": {
             "heading": "Шкала CFG",
             "paragraphs": [
-                "Контролирует, насколько сильно запрос влияет на процесс генерации.",
+                "Определяет, насколько сильно промпт влияет на процесс генерации.",
                 "Аналогично CFG шкале генерации."
             ]
         },
@@ -1290,24 +1325,24 @@
         "ipAdapterMethod": {
             "heading": "Метод",
             "paragraphs": [
-                "Метод, с помощью которого применяется текущий IP-адаптер."
+                "Метод определяет, как референсное изображение будет влиять на процесс генерации."
             ]
         },
         "structure": {
             "paragraphs": [
-                "Структура контролирует, насколько точно выходное изображение будет соответствовать макету оригинала. Низкая структура допускает значительные изменения, в то время как высокая структура строго сохраняет исходную композицию и макет."
+                "Структура определяет, насколько точно выходное изображение сохраняет компоновку исходного. Низкое значение допускает значительные изменения, а высокое строго сохраняет исходную композицию и расположение элементов."
             ],
             "heading": "Структура"
         },
         "scale": {
             "paragraphs": [
-                "Масштаб управляет размером выходного изображения и основывается на кратном разрешении входного изображения. Например, при увеличении в 2 раза изображения 1024x1024 на выходе получится 2048 x 2048."
+                "Масштаб определяет размер выходного изображения и рассчитывается как кратное разрешению исходного изображения. Например, увеличение в 2 раза для изображения 1024×1024 даст результат 2048×2048."
             ],
             "heading": "Масштаб"
         },
         "creativity": {
             "paragraphs": [
-                "Креативность контролирует степень свободы, предоставляемой модели при добавлении деталей. При низкой креативности модель остается близкой к оригинальному изображению, в то время как высокая креативность позволяет вносить больше изменений. При использовании подсказки высокая креативность увеличивает влияние подсказки."
+                "Креативность определяет степень свободы модели при добавлении деталей. Низкое значение сохраняет больше сходства с исходным изображением, а высокое допускает более значительные изменения. При использовании промпта высокое значение усиливает его влияние."
             ],
             "heading": "Креативность"
         },
@@ -1320,18 +1355,18 @@
         "fluxDevLicense": {
             "heading": "Некоммерческая лицензия",
             "paragraphs": [
-                "Модели FLUX.1 [dev] лицензируются по некоммерческой лицензии FLUX [dev]. Чтобы использовать этот тип модели в коммерческих целях в Invoke, посетите наш веб-сайт, чтобы узнать больше."
+                "Модели FLUX.1 [dev] распространяются по некоммерческой лицензии FLUX [dev]. Для их коммерческого использования требуется отдельная лицензия."
             ]
         },
         "optimizedDenoising": {
             "heading": "Оптимизированный img2img",
             "paragraphs": [
-                "Включите опцию «Оптимизированный img2img», чтобы получить более плавную шкалу Denoise Strength для img2img и перерисовки с моделями Flux. Эта настройка улучшает возможность контролировать степень изменения изображения, но может быть отключена, если вы предпочитаете использовать стандартную шкалу Denoise Strength. Эта настройка все еще находится в стадии настройки и в настоящее время имеет статус бета-версии."
+                "Включите «Optimized Image-to-Image», чтобы использовать более плавную шкалу Denoise Strength для преобразований image-to-image и инпейнтинга с моделями Flux. Эта настройка улучшает контроль над степенью изменений изображения, однако её можно отключить, если вы предпочитаете стандартную шкалу Denoise Strength. Функция находится в стадии настройки и имеет статус бета-версии."
             ]
         },
         "paramGuidance": {
             "paragraphs": [
-                "Контролирует, насколько сильно запрос влияет на процесс генерации.",
+                "Определяет, насколько сильно промпт влияет на процесс генерации.",
                 "Высокие значения точности могут привести к перенасыщению, а высокие или низкие значения точности могут привести к искажению результатов генерации. Точность применима только к моделям FLUX DEV."
             ],
             "heading": "Точность"
@@ -1363,7 +1398,7 @@
         "parameterSet": "Параметр {{parameter}} установлен",
         "allPrompts": "Все запросы",
         "imageDimensions": "Размеры изображения",
-        "canvasV2Metadata": "Холст",
+        "canvasV2Metadata": "Слои холста",
         "guidance": "Точность"
     },
     "queue": {
@@ -1393,7 +1428,7 @@
         "graphQueued": "График поставлен в очередь",
         "queue": "Очередь",
         "batch": "Пакет",
-        "clearQueueAlertDialog": "Очистка очереди немедленно отменяет все элементы обработки и полностью очищает очередь. Ожидающие фильтры будут отменены.",
+        "clearQueueAlertDialog": "Очистка очереди немедленно отменит все текущие задачи и очистит очередь. Ожидающие фильтры будут отменены, а область предпросмотра на холсте сброшена.",
         "pending": "В ожидании",
         "completedIn": "Завершено за",
         "resumeFailed": "Проблема с возобновлением рендеринга",
@@ -1477,7 +1512,7 @@
         "workflowEditorMenu": "Меню редактора рабочего процесса",
         "workflowName": "Имя рабочего процесса",
         "saveWorkflow": "Сохранить рабочий процесс",
-        "workflowLibrary": "Библиотека",
+        "workflowLibrary": "Библиотека схем генерации",
         "downloadWorkflow": "Сохранить в файл",
         "workflowSaved": "Рабочий процесс сохранен",
         "unnamedWorkflow": "Безымянный рабочий процесс",
@@ -1560,7 +1595,7 @@
         "autoNegative": "Авто негатив",
         "rectangle": "Прямоугольник",
         "addNegativePrompt": "Добавить $t(controlLayers.negativePrompt)",
-        "regionalGuidance": "Региональная точность",
+        "regionalGuidance": "Региональное влияние",
         "opacity": "Непрозрачность",
         "addLayer": "Добавить слой",
         "moveToFront": "На передний план",
@@ -1568,33 +1603,33 @@
         "regional": "Региональный",
         "bookmark": "Закладка для быстрого переключения",
         "fitBboxToLayers": "Подогнать рамку к слоям",
-        "mergeVisibleOk": "Объединенные видимые слои",
-        "mergeVisibleError": "Ошибка объединения видимых слоев",
+        "mergeVisibleOk": "Объединенные слои",
+        "mergeVisibleError": "Ошибка объединения слоев",
         "clearHistory": "Очистить историю",
         "mergeVisible": "Объединить видимые",
         "removeBookmark": "Удалить закладку",
-        "saveLayerToAssets": "Сохранить слой в активы",
+        "saveLayerToAssets": "Сохранить слой в ресурсы",
         "clearCaches": "Очистить кэши",
         "recalculateRects": "Пересчитать прямоугольники",
-        "saveBboxToGallery": "Сохранить рамку в галерею",
+        "saveBboxToGallery": "Сохранить область в галерею",
         "canvas": "Холст",
         "global": "Глобальный",
-        "newGlobalReferenceImageError": "Проблема с созданием глобального эталонного изображения",
-        "newRegionalReferenceImageOk": "Создано региональное эталонное изображение",
-        "newRegionalReferenceImageError": "Проблема создания регионального эталонного изображения",
+        "newGlobalReferenceImageError": "Проблема с созданием глобального референсного изображения",
+        "newRegionalReferenceImageOk": "Создано региональное референсное изображение",
+        "newRegionalReferenceImageError": "Проблема создания регионального референсного изображения",
         "newControlLayerOk": "Создан слой управления",
         "newControlLayerError": "Ошибка создания слоя управления",
         "newRasterLayerOk": "Создан растровый слой",
         "newRasterLayerError": "Ошибка создания растрового слоя",
-        "newGlobalReferenceImageOk": "Создано глобальное эталонное изображение",
-        "bboxOverlay": "Показать наложение ограничительной рамки",
+        "newGlobalReferenceImageOk": "Создано глобальное референсное изображение",
+        "bboxOverlay": "Показать наложение рамки",
         "saveCanvasToGallery": "Сохранить холст в галерею",
-        "pullBboxIntoReferenceImageOk": "рамка перенесена в эталонное изображение",
-        "pullBboxIntoReferenceImageError": "Ошибка переноса рамки в эталонное изображение",
+        "pullBboxIntoReferenceImageOk": "Рамка перенесена в референсное изображение",
+        "pullBboxIntoReferenceImageError": "Ошибка переноса рамки в референсное изображение",
         "regionIsEmpty": "Выбранный регион пуст",
         "savedToGalleryOk": "Сохранено в галерею",
         "savedToGalleryError": "Ошибка сохранения в галерею",
-        "pullBboxIntoLayerOk": "Рамка перенесена в слой",
+        "pullBboxIntoLayerOk": "Содержимое рамки перенесено в слой",
         "pullBboxIntoLayerError": "Проблема с переносом рамки в слой",
         "newLayerFromImage": "Новый слой из изображения",
         "filter": {
@@ -1693,11 +1728,12 @@
                 "isTransforming": "{{title}} трансформируется"
             },
             "scaledBbox": "Масштабированная рамка",
-            "bbox": "Ограничительная рамка"
+            "bbox": "Ограничительная рамка",
+            "textSessionActive": "Активен режим ввода"
         },
         "canvasContextMenu": {
             "saveBboxToGallery": "Сохранить рамку в галерею",
-            "newGlobalReferenceImage": "Новое глобальное эталонное изображение",
+            "newGlobalReferenceImage": "Новое глобальное референсное изображение",
             "bboxGroup": "Сохдать из рамки",
             "canvasGroup": "Холст",
             "newControlLayer": "Новый контрольный слой",
@@ -1709,8 +1745,8 @@
         },
         "fill": {
             "solid": "Сплошной",
-            "fillStyle": "Стиль заполнения",
-            "fillColor": "Цвет заполнения",
+            "fillStyle": "Стиль заливки",
+            "fillColor": "Цвет заливкии",
             "grid": "Сетка",
             "horizontal": "Горизонтальная",
             "diagonal": "Диагональная",
@@ -1729,8 +1765,8 @@
         "inpaintMask": "Маска перерисовки",
         "sendToCanvas": "Отправить на холст",
         "regionalGuidance_withCount_one": "$t(controlLayers.regionalGuidance)",
-        "regionalGuidance_withCount_few": "Региональных точности",
-        "regionalGuidance_withCount_many": "Региональных точностей",
+        "regionalGuidance_withCount_few": "Региональных влияния",
+        "regionalGuidance_withCount_many": "Региональных влияний",
         "controlLayer_withCount_one": "$t(controlLayers.controlLayer)",
         "controlLayer_withCount_few": "Контрольных слоя",
         "controlLayer_withCount_many": "Контрольных слоев",
@@ -1739,9 +1775,9 @@
         "inpaintMask_withCount_few": "Маски перерисовки",
         "inpaintMask_withCount_many": "Масок перерисовки",
         "controlMode": {
-            "prompt": "Запрос",
+            "prompt": "Промпт",
             "controlMode": "Режим контроля",
-            "megaControl": "Мега контроль",
+            "megaControl": "Максимальный контроль",
             "balanced": "Сбалансированный",
             "control": "Контроль"
         },
@@ -1770,24 +1806,25 @@
             "showResultsOn": "Показать результаты",
             "showResultsOff": "Скрыть результаты"
         },
-        "pullBboxIntoReferenceImage": "Поместить рамку в эталонное изображение",
+        "pullBboxIntoReferenceImage": "Преобразовать рамку в референсное изображение",
         "enableAutoNegative": "Включить авто негатив",
-        "maskFill": "Заполнение маски",
+        "maskFill": "Заливка маски",
         "tool": {
-            "move": "Двигать",
+            "move": "Перемещение",
             "bbox": "Ограничительная рамка",
-            "view": "Смотреть",
+            "view": "Перемещение холста",
             "brush": "Кисть",
             "eraser": "Ластик",
             "rectangle": "Прямоугольник",
-            "colorPicker": "Подборщик цветов"
+            "colorPicker": "Пипетка",
+            "text": "Текст"
         },
         "rasterLayer": "Растровый слой",
         "enableTransparencyEffect": "Включить эффект прозрачности",
         "hidingType": "Скрыть {{type}}",
         "addRegionalGuidance": "Добавить $t(controlLayers.regionalGuidance)",
         "deleteSelected": "Удалить выбранное",
-        "pullBboxIntoLayer": "Поместить рамку в слой",
+        "pullBboxIntoLayer": "Преобразовать рамку в слой",
         "locked": "Заблокировано",
         "replaceLayer": "Заменить слой",
         "width": "Ширина",
@@ -1795,15 +1832,15 @@
         "addRasterLayer": "Добавить $t(controlLayers.rasterLayer)",
         "addControlLayer": "Добавить $t(controlLayers.controlLayer)",
         "addInpaintMask": "Добавить $t(controlLayers.inpaintMask)",
-        "cropLayerToBbox": "Обрезать слой по ограничительной рамке",
-        "clipToBbox": "Обрезка штрихов в рамке",
-        "outputOnlyMaskedRegions": "Вывод только маскированных областей",
+        "cropLayerToBbox": "Обрезать слой по рамке",
+        "clipToBbox": "Ограничить мазки рамкой",
+        "outputOnlyMaskedRegions": "Выводить только сгенерированные области",
         "duplicate": "Дублировать",
         "layer_one": "Слой",
         "layer_few": "Слоя",
         "layer_many": "Слоев",
-        "prompt": "Запрос",
-        "negativePrompt": "Исключающий запрос",
+        "prompt": "Промпт",
+        "negativePrompt": "Негативный промпт",
         "beginEndStepPercentShort": "Начало/конец %",
         "transform": {
             "transform": "Трансформировать",
@@ -1816,7 +1853,7 @@
             "fitModeFill": "Заполнить"
         },
         "disableAutoNegative": "Отключить авто негатив",
-        "deleteReferenceImage": "Удалить эталонное изображение",
+        "deleteReferenceImage": "Удалить референсное изображение",
         "rasterLayer_withCount_one": "$t(controlLayers.rasterLayer)",
         "rasterLayer_withCount_few": "Растровых слоя",
         "rasterLayer_withCount_many": "Растровых слоев",
@@ -1828,9 +1865,42 @@
         "logDebugInfo": "Писать отладочную информацию",
         "unlocked": "Разблокировано",
         "showProgressOnCanvas": "Показать прогресс на холсте",
-        "regionalReferenceImage": "Региональное эталонное изображение",
-        "globalReferenceImage": "Глобальное эталонное изображение",
-        "referenceImage": "Эталонное изображение"
+        "regionalReferenceImage": "Региональное референсное изображение",
+        "globalReferenceImage": "Глобальное референсное изображение",
+        "referenceImage": "Референсное изображение",
+        "text": {
+            "px": "px",
+            "alignRight": "По правому краю",
+            "alignCenter": "По центру",
+            "alignLeft": "По левому краю",
+            "strikethrough": "Зачёркнутый",
+            "italic": "Курсив",
+            "bold": "Полужирный",
+            "size": "Размер",
+            "font": "Шрифт"
+        },
+        "newImg2ImgCanvasFromImage": "Новое изображение из Img2Img",
+        "sendToCanvasDesc": "При нажатии Invoke результат появляется на холсте в режиме предпросмотра.",
+        "compositeOperation": {
+            "blendModes": {
+                "darken": "Затемнение",
+                "multiply": "Умножение",
+                "color-dodge": "Осветление основы",
+                "color-burn": "Затемнение основы",
+                "screen": "Экран",
+                "hard-light": "Жёсткий свет",
+                "soft-light": "Мягкий свет",
+                "overlay": "Перекрытие",
+                "hue": "Тон",
+                "color": "Цвет",
+                "source-over": "Обычный"
+            }
+        },
+        "globalReferenceImage_withCount_one": "$t(controlLayers.globalReferenceImage)",
+        "globalReferenceImage_withCount_few": "Глобальных референсных изображения",
+        "globalReferenceImage_withCount_many": "Глобальных референсных изображений",
+        "regionalGuidance_withCount_hidden": "Региональное влияние (скрыто: {{count}})",
+        "controlLayers_withCount_hidden": "Слои управления (скрыто: {{count}})"
     },
     "ui": {
         "tabs": {
