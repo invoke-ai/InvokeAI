@@ -138,6 +138,22 @@ export const collect: InvocationTemplate = {
   description: 'Collects values into a collection',
   outputType: 'collect_output',
   inputs: {
+    collection: {
+      name: 'collection',
+      title: 'Collection',
+      required: false,
+      default: undefined,
+      description: 'An optional collection to append to',
+      fieldKind: 'input',
+      input: 'connection',
+      ui_hidden: false,
+      ui_type: 'CollectionField' as const,
+      type: {
+        name: 'CollectionField' as const,
+        cardinality: 'COLLECTION',
+        batch: false,
+      },
+    },
     item: {
       name: 'item',
       title: 'Collection Item',
