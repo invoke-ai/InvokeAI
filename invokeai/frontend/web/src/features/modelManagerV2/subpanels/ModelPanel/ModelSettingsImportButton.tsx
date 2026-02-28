@@ -7,6 +7,34 @@ import { PiUploadSimpleBold } from 'react-icons/pi';
 import { useUpdateModelMutation } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
+const validateImportData = (data: unknown): data is Record<string, unknown> => {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    return false;
+  }
+
+  const obj = data as Record<string, unknown>;
+
+  if ('trigger_phrases' in obj && obj.trigger_phrases !== undefined) {
+    if (!Array.isArray(obj.trigger_phrases) || !obj.trigger_phrases.every((p) => typeof p === 'string')) {
+      return false;
+    }
+  }
+
+  if ('default_settings' in obj && obj.default_settings !== undefined) {
+    if (typeof obj.default_settings !== 'object' || obj.default_settings === null || Array.isArray(obj.default_settings)) {
+      return false;
+    }
+  }
+
+  if ('cpu_only' in obj && obj.cpu_only !== undefined) {
+    if (typeof obj.cpu_only !== 'boolean') {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 type Props = {
   modelConfig: AnyModelConfig;
 };
@@ -19,20 +47,29 @@ export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {
   const applySettings = useCallback(
     async (data: Record<string, unknown>) => {
       const body: Record<string, unknown> = {};
+      const skippedFields: string[] = [];
 
-      if ('default_settings' in data && data.default_settings !== null) {
-        body.default_settings = data.default_settings;
-      }
+      const importableFields = ['default_settings', 'trigger_phrases', 'cpu_only'] as const;
 
-      if ('trigger_phrases' in data && Array.isArray(data.trigger_phrases)) {
-        body.trigger_phrases = data.trigger_phrases;
-      }
-
-      if ('cpu_only' in data && data.cpu_only !== null) {
-        body.cpu_only = data.cpu_only;
+      for (const field of importableFields) {
+        if (!(field in data) || data[field] === undefined || data[field] === null) {
+          continue;
+        }
+        if (field in modelConfig) {
+          body[field] = data[field];
+        } else {
+          skippedFields.push(field);
+        }
       }
 
       if (Object.keys(body).length === 0) {
+        if (skippedFields.length > 0) {
+          toast({
+            id: 'SETTINGS_IMPORT_INCOMPATIBLE',
+            title: t('modelManager.settingsImportIncompatible'),
+            status: 'warning',
+          });
+        }
         return;
       }
 
@@ -42,21 +79,29 @@ export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {
       })
         .unwrap()
         .then(() => {
-          toast({
-            id: 'SETTINGS_IMPORTED',
-            title: t('modelManager.settingsImported'),
-            status: 'success',
-          });
+          if (skippedFields.length > 0) {
+            toast({
+              id: 'SETTINGS_IMPORTED',
+              title: t('modelManager.settingsImportedPartial', { fields: skippedFields.join(', ') }),
+              status: 'warning',
+            });
+          } else {
+            toast({
+              id: 'SETTINGS_IMPORTED',
+              title: t('modelManager.settingsImported'),
+              status: 'success',
+            });
+          }
         })
-        .catch((error) => {
+        .catch((_error) => {
           toast({
             id: 'SETTINGS_IMPORT_FAILED',
-            title: `${t('modelManager.settingsImportFailed')}: ${error.data?.detail ?? ''}`,
+            title: t('modelManager.settingsImportFailed'),
             status: 'error',
           });
         });
     },
-    [modelConfig.key, updateModel, t]
+    [modelConfig, updateModel, t]
   );
 
   const handleFileChange = useCallback(
@@ -70,6 +115,14 @@ export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {
       reader.onload = (event) => {
         try {
           const json = JSON.parse(event.target?.result as string);
+          if (!validateImportData(json)) {
+            toast({
+              id: 'SETTINGS_IMPORT_INVALID',
+              title: t('modelManager.settingsImportInvalidFile'),
+              status: 'error',
+            });
+            return;
+          }
           applySettings(json);
         } catch {
           toast({
@@ -78,6 +131,13 @@ export const ModelSettingsImportButton = memo(({ modelConfig }: Props) => {
             status: 'error',
           });
         }
+      };
+      reader.onerror = () => {
+        toast({
+          id: 'SETTINGS_IMPORT_INVALID',
+          title: t('modelManager.settingsImportInvalidFile'),
+          status: 'error',
+        });
       };
       reader.readAsText(file);
 

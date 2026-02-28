@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold } from 'react-icons/pi';
 import type { AnyModelConfig } from 'services/api/types';
@@ -12,11 +12,11 @@ type Props = {
 const buildExportData = (modelConfig: AnyModelConfig): Record<string, unknown> => {
   const data: Record<string, unknown> = {};
 
-  if ('default_settings' in modelConfig && modelConfig.default_settings) {
+  if ('default_settings' in modelConfig && modelConfig.default_settings !== undefined && modelConfig.default_settings !== null) {
     data.default_settings = modelConfig.default_settings;
   }
 
-  if ('trigger_phrases' in modelConfig && modelConfig.trigger_phrases) {
+  if ('trigger_phrases' in modelConfig && modelConfig.trigger_phrases !== undefined && modelConfig.trigger_phrases !== null) {
     data.trigger_phrases = modelConfig.trigger_phrases;
   }
 
@@ -33,6 +33,8 @@ const sanitizeFilename = (name: string): string => {
 
 export const ModelSettingsExportButton = memo(({ modelConfig }: Props) => {
   const { t } = useTranslation();
+
+  const hasExportableData = useMemo(() => Object.keys(buildExportData(modelConfig)).length > 0, [modelConfig]);
 
   const handleExport = useCallback(() => {
     const data = buildExportData(modelConfig);
@@ -63,6 +65,7 @@ export const ModelSettingsExportButton = memo(({ modelConfig }: Props) => {
       aria-label={t('modelManager.exportSettings')}
       tooltip={t('modelManager.exportSettings')}
       onClick={handleExport}
+      isDisabled={!hasExportableData}
     />
   );
 });
