@@ -37,6 +37,7 @@ export const zGalleryState = z.object({
   shouldShowArchivedBoards: z.boolean(),
   boardsListOrderBy: zBoardRecordOrderBy,
   boardsListOrderDir: zOrderDir,
+  showAspectRatioThumbnails: z.boolean(),
 });
 
 export type GalleryState = z.infer<typeof zGalleryState>;

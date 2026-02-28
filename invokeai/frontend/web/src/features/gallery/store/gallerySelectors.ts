@@ -54,8 +54,6 @@ export const selectAutoAssignBoardOnClick = createSelector(
 );
 export const selectBoardSearchText = createSelector(selectGallerySlice, (gallery) => gallery.boardSearchText);
 export const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
-export const selectBoardsListOrderBy = createSelector(selectGallerySlice, (gallery) => gallery.boardsListOrderBy);
-export const selectBoardsListOrderDir = createSelector(selectGallerySlice, (gallery) => gallery.boardsListOrderDir);
 
 export const selectSelectionCount = createSelector(selectGallerySlice, (gallery) => gallery.selection.length);
 export const selectSelection = createSelector(selectGallerySlice, (gallery) => gallery.selection);
@@ -70,4 +68,8 @@ export const selectImageToCompare = createSelector(selectGallerySlice, (gallery)
 export const selectAlwaysShouldImageSizeBadge = createSelector(
   selectGallerySlice,
   (gallery) => gallery.alwaysShowImageSizeBadge
+);
+export const selectShowAspectRatioThumbnails = createSelector(
+  selectGallerySlice,
+  (gallery) => gallery.showAspectRatioThumbnails
 );

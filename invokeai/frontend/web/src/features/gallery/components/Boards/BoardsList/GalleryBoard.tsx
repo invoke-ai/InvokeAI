@@ -6,7 +6,7 @@ import { selectCurrentUser } from 'features/auth/store/authSlice';
 import type { AddImageToBoardDndTargetData } from 'features/dnd/dnd';
 import { addImageToBoardDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
-import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
+import { AutoAddIndicator } from 'features/gallery/components/Boards/AutoAddIndicator';
 import BoardContextMenu from 'features/gallery/components/Boards/BoardContextMenu';
 import { BoardEditableTitle } from 'features/gallery/components/Boards/BoardsList/BoardEditableTitle';
 import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
@@ -68,7 +68,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
         {(ref) => (
           <Tooltip
             label={<BoardTooltip board={board} boardCounts={boardCounts} />}
-            openDelay={1000}
+            openDelay={150}
             placement="right"
             closeOnScroll
             p={2}
@@ -81,8 +81,8 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
               cursor="pointer"
               py={1}
               ps={1}
-              pe={4}
-              gap={4}
+              pe={2}
+              gap={2}
               bg={isSelected ? 'base.850' : undefined}
               _hover={_hover}
               w="full"
@@ -97,9 +97,9 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
                   </Text>
                 )}
               </Flex>
-              {autoAddBoardId === board.board_id && <AutoAddBadge />}
+              {autoAddBoardId === board.board_id && <AutoAddIndicator />}
               {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
-              <Flex justifyContent="flex-end">
+              <Flex justifyContent="flex-end" flexShrink={0}>
                 <Text variant="subtext">
                   {board.image_count} | {board.asset_count}
                 </Text>
@@ -127,7 +127,7 @@ const CoverImage = ({ board }: { board: BoardDTO }) => {
         w={10}
         h={10}
         borderRadius="base"
-        borderBottomRadius="lg"
+        flexShrink={0}
       />
     );
   }

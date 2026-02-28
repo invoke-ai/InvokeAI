@@ -10,6 +10,7 @@ import {
   selectLastSelectedItem,
   selectSelection,
   selectSelectionCount,
+  selectShowAspectRatioThumbnails,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -43,6 +44,7 @@ type ListImageNamesQueryArgs = ReturnType<typeof selectGetImageNamesQueryArgs>;
 type GridContext = {
   queryArgs: ListImageNamesQueryArgs;
   imageNames: string[];
+  showAspectRatioThumbnails: boolean;
 };
 
 /**
@@ -350,6 +352,7 @@ export const GalleryImageGridContent = memo(
     const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
     const internalRootRef = useRef<HTMLDivElement>(null);
     const rootRef = rootRefProp ?? internalRootRef;
+    const showAspectRatioThumbnails = useAppSelector(selectShowAspectRatioThumbnails);
 
     // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
     const { onRangeChanged } = useRangeBasedImageFetching({
@@ -374,7 +377,10 @@ export const GalleryImageGridContent = memo(
       [onRangeChanged]
     );
 
-    const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
+    const context = useMemo<GridContext>(
+      () => ({ imageNames, queryArgs, showAspectRatioThumbnails }),
+      [imageNames, queryArgs, showAspectRatioThumbnails]
+    );
 
     if (isLoading) {
       return (
@@ -454,16 +460,20 @@ const itemContent: GridItemContent<string, GridContext> = (index, imageName) => 
   return <ImageAtPosition index={index} imageName={imageName} />;
 };
 
-const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef(({ context: _, ...rest }, ref) => (
-  <GridItem ref={ref} aspectRatio="1/1" {...rest} />
+const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef(({ context, ...rest }, ref) => (
+  <GridItem ref={ref} aspectRatio={context?.showAspectRatioThumbnails ? undefined : '1/1'} {...rest} />
 ));
 ItemComponent.displayName = 'ItemComponent';
 
-const ScrollSeekPlaceholderComponent: GridComponents<GridContext>['ScrollSeekPlaceholder'] = (props) => (
-  <GridItem aspectRatio="1/1" {...props}>
-    <GalleryImagePlaceholder />
-  </GridItem>
-);
+const ScrollSeekPlaceholderComponent: GridComponents<GridContext>['ScrollSeekPlaceholder'] = (props) => {
+  // eslint-disable-next-line react/prop-types
+  const aspectRatio = props.context?.showAspectRatioThumbnails ? undefined : '1/1';
+  return (
+    <GridItem aspectRatio={aspectRatio} {...props}>
+      <GalleryImagePlaceholder />
+    </GridItem>
+  );
+};
 
 ScrollSeekPlaceholderComponent.displayName = 'ScrollSeekPlaceholderComponent';
 

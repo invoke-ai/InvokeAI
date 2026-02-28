@@ -178,7 +178,7 @@ export const GalleryImageGridPaged = memo(() => {
         onGoToPage={handleTabChange}
         onPageInputChange={handlePageInputChange}
       />
-      <Flex w="full" h="full">
+      <Flex w="full" h="full" px={2}>
         <GalleryImageGridContent
           imageNames={pageImageNames}
           navigationImageNames={imageNames}

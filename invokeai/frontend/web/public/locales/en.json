@@ -475,6 +475,8 @@
         "displayBoardSearch": "Board Search",
         "displaySearch": "Image Search",
         "download": "Download",
+        "expandGallery": "Show Gallery",
+        "collapseGallery": "Hide Gallery",
         "exitBoardSearch": "Exit Board Search",
         "exitSearch": "Exit Image Search",
         "featuresWillReset": "If you delete this image, those features will immediately be reset.",
@@ -523,7 +525,13 @@
         "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
         "move": "Move",
-        "useForPromptGeneration": "Use for Prompt Generation"
+        "useForPromptGeneration": "Use for Prompt Generation",
+        "showBoardsSidebar": "Show Boards Sidebar",
+        "hideBoardsSidebar": "Hide Boards Sidebar",
+        "toggleBoardsSidebar": "Toggle Boards Sidebar",
+        "showSquareThumbnails": "Show Square Thumbnails",
+        "showAspectRatioThumbnails": "Show Aspect Ratio Thumbnails",
+        "toggleAspectRatio": "Toggle Aspect Ratio"
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",

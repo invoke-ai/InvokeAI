@@ -11,7 +11,7 @@ export const PanelHotkeysLogical = memo(() => {
   useRegisteredHotkeys({
     category: 'app',
     id: 'toggleRightPanel',
-    callback: navigationApi.toggleRightPanel,
+    callback: navigationApi.toggleBottomPanel,
   });
   useRegisteredHotkeys({
     category: 'app',

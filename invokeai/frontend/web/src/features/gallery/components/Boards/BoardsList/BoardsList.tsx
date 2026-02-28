@@ -58,7 +58,6 @@ export const BoardsList = memo(() => {
         w="full"
         justifyContent="space-between"
         alignItems="center"
-        ps={2}
         py={1}
         zIndex={1}
         top={0}
@@ -67,10 +66,12 @@ export const BoardsList = memo(() => {
         <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.500">
           {t('boards.boards')}
         </Text>
-        <AddBoardButton />
+        <AddBoardButton variant="icon" />
+        {/* TODO: Add search toggle here */}
       </Flex>
+      {/* TODO: Add search input here */}
       <Collapse in={isOpen} style={fixTooltipCloseOnScrollStyles}>
-        <Flex direction="column" gap={1}>
+        <Flex direction="column">
           {boardElements.length ? (
             boardElements
           ) : (

@@ -35,6 +35,7 @@ const getInitialState = (): GalleryState => ({
   shouldShowArchivedBoards: false,
   boardsListOrderBy: 'created_at',
   boardsListOrderDir: 'DESC',
+  showAspectRatioThumbnails: false,
 });
 
 const slice = createSlice({
@@ -142,6 +143,9 @@ const slice = createSlice({
     boardsListOrderDirChanged: (state, action: PayloadAction<OrderDir>) => {
       state.boardsListOrderDir = action.payload;
     },
+    showAspectRatioThumbnailsChanged: (state, action: PayloadAction<boolean>) => {
+      state.showAspectRatioThumbnails = action.payload;
+    },
   },
   extraReducers(builder) {
     // Clear board-related state on logout to prevent stale data when switching users
@@ -156,7 +160,6 @@ const slice = createSlice({
 export const {
   imageSelected,
   shouldAutoSwitchChanged,
-  autoAssignBoardOnClickChanged,
   setGalleryImageMinimumWidth,
   boardIdSelected,
   autoAddBoardIdChanged,
@@ -173,8 +176,7 @@ export const {
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
   searchTermChanged,
-  boardsListOrderByChanged,
-  boardsListOrderDirChanged,
+  showAspectRatioThumbnailsChanged,
 } = slice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;

@@ -14,7 +14,6 @@ import { boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { IMAGE_CATEGORIES } from 'features/gallery/store/types';
 import { PostProcessingPopover } from 'features/parameters/components/PostProcessing/PostProcessingPopover';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
-import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useMemo } from 'react';
 import { flushSync } from 'react-dom';
@@ -36,16 +35,13 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
   const { t } = useTranslation();
   const tab = useAppSelector(selectActiveTab);
   const dispatch = useAppDispatch();
-  const activeTab = useAppSelector(selectActiveTab);
-  const galleryPanel = useGalleryPanel(activeTab);
 
   const isGalleryImage = useMemo(() => {
     return !imageDTO.is_intermediate;
   }, [imageDTO]);
 
   const locateInGallery = useCallback(() => {
-    navigationApi.expandRightPanel();
-    galleryPanel.expand();
+    navigationApi.expandBottomPanel();
     flushSync(() => {
       dispatch(
         boardIdSelected({
@@ -57,7 +53,7 @@ export const CurrentImageButtons = memo(({ imageDTO }: { imageDTO: ImageDTO }) =
         })
       );
     });
-  }, [dispatch, galleryPanel, imageDTO]);
+  }, [dispatch, imageDTO]);
 
   const isCanvasOrGenerateTab = tab === 'canvas' || tab === 'generate';
   const isCanvasOrGenerateOrUpscalingTab = tab === 'canvas' || tab === 'generate' || tab === 'upscaling';

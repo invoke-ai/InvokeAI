@@ -4,7 +4,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { RemoveImageFromBoardDndTargetData } from 'features/dnd/dnd';
 import { removeImageFromBoardDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
-import { AutoAddBadge } from 'features/gallery/components/Boards/AutoAddBadge';
+import { AutoAddIndicator } from 'features/gallery/components/Boards/AutoAddIndicator';
 import { BoardTooltip } from 'features/gallery/components/Boards/BoardsList/BoardTooltip';
 import NoBoardBoardContextMenu from 'features/gallery/components/Boards/NoBoardBoardContextMenu';
 import {
@@ -63,7 +63,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
         {(ref) => (
           <Tooltip
             label={<BoardTooltip board={null} boardCounts={{ image_count: imagesTotal, asset_count: assetsTotal }} />}
-            openDelay={1000}
+            openDelay={150}
             placement="right"
             closeOnScroll
           >
@@ -78,11 +78,11 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               py={1}
               ps={1}
               pe={4}
-              gap={4}
+              gap={2}
               bg={isSelected ? 'base.850' : undefined}
               _hover={_hover}
             >
-              <Flex w="10" justifyContent="space-around">
+              <Flex w="10" justifyContent="space-around" flexShrink={0}>
                 {/* iconified from public/assets/images/invoke-symbol-wht-lrg.svg */}
                 <Icon boxSize={8} opacity={1} stroke="base.500" viewBox="0 0 66 66" fill="none">
                   <path
@@ -101,8 +101,8 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               >
                 {boardName}
               </Text>
-              {autoAddBoardId === 'none' && <AutoAddBadge />}
-              <Text variant="subtext">
+              {autoAddBoardId === 'none' && <AutoAddIndicator />}
+              <Text variant="subtext" flexShrink={0}>
                 {imagesTotal} | {assetsTotal}
               </Text>
             </Flex>

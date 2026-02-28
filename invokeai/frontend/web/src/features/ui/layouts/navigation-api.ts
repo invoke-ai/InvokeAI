@@ -10,6 +10,8 @@ import type { Atom } from 'nanostores';
 import { atom } from 'nanostores';
 
 import {
+  BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX,
+  BOTTOM_GALLERY_PANEL_ID,
   GALLERY_PANEL_ID,
   LAUNCHPAD_PANEL_ID,
   LEFT_PANEL_ID,
@@ -76,6 +78,12 @@ export class NavigationApi {
    */
   private _$isLoading = atom(false);
   $isLoading: Atom<boolean> = this._$isLoading;
+
+  /**
+   * Track the last expanded height of the bottom gallery panel for each tab.
+   * Used to restore the panel to its previous height when re-expanding after a collapse.
+   */
+  _lastBottomPanelHeight: Map<TabName, number> = new Map();
 
   /**
    * Track the _previous_ active dockview panel for each tab.
@@ -610,10 +618,10 @@ export class NavigationApi {
   };
 
   /**
-   * Toggle the left and right panels in the currently active tab.
+   * Toggle the left and bottom gallery panels in the currently active tab.
+   * On the canvas tab, also toggles the right panel if it exists.
    *
-   * This method will not wait for the panels to be registered. If either panel is not found, it will not toggle
-   * either panel.
+   * This method will not wait for the panels to be registered.
    *
    * @returns True if the panels were toggled, false if they were not found or an error occurred
    */
@@ -624,65 +632,203 @@ export class NavigationApi {
       return false;
     }
     const leftPanel = this.getPanel(activeTab, LEFT_PANEL_ID);
-    const rightPanel = this.getPanel(activeTab, RIGHT_PANEL_ID);
+    const bottomPanel = this.getPanel(activeTab, BOTTOM_GALLERY_PANEL_ID);
 
-    if (!rightPanel || !leftPanel) {
-      log.warn(`Right and/or left panel not found in tab "${activeTab}"`);
+    if (!leftPanel) {
+      log.warn(`Left panel not found in tab "${activeTab}"`);
       return false;
     }
 
-    if (!(leftPanel instanceof GridviewPanel) || !(rightPanel instanceof GridviewPanel)) {
-      log.error(`Left and right panels must be instances of GridviewPanel`);
+    if (!(leftPanel instanceof GridviewPanel)) {
+      log.error(`Left panel must be an instance of GridviewPanel`);
       return false;
     }
 
     const isLeftCollapsed = leftPanel.width === 0;
-    const isRightCollapsed = rightPanel.width === 0;
 
-    if (isLeftCollapsed || isRightCollapsed) {
+    // Check for bottom panel (only counts toward collapse state if it exists)
+    let hasBottomPanel = false;
+    let isBottomCollapsed = false;
+    if (bottomPanel && bottomPanel instanceof GridviewPanel) {
+      hasBottomPanel = true;
+      isBottomCollapsed = bottomPanel.height <= 36;
+    }
+
+    // Also check for right panel (canvas tab has one)
+    const rightPanel = this.getPanel(activeTab, RIGHT_PANEL_ID);
+    let hasRightPanel = false;
+    let isRightCollapsed = false;
+    if (rightPanel && rightPanel instanceof GridviewPanel) {
+      hasRightPanel = true;
+      isRightCollapsed = rightPanel.width === 0;
+    }
+
+    const anyCollapsed =
+      isLeftCollapsed || (hasBottomPanel && isBottomCollapsed) || (hasRightPanel && isRightCollapsed);
+
+    if (anyCollapsed) {
       this._expandPanel(leftPanel, LEFT_PANEL_MIN_SIZE_PX);
-      this._expandPanel(rightPanel, RIGHT_PANEL_MIN_SIZE_PX);
+      if (bottomPanel && bottomPanel instanceof GridviewPanel) {
+        const savedHeight = this._lastBottomPanelHeight.get(activeTab) ?? BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX;
+        this._expandPanelVertical(bottomPanel, savedHeight, BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX);
+      }
+      if (rightPanel && rightPanel instanceof GridviewPanel) {
+        this._expandPanel(rightPanel, RIGHT_PANEL_MIN_SIZE_PX);
+      }
     } else {
       this._collapsePanel(leftPanel);
-      this._collapsePanel(rightPanel);
+      if (bottomPanel && bottomPanel instanceof GridviewPanel) {
+        // Save current height before collapsing
+        this._lastBottomPanelHeight.set(activeTab, bottomPanel.height);
+        this._collapsePanelVertical(bottomPanel, 36);
+      }
+      if (rightPanel && rightPanel instanceof GridviewPanel) {
+        this._collapsePanel(rightPanel);
+      }
     }
     return true;
   };
 
   /**
-   * Reset both left and right panels in the currently active tab to their minimum sizes.
+   * Reset left, right (if exists), and bottom gallery panels in the currently active tab to their default sizes.
    *
-   * This method will not wait for the panels to be registered. If either panel is not found, it will not reset
-   * either panel.
+   * This method will not wait for the panels to be registered.
    *
    * @returns True if the panels were reset, false if they were not found or an error occurred
    */
   resetLeftAndRightPanels = (): boolean => {
     const activeTab = this._app?.activeTab.get() ?? null;
     if (!activeTab) {
-      log.warn('No active tab found to toggle right panel');
+      log.warn('No active tab found to reset panels');
       return false;
     }
     const leftPanel = this.getPanel(activeTab, LEFT_PANEL_ID);
-    const rightPanel = this.getPanel(activeTab, RIGHT_PANEL_ID);
 
-    if (!rightPanel || !leftPanel) {
-      log.warn(`Right and/or left panel not found in tab "${activeTab}"`);
+    if (!leftPanel) {
+      log.warn(`Left panel not found in tab "${activeTab}"`);
       return false;
     }
 
-    if (!(leftPanel instanceof GridviewPanel) || !(rightPanel instanceof GridviewPanel)) {
-      log.error(`Left and right panels must be instances of GridviewPanel`);
+    if (!(leftPanel instanceof GridviewPanel)) {
+      log.error(`Left panel must be an instance of GridviewPanel`);
       return false;
     }
 
     leftPanel.api.setConstraints({ maximumWidth: Number.MAX_SAFE_INTEGER, minimumWidth: LEFT_PANEL_MIN_SIZE_PX });
     leftPanel.api.setSize({ width: LEFT_PANEL_MIN_SIZE_PX });
 
-    rightPanel.api.setConstraints({ maximumWidth: Number.MAX_SAFE_INTEGER, minimumWidth: RIGHT_PANEL_MIN_SIZE_PX });
-    rightPanel.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
+    // Reset right panel if it exists (canvas tab)
+    const rightPanel = this.getPanel(activeTab, RIGHT_PANEL_ID);
+    if (rightPanel && rightPanel instanceof GridviewPanel) {
+      rightPanel.api.setConstraints({ maximumWidth: Number.MAX_SAFE_INTEGER, minimumWidth: RIGHT_PANEL_MIN_SIZE_PX });
+      rightPanel.api.setSize({ width: RIGHT_PANEL_MIN_SIZE_PX });
+    }
+
+    // Reset bottom gallery panel
+    const bottomPanel = this.getPanel(activeTab, BOTTOM_GALLERY_PANEL_ID);
+    if (bottomPanel && bottomPanel instanceof GridviewPanel) {
+      bottomPanel.api.setConstraints({
+        maximumHeight: Number.MAX_SAFE_INTEGER,
+        minimumHeight: BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX,
+      });
+      bottomPanel.api.setSize({ height: BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX });
+    }
 
     return true;
+  };
+
+  /**
+   * Expand a panel vertically to a specified height.
+   * @param panel - The panel to expand
+   * @param height - The target height to set
+   * @param minHeight - The minimum height constraint (defaults to height if not specified)
+   */
+  _expandPanelVertical = (panel: IGridviewPanel, height: number, minHeight?: number) => {
+    panel.api.setConstraints({ maximumHeight: Number.MAX_SAFE_INTEGER, minimumHeight: minHeight ?? height });
+    panel.api.setSize({ height: height });
+  };
+
+  /**
+   * Collapse a panel vertically by setting its height to 0.
+   */
+  _collapsePanelVertical = (panel: IGridviewPanel, collapsedHeight: number = 0) => {
+    panel.api.setConstraints({ maximumHeight: collapsedHeight, minimumHeight: collapsedHeight });
+    panel.api.setSize({ height: collapsedHeight });
+  };
+
+  /**
+   * Toggle the bottom gallery panel in the currently active tab.
+   */
+  toggleBottomPanel = (): boolean => {
+    const activeTab = this._app?.activeTab.get() ?? null;
+    if (!activeTab) {
+      log.warn('No active tab found to toggle bottom panel');
+      return false;
+    }
+    const bottomPanel = this.getPanel(activeTab, BOTTOM_GALLERY_PANEL_ID);
+    if (!bottomPanel) {
+      log.warn(`Bottom gallery panel not found in active tab "${activeTab}"`);
+      return false;
+    }
+
+    if (!(bottomPanel instanceof GridviewPanel)) {
+      log.error(`Bottom gallery panel must be an instance of GridviewPanel`);
+      return false;
+    }
+
+    // Panel is collapsed if its height is at the collapsed min (36px header bar)
+    const isCollapsed = bottomPanel.height <= 36;
+    if (isCollapsed) {
+      const savedHeight = this._lastBottomPanelHeight.get(activeTab) ?? BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX;
+      this._expandPanelVertical(bottomPanel, savedHeight, BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX);
+    } else {
+      // Save current height before collapsing
+      this._lastBottomPanelHeight.set(activeTab, bottomPanel.height);
+      this._collapsePanelVertical(bottomPanel, 36);
+    }
+    return true;
+  };
+
+  /**
+   * Expand the bottom gallery panel in the currently active tab.
+   */
+  expandBottomPanel = (): boolean => {
+    const activeTab = this._app?.activeTab.get() ?? null;
+    if (!activeTab) {
+      log.warn('No active tab found to expand bottom panel');
+      return false;
+    }
+    const bottomPanel = this.getPanel(activeTab, BOTTOM_GALLERY_PANEL_ID);
+    if (!bottomPanel) {
+      log.warn(`Bottom gallery panel not found in active tab "${activeTab}"`);
+      return false;
+    }
+
+    if (!(bottomPanel instanceof GridviewPanel)) {
+      log.error(`Bottom gallery panel must be an instance of GridviewPanel`);
+      return false;
+    }
+
+    const savedHeight = this._lastBottomPanelHeight.get(activeTab) ?? BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX;
+    this._expandPanelVertical(bottomPanel, savedHeight, BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX);
+    return true;
+  };
+
+  /**
+   * Check if the bottom gallery panel in the currently active tab is collapsed.
+   *
+   * @returns True if the bottom panel is collapsed (height <= 36px), false if expanded or not found
+   */
+  isBottomPanelCollapsed = (): boolean => {
+    const activeTab = this._app?.activeTab.get() ?? null;
+    if (!activeTab) {
+      return false;
+    }
+    const bottomPanel = this.getPanel(activeTab, BOTTOM_GALLERY_PANEL_ID);
+    if (!bottomPanel || !(bottomPanel instanceof GridviewPanel)) {
+      return false;
+    }
+    return bottomPanel.height <= 36;
   };
 
   /**
@@ -822,6 +968,7 @@ export class NavigationApi {
     // Clear previous panel tracking for this tab
     this._prevActiveDockviewPanel.delete(tab);
     this._currentActiveDockviewPanel.delete(tab);
+    this._lastBottomPanelHeight.delete(tab);
     this._disposablesForTab.get(tab)?.forEach((disposeFn) => {
       try {
         disposeFn();

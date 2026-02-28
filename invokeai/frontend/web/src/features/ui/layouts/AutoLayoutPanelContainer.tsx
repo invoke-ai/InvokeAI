@@ -11,7 +11,6 @@ const sx: SystemStyleObject = {
   position: 'relative',
   w: 'full',
   h: 'full',
-  p: 2,
   '&[data-highlighted="true"]::after': {
     borderColor: 'invokeBlue.300',
   },
