@@ -7,6 +7,7 @@ import {
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
   modelChanged,
+  setZImageScheduler,
   syncedToOptimalDimension,
   vaeSelected,
   zImageQwen3EncoderModelSelected,
@@ -316,6 +317,24 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                 status: 'info',
               });
             }
+          }
+        }
+      }
+
+      // Handle Z-Image scheduler when switching to Z-Image Base (zbase) model
+      // LCM is not supported for undistilled models, so reset to euler
+      if (newBase === 'z-image' && state.params.zImageScheduler === 'lcm') {
+        const modelConfigsResult = selectModelConfigsQuery(state);
+        if (modelConfigsResult.data) {
+          const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+          if (newModelConfig && 'variant' in newModelConfig && newModelConfig.variant === 'zbase') {
+            dispatch(setZImageScheduler('euler'));
+            toast({
+              id: 'ZIMAGE_SCHEDULER_RESET',
+              title: t('toast.schedulerReset'),
+              description: t('toast.schedulerResetZImageBase'),
+              status: 'info',
+            });
           }
         }
       }

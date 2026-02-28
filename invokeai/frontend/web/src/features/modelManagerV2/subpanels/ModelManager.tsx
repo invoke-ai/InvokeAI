@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Button, Flex, Heading } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { selectSelectedModelKey, setSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +24,7 @@ const modelManagerSx: SystemStyleObject = {
 export const ModelManager = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const canManageModels = useIsModelManagerEnabled();
   const handleClickAddModel = useCallback(() => {
     dispatch(setSelectedModelKey(null));
   }, [dispatch]);
@@ -36,7 +38,7 @@ export const ModelManager = memo(() => {
         </Heading>
         <Flex gap={2}>
           <SyncModelsButton />
-          {!!selectedModelKey && (
+          {!!selectedModelKey && canManageModels && (
             <Button size="sm" colorScheme="invokeYellow" leftIcon={<PiPlusBold />} onClick={handleClickAddModel}>
               {t('modelManager.addModels')}
             </Button>

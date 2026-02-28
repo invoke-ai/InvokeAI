@@ -11,6 +11,7 @@ import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/
 import { isFlux2ReferenceImageConfig, isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { zImageField } from 'features/nodes/types/common';
+import { addFlux2KleinLoRAs } from 'features/nodes/util/graph/generation/addFlux2KleinLoRAs';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addFLUXReduxes } from 'features/nodes/util/graph/generation/addFLUXRedux';
@@ -259,6 +260,9 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     const flux2Denoise = denoise as Invocation<'flux2_denoise'>;
     const flux2ModelLoader = modelLoader as Invocation<'flux2_klein_model_loader'>;
     const flux2L2i = l2i as Invocation<'flux2_vae_decode'>;
+    const flux2Cond = posCond as Invocation<'flux2_klein_text_encoder'>;
+
+    addFlux2KleinLoRAs(state, g, flux2Denoise, flux2ModelLoader, flux2Cond);
 
     // FLUX.2 Klein has built-in multi-reference image editing - no separate model needed
     const validFlux2RefImageConfigs = selectRefImagesSlice(state)

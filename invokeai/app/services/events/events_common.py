@@ -91,6 +91,7 @@ class QueueItemEventBase(QueueEventBase):
     batch_id: str = Field(description="The ID of the queue batch")
     origin: str | None = Field(default=None, description="The origin of the queue item")
     destination: str | None = Field(default=None, description="The destination of the queue item")
+    user_id: str = Field(default="system", description="The ID of the user who created the queue item")
 
 
 class InvocationEventBase(QueueItemEventBase):
@@ -117,6 +118,7 @@ class InvocationStartedEvent(InvocationEventBase):
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
             destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -152,6 +154,7 @@ class InvocationProgressEvent(InvocationEventBase):
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
             destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -179,6 +182,7 @@ class InvocationCompleteEvent(InvocationEventBase):
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
             destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -211,6 +215,7 @@ class InvocationErrorEvent(InvocationEventBase):
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
             destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             invocation=invocation,
             invocation_source_id=queue_item.session.prepared_source_mapping[invocation.id],
@@ -248,6 +253,7 @@ class QueueItemStatusChangedEvent(QueueItemEventBase):
             batch_id=queue_item.batch_id,
             origin=queue_item.origin,
             destination=queue_item.destination,
+            user_id=queue_item.user_id,
             session_id=queue_item.session_id,
             status=queue_item.status,
             error_type=queue_item.error_type,
@@ -379,6 +385,17 @@ class DownloadCancelledEvent(DownloadEventBase):
 
     @classmethod
     def build(cls, job: "DownloadJob") -> "DownloadCancelledEvent":
+        return cls(source=str(job.source))
+
+
+@payload_schema.register
+class DownloadPausedEvent(DownloadEventBase):
+    """Event model for download_paused"""
+
+    __event_name__ = "download_paused"
+
+    @classmethod
+    def build(cls, job: "DownloadJob") -> "DownloadPausedEvent":
         return cls(source=str(job.source))
 
 
@@ -646,3 +663,16 @@ class BulkDownloadErrorEvent(BulkDownloadEventBase):
             bulk_download_item_name=bulk_download_item_name,
             error=error,
         )
+
+
+@payload_schema.register
+class RecallParametersUpdatedEvent(QueueEventBase):
+    """Event model for recall_parameters_updated"""
+
+    __event_name__ = "recall_parameters_updated"
+
+    parameters: dict[str, Any] = Field(description="The recall parameters that were updated")
+
+    @classmethod
+    def build(cls, queue_id: str, parameters: dict[str, Any]) -> "RecallParametersUpdatedEvent":
+        return cls(queue_id=queue_id, parameters=parameters)

@@ -18,6 +18,7 @@ class DownloadJobStatus(str, Enum):
 
     WAITING = "waiting"  # not enqueued, will not run
     RUNNING = "running"  # actively downloading
+    PAUSED = "paused"  # paused, can be resumed
     COMPLETED = "completed"  # finished running
     CANCELLED = "cancelled"  # user cancelled
     ERROR = "error"  # terminated with an error message
@@ -61,6 +62,7 @@ class DownloadJobBase(BaseModel):
 
     # internal flag
     _cancelled: bool = PrivateAttr(default=False)
+    _paused: bool = PrivateAttr(default=False)
 
     # optional event handlers passed in on creation
     _on_start: Optional[DownloadEventHandler] = PrivateAttr(default=None)
@@ -72,6 +74,12 @@ class DownloadJobBase(BaseModel):
     def cancel(self) -> None:
         """Call to cancel the job."""
         self._cancelled = True
+        self._paused = False
+
+    def pause(self) -> None:
+        """Pause the job, preserving partial downloads."""
+        self._paused = True
+        self._cancelled = True
 
     # cancelled and the callbacks are private attributes in order to prevent
     # them from being serialized and/or used in the Json Schema
@@ -79,6 +87,11 @@ class DownloadJobBase(BaseModel):
     def cancelled(self) -> bool:
         """Call to cancel the job."""
         return self._cancelled
+
+    @property
+    def paused(self) -> bool:
+        """Return true if job is paused."""
+        return self._paused
 
     @property
     def complete(self) -> bool:
@@ -161,6 +174,17 @@ class DownloadJob(DownloadJobBase):
         default=None, description="Timestamp for when the download job ende1d (completed or errored)"
     )
     content_type: Optional[str] = Field(default=None, description="Content type of downloaded file")
+    canonical_url: Optional[str] = Field(default=None, description="Canonical URL to request on resume")
+    etag: Optional[str] = Field(default=None, description="ETag from the remote server, if available")
+    last_modified: Optional[str] = Field(default=None, description="Last-Modified from the remote server, if available")
+    final_url: Optional[str] = Field(default=None, description="Final resolved URL after redirects, if available")
+    expected_total_bytes: Optional[int] = Field(default=None, description="Expected total size of the download")
+    resume_required: bool = Field(default=False, description="True if server refused resume; restart required")
+    resume_message: Optional[str] = Field(default=None, description="Message explaining why resume is required")
+    resume_from_scratch: bool = Field(
+        default=False,
+        description="True if resume metadata existed but the partial file was missing and the download restarted from the beginning",
+    )
 
     def __hash__(self) -> int:
         """Return hash of the string representation of this object, for indexing."""
@@ -320,6 +344,10 @@ class DownloadQueueServiceBase(ABC):
     def cancel_job(self, job: DownloadJobBase) -> None:
         """Cancel the job, clearing partial downloads and putting it into ERROR state."""
         pass
+
+    def pause_job(self, job: DownloadJobBase) -> None:  # noqa D401
+        """Pause the job, preserving partial downloads."""
+        raise NotImplementedError
 
     @abstractmethod
     def join(self) -> None:
