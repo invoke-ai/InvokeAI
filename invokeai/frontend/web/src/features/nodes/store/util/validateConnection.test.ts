@@ -155,6 +155,19 @@ describe(validateConnection.name, () => {
     expect(r).toEqual('nodes.cannotMixAndMatchCollectionItemTypes');
   });
 
+  it('should reject chaining collection-to-collection for differently typed collects', () => {
+    const n1 = buildNode(add);
+    const n2 = buildNode(img_resize);
+    const n3 = buildNode(collect);
+    const n4 = buildNode(collect);
+    const nodes = [n1, n2, n3, n4];
+    const e1 = buildEdge(n1.id, 'value', n3.id, 'item');
+    const e2 = buildEdge(n2.id, 'image', n4.id, 'item');
+    const c = { source: n3.id, sourceHandle: 'collection', target: n4.id, targetHandle: 'collection' };
+    const r = validateConnection(c, nodes, [e1, e2], templates, null);
+    expect(r).toEqual('nodes.cannotMixAndMatchCollectionItemTypes');
+  });
+
   it('should reject connections to target field that is already connected', () => {
     const n1 = buildNode(add);
     const n2 = buildNode(add);
