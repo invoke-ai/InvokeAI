@@ -64,6 +64,9 @@
             "currentPasswordPlaceholder": "Current password",
             "newPassword": "New Password",
             "newPasswordPlaceholder": "New password",
+            "confirmPassword": "Confirm New Password",
+            "confirmPasswordPlaceholder": "Confirm new password",
+            "passwordsDoNotMatch": "Passwords do not match",
             "saveSuccess": "Profile updated successfully",
             "saveFailed": "Failed to save profile. Please try again."
         },

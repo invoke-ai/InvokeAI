@@ -7,6 +7,8 @@ import {
   FormErrorMessage,
   FormHelperText,
   FormLabel,
+  Grid,
+  GridItem,
   Heading,
   IconButton,
   Input,
@@ -22,7 +24,7 @@ import { selectAuthToken, selectCurrentUser, setCredentials } from 'features/aut
 import type { ChangeEvent, FormEvent } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiEyeBold, PiEyeSlashBold } from 'react-icons/pi';
+import { PiEyeBold, PiEyeSlashBold, PiLightningFill } from 'react-icons/pi';
 import { useNavigate } from 'react-router-dom';
 import { useLazyGeneratePasswordQuery, useUpdateCurrentUserMutation } from 'services/api/endpoints/auth';
 
@@ -45,6 +47,8 @@ const validatePasswordStrength = (
   return { isValid: true, message: '' };
 };
 
+const PASSWORD_GRID_COLUMNS = '180px 1fr';
+
 export const UserProfile = memo(() => {
   const { t } = useTranslation();
   const currentUser = useAppSelector(selectCurrentUser);
@@ -55,8 +59,10 @@ export const UserProfile = memo(() => {
   const [displayName, setDisplayName] = useState(currentUser?.display_name ?? '');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [updateCurrentUser, { isLoading }] = useUpdateCurrentUserMutation();
@@ -65,8 +71,9 @@ export const UserProfile = memo(() => {
   const newPasswordValidation = validatePasswordStrength(newPassword, t);
 
   const isPasswordChangeAttempted = newPassword.length > 0 || currentPassword.length > 0;
+  const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
   const isPasswordChangeValid =
-    !isPasswordChangeAttempted || (currentPassword.length > 0 && newPasswordValidation.isValid);
+    !isPasswordChangeAttempted || (currentPassword.length > 0 && newPasswordValidation.isValid && passwordsMatch);
 
   const handleCancel = useCallback(() => {
     navigate(-1);
@@ -76,7 +83,9 @@ export const UserProfile = memo(() => {
     try {
       const result = await triggerGeneratePassword().unwrap();
       setNewPassword(result.password);
+      setConfirmPassword(result.password);
       setShowNewPassword(true);
+      setShowConfirmPassword(true);
     } catch {
       // ignore
     }
@@ -90,6 +99,10 @@ export const UserProfile = memo(() => {
     setShowNewPassword((v) => !v);
   }, []);
 
+  const toggleShowConfirmPassword = useCallback(() => {
+    setShowConfirmPassword((v) => !v);
+  }, []);
+
   const handleDisplayNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setDisplayName(e.target.value);
   }, []);
@@ -100,6 +113,10 @@ export const UserProfile = memo(() => {
 
   const handleNewPasswordChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setNewPassword(e.target.value);
+  }, []);
+
+  const handleConfirmPasswordChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setConfirmPassword(e.target.value);
   }, []);
 
   const handleSubmit = useCallback(
@@ -201,80 +218,154 @@ export const UserProfile = memo(() => {
 
             {/* Current password */}
             <FormControl mb={4} isRequired={newPassword.length > 0}>
-              <FormLabel>{t('auth.profile.currentPassword')}</FormLabel>
-              <InputGroup>
-                <Input
-                  type={showCurrentPassword ? 'text' : 'password'}
-                  value={currentPassword}
-                  onChange={handleCurrentPasswordChange}
-                  placeholder={t('auth.profile.currentPasswordPlaceholder')}
-                  autoComplete="current-password"
-                  pr="3rem"
-                />
-                <InputRightElement>
-                  <Tooltip
-                    label={
-                      showCurrentPassword
-                        ? t('auth.userManagement.hidePassword')
-                        : t('auth.userManagement.showPassword')
-                    }
-                  >
-                    <IconButton
-                      aria-label={
-                        showCurrentPassword
-                          ? t('auth.userManagement.hidePassword')
-                          : t('auth.userManagement.showPassword')
-                      }
-                      icon={showCurrentPassword ? <PiEyeSlashBold /> : <PiEyeBold />}
-                      variant="ghost"
-                      size="sm"
-                      onClick={toggleShowCurrentPassword}
-                      tabIndex={-1}
+              <Grid templateColumns={PASSWORD_GRID_COLUMNS} gap={4} alignItems="start">
+                <GridItem>
+                  <FormLabel textAlign="right" mb={0} pt={2}>
+                    {t('auth.profile.currentPassword')}
+                  </FormLabel>
+                </GridItem>
+                <GridItem>
+                  <InputGroup>
+                    <Input
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      value={currentPassword}
+                      onChange={handleCurrentPasswordChange}
+                      placeholder={t('auth.profile.currentPasswordPlaceholder')}
+                      autoComplete="current-password"
+                      pr="3rem"
                     />
-                  </Tooltip>
-                </InputRightElement>
-              </InputGroup>
+                    <InputRightElement>
+                      <Tooltip
+                        label={
+                          showCurrentPassword
+                            ? t('auth.userManagement.hidePassword')
+                            : t('auth.userManagement.showPassword')
+                        }
+                      >
+                        <IconButton
+                          aria-label={
+                            showCurrentPassword
+                              ? t('auth.userManagement.hidePassword')
+                              : t('auth.userManagement.showPassword')
+                          }
+                          icon={showCurrentPassword ? <PiEyeSlashBold /> : <PiEyeBold />}
+                          variant="ghost"
+                          size="sm"
+                          onClick={toggleShowCurrentPassword}
+                          tabIndex={-1}
+                        />
+                      </Tooltip>
+                    </InputRightElement>
+                  </InputGroup>
+                </GridItem>
+              </Grid>
             </FormControl>
 
             {/* New password */}
-            <FormControl isInvalid={newPassword.length > 0 && !newPasswordValidation.isValid} mb={2}>
-              <FormLabel>{t('auth.profile.newPassword')}</FormLabel>
-              <InputGroup>
-                <Input
-                  type={showNewPassword ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={handleNewPasswordChange}
-                  placeholder={t('auth.profile.newPasswordPlaceholder')}
-                  autoComplete="new-password"
-                  pr="3rem"
-                />
-                <InputRightElement>
-                  <Tooltip
-                    label={
-                      showNewPassword ? t('auth.userManagement.hidePassword') : t('auth.userManagement.showPassword')
-                    }
-                  >
-                    <IconButton
-                      aria-label={
-                        showNewPassword ? t('auth.userManagement.hidePassword') : t('auth.userManagement.showPassword')
-                      }
-                      icon={showNewPassword ? <PiEyeSlashBold /> : <PiEyeBold />}
-                      variant="ghost"
-                      size="sm"
-                      onClick={toggleShowNewPassword}
-                      tabIndex={-1}
+            <FormControl isInvalid={newPassword.length > 0 && !newPasswordValidation.isValid} mb={4}>
+              <Grid templateColumns={PASSWORD_GRID_COLUMNS} gap={4} alignItems="start">
+                <GridItem>
+                  <FormLabel textAlign="right" mb={0} pt={2}>
+                    {t('auth.profile.newPassword')}
+                  </FormLabel>
+                </GridItem>
+                <GridItem>
+                  <InputGroup>
+                    <Input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={handleNewPasswordChange}
+                      placeholder={t('auth.profile.newPasswordPlaceholder')}
+                      autoComplete="new-password"
+                      pr="3rem"
                     />
-                  </Tooltip>
-                </InputRightElement>
-              </InputGroup>
-              {newPassword.length > 0 && !newPasswordValidation.isValid && (
-                <FormErrorMessage>{newPasswordValidation.message}</FormErrorMessage>
-              )}
+                    <InputRightElement>
+                      <Tooltip
+                        label={
+                          showNewPassword
+                            ? t('auth.userManagement.hidePassword')
+                            : t('auth.userManagement.showPassword')
+                        }
+                      >
+                        <IconButton
+                          aria-label={
+                            showNewPassword
+                              ? t('auth.userManagement.hidePassword')
+                              : t('auth.userManagement.showPassword')
+                          }
+                          icon={showNewPassword ? <PiEyeSlashBold /> : <PiEyeBold />}
+                          variant="ghost"
+                          size="sm"
+                          onClick={toggleShowNewPassword}
+                          tabIndex={-1}
+                        />
+                      </Tooltip>
+                    </InputRightElement>
+                  </InputGroup>
+                  {newPassword.length > 0 && !newPasswordValidation.isValid && (
+                    <FormErrorMessage>{newPasswordValidation.message}</FormErrorMessage>
+                  )}
+                </GridItem>
+              </Grid>
             </FormControl>
 
-            <Button size="sm" variant="ghost" onClick={handleGeneratePassword} mb={2}>
-              {t('auth.userManagement.generatePassword')}
-            </Button>
+            {/* Confirm new password */}
+            <FormControl isInvalid={confirmPassword.length > 0 && !passwordsMatch} mb={4}>
+              <Grid templateColumns={PASSWORD_GRID_COLUMNS} gap={4} alignItems="start">
+                <GridItem>
+                  <FormLabel textAlign="right" mb={0} pt={2}>
+                    {t('auth.profile.confirmPassword')}
+                  </FormLabel>
+                </GridItem>
+                <GridItem>
+                  <InputGroup>
+                    <Input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={handleConfirmPasswordChange}
+                      placeholder={t('auth.profile.confirmPasswordPlaceholder')}
+                      autoComplete="new-password"
+                      pr="3rem"
+                    />
+                    <InputRightElement>
+                      <Tooltip
+                        label={
+                          showConfirmPassword
+                            ? t('auth.userManagement.hidePassword')
+                            : t('auth.userManagement.showPassword')
+                        }
+                      >
+                        <IconButton
+                          aria-label={
+                            showConfirmPassword
+                              ? t('auth.userManagement.hidePassword')
+                              : t('auth.userManagement.showPassword')
+                          }
+                          icon={showConfirmPassword ? <PiEyeSlashBold /> : <PiEyeBold />}
+                          variant="ghost"
+                          size="sm"
+                          onClick={toggleShowConfirmPassword}
+                          tabIndex={-1}
+                        />
+                      </Tooltip>
+                    </InputRightElement>
+                  </InputGroup>
+                  {confirmPassword.length > 0 && !passwordsMatch && (
+                    <FormErrorMessage>{t('auth.profile.passwordsDoNotMatch')}</FormErrorMessage>
+                  )}
+                </GridItem>
+              </Grid>
+            </FormControl>
+
+            {/* Generate password button – aligned with the input column */}
+            <Grid templateColumns={PASSWORD_GRID_COLUMNS} gap={4}>
+              <GridItem />
+              <GridItem>
+                <Button size="sm" variant="ghost" onClick={handleGeneratePassword} leftIcon={<PiLightningFill />}>
+                  {t('auth.userManagement.generatePassword')}
+                </Button>
+              </GridItem>
+            </Grid>
           </Box>
 
           {errorMessage && (

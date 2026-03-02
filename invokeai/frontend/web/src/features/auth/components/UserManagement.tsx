@@ -8,6 +8,8 @@ import {
   FormControl,
   FormErrorMessage,
   FormLabel,
+  Grid,
+  GridItem,
   Heading,
   IconButton,
   Input,
@@ -38,7 +40,15 @@ import { selectCurrentUser } from 'features/auth/store/authSlice';
 import type { ChangeEvent, FormEvent } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArrowLeftBold, PiEyeBold, PiEyeSlashBold, PiPencilBold, PiPlusBold, PiTrashBold } from 'react-icons/pi';
+import {
+  PiArrowLeftBold,
+  PiEyeBold,
+  PiEyeSlashBold,
+  PiLightningFill,
+  PiPencilBold,
+  PiPlusBold,
+  PiTrashBold,
+} from 'react-icons/pi';
 import { useNavigate } from 'react-router-dom';
 import type { UserDTO } from 'services/api/endpoints/auth';
 import {
@@ -67,6 +77,8 @@ const validatePasswordStrength = (
   }
   return { isValid: true, message: '' };
 };
+
+const FORM_GRID_COLUMNS = '120px 1fr';
 
 // ---------------------------------------------------------------------------
 // Create / Edit user modal
@@ -206,71 +218,100 @@ const UserFormModal = memo(({ isOpen, onClose, editUser }: UserFormModalProps) =
             <VStack spacing={4}>
               {!isEdit && (
                 <FormControl isRequired>
-                  <FormLabel>{t('auth.userManagement.email')}</FormLabel>
-                  <Input
-                    type="email"
-                    value={email}
-                    onChange={handleEmailChange}
-                    placeholder={t('auth.userManagement.emailPlaceholder')}
-                    autoComplete="off"
-                  />
+                  <Grid templateColumns={FORM_GRID_COLUMNS} gap={4} alignItems="start">
+                    <GridItem>
+                      <FormLabel textAlign="right" mb={0} pt={2}>
+                        {t('auth.userManagement.email')}
+                      </FormLabel>
+                    </GridItem>
+                    <GridItem>
+                      <Input
+                        type="email"
+                        value={email}
+                        onChange={handleEmailChange}
+                        placeholder={t('auth.userManagement.emailPlaceholder')}
+                        autoComplete="off"
+                      />
+                    </GridItem>
+                  </Grid>
                 </FormControl>
               )}
 
               <FormControl>
-                <FormLabel>{t('auth.userManagement.displayName')}</FormLabel>
-                <Input
-                  type="text"
-                  value={displayName}
-                  onChange={handleDisplayNameChange}
-                  placeholder={t('auth.userManagement.displayNamePlaceholder')}
-                />
+                <Grid templateColumns={FORM_GRID_COLUMNS} gap={4} alignItems="start">
+                  <GridItem>
+                    <FormLabel textAlign="right" mb={0} pt={2}>
+                      {t('auth.userManagement.displayName')}
+                    </FormLabel>
+                  </GridItem>
+                  <GridItem>
+                    <Input
+                      type="text"
+                      value={displayName}
+                      onChange={handleDisplayNameChange}
+                      placeholder={t('auth.userManagement.displayNamePlaceholder')}
+                    />
+                  </GridItem>
+                </Grid>
               </FormControl>
 
               <FormControl isInvalid={password.length > 0 && !passwordValidation.isValid} isRequired={!isEdit}>
-                <FormLabel>
-                  {isEdit ? t('auth.userManagement.newPassword') : t('auth.userManagement.password')}
-                </FormLabel>
-                <InputGroup>
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={handlePasswordChange}
-                    placeholder={
-                      isEdit
-                        ? t('auth.userManagement.newPasswordPlaceholder')
-                        : t('auth.userManagement.passwordPlaceholder')
-                    }
-                    autoComplete="new-password"
-                    pr="4.5rem"
-                  />
-                  <InputRightElement w="4.5rem">
-                    <Tooltip
-                      label={
-                        showPassword ? t('auth.userManagement.hidePassword') : t('auth.userManagement.showPassword')
-                      }
-                    >
-                      <IconButton
-                        aria-label={
-                          showPassword ? t('auth.userManagement.hidePassword') : t('auth.userManagement.showPassword')
+                <Grid templateColumns={FORM_GRID_COLUMNS} gap={4} alignItems="start">
+                  <GridItem>
+                    <FormLabel textAlign="right" mb={0} pt={2}>
+                      {isEdit ? t('auth.userManagement.newPassword') : t('auth.userManagement.password')}
+                    </FormLabel>
+                  </GridItem>
+                  <GridItem>
+                    <InputGroup>
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={handlePasswordChange}
+                        placeholder={
+                          isEdit
+                            ? t('auth.userManagement.newPasswordPlaceholder')
+                            : t('auth.userManagement.passwordPlaceholder')
                         }
-                        icon={showPassword ? <PiEyeSlashBold /> : <PiEyeBold />}
-                        variant="ghost"
-                        size="sm"
-                        onClick={toggleShowPassword}
-                        tabIndex={-1}
+                        autoComplete="new-password"
+                        pr="4.5rem"
                       />
-                    </Tooltip>
-                  </InputRightElement>
-                </InputGroup>
-                {password.length > 0 && !passwordValidation.isValid && (
-                  <FormErrorMessage>{passwordValidation.message}</FormErrorMessage>
-                )}
+                      <InputRightElement w="4.5rem">
+                        <Tooltip
+                          label={
+                            showPassword ? t('auth.userManagement.hidePassword') : t('auth.userManagement.showPassword')
+                          }
+                        >
+                          <IconButton
+                            aria-label={
+                              showPassword
+                                ? t('auth.userManagement.hidePassword')
+                                : t('auth.userManagement.showPassword')
+                            }
+                            icon={showPassword ? <PiEyeSlashBold /> : <PiEyeBold />}
+                            variant="ghost"
+                            size="sm"
+                            onClick={toggleShowPassword}
+                            tabIndex={-1}
+                          />
+                        </Tooltip>
+                      </InputRightElement>
+                    </InputGroup>
+                    {password.length > 0 && !passwordValidation.isValid && (
+                      <FormErrorMessage>{passwordValidation.message}</FormErrorMessage>
+                    )}
+                  </GridItem>
+                </Grid>
               </FormControl>
 
-              <Button size="sm" variant="ghost" onClick={handleGeneratePassword} alignSelf="flex-start">
-                {t('auth.userManagement.generatePassword')}
-              </Button>
+              <Grid templateColumns={FORM_GRID_COLUMNS} gap={4} w="full">
+                <GridItem />
+                <GridItem>
+                  <Button size="sm" variant="ghost" onClick={handleGeneratePassword} leftIcon={<PiLightningFill />}>
+                    {t('auth.userManagement.generatePassword')}
+                  </Button>
+                </GridItem>
+              </Grid>
 
               <FormControl display="flex" alignItems="center">
                 <FormLabel mb={0}>{t('auth.userManagement.isAdmin')}</FormLabel>
