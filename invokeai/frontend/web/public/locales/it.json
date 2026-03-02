@@ -822,7 +822,21 @@
         "orphanedModelsDeleted": "Eliminato con successo {{count}} modello orfano",
         "orphanedModelsDeleteErrors": "Alcuni modelli non possono essere eliminati",
         "orphanedModelsDeleteFailed": "Impossibile eliminare i modelli orfani",
-        "errorLoadingOrphanedModels": "Errore durante il caricamento dei modelli orfani. Riprova."
+        "errorLoadingOrphanedModels": "Errore durante il caricamento dei modelli orfani. Riprova.",
+        "pause": "Pausa",
+        "pauseAll": "Metti in pausa tutto",
+        "pauseAllTooltip": "Metti in pausa tutti i download attivi",
+        "resume": "Riprendi",
+        "resumeAll": "Riprendi tutto",
+        "resumeAllTooltip": "Riprendi tutti i download in pausa",
+        "restartFailed": "Riavvio non riuscito",
+        "restartFile": "Riavvia il file",
+        "restartRequired": "Riavvio richiesto",
+        "resumeRefused": "Ripristino rifiutato dal server. Riavvio richiesto.",
+        "backendDisconnected": "Backend disconnesso",
+        "cancelAll": "Annulla tutto",
+        "cancelAllTooltip": "Annulla tutti i download attivi",
+        "selectModelToView": "Seleziona un modello per visualizzarne i dettagli"
     },
     "parameters": {
         "images": "Immagini",
@@ -1098,7 +1112,12 @@
         "kleinEncoderClearedDescription": "Selezionare un encoder Qwen3 compatibile per la nuova variante del modello Klein",
         "kleinEncoderCleared": "Encoder Qwen3 cancellato",
         "schedulerReset": "Ripristino campionatore",
-        "schedulerResetZImageBase": "Il campionatore LCM non è compatibile con i modelli Z-Image Base. Reimpostare su Euler."
+        "schedulerResetZImageBase": "Il campionatore LCM non è compatibile con i modelli Z-Image Base. Reimpostare su Euler.",
+        "modelDownloadPaused": "Download del modello in pausa",
+        "modelDownloadResumed": "Ripresa del download",
+        "modelDownloadRestartFailed": "Riavvia i download non riusciti",
+        "modelDownloadRestartFile": "Riavvio del download del file",
+        "modelDownloadRestartedFromScratch": "Manca una parte del file. Riavviato il download dall'inizio."
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1357,7 +1376,13 @@
         "locateInGalery": "Trova nella Galleria",
         "deletedImagesCannotBeRestored": "Le immagini eliminate non possono essere ripristinate.",
         "hideBoards": "Nascondi bacheche",
-        "viewBoards": "Visualizza le bacheche"
+        "viewBoards": "Visualizza le bacheche",
+        "pause": "Pausa",
+        "resume": "Riprendi",
+        "restartFailed": "Riavvio non riuscito",
+        "restartFile": "Riavvia il file",
+        "restartRequired": "Riavvio richiesto",
+        "resumeRefused": "Ripristino rifiutato dal server. Riavvio richiesto."
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1449,7 +1474,13 @@
         "sortOrderDescending": "Discendente",
         "createdAt": "Creato",
         "completedAt": "Completato",
-        "batchFieldValues": "Valori del campo Lotto"
+        "batchFieldValues": "Valori del campo Lotto",
+        "paused": "In pausa",
+        "cancelFailedAccessDenied": "Problema durante l'annullamento dell'articolo: accesso negato",
+        "clearFailedAccessDenied": "Problema durante la cancellazione della coda: accesso negato",
+        "user": "Utente",
+        "cannotViewDetails": "Non hai l'autorizzazione per visualizzare i dettagli di questo elemento della coda",
+        "fieldValuesHidden": "<Nascosto>"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -2557,7 +2588,8 @@
                 "isEmpty": "{{title}} è vuoto",
                 "isDisabled": "{{title}} è disabilitato"
             },
-            "scaledBbox": "Riquadro scalato"
+            "scaledBbox": "Riquadro scalato",
+            "textSessionActive": "L'inserimento del testo è attivo"
         },
         "canvasContextMenu": {
             "newControlLayer": "Nuovo Livello di Controllo",
@@ -3024,5 +3056,34 @@
     },
     "lora": {
         "weight": "Peso"
+    },
+    "auth": {
+        "login": {
+            "title": "Accedi a InvokeAI",
+            "rememberMe": "Ricordami per 7 giorni",
+            "signIn": "Accedi",
+            "signingIn": "Accesso in corso...",
+            "loginFailed": "Accesso non riuscito. Controlla le tue credenziali."
+        },
+        "setup": {
+            "title": "Benvenuti a InvokeAI",
+            "subtitle": "Configura il tuo account amministratore per iniziare",
+            "emailHelper": "Questo sarà il tuo nome utente per accedere",
+            "displayName": "Nome da visualizzare",
+            "displayNamePlaceholder": "Amministratore",
+            "displayNameHelper": "Il tuo nome come apparirà nell'applicazione",
+            "passwordHelper": "Deve contenere almeno 8 caratteri, tra maiuscole, minuscole e numeri",
+            "passwordTooShort": "La password deve essere lunga almeno 8 caratteri",
+            "passwordMissingRequirements": "La password deve contenere maiuscole, minuscole e numeri",
+            "confirmPassword": "Conferma password",
+            "confirmPasswordPlaceholder": "Conferma password",
+            "passwordsDoNotMatch": "Le password non corrispondono",
+            "createAccount": "Crea un account amministratore",
+            "creatingAccount": "Impostazione in corso...",
+            "setupFailed": "Installazione non riuscita. Riprova."
+        },
+        "userMenu": "Menu utente",
+        "logout": "Esci",
+        "adminOnlyFeature": "Questa funzionalità è disponibile solo per gli amministratori."
     }
 }
