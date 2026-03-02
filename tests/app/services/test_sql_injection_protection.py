@@ -58,7 +58,7 @@ def test_sql_injection_payload_in_delete_does_not_delete_other_rows() -> None:
         offset=0,
         include_archived=True,
         user_id="0",
-        is_admin=True
+        is_admin=True,
     )
 
     assert {board.board_id for board in remaining.items} == {first.board_id, second.board_id}
