@@ -261,7 +261,7 @@ export const useCanvasWorkflowIntegrationExecute = () => {
             origin: 'canvas_workflow_integration',
             destination: canvasSessionId,
           },
-          prepend: true,
+          prepend: false,
         })
       ).unwrap();
 
