@@ -1,5 +1,6 @@
 import { Button, Flex, Heading, SimpleGrid } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import { useMainModelDefaultSettings } from 'features/modelManagerV2/hooks/useMainModelDefaultSettings';
 import { selectSelectedModelKey } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { DefaultHeight } from 'features/modelManagerV2/subpanels/ModelPanel/MainModelDefaultSettings/DefaultHeight';
@@ -7,7 +8,7 @@ import { DefaultWidth } from 'features/modelManagerV2/subpanels/ModelPanel/MainM
 import type { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -46,6 +47,7 @@ type Props = {
 
 export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const selectedModelKey = useAppSelector(selectSelectedModelKey);
+  const canManageModels = useIsModelManagerEnabled();
   const { t } = useTranslation();
 
   const isFluxFamily = useMemo(() => {
@@ -62,6 +64,10 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const { handleSubmit, control, formState, reset } = useForm<MainModelDefaultSettingsFormData>({
     defaultValues: defaultSettingsDefaults,
   });
+
+  useEffect(() => {
+    reset(defaultSettingsDefaults);
+  }, [defaultSettingsDefaults, reset]);
 
   const onSubmit = useCallback<SubmitHandler<MainModelDefaultSettingsFormData>>(
     (data) => {
@@ -111,16 +117,18 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
     <>
       <Flex gap="4" justifyContent="space-between" w="full" pb={4}>
         <Heading fontSize="md">{t('modelManager.defaultSettings')}</Heading>
-        <Button
-          size="sm"
-          leftIcon={<PiCheckBold />}
-          colorScheme="invokeYellow"
-          isDisabled={!formState.isDirty}
-          onClick={handleSubmit(onSubmit)}
-          isLoading={isLoadingUpdateModel}
-        >
-          {t('common.save')}
-        </Button>
+        {canManageModels && (
+          <Button
+            size="sm"
+            leftIcon={<PiCheckBold />}
+            colorScheme="invokeYellow"
+            isDisabled={!formState.isDirty}
+            onClick={handleSubmit(onSubmit)}
+            isLoading={isLoadingUpdateModel}
+          >
+            {t('common.save')}
+          </Button>
+        )}
       </Flex>
 
       <SimpleGrid columns={2} gap={8}>

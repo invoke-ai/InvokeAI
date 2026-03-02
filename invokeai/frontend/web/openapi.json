@@ -53481,6 +53481,36 @@
               }
             ],
             "description": "The workflow associated with this queue item"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The id of the user who created this queue item",
+            "default": "system"
+          },
+          "user_display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Display Name",
+            "description": "The display name of the user who created this queue item, if available"
+          },
+          "user_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Email",
+            "description": "The email of the user who created this queue item, if available"
           }
         },
         "type": "object",
@@ -53571,6 +53601,30 @@
             "type": "integer",
             "title": "Total",
             "description": "Total number of queue items"
+          },
+          "user_pending": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Pending",
+            "description": "Number of queue items with status 'pending' for the current user"
+          },
+          "user_in_progress": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User In Progress",
+            "description": "Number of queue items with status 'in_progress' for the current user"
           }
         },
         "type": "object",
@@ -60983,6 +61037,45 @@
         "output": {
           "$ref": "#/components/schemas/ZImageConditioningOutput"
         }
+      },
+      "UserDTO": {
+        "type": "object",
+        "required": ["user_id", "email", "is_admin", "is_active"],
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The user ID"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email",
+            "description": "The user email"
+          },
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name",
+            "description": "The user display name"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin",
+            "description": "Whether the user is an admin"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "Whether the user is active"
+          }
+        },
+        "title": "UserDTO"
       }
     }
   }
