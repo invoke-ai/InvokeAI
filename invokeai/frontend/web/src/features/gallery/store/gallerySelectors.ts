@@ -57,10 +57,7 @@ export const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => 
 
 export const selectSelectionCount = createSelector(selectGallerySlice, (gallery) => gallery.selection.length);
 export const selectSelection = createSelector(selectGallerySlice, (gallery) => gallery.selection);
-export const selectGalleryImageMinimumWidth = createSelector(
-  selectGallerySlice,
-  (gallery) => gallery.galleryImageMinimumWidth
-);
+export const selectGalleryColumns = createSelector(selectGallerySlice, (gallery) => gallery.galleryColumns);
 
 export const selectComparisonMode = createSelector(selectGallerySlice, (gallery) => gallery.comparisonMode);
 export const selectComparisonFit = createSelector(selectGallerySlice, (gallery) => gallery.comparisonFit);

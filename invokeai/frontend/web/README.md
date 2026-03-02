@@ -4,16 +4,15 @@
 
 ## TODO:
 
-- [ ] Move Image Metadata Overlay to Right Sidebar
+- [ ] Move ImageViewer Component Metadata Overlay to Right Sidebar
 - [ ] Replace Image Size Slider with Columns Slider
-- [ ] Move Image Metadata Search to Popover instead of Collapsable
 - [ ] Fix ImageViewer being slightly visible beneath neighboring ImageViewer when no active image is selected
-- [ ] Create new Image Gallery Header with board name, actions and pagination
-- [ ] Move search bar to below the 'Boards' Header
+- [ ] Move boards search bar to below the 'Boards' text
 - [ ] Disable image search when no images are present in the board
-- [ ] Add Queued, Failed and In Progress items to the image gallery
-- [ ] Make Viewer have drag navigation
-- [ ] Unify NoBoardBoard and GalleryBoard components into a single component that handles both states
-- [ ] Highlight new board on creation
-- [ ] View Archived Boards
+- [ ] Add Queued, Failed and In Progress items to the image gallery with visible status and generation progress
+- [ ] Highlight new board on creation, seems to be broken currently
+- [ ] Toggle archived boards
 - [ ] Refactor Boards Sidebar to still show thumbnails when collapsed, becomes more of a "minimized" sidebar rather then a "collapsed" sidebar
+- [ ] Disable board/image operations when server is not connected
+- [ ] Add max resizable width to boards sidebar
+- [ ] Move Paged Image Gallery Pagination into he GalleryHeader

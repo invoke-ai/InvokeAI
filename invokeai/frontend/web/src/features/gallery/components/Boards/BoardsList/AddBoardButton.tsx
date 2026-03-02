@@ -6,9 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
 
-const AddBoardButton = ({ variant = 'default' }: {
-  variant?: 'icon' | 'default';
-}) => {
+const AddBoardButton = ({ variant = 'default' }: { variant?: 'icon' | 'default' }) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const [createBoard, { isLoading }] = useCreateBoardMutation();
@@ -23,32 +21,30 @@ const AddBoardButton = ({ variant = 'default' }: {
     }
   }, [t, createBoard, dispatch]);
 
-  return (
-    variant === 'icon' ? (
-      <IconButton
-        aria-label={t('boards.addBoard')}
-        tooltip={t('boards.addBoard')}
-        icon={<PiPlusBold />}
-        isLoading={isLoading}
-        onClick={handleCreateBoard}
-        size="sm"
-        data-testid="add-board-icon-button"
-        variant="ghost"
-      />
-    ): (
-      <Button
-        leftIcon={<PiPlusBold />}
-        isLoading={isLoading}
-        onClick={handleCreateBoard}
-        size="sm"
-        data-testid="add-board-button"
-        variant="ghost"
-        flex={1}
-        justifyContent="start"
-      >
-        {t('boards.addBoard')}
-      </Button>
-    )
+  return variant === 'icon' ? (
+    <IconButton
+      aria-label={t('boards.addBoard')}
+      tooltip={t('boards.addBoard')}
+      icon={<PiPlusBold />}
+      isLoading={isLoading}
+      onClick={handleCreateBoard}
+      size="sm"
+      data-testid="add-board-icon-button"
+      variant="ghost"
+    />
+  ) : (
+    <Button
+      leftIcon={<PiPlusBold />}
+      isLoading={isLoading}
+      onClick={handleCreateBoard}
+      size="sm"
+      data-testid="add-board-button"
+      variant="ghost"
+      flex={1}
+      justifyContent="start"
+    >
+      {t('boards.addBoard')}
+    </Button>
   );
 };
 

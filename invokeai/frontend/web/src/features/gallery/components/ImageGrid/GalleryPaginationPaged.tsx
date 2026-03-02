@@ -1,4 +1,4 @@
-import { Button, Divider, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
+import { Button, Divider, Flex, IconButton } from '@invoke-ai/ui-library';
 import { memo, useCallback, useMemo } from 'react';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 

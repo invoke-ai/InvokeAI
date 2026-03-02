@@ -21,7 +21,7 @@ const getInitialState = (): GalleryState => ({
   shouldAutoSwitch: true,
   autoAssignBoardOnClick: true,
   autoAddBoardId: 'none',
-  galleryImageMinimumWidth: 90,
+  galleryColumns: 8,
   alwaysShowImageSizeBadge: false,
   selectedBoardId: 'none',
   galleryView: 'images',
@@ -76,8 +76,8 @@ const slice = createSlice({
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
     },
-    setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
-      state.galleryImageMinimumWidth = action.payload;
+    setGalleryColumns: (state, action: PayloadAction<number>) => {
+      state.galleryColumns = action.payload;
     },
     autoAssignBoardOnClickChanged: (state, action: PayloadAction<boolean>) => {
       state.autoAssignBoardOnClick = action.payload;
@@ -160,7 +160,7 @@ const slice = createSlice({
 export const {
   imageSelected,
   shouldAutoSwitchChanged,
-  setGalleryImageMinimumWidth,
+  setGalleryColumns,
   boardIdSelected,
   autoAddBoardIdChanged,
   galleryViewChanged,

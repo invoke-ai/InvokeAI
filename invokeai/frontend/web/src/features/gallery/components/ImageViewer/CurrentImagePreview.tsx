@@ -3,17 +3,12 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { CanvasAlertsInvocationProgress } from 'features/controlLayers/components/CanvasAlerts/CanvasAlertsInvocationProgress';
 import { DndImage } from 'features/dnd/DndImage';
-import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
-import {
-  selectActiveTab,
-  selectShouldShowItemDetails,
-  selectShouldShowProgressInViewer,
-} from 'features/ui/store/uiSelectors';
+import { selectActiveTab, selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import type { AnimationProps } from 'framer-motion';
 import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
@@ -27,7 +22,6 @@ import { ProgressIndicator } from './ProgressIndicator2';
 export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | null }) => {
   const activeTab = useAppSelector(selectActiveTab);
   const selectedImageName = useAppSelector(selectLastSelectedItem);
-  const shouldShowItemDetails = useAppSelector(selectShouldShowItemDetails);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
   const { goToPreviousImage, goToNextImage, isFetching } = useNextPrevItemNavigation();
   const { onLoadImage, $progressEvent, $progressImage } = useImageViewerContext();
@@ -162,11 +156,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
         <CanvasAlertsInvocationProgress />
       </Flex>
-      {shouldShowItemDetails && imageToRender && !withProgress && (
-        <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
-          <ImageMetadataViewer image={imageToRender} />
-        </Box>
-      )}
+      {/* Metadata viewer is now rendered in the ImageViewer component as a side panel */}
       <AnimatePresence>
         {shouldShowNextPrevButtons && imageToRender && (
           <Box

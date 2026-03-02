@@ -15,15 +15,10 @@ const selectIsComparing = createSelector(
 
 export const ImageViewerPanel = memo(() => {
   const isComparing = useAppSelector(selectIsComparing);
-  const lastSelectedItem = useAppSelector(selectLastSelectedItem);
 
   return (
     <ImageViewerContextProvider>
       <Box p={2} width="100%" height="100%" position="relative">
-        {
-          // The image viewer renders progress images - if no image is selected, show the image viewer anyway
-          !isComparing && !lastSelectedItem && <ImageViewer />
-        }
         {!isComparing && <ImageViewer />}
         {isComparing && <ImageComparison />}
       </Box>

@@ -9,9 +9,10 @@ type Props = {
   searchTerm: string;
   onChangeSearchTerm: (value: string) => void;
   onResetSearchTerm: () => void;
+  isDisabled?: boolean;
 };
 
-export const GallerySearch = memo(({ searchTerm, onChangeSearchTerm, onResetSearchTerm }: Props) => {
+export const GallerySearch = memo(({ searchTerm, onChangeSearchTerm, onResetSearchTerm, isDisabled }: Props) => {
   const { t } = useTranslation();
   const { isFetching } = useGalleryImageNames();
 
@@ -40,6 +41,7 @@ export const GallerySearch = memo(({ searchTerm, onChangeSearchTerm, onResetSear
         onChange={handleChangeInput}
         data-testid="image-search-input"
         onKeyDown={handleKeydown}
+        isDisabled={isDisabled}
       />
       {isFetching && (
         <InputRightElement h="full" pe={2}>

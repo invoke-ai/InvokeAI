@@ -5,7 +5,7 @@ import { getFocusedRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
 import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
-  selectGalleryImageMinimumWidth,
+  selectGalleryColumns,
   selectImageToCompare,
   selectLastSelectedItem,
   selectSelection,
@@ -443,8 +443,8 @@ const scrollSeekConfiguration: ScrollSeekConfiguration = {
 const style = { height: '100%', width: '100%' };
 
 const selectGridTemplateColumns = createSelector(
-  selectGalleryImageMinimumWidth,
-  (galleryImageMinimumWidth) => `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr))`
+  selectGalleryColumns,
+  (galleryColumns) => `repeat(${galleryColumns}, 1fr)`
 );
 
 // Grid components

@@ -12,8 +12,8 @@ import { useTranslation } from 'react-i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
 import AddBoardButton from './AddBoardButton';
-import GalleryBoard from './GalleryBoard';
-import NoBoardBoard from './NoBoardBoard';
+import BoardItem from './BoardItem';
+import { BoardsSearch } from './BoardsSearch';
 
 export const BoardsList = memo(() => {
   const { t } = useTranslation();
@@ -39,13 +39,11 @@ export const BoardsList = memo(() => {
     const elements = [];
 
     if (!boardSearchText.length) {
-      elements.push(<NoBoardBoard key="none" isSelected={selectedBoardId === 'none'} />);
+      elements.push(<BoardItem key="none" board={null} isSelected={selectedBoardId === 'none'} />);
     }
 
     filteredBoards.forEach((board) => {
-      elements.push(
-        <GalleryBoard board={board} isSelected={selectedBoardId === board.board_id} key={board.board_id} />
-      );
+      elements.push(<BoardItem board={board} isSelected={selectedBoardId === board.board_id} key={board.board_id} />);
     });
 
     return elements;
@@ -62,14 +60,16 @@ export const BoardsList = memo(() => {
         zIndex={1}
         top={0}
         bg="base.900"
+        h={12}
       >
-        <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.500">
+        <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.400">
           {t('boards.boards')}
         </Text>
         <AddBoardButton variant="icon" />
-        {/* TODO: Add search toggle here */}
       </Flex>
-      {/* TODO: Add search input here */}
+      <Flex pb={2}>
+        <BoardsSearch />
+      </Flex>
       <Collapse in={isOpen} style={fixTooltipCloseOnScrollStyles}>
         <Flex direction="column">
           {boardElements.length ? (

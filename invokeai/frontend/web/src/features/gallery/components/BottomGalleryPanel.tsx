@@ -1,24 +1,12 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Button, ButtonGroup, Collapse, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
-import { createSelector } from '@reduxjs/toolkit';
-import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { Box, Button, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { useDisclosure } from 'common/hooks/useBoolean';
 import AddBoardButton from 'features/gallery/components/Boards/BoardsList/AddBoardButton';
 import { BoardsList } from 'features/gallery/components/Boards/BoardsList/BoardsList';
-import { BoardsSearch } from 'features/gallery/components/Boards/BoardsList/BoardsSearch';
 import { GalleryImageGrid } from 'features/gallery/components/GalleryImageGrid';
 import { GalleryImageGridPaged } from 'features/gallery/components/GalleryImageGridPaged';
-import { GallerySettingsPopover } from 'features/gallery/components/GallerySettingsPopover/GallerySettingsPopover';
-import { GalleryUploadButton } from 'features/gallery/components/GalleryUploadButton';
-import { GallerySearch } from 'features/gallery/components/ImageGrid/GallerySearch';
-import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useGallerySearchTerm';
-import { selectSelectedBoardId, selectShowAspectRatioThumbnails } from 'features/gallery/store/gallerySelectors';
-import {
-  galleryViewChanged,
-  selectGallerySlice,
-  showAspectRatioThumbnailsChanged,
-} from 'features/gallery/store/gallerySlice';
+import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { BOARDS_SIDEBAR_DEFAULT_WIDTH_PX, BOARDS_SIDEBAR_MIN_WIDTH_PX } from 'features/ui/layouts/shared';
 import { selectShouldUsePagedGalleryView } from 'features/ui/store/uiSelectors';
@@ -29,14 +17,12 @@ import { useTranslation } from 'react-i18next';
 import {
   PiCaretDownBold,
   PiCaretUpBold,
-  PiGridNineBold,
   PiMagnifyingGlassBold,
   PiSidebarSimpleBold,
-  PiSquaresFourBold,
 } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
-const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0, width: '100%' };
+import { GalleryHeader } from './GalleryHeader';
 
 const HEADER_STYLES_SX: SystemStyleObject = {
   gap: 2,
@@ -47,25 +33,33 @@ const HEADER_STYLES_SX: SystemStyleObject = {
   borderBottomWidth: 1,
   borderColor: 'base.700',
   bg: 'base.850',
-}
+  h: 12,
+};
 
 const overlayScrollbarsStyles: CSSProperties = {
   height: '100%',
   width: '100%',
 };
 
-const selectGalleryView = createSelector(selectGallerySlice, (gallery) => gallery.galleryView);
-const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
+const BOARDS_SIDEBAR_STYLES_SX: SystemStyleObject = {
+  h: 'full',
+  flexShrink: 0,
+  borderEndWidth: 1,
+  borderColor: 'base.700',
+  gap: 1,
+  position: 'relative',
+};
 
-/**
- * Ensures the bottom gallery panel is expanded. If it's currently collapsed, expands it.
- * This is called by action handlers in the header bar so that clicking any action
- * while collapsed also opens the gallery.
- */
-const ensureExpanded = () => {
-  if (navigationApi.isBottomPanelCollapsed()) {
-    navigationApi.expandBottomPanel();
-  }
+const BOARDS_SIDEBAR_EXPANDED_STYLES_SX: SystemStyleObject = {
+  ...BOARDS_SIDEBAR_STYLES_SX,
+  w: `${BOARDS_SIDEBAR_DEFAULT_WIDTH_PX}px`,
+  minW: `${BOARDS_SIDEBAR_MIN_WIDTH_PX}px`,
+};
+
+const BOARDS_SIDEBAR_COLLAPSED_STYLES_SX: SystemStyleObject = {
+  ...BOARDS_SIDEBAR_STYLES_SX,
+  w: 12,
+  minW: 12,
 };
 
 /**
@@ -74,13 +68,7 @@ const ensureExpanded = () => {
  */
 export const BottomGalleryPanel = memo(() => {
   const { t } = useTranslation();
-  const dispatch = useAppDispatch();
-  const galleryView = useAppSelector(selectGalleryView);
-  const initialSearchTerm = useAppSelector(selectSearchTerm);
   const shouldUsePagedGalleryView = useAppSelector(selectShouldUsePagedGalleryView);
-  const showAspectRatio = useAppSelector(selectShowAspectRatioThumbnails);
-  const searchDisclosure = useDisclosure(!!initialSearchTerm);
-  const [searchTerm, onChangeSearchTerm, onResetSearchTerm] = useGallerySearchTerm();
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const boardName = useBoardName(selectedBoardId);
   const [isBoardsSidebarCollapsed, setIsBoardsSidebarCollapsed] = useState(false);
@@ -88,41 +76,21 @@ export const BottomGalleryPanel = memo(() => {
   const isResizingRef = useRef(false);
   const [isGalleryCollapsed, setIsGalleryCollapsed] = useState(false);
 
-  const handleClickImages = useCallback(() => {
-    ensureExpanded();
-    setIsGalleryCollapsed(false);
-    dispatch(galleryViewChanged('images'));
-  }, [dispatch]);
-
-  const handleClickAssets = useCallback(() => {
-    ensureExpanded();
-    setIsGalleryCollapsed(false);
-    dispatch(galleryViewChanged('assets'));
-  }, [dispatch]);
-
-  const handleClickSearch = useCallback(() => {
-    ensureExpanded();
-    setIsGalleryCollapsed(false);
-    onResetSearchTerm();
-    searchDisclosure.toggle();
-  }, [onResetSearchTerm, searchDisclosure]);
-
   const handleToggleGallery = useCallback(() => {
     setIsGalleryCollapsed((prev) => !prev);
     navigationApi.toggleBottomPanel();
   }, []);
 
   const handleToggleBoardsSidebar = useCallback(() => {
-    ensureExpanded();
-    setIsGalleryCollapsed(false);
     setIsBoardsSidebarCollapsed((prev) => !prev);
   }, []);
 
-  const handleToggleAspectRatio = useCallback(() => {
-    ensureExpanded();
-    setIsGalleryCollapsed(false);
-    dispatch(showAspectRatioThumbnailsChanged(!showAspectRatio));
-  }, [dispatch, showAspectRatio]);
+  const onCollapsedBoardSearch = useCallback(() => {
+    if (isBoardsSidebarCollapsed) {
+      setIsBoardsSidebarCollapsed(false);
+    }
+    // TODO: Highlight the search input in the sidebar after expanding
+  }, [isBoardsSidebarCollapsed]);
 
   // Resize handler for the boards sidebar
   const handleResizeStart = useCallback(
@@ -188,54 +156,13 @@ export const BottomGalleryPanel = memo(() => {
           />
         </Flex>
         <Spacer />
-        <ButtonGroup size="sm" variant="outline">
-          <Button
-            tooltip={t('gallery.imagesTab')}
-            onClick={handleClickImages}
-            data-testid="images-tab"
-            colorScheme={galleryView === 'images' ? 'invokeBlue' : undefined}
-          >
-            {t('parameters.images')}
-          </Button>
-          <Button
-            tooltip={t('gallery.assetsTab')}
-            onClick={handleClickAssets}
-            data-testid="assets-tab"
-            colorScheme={galleryView === 'assets' ? 'invokeBlue' : undefined}
-          >
-            {t('gallery.assets')}
-          </Button>
-        </ButtonGroup>
-        <Flex gap={0} alignItems="center">
-          <IconButton
-            size="sm"
-            variant="link"
-            alignSelf="stretch"
-            onClick={handleToggleAspectRatio}
-            tooltip={showAspectRatio ? t('gallery.showSquareThumbnails') : t('gallery.showAspectRatioThumbnails')}
-            aria-label={t('gallery.toggleAspectRatio')}
-            icon={showAspectRatio ? <PiGridNineBold /> : <PiSquaresFourBold />}
-            colorScheme={showAspectRatio ? 'invokeBlue' : 'base'}
-          />
-          <GalleryUploadButton />
-          <GallerySettingsPopover />
-          <IconButton
-            size="sm"
-            variant="link"
-            alignSelf="stretch"
-            onClick={handleClickSearch}
-            tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
-            aria-label={t('gallery.displaySearch')}
-            icon={<PiMagnifyingGlassBold />}
-            colorScheme={searchDisclosure.isOpen ? 'invokeBlue' : 'base'}
-          />
-        </Flex>
       </Flex>
 
       {/* Main content area - hidden when collapsed */}
       <Flex flex={1} minH={0} w="full">
         {/* Boards Sidebar */}
-        {!isBoardsSidebarCollapsed && (
+
+        {/*{!isBoardsSidebarCollapsed && (
           <>
             <Flex
               flexDirection="column"
@@ -247,12 +174,6 @@ export const BottomGalleryPanel = memo(() => {
               borderColor="base.700"
               gap={1}
             >
-              {/* Boards search at top */}
-              <Flex px={2} pt={2} flexShrink={0}>
-                <BoardsSearch />
-              </Flex>
-
-              {/* Board list - scrollable middle */}
               <Flex flex={1} minH={0} position="relative">
                 <Box position="absolute" top={0} right={0} bottom={0} left={0} px={2}>
                   <OverlayScrollbarsComponent style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
@@ -261,7 +182,7 @@ export const BottomGalleryPanel = memo(() => {
                 </Box>
               </Flex>
 
-              {/* Sticky Add Board footer */}
+
               <Flex
                 p={2}
                 borderTopWidth={1}
@@ -274,7 +195,7 @@ export const BottomGalleryPanel = memo(() => {
               </Flex>
             </Flex>
 
-            {/* Resize handle */}
+
             <Flex
               w="4px"
               cursor="col-resize"
@@ -285,20 +206,51 @@ export const BottomGalleryPanel = memo(() => {
               flexShrink={0}
             />
           </>
+        )}*/}
+
+        <Flex
+          flexDirection="column"
+          sx={isBoardsSidebarCollapsed ? BOARDS_SIDEBAR_COLLAPSED_STYLES_SX : BOARDS_SIDEBAR_EXPANDED_STYLES_SX}
+        >
+          {isBoardsSidebarCollapsed ? (
+            <>
+              <IconButton
+                size="sm"
+                variant="ghost"
+                icon={<PiSidebarSimpleBold />}
+                onClick={handleToggleBoardsSidebar}
+                tooltip={t('gallery.showBoardsSidebar')}
+                aria-label={t('gallery.toggleBoardsSidebar')}
+              />
+              <IconButton
+                size="sm"
+                variant="ghost"
+                icon={<PiMagnifyingGlassBold />}
+                onClick={onCollapsedBoardSearch}
+                tooltip={t('gallery.searchBoards')}
+                aria-label={t('gallery.searchBoards')}
+              />
+            </>
+          ) : (
+            <p>something</p>
+          )}
+        </Flex>
+
+        {!isBoardsSidebarCollapsed && (
+          <Flex
+            w="4px"
+            cursor="col-resize"
+            bg="base.700"
+            _hover={{ bg: 'base.500' }}
+            transition="background 0.15s"
+            onMouseDown={handleResizeStart}
+            flexShrink={0}
+          />
         )}
 
         {/* Image grid area */}
-        <Flex flexDirection="column" flex={1} minW={0} h="full">
-          {/* Search bar (collapsible) */}
-          <Collapse in={searchDisclosure.isOpen} style={COLLAPSE_STYLES}>
-            <Box w="full" px={2} pt={2}>
-              <GallerySearch
-                searchTerm={searchTerm}
-                onChangeSearchTerm={onChangeSearchTerm}
-                onResetSearchTerm={onResetSearchTerm}
-              />
-            </Box>
-          </Collapse>
+        <Flex flexDirection="column" flex={1} minW={800} h="full">
+          <GalleryHeader />
 
           {/* Image grid */}
           <Flex w="full" flex={1} minH={0} p={2}>
