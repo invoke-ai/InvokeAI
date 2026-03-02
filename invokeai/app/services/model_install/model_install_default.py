@@ -132,6 +132,9 @@ class ModelInstallService(ModelInstallServiceBase):
         marker = {
             "version": INSTALL_MARKER_VERSION,
             "source": str(job.source),
+            "access_token": (
+                job.source.access_token if isinstance(job.source, (HFModelSource, URLModelSource)) else None
+            ),
             "config_in": job.config_in.model_dump(),
             "status": (status or job.status).value,
             "updated_at": get_iso_timestamp(),
@@ -200,7 +203,13 @@ class ModelInstallService(ModelInstallServiceBase):
                 continue
 
             try:
-                source_str = marker["source"]
+                source_str = marker.get("source")
+                if not isinstance(source_str, str):
+                    raise ValueError("Missing source in install marker")
+                source = self._guess_source(source_str)
+                access_token = marker.get("access_token")
+                if isinstance(source, (HFModelSource, URLModelSource)) and isinstance(access_token, str):
+                    source.access_token = access_token
                 if source_str in active_sources:
                     # This tmpdir belongs to an install already in progress; leave it alone.
                     self._logger.debug(f"Skipping restore for {source_str} - already being tracked")
@@ -210,7 +219,6 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._safe_rmtree(tmpdir, self._logger)
                     continue
                 seen_sources.add(source_str)
-                source = self._guess_source(source_str)
             except Exception as e:
                 self._logger.warning(f"Skipping install marker in {tmpdir}: {e}")
                 continue

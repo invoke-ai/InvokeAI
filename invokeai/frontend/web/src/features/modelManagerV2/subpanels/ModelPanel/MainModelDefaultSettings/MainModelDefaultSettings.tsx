@@ -8,7 +8,7 @@ import { DefaultWidth } from 'features/modelManagerV2/subpanels/ModelPanel/MainM
 import type { ParameterScheduler } from 'features/parameters/types/parameterSchemas';
 import { getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useEffect, useMemo } from 'react';
 import type { SubmitHandler } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
@@ -64,6 +64,10 @@ export const MainModelDefaultSettings = memo(({ modelConfig }: Props) => {
   const { handleSubmit, control, formState, reset } = useForm<MainModelDefaultSettingsFormData>({
     defaultValues: defaultSettingsDefaults,
   });
+
+  useEffect(() => {
+    reset(defaultSettingsDefaults);
+  }, [defaultSettingsDefaults, reset]);
 
   const onSubmit = useCallback<SubmitHandler<MainModelDefaultSettingsFormData>>(
     (data) => {
