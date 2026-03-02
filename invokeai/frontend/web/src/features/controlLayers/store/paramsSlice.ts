@@ -6,6 +6,7 @@ import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
+import { logout } from 'features/auth/store/authSlice';
 import type { AspectRatioID, InfillMethod, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
@@ -430,6 +431,12 @@ const slice = createSlice({
     paramsRecalled: (_state, action: PayloadAction<ParamsState>) => {
       return action.payload;
     },
+  },
+  extraReducers(builder) {
+    // Reset params state on logout to prevent user data leakage when switching users
+    builder.addCase(logout, () => {
+      return getInitialParamsState();
+    });
   },
 });
 

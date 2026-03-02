@@ -1,4 +1,5 @@
 import { Flex, Heading, Spacer, Text } from '@invoke-ai/ui-library';
+import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import ModelImageUpload from 'features/modelManagerV2/subpanels/ModelPanel/Fields/ModelImageUpload';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
@@ -11,9 +12,11 @@ type Props = PropsWithChildren<{
 
 export const ModelHeader = memo(({ modelConfig, children }: Props) => {
   const { t } = useTranslation();
+  const canManageModels = useIsModelManagerEnabled();
+
   return (
     <Flex alignItems="flex-start" gap={4}>
-      <ModelImageUpload model_key={modelConfig.key} model_image={modelConfig.cover_image} />
+      {canManageModels && <ModelImageUpload model_key={modelConfig.key} model_image={modelConfig.cover_image} />}
       <Flex flexDir="column" gap={1} flexGrow={1} minW={0}>
         <Flex gap={2}>
           <Heading as="h2" fontSize="lg" noOfLines={1} wordBreak="break-all">
