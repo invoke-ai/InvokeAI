@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Box,
+  Button,
   Flex,
   Icon,
   Input,
@@ -41,7 +42,7 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { computed } from 'nanostores';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, Dispatch, SetStateAction } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -238,6 +239,7 @@ export const AddNodeCmdk = memo(() => {
                       searchTerm={debouncedSearchTerm}
                       onSelect={onSelect}
                       expandedCategories={expandedCategories}
+                      setExpandedCategories={setExpandedCategories}
                     />
                   </CommandList>
                 </ScrollableContent>
@@ -385,10 +387,12 @@ const NodeCommandList = memo(
     searchTerm,
     onSelect,
     expandedCategories,
+    setExpandedCategories,
   }: {
     searchTerm: string;
     onSelect: (value: string) => void;
     expandedCategories: Set<string>;
+    setExpandedCategories: Dispatch<SetStateAction<Set<string>>>;
   }) => {
     const { t } = useTranslation();
     const templatesArray = useStore($templatesArray);
@@ -531,6 +535,14 @@ const NodeCommandList = memo(
     // When searching, auto-expand all categories; when not searching, use manual state
     const isSearching = searchTerm.length > 0;
 
+    const expandAll = useCallback(() => {
+      setExpandedCategories(new Set(groupedItems.map(([cat]) => cat)));
+    }, [groupedItems, setExpandedCategories]);
+
+    const collapseAll = useCallback(() => {
+      setExpandedCategories(new Set());
+    }, [setExpandedCategories]);
+
     if (!shouldGroupNodesByCategory) {
       return (
         <>
@@ -543,6 +555,16 @@ const NodeCommandList = memo(
 
     return (
       <>
+        {!isSearching && (
+          <Flex gap={1} px={2} pb={1}>
+            <Button size="sm" variant="ghost" onClick={expandAll}>
+              {t('common.expandAll')}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={collapseAll}>
+              {t('common.collapseAll')}
+            </Button>
+          </Flex>
+        )}
         {groupedItems.map(([category, categoryItems]) => {
           const isExpanded = isSearching || expandedCategories.has(category);
           return (
