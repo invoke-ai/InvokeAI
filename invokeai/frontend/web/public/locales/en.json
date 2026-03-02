@@ -1164,7 +1164,15 @@
         "installingXModels_other": "Installing {{count}} models",
         "skippingXDuplicates_one": ", skipping {{count}} duplicate",
         "skippingXDuplicates_other": ", skipping {{count}} duplicates",
-        "manageModels": "Manage Models"
+        "manageModels": "Manage Models",
+        "exportSettings": "Export Settings",
+        "importSettings": "Import Settings",
+        "settingsExported": "Model settings exported",
+        "settingsImported": "Model settings imported",
+        "settingsImportedPartial": "Model settings partially imported. Incompatible settings were skipped: {{fields}}",
+        "settingsImportFailed": "Failed to import model settings",
+        "settingsImportIncompatible": "The settings file contains no compatible settings for this model type",
+        "settingsImportInvalidFile": "Invalid settings file"
     },
     "models": {
         "addLora": "Add LoRA",
