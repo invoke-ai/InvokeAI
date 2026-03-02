@@ -367,6 +367,11 @@ class DefaultSessionProcessor(SessionProcessorBase):
 
     def stop(self, *args, **kwargs) -> None:
         self._stop_event.set()
+        # Cancel any in-progress generation so that long-running nodes (e.g. denoising) stop at
+        # the next step boundary instead of running to completion. Without this, the generation
+        # thread may still be executing CUDA operations when Python teardown begins, which can
+        # cause a C++ std::terminate() crash ("terminate called without an active exception").
+        self._cancel_event.set()
         # Wake the thread if it is sleeping in poll_now_event.wait() or blocked in resume_event.wait() (paused).
         self._poll_now_event.set()
         self._resume_event.set()
