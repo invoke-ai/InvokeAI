@@ -6,6 +6,8 @@ import { LoRAModelDefaultSettings } from 'features/modelManagerV2/subpanels/Mode
 import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelConvertButton';
 import { ModelEditButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelEditButton';
 import { ModelHeader } from 'features/modelManagerV2/subpanels/ModelPanel/ModelHeader';
+import { ModelSettingsExportButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelSettingsExportButton';
+import { ModelSettingsImportButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelSettingsImportButton';
 import { TriggerPhrases } from 'features/modelManagerV2/subpanels/ModelPanel/TriggerPhrases';
 import { filesize } from 'filesize';
 import { memo, useMemo } from 'react';
@@ -88,6 +90,8 @@ export const ModelView = memo(({ modelConfig }: Props) => {
         {canManageModels && modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />
         )}
+        {withSettings && <ModelSettingsImportButton modelConfig={modelConfig} />}
+        {withSettings && <ModelSettingsExportButton modelConfig={modelConfig} />}
         {canManageModels && <ModelEditButton />}
         {canManageModels && <ModelDeleteButton modelConfig={modelConfig} />}
       </ModelHeader>
