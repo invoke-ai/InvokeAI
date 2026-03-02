@@ -41,6 +41,17 @@ const isIfInputHandle = (handle: string): handle is (typeof IF_INPUT_HANDLES)[nu
   return IF_INPUT_HANDLES.includes(handle as (typeof IF_INPUT_HANDLES)[number]);
 };
 
+const isSingleCollectionPairOfSameBaseType = (
+  firstType: { name: string; cardinality: string; batch: boolean },
+  secondType: { name: string; cardinality: string; batch: boolean }
+) => {
+  const isSingleToCollection =
+    firstType.cardinality === 'SINGLE' && secondType.cardinality === 'COLLECTION' && firstType.name === secondType.name;
+  const isCollectionToSingle =
+    firstType.cardinality === 'COLLECTION' && secondType.cardinality === 'SINGLE' && firstType.name === secondType.name;
+  return firstType.batch === secondType.batch && (isSingleToCollection || isCollectionToSingle);
+};
+
 /**
  * Validates a connection between two fields
  * @returns A translation key for an error if the connection is invalid, otherwise null
@@ -162,7 +173,8 @@ export const validateConnection: ValidateConnectionFunc = (
 
         const areIfInputTypesCompatible =
           validateConnectionTypes(sourceFieldTemplate.type, siblingSourceFieldTemplate.type) ||
-          validateConnectionTypes(siblingSourceFieldTemplate.type, sourceFieldTemplate.type);
+          validateConnectionTypes(siblingSourceFieldTemplate.type, sourceFieldTemplate.type) ||
+          isSingleCollectionPairOfSameBaseType(sourceFieldTemplate.type, siblingSourceFieldTemplate.type);
 
         if (!areIfInputTypesCompatible) {
           return 'nodes.fieldTypesMustMatch';
@@ -177,7 +189,43 @@ export const validateConnection: ValidateConnectionFunc = (
       }
     }
 
-    if (!validateConnectionTypes(sourceFieldTemplate.type, targetFieldTemplate.type)) {
+    if (sourceNode.data.type === 'if' && c.sourceHandle === 'value') {
+      const ifInputEdges = filteredEdges.filter(
+        (e) => e.target === sourceNode.id && typeof e.targetHandle === 'string' && isIfInputHandle(e.targetHandle)
+      );
+      const ifInputTypes = ifInputEdges.flatMap((edge) => {
+        if (edge.source === null || edge.source === undefined) {
+          return [];
+        }
+        if (edge.sourceHandle === null || edge.sourceHandle === undefined) {
+          return [];
+        }
+        const ifInputSourceNode = nodes.find((n) => n.id === edge.source);
+        if (!ifInputSourceNode) {
+          return [];
+        }
+        const ifInputSourceTemplate = templates[ifInputSourceNode.data.type];
+        if (!ifInputSourceTemplate) {
+          return [];
+        }
+        const ifInputSourceFieldTemplate = ifInputSourceTemplate.outputs[edge.sourceHandle];
+        if (!ifInputSourceFieldTemplate) {
+          return [];
+        }
+        return [ifInputSourceFieldTemplate.type];
+      });
+
+      if (ifInputTypes.length > 0) {
+        const areAllIfInputsCompatibleWithTarget = ifInputTypes.every((ifInputType) =>
+          validateConnectionTypes(ifInputType, targetFieldTemplate.type)
+        );
+        if (!areAllIfInputsCompatibleWithTarget) {
+          return 'nodes.fieldTypesMustMatch';
+        }
+      } else if (!validateConnectionTypes(sourceFieldTemplate.type, targetFieldTemplate.type)) {
+        return 'nodes.fieldTypesMustMatch';
+      }
+    } else if (!validateConnectionTypes(sourceFieldTemplate.type, targetFieldTemplate.type)) {
       return 'nodes.fieldTypesMustMatch';
     }
   }
