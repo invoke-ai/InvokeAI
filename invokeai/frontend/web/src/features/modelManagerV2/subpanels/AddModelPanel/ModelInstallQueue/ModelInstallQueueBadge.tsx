@@ -8,21 +8,23 @@ const STATUSES = {
   downloading: { colorScheme: 'yellow', translationKey: 'queue.in_progress' },
   downloads_done: { colorScheme: 'yellow', translationKey: 'queue.in_progress' },
   running: { colorScheme: 'yellow', translationKey: 'queue.in_progress' },
+  paused: { colorScheme: 'orange', translationKey: 'queue.paused' },
   completed: { colorScheme: 'green', translationKey: 'queue.completed' },
   error: { colorScheme: 'red', translationKey: 'queue.failed' },
   cancelled: { colorScheme: 'orange', translationKey: 'queue.canceled' },
-};
+} as const satisfies Partial<Record<ModelInstallStatus, { colorScheme: string; translationKey: string }>>;
 
 const ModelInstallQueueBadge = ({ status }: { status?: ModelInstallStatus }) => {
   const { t } = useTranslation();
+  const statusConfig = status ? STATUSES[status] : undefined;
 
-  if (!status || !Object.keys(STATUSES).includes(status)) {
+  if (!statusConfig) {
     return null;
   }
 
   return (
-    <Badge textAlign="center" w="134px" colorScheme={STATUSES[status].colorScheme}>
-      {t(STATUSES[status].translationKey)}
+    <Badge textAlign="center" w="134px" colorScheme={statusConfig.colorScheme}>
+      {t(statusConfig.translationKey)}
     </Badge>
   );
 };
