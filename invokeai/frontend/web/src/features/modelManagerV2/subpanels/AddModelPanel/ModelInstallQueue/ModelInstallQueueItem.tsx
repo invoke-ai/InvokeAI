@@ -358,7 +358,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
               <PiPauseFill size={16} />
             </Flex>
           ) : installJob.status === 'cancelled' ? (
-            <Flex sx={{ color: 'orange.200', transform: 'rotate(-45deg)' }}>
+            <Flex sx={{ color: 'orange.200' }}>
               <PiMinusBold size={16} />
             </Flex>
           ) : installJob.status === 'error' ? (
@@ -377,11 +377,9 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       <Td>
         <Flex sx={ModelInfoColumnSx}>
           <Text fontWeight="semibold">{modelName}</Text>
-          <Tooltip label={sourceLocation} placement="top-start" hasArrow>
-            <Text fontStyle="italic" fontSize="2xs" maxW="250px" noOfLines={1} cursor="default">
-              {sourceLocation}
-            </Text>
-          </Tooltip>
+          <Text fontStyle="italic" fontSize="2xs" noOfLines={1}>
+            {sourceLocation}
+          </Text>
           {hasRestartRequired && (
             <Flex direction="column" gap={1} w="full" mt={1}>
               {restartRequiredParts.map((part) => {
@@ -423,7 +421,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       <Td>
         <Flex sx={BadgesColumnSx}>
           {showDisconnectedIndicator && (
-            <Tooltip label={t('common.statusDisconnected')}>
+            <Tooltip label={t('modelManager.backendDisconnected')}>
               <Box padding={1}>
                 <Icon as={PiWarningBold} color="error.300" />
               </Box>
