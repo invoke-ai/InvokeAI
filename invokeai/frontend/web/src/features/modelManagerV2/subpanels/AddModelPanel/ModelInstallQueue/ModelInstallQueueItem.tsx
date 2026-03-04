@@ -1,5 +1,18 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Badge, Button, CircularProgress, Flex, Icon, IconButton, Td, Text, Tooltip, Tr } from '@invoke-ai/ui-library';
+import {
+  Badge,
+  Box,
+  Button,
+  CircularProgress,
+  Flex,
+  Icon,
+  IconButton,
+  Td,
+  Text,
+  Tooltip,
+  Tr,
+} from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { isNil } from 'es-toolkit/compat';
 import { getApiErrorDetail } from 'features/modelManagerV2/util/getApiErrorDetail';
 import { toast } from 'features/toast/toast';
@@ -11,6 +24,7 @@ import {
   PiMinusBold,
   PiPauseFill,
   PiPlayFill,
+  PiWarningBold,
   PiWarningDiamondBold,
   PiWarningFill,
   PiXBold,
@@ -23,6 +37,7 @@ import {
   useResumeModelInstallMutation,
 } from 'services/api/endpoints/models';
 import type { ModelInstallJob } from 'services/api/types';
+import { $isConnected } from 'services/events/stores';
 
 import { ModelInstallQueueBadge } from './ModelInstallQueueBadge';
 
@@ -84,6 +99,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
   const [restartFailedModelInstall] = useRestartFailedModelInstallMutation();
   const [restartModelInstallFile] = useRestartModelInstallFileMutation();
   const resumeFromScratchShown = useRef(false);
+  const isConnected = useStore($isConnected);
 
   const handleDeleteModelImport = useCallback(() => {
     deleteImportModel(installJob.id)
@@ -312,6 +328,10 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     installJob.status === 'running' ||
     installJob.status === 'paused';
 
+  const showDisconnectedIndicator =
+    !isConnected &&
+    (installJob.status === 'downloading' || installJob.status === 'waiting' || installJob.status === 'running');
+
   return (
     <Tr>
       {/* Progress */}
@@ -323,7 +343,10 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
                 size="20px"
                 value={progressValue ?? 0}
                 isIndeterminate={
-                  progressValue === null || installJob.status === 'waiting' || installJob.status === 'running'
+                  !isConnected ||
+                  progressValue === null ||
+                  installJob.status === 'waiting' ||
+                  installJob.status === 'running'
                 }
                 aria-label={t('accessibility.invokeProgressBar')}
                 sx={CircularProgressSx}
@@ -399,10 +422,19 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       {/* Status */}
       <Td>
         <Flex sx={BadgesColumnSx}>
+          {showDisconnectedIndicator && (
+            <Tooltip label={t('common.statusDisconnected')}>
+              <Box padding={1}>
+                <Icon as={PiWarningBold} color="error.300" />
+              </Box>
+            </Tooltip>
+          )}
           <ModelInstallQueueBadge status={installJob.status} label={installJob.error} />
           {hasRestartRequired && (
             <Tooltip label={t('modelManager.restartRequiredTooltip')}>
-              <Badge colorScheme="red">{t('modelManager.restartRequired')}</Badge>
+              <Box>
+                <Badge colorScheme="red">{t('modelManager.restartRequired')}</Badge>
+              </Box>
             </Tooltip>
           )}
         </Flex>

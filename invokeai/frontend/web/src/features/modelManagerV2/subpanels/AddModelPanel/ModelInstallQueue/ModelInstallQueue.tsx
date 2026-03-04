@@ -287,8 +287,8 @@ export const ModelInstallQueue = memo(() => {
             <Tbody>
               {data?.length === 0 ? (
                 <Tr>
-                  <Td colSpan={4} textAlign="center" py={8} color="base.500">
-                    <Text>{t('modelManager.queueEmpty')}</Text>
+                  <Td colSpan={4} textAlign="center" py={8}>
+                    <Text variant="subtext">{t('modelManager.queueEmpty')}</Text>
                   </Td>
                 </Tr>
               ) : (
