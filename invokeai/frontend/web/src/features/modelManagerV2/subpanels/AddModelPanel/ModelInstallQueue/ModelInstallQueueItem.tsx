@@ -412,18 +412,17 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       <Td textAlign="right" minWidth={130}>
         <Flex sx={ActionsColumnSx}>
           {/* Pause/Resume installatino */}
-          {(canResume ||
-            canPause) && (
-              <Button
-                size="sm"
-                tooltip={canResume ? t('modelManager.resume') : t('modelManager.pause')}
-                leftIcon={canResume ? <PiPlayFill /> : <PiPauseFill />}
-                onClick={canResume ? handleResumeModelInstall : handlePauseModelInstall}
-                variant={canResume ? 'solid' : 'outline'}
-              >
-                {canResume ? t('modelManager.resume') : t('modelManager.pause')}
-              </Button>
-            )}
+          {(canResume || canPause) && (
+            <Button
+              size="sm"
+              tooltip={canResume ? t('modelManager.resume') : t('modelManager.pause')}
+              leftIcon={canResume ? <PiPlayFill /> : <PiPauseFill />}
+              onClick={canResume ? handleResumeModelInstall : handlePauseModelInstall}
+              variant={canResume ? 'solid' : 'outline'}
+            >
+              {canResume ? t('modelManager.resume') : t('modelManager.pause')}
+            </Button>
+          )}
 
           {/* Restart installation if required */}
           {hasRestartRequired && (
