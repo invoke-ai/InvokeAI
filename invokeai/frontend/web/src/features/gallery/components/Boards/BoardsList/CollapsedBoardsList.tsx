@@ -71,7 +71,7 @@ export const CollapsedBoardsList = memo(() => {
         (boards ?? []).map((board) => ({
           boardId: board.board_id,
           label: board.board_name,
-          coverImageName: board.cover_image_name,
+          coverImageName: board.cover_image_name ?? undefined,
         }))
       ),
     [boards, noBoardName]

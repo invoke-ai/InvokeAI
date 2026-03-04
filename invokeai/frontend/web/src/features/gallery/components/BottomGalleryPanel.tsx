@@ -9,7 +9,11 @@ import { GalleryImageGrid } from 'features/gallery/components/GalleryImageGrid';
 import { GalleryImageGridPaged } from 'features/gallery/components/GalleryImageGridPaged';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
-import { BOARDS_SIDEBAR_DEFAULT_WIDTH_PX, BOARDS_SIDEBAR_MIN_WIDTH_PX } from 'features/ui/layouts/shared';
+import {
+  BOARDS_SIDEBAR_DEFAULT_WIDTH_PX,
+  BOARDS_SIDEBAR_MAX_WIDTH_PX,
+  BOARDS_SIDEBAR_MIN_WIDTH_PX,
+} from 'features/ui/layouts/shared';
 import { selectShouldUsePagedGalleryView } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
@@ -123,7 +127,10 @@ export const BottomGalleryPanel = memo(() => {
           return;
         }
         const delta = moveEvent.clientX - startX;
-        const newWidth = Math.max(BOARDS_SIDEBAR_MIN_WIDTH_PX, startWidth + delta);
+        const newWidth = Math.min(
+          BOARDS_SIDEBAR_MAX_WIDTH_PX,
+          Math.max(BOARDS_SIDEBAR_MIN_WIDTH_PX, startWidth + delta)
+        );
         setBoardsSidebarWidth(newWidth);
       };
 
