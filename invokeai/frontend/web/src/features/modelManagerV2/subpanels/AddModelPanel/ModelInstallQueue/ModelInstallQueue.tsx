@@ -18,7 +18,6 @@ import {
   Thead,
   Tr,
 } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { getApiErrorDetail } from 'features/modelManagerV2/util/getApiErrorDetail';
 import { toast } from 'features/toast/toast';
