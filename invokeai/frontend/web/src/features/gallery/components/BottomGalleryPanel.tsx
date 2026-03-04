@@ -1,9 +1,10 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Button, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import AddBoardButton from 'features/gallery/components/Boards/BoardsList/AddBoardButton';
+import {AddBoardButton, AddBoardIconButton} from 'features/gallery/components/Boards/BoardsList/AddBoardButton';
 import { BoardsList } from 'features/gallery/components/Boards/BoardsList/BoardsList';
+import { CollapsedBoardsList } from 'features/gallery/components/Boards/BoardsList/CollapsedBoardsList';
 import { GalleryImageGrid } from 'features/gallery/components/GalleryImageGrid';
 import { GalleryImageGridPaged } from 'features/gallery/components/GalleryImageGridPaged';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
@@ -14,12 +15,7 @@ import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
 import { memo, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  PiCaretDownBold,
-  PiCaretUpBold,
-  PiMagnifyingGlassBold,
-  PiSidebarSimpleBold,
-} from 'react-icons/pi';
+import { PiCaretDownBold, PiCaretUpBold, PiMagnifyingGlassBold, PiSidebarSimpleBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 import { GalleryHeader } from './GalleryHeader';
@@ -46,20 +42,39 @@ const BOARDS_SIDEBAR_STYLES_SX: SystemStyleObject = {
   flexShrink: 0,
   borderEndWidth: 1,
   borderColor: 'base.700',
-  gap: 1,
   position: 'relative',
 };
 
 const BOARDS_SIDEBAR_EXPANDED_STYLES_SX: SystemStyleObject = {
   ...BOARDS_SIDEBAR_STYLES_SX,
-  w: `${BOARDS_SIDEBAR_DEFAULT_WIDTH_PX}px`,
   minW: `${BOARDS_SIDEBAR_MIN_WIDTH_PX}px`,
 };
 
+const COLLAPSED_SIDEBAR_WIDTH = 16;
+const COLLAPSED_CONTROL_SIZE = 12;
+const SIDEBAR_ACTION_ROW_HEIGHT = 12;
+
 const BOARDS_SIDEBAR_COLLAPSED_STYLES_SX: SystemStyleObject = {
   ...BOARDS_SIDEBAR_STYLES_SX,
-  w: 12,
-  minW: 12,
+  w: COLLAPSED_SIDEBAR_WIDTH,
+  minW: COLLAPSED_SIDEBAR_WIDTH,
+};
+
+const BOARDS_SIDEBAR_RESIZE_HANDLE_STYLES_SX: SystemStyleObject = {
+  position: 'absolute',
+  insetY: 0,
+  right: '-2px',
+  w: '4px',
+  cursor: 'col-resize',
+  _hover: { bg: 'base.600' },
+  transition: 'background 0.15s',
+}
+
+const COLLAPSED_SIDEBAR_ICON_BUTTON_PROPS = {
+  variant: 'ghost' as const,
+  w: COLLAPSED_CONTROL_SIZE,
+  h: COLLAPSED_CONTROL_SIZE,
+  p: 0,
 };
 
 /**
@@ -132,57 +147,68 @@ export const BottomGalleryPanel = memo(() => {
     <Flex flexDirection="column" h="full" w="full" minH={0}>
       {/* Header bar - always visible, even when collapsed */}
       <Flex sx={HEADER_STYLES_SX}>
-        <Flex gap={2} alignItems="center">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleToggleGallery}
-            leftIcon={isGalleryCollapsed ? <PiCaretUpBold /> : <PiCaretDownBold />}
-            // noOfLines={1}
-            flexShrink={0}
-            tooltip={isGalleryCollapsed ? t('gallery.expandGallery') : t('gallery.collapseGallery')}
-          >
-            {t('common.board')}: {boardName}
-          </Button>
-          <IconButton
-            size="sm"
-            variant="link"
-            alignSelf="stretch"
-            onClick={handleToggleBoardsSidebar}
-            tooltip={isBoardsSidebarCollapsed ? t('gallery.showBoardsSidebar') : t('gallery.hideBoardsSidebar')}
-            aria-label={t('gallery.toggleBoardsSidebar')}
-            icon={<PiSidebarSimpleBold />}
-            colorScheme={isBoardsSidebarCollapsed ? 'base' : 'invokeBlue'}
-          />
-        </Flex>
-        <Spacer />
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={handleToggleGallery}
+          leftIcon={isGalleryCollapsed ? <PiCaretUpBold /> : <PiCaretDownBold />}
+          // noOfLines={1} -> this results in weird vertical alignment, ideally we re-enable this and fix
+          flexShrink={0}
+          tooltip={isGalleryCollapsed ? t('gallery.expandGallery') : t('gallery.collapseGallery')}
+        >
+          {t('common.board')}: {boardName}
+        </Button>
       </Flex>
 
       {/* Main content area - hidden when collapsed */}
-      <Flex flex={1} minH={0} w="full">
+      <Flex flex={1} minH={0} w="full" position="relative">
         {/* Boards Sidebar */}
-
-        {/*{!isBoardsSidebarCollapsed && (
-          <>
-            <Flex
-              flexDirection="column"
-              w={`${boardsSidebarWidth}px`}
-              minW={`${BOARDS_SIDEBAR_MIN_WIDTH_PX}px`}
-              h="full"
-              flexShrink={0}
-              borderRightWidth={1}
-              borderColor="base.700"
-              gap={1}
-            >
+        <Flex
+          flexDirection="column"
+          sx={isBoardsSidebarCollapsed ? BOARDS_SIDEBAR_COLLAPSED_STYLES_SX : BOARDS_SIDEBAR_EXPANDED_STYLES_SX}
+          w={isBoardsSidebarCollapsed ? COLLAPSED_SIDEBAR_WIDTH : `${boardsSidebarWidth}px`}
+        >
+          {isBoardsSidebarCollapsed ? (
+            // Boards sidebar collapsed view
+            <>
+              <Flex flex={1} minH={0} position="relative" flexDir="column" alignItems="center" p={1}>
+                <IconButton
+                  {...COLLAPSED_SIDEBAR_ICON_BUTTON_PROPS}
+                  icon={<PiSidebarSimpleBold />}
+                  onClick={handleToggleBoardsSidebar}
+                  tooltip={t('gallery.showBoardsSidebar')}
+                  aria-label={t('gallery.toggleBoardsSidebar')}
+                />
+                <IconButton
+                  {...COLLAPSED_SIDEBAR_ICON_BUTTON_PROPS}
+                  icon={<PiMagnifyingGlassBold />}
+                  onClick={onCollapsedBoardSearch}
+                  tooltip={t('boards.searchBoard')}
+                  aria-label={t('boards.searchBoard')}
+                />
+                <CollapsedBoardsList />
+              </Flex>
+              <Flex
+                p={1}
+                borderTopWidth={1}
+                borderColor="base.700"
+                justifyContent="center"
+                flexShrink={0}
+                h={SIDEBAR_ACTION_ROW_HEIGHT}
+              >
+                <AddBoardIconButton />
+              </Flex>
+            </>
+          ) : (
+            // Boards sidebar expanded view
+            <>
               <Flex flex={1} minH={0} position="relative">
                 <Box position="absolute" top={0} right={0} bottom={0} left={0} px={2}>
                   <OverlayScrollbarsComponent style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
-                    <BoardsList />
+                    <BoardsList onCollapse={handleToggleBoardsSidebar} showHeaderAddButton />
                   </OverlayScrollbarsComponent>
                 </Box>
               </Flex>
-
-
               <Flex
                 p={2}
                 borderTopWidth={1}
@@ -190,63 +216,20 @@ export const BottomGalleryPanel = memo(() => {
                 alignItems="center"
                 justifyContent="center"
                 flexShrink={0}
+                h={SIDEBAR_ACTION_ROW_HEIGHT}
               >
                 <AddBoardButton />
               </Flex>
-            </Flex>
-
-
-            <Flex
-              w="4px"
-              cursor="col-resize"
-              bg="base.700"
-              _hover={{ bg: 'base.500' }}
-              transition="background 0.15s"
-              onMouseDown={handleResizeStart}
-              flexShrink={0}
-            />
-          </>
-        )}*/}
-
-        <Flex
-          flexDirection="column"
-          sx={isBoardsSidebarCollapsed ? BOARDS_SIDEBAR_COLLAPSED_STYLES_SX : BOARDS_SIDEBAR_EXPANDED_STYLES_SX}
-        >
-          {isBoardsSidebarCollapsed ? (
-            <>
-              <IconButton
-                size="sm"
-                variant="ghost"
-                icon={<PiSidebarSimpleBold />}
-                onClick={handleToggleBoardsSidebar}
-                tooltip={t('gallery.showBoardsSidebar')}
-                aria-label={t('gallery.toggleBoardsSidebar')}
-              />
-              <IconButton
-                size="sm"
-                variant="ghost"
-                icon={<PiMagnifyingGlassBold />}
-                onClick={onCollapsedBoardSearch}
-                tooltip={t('gallery.searchBoards')}
-                aria-label={t('gallery.searchBoards')}
-              />
             </>
-          ) : (
-            <p>something</p>
+          )}
+
+          {!isBoardsSidebarCollapsed && (
+            <Flex
+              sx={BOARDS_SIDEBAR_RESIZE_HANDLE_STYLES_SX}
+              onMouseDown={handleResizeStart}
+            />
           )}
         </Flex>
-
-        {!isBoardsSidebarCollapsed && (
-          <Flex
-            w="4px"
-            cursor="col-resize"
-            bg="base.700"
-            _hover={{ bg: 'base.500' }}
-            transition="background 0.15s"
-            onMouseDown={handleResizeStart}
-            flexShrink={0}
-          />
-        )}
 
         {/* Image grid area */}
         <Flex flexDirection="column" flex={1} minW={800} h="full">

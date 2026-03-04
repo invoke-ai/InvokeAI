@@ -1,4 +1,4 @@
-import { Collapse, Flex, Text, useDisclosure } from '@invoke-ai/ui-library';
+import { Collapse, Flex, IconButton, Text, useDisclosure } from '@invoke-ai/ui-library';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
 import { fixTooltipCloseOnScrollStyles } from 'common/util/fixTooltipCloseOnScrollStyles';
@@ -9,13 +9,21 @@ import {
 } from 'features/gallery/store/gallerySelectors';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PiSidebarSimpleBold } from 'react-icons/pi';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
-import AddBoardButton from './AddBoardButton';
+import { AddBoardIconButton } from './AddBoardButton';
 import BoardItem from './BoardItem';
 import { BoardsSearch } from './BoardsSearch';
 
-export const BoardsList = memo(() => {
+const HEADER_ACTION_BUTTON_SIZE = 10;
+
+type BoardsListProps = {
+  onCollapse?: () => void;
+  showHeaderAddButton?: boolean;
+};
+
+export const BoardsList = memo(({ onCollapse, showHeaderAddButton = false }: BoardsListProps) => {
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const boardSearchText = useAppSelector(selectBoardSearchText);
@@ -65,7 +73,22 @@ export const BoardsList = memo(() => {
         <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.400">
           {t('boards.boards')}
         </Text>
-        <AddBoardButton variant="icon" />
+        <Flex alignItems="center" gap={1}>
+          {onCollapse && (
+            <IconButton
+              size="sm"
+              variant="ghost"
+              icon={<PiSidebarSimpleBold />}
+              onClick={onCollapse}
+              tooltip={t('gallery.hideBoardsSidebar')}
+              aria-label={t('gallery.toggleBoardsSidebar')}
+              h={HEADER_ACTION_BUTTON_SIZE}
+              w={HEADER_ACTION_BUTTON_SIZE}
+              p={0}
+            />
+          )}
+          {showHeaderAddButton && <AddBoardIconButton />}
+        </Flex>
       </Flex>
       <Flex pb={2}>
         <BoardsSearch />
