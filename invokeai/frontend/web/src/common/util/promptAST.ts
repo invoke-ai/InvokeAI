@@ -23,6 +23,8 @@ export type PromptFunctionArg = {
   quote: string;
   /** Range of the content between the quotes (exclusive of quotes themselves) in original prompt coordinates. */
   contentRange: { start: number; end: number };
+  /** Raw separator whitespace after the comma before this arg (args[1+] only). */
+  separator?: string;
 };
 
 export type ASTNode =
@@ -406,6 +408,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
     const args: PromptFunctionArg[] = [];
     let openQuoteChar: string | null = null;
     let closeQuoteChar: string | null = null;
+    let pendingSeparator: string | undefined;
 
     while (pos < tokens.length) {
       // Skip whitespace before arg or closing paren
@@ -422,9 +425,15 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
       if (args.length > 0) {
         if (isPunctValue(peek(), ',')) {
           consume();
+          let sep = '';
           while (peek()?.type === 'whitespace') {
-            consume();
+            const sepToken = consume()!;
+            const sepValue = tokenValue(sepToken);
+            if (sepValue !== undefined) {
+              sep += sepValue;
+            }
           }
+          pendingSeparator = sep;
         } else {
           pos = savedPos;
           return null;
@@ -484,7 +493,9 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
         nodes: argNodes,
         quote: openQuoteChar,
         contentRange: { start: contentStart, end: contentEnd },
+        separator: pendingSeparator,
       });
+      pendingSeparator = undefined;
     }
 
     if (args.length === 0) {
@@ -523,6 +534,7 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
    */
   function tryParseUnquotedPromptFunction(lparenToken: Token & { type: 'lparen' }, savedPos: number): ASTNode | null {
     const args: PromptFunctionArg[] = [];
+    let pendingSeparator: string | undefined;
 
     while (pos < tokens.length) {
       // Check for rparen (end of prompt function args)
@@ -534,6 +546,15 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
       if (args.length > 0) {
         if (isPunctValue(peek(), ',')) {
           consume(); // consume comma
+          let sep = '';
+          while (peek()?.type === 'whitespace') {
+            const sepToken = consume()!;
+            const sepValue = tokenValue(sepToken);
+            if (sepValue !== undefined) {
+              sep += sepValue;
+            }
+          }
+          pendingSeparator = sep;
         } else {
           pos = savedPos;
           return null;
@@ -594,7 +615,9 @@ export function parseTokens(tokens: Token[]): ASTNode[] {
         nodes: argNodes,
         quote: '', // Unquoted
         contentRange: { start: trimmedStart, end: trimmedEnd },
+        separator: pendingSeparator,
       });
+      pendingSeparator = undefined;
     }
 
     if (args.length < 2) {
@@ -813,7 +836,8 @@ function serializeCore(ast: ASTNode[], visitor: SerializeVisitor | undefined, bu
         buf.prompt += '(';
         for (let i = 0; i < node.promptArgs.length; i++) {
           if (i > 0) {
-            buf.prompt += ', ';
+            const sep = node.promptArgs[i]!.separator ?? ' ';
+            buf.prompt += `,${sep}`;
           }
           const arg = node.promptArgs[i]!;
           buf.prompt += arg.quote;

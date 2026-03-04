@@ -460,6 +460,14 @@ describe('adjustPromptAttention', () => {
         expect(result.prompt).toBe('(hello+, other).and()');
       });
     });
+
+    describe('paragraph separators between args', () => {
+      it('should preserve newlines between quoted args when adjusting', () => {
+        const prompt = "('chunk 1\n\nline',\n 'chunk 2').and()";
+        const result = adj(prompt, 'chunk', 'increment');
+        expect(result.prompt).toBe("('chunk+ 1\n\nline',\n 'chunk 2').and()");
+      });
+    });
   });
 
   // Selection Preservation with Prompt Functions

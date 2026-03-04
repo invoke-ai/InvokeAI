@@ -695,6 +695,7 @@ describe('promptAST', () => {
       '(one two, three four).blend(0.7, 0.3)',
       '(a, b, c).blend(0.5, 0.3, 0.2)',
       'some text, (a, b).and(), more text',
+      "('one',\n 'two',\n 'three').and()",
     ])('should round-trip: %s', (prompt) => {
       expect(roundTrip(prompt)).toBe(prompt);
     });
