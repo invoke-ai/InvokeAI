@@ -14,6 +14,7 @@ import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
 import { AddBoardIconButton } from './AddBoardButton';
 import BoardItem from './BoardItem';
+import { BoardsSettingsPopover } from './BoardsSettingsPopover';
 import { BoardsSearch } from './BoardsSearch';
 
 const HEADER_ACTION_BUTTON_SIZE = 10;
@@ -87,7 +88,8 @@ export const BoardsList = memo(({ onCollapse, showHeaderAddButton = false }: Boa
               p={0}
             />
           )}
-          {showHeaderAddButton && <AddBoardIconButton />}
+          <BoardsSettingsPopover h={HEADER_ACTION_BUTTON_SIZE} w={HEADER_ACTION_BUTTON_SIZE} p={0} />
+          {showHeaderAddButton && <AddBoardIconButton h={HEADER_ACTION_BUTTON_SIZE} w={HEADER_ACTION_BUTTON_SIZE} p={0} />}
         </Flex>
       </Flex>
       <Flex pb={2}>

@@ -161,6 +161,7 @@ export const {
   imageSelected,
   shouldAutoSwitchChanged,
   setGalleryColumns,
+  autoAssignBoardOnClickChanged,
   boardIdSelected,
   autoAddBoardIdChanged,
   galleryViewChanged,
@@ -175,6 +176,8 @@ export const {
   orderDirChanged,
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
+  boardsListOrderByChanged,
+  boardsListOrderDirChanged,
   searchTermChanged,
   showAspectRatioThumbnailsChanged,
 } = slice.actions;
