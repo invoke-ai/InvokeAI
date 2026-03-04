@@ -2,7 +2,6 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Box,
   Button,
-  ButtonGroup,
   Flex,
   Heading,
   IconButton,
@@ -202,8 +201,6 @@ export const ModelInstallQueue = memo(() => {
   const hasPauseableInstalls = pauseableInstallIds.length > 0;
   const hasResumableInstalls = resumableInstallIds.length > 0;
   const hasCancelableInstalls = cancelableInstallIds.length > 0;
-  const showResumeAll = !hasPauseableInstalls && hasResumableInstalls;
-  const pauseResumeAvailable = hasPauseableInstalls || hasResumableInstalls;
 
   const pruneAvailable = useMemo(() => {
     return data?.some(
@@ -211,16 +208,25 @@ export const ModelInstallQueue = memo(() => {
     );
   }, [data]);
 
-  const pauseResumeLabel = showResumeAll ? t('modelManager.resumeAll') : t('modelManager.pauseAll');
-
-  const pauseOrResumeAll = useCallback(() => {
-    if (showResumeAll) {
-      void runBulkAction('resume', resumableInstallIds);
-      return;
+  const isPrunePriority = useMemo(() => {
+    if (!pruneAvailable) {
+      return false;
     }
 
+    if (hasCancelableInstalls) {
+      return false;
+    }
+
+    return true;
+  }, [pruneAvailable, hasCancelableInstalls]);
+
+  const pauseAll = useCallback(() => {
     void runBulkAction('pause', pauseableInstallIds);
-  }, [pauseableInstallIds, resumableInstallIds, runBulkAction, showResumeAll]);
+  }, [pauseableInstallIds, runBulkAction]);
+
+  const resumeAll = useCallback(() => {
+    void runBulkAction('resume', resumableInstallIds);
+  }, [resumableInstallIds, runBulkAction]);
 
   const cancelAll = useCallback(() => {
     void runBulkAction('cancel', cancelableInstallIds);
@@ -237,37 +243,70 @@ export const ModelInstallQueue = memo(() => {
         </Flex>
 
         {/* Bulk Actions */}
-        <ButtonGroup>
-          <Button
-            size="sm"
-            leftIcon={<PiBroomBold />}
-            isDisabled={!pruneAvailable || isBulkActionRunning}
-            isLoading={isPruning}
-            onClick={pruneCompletedModelInstalls}
-            tooltip={t('modelManager.pruneTooltip')}
-          >
-            {t('modelManager.prune')}
-          </Button>
+        {/* Non-destructive, easily-ccessible actions */}
+        <Flex gap={2}>
+          {hasPauseableInstalls && (
+            <Button
+              size="sm"
+              leftIcon={<PiPauseFill />}
+              isDisabled={isBulkActionRunning || isPruning}
+              onClick={pauseAll}
+              variant="outline"
+            >
+              {t('modelManager.pauseAll')}
+            </Button>
+          )}
+
+          {hasResumableInstalls && (
+            <Button
+              size="sm"
+              leftIcon={<PiPlayFill />}
+              isDisabled={isBulkActionRunning || isPruning}
+              onClick={resumeAll}
+              variant="outline"
+            >
+              {t('modelManager.resumeAll')}
+            </Button>
+          )}
+
+          {/* When no other actions, offer to prune */}
+          {isPrunePriority && (
+            <Button
+              leftIcon={<PiBroomBold />}
+              size="sm"
+              isDisabled={!pruneAvailable || isBulkActionRunning || isPruning}
+              onClick={pruneCompletedModelInstalls}
+              variant="outline"
+            >
+              {t('modelManager.prune')}
+            </Button>
+          )}
+
+          {/* Destructive Actions go to the dropdown menu */}
           <Menu>
             <MenuButton as={IconButton} size="sm" icon={<PiCaretDownBold />} />
             <MenuList>
+              {!isPrunePriority && (
+                <MenuItem
+                  icon={<PiBroomBold />}
+                  isDisabled={!pruneAvailable || isBulkActionRunning || isPruning}
+                  onClick={pruneCompletedModelInstalls}
+                >
+                  {t('modelManager.prune')}
+                </MenuItem>
+              )}
               <MenuItem
-                icon={showResumeAll ? <PiPlayFill /> : <PiPauseFill />}
-                isDisabled={!pauseResumeAvailable || isBulkActionRunning || isPruning}
-                onClick={pauseOrResumeAll}
-              >
-                {pauseResumeLabel}
-              </MenuItem>
-              <MenuItem
+                color="error.300"
                 icon={<PiXBold />}
                 isDisabled={!hasCancelableInstalls || isBulkActionRunning || isPruning}
                 onClick={cancelAll}
+                isDestructive
               >
                 {t('modelManager.cancelAll')}
               </MenuItem>
             </MenuList>
           </Menu>
-        </ButtonGroup>
+        </Flex>
       </Flex>
 
       {/* Model Queue List */}
