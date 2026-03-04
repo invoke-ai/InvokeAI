@@ -46,7 +46,6 @@ export const AddBoardButton = memo(() => {
 
 AddBoardButton.displayName = 'AddBoardButton';
 
-
 export const AddBoardIconButton = memo((props: Partial<IconButtonProps>) => {
   const { handleCreateBoard, isLoading, t } = useAddBoard();
   const { 'aria-label': ariaLabel = t('boards.addBoard'), ...rest } = props;
@@ -63,6 +62,6 @@ export const AddBoardIconButton = memo((props: Partial<IconButtonProps>) => {
       {...rest}
     />
   );
-})
+});
 
 AddBoardIconButton.displayName = 'AddBoardIconButton';

@@ -2,7 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Button, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import {AddBoardButton, AddBoardIconButton} from 'features/gallery/components/Boards/BoardsList/AddBoardButton';
+import { AddBoardButton, AddBoardIconButton } from 'features/gallery/components/Boards/BoardsList/AddBoardButton';
 import { BoardsList } from 'features/gallery/components/Boards/BoardsList/BoardsList';
 import { CollapsedBoardsList } from 'features/gallery/components/Boards/BoardsList/CollapsedBoardsList';
 import { GalleryImageGrid } from 'features/gallery/components/GalleryImageGrid';
@@ -68,7 +68,7 @@ const BOARDS_SIDEBAR_RESIZE_HANDLE_STYLES_SX: SystemStyleObject = {
   cursor: 'col-resize',
   _hover: { bg: 'base.600' },
   transition: 'background 0.15s',
-}
+};
 
 const COLLAPSED_SIDEBAR_ICON_BUTTON_PROPS = {
   variant: 'ghost' as const,
@@ -224,10 +224,7 @@ export const BottomGalleryPanel = memo(() => {
           )}
 
           {!isBoardsSidebarCollapsed && (
-            <Flex
-              sx={BOARDS_SIDEBAR_RESIZE_HANDLE_STYLES_SX}
-              onMouseDown={handleResizeStart}
-            />
+            <Flex sx={BOARDS_SIDEBAR_RESIZE_HANDLE_STYLES_SX} onMouseDown={handleResizeStart} />
           )}
         </Flex>
 

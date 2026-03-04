@@ -40,15 +40,15 @@ export const BoardsSearch = memo(() => {
     [handleBoardSearch]
   );
 
-    return (
-      <InputGroup>
-        <Input
-          h={10}
-          placeholder={t('boards.searchBoard')}
-          value={boardSearchText}
-          onKeyDown={handleKeydown}
-          onChange={handleChange}
-          data-testid="board-search-input"
+  return (
+    <InputGroup>
+      <Input
+        h={10}
+        placeholder={t('boards.searchBoard')}
+        value={boardSearchText}
+        onKeyDown={handleKeydown}
+        onChange={handleChange}
+        data-testid="board-search-input"
       />
       {boardSearchText && boardSearchText.length && (
         <InputRightElement h="full" pe={2}>
