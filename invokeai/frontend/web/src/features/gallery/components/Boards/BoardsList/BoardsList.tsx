@@ -89,7 +89,9 @@ export const BoardsList = memo(({ onCollapse, showHeaderAddButton = false }: Boa
             />
           )}
           <BoardsSettingsPopover h={HEADER_ACTION_BUTTON_SIZE} w={HEADER_ACTION_BUTTON_SIZE} p={0} />
-          {showHeaderAddButton && <AddBoardIconButton h={HEADER_ACTION_BUTTON_SIZE} w={HEADER_ACTION_BUTTON_SIZE} p={0} />}
+          {showHeaderAddButton && (
+            <AddBoardIconButton h={HEADER_ACTION_BUTTON_SIZE} w={HEADER_ACTION_BUTTON_SIZE} p={0} />
+          )}
         </Flex>
       </Flex>
       <Flex pb={2}>

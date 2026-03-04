@@ -126,13 +126,23 @@ export const BoardsSettingsPopover = memo((iconButtonProps: Partial<IconButtonPr
                 <FormLabel flexGrow={1} m={0}>
                   {t('common.orderBy')}
                 </FormLabel>
-                <Combobox isSearchable={false} value={orderByValue} options={orderByOptions} onChange={onChangeOrderBy} />
+                <Combobox
+                  isSearchable={false}
+                  value={orderByValue}
+                  options={orderByOptions}
+                  onChange={onChangeOrderBy}
+                />
               </FormControl>
               <FormControl>
                 <FormLabel flexGrow={1} m={0}>
                   {t('common.direction')}
                 </FormLabel>
-                <Combobox isSearchable={false} value={orderDirValue} options={orderDirOptions} onChange={onChangeOrderDir} />
+                <Combobox
+                  isSearchable={false}
+                  value={orderDirValue}
+                  options={orderDirOptions}
+                  onChange={onChangeOrderDir}
+                />
               </FormControl>
             </Flex>
           </PopoverBody>
