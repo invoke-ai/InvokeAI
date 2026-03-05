@@ -317,8 +317,8 @@ export const ModelInstallQueue = memo(() => {
               <Tr>
                 <Th minWidth="50px"></Th>
                 <Th width="80%">Name</Th>
-                <Th minWidth="115px">Status</Th>
-                <Th minWidth="130px" textAlign="right">
+                <Th minWidth="130px">Status</Th>
+                <Th minWidth="160px" textAlign="right">
                   Actions
                 </Th>
               </Tr>
