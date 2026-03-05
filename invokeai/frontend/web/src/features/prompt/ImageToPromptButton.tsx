@@ -20,7 +20,7 @@ import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { positivePromptChanged, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { setPromptUndo } from 'features/prompt/promptUndo';
-import { memo, useCallback, useState } from 'react';
+import { memo, useCallback, useEffect, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import { useImageToPromptMutation } from 'services/api/endpoints/utilities';
 import { useLlavaModels } from 'services/api/hooks/modelsByType';
@@ -30,7 +30,12 @@ const loadingStyles: SystemStyleObject = {
   svg: { animation: spinAnimation },
 };
 
-export const ImageToPromptButton = memo(() => {
+type Props = {
+  droppedImage?: ImageDTO;
+  onClearDroppedImage?: () => void;
+};
+
+export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: Props) => {
   const dispatch = useAppDispatch();
   const currentPrompt = useAppSelector(selectPositivePrompt);
   const [modelConfigs] = useLlavaModels();
@@ -46,6 +51,15 @@ export const ImageToPromptButton = memo(() => {
   const handleImageUpload = useCallback((imageDTO: ImageDTO) => {
     setUploadedImage(imageDTO);
   }, []);
+
+  // When a gallery image is dropped onto the prompt box, auto-open and set the image
+  useEffect(() => {
+    if (droppedImage) {
+      setUploadedImage(droppedImage);
+      popover.open();
+      onClearDroppedImage?.();
+    }
+  }, [droppedImage, onClearDroppedImage, popover]);
 
   const { getUploadButtonProps, getUploadInputProps } = useImageUploadButton({
     allowMultiple: false,

@@ -1,3 +1,5 @@
+import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
+import { dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Box, Flex, Textarea } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize';
@@ -7,6 +9,9 @@ import {
   selectPositivePrompt,
   selectPositivePromptHistory,
 } from 'features/controlLayers/store/paramsSlice';
+import { singleImageDndSource } from 'features/dnd/dnd';
+import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
+import type { DndTargetState } from 'features/dnd/types';
 import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/components/ShowDynamicPromptsPreviewButton';
 import { NegativePromptToggleButton } from 'features/parameters/components/Core/NegativePromptToggleButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
@@ -24,11 +29,12 @@ import {
   selectStylePresetViewMode,
 } from 'features/stylePresets/store/stylePresetSlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import React, { memo, useCallback, useRef } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useClickAway } from 'react-use';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
+import type { ImageDTO } from 'services/api/types';
 
 import { PositivePromptHistoryIconButton } from './PositivePromptHistory';
 
@@ -227,8 +233,44 @@ export const ParamPositivePrompt = memo(() => {
     onPromptChange: (prompt) => dispatch(positivePromptChanged(prompt)),
   });
 
+  // Drop target for gallery images -> Image to Prompt
+  const dropTargetRef = useRef<HTMLDivElement>(null);
+  const [droppedImage, setDroppedImage] = useState<ImageDTO | undefined>(undefined);
+  const [dndState, setDndState] = useState<DndTargetState>('idle');
+
+  const clearDroppedImage = useCallback(() => {
+    setDroppedImage(undefined);
+  }, []);
+
+  useEffect(() => {
+    const element = dropTargetRef.current;
+    if (!element) {
+      return;
+    }
+
+    return combine(
+      dropTargetForElements({
+        element,
+        canDrop: ({ source }) => singleImageDndSource.typeGuard(source.data),
+        onDragEnter: () => setDndState('over'),
+        onDragLeave: () => setDndState('potential'),
+        onDrop: ({ source }) => {
+          setDndState('idle');
+          if (singleImageDndSource.typeGuard(source.data)) {
+            setDroppedImage(source.data.payload.imageDTO);
+          }
+        },
+      }),
+      monitorForElements({
+        canMonitor: ({ source }) => singleImageDndSource.typeGuard(source.data),
+        onDragStart: () => setDndState('potential'),
+        onDrop: () => setDndState('idle'),
+      })
+    );
+  }, []);
+
   return (
-    <Box pos="relative">
+    <Box pos="relative" ref={dropTargetRef}>
       <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
         <Box pos="relative">
           <Textarea
@@ -254,7 +296,7 @@ export const ParamPositivePrompt = memo(() => {
               <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
               <ShowDynamicPromptsPreviewButton />
               <ExpandPromptButton />
-              <ImageToPromptButton />
+              <ImageToPromptButton droppedImage={droppedImage} onClearDroppedImage={clearDroppedImage} />
               <PositivePromptHistoryIconButton />
               {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
             </Flex>
@@ -269,6 +311,7 @@ export const ParamPositivePrompt = memo(() => {
           )}
         </Box>
       </PromptPopover>
+      <DndDropOverlay dndState={dndState} label="Image to Prompt" />
     </Box>
   );
 });
