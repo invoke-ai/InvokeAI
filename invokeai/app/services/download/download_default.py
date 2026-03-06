@@ -88,7 +88,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         """Stop the download worker threads."""
         with self._lock:
             if not self._worker_pool:
-                raise Exception("Attempt to stop the download service before it was started")
+                return
             self._accept_download_requests = False  # reject attempts to add new jobs to queue
             queued_jobs = [x for x in self.list_jobs() if x.status == DownloadJobStatus.WAITING]
             active_jobs = [x for x in self.list_jobs() if x.status == DownloadJobStatus.RUNNING]
