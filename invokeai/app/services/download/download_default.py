@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Lincoln D. Stein
+# Copyright (c) 2023,2026 Lincoln D. Stein
 """Implementation of multithreaded download queue for invokeai."""
 
 import os
@@ -388,18 +388,23 @@ class DownloadQueueService(DownloadQueueServiceBase):
             if len(candidates) == 1:
                 inferred = candidates[0].with_name(candidates[0].name.removesuffix(".downloading"))
                 job.download_path = inferred
-                resume_from = candidates[0].stat().st_size
-                job.bytes = resume_from
-                self._logger.debug(
-                    f"Resume check (dir): inferred in-progress file path={candidates[0]} size={resume_from} bytes"
-                )
-                if resume_from > 0:
-                    if job.etag:
-                        header["If-Range"] = job.etag
-                    elif job.last_modified:
-                        header["If-Range"] = job.last_modified
-                    header["Range"] = f"bytes={resume_from}-"
-                    open_mode = "ab"
+                try:
+                    resume_from = candidates[0].stat().st_size
+                except FileNotFoundError:
+                    # The .downloading file was renamed/deleted between glob and stat (race condition); skip resume.
+                    job.download_path = None
+                else:
+                    job.bytes = resume_from
+                    self._logger.debug(
+                        f"Resume check (dir): inferred in-progress file path={candidates[0]} size={resume_from} bytes"
+                    )
+                    if resume_from > 0:
+                        if job.etag:
+                            header["If-Range"] = job.etag
+                        elif job.last_modified:
+                            header["If-Range"] = job.last_modified
+                        header["Range"] = f"bytes={resume_from}-"
+                        open_mode = "ab"
             else:
                 self._logger.debug(
                     "Resume check (dir): no prior download_path available; cannot resume from disk "
