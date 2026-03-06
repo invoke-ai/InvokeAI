@@ -1212,7 +1212,7 @@ class DeleteOrphanedModelsResponse(BaseModel):
     operation_id="get_orphaned_models",
     response_model=list[OrphanedModelInfo],
 )
-async def get_orphaned_models() -> list[OrphanedModelInfo]:
+async def get_orphaned_models(_: AdminUserOrDefault) -> list[OrphanedModelInfo]:
     """Find orphaned model directories.
 
     Orphaned models are directories in the models folder that contain model files
@@ -1239,7 +1239,9 @@ async def get_orphaned_models() -> list[OrphanedModelInfo]:
     operation_id="delete_orphaned_models",
     response_model=DeleteOrphanedModelsResponse,
 )
-async def delete_orphaned_models(request: DeleteOrphanedModelsRequest) -> DeleteOrphanedModelsResponse:
+async def delete_orphaned_models(
+    request: DeleteOrphanedModelsRequest, _: AdminUserOrDefault
+) -> DeleteOrphanedModelsResponse:
     """Delete specified orphaned model directories.
 
     Args:
