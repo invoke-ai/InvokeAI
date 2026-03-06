@@ -24312,6 +24312,11 @@ export type components = {
              * @description Whether multiuser mode is enabled
              */
             multiuser_enabled: boolean;
+            /**
+             * Admin Email
+             * @description Email of the first active admin user, if any
+             */
+            admin_email?: string | null;
         };
         /**
          * Show Image
