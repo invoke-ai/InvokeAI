@@ -167,7 +167,9 @@ class ModelLoader(ModelLoaderBase):
             storage_dtype=torch.float8_e4m3fn,
             compute_dtype=self._torch_dtype,
         )
-        self._logger.info(f"FP8 layerwise casting enabled for {config.name} (storage=float8_e4m3fn, compute={self._torch_dtype})")
+        self._logger.info(
+            f"FP8 layerwise casting enabled for {config.name} (storage=float8_e4m3fn, compute={self._torch_dtype})"
+        )
         return model
 
     # This needs to be implemented in the subclass
