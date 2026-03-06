@@ -234,6 +234,7 @@ export const getRasterLayerState = (
     type: 'raster_layer',
     isEnabled: true,
     isLocked: false,
+    isTransparencyLocked: false,
     objects: [],
     opacity: 1,
     position: { x: 0, y: 0 },
