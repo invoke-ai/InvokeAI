@@ -4,6 +4,7 @@ from typing import Optional
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.workflow_records.workflow_records_common import (
+    WORKFLOW_LIBRARY_DEFAULT_USER_ID,
     Workflow,
     WorkflowCategory,
     WorkflowRecordDTO,
@@ -22,7 +23,7 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def create(self, workflow: WorkflowWithoutID) -> WorkflowRecordDTO:
+    def create(self, workflow: WorkflowWithoutID, user_id: str = WORKFLOW_LIBRARY_DEFAULT_USER_ID) -> WorkflowRecordDTO:
         """Creates a workflow."""
         pass
 
@@ -47,6 +48,8 @@ class WorkflowRecordsStorageBase(ABC):
         query: Optional[str],
         tags: Optional[list[str]],
         has_been_opened: Optional[bool],
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         """Gets many workflows."""
         pass
@@ -56,6 +59,8 @@ class WorkflowRecordsStorageBase(ABC):
         self,
         categories: list[WorkflowCategory],
         has_been_opened: Optional[bool] = None,
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> dict[str, int]:
         """Gets a dictionary of counts for each of the provided categories."""
         pass
@@ -66,6 +71,8 @@ class WorkflowRecordsStorageBase(ABC):
         tags: list[str],
         categories: Optional[list[WorkflowCategory]] = None,
         has_been_opened: Optional[bool] = None,
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> dict[str, int]:
         """Gets a dictionary of counts for each of the provided tags."""
         pass
@@ -79,6 +86,13 @@ class WorkflowRecordsStorageBase(ABC):
     def get_all_tags(
         self,
         categories: Optional[list[WorkflowCategory]] = None,
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> list[str]:
         """Gets all unique tags from workflows."""
+        pass
+
+    @abstractmethod
+    def update_is_public(self, workflow_id: str, is_public: bool) -> WorkflowRecordDTO:
+        """Updates the is_public field of a workflow."""
         pass

@@ -337,7 +337,7 @@ export type ModelInstallStatus = S['InstallStatus'];
 export type Graph = S['Graph'];
 export type NonNullableGraph = SetRequired<Graph, 'nodes' | 'edges'>;
 export type Batch = S['Batch'];
-export const zWorkflowRecordOrderBy = z.enum(['name', 'created_at', 'updated_at', 'opened_at']);
+export const zWorkflowRecordOrderBy = z.enum(['name', 'created_at', 'updated_at', 'opened_at', 'is_public']);
 export type WorkflowRecordOrderBy = z.infer<typeof zWorkflowRecordOrderBy>;
 assert<Equals<S['WorkflowRecordOrderBy'], WorkflowRecordOrderBy>>();
 

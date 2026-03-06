@@ -41,6 +41,7 @@ export const WorkflowLibrarySideNav = () => {
       <Flex flexDir="column" w="full" pb={2} gap={2}>
         <WorkflowLibraryViewButton view="recent">{t('workflows.recentlyOpened')}</WorkflowLibraryViewButton>
         <YourWorkflowsButton />
+        <WorkflowLibraryViewButton view="shared">{t('workflows.sharedWorkflows')}</WorkflowLibraryViewButton>
       </Flex>
       <Flex h="full" minH={0} overflow="hidden" flexDir="column">
         <BrowseWorkflowsButton />

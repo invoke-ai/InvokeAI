@@ -2001,6 +2001,26 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workflows/i/{workflow_id}/is_public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Workflow Is Public
+         * @description Updates whether a workflow is shared publicly
+         */
+        patch: operations["update_workflow_is_public"];
+        trace?: never;
+    };
     "/api/v1/workflows/tags": {
         parameters: {
             query?: never;
@@ -3165,6 +3185,14 @@ export type components = {
         Body_update_workflow: {
             /** @description The updated workflow */
             workflow: components["schemas"]["Workflow"];
+        };
+        /** Body_update_workflow_is_public */
+        Body_update_workflow_is_public: {
+            /**
+             * Is Public
+             * @description Whether the workflow should be shared publicly
+             */
+            is_public: boolean;
         };
         /** Body_upload_image */
         Body_upload_image: {
@@ -27450,6 +27478,16 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * User Id
+             * @description The id of the user who owns this workflow.
+             */
+            user_id: string;
+            /**
+             * Is Public
+             * @description Whether this workflow is shared with all users.
+             */
+            is_public: boolean;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
         };
@@ -27481,6 +27519,16 @@ export type components = {
              */
             opened_at?: string | null;
             /**
+             * User Id
+             * @description The id of the user who owns this workflow.
+             */
+            user_id: string;
+            /**
+             * Is Public
+             * @description Whether this workflow is shared with all users.
+             */
+            is_public: boolean;
+            /**
              * Description
              * @description The description of the workflow.
              */
@@ -27503,7 +27551,7 @@ export type components = {
          * @description The order by options for workflow records
          * @enum {string}
          */
-        WorkflowRecordOrderBy: "created_at" | "updated_at" | "opened_at" | "name";
+        WorkflowRecordOrderBy: "created_at" | "updated_at" | "opened_at" | "name" | "is_public";
         /** WorkflowRecordWithThumbnailDTO */
         WorkflowRecordWithThumbnailDTO: {
             /**
@@ -27531,6 +27579,16 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * User Id
+             * @description The id of the user who owns this workflow.
+             */
+            user_id: string;
+            /**
+             * Is Public
+             * @description Whether this workflow is shared with all users.
+             */
+            is_public: boolean;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
             /**
@@ -32380,6 +32438,8 @@ export interface operations {
                 query?: string | null;
                 /** @description Whether to include/exclude recent workflows */
                 has_been_opened?: boolean | null;
+                /** @description Filter by public/shared status */
+                is_public?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -32554,11 +32614,49 @@ export interface operations {
             };
         };
     };
+    update_workflow_is_public: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow to update */
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_update_workflow_is_public"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_all_tags: {
         parameters: {
             query?: {
                 /** @description The categories to include */
                 categories?: components["schemas"]["WorkflowCategory"][] | null;
+                /** @description Filter by public/shared status */
+                is_public?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -32595,6 +32693,8 @@ export interface operations {
                 categories?: components["schemas"]["WorkflowCategory"][] | null;
                 /** @description Whether to include/exclude recent workflows */
                 has_been_opened?: boolean | null;
+                /** @description Filter by public/shared status */
+                is_public?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -32631,6 +32731,8 @@ export interface operations {
                 categories: components["schemas"]["WorkflowCategory"][];
                 /** @description Whether to include/exclude recent workflows */
                 has_been_opened?: boolean | null;
+                /** @description Filter by public/shared status */
+                is_public?: boolean | null;
             };
             header?: never;
             path?: never;

@@ -2158,6 +2158,8 @@
         "tags": "Tags",
         "yourWorkflows": "Your Workflows",
         "recentlyOpened": "Recently Opened",
+        "sharedWorkflows": "Shared Workflows",
+        "shareWorkflow": "Shared workflow",
         "noRecentWorkflows": "No Recent Workflows",
         "private": "Private",
         "shared": "Shared",
