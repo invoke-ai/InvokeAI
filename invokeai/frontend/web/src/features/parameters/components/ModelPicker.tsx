@@ -3,6 +3,7 @@ import {
   Button,
   Flex,
   Icon,
+  Link,
   Popover,
   PopoverArrow,
   PopoverBody,
@@ -20,6 +21,7 @@ import { buildGroup, getRegex, isGroup, Picker, usePickerContext } from 'common/
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { typedMemo } from 'common/util/typedMemo';
 import { uniq } from 'es-toolkit/compat';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { MODEL_BASE_TO_COLOR, MODEL_BASE_TO_LONG_NAME, MODEL_BASE_TO_SHORT_NAME } from 'features/modelManagerV2/models';
@@ -32,6 +34,7 @@ import { filesize } from 'filesize';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiCaretDownBold, PiLinkSimple } from 'react-icons/pi';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 import { useGetRelatedModelIdsBatchQuery } from 'services/api/endpoints/modelRelationships';
 import type { AnyModelConfig } from 'services/api/types';
 
@@ -82,6 +85,32 @@ const components = {
 
 const NoOptionsFallback = memo(({ noOptionsText }: { noOptionsText?: string }) => {
   const { t } = useTranslation();
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const user = useAppSelector(selectCurrentUser);
+
+  const isMultiuser = setupStatus?.multiuser_enabled ?? false;
+  const isAdmin = !isMultiuser || (user?.is_admin ?? false);
+  const adminEmail = setupStatus?.admin_email ?? null;
+
+  if (!isAdmin) {
+    const AdminEmailLink = adminEmail ? (
+      <Link href={`mailto:${adminEmail}`} color="base.200">
+        {adminEmail}
+      </Link>
+    ) : (
+      <Text as="span" color="base.200">
+        your administrator
+      </Text>
+    );
+
+    return (
+      <Flex flexDir="column" gap={4} alignItems="center">
+        <Text color="base.200" textAlign="center">
+          <Trans i18nKey="modelManager.modelPickerFallbackNoModelsInstalledNonAdmin" components={{ AdminEmailLink }} />
+        </Text>
+      </Flex>
+    );
+  }
 
   return (
     <Flex flexDir="column" gap={4} alignItems="center">

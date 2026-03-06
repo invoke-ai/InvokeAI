@@ -1062,7 +1062,9 @@
         "name": "Name",
         "modelPickerFallbackNoModelsInstalled": "No models installed.",
         "modelPickerFallbackNoModelsInstalled2": "Visit the <LinkComponent>Model Manager</LinkComponent> to install models.",
+        "modelPickerFallbackNoModelsInstalledNonAdmin": "No models installed. Ask your InvokeAI administrator (<AdminEmailLink />) to install some models.",
         "noModelsInstalledDesc1": "Install models with the",
+        "noModelsInstalledAskAdmin": "Ask your administrator to install some.",
         "noModelSelected": "No Model Selected",
         "noMatchingModels": "No matching models",
         "noModelsInstalled": "No models installed",
@@ -2863,6 +2865,7 @@
         "tileOverlap": "Tile Overlap",
         "postProcessingMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
         "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
+        "missingModelsWarningNonAdmin": "Ask your InvokeAI administrator (<AdminEmailLink />) to install the required models:",
         "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",
         "tileControlNetModelDesc": "Tile ControlNet model for the chosen main model architecture",
         "upscaleModelDesc": "Upscale (image to image) model",
@@ -2971,6 +2974,7 @@
             },
             "workflows": {
                 "description": "Workflows are reusable templates that automate image generation tasks, allowing you to quickly perform complex operations and get consistent results.",
+                "descriptionMultiuser": "Workflows are reusable templates that automate image generation tasks, allowing you to quickly perform complex operations and get consistent results. You may share your workflows with other users of the system by selecting 'Shared workflow' when you create or edit it.",
                 "learnMoreLink": "Learn more about creating workflows",
                 "browseTemplates": {
                     "title": "Browse Workflow Templates",
@@ -3049,9 +3053,11 @@
         "toGetStartedLocal": "To get started, make sure to download or import models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "toGetStartedWorkflow": "To get started, fill in the fields on the left and press <StrongComponent>Invoke</StrongComponent> to generate your image. Want to explore more workflows? Click the <StrongComponent>folder icon</StrongComponent> next to the workflow title to see a list of other templates you can try.",
+        "toGetStartedNonAdmin": "To get started, ask your InvokeAI administrator (<AdminEmailLink />) to install the AI models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "gettingStartedSeries": "Want more guidance? Check out our <LinkComponent>Getting Started Series</LinkComponent> for tips on unlocking the full potential of the Invoke Studio.",
         "lowVRAMMode": "For best performance, follow our <LinkComponent>Low VRAM guide</LinkComponent>.",
-        "noModelsInstalled": "It looks like you don't have any models installed! You can <DownloadStarterModelsButton>download a starter model bundle</DownloadStarterModelsButton> or <ImportModelsButton>import models</ImportModelsButton>."
+        "noModelsInstalled": "It looks like you don't have any models installed! You can <DownloadStarterModelsButton>download a starter model bundle</DownloadStarterModelsButton> or <ImportModelsButton>import models</ImportModelsButton>.",
+        "noModelsInstalledAskAdmin": "Ask your administrator to install some."
     },
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",

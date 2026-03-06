@@ -124,3 +124,12 @@ class UserServiceBase(ABC):
             List of users
         """
         pass
+
+    @abstractmethod
+    def get_admin_email(self) -> str | None:
+        """Get the email address of the first active admin user.
+
+        Returns:
+            Email address of the first active admin, or None if no admin exists
+        """
+        pass
