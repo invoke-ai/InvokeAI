@@ -48,7 +48,7 @@ export const GalleryHeader = memo(() => {
 
   return (
     <Flex gap={2} borderBottomWidth={1} borderColor="base.750" alignItems="center" h={12} px={2} w="full">
-      <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.400">
+      <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.400" px={2}>
         {boardName || t('gallery.allImages')}
       </Text>
       <Spacer />

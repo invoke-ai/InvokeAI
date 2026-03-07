@@ -29,13 +29,14 @@ const _hover: SystemStyleObject = {
   bg: 'base.850',
 };
 
-interface BoardItemProps {
+type BoardItemProps = {
   /** Pass a BoardDTO for a regular board, or null for the "Uncategorized" board. */
   board: BoardDTO | null;
   isSelected: boolean;
+  isCollapsed?: boolean;
 }
 
-const BoardItem = ({ board, isSelected }: BoardItemProps) => {
+const BoardItem = ({ board, isSelected, isCollapsed = false }: BoardItemProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
@@ -94,9 +95,7 @@ const BoardItem = ({ board, isSelected }: BoardItemProps) => {
         alignItems="center"
         borderRadius="base"
         cursor="pointer"
-        py={1}
-        ps={1}
-        pe={board ? 2 : 4}
+        p={1}
         gap={2}
         bg={isSelected ? 'base.850' : undefined}
         _hover={_hover}
@@ -117,7 +116,7 @@ const BoardItem = ({ board, isSelected }: BoardItemProps) => {
   );
 
   const countsContent = (
-    <Flex justifyContent="flex-end" flexShrink={0}>
+    <Flex justifyContent="flex-end" flexShrink={0} pe={3}>
       <Text variant="subtext">
         {boardCounts.image_count} | {boardCounts.asset_count}
       </Text>
@@ -126,7 +125,7 @@ const BoardItem = ({ board, isSelected }: BoardItemProps) => {
 
   const tooltipLabel = <BoardTooltip board={board} boardCounts={boardCounts} />;
 
-  const innerContent = (
+  const expandedInnerContent = (
     <>
       <BoardThumbnail board={board} />
       {titleContent}
@@ -136,15 +135,21 @@ const BoardItem = ({ board, isSelected }: BoardItemProps) => {
     </>
   );
 
+  const collapsedInnerContent = (
+    <>
+      <BoardThumbnail board={board} />
+    </>
+  )
+
   return (
     <Box position="relative" w="full" h={12}>
       {board ? (
         <BoardContextMenu board={board}>
-          {(ref) => contextMenuContent(ref, tooltipLabel, innerContent)}
+          {(ref) => contextMenuContent(ref, tooltipLabel, isCollapsed ? collapsedInnerContent : expandedInnerContent)}
         </BoardContextMenu>
       ) : (
         <NoBoardBoardContextMenu>
-          {(ref) => contextMenuContent(ref, tooltipLabel, innerContent)}
+          {(ref) => contextMenuContent(ref, tooltipLabel, isCollapsed ? collapsedInnerContent : expandedInnerContent)}
         </NoBoardBoardContextMenu>
       )}
       <DndDropTarget dndTarget={dndTarget} dndTargetData={dndTargetData} label={t('gallery.move')} />
@@ -185,13 +190,14 @@ const BoardThumbnail = memo(({ board }: { board: BoardDTO | null }) => {
 
   // Uncategorized board - show Invoke logo
   return (
-    <Flex w="10" justifyContent="space-around" flexShrink={0}>
+    <Flex w={10} h={10} justifyContent="center" alignItems="center">
       <Icon boxSize={8} opacity={1} stroke="base.500" viewBox="0 0 66 66" fill="none">
         <path d="M43.9137 16H63.1211V3H3.12109V16H22.3285L43.9137 50H63.1211V63H3.12109V50H22.3285" strokeWidth="5" />
       </Icon>
     </Flex>
   );
 });
+
 BoardThumbnail.displayName = 'BoardThumbnail';
 
 /**
@@ -205,4 +211,5 @@ const NoBoardTitle = memo(({ isSelected }: { isSelected: boolean }) => {
     </Text>
   );
 });
+
 NoBoardTitle.displayName = 'NoBoardTitle';

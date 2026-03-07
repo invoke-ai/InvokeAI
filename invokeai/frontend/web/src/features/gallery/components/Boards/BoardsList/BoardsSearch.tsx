@@ -3,11 +3,11 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectBoardSearchText } from 'features/gallery/store/gallerySelectors';
 import { boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import type { ChangeEvent, KeyboardEvent } from 'react';
-import { memo, useCallback } from 'react';
+import { forwardRef, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
-export const BoardsSearch = memo(() => {
+export const BoardsSearch = memo(forwardRef<HTMLInputElement>((_, ref) => {
   const dispatch = useAppDispatch();
   const boardSearchText = useAppSelector(selectBoardSearchText);
   const { t } = useTranslation();
@@ -49,6 +49,7 @@ export const BoardsSearch = memo(() => {
         onKeyDown={handleKeydown}
         onChange={handleChange}
         data-testid="board-search-input"
+        ref={ref}
       />
       {boardSearchText && boardSearchText.length && (
         <InputRightElement h="full" pe={2}>
@@ -63,5 +64,6 @@ export const BoardsSearch = memo(() => {
       )}
     </InputGroup>
   );
-});
+}));
+
 BoardsSearch.displayName = 'BoardsSearch';
