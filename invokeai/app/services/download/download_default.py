@@ -1,4 +1,4 @@
-# Copyright (c) 2023, Lincoln D. Stein
+# Copyright (c) 2023,2026 Lincoln D. Stein
 """Implementation of multithreaded download queue for invokeai."""
 
 import os
@@ -60,7 +60,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         """
         self._app_config = app_config or get_config()
         self._jobs: Dict[int, DownloadJob] = {}
-        self._download_part2parent: Dict[AnyHttpUrl, MultiFileDownloadJob] = {}
+        self._download_part2parent: Dict[int, MultiFileDownloadJob] = {}
         self._mfd_pending: Dict[int, list[DownloadJob]] = {}
         self._mfd_active: Dict[int, DownloadJob] = {}
         self._next_job_id = 0
@@ -88,7 +88,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         """Stop the download worker threads."""
         with self._lock:
             if not self._worker_pool:
-                raise Exception("Attempt to stop the download service before it was started")
+                return
             self._accept_download_requests = False  # reject attempts to add new jobs to queue
             queued_jobs = [x for x in self.list_jobs() if x.status == DownloadJobStatus.WAITING]
             active_jobs = [x for x in self.list_jobs() if x.status == DownloadJobStatus.RUNNING]
@@ -118,7 +118,8 @@ class DownloadQueueService(DownloadQueueServiceBase):
             raise ServiceInactiveException(
                 "The download service is not currently accepting requests. Please call start() to initialize the service."
             )
-        job.id = self._next_id()
+        if job.id == -1:
+            job.id = self._next_id()
         job.set_callbacks(
             on_start=on_start,
             on_progress=on_progress,
@@ -197,12 +198,13 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 dest=path,
                 access_token=access_token or self._lookup_access_token(url),
             )
+            job.id = self._next_id()  # pre-assign ID so _download_part2parent can be keyed by ID
             if part.size and part.size > 0:
                 job.total_bytes = part.size
                 job.expected_total_bytes = part.size
             job.canonical_url = str(url)
             mfdj.download_parts.add(job)
-            self._download_part2parent[job.source] = mfdj
+            self._download_part2parent[job.id] = mfdj
         if submit_job:
             self.submit_multifile_download(mfdj)
         return mfdj
@@ -327,7 +329,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             finally:
                 job.job_ended = get_iso_timestamp()
                 self._job_terminated_event.set()  # signal a change to terminal state
-                self._download_part2parent.pop(job.source, None)  # if this is a subpart of a multipart job, remove it
+                self._download_part2parent.pop(job.id, None)  # if this is a subpart of a multipart job, remove it
                 self._queue.task_done()
 
         self._logger.debug(f"Download queue worker thread {threading.current_thread().name} exiting.")
@@ -386,18 +388,23 @@ class DownloadQueueService(DownloadQueueServiceBase):
             if len(candidates) == 1:
                 inferred = candidates[0].with_name(candidates[0].name.removesuffix(".downloading"))
                 job.download_path = inferred
-                resume_from = candidates[0].stat().st_size
-                job.bytes = resume_from
-                self._logger.debug(
-                    f"Resume check (dir): inferred in-progress file path={candidates[0]} size={resume_from} bytes"
-                )
-                if resume_from > 0:
-                    if job.etag:
-                        header["If-Range"] = job.etag
-                    elif job.last_modified:
-                        header["If-Range"] = job.last_modified
-                    header["Range"] = f"bytes={resume_from}-"
-                    open_mode = "ab"
+                try:
+                    resume_from = candidates[0].stat().st_size
+                except FileNotFoundError:
+                    # The .downloading file was renamed/deleted between glob and stat (race condition); skip resume.
+                    job.download_path = None
+                else:
+                    job.bytes = resume_from
+                    self._logger.debug(
+                        f"Resume check (dir): inferred in-progress file path={candidates[0]} size={resume_from} bytes"
+                    )
+                    if resume_from > 0:
+                        if job.etag:
+                            header["If-Range"] = job.etag
+                        elif job.last_modified:
+                            header["If-Range"] = job.last_modified
+                        header["Range"] = f"bytes={resume_from}-"
+                        open_mode = "ab"
             else:
                 self._logger.debug(
                     "Resume check (dir): no prior download_path available; cannot resume from disk "
@@ -622,7 +629,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
             self._event_bus.emit_download_cancelled(job)
 
         # if multifile download, then signal the parent
-        if parent_job := self._download_part2parent.get(job.source, None):
+        if parent_job := self._download_part2parent.get(job.id, None):
             if not parent_job.in_terminal_state:
                 parent_job.status = DownloadJobStatus.CANCELLED
                 self._execute_cb(parent_job, "on_cancelled")
@@ -639,7 +646,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         if self._event_bus:
             self._event_bus.emit_download_paused(job)
 
-        if parent_job := self._download_part2parent.get(job.source, None):
+        if parent_job := self._download_part2parent.get(job.id, None):
             if not parent_job.in_terminal_state:
                 parent_job.status = DownloadJobStatus.PAUSED
                 self._execute_cb(parent_job, "on_cancelled")
@@ -669,7 +676,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
     def _mfd_started(self, download_job: DownloadJob) -> None:
         self._logger.info(f"File download started: {download_job.source}")
         with self._lock:
-            mf_job = self._download_part2parent[download_job.source]
+            mf_job = self._download_part2parent[download_job.id]
             if mf_job.waiting:
                 mf_job.total_bytes = sum(x.total_bytes for x in mf_job.download_parts)
                 mf_job.status = DownloadJobStatus.RUNNING
@@ -682,7 +689,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def _mfd_progress(self, download_job: DownloadJob) -> None:
         with self._lock:
-            mf_job = self._download_part2parent[download_job.source]
+            mf_job = self._download_part2parent[download_job.id]
             if mf_job.cancelled:
                 for part in mf_job.download_parts:
                     self.cancel_job(part)
@@ -696,7 +703,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         submit_next = False
         mf_job: Optional[MultiFileDownloadJob] = None
         with self._lock:
-            mf_job = self._download_part2parent[download_job.source]
+            mf_job = self._download_part2parent[download_job.id]
             self._mfd_active.pop(mf_job.id, None)
             mf_job.total_bytes = sum(x.total_bytes for x in mf_job.download_parts)
             mf_job.bytes = sum(x.bytes for x in mf_job.download_parts)
@@ -715,7 +722,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def _mfd_cancelled(self, download_job: DownloadJob) -> None:
         with self._lock:
-            mf_job = self._download_part2parent[download_job.source]
+            mf_job = self._download_part2parent[download_job.id]
             assert mf_job is not None
             self._mfd_active.pop(mf_job.id, None)
 
@@ -735,7 +742,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
     def _mfd_error(self, download_job: DownloadJob, excp: Optional[Exception] = None) -> None:
         with self._lock:
-            mf_job = self._download_part2parent[download_job.source]
+            mf_job = self._download_part2parent[download_job.id]
             assert mf_job is not None
             self._mfd_active.pop(mf_job.id, None)
             if not mf_job.in_terminal_state:
@@ -748,7 +755,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 )
                 for s in [x for x in mf_job.download_parts if x.running]:
                     self.cancel_job(s)
-                self._download_part2parent.pop(download_job.source)
                 self._mfd_pending.pop(mf_job.id, None)
                 self._job_terminated_event.set()
 

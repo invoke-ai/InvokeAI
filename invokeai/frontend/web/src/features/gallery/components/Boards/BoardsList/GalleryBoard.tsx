@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import type { AddImageToBoardDndTargetData } from 'features/dnd/dnd';
 import { addImageToBoardDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -36,6 +37,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
+  const currentUser = useAppSelector(selectCurrentUser);
   const onClick = useCallback(() => {
     if (selectedBoardId !== board.board_id) {
       dispatch(boardIdSelected({ boardId: board.board_id }));
@@ -57,6 +59,8 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     }),
     [board]
   );
+
+  const showOwner = currentUser?.is_admin && board.owner_username;
 
   return (
     <Box position="relative" w="full" h={12}>
@@ -85,8 +89,13 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
               h="full"
             >
               <CoverImage board={board} />
-              <Flex flex={1}>
+              <Flex flex={1} direction="column" minW={0}>
                 <BoardEditableTitle board={board} isSelected={isSelected} />
+                {showOwner && (
+                  <Text fontSize="xs" color="base.500" noOfLines={1}>
+                    {board.owner_username}
+                  </Text>
+                )}
               </Flex>
               {autoAddBoardId === board.board_id && <AutoAddBadge />}
               {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}

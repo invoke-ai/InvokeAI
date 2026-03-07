@@ -3,6 +3,7 @@ import { createSlice } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import type { SliceConfig } from 'app/store/types';
 import { isPlainObject, uniq } from 'es-toolkit';
+import { logout } from 'features/auth/store/authSlice';
 import type { BoardRecordOrderBy } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -142,6 +143,14 @@ const slice = createSlice({
       state.boardsListOrderDir = action.payload;
     },
   },
+  extraReducers(builder) {
+    // Clear board-related state on logout to prevent stale data when switching users
+    builder.addCase(logout, (state) => {
+      state.selectedBoardId = 'none';
+      state.autoAddBoardId = 'none';
+      state.boardSearchText = '';
+    });
+  },
 });
 
 export const {
@@ -182,6 +191,6 @@ export const gallerySliceConfig: SliceConfig<typeof slice> = {
       }
       return zGalleryState.parse(state);
     },
-    persistDenylist: ['selection', 'selectedBoardId', 'galleryView', 'imageToCompare'],
+    persistDenylist: ['selection', 'galleryView', 'imageToCompare'],
   },
 };
