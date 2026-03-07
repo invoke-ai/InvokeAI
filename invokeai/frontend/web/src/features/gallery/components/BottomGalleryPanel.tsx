@@ -135,7 +135,7 @@ export const BottomGalleryPanel = memo(() => {
   return (
     <Flex flexDirection="column" h="full" w="full" minH={0}>
       {/* Top header bar */}
-      <Flex sx={HEADER_STYLES_SX} borderBottomWidth={isGalleryPanelCollapsed ? 1 : 0}>
+      <Flex sx={HEADER_STYLES_SX} borderBottomWidth={isGalleryPanelCollapsed ? 0 : 1}>
         <Button
           size="sm"
           variant="ghost"
