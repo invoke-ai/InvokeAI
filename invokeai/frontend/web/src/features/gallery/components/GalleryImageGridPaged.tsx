@@ -185,6 +185,7 @@ export const GalleryImageGridPaged = memo(() => {
           isLoading={false}
           queryArgs={queryArgs}
           rootRef={gridRootRef}
+          showProgressTiles={pageIndex === 0}
         />
       </Flex>
     </Flex>

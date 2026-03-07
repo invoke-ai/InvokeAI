@@ -14,8 +14,8 @@ import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
 import { AddBoardIconButton } from './AddBoardButton';
 import BoardItem from './BoardItem';
-import { BoardsSettingsPopover } from './BoardsSettingsPopover';
 import { BoardsSearch } from './BoardsSearch';
+import { BoardsSettingsPopover } from './BoardsSettingsPopover';
 
 const HEADER_ACTION_BUTTON_SIZE = 10;
 
