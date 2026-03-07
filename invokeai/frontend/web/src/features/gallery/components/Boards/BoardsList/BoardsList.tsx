@@ -7,7 +7,7 @@ import {
   selectListBoardsQueryArgs,
   selectSelectedBoardId,
 } from 'features/gallery/store/gallerySelectors';
-import { memo, useCallback,useMemo, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiMagnifyingGlassBold, PiSidebarSimpleBold } from 'react-icons/pi';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
@@ -48,11 +48,20 @@ export const BoardsList = memo(({ onCollapseBoards, onExpandBoards, isCollapsed 
     const elements = [];
 
     if (!boardSearchText.length) {
-      elements.push(<BoardItem key="none" board={null} isSelected={selectedBoardId === 'none'} isCollapsed={isCollapsed} />);
+      elements.push(
+        <BoardItem key="none" board={null} isSelected={selectedBoardId === 'none'} isCollapsed={isCollapsed} />
+      );
     }
 
     filteredBoards.forEach((board) => {
-      elements.push(<BoardItem board={board} isSelected={selectedBoardId === board.board_id} key={board.board_id} isCollapsed={isCollapsed} />);
+      elements.push(
+        <BoardItem
+          board={board}
+          isSelected={selectedBoardId === board.board_id}
+          key={board.board_id}
+          isCollapsed={isCollapsed}
+        />
+      );
     });
 
     return elements;
@@ -64,7 +73,7 @@ export const BoardsList = memo(({ onCollapseBoards, onExpandBoards, isCollapsed 
     }
     setTimeout(() => {
       searchInputRef.current?.focus();
-    }, 0)
+    }, 0);
   }, [onExpandBoards]);
 
   return (
@@ -141,6 +150,6 @@ export const BoardsList = memo(({ onCollapseBoards, onExpandBoards, isCollapsed 
         </>
       )}
     </Flex>
-  )
+  );
 });
 BoardsList.displayName = 'BoardsList';

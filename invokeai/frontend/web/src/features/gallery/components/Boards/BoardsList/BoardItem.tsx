@@ -34,7 +34,7 @@ type BoardItemProps = {
   board: BoardDTO | null;
   isSelected: boolean;
   isCollapsed?: boolean;
-}
+};
 
 const BoardItem = ({ board, isSelected, isCollapsed = false }: BoardItemProps) => {
   const dispatch = useAppDispatch();
@@ -139,7 +139,7 @@ const BoardItem = ({ board, isSelected, isCollapsed = false }: BoardItemProps) =
     <>
       <BoardThumbnail board={board} />
     </>
-  )
+  );
 
   return (
     <Box position="relative" w="full" h={12}>

@@ -7,63 +7,65 @@ import { forwardRef, memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
-export const BoardsSearch = memo(forwardRef<HTMLInputElement>((_, ref) => {
-  const dispatch = useAppDispatch();
-  const boardSearchText = useAppSelector(selectBoardSearchText);
-  const { t } = useTranslation();
+export const BoardsSearch = memo(
+  forwardRef<HTMLInputElement>((_, ref) => {
+    const dispatch = useAppDispatch();
+    const boardSearchText = useAppSelector(selectBoardSearchText);
+    const { t } = useTranslation();
 
-  const handleBoardSearch = useCallback(
-    (searchTerm: string) => {
-      dispatch(boardSearchTextChanged(searchTerm));
-    },
-    [dispatch]
-  );
+    const handleBoardSearch = useCallback(
+      (searchTerm: string) => {
+        dispatch(boardSearchTextChanged(searchTerm));
+      },
+      [dispatch]
+    );
 
-  const clearBoardSearch = useCallback(() => {
-    dispatch(boardSearchTextChanged(''));
-  }, [dispatch]);
+    const clearBoardSearch = useCallback(() => {
+      dispatch(boardSearchTextChanged(''));
+    }, [dispatch]);
 
-  const handleKeydown = useCallback(
-    (e: KeyboardEvent<HTMLInputElement>) => {
-      // exit search mode on escape
-      if (e.key === 'Escape') {
-        clearBoardSearch();
-      }
-    },
-    [clearBoardSearch]
-  );
+    const handleKeydown = useCallback(
+      (e: KeyboardEvent<HTMLInputElement>) => {
+        // exit search mode on escape
+        if (e.key === 'Escape') {
+          clearBoardSearch();
+        }
+      },
+      [clearBoardSearch]
+    );
 
-  const handleChange = useCallback(
-    (e: ChangeEvent<HTMLInputElement>) => {
-      handleBoardSearch(e.target.value);
-    },
-    [handleBoardSearch]
-  );
+    const handleChange = useCallback(
+      (e: ChangeEvent<HTMLInputElement>) => {
+        handleBoardSearch(e.target.value);
+      },
+      [handleBoardSearch]
+    );
 
-  return (
-    <InputGroup>
-      <Input
-        h={10}
-        placeholder={t('boards.searchBoard')}
-        value={boardSearchText}
-        onKeyDown={handleKeydown}
-        onChange={handleChange}
-        data-testid="board-search-input"
-        ref={ref}
-      />
-      {boardSearchText && boardSearchText.length && (
-        <InputRightElement h="full" pe={2}>
-          <IconButton
-            onClick={clearBoardSearch}
-            size="sm"
-            variant="link"
-            aria-label={t('boards.clearSearch')}
-            icon={<PiXBold />}
-          />
-        </InputRightElement>
-      )}
-    </InputGroup>
-  );
-}));
+    return (
+      <InputGroup>
+        <Input
+          h={10}
+          placeholder={t('boards.searchBoard')}
+          value={boardSearchText}
+          onKeyDown={handleKeydown}
+          onChange={handleChange}
+          data-testid="board-search-input"
+          ref={ref}
+        />
+        {boardSearchText && boardSearchText.length && (
+          <InputRightElement h="full" pe={2}>
+            <IconButton
+              onClick={clearBoardSearch}
+              size="sm"
+              variant="link"
+              aria-label={t('boards.clearSearch')}
+              icon={<PiXBold />}
+            />
+          </InputRightElement>
+        )}
+      </InputGroup>
+    );
+  })
+);
 
 BoardsSearch.displayName = 'BoardsSearch';

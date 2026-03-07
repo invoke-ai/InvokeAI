@@ -169,19 +169,8 @@ export const BottomGalleryPanel = memo(() => {
             </Box>
           </Flex>
 
-          <Flex
-            p={1}
-            borderTopWidth={1}
-            borderColor="base.700"
-            justifyContent="center"
-            flexShrink={0}
-            h={10}
-          >
-            {isBoardsSidebarCollapsed ? (
-              <AddBoardIconButton />
-            ): (
-              <AddBoardButton />
-            )}
+          <Flex p={1} borderTopWidth={1} borderColor="base.700" justifyContent="center" flexShrink={0} h={10}>
+            {isBoardsSidebarCollapsed ? <AddBoardIconButton /> : <AddBoardButton />}
           </Flex>
 
           {!isBoardsSidebarCollapsed && (
