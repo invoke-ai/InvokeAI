@@ -836,7 +836,15 @@
         "backendDisconnected": "Backend disconnesso",
         "cancelAll": "Annulla tutto",
         "cancelAllTooltip": "Annulla tutti i download attivi",
-        "selectModelToView": "Seleziona un modello per visualizzarne i dettagli"
+        "selectModelToView": "Seleziona un modello per visualizzarne i dettagli",
+        "exportSettings": "Impostazioni di esportazione",
+        "importSettings": "Impostazioni di importazione",
+        "settingsExported": "Impostazioni del modello esportate",
+        "settingsImported": "Impostazioni del modello importate",
+        "settingsImportedPartial": "Impostazioni del modello parzialmente importate. Le impostazioni incompatibili sono state ignorate: {{fields}}",
+        "settingsImportFailed": "Impossibile importare le impostazioni del modello",
+        "settingsImportIncompatible": "Il file delle impostazioni non contiene impostazioni compatibili per questo tipo di modello",
+        "settingsImportInvalidFile": "File di impostazioni non valido"
     },
     "parameters": {
         "images": "Immagini",
