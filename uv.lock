@@ -153,6 +153,27 @@ wheels = [
 ]
 
 [[package]]
+name = "bcrypt"
+version = "3.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cffi" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e8/36/edc85ab295ceff724506252b774155eff8a238f13730c8b13badd33ef866/bcrypt-3.2.2.tar.gz", hash = "sha256:433c410c2177057705da2a9f2cd01dd157493b2a7ac14c8593a16b3dab6b6bfb", size = 42455, upload-time = "2022-05-01T17:58:52.348Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a0/c2/05354b1d4351d2e686a32296cc9dd1e63f9909a580636df0f7b06d774600/bcrypt-3.2.2-cp36-abi3-macosx_10_10_universal2.whl", hash = "sha256:7180d98a96f00b1050e93f5b0f556e658605dd9f524d0b0e68ae7944673f525e", size = 50049, upload-time = "2022-05-01T18:05:47.625Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/b3/1257f7d64ee0aa0eb4fb1de5da8c2647a57db7b737da1f2342ac1889d3b8/bcrypt-3.2.2-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.manylinux_2_24_aarch64.whl", hash = "sha256:61bae49580dce88095d669226d5076d0b9d927754cedbdf76c6c9f5099ad6f26", size = 54914, upload-time = "2022-05-01T18:03:00.752Z" },
+    { url = "https://files.pythonhosted.org/packages/61/3d/dce83194830183aa700cab07c89822471d21663a86a0b305d1e5c7b02810/bcrypt-3.2.2-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:88273d806ab3a50d06bc6a2fc7c87d737dd669b76ad955f449c43095389bc8fb", size = 54403, upload-time = "2022-05-01T18:03:02.483Z" },
+    { url = "https://files.pythonhosted.org/packages/86/1b/f4d7425dfc6cd0e405b48ee484df6d80fb39e05f25963dbfcc2c511e8341/bcrypt-3.2.2-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_24_x86_64.whl", hash = "sha256:6d2cb9d969bfca5bc08e45864137276e4c3d3d7de2b162171def3d188bf9d34a", size = 62337, upload-time = "2022-05-01T18:05:49.524Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/df/289db4f31b303de6addb0897c8b5c01b23bd4b8c511ac80a32b08658847c/bcrypt-3.2.2-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:2b02d6bfc6336d1094276f3f588aa1225a598e27f8e3388f4db9948cb707b521", size = 61026, upload-time = "2022-05-01T18:05:51.107Z" },
+    { url = "https://files.pythonhosted.org/packages/40/8f/b67b42faa2e4d944b145b1a402fc08db0af8fe2dfa92418c674b5a302496/bcrypt-3.2.2-cp36-abi3-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_12_x86_64.manylinux2010_x86_64.whl", hash = "sha256:a2c46100e315c3a5b90fdc53e429c006c5f962529bc27e1dfd656292c20ccc40", size = 64672, upload-time = "2022-05-01T18:05:52.748Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/9a/e1867f0b27a3f4ce90e21dd7f322f0e15d4aac2434d3b938dcf765e47c6b/bcrypt-3.2.2-cp36-abi3-musllinux_1_1_aarch64.whl", hash = "sha256:7d9ba2e41e330d2af4af6b1b6ec9e6128e91343d0b4afb9282e54e5508f31baa", size = 56795, upload-time = "2022-05-01T18:03:04.028Z" },
+    { url = "https://files.pythonhosted.org/packages/18/76/057b0637c880e6cb0abdc8a867d080376ddca6ed7d05b7738f589cc5c1a8/bcrypt-3.2.2-cp36-abi3-musllinux_1_1_x86_64.whl", hash = "sha256:cd43303d6b8a165c29ec6756afd169faba9396a9472cdff753fe9f19b96ce2fa", size = 62075, upload-time = "2022-05-01T18:05:54.412Z" },
+    { url = "https://files.pythonhosted.org/packages/f1/64/cd93e2c3e28a5fa8bcf6753d5cc5e858e4da08bf51404a0adb6a412532de/bcrypt-3.2.2-cp36-abi3-win32.whl", hash = "sha256:4e029cef560967fb0cf4a802bcf4d562d3d6b4b1bf81de5ec1abbe0f1adb027e", size = 27916, upload-time = "2022-05-01T18:05:56.45Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/37/7cd297ff571c4d86371ff024c0e008b37b59e895b28f69444a9b6f94ca1a/bcrypt-3.2.2-cp36-abi3-win_amd64.whl", hash = "sha256:7ff2069240c6bbe49109fe84ca80508773a904f5a8cb960e02a977f7f519b129", size = 29581, upload-time = "2022-05-01T18:05:57.878Z" },
+]
+
+[[package]]
 name = "bidict"
 version = "0.23.1"
 source = { registry = "https://pypi.org/simple" }
@@ -499,7 +520,7 @@ name = "cryptography"
 version = "45.0.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cffi", marker = "(platform_python_implementation != 'PyPy' and sys_platform == 'linux') or (platform_python_implementation != 'PyPy' and sys_platform != 'darwin' and extra == 'extra-8-invokeai-cpu') or (platform_python_implementation != 'PyPy' and sys_platform != 'darwin' and extra == 'extra-8-invokeai-cuda') or (platform_python_implementation != 'PyPy' and sys_platform != 'darwin' and extra != 'extra-8-invokeai-rocm') or (platform_python_implementation == 'PyPy' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (platform_python_implementation == 'PyPy' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (platform_python_implementation == 'PyPy' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
+    { name = "cffi", marker = "platform_python_implementation != 'PyPy' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/95/1e/49527ac611af559665f71cbb8f92b332b5ec9c6fbc4e88b0f8e92f5e85df/cryptography-45.0.5.tar.gz", hash = "sha256:72e76caa004ab63accdf26023fccd1d087f6d90ec6048ff33ad0445abf7f605a", size = 744903, upload-time = "2025-07-02T13:06:25.941Z" }
 wheels = [
@@ -625,12 +646,37 @@ wheels = [
 ]
 
 [[package]]
+name = "ecdsa"
+version = "0.19.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c0/1f/924e3caae75f471eae4b26bd13b698f6af2c44279f67af317439c2f4c46a/ecdsa-0.19.1.tar.gz", hash = "sha256:478cba7b62555866fcb3bb3fe985e06decbdb68ef55713c4e5ab98c57d508e61", size = 201793, upload-time = "2025-03-13T11:52:43.25Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/cb/a3/460c57f094a4a165c84a1341c373b0a4f5ec6ac244b998d5021aade89b77/ecdsa-0.19.1-py2.py3-none-any.whl", hash = "sha256:30638e27cf77b7e15c4c4cc1973720149e1033827cfd00661ca5c8cc0cdb24c3", size = 150607, upload-time = "2025-03-13T11:52:41.757Z" },
+]
+
+[[package]]
 name = "einops"
 version = "0.8.1"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/e5/81/df4fbe24dff8ba3934af99044188e20a98ed441ad17a274539b74e82e126/einops-0.8.1.tar.gz", hash = "sha256:de5d960a7a761225532e0f1959e5315ebeafc0cd43394732f103ca44b9837e84", size = 54805, upload-time = "2025-02-09T03:17:00.434Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/87/62/9773de14fe6c45c23649e98b83231fffd7b9892b6cf863251dc2afa73643/einops-0.8.1-py3-none-any.whl", hash = "sha256:919387eb55330f5757c6bea9165c5ff5cfe63a642682ea788a6d472576d81737", size = 64359, upload-time = "2025-02-09T03:17:01.998Z" },
+]
+
+[[package]]
+name = "email-validator"
+version = "2.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dnspython" },
+    { name = "idna" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f5/22/900cb125c76b7aaa450ce02fd727f452243f2e91a61af068b40adba60ea9/email_validator-2.3.0.tar.gz", hash = "sha256:9fc05c37f2f6cf439ff414f8fc46d917929974a82244c20eb10231ba60c54426", size = 51238, upload-time = "2025-08-26T13:09:06.831Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/de/15/545e2b6cf2e3be84bc1ed85613edd75b8aea69807a71c26f4ca6a9258e82/email_validator-2.3.0-py3-none-any.whl", hash = "sha256:80f13f623413e6b197ae73bb10bf4eb0908faf509ad8362c5edeb0be7fd450b4", size = 35604, upload-time = "2025-08-26T13:09:05.858Z" },
 ]
 
 [[package]]
@@ -961,6 +1007,7 @@ name = "invokeai"
 source = { editable = "." }
 dependencies = [
     { name = "accelerate" },
+    { name = "bcrypt" },
     { name = "bitsandbytes", marker = "sys_platform != 'darwin' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
     { name = "blake3" },
     { name = "compel" },
@@ -969,6 +1016,7 @@ dependencies = [
     { name = "dnspython" },
     { name = "dynamicprompts" },
     { name = "einops" },
+    { name = "email-validator" },
     { name = "fastapi" },
     { name = "fastapi-events" },
     { name = "gguf" },
@@ -978,12 +1026,14 @@ dependencies = [
     { name = "onnx" },
     { name = "onnxruntime" },
     { name = "opencv-contrib-python" },
+    { name = "passlib", extra = ["bcrypt"] },
     { name = "picklescan" },
     { name = "pillow" },
     { name = "prompt-toolkit" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "pypatchmatch" },
+    { name = "python-jose", extra = ["cryptography"] },
     { name = "python-multipart" },
     { name = "python-socketio" },
     { name = "pywavelets" },
@@ -1067,6 +1117,7 @@ xformers = [
 [package.metadata]
 requires-dist = [
     { name = "accelerate" },
+    { name = "bcrypt", specifier = "<4.0.0" },
     { name = "bitsandbytes", marker = "sys_platform != 'darwin'" },
     { name = "blake3" },
     { name = "compel", specifier = "==2.1.1" },
@@ -1075,6 +1126,7 @@ requires-dist = [
     { name = "dnspython" },
     { name = "dynamicprompts" },
     { name = "einops" },
+    { name = "email-validator", specifier = ">=2.0.0" },
     { name = "fastapi", specifier = "==0.118.3" },
     { name = "fastapi-events" },
     { name = "gguf" },
@@ -1096,6 +1148,7 @@ requires-dist = [
     { name = "onnxruntime-directml", marker = "extra == 'onnx-directml'" },
     { name = "onnxruntime-gpu", marker = "extra == 'onnx-cuda'" },
     { name = "opencv-contrib-python" },
+    { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
     { name = "picklescan" },
     { name = "pillow" },
     { name = "pip-tools", marker = "extra == 'dist'" },
@@ -1111,6 +1164,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'test'" },
     { name = "pytest-datadir", marker = "extra == 'test'" },
     { name = "pytest-timeout", marker = "extra == 'test'" },
+    { name = "python-jose", extras = ["cryptography"], specifier = ">=3.3.0" },
     { name = "python-multipart" },
     { name = "python-socketio" },
     { name = "pytorch-triton-rocm", marker = "sys_platform == 'linux' and extra == 'rocm'", index = "https://download.pytorch.org/whl/rocm6.3", conflict = { package = "invokeai", extra = "rocm" } },
@@ -2301,6 +2355,20 @@ wheels = [
 ]
 
 [[package]]
+name = "passlib"
+version = "1.7.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b6/06/9da9ee59a67fae7761aab3ccc84fa4f3f33f125b370f1ccdb915bf967c11/passlib-1.7.4.tar.gz", hash = "sha256:defd50f72b65c5402ab2c573830a6978e5f202ad0d984793c8dde2c4152ebe04", size = 689844, upload-time = "2020-10-08T19:00:52.121Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3b/a4/ab6b7589382ca3df236e03faa71deac88cae040af60c071a78d254a62172/passlib-1.7.4-py2.py3-none-any.whl", hash = "sha256:aa6bca462b8d8bda89c70b382f0c298a20b5560af6cbfa2dce410c0a2fb669f1", size = 525554, upload-time = "2020-10-08T19:00:49.856Z" },
+]
+
+[package.optional-dependencies]
+bcrypt = [
+    { name = "bcrypt" },
+]
+
+[[package]]
 name = "pathspec"
 version = "0.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2496,6 +2564,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/93/40/8d17b16a1c2a36d8cc1befb5eda13310ad20fcb347e58bef5e104696e14a/pudb-2025.1.tar.gz", hash = "sha256:a528b29c69ce8b182a337872c5f046071f6d68d3415c6d7bf53bd27c264f58d0", size = 220623, upload-time = "2025-05-06T20:43:18.306Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b1/01/069766294390d3e10c77dfb553171466d67ffb51bf72a437650c0a5db86a/pudb-2025.1-py3-none-any.whl", hash = "sha256:f642d42e6054c992b43c463742650aa879fe290d7d7ffdeb21f7d00dc4587a21", size = 89208, upload-time = "2025-05-06T20:43:17.101Z" },
+]
+
+[[package]]
+name = "pyasn1"
+version = "0.6.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ba/e9/01f1a64245b89f039897cb0130016d79f77d52669aae6ee7b159a6c4c018/pyasn1-0.6.1.tar.gz", hash = "sha256:6f580d2bdd84365380830acf45550f2511469f673cb4a5ae3857a3170128b034", size = 145322, upload-time = "2024-09-10T22:41:42.55Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c8/f1/d6a797abb14f6283c0ddff96bbdd46937f64122b8c925cab503dd37f8214/pyasn1-0.6.1-py3-none-any.whl", hash = "sha256:0d632f46f2ba09143da3a8afe9e33fb6f92fa2320ab7e886e2d0f7672af84629", size = 83135, upload-time = "2024-09-11T16:00:36.122Z" },
 ]
 
 [[package]]
@@ -2745,6 +2822,25 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ba/0b/67295279b66835f9fa7a491650efcd78b20321c127036eef62c11a31e028/python_engineio-4.12.2.tar.gz", hash = "sha256:e7e712ffe1be1f6a05ee5f951e72d434854a32fcfc7f6e4d9d3cae24ec70defa", size = 91677, upload-time = "2025-06-04T19:22:18.789Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0c/fa/df59acedf7bbb937f69174d00f921a7b93aa5a5f5c17d05296c814fff6fc/python_engineio-4.12.2-py3-none-any.whl", hash = "sha256:8218ab66950e179dfec4b4bbb30aecf3f5d86f5e58e6fc1aa7fde2c698b2804f", size = 59536, upload-time = "2025-06-04T19:22:16.916Z" },
+]
+
+[[package]]
+name = "python-jose"
+version = "3.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "ecdsa" },
+    { name = "pyasn1" },
+    { name = "rsa" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c6/77/3a1c9039db7124eb039772b935f2244fbb73fc8ee65b9acf2375da1c07bf/python_jose-3.5.0.tar.gz", hash = "sha256:fb4eaa44dbeb1c26dcc69e4bd7ec54a1cb8dd64d3b4d81ef08d90ff453f2b01b", size = 92726, upload-time = "2025-05-28T17:31:54.288Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d9/c3/0bd11992072e6a1c513b16500a5d07f91a24017c5909b02c72c62d7ad024/python_jose-3.5.0-py2.py3-none-any.whl", hash = "sha256:abd1202f23d34dfad2c3d28cb8617b90acf34132c7afd60abd0b0b7d3cb55771", size = 34624, upload-time = "2025-05-28T17:31:52.802Z" },
+]
+
+[package.optional-dependencies]
+cryptography = [
+    { name = "cryptography" },
 ]
 
 [[package]]
@@ -2999,6 +3095,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a1/53/830aa4c3066a8ab0ae9a9955976fb770fe9c6102117c8ec4ab3ea62d89e8/rich-14.0.0.tar.gz", hash = "sha256:82f1bc23a6a21ebca4ae0c45af9bdbc492ed20231dcb63f297d6d1021a9d5725", size = 224078, upload-time = "2025-03-30T14:15:14.23Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0d/9b/63f4c7ebc259242c89b3acafdb37b41d1185c07ff0011164674e9076b491/rich-14.0.0-py3-none-any.whl", hash = "sha256:1c9491e1951aac09caffd42f448ee3d04e58923ffe14993f6e83068dc395d7e0", size = 243229, upload-time = "2025-03-30T14:15:12.283Z" },
+]
+
+[[package]]
+name = "rsa"
+version = "4.9.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyasn1" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/da/8a/22b7beea3ee0d44b1916c0c1cb0ee3af23b700b6da9f04991899d0c555d4/rsa-4.9.1.tar.gz", hash = "sha256:e7bdbfdb5497da4c07dfd35530e1a902659db6ff241e39d9953cad06ebd0ae75", size = 29034, upload-time = "2025-04-16T09:51:18.218Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/64/8d/0133e4eb4beed9e425d9a98ed6e081a55d195481b7632472be1af08d2f6b/rsa-4.9.1-py3-none-any.whl", hash = "sha256:68635866661c6836b8d39430f97a996acbd61bfa49406748ea243539fe239762", size = 34696, upload-time = "2025-04-16T09:51:17.142Z" },
 ]
 
 [[package]]

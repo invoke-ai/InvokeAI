@@ -34,10 +34,9 @@ const LoRASelect = () => {
       if (model.base !== currentBaseModel) {
         return false;
       }
-      // For models with variant support: filter by variant when both main model and LoRA have variant info.
-      // LoRAs with no variant (null) are always shown (compatible with all variants).
+      // For Flux2: filter by variant when both main model and LoRA have variant info
       if (
-        currentMainModelConfig &&
+        currentMainModelConfig?.base === 'flux2' &&
         'variant' in currentMainModelConfig &&
         currentMainModelConfig.variant &&
         'variant' in model &&
