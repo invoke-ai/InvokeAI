@@ -29,7 +29,6 @@ const HEADER_STYLES_SX: SystemStyleObject = {
   alignItems: 'center',
   w: 'full',
   flexShrink: 0,
-  borderBottomWidth: 1,
   borderColor: 'base.700',
   bg: 'base.850',
   h: 12,
@@ -83,10 +82,10 @@ export const BottomGalleryPanel = memo(() => {
   const [isBoardsSidebarCollapsed, setIsBoardsSidebarCollapsed] = useState(false);
   const [boardsSidebarWidth, setBoardsSidebarWidth] = useState(BOARDS_SIDEBAR_DEFAULT_WIDTH_PX);
   const isResizingRef = useRef(false);
-  const [isGalleryCollapsed, setIsGalleryCollapsed] = useState(false);
+  const [isGalleryPanelCollapsed, setIsGalleryPanelCollapsed] = useState(false);
 
-  const handleToggleGallery = useCallback(() => {
-    setIsGalleryCollapsed((prev) => !prev);
+  const handleToggleGalleryPanel = useCallback(() => {
+    setIsGalleryPanelCollapsed((prev) => !prev);
     navigationApi.toggleBottomPanel();
   }, []);
 
@@ -136,15 +135,15 @@ export const BottomGalleryPanel = memo(() => {
   return (
     <Flex flexDirection="column" h="full" w="full" minH={0}>
       {/* Top header bar */}
-      <Flex sx={HEADER_STYLES_SX}>
+      <Flex sx={HEADER_STYLES_SX} borderBottomWidth={isGalleryPanelCollapsed ? 1 : 0}>
         <Button
           size="sm"
           variant="ghost"
-          onClick={handleToggleGallery}
-          leftIcon={isGalleryCollapsed ? <PiCaretUpBold /> : <PiCaretDownBold />}
+          onClick={handleToggleGalleryPanel}
+          leftIcon={isGalleryPanelCollapsed ? <PiCaretUpBold /> : <PiCaretDownBold />}
           // noOfLines={1} -> this results in weird vertical alignment, ideally we re-enable this and fix
           flexShrink={0}
-          tooltip={isGalleryCollapsed ? t('gallery.expandGallery') : t('gallery.collapseGallery')}
+          tooltip={isGalleryPanelCollapsed ? t('gallery.expandGallery') : t('gallery.collapseGallery')}
         >
           {t('common.board')}: {boardName}
         </Button>
