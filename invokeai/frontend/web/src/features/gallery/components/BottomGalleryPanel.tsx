@@ -184,7 +184,7 @@ export const BottomGalleryPanel = memo(() => {
                   icon={<PiSidebarSimpleBold />}
                   onClick={handleToggleBoardsSidebar}
                   tooltip={t('gallery.showBoardsSidebar')}
-                  aria-label={t('gallery.toggleBoardsSidebar')}
+                  aria-label={t('gallery.showBoardsSidebar')}
                 />
                 <IconButton
                   {...COLLAPSED_SIDEBAR_ICON_BUTTON_PROPS}
@@ -212,7 +212,7 @@ export const BottomGalleryPanel = memo(() => {
               <Flex flex={1} minH={0} position="relative">
                 <Box position="absolute" top={0} right={0} bottom={0} left={0} px={2}>
                   <OverlayScrollbarsComponent style={overlayScrollbarsStyles} options={overlayScrollbarsParams.options}>
-                    <BoardsList onCollapse={handleToggleBoardsSidebar} showHeaderAddButton />
+                    <BoardsList onCollapse={handleToggleBoardsSidebar} />
                   </OverlayScrollbarsComponent>
                 </Box>
               </Flex>

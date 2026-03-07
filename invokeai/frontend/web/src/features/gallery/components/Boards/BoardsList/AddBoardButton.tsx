@@ -53,12 +53,13 @@ export const AddBoardIconButton = memo((props: Partial<IconButtonProps>) => {
   return (
     <IconButton
       aria-label={ariaLabel}
+      size="sm"
+      variant="link"
       tooltip={t('boards.addBoard')}
       icon={<PiPlusBold />}
       isLoading={isLoading}
       onClick={handleCreateBoard}
       data-testid="add-board-icon-button"
-      variant="ghost"
       {...rest}
     />
   );

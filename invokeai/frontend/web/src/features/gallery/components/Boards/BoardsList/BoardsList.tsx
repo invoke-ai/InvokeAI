@@ -17,14 +17,12 @@ import BoardItem from './BoardItem';
 import { BoardsSearch } from './BoardsSearch';
 import { BoardsSettingsPopover } from './BoardsSettingsPopover';
 
-const HEADER_ACTION_BUTTON_SIZE = 10;
-
 type BoardsListProps = {
   onCollapse?: () => void;
   showHeaderAddButton?: boolean;
 };
 
-export const BoardsList = memo(({ onCollapse, showHeaderAddButton = false }: BoardsListProps) => {
+export const BoardsList = memo(({ onCollapse }: BoardsListProps) => {
   const { t } = useTranslation();
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
   const boardSearchText = useAppSelector(selectBoardSearchText);
@@ -74,31 +72,24 @@ export const BoardsList = memo(({ onCollapse, showHeaderAddButton = false }: Boa
         <Text fontSize="sm" fontWeight="semibold" userSelect="none" color="base.400">
           {t('boards.boards')}
         </Text>
-        <Flex alignItems="center" gap={1}>
-          {onCollapse && (
-            <IconButton
-              size="sm"
-              variant="ghost"
-              icon={<PiSidebarSimpleBold />}
-              onClick={onCollapse}
-              tooltip={t('gallery.hideBoardsSidebar')}
-              aria-label={t('gallery.toggleBoardsSidebar')}
-              h={HEADER_ACTION_BUTTON_SIZE}
-              w={HEADER_ACTION_BUTTON_SIZE}
-              p={0}
-            />
-          )}
-          <BoardsSettingsPopover h={HEADER_ACTION_BUTTON_SIZE} w={HEADER_ACTION_BUTTON_SIZE} p={0} />
-          {showHeaderAddButton && (
-            <AddBoardIconButton h={HEADER_ACTION_BUTTON_SIZE} w={HEADER_ACTION_BUTTON_SIZE} p={0} />
-          )}
+        <Flex alignItems="center">
+          <IconButton
+            size="sm"
+            variant="link"
+            icon={<PiSidebarSimpleBold />}
+            onClick={onCollapse}
+            tooltip={t('gallery.hideBoardsSidebar')}
+            aria-label={t('gallery.toggleBoardsSidebar')}
+          />
+          <BoardsSettingsPopover />
+          <AddBoardIconButton />
         </Flex>
       </Flex>
       <Flex pb={2}>
         <BoardsSearch />
       </Flex>
       <Collapse in={isOpen} style={fixTooltipCloseOnScrollStyles}>
-        <Flex direction="column">
+        <Flex direction="column" gap={1}>
           {boardElements.length ? (
             boardElements
           ) : (

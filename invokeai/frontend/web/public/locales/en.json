@@ -527,9 +527,8 @@
         "closeViewer": "Close Viewer",
         "move": "Move",
         "useForPromptGeneration": "Use for Prompt Generation",
-        "showBoardsSidebar": "Show Boards Sidebar",
-        "hideBoardsSidebar": "Hide Boards Sidebar",
-        "toggleBoardsSidebar": "Toggle Boards Sidebar",
+        "showBoardsSidebar": "Expand Boards",
+        "hideBoardsSidebar": "Minimize Boards",
         "showSquareThumbnails": "Show Square Thumbnails",
         "showAspectRatioThumbnails": "Show Aspect Ratio Thumbnails",
         "toggleAspectRatio": "Toggle Aspect Ratio"

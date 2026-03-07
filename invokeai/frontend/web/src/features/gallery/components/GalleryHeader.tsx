@@ -13,7 +13,7 @@ import {
 } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiGridNineBold, PiSquaresFourBold } from 'react-icons/pi';
+import { PiArchiveBold, PiGridNineBold, PiImageSquareBold, PiSquaresFourBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettingsPopover';
@@ -54,6 +54,7 @@ export const GalleryHeader = memo(() => {
       <Spacer />
       <ButtonGroup size="sm" variant="outline">
         <Button
+          leftIcon={<PiImageSquareBold />}
           tooltip={t('gallery.imagesTab')}
           onClick={handleClickImages}
           data-testid="images-tab"
@@ -62,6 +63,7 @@ export const GalleryHeader = memo(() => {
           {t('parameters.images')}
         </Button>
         <Button
+          leftIcon={<PiArchiveBold />}
           tooltip={t('gallery.assetsTab')}
           onClick={handleClickAssets}
           data-testid="assets-tab"
@@ -70,7 +72,7 @@ export const GalleryHeader = memo(() => {
           {t('gallery.assets')}
         </Button>
       </ButtonGroup>
-      <Flex maxW="300px" flex={1}>
+      <Flex maxW={64} flex={1}>
         <GallerySearch
           searchTerm={searchTerm || initialSearchTerm}
           onChangeSearchTerm={onChangeSearchTerm}

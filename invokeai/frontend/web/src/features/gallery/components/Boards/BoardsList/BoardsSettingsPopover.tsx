@@ -98,7 +98,7 @@ export const BoardsSettingsPopover = memo((iconButtonProps: Partial<IconButtonPr
       <PopoverTrigger>
         <IconButton
           size="sm"
-          variant="ghost"
+          variant="link"
           icon={<PiGearSixFill />}
           aria-label={t('gallery.boardsSettings')}
           tooltip={t('gallery.boardsSettings')}
