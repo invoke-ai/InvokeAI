@@ -259,6 +259,7 @@ async def reidentify_model(
             raise InvalidModelException("Unable to identify model format")
 
         # Retain user-editable fields from the original config
+        result.config.path = config.path
         result.config.key = config.key
         result.config.name = config.name
         result.config.description = config.description
@@ -1155,11 +1156,11 @@ class HFTokenHelper:
     @classmethod
     def get_status(cls) -> HFTokenStatus:
         try:
-            if huggingface_hub.get_token_permission(huggingface_hub.get_token()):
-                # Valid token!
-                return HFTokenStatus.VALID
-            # No token set
-            return HFTokenStatus.INVALID
+            token = huggingface_hub.get_token()
+            if not token:
+                return HFTokenStatus.INVALID
+            huggingface_hub.whoami(token=token)
+            return HFTokenStatus.VALID
         except Exception:
             return HFTokenStatus.UNKNOWN
 

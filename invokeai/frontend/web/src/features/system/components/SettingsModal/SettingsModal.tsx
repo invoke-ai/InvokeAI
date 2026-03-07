@@ -28,6 +28,7 @@ import { SettingsDeveloperLogNamespaces } from 'features/system/components/Setti
 import { useClearIntermediates } from 'features/system/components/SettingsModal/useClearIntermediates';
 import { StickyScrollable } from 'features/system/components/StickyScrollable';
 import {
+  selectSystemPrefersNumericAttentionWeights,
   selectSystemShouldAntialiasProgressImage,
   selectSystemShouldConfirmOnDelete,
   selectSystemShouldConfirmOnNewSession,
@@ -37,6 +38,7 @@ import {
   selectSystemShouldShowInvocationProgressDetail,
   selectSystemShouldUseNSFWChecker,
   selectSystemShouldUseWatermarker,
+  setPrefersNumericAttentionStyle,
   setShouldConfirmOnDelete,
   setShouldEnableInformationalPopovers,
   setShouldEnableModelDescriptions,
@@ -71,6 +73,7 @@ const SettingsModal = (props: { children: ReactElement }) => {
   const settingsModal = useSettingsModal();
   const refreshModal = useRefreshAfterResetModal();
 
+  const prefersNumericAttentionWeights = useAppSelector(selectSystemPrefersNumericAttentionWeights);
   const shouldUseCpuNoise = useAppSelector(selectShouldUseCPUNoise);
   const shouldConfirmOnDelete = useAppSelector(selectSystemShouldConfirmOnDelete);
   const shouldShowProgressInViewer = useAppSelector(selectShouldShowProgressInViewer);
@@ -158,6 +161,13 @@ const SettingsModal = (props: { children: ReactElement }) => {
   const handleChangeShouldHighlightFocusedRegions = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(setShouldHighlightFocusedRegions(e.target.checked));
+    },
+    [dispatch]
+  );
+
+  const handleChangePreferAttentionStyleNumeric = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setPrefersNumericAttentionStyle(e.target.checked));
     },
     [dispatch]
   );
@@ -250,6 +260,16 @@ const SettingsModal = (props: { children: ReactElement }) => {
                       <Switch
                         isChecked={shouldHighlightFocusedRegions}
                         onChange={handleChangeShouldHighlightFocusedRegions}
+                      />
+                    </FormControl>
+                  </StickyScrollable>
+
+                  <StickyScrollable title={t('settings.prompt')}>
+                    <FormControl>
+                      <FormLabel>{t('settings.preferAttentionStyleNumeric')}</FormLabel>
+                      <Switch
+                        isChecked={prefersNumericAttentionWeights}
+                        onChange={handleChangePreferAttentionStyleNumeric}
                       />
                     </FormControl>
                   </StickyScrollable>
