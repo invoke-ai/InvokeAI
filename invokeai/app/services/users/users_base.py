@@ -124,3 +124,12 @@ class UserServiceBase(ABC):
             List of users
         """
         pass
+
+    @abstractmethod
+    def count_admins(self) -> int:
+        """Count active admin users.
+
+        Returns:
+            The number of active admin users
+        """
+        pass
