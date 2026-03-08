@@ -9,6 +9,8 @@ import { CanvasObjectEraserLineWithPressure } from 'features/controlLayers/konva
 import { CanvasObjectGradient } from 'features/controlLayers/konva/CanvasObject/CanvasObjectGradient';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { CanvasObjectLasso } from 'features/controlLayers/konva/CanvasObject/CanvasObjectLasso';
+import { CanvasObjectOval } from 'features/controlLayers/konva/CanvasObject/CanvasObjectOval';
+import { CanvasObjectPolygon } from 'features/controlLayers/konva/CanvasObject/CanvasObjectPolygon';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
@@ -83,6 +85,17 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
     this.subscriptions.add(
       this.manager.tool.$tool.listen(() => {
         if (this.hasBuffer() && !this.manager.$isBusy.get()) {
+          if (this.state?.type === 'polygon' && this.state.previewPoint) {
+            const hasActivePolygonSession = this.manager.tool.tools.rect.hasActivePolygonSession();
+            const isTemporaryViewSwitch =
+              hasActivePolygonSession &&
+              ((this.manager.tool.$tool.get() === 'view' && this.manager.tool.$toolBuffer.get() === 'rect') ||
+                this.manager.tool.$tool.get() === 'rect');
+            if (!isTemporaryViewSwitch) {
+              this.clearBuffer();
+            }
+            return;
+          }
           this.commitBuffer();
         }
       })
@@ -150,6 +163,24 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
 
       if (!this.renderer) {
         this.renderer = new CanvasObjectRect(this.state, this);
+        this.konva.group.add(this.renderer.konva.group);
+      }
+
+      didRender = this.renderer.update(this.state, true);
+    } else if (this.state.type === 'oval') {
+      assert(this.renderer instanceof CanvasObjectOval || !this.renderer);
+
+      if (!this.renderer) {
+        this.renderer = new CanvasObjectOval(this.state, this);
+        this.konva.group.add(this.renderer.konva.group);
+      }
+
+      didRender = this.renderer.update(this.state, true);
+    } else if (this.state.type === 'polygon') {
+      assert(this.renderer instanceof CanvasObjectPolygon || !this.renderer);
+
+      if (!this.renderer) {
+        this.renderer = new CanvasObjectPolygon(this.state, this);
         this.konva.group.add(this.renderer.konva.group);
       }
 
@@ -255,7 +286,9 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
           this.manager.stateApi.addEraserLine({ entityIdentifier, eraserLine: this.state });
           break;
         case 'rect':
-          this.manager.stateApi.addRect({ entityIdentifier, rect: this.state });
+        case 'oval':
+        case 'polygon':
+          this.manager.stateApi.addShape({ entityIdentifier, shape: this.state });
           break;
         case 'lasso':
           this.manager.stateApi.addLasso({ entityIdentifier, lasso: this.state });
