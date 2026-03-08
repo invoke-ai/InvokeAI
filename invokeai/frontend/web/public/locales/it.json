@@ -1015,7 +1015,8 @@
         "showDetailedInvocationProgress": "Mostra dettagli avanzamento",
         "enableHighlightFocusedRegions": "Evidenzia le regioni interessate",
         "modelDescriptionsDisabled": "Descrizioni dei modelli nei menu a discesa disabilitate",
-        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disattivate. Abilitale nelle Impostazioni."
+        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disattivate. Abilitale nelle Impostazioni.",
+        "preferAttentionStyleNumeric": "Preferisci lo stile di attenzione numerico"
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
