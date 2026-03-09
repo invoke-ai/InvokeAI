@@ -7,7 +7,7 @@ Multi-User mode is a recent feature (introduced in version 6.12), which allows m
 Two types of users are recognized:
 
 * A user with **Administrator** status can add, remove and modify other users, and can install models. They also have the ability to view the full session queue and pause or kill other users' jobs.
-* **Non-administrator** users can modify their own profile but not others'. They also do not have the ability to install or configure models, but must ask an Administrator to do this task.
+* **Non-administrator** users can modify their own profile but not others. They also do not have the ability to install or configure models, but must ask an Administrator to do this task.
 
 Multiple users can be granted Administrator status.
 
