@@ -2,21 +2,25 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Button, Flex } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
+import type { GridviewPanel } from 'dockview';
 import { AddBoardButton, AddBoardIconButton } from 'features/gallery/components/Boards/BoardsList/AddBoardButton';
 import { BoardsList } from 'features/gallery/components/Boards/BoardsList/BoardsList';
 import { GalleryImageGrid } from 'features/gallery/components/GalleryImageGrid';
 import { GalleryImageGridPaged } from 'features/gallery/components/GalleryImageGridPaged';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
+import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import {
   BOARDS_SIDEBAR_DEFAULT_WIDTH_PX,
   BOARDS_SIDEBAR_MAX_WIDTH_PX,
   BOARDS_SIDEBAR_MIN_WIDTH_PX,
+  BOTTOM_GALLERY_MIN_HEIGHT_PX,
+  BOTTOM_GALLERY_PANEL_ID,
 } from 'features/ui/layouts/shared';
 import { selectShouldUsePagedGalleryView } from 'features/ui/store/uiSelectors';
 import { OverlayScrollbarsComponent } from 'overlayscrollbars-react';
 import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react';
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold, PiCaretUpBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
@@ -71,6 +75,35 @@ const BOARDS_SIDEBAR_RESIZE_HANDLE_STYLES_SX: SystemStyleObject = {
 };
 
 /**
+ * Hook that derives the gallery panel's collapsed state from dockview's panel dimensions.
+ * Subscribes to the panel's onDidDimensionsChange event so the UI stays in sync
+ * regardless of how the panel is collapsed/expanded (toggle button, hotkey, or external API call).
+ */
+const useIsGalleryPanelCollapsed = (): boolean => {
+  const { tab } = useAutoLayoutContext();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    const panel = navigationApi.getPanel(tab, BOTTOM_GALLERY_PANEL_ID) as GridviewPanel | undefined;
+    if (!panel) {
+      return;
+    }
+
+    // Sync initial state
+    setIsCollapsed(panel.height <= BOTTOM_GALLERY_MIN_HEIGHT_PX);
+
+    // Subscribe to dimension changes
+    const { dispose } = panel.api.onDidDimensionsChange((event) => {
+      setIsCollapsed(event.height <= BOTTOM_GALLERY_MIN_HEIGHT_PX);
+    });
+
+    return dispose;
+  }, [tab]);
+
+  return isCollapsed;
+};
+
+/**
  * The bottom gallery panel that contains the boards sidebar and image grid.
  * This component is placed at the bottom of the layout spanning the full width.
  */
@@ -82,10 +115,9 @@ export const BottomGalleryPanel = memo(() => {
   const [isBoardsSidebarCollapsed, setIsBoardsSidebarCollapsed] = useState(false);
   const [boardsSidebarWidth, setBoardsSidebarWidth] = useState(BOARDS_SIDEBAR_DEFAULT_WIDTH_PX);
   const isResizingRef = useRef(false);
-  const [isGalleryPanelCollapsed, setIsGalleryPanelCollapsed] = useState(false);
+  const isGalleryPanelCollapsed = useIsGalleryPanelCollapsed();
 
   const handleToggleGalleryPanel = useCallback(() => {
-    setIsGalleryPanelCollapsed((prev) => !prev);
     navigationApi.toggleBottomPanel();
   }, []);
 
@@ -180,6 +212,7 @@ export const BottomGalleryPanel = memo(() => {
 
         {/* Image grid area */}
         <Flex flexDirection="column" flex={1} minW={800} h="full">
+          {/* Gallery controls, settings + search */}
           <GalleryHeader />
 
           {/* Image grid */}

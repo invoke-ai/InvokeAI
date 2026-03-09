@@ -11,8 +11,8 @@ import { atom } from 'nanostores';
 
 import {
   BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX,
+  BOTTOM_GALLERY_MIN_HEIGHT_PX,
   BOTTOM_GALLERY_PANEL_ID,
-  GALLERY_PANEL_ID,
   LAUNCHPAD_PANEL_ID,
   LEFT_PANEL_ID,
   LEFT_PANEL_MIN_SIZE_PX,
@@ -651,7 +651,7 @@ export class NavigationApi {
     let isBottomCollapsed = false;
     if (bottomPanel && bottomPanel instanceof GridviewPanel) {
       hasBottomPanel = true;
-      isBottomCollapsed = bottomPanel.height <= 36;
+      isBottomCollapsed = this._isBottomPanelCollapsedByHeight(bottomPanel);
     }
 
     // Also check for right panel (canvas tab has one)
@@ -680,7 +680,7 @@ export class NavigationApi {
       if (bottomPanel && bottomPanel instanceof GridviewPanel) {
         // Save current height before collapsing
         this._lastBottomPanelHeight.set(activeTab, bottomPanel.height);
-        this._collapsePanelVertical(bottomPanel, 36);
+        this._collapsePanelVertical(bottomPanel, BOTTOM_GALLERY_MIN_HEIGHT_PX);
       }
       if (rightPanel && rightPanel instanceof GridviewPanel) {
         this._collapsePanel(rightPanel);
@@ -757,6 +757,14 @@ export class NavigationApi {
   };
 
   /**
+   * Check if a bottom gallery panel is collapsed based on its height.
+   * A panel is considered collapsed when its height is at or below the minimum (header-only) height.
+   */
+  _isBottomPanelCollapsedByHeight = (panel: IGridviewPanel): boolean => {
+    return panel.height <= BOTTOM_GALLERY_MIN_HEIGHT_PX;
+  };
+
+  /**
    * Toggle the bottom gallery panel in the currently active tab.
    */
   toggleBottomPanel = (): boolean => {
@@ -776,15 +784,15 @@ export class NavigationApi {
       return false;
     }
 
-    // Panel is collapsed if its height is at the collapsed min (36px header bar)
-    const isCollapsed = bottomPanel.height <= 36;
+    // Panel is collapsed if its height is at the collapsed min (header bar only)
+    const isCollapsed = this._isBottomPanelCollapsedByHeight(bottomPanel);
     if (isCollapsed) {
       const savedHeight = this._lastBottomPanelHeight.get(activeTab) ?? BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX;
       this._expandPanelVertical(bottomPanel, savedHeight, BOTTOM_GALLERY_MIN_EXPANDED_HEIGHT_PX);
     } else {
       // Save current height before collapsing
       this._lastBottomPanelHeight.set(activeTab, bottomPanel.height);
-      this._collapsePanelVertical(bottomPanel, 36);
+      this._collapsePanelVertical(bottomPanel, BOTTOM_GALLERY_MIN_HEIGHT_PX);
     }
     return true;
   };
@@ -817,7 +825,7 @@ export class NavigationApi {
   /**
    * Check if the bottom gallery panel in the currently active tab is collapsed.
    *
-   * @returns True if the bottom panel is collapsed (height <= 36px), false if expanded or not found
+   * @returns True if the bottom panel is collapsed (height <= collapsed min), false if expanded or not found
    */
   isBottomPanelCollapsed = (): boolean => {
     const activeTab = this._app?.activeTab.get() ?? null;
@@ -828,7 +836,7 @@ export class NavigationApi {
     if (!bottomPanel || !(bottomPanel instanceof GridviewPanel)) {
       return false;
     }
-    return bottomPanel.height <= 36;
+    return this._isBottomPanelCollapsedByHeight(bottomPanel);
   };
 
   /**
@@ -915,11 +923,11 @@ export class NavigationApi {
    * Returns true when the gallery panel is collapsed in the provided tab.
    */
   isGalleryPanelCollapsed = (tab: TabName): boolean => {
-    const galleryPanel = this.getPanel(tab, GALLERY_PANEL_ID);
+    const galleryPanel = this.getPanel(tab, BOTTOM_GALLERY_PANEL_ID);
     if (!(galleryPanel instanceof GridviewPanel)) {
       return false;
     }
-    return galleryPanel.height <= (galleryPanel.minimumHeight ?? 0);
+    return this._isBottomPanelCollapsedByHeight(galleryPanel);
   };
 
   /**
