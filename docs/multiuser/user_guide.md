@@ -20,7 +20,20 @@ To activate Multi-User mode, open the `INVOKEAI_ROOT/invokeai.yaml` configuratio
 multiuser: true
 ```
 
-Restart the server. It will now be in multi-user mode.
+You may also wish to make InvokeAI available to other machines on your local LAN. Add an additional line to `invokeai.yaml`:
+
+```yaml
+host: 0.0.0.0
+```
+
+Restart the server. It will now be in multi-user mode. If you enabled
+the `host` option, other users on your home or office LAN will be able
+to reach it by browsing to the IP address of the machine the backend
+is running on (`http://host-ip-address:9090`).
+
+!!! tip "Do not expose InvokeAI to the internet"
+    It is not recommended to expose the InvokeAI host to the internet
+	due to security concerns.	
 
 ### Initial Setup (First Time in Multi-User Mode)
 
@@ -139,7 +152,6 @@ You cannot:
 - ❌ View or cancel other users' generation tasks
 
 !!! tip "The generation queue"
-
 	When two or more users are accessing InvokeAI at the same time,
 	their image generation jobs will be placed on the session queue on
 	a first-come, first-serve basis. This means that you will have to
