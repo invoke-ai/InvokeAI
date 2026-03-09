@@ -263,3 +263,10 @@ class UserService(UserServiceBase):
             )
             row = cursor.fetchone()
         return row[0] if row else None
+
+    def count_admins(self) -> int:
+        """Count active admin users."""
+        with self._db.transaction() as cursor:
+            cursor.execute("SELECT COUNT(*) FROM users WHERE is_admin = TRUE AND is_active = TRUE")
+            row = cursor.fetchone()
+        return int(row[0]) if row else 0

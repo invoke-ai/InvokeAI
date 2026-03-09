@@ -133,3 +133,11 @@ class UserServiceBase(ABC):
             Email address of the first active admin, or None if no admin exists
         """
         pass
+
+    def count_admins(self) -> int:
+        """Count active admin users.
+
+        Returns:
+            The number of active admin users
+        """
+        pass

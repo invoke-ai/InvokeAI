@@ -246,11 +246,13 @@ async def reidentify_model(
             raise InvalidModelException("Unable to identify model format")
 
         # Retain user-editable fields from the original config
+        result.config.path = config.path
         result.config.key = config.key
         result.config.name = config.name
         result.config.description = config.description
         result.config.cover_image = config.cover_image
-        result.config.trigger_phrases = config.trigger_phrases
+        if hasattr(config, "trigger_phrases") and hasattr(result.config, "trigger_phrases"):
+            result.config.trigger_phrases = config.trigger_phrases
         result.config.source = config.source
         result.config.source_type = config.source_type
 
