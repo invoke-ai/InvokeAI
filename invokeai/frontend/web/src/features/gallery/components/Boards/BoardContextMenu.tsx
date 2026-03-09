@@ -21,6 +21,7 @@ import {
 } from 'react-icons/pi';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useBulkDownloadImagesMutation } from 'services/api/endpoints/images';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 import type { BoardDTO } from 'services/api/types';
 
@@ -49,6 +50,8 @@ const BoardContextMenu = ({ board, children }: Props) => {
   // Only the board owner or admin can modify visibility
   const canChangeVisibility =
     currentUser !== null && (currentUser.is_admin || board.user_id === currentUser.user_id);
+
+  const { canDeleteBoard } = useBoardAccess(board);
 
   const handleSetAutoAdd = useCallback(() => {
     dispatch(autoAddBoardIdChanged(board.board_id));
@@ -164,7 +167,13 @@ const BoardContextMenu = ({ board, children }: Props) => {
             </>
           )}
 
-          <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClick={setAsBoardToDelete} isDestructive>
+          <MenuItem
+            color="error.300"
+            icon={<PiTrashSimpleBold />}
+            onClick={setAsBoardToDelete}
+            isDestructive
+            isDisabled={!canDeleteBoard}
+          >
             {t('boards.deleteBoard')}
           </MenuItem>
         </MenuGroup>
@@ -185,6 +194,7 @@ const BoardContextMenu = ({ board, children }: Props) => {
       handleSetVisibilityPrivate,
       handleSetVisibilityShared,
       handleSetVisibilityPublic,
+      canDeleteBoard,
       setAsBoardToDelete,
     ]
   );

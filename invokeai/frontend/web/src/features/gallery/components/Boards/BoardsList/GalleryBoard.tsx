@@ -20,6 +20,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArchiveBold, PiGlobeBold, PiImageSquare, PiShareNetworkBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 import type { BoardDTO } from 'services/api/types';
 
 const _hover: SystemStyleObject = {
@@ -61,6 +62,8 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
   );
 
   const showOwner = currentUser?.is_admin && board.owner_username;
+
+  const { canWriteImages } = useBoardAccess(board);
 
   return (
     <Box position="relative" w="full" h={12}>
@@ -122,7 +125,12 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
           </Tooltip>
         )}
       </BoardContextMenu>
-      <DndDropTarget dndTarget={addImageToBoardDndTarget} dndTargetData={dndTargetData} label={t('gallery.move')} />
+      <DndDropTarget
+        dndTarget={addImageToBoardDndTarget}
+        dndTargetData={dndTargetData}
+        label={t('gallery.move')}
+        isDisabled={!canWriteImages}
+      />
     </Box>
   );
 };
