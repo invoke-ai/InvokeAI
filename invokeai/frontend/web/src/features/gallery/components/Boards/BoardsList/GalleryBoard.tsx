@@ -18,7 +18,7 @@ import {
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArchiveBold, PiImageSquare } from 'react-icons/pi';
+import { PiArchiveBold, PiGlobeBold, PiImageSquare, PiShareNetworkBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
 import type { BoardDTO } from 'services/api/types';
 
@@ -99,6 +99,20 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
               </Flex>
               {autoAddBoardId === board.board_id && <AutoAddBadge />}
               {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
+              {board.board_visibility === 'shared' && (
+                <Tooltip label={t('boards.visibilityBadgeShared')}>
+                  <span>
+                    <Icon as={PiShareNetworkBold} fill="blue.300" />
+                  </span>
+                </Tooltip>
+              )}
+              {board.board_visibility === 'public' && (
+                <Tooltip label={t('boards.visibilityBadgePublic')}>
+                  <span>
+                    <Icon as={PiGlobeBold} fill="green.300" />
+                  </span>
+                </Tooltip>
+              )}
               <Flex justifyContent="flex-end">
                 <Text variant="subtext">
                   {board.image_count} | {board.asset_count}

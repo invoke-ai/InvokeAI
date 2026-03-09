@@ -154,7 +154,17 @@
         "imagesWithCount_other": "{{count}} images",
         "assetsWithCount_one": "{{count}} asset",
         "assetsWithCount_other": "{{count}} assets",
-        "updateBoardError": "Error updating board"
+        "updateBoardError": "Error updating board",
+        "setBoardVisibility": "Set Board Visibility",
+        "setVisibilityPrivate": "Set Private",
+        "setVisibilityShared": "Set Shared",
+        "setVisibilityPublic": "Set Public",
+        "visibilityPrivate": "Private",
+        "visibilityShared": "Shared",
+        "visibilityPublic": "Public",
+        "visibilityBadgeShared": "Shared board",
+        "visibilityBadgePublic": "Public board",
+        "updateBoardVisibilityError": "Error updating board visibility"
     },
     "accordions": {
         "generation": {

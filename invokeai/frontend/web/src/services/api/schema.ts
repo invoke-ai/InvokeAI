@@ -3046,6 +3046,8 @@ export type components = {
              * @description Whether or not the board is archived
              */
             archived?: boolean | null;
+            /** @description The visibility of the board. */
+            board_visibility?: components["schemas"]["BoardVisibility"] | null;
         };
         /**
          * BoardDTO
@@ -3107,6 +3109,8 @@ export type components = {
              * @description The username of the board owner (for admin view).
              */
             owner_username?: string | null;
+            /** @description The visibility of the board. */
+            board_visibility: components["schemas"]["BoardVisibility"];
         };
         /**
          * BoardField
@@ -3125,6 +3129,12 @@ export type components = {
          * @enum {string}
          */
         BoardRecordOrderBy: "created_at" | "board_name";
+        /**
+         * BoardVisibility
+         * @description The visibility options for a board.
+         * @enum {string}
+         */
+        BoardVisibility: "private" | "shared" | "public";
         /** Body_add_image_to_board */
         Body_add_image_to_board: {
             /**

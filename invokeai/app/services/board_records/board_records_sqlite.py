@@ -9,6 +9,7 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordNotFoundException,
     BoardRecordOrderBy,
     BoardRecordSaveException,
+    BoardVisibility,
     deserialize_board_record,
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -116,6 +117,17 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                         (changes.archived, board_id),
                     )
 
+                # Change the visibility of a board
+                if changes.board_visibility is not None:
+                    cursor.execute(
+                        """--sql
+                        UPDATE boards
+                        SET board_visibility = ?
+                        WHERE board_id = ?;
+                        """,
+                        (changes.board_visibility.value, board_id),
+                    )
+
             except sqlite3.Error as e:
                 raise BoardRecordSaveException from e
         return self.get(board_id)
@@ -155,7 +167,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                     SELECT DISTINCT boards.*
                     FROM boards
                     LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
-                    WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.is_public = 1)
+                    WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.board_visibility IN ('shared', 'public'))
                     {archived_filter}
                     ORDER BY {order_by} {direction}
                     LIMIT ? OFFSET ?;
@@ -194,14 +206,14 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                         SELECT COUNT(DISTINCT boards.board_id)
                         FROM boards
                         LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
-                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.is_public = 1);
+                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.board_visibility IN ('shared', 'public'));
                     """
                 else:
                     count_query = """
                         SELECT COUNT(DISTINCT boards.board_id)
                         FROM boards
                         LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
-                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.is_public = 1)
+                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.board_visibility IN ('shared', 'public'))
                         AND boards.archived = 0;
                     """
 
@@ -251,7 +263,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                         SELECT DISTINCT boards.*
                         FROM boards
                         LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
-                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.is_public = 1)
+                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.board_visibility IN ('shared', 'public'))
                         {archived_filter}
                         ORDER BY LOWER(boards.board_name) {direction}
                     """
@@ -260,7 +272,7 @@ class SqliteBoardRecordStorage(BoardRecordStorageBase):
                         SELECT DISTINCT boards.*
                         FROM boards
                         LEFT JOIN shared_boards ON boards.board_id = shared_boards.board_id
-                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.is_public = 1)
+                        WHERE (boards.user_id = ? OR shared_boards.user_id = ? OR boards.board_visibility IN ('shared', 'public'))
                         {archived_filter}
                         ORDER BY {order_by} {direction}
                     """

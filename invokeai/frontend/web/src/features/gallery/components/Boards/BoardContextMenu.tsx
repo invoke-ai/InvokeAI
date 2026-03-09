@@ -2,13 +2,23 @@ import type { ContextMenuProps } from '@invoke-ai/ui-library';
 import { ContextMenu, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { $boardToDelete } from 'features/gallery/components/Boards/DeleteBoardModal';
 import { selectAutoAddBoardId, selectAutoAssignBoardOnClick } from 'features/gallery/store/gallerySelectors';
 import { autoAddBoardIdChanged } from 'features/gallery/store/gallerySlice';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArchiveBold, PiArchiveFill, PiDownloadBold, PiPlusBold, PiTrashSimpleBold } from 'react-icons/pi';
+import {
+  PiArchiveBold,
+  PiArchiveFill,
+  PiDownloadBold,
+  PiGlobeBold,
+  PiLockBold,
+  PiPlusBold,
+  PiShareNetworkBold,
+  PiTrashSimpleBold,
+} from 'react-icons/pi';
 import { useUpdateBoardMutation } from 'services/api/endpoints/boards';
 import { useBulkDownloadImagesMutation } from 'services/api/endpoints/images';
 import { useBoardName } from 'services/api/hooks/useBoardName';
@@ -23,6 +33,7 @@ const BoardContextMenu = ({ board, children }: Props) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
+  const currentUser = useAppSelector(selectCurrentUser);
   const selectIsSelectedForAutoAdd = useMemo(
     () => createSelector(selectAutoAddBoardId, (autoAddBoardId) => board.board_id === autoAddBoardId),
     [board.board_id]
@@ -34,6 +45,10 @@ const BoardContextMenu = ({ board, children }: Props) => {
   const boardName = useBoardName(board.board_id);
 
   const [bulkDownload] = useBulkDownloadImagesMutation();
+
+  // Only the board owner or admin can modify visibility
+  const canChangeVisibility =
+    currentUser !== null && (currentUser.is_admin || board.user_id === currentUser.user_id);
 
   const handleSetAutoAdd = useCallback(() => {
     dispatch(autoAddBoardIdChanged(board.board_id));
@@ -63,6 +78,35 @@ const BoardContextMenu = ({ board, children }: Props) => {
       changes: { archived: false },
     });
   }, [board.board_id, updateBoard]);
+
+  const handleSetVisibility = useCallback(
+    async (visibility: 'private' | 'shared' | 'public') => {
+      try {
+        await updateBoard({
+          board_id: board.board_id,
+          changes: { board_visibility: visibility },
+        }).unwrap();
+      } catch {
+        toast({ status: 'error', title: t('boards.updateBoardVisibilityError') });
+      }
+    },
+    [board.board_id, t, updateBoard]
+  );
+
+  const handleSetVisibilityPrivate = useCallback(
+    () => handleSetVisibility('private'),
+    [handleSetVisibility]
+  );
+
+  const handleSetVisibilityShared = useCallback(
+    () => handleSetVisibility('shared'),
+    [handleSetVisibility]
+  );
+
+  const handleSetVisibilityPublic = useCallback(
+    () => handleSetVisibility('public'),
+    [handleSetVisibility]
+  );
 
   const setAsBoardToDelete = useCallback(() => {
     $boardToDelete.set(board);
@@ -94,6 +138,32 @@ const BoardContextMenu = ({ board, children }: Props) => {
             </MenuItem>
           )}
 
+          {canChangeVisibility && (
+            <>
+              <MenuItem
+                icon={<PiLockBold />}
+                onClick={handleSetVisibilityPrivate}
+                isDisabled={board.board_visibility === 'private'}
+              >
+                {t('boards.setVisibilityPrivate')}
+              </MenuItem>
+              <MenuItem
+                icon={<PiShareNetworkBold />}
+                onClick={handleSetVisibilityShared}
+                isDisabled={board.board_visibility === 'shared'}
+              >
+                {t('boards.setVisibilityShared')}
+              </MenuItem>
+              <MenuItem
+                icon={<PiGlobeBold />}
+                onClick={handleSetVisibilityPublic}
+                isDisabled={board.board_visibility === 'public'}
+              >
+                {t('boards.setVisibilityPublic')}
+              </MenuItem>
+            </>
+          )}
+
           <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClick={setAsBoardToDelete} isDestructive>
             {t('boards.deleteBoard')}
           </MenuItem>
@@ -108,8 +178,13 @@ const BoardContextMenu = ({ board, children }: Props) => {
       t,
       handleBulkDownload,
       board.archived,
+      board.board_visibility,
       handleUnarchive,
       handleArchive,
+      canChangeVisibility,
+      handleSetVisibilityPrivate,
+      handleSetVisibilityShared,
+      handleSetVisibilityPublic,
       setAsBoardToDelete,
     ]
   );
