@@ -1,7 +1,9 @@
 import type { ButtonProps } from '@invoke-ai/ui-library';
 import { Alert, AlertDescription, AlertIcon, Button, Divider, Flex, Link, Spinner, Text } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { InvokeLogoIcon } from 'common/components/InvokeLogoIcon';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { LOADING_SYMBOL, useHasImages } from 'features/gallery/hooks/useHasImages';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -9,16 +11,26 @@ import type { PropsWithChildren } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { Trans, useTranslation } from 'react-i18next';
 import { PiArrowSquareOutBold, PiImageBold } from 'react-icons/pi';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 
 export const NoContentForViewer = memo(() => {
   const hasImages = useHasImages();
   const [mainModels, { data }] = useMainModels();
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const user = useAppSelector(selectCurrentUser);
   const { t } = useTranslation();
 
+  const isMultiuser = setupStatus?.multiuser_enabled ?? false;
+  const isAdmin = !isMultiuser || (user?.is_admin ?? false);
+  const adminEmail = setupStatus?.admin_email ?? null;
+
+  const modelsLoaded = data !== undefined;
+  const hasModels = mainModels.length > 0;
+
   const showStarterBundles = useMemo(() => {
-    return data && mainModels.length === 0;
-  }, [mainModels.length, data]);
+    return modelsLoaded && !hasModels && isAdmin;
+  }, [modelsLoaded, hasModels, isAdmin]);
 
   if (hasImages === LOADING_SYMBOL) {
     // Blank bg w/ a spinner. The new user experience components below have an invoke logo, but it's not centered.
@@ -36,10 +48,18 @@ export const NoContentForViewer = memo(() => {
     <Flex flexDir="column" gap={8} alignItems="center" textAlign="center" maxW="400px">
       <InvokeLogoIcon w={32} h={32} />
       <Flex flexDir="column" gap={4} alignItems="center" textAlign="center">
-        <GetStartedLocal />
-        {showStarterBundles && <StarterBundlesCallout />}
-        <Divider />
-        <LowVRAMAlert />
+        {isAdmin ? (
+          // Admin / single-user mode
+          <>
+            {modelsLoaded && hasModels ? <GetStartedWithModels /> : <GetStartedLocal />}
+            {showStarterBundles && <StarterBundlesCallout />}
+            <Divider />
+            <LowVRAMAlert />
+          </>
+        ) : (
+          // Non-admin user in multiuser mode
+          <>{modelsLoaded && hasModels ? <GetStartedWithModels /> : <GetStartedNonAdmin adminEmail={adminEmail} />}</>
+        )}
       </Flex>
     </Flex>
   );
@@ -85,6 +105,32 @@ const GetStartedLocal = () => {
   return (
     <Text fontSize="md" color="base.200">
       <Trans i18nKey="newUserExperience.toGetStartedLocal" components={{ StrongComponent }} />
+    </Text>
+  );
+};
+
+const GetStartedWithModels = () => {
+  return (
+    <Text fontSize="md" color="base.200">
+      <Trans i18nKey="newUserExperience.toGetStarted" components={{ StrongComponent }} />
+    </Text>
+  );
+};
+
+const GetStartedNonAdmin = ({ adminEmail }: { adminEmail: string | null }) => {
+  const AdminEmailLink = adminEmail ? (
+    <Link href={`mailto:${adminEmail}`} color="base.50">
+      {adminEmail}
+    </Link>
+  ) : (
+    <Text as="span" color="base.50">
+      your administrator
+    </Text>
+  );
+
+  return (
+    <Text fontSize="md" color="base.200">
+      <Trans i18nKey="newUserExperience.toGetStartedNonAdmin" components={{ StrongComponent, AdminEmailLink }} />
     </Text>
   );
 };

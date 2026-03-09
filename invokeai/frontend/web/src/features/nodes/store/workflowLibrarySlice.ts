@@ -11,7 +11,7 @@ import {
 } from 'services/api/types';
 import z from 'zod';
 
-const zWorkflowLibraryView = z.enum(['recent', 'yours', 'defaults']);
+const zWorkflowLibraryView = z.enum(['recent', 'yours', 'shared', 'defaults']);
 export type WorkflowLibraryView = z.infer<typeof zWorkflowLibraryView>;
 
 const zWorkflowLibraryState = z.object({
@@ -55,6 +55,9 @@ const slice = createSlice({
       if (action.payload === 'recent') {
         state.orderBy = 'opened_at';
         state.direction = 'DESC';
+      } else if (action.payload === 'shared') {
+        state.orderBy = 'name';
+        state.direction = 'ASC';
       }
     },
     workflowLibraryTagToggled: (state, action: PayloadAction<string>) => {
@@ -121,5 +124,11 @@ export const WORKFLOW_LIBRARY_TAG_CATEGORIES: WorkflowTagCategory[] = [
 ];
 export const WORKFLOW_LIBRARY_TAGS = WORKFLOW_LIBRARY_TAG_CATEGORIES.flatMap(({ tags }) => tags);
 
-type WorkflowSortOption = 'opened_at' | 'created_at' | 'updated_at' | 'name';
-export const WORKFLOW_LIBRARY_SORT_OPTIONS: WorkflowSortOption[] = ['opened_at', 'created_at', 'updated_at', 'name'];
+type WorkflowSortOption = 'opened_at' | 'created_at' | 'updated_at' | 'name' | 'is_public';
+export const WORKFLOW_LIBRARY_SORT_OPTIONS: WorkflowSortOption[] = [
+  'opened_at',
+  'created_at',
+  'updated_at',
+  'name',
+  'is_public',
+];

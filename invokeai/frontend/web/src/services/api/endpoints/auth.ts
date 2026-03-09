@@ -33,6 +33,7 @@ type LogoutResponse = {
 type SetupStatusResponse = {
   setup_required: boolean;
   multiuser_enabled: boolean;
+  admin_email: string | null;
 };
 
 export type UserDTO = components['schemas']['UserDTO'];

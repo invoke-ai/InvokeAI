@@ -37,7 +37,7 @@ export const ModelManager = memo(() => {
           {t('common.modelManager')}
         </Heading>
         <Flex gap={2}>
-          <SyncModelsButton />
+          {canManageModels && <SyncModelsButton />}
           {!!selectedModelKey && canManageModels && (
             <Button size="sm" colorScheme="invokeYellow" leftIcon={<PiPlusBold />} onClick={handleClickAddModel}>
               {t('modelManager.addModels')}

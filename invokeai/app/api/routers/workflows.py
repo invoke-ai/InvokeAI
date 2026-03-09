@@ -6,6 +6,7 @@ from fastapi import APIRouter, Body, File, HTTPException, Path, Query, UploadFil
 from fastapi.responses import FileResponse
 from PIL import Image
 
+from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -33,15 +34,24 @@ workflows_router = APIRouter(prefix="/v1/workflows", tags=["workflows"])
     },
 )
 async def get_workflow(
+    current_user: CurrentUserOrDefault,
     workflow_id: str = Path(description="The workflow to get"),
 ) -> WorkflowRecordWithThumbnailDTO:
     """Gets a workflow"""
     try:
-        thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow_id)
         workflow = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
-        return WorkflowRecordWithThumbnailDTO(thumbnail_url=thumbnail_url, **workflow.model_dump())
     except WorkflowNotFoundError:
         raise HTTPException(status_code=404, detail="Workflow not found")
+
+    config = ApiDependencies.invoker.services.configuration
+    if config.multiuser:
+        is_default = workflow.workflow.meta.category is WorkflowCategory.Default
+        is_owner = workflow.user_id == current_user.user_id
+        if not (is_default or is_owner or workflow.is_public or current_user.is_admin):
+            raise HTTPException(status_code=403, detail="Not authorized to access this workflow")
+
+    thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow_id)
+    return WorkflowRecordWithThumbnailDTO(thumbnail_url=thumbnail_url, **workflow.model_dump())
 
 
 @workflows_router.patch(
@@ -52,9 +62,18 @@ async def get_workflow(
     },
 )
 async def update_workflow(
+    current_user: CurrentUserOrDefault,
     workflow: Workflow = Body(description="The updated workflow", embed=True),
 ) -> WorkflowRecordDTO:
     """Updates a workflow"""
+    config = ApiDependencies.invoker.services.configuration
+    if config.multiuser:
+        try:
+            existing = ApiDependencies.invoker.services.workflow_records.get(workflow.id)
+        except WorkflowNotFoundError:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+        if not current_user.is_admin and existing.user_id != current_user.user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
     return ApiDependencies.invoker.services.workflow_records.update(workflow=workflow)
 
 
@@ -63,9 +82,18 @@ async def update_workflow(
     operation_id="delete_workflow",
 )
 async def delete_workflow(
+    current_user: CurrentUserOrDefault,
     workflow_id: str = Path(description="The workflow to delete"),
 ) -> None:
     """Deletes a workflow"""
+    config = ApiDependencies.invoker.services.configuration
+    if config.multiuser:
+        try:
+            existing = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+        except WorkflowNotFoundError:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+        if not current_user.is_admin and existing.user_id != current_user.user_id:
+            raise HTTPException(status_code=403, detail="Not authorized to delete this workflow")
     try:
         ApiDependencies.invoker.services.workflow_thumbnails.delete(workflow_id)
     except WorkflowThumbnailFileNotFoundException:
@@ -82,10 +110,11 @@ async def delete_workflow(
     },
 )
 async def create_workflow(
+    current_user: CurrentUserOrDefault,
     workflow: WorkflowWithoutID = Body(description="The workflow to create", embed=True),
 ) -> WorkflowRecordDTO:
     """Creates a workflow"""
-    return ApiDependencies.invoker.services.workflow_records.create(workflow=workflow)
+    return ApiDependencies.invoker.services.workflow_records.create(workflow=workflow, user_id=current_user.user_id)
 
 
 @workflows_router.get(
@@ -96,6 +125,7 @@ async def create_workflow(
     },
 )
 async def list_workflows(
+    current_user: CurrentUserOrDefault,
     page: int = Query(default=0, description="The page to get"),
     per_page: Optional[int] = Query(default=None, description="The number of workflows per page"),
     order_by: WorkflowRecordOrderBy = Query(
@@ -106,8 +136,19 @@ async def list_workflows(
     tags: Optional[list[str]] = Query(default=None, description="The tags of workflow to get"),
     query: Optional[str] = Query(default=None, description="The text to query by (matches name and description)"),
     has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
+    is_public: Optional[bool] = Query(default=None, description="Filter by public/shared status"),
 ) -> PaginatedResults[WorkflowRecordListItemWithThumbnailDTO]:
     """Gets a page of workflows"""
+    config = ApiDependencies.invoker.services.configuration
+
+    # In multiuser mode, scope user-category workflows to the current user unless fetching shared workflows
+    user_id_filter: Optional[str] = None
+    if config.multiuser:
+        # Only filter 'user' category results by user_id when not explicitly listing public workflows
+        has_user_category = not categories or WorkflowCategory.User in categories
+        if has_user_category and is_public is not True:
+            user_id_filter = current_user.user_id
+
     workflows_with_thumbnails: list[WorkflowRecordListItemWithThumbnailDTO] = []
     workflows = ApiDependencies.invoker.services.workflow_records.get_many(
         order_by=order_by,
@@ -118,6 +159,8 @@ async def list_workflows(
         categories=categories,
         tags=tags,
         has_been_opened=has_been_opened,
+        user_id=user_id_filter,
+        is_public=is_public,
     )
     for workflow in workflows.items:
         workflows_with_thumbnails.append(
@@ -143,14 +186,19 @@ async def list_workflows(
     },
 )
 async def set_workflow_thumbnail(
+    current_user: CurrentUserOrDefault,
     workflow_id: str = Path(description="The workflow to update"),
     image: UploadFile = File(description="The image file to upload"),
 ):
     """Sets a workflow's thumbnail image"""
     try:
-        ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+        existing = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
     except WorkflowNotFoundError:
         raise HTTPException(status_code=404, detail="Workflow not found")
+
+    config = ApiDependencies.invoker.services.configuration
+    if config.multiuser and not current_user.is_admin and existing.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
 
     if not image.content_type or not image.content_type.startswith("image"):
         raise HTTPException(status_code=415, detail="Not an image")
@@ -177,13 +225,18 @@ async def set_workflow_thumbnail(
     },
 )
 async def delete_workflow_thumbnail(
+    current_user: CurrentUserOrDefault,
     workflow_id: str = Path(description="The workflow to update"),
 ):
     """Removes a workflow's thumbnail image"""
     try:
-        ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+        existing = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
     except WorkflowNotFoundError:
         raise HTTPException(status_code=404, detail="Workflow not found")
+
+    config = ApiDependencies.invoker.services.configuration
+    if config.multiuser and not current_user.is_admin and existing.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
 
     try:
         ApiDependencies.invoker.services.workflow_thumbnails.delete(workflow_id)
@@ -223,37 +276,90 @@ async def get_workflow_thumbnail(
         raise HTTPException(status_code=404)
 
 
+@workflows_router.patch(
+    "/i/{workflow_id}/is_public",
+    operation_id="update_workflow_is_public",
+    responses={
+        200: {"model": WorkflowRecordDTO},
+    },
+)
+async def update_workflow_is_public(
+    current_user: CurrentUserOrDefault,
+    workflow_id: str = Path(description="The workflow to update"),
+    is_public: bool = Body(description="Whether the workflow should be shared publicly", embed=True),
+) -> WorkflowRecordDTO:
+    """Updates whether a workflow is shared publicly"""
+    try:
+        existing = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+    except WorkflowNotFoundError:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    config = ApiDependencies.invoker.services.configuration
+    if config.multiuser and not current_user.is_admin and existing.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
+
+    return ApiDependencies.invoker.services.workflow_records.update_is_public(
+        workflow_id=workflow_id, is_public=is_public
+    )
+
+
 @workflows_router.get("/tags", operation_id="get_all_tags")
 async def get_all_tags(
+    current_user: CurrentUserOrDefault,
     categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories to include"),
+    is_public: Optional[bool] = Query(default=None, description="Filter by public/shared status"),
 ) -> list[str]:
     """Gets all unique tags from workflows"""
+    config = ApiDependencies.invoker.services.configuration
+    user_id_filter: Optional[str] = None
+    if config.multiuser:
+        has_user_category = not categories or WorkflowCategory.User in categories
+        if has_user_category and is_public is not True:
+            user_id_filter = current_user.user_id
 
-    return ApiDependencies.invoker.services.workflow_records.get_all_tags(categories=categories)
+    return ApiDependencies.invoker.services.workflow_records.get_all_tags(
+        categories=categories, user_id=user_id_filter, is_public=is_public
+    )
 
 
 @workflows_router.get("/counts_by_tag", operation_id="get_counts_by_tag")
 async def get_counts_by_tag(
+    current_user: CurrentUserOrDefault,
     tags: list[str] = Query(description="The tags to get counts for"),
     categories: Optional[list[WorkflowCategory]] = Query(default=None, description="The categories to include"),
     has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
+    is_public: Optional[bool] = Query(default=None, description="Filter by public/shared status"),
 ) -> dict[str, int]:
     """Counts workflows by tag"""
+    config = ApiDependencies.invoker.services.configuration
+    user_id_filter: Optional[str] = None
+    if config.multiuser:
+        has_user_category = not categories or WorkflowCategory.User in categories
+        if has_user_category and is_public is not True:
+            user_id_filter = current_user.user_id
 
     return ApiDependencies.invoker.services.workflow_records.counts_by_tag(
-        tags=tags, categories=categories, has_been_opened=has_been_opened
+        tags=tags, categories=categories, has_been_opened=has_been_opened, user_id=user_id_filter, is_public=is_public
     )
 
 
 @workflows_router.get("/counts_by_category", operation_id="counts_by_category")
 async def counts_by_category(
+    current_user: CurrentUserOrDefault,
     categories: list[WorkflowCategory] = Query(description="The categories to include"),
     has_been_opened: Optional[bool] = Query(default=None, description="Whether to include/exclude recent workflows"),
+    is_public: Optional[bool] = Query(default=None, description="Filter by public/shared status"),
 ) -> dict[str, int]:
     """Counts workflows by category"""
+    config = ApiDependencies.invoker.services.configuration
+    user_id_filter: Optional[str] = None
+    if config.multiuser:
+        has_user_category = WorkflowCategory.User in categories
+        if has_user_category and is_public is not True:
+            user_id_filter = current_user.user_id
 
     return ApiDependencies.invoker.services.workflow_records.counts_by_category(
-        categories=categories, has_been_opened=has_been_opened
+        categories=categories, has_been_opened=has_been_opened, user_id=user_id_filter, is_public=is_public
     )
 
 
