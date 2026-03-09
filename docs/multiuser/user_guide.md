@@ -2,74 +2,131 @@
 
 ## Overview
 
-InvokeAI supports both single-user and multi-user modes. In
-single-user mode, no login is required and you have access to all
-features. In multi-user mode, multiple people can use the same
-InvokeAI instance while keeping their work private and organized.
+Multi-User mode is a recent feature (introduced in version 6.12), which allows multiple individuals to share a single InvokeAI server while keeping their work separate and organized. Each user has their own username and login password, images, assets, image boards, customization settings and workflows. 
 
-### Single-User vs Multi-User Mode
+Two types of users are recognized:
 
-**Single-User Mode:**
+* A user with **Administrator** status can add, remove and modify other users, and can install models. They also have the ability to view the full session queue and pause or kill other users' jobs.
+* **Non-administrator** users can modify their own profile but not others. They also do not have the ability to install or configure models, but must ask an Administrator to do this task.
 
-- No login required - direct access to InvokeAI
-- All functionality enabled by default
-- All boards and images visible in a unified view
-- Ideal for personal use or trusted environments
-- Enabled when `multiuser: false` in config or option is absent
+Multiple users can be granted Administrator status.
 
-**Multi-User Mode:**
-
-- Secure login required for access
-- User isolation for boards, images, and workflows
-- Role-based permissions (Administrator vs Regular User)
-- Ideal for shared servers or team environments
-- Enabled when `multiuser: true` in config
-
-!!! note "Mode Switching"
-    
-	If you switch from multi-user mode to single-user mode, 
-	all boards and images from different users will be combined 
-	into a single unified view. When switching back to multi-user
-	mode, they will be separated again by user ownership.
+*** 
 
 ## Getting Started
+
+To activate Multi-User mode, open the `INVOKEAI_ROOT/invokeai.yaml` configuration file in a text editor. Add this line anywhere in the file:
+```yaml
+multiuser: true
+```
+
+You may also wish to make InvokeAI available to other machines on your local LAN. Add an additional line to `invokeai.yaml`:
+
+```yaml
+host: 0.0.0.0
+```
+
+Restart the server. It will now be in multi-user mode. If you enabled
+the `host` option, other users on your home or office LAN will be able
+to reach it by browsing to the IP address of the machine the backend
+is running on (`http://host-ip-address:9090`).
+
+!!! tip "Do not expose InvokeAI to the internet"
+    It is not recommended to expose the InvokeAI host to the internet
+	due to security concerns.	
 
 ### Initial Setup (First Time in Multi-User Mode)
 
 If you're the first person to access a fresh InvokeAI installation in multi-user mode, you'll see the **Administrator Setup** dialog:
 
-1. Enter your email address (this will be your username)
-2. Create a display name
+![Administrator Setup Screen](../../assets/multiuser/admin-setup.png)
+
+Now
+
+1. Enter your email address (this will be your login name)
+2. Create a display name (this will be the name other users see)
 3. Choose a strong password that meets the requirements:
-   - At least 8 characters long
-   - Contains uppercase letters
-   - Contains lowercase letters
-   - Contains numbers
+    - At least 8 characters long
+    - Contains uppercase letters
+    - Contains lowercase letters
+    - Contains numbers
 4. Confirm your password
 5. Click **Create Administrator Account**
 
 You'll now be taken to a login screen and can enter the credentials
 you just created.
 
-### Accessing InvokeAI
+### Adding and Modifying Users
 
-**In Single-User Mode:**
+If you are logged in as Administrator, you can add additional users. Click on the small "person silhouette" icon at the bottom left of the main Invoke screen and select "User Management:"
 
-1. Navigate to your InvokeAI URL (e.g., `http://localhost:9090`)
-2. You'll go directly to the InvokeAI interface
-3. No login required - start creating immediately!
+![Administrator Menu](../../assets/multiuser/admin-add-user-1.png)
 
-**In Multi-User Mode:**
+This will take you to the User Management screen...
 
-1. Navigate to your InvokeAI URL (e.g., `http://localhost:9090`)
-2. You'll see the login screen
-3. Enter your email address and password provided by your administrator
-4. Click **Sign In**
+![User Management screen](../../assets/multiuser/admin-add-user-2.png)
 
-!!! tip "Remember Me"
-    In multi-user mode, check the "Remember me" box to stay logged in for 7 days. Otherwise, your session will expire after 24 hours.
+...where you can click "Create User" to add a new user.
 
-## Understanding User Roles (Multi-User Mode Only)
+![Add User Screen](../../assets/multiuser/admin-add-user-3.png)
+
+The User Management screen also allows you to:
+
+1. Temporarily change a user's status to Inactive, preventing them from logging in to Invoke.
+2. Edit a user (by clicking on the pencil icon) to change the user's display name or password.
+3. Permanently delete a user.
+4. Grant a user Administrator privileges.
+
+### Command-line User Management Scripts
+
+Administrators can also use a series of command-line scripts to add, modify, or delete users. If you use the launcher, click the ">" icon to enter the command-line interface. Otherwise, if you are a native command-line user, activate the InvokeAI environment from your terminal.
+
+The commands are named:
+
+* **invoke-useradd** -- add a user
+* **invoke-usermod** -- modify a user
+* **invoke-userdel** -- delete a user
+* **invoke-userlist** -- list all users
+
+Pass the `--help` argument to get the usage of each script. For example:
+
+```bash
+> invoke-useradd --help
+usage: invoke-useradd [-h] [--root ROOT] [--email EMAIL] [--password PASSWORD] [--name NAME] [--admin]
+
+Add a user to the InvokeAI database
+
+options:
+  -h, --help            show this help message and exit
+  --root ROOT, -r ROOT  Path to the InvokeAI root directory. If omitted, the root is resolved in this order: the $INVOKEAI_ROOT environment
+                        variable, the active virtual environment's parent directory, or $HOME/invokeai.
+  --email EMAIL, -e EMAIL
+                        User email address
+  --password PASSWORD, -p PASSWORD
+                        User password
+  --name NAME, -n NAME  User display name (optional)
+  --admin, -a           Make user an administrator
+
+If no arguments are provided, the script will run in interactive mode.
+```
+
+***
+
+## Logging in as a Non-Administrative User
+
+If you are a registered user on the system, enter your email address and password to log in. The Administrator will be able to provide you with the values to use:
+
+![Login Screen](../../assets/multiuser/user-login-1.png)
+
+As an unprivileged user you can do pretty much anything that's allowed under single-user mode -- generating images, using LoRAs, creating and running workflows, creating image boards -- but you are restricted against installing new models, changing low-level server settings, or interfering with other users. More information on user roles is given below.
+
+### Changing your Profile
+
+To change your display name or profile, click on the person silhouette icon at the bottom left of the screen and choose "My Profile". This will take you to a screen that lets you change these values. At this time you can change your display name but not your login ID (ordinarily your contact email address). 
+
+*** 
+
+## Understanding User Roles
 
 In single-user mode, you have access to all features without restrictions. In multi-user mode, InvokeAI has two user roles:
 
@@ -80,11 +137,11 @@ As a regular user, you can:
 - ✅ Create and manage your own image boards
 - ✅ Generate images using all AI tools (Linear, Canvas, Upscale, Workflows)
 - ✅ Create, save, and load your own workflows
-- ✅ Access workflows marked as public
 - ✅ View your own generation queue
 - ✅ Customize your UI preferences (theme, hotkeys, etc.)
+- ✅ View available models (read-only access to Model Manager)
 - ✅ Access shared boards (based on permissions granted to you) (FUTURE FEATURE)
-- ✅ **View available models** (read-only access to Model Manager)
+- ✅ Access workflows marked as public (FUTURE FEATURE)
 
 You cannot:
 
@@ -95,7 +152,6 @@ You cannot:
 - ❌ View or cancel other users' generation tasks
 
 !!! tip "The generation queue"
-
 	When two or more users are accessing InvokeAI at the same time,
 	their image generation jobs will be placed on the session queue on
 	a first-come, first-serve basis. This means that you will have to
@@ -121,50 +177,32 @@ Administrators have all regular user capabilities, plus:
 - ✅ Access system configuration
 - ✅ Grant or revoke admin privileges
 
-## Working with Your Content
+***
+
+## Working with Your Content in Multi-User Mode
 
 ### Image Boards
 
-Image boards help organize your generated images. Each user has their own private boards.
+In multi-user model, Image Boards work as before. Each user can create an unlimited number of boards and organize their images and assets as they see fit. Boards are private: you cannot see a board owned by a different user.
 
-**Creating a Board:**
+!!! tip "Shared Boards"
+    InvokeAI 6.13 will add support for creating public boards that are accessible to all users.
 
-1. Click the **+** button in the Boards panel
-2. Enter a board name
-3. Press Enter or click Create
+The Administrator can see all users Image Boards and their contents.
 
-**Managing Boards:**
+### Going From Multi-User to Single-User mode
 
-- Click a board to select it
-- Generated images will automatically be added to the selected board
-- Right-click a board for options (rename, delete, archive)
-- Drag images between boards to reorganize
-
-**Board Visibility:**
-
-- Your boards are private by default
-- Only administrators can create shared boards (FUTURE FEATURE)
-- You'll see shared boards you have access to in a separate section
+If an InvokeAI instance was in multiuser mode and then restarted in single user mode (by setting `multiuser: false` in the configuration file), all users' boards will be consolidated in one place. Any images that were in  "Uncategorized" will be merged together into a single Uncategorized board. If, at a later date, the server is restarted in multi-user mode, the boards and images will be separated and restored to their owners.
 
 ### Workflows
 
-Workflows are reusable generation templates that you create in the Workflow Editor.
+In the current released version (6.12) workflows are always shared among users. Any workflow that you create will be visible to other users and vice-versa, and there is no protection against one user modifying another user's workflow.
 
-**Creating a Workflow:**
+!!! tip "Private and Shared Workflows"
+    InvokeAI 6.13 will provide the ability to create private and shared workflows. A private workflow can only be viewed by the user who created it. At any time, however, the user can designate the workflow *shared*, in which case it can be opened on a read-only basis by all logged-in users.
 
-1. Go to the **Workflows** tab
-2. Build your workflow using nodes
-3. Click **Save** and give it a name
-4. Your workflow is saved to your personal library
 
-**Workflow Privacy:**
-
-- Your workflows are private by default
-- Only you can see and edit your workflows
-- Administrators can mark workflows as "public" for all users to access
-- Public workflows appear in everyone's workflow library but remain read-only
-
-### Your Generation Queue
+### The Generation Queue
 
 The queue shows your pending and running generation tasks.
 
@@ -183,69 +221,13 @@ The queue shows your pending and running generation tasks.
 - Administrators can view all queues for troubleshooting
 - Your generations won't interfere with other users' tasks
 
-## Using Shared Boards (FUTURE FEATURE)
-
-Shared boards are a feature that will be added in a future
-release. Administrators will able to designate certain boards as being
-accessible to multiple users, allowing for collaboration among users
-while maintaining security.
-
-### Accessing Shared Boards
-
-Shared boards appear in your Boards panel marked with a sharing icon. You can:
-
-- View images on shared boards (if you have read access)
-- Add images to shared boards (if you have write access)
-- Use shared boards like your personal boards
-
-### Permission Levels
-
-Shared boards have three permission levels:
-
-| Permission | View Images | Add Images | Edit/Delete | Manage Sharing |
-|------------|-------------|------------|-------------|----------------|
-| **Read** | ✅ | ❌ | ❌ | ❌ |
-| **Write** | ✅ | ✅ | ✅ | ❌ |
-| **Admin** | ✅ | ✅ | ✅ | ✅ |
-
-!!! note "Shared boards"
-    Only administrators will be able to create shared boards and
-    assign initial permissions.
-
-## Viewing Models (Read-Only)
-
-Regular users have read-only access to the Model Manager, allowing you to:
-
-**What You Can View:**
-
-- ✅ Browse all available models
-- ✅ See model details and configurations
-- ✅ View default settings for each model
-- ✅ Check model metadata and descriptions
-- ✅ See which models are installed
-
-**What You Cannot Do:**
-
-- ❌ Install new models
-- ❌ Delete or modify existing models
-- ❌ Change model configurations
-- ❌ Upload or change model images
-- ❌ Convert models between formats
-
-**Accessing the Model Manager:**
-
-1. Click on the **Models** tab in the navigation
-2. Browse available models
-3. Click on any model to view its details
-
-!!! tip "Need a New Model?"
-    If you need a model that isn't installed, ask your administrator to add it.
+***
 
 ## Customizing Your Experience
 
 ### Personal Preferences
 
-Your UI preferences are saved to your account:
+Your UI preferences are saved to your account and are restored when you log in:
 
 - **Theme**: Choose between light and dark modes
 - **Hotkeys**: Customize keyboard shortcuts
@@ -254,38 +236,7 @@ Your UI preferences are saved to your account:
 
 These settings are stored per-user and won't affect other users.
 
-### Profile Settings (Multi-User Mode)
-
-In multi-user mode, access your profile by clicking your name in the top-right corner:
-
-**Display Name:** Update how your name appears throughout the UI
-
-**Change Password:**
-
-!!! info "Password Changes"
-    A web-based interface for users to change their own passwords is coming in a future release. Until then, contact your administrator to reset your password if needed.
-
-## Security Best Practices
-
-### Password Security
-
-- Use a strong, unique password
-- Don't share your password with others
-- Change your password regularly
-- Use a password manager to store complex passwords
-
-### Session Security
-
-- Log out when using a shared computer
-- Be aware of your session timeout (24 hours or 7 days with "remember me")
-- Your session will automatically expire for security
-- You'll need to log in again after the session expires
-
-### Data Privacy
-
-- Your boards, images, and workflows are private by default
-- Other users cannot access your content unless explicitly shared
-- Only administrators can see all users' content for management purposes
+***
 
 ## Troubleshooting
 
@@ -372,49 +323,8 @@ In multi-user mode, access your profile by clicking your name in the top-right c
 - Check if your generation is paused
 - Contact administrator if stuck for extended period
 
-## Common Tasks
 
-### Changing Your Password
-
-!!! note This is a FUTURE FEATURE. For now, the Administrator must change/reset a user's password using command-line tools.
-
-1. Click your display name (top-right corner)
-2. Select **Change Password**
-3. Enter current password
-4. Enter new password (8+ characters, mixed case, numbers)
-5. Confirm new password
-6. Click **Update Password**
-
-### Creating a New Board
-
-1. Navigate to the Gallery or Canvas tab
-2. Find the Boards panel (usually on the left)
-3. Click the **+ New Board** button
-4. Type a descriptive name
-5. Press Enter
-
-### Saving a Workflow
-
-1. Create or edit a workflow in the Workflows tab
-2. Click **Save** in the top bar
-3. Enter a workflow name
-4. Optionally add a description
-5. Click **Save Workflow**
-
-### Finding a Public Workflow
-
-!!! note Sharing of workflows is a FUTURE FEATURE, not yet implemented
-
-1. Go to the **Workflows** tab
-2. Open the workflow library
-3. Public workflows are marked with a 🌐 icon
-4. Click to load and use the workflow
-
-### Logging Out
-
-1. Click your display name (top-right corner)
-2. Select **Logout**
-3. You'll be redirected to the login screen
+***
 
 ## Frequently Asked Questions
 
