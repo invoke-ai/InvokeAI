@@ -111,7 +111,25 @@ export type paths = {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Current User
+         * @description Update the current user's own profile.
+         *
+         *     To change the password, both ``current_password`` and ``new_password`` must
+         *     be provided. The current password is verified before the change is applied.
+         *
+         *     Args:
+         *         request: Profile fields to update
+         *         current_user: The authenticated user
+         *
+         *     Returns:
+         *         The updated user
+         *
+         *     Raises:
+         *         HTTPException: 400 if current password is incorrect or new password is weak
+         *         HTTPException: 404 if user not found
+         */
+        patch: operations["update_current_user_api_v1_auth_me_patch"];
         trace?: never;
     };
     "/api/v1/auth/setup": {
@@ -145,6 +163,126 @@ export type paths = {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/generate-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate Password
+         * @description Generate a strong random password.
+         *
+         *     Returns a cryptographically secure random password of 16 characters
+         *     containing uppercase, lowercase, digits, and punctuation.
+         */
+        get: operations["generate_password_api_v1_auth_generate_password_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Users
+         * @description List all users. Requires admin privileges.
+         *
+         *     The internal 'system' user (created for backward compatibility) is excluded
+         *     from the results since it cannot be managed through this interface.
+         *
+         *     Returns:
+         *         List of all real users (system user excluded)
+         */
+        get: operations["list_users_api_v1_auth_users_get"];
+        put?: never;
+        /**
+         * Create User
+         * @description Create a new user. Requires admin privileges.
+         *
+         *     Args:
+         *         request: New user details
+         *
+         *     Returns:
+         *         The created user
+         *
+         *     Raises:
+         *         HTTPException: 400 if email already exists or password is weak
+         */
+        post: operations["create_user_api_v1_auth_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get User
+         * @description Get a user by ID. Requires admin privileges.
+         *
+         *     Args:
+         *         user_id: The user ID
+         *
+         *     Returns:
+         *         The user
+         *
+         *     Raises:
+         *         HTTPException: 404 if user not found
+         */
+        get: operations["get_user_api_v1_auth_users__user_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete User
+         * @description Delete a user. Requires admin privileges.
+         *
+         *     Admins can delete any user including other admins, but cannot delete the last
+         *     remaining admin.
+         *
+         *     Args:
+         *         user_id: The user ID
+         *
+         *     Raises:
+         *         HTTPException: 400 if attempting to delete the last admin
+         *         HTTPException: 404 if user not found
+         */
+        delete: operations["delete_user_api_v1_auth_users__user_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update User
+         * @description Update a user. Requires admin privileges.
+         *
+         *     Args:
+         *         user_id: The user ID
+         *         request: Fields to update
+         *
+         *     Returns:
+         *         The updated user
+         *
+         *     Raises:
+         *         HTTPException: 400 if password is weak
+         *         HTTPException: 404 if user not found
+         */
+        patch: operations["update_user_api_v1_auth_users__user_id__patch"];
         trace?: never;
     };
     "/api/v1/utilities/dynamicprompts": {
@@ -2359,6 +2497,59 @@ export type components = {
              * @constant
              */
             type: "add";
+        };
+        /**
+         * AdminUserCreateRequest
+         * @description Request body for admin to create a new user.
+         */
+        AdminUserCreateRequest: {
+            /**
+             * Email
+             * @description User email address
+             */
+            email: string;
+            /**
+             * Display Name
+             * @description Display name
+             */
+            display_name?: string | null;
+            /**
+             * Password
+             * @description User password
+             */
+            password: string;
+            /**
+             * Is Admin
+             * @description Whether user should have admin privileges
+             * @default false
+             */
+            is_admin?: boolean;
+        };
+        /**
+         * AdminUserUpdateRequest
+         * @description Request body for admin to update any user.
+         */
+        AdminUserUpdateRequest: {
+            /**
+             * Display Name
+             * @description Display name
+             */
+            display_name?: string | null;
+            /**
+             * Password
+             * @description New password
+             */
+            password?: string | null;
+            /**
+             * Is Admin
+             * @description Whether user should have admin privileges
+             */
+            is_admin?: boolean | null;
+            /**
+             * Is Active
+             * @description Whether user account should be active
+             */
+            is_active?: boolean | null;
         };
         /**
          * Alpha Mask to Tensor
@@ -10348,6 +10539,17 @@ export type components = {
              * @constant
              */
             type: "freeu";
+        };
+        /**
+         * GeneratePasswordResponse
+         * @description Response containing a generated password.
+         */
+        GeneratePasswordResponse: {
+            /**
+             * Password
+             * @description Generated strong password
+             */
+            password: string;
         };
         /**
          * Get Image Mask Bounding Box
@@ -26672,6 +26874,27 @@ export type components = {
              */
             last_login_at?: string | null;
         };
+        /**
+         * UserProfileUpdateRequest
+         * @description Request body for a user to update their own profile.
+         */
+        UserProfileUpdateRequest: {
+            /**
+             * Display Name
+             * @description New display name
+             */
+            display_name?: string | null;
+            /**
+             * Current Password
+             * @description Current password (required when changing password)
+             */
+            current_password?: string | null;
+            /**
+             * New Password
+             * @description New password
+             */
+            new_password?: string | null;
+        };
         /** VAEField */
         VAEField: {
             /** @description Info to load vae submodel */
@@ -28518,6 +28741,39 @@ export interface operations {
             };
         };
     };
+    update_current_user_api_v1_auth_me_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserProfileUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     setup_admin_api_v1_auth_setup_post: {
         parameters: {
             query?: never;
@@ -28538,6 +28794,177 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SetupResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_password_api_v1_auth_generate_password_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeneratePasswordResponse"];
+                };
+            };
+        };
+    };
+    list_users_api_v1_auth_users_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"][];
+                };
+            };
+        };
+    };
+    create_user_api_v1_auth_users_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_user_api_v1_auth_users__user_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_api_v1_auth_users__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_user_api_v1_auth_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
                 };
             };
             /** @description Validation Error */
