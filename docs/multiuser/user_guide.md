@@ -180,7 +180,7 @@ The Administrator can see all users Image Boards and their contents.
 
 ### Going From Multi-User to Single-User mode
 
-If an InvokeAI instance was in multiuser mode and then restarted in single user mode (by setting `multiuser: false` in the configuration file), all user's boards will be consolidated in one place. Any images that were in  "Uncategorized" will be merged together into a single Uncategorized board. If at a later date, the server is restarted in multi-user mode, the boards and images will be disaggregated and restored to their owners.
+If an InvokeAI instance was in multiuser mode and then restarted in single user mode (by setting `multiuser: false` in the configuration file), all users' boards will be consolidated in one place. Any images that were in  "Uncategorized" will be merged together into a single Uncategorized board. If, at a later date, the server is restarted in multi-user mode, the boards and images will be disaggregated and restored to their owners.
 
 ### Workflows
 
