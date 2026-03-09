@@ -3,7 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { logout, selectCurrentUser } from 'features/auth/store/authSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiSignOutBold, PiUserBold } from 'react-icons/pi';
+import { PiGearBold, PiSignOutBold, PiUserBold, PiUsersBold } from 'react-icons/pi';
 import { useNavigate } from 'react-router-dom';
 import { useLogoutMutation } from 'services/api/endpoints/auth';
 
@@ -27,6 +27,14 @@ export const UserMenu = memo(() => {
         navigate('/login');
       });
   }, [dispatch, navigate, logoutMutation]);
+
+  const handleProfile = useCallback(() => {
+    navigate('/profile');
+  }, [navigate]);
+
+  const handleUserManagement = useCallback(() => {
+    navigate('/admin/users');
+  }, [navigate]);
 
   if (!user) {
     return null;
@@ -60,6 +68,14 @@ export const UserMenu = memo(() => {
             </Badge>
           )}
         </Flex>
+        <MenuItem icon={<PiGearBold />} onClick={handleProfile}>
+          {t('auth.profile.menuItem')}
+        </MenuItem>
+        {user.is_admin && (
+          <MenuItem icon={<PiUsersBold />} onClick={handleUserManagement}>
+            {t('auth.userManagement.menuItem')}
+          </MenuItem>
+        )}
         <MenuItem icon={<PiSignOutBold />} onClick={handleLogout}>
           {t('auth.logout')}
         </MenuItem>
