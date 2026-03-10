@@ -1,4 +1,6 @@
 import { Button, Text, useToast } from '@invoke-ai/ui-library';
+import { useAppSelector } from 'app/store/storeHooks';
+import { selectIsAuthenticated } from 'features/auth/store/authSlice';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { useCallback, useEffect, useState } from 'react';
@@ -12,8 +14,14 @@ export const useStarterModelsToast = () => {
   const [didToast, setDidToast] = useState(false);
   const [mainModels, { data }] = useMainModels();
   const toast = useToast();
+  const isAuthenticated = useAppSelector(selectIsAuthenticated);
 
   useEffect(() => {
+    // Only show the toast if the user is authenticated
+    if (!isAuthenticated) {
+      return;
+    }
+
     if (toast.isActive(TOAST_ID)) {
       if (mainModels.length === 0) {
         return;
@@ -32,7 +40,7 @@ export const useStarterModelsToast = () => {
         onCloseComplete: () => setDidToast(true),
       });
     }
-  }, [data, didToast, mainModels.length, t, toast]);
+  }, [data, didToast, isAuthenticated, mainModels.length, t, toast]);
 };
 
 const ToastDescription = () => {

@@ -44,5 +44,6 @@ export const zSystemState = z.object({
   logNamespaces: z.array(zLogNamespace),
   shouldShowInvocationProgressDetail: z.boolean(),
   shouldHighlightFocusedRegions: z.boolean(),
+  prefersNumericAttentionWeights: z.boolean(),
 });
 export type SystemState = z.infer<typeof zSystemState>;

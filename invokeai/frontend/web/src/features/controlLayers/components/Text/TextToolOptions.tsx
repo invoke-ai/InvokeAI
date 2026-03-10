@@ -96,16 +96,14 @@ const FontSelect = () => {
       <Text fontSize="sm" lineHeight="1" whiteSpace="nowrap">
         {t('controlLayers.text.font', { defaultValue: 'Font' })}
       </Text>
-      <Tooltip label={t('controlLayers.text.font', { defaultValue: 'Font' })}>
-        <Combobox
-          size="sm"
-          variant="outline"
-          isSearchable={false}
-          options={options}
-          value={selectedOption}
-          onChange={handleFontChange}
-        />
-      </Tooltip>
+      <Combobox
+        size="sm"
+        variant="outline"
+        isSearchable={false}
+        options={options}
+        value={selectedOption}
+        onChange={handleFontChange}
+      />
     </Flex>
   );
 };
