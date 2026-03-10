@@ -170,6 +170,7 @@ class Batch(BaseModel):
 # region Queue Items
 
 DEFAULT_QUEUE_ID = "default"
+SYSTEM_USER_ID = "system"  # Default user_id for system-generated queue items
 
 QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "completed", "failed", "canceled"]
 
@@ -243,6 +244,13 @@ class SessionQueueItem(BaseModel):
     started_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was started")
     completed_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was completed")
     queue_id: str = Field(description="The id of the queue with which this item is associated")
+    user_id: str = Field(default="system", description="The id of the user who created this queue item")
+    user_display_name: Optional[str] = Field(
+        default=None, description="The display name of the user who created this queue item, if available"
+    )
+    user_email: Optional[str] = Field(
+        default=None, description="The email of the user who created this queue item, if available"
+    )
     field_values: Optional[list[NodeFieldValue]] = Field(
         default=None, description="The field values that were used for this queue item"
     )
@@ -296,6 +304,12 @@ class SessionQueueStatus(BaseModel):
     failed: int = Field(..., description="Number of queue items with status 'error'")
     canceled: int = Field(..., description="Number of queue items with status 'canceled'")
     total: int = Field(..., description="Total number of queue items")
+    user_pending: Optional[int] = Field(
+        default=None, description="Number of queue items with status 'pending' for the current user"
+    )
+    user_in_progress: Optional[int] = Field(
+        default=None, description="Number of queue items with status 'in_progress' for the current user"
+    )
 
 
 class SessionQueueCountsByDestination(BaseModel):
@@ -565,6 +579,7 @@ ValueToInsertTuple: TypeAlias = tuple[
     str | None,  # origin (optional)
     str | None,  # destination (optional)
     int | None,  # retried_from_item_id (optional, this is always None for new items)
+    str,  # user_id
 ]
 """A type alias for the tuple of values to insert into the session queue table.
 
@@ -573,7 +588,7 @@ ValueToInsertTuple: TypeAlias = tuple[
 
 
 def prepare_values_to_insert(
-    queue_id: str, batch: Batch, priority: int, max_new_queue_items: int
+    queue_id: str, batch: Batch, priority: int, max_new_queue_items: int, user_id: str = "system"
 ) -> list[ValueToInsertTuple]:
     """
     Given a batch, prepare the values to insert into the session queue table. The list of tuples can be used with an
@@ -584,6 +599,7 @@ def prepare_values_to_insert(
         batch: The batch to prepare the values for
         priority: The priority of the queue items
         max_new_queue_items: The maximum number of queue items to insert
+        user_id: The user ID who is creating these queue items
 
     Returns:
         A list of tuples to insert into the session queue table. Each tuple contains the following values:
@@ -597,6 +613,7 @@ def prepare_values_to_insert(
         - origin (optional)
         - destination (optional)
         - retried_from_item_id (optional, this is always None for new items)
+        - user_id
     """
 
     # A tuple is a fast and memory-efficient way to store the values to insert. Previously, we used a NamedTuple, but
@@ -626,6 +643,7 @@ def prepare_values_to_insert(
                 batch.origin,
                 batch.destination,
                 None,
+                user_id,
             )
         )
     return values_to_insert
