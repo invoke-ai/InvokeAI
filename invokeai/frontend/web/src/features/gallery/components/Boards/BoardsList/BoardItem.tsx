@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import type { AddImageToBoardDndTargetData, RemoveImageFromBoardDndTargetData } from 'features/dnd/dnd';
 import { addImageToBoardDndTarget, removeImageFromBoardDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -42,6 +43,7 @@ const BoardItem = ({ board, isSelected, isCollapsed = false }: BoardItemProps) =
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const selectedBoardId = useAppSelector(selectSelectedBoardId);
+  const currentUser = useAppSelector(selectCurrentUser);
 
   const boardId = board?.board_id ?? 'none';
 
@@ -87,6 +89,8 @@ const BoardItem = ({ board, isSelected, isCollapsed = false }: BoardItemProps) =
     [board, noBoardImagesTotal, noBoardAssetsTotal]
   );
 
+  const showOwner = currentUser?.is_admin && board?.owner_username;
+
   const contextMenuContent = (ref: RefObject<HTMLDivElement>, tooltipLabel: ReactNode, innerContent: ReactNode) => (
     <Tooltip label={tooltipLabel} openDelay={150} placement="right" closeOnScroll>
       <Flex
@@ -128,7 +132,14 @@ const BoardItem = ({ board, isSelected, isCollapsed = false }: BoardItemProps) =
   const expandedInnerContent = (
     <>
       <BoardThumbnail board={board} />
-      {titleContent}
+      <Flex flexDir="column" flex={1} minW={0}>
+        {titleContent}
+        {showOwner && (
+          <Text fontSize="xs" color="base.500" noOfLines={1} mt={-0.5}>
+            {board.owner_username}
+          </Text>
+        )}
+      </Flex>
       {autoAddBoardId === boardId && <AutoAddIndicator />}
       {board?.archived && <Icon as={PiArchiveBold} fill="base.300" />}
       {countsContent}
