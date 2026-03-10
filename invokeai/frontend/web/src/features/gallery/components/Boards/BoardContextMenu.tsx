@@ -48,8 +48,7 @@ const BoardContextMenu = ({ board, children }: Props) => {
   const [bulkDownload] = useBulkDownloadImagesMutation();
 
   // Only the board owner or admin can modify visibility
-  const canChangeVisibility =
-    currentUser !== null && (currentUser.is_admin || board.user_id === currentUser.user_id);
+  const canChangeVisibility = currentUser !== null && (currentUser.is_admin || board.user_id === currentUser.user_id);
 
   const { canDeleteBoard } = useBoardAccess(board);
 
@@ -96,20 +95,11 @@ const BoardContextMenu = ({ board, children }: Props) => {
     [board.board_id, t, updateBoard]
   );
 
-  const handleSetVisibilityPrivate = useCallback(
-    () => handleSetVisibility('private'),
-    [handleSetVisibility]
-  );
+  const handleSetVisibilityPrivate = useCallback(() => handleSetVisibility('private'), [handleSetVisibility]);
 
-  const handleSetVisibilityShared = useCallback(
-    () => handleSetVisibility('shared'),
-    [handleSetVisibility]
-  );
+  const handleSetVisibilityShared = useCallback(() => handleSetVisibility('shared'), [handleSetVisibility]);
 
-  const handleSetVisibilityPublic = useCallback(
-    () => handleSetVisibility('public'),
-    [handleSetVisibility]
-  );
+  const handleSetVisibilityPublic = useCallback(() => handleSetVisibility('public'), [handleSetVisibility]);
 
   const setAsBoardToDelete = useCallback(() => {
     $boardToDelete.set(board);
@@ -130,13 +120,13 @@ const BoardContextMenu = ({ board, children }: Props) => {
           </MenuItem>
 
           {board.archived && (
-            <MenuItem icon={<PiArchiveBold />} onClick={handleUnarchive}>
+            <MenuItem icon={<PiArchiveBold />} onClick={handleUnarchive} isDisabled={!canDeleteBoard}>
               {t('boards.unarchiveBoard')}
             </MenuItem>
           )}
 
           {!board.archived && (
-            <MenuItem icon={<PiArchiveFill />} onClick={handleArchive}>
+            <MenuItem icon={<PiArchiveFill />} onClick={handleArchive} isDisabled={!canDeleteBoard}>
               {t('boards.archiveBoard')}
             </MenuItem>
           )}

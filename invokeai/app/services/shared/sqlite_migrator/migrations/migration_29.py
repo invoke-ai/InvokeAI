@@ -33,17 +33,11 @@ class Migration29Callback:
         columns = [row[1] for row in cursor.fetchall()]
 
         if "board_visibility" not in columns:
-            cursor.execute(
-                "ALTER TABLE boards ADD COLUMN board_visibility TEXT NOT NULL DEFAULT 'private';"
-            )
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_boards_board_visibility ON boards(board_visibility);"
-            )
+            cursor.execute("ALTER TABLE boards ADD COLUMN board_visibility TEXT NOT NULL DEFAULT 'private';")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_boards_board_visibility ON boards(board_visibility);")
             # Migrate existing is_public = 1 boards to 'public'
             if "is_public" in columns:
-                cursor.execute(
-                    "UPDATE boards SET board_visibility = 'public' WHERE is_public = 1;"
-                )
+                cursor.execute("UPDATE boards SET board_visibility = 'public' WHERE is_public = 1;")
 
 
 def build_migration_29() -> Migration:

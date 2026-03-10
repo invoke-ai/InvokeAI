@@ -3095,6 +3095,11 @@ export type components = {
              */
             archived: boolean;
             /**
+             * @description The visibility of the board.
+             * @default private
+             */
+            board_visibility?: components["schemas"]["BoardVisibility"];
+            /**
              * Image Count
              * @description The number of images in the board.
              */
@@ -3109,8 +3114,6 @@ export type components = {
              * @description The username of the board owner (for admin view).
              */
             owner_username?: string | null;
-            /** @description The visibility of the board. */
-            board_visibility: components["schemas"]["BoardVisibility"];
         };
         /**
          * BoardField
