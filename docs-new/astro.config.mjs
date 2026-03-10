@@ -5,6 +5,7 @@ import starlight from '@astrojs/starlight';
 // Plugins
 import starlightLlmsText from 'starlight-llms-txt';
 import starlightChangelogs, { makeChangelogsSidebarLinks } from 'starlight-changelogs';
+import starlightContextualMenu from 'starlight-contextual-menu';
 
 // https://astro.build/config
 export default defineConfig({
@@ -116,6 +117,11 @@ export default defineConfig({
       plugins: [
         starlightLlmsText(),
         starlightChangelogs(),
+        starlightContextualMenu({
+          actions: [
+            'copy', 'view', 'chatgpt', 'claude'
+          ]
+        }),
       ],
     }),
   ],

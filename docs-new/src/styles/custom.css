@@ -302,6 +302,18 @@ article.card {
   }
 }
 
+/* Contextual Menu */
+#contextual-menu-container {
+
+  & > button {
+    transition: background 100ms ease-in-out;
+  }
+
+  #contextual-dropdown-menu button {
+    transition: background 75ms ease-in-out;
+  }
+}
+
 /* TODO: Custom markdown content styles */
 .sl-markdown-content {
   table {

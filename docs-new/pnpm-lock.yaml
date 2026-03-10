@@ -38,6 +38,9 @@ importers:
       starlight-changelogs:
         specifier: ^0.4.0
         version: 0.4.0(@astrojs/starlight@0.37.6(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
+      starlight-contextual-menu:
+        specifier: ^0.1.5
+        version: 0.1.5(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))(starlight-markdown@0.1.5(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))
       starlight-llms-txt:
         specifier: ^0.7.0
         version: 0.7.0(@astrojs/starlight@0.37.6(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
@@ -2381,12 +2384,23 @@ packages:
     peerDependencies:
       '@astrojs/starlight': '>=0.35.0'
 
+  starlight-contextual-menu@0.1.5:
+    resolution: {integrity: sha512-MYQ6eFDIBBnKrEh3XqR7RZ6YDJ641ADmrSjj93d+cVJGPvrCHrd6VYiKeehhczsrn6GqjaCCFAn4xUd69gcfcQ==}
+    peerDependencies:
+      astro: ^5.0.0
+      starlight-markdown: ^0.1.5
+
   starlight-llms-txt@0.7.0:
     resolution: {integrity: sha512-KAay6JLXqB0GiNQ481z3Z/h/y4xeAU55TUGLz+npjxcRvN3h/7rDxjmyLiphZF8xfoqqSTduQPanl5Ct4Je6kA==}
     engines: {node: ^18.17.1 || ^20.3.0 || >=21.0.0}
     peerDependencies:
       '@astrojs/starlight': '>=0.31'
       astro: ^5.15.9
+
+  starlight-markdown@0.1.5:
+    resolution: {integrity: sha512-23LXRaZp7pyE+r/HP6rxHfwic8HfvUBT4EImECA6encs/eTtrF0Z+7svANofdtfbiNt31D5q26i03B6FtcSmGg==}
+    peerDependencies:
+      astro: ^5.0.0
 
   stream-replace-string@2.0.0:
     resolution: {integrity: sha512-TlnjJ1C0QrmxRNrON00JvaFFlNh5TTG00APw23j74ET7gkQpTASi6/L2fuiav8pzK715HXtUeClpBTw2NPSn6w==}
@@ -5718,6 +5732,11 @@ snapshots:
       - astro
       - supports-color
 
+  starlight-contextual-menu@0.1.5(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))(starlight-markdown@0.1.5(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))):
+    dependencies:
+      astro: 5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
+      starlight-markdown: 0.1.5(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
+
   starlight-llms-txt@0.7.0(@astrojs/starlight@0.37.6(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)))(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)):
     dependencies:
       '@astrojs/mdx': 4.3.13(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3))
@@ -5736,6 +5755,10 @@ snapshots:
       unist-util-remove: 4.0.0
     transitivePeerDependencies:
       - supports-color
+
+  starlight-markdown@0.1.5(astro@5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)):
+    dependencies:
+      astro: 5.17.3(jiti@2.6.1)(rollup@4.57.1)(typescript@5.9.3)
 
   stream-replace-string@2.0.0: {}
 

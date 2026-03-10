@@ -20,6 +20,7 @@
     "rehype-external-links": "^3.0.0",
     "sharp": "^0.34.2",
     "starlight-changelogs": "^0.4.0",
+    "starlight-contextual-menu": "^0.1.5",
     "starlight-llms-txt": "^0.7.0"
   },
   "devDependencies": {
