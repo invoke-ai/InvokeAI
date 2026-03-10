@@ -1015,7 +1015,8 @@
         "showDetailedInvocationProgress": "Mostra dettagli avanzamento",
         "enableHighlightFocusedRegions": "Evidenzia le regioni interessate",
         "modelDescriptionsDisabled": "Descrizioni dei modelli nei menu a discesa disabilitate",
-        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disattivate. Abilitale nelle Impostazioni."
+        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disattivate. Abilitale nelle Impostazioni.",
+        "preferAttentionStyleNumeric": "Preferisci lo stile di attenzione numerico"
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -3092,6 +3093,52 @@
         },
         "userMenu": "Menu utente",
         "logout": "Esci",
-        "adminOnlyFeature": "Questa funzionalità è disponibile solo per gli amministratori."
+        "adminOnlyFeature": "Questa funzionalità è disponibile solo per gli amministratori.",
+        "profile": {
+            "menuItem": "Il mio profilo",
+            "title": "Il mio profilo",
+            "emailReadOnly": "L'indirizzo email non può essere modificato",
+            "displayName": "Nome da visualizzare",
+            "displayNamePlaceholder": "Il tuo nome",
+            "changePassword": "Cambiare la password",
+            "currentPassword": "Password attuale",
+            "currentPasswordPlaceholder": "Password attuale",
+            "newPassword": "Nuova password",
+            "newPasswordPlaceholder": "Nuova password",
+            "confirmPassword": "Conferma nuova password",
+            "confirmPasswordPlaceholder": "Conferma nuova password",
+            "passwordsDoNotMatch": "Le password non corrispondono",
+            "saveSuccess": "Profilo aggiornato con successo",
+            "saveFailed": "Impossibile salvare il profilo. Riprova."
+        },
+        "userManagement": {
+            "menuItem": "Gestione utenti",
+            "title": "Gestione utenti",
+            "displayName": "Nome da visualizzare",
+            "displayNamePlaceholder": "Nome da visualizzare",
+            "newPassword": "Nuova password",
+            "newPasswordPlaceholder": "Lasciare vuoto per mantenere la password corrente",
+            "role": "Ruolo",
+            "status": "Stato",
+            "actions": "Azioni",
+            "isAdmin": "Amministratore",
+            "user": "Utente",
+            "you": "Tu",
+            "createUser": "Crea utente",
+            "editUser": "Modifica utente",
+            "deleteUser": "Elimina utente",
+            "deleteConfirm": "Vuoi davvero eliminare \"{{name}}\"? Questa azione non può essere annullata.",
+            "generatePassword": "Genera una password complessa",
+            "showPassword": "Mostra password",
+            "hidePassword": "Nascondi password",
+            "activate": "Attiva",
+            "deactivate": "Disattiva",
+            "saveFailed": "Impossibile salvare l'utente. Riprova.",
+            "deleteFailed": "Impossibile eliminare l'utente. Riprova.",
+            "loadFailed": "Impossibile caricare gli utenti.",
+            "back": "Indietro",
+            "cannotDeleteSelf": "Non puoi eliminare il tuo account",
+            "cannotDeactivateSelf": "Non puoi disattivare il tuo account"
+        }
     }
 }
