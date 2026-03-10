@@ -821,7 +821,7 @@ z_image_turbo = StarterModel(
     name="Z-Image Turbo",
     base=BaseModelType.ZImage,
     source="Tongyi-MAI/Z-Image-Turbo",
-    description="Z-Image Turbo - fast 6B parameter text-to-image model with 8 inference steps. Supports bilingual prompts (English & Chinese). ~13GB",
+    description="Z-Image Turbo - fast 6B parameter text-to-image model with 8 inference steps. Supports bilingual prompts (English & Chinese). ~30.6GB",
     type=ModelType.Main,
 )
 

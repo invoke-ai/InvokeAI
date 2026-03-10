@@ -1,4 +1,290 @@
 export type paths = {
+    "/api/v1/auth/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Setup Status
+         * @description Check if initial administrator setup is required.
+         *
+         *     Returns:
+         *         SetupStatusResponse indicating whether setup is needed and multiuser mode status
+         */
+        get: operations["get_setup_status_api_v1_auth_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login
+         * @description Authenticate user and return access token.
+         *
+         *     Args:
+         *         request: Login credentials (email and password)
+         *
+         *     Returns:
+         *         LoginResponse containing JWT token and user information
+         *
+         *     Raises:
+         *         HTTPException: 401 if credentials are invalid or user is inactive
+         *         HTTPException: 403 if multiuser mode is disabled
+         */
+        post: operations["login_api_v1_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Logout
+         * @description Logout current user.
+         *
+         *     Currently a no-op since we use stateless JWT tokens. For token invalidation in
+         *     future implementations, consider:
+         *     - Token blacklist: Store invalidated tokens in Redis/database with expiration
+         *     - Token versioning: Add version field to user record, increment on logout
+         *     - Short-lived tokens: Use refresh token pattern with token rotation
+         *     - Session storage: Track active sessions server-side for revocation
+         *
+         *     Args:
+         *         current_user: The authenticated user (validates token)
+         *
+         *     Returns:
+         *         LogoutResponse indicating success
+         */
+        post: operations["logout_api_v1_auth_logout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Current User Info
+         * @description Get current authenticated user's information.
+         *
+         *     Args:
+         *         current_user: The authenticated user's token data
+         *
+         *     Returns:
+         *         UserDTO containing user information
+         *
+         *     Raises:
+         *         HTTPException: 404 if user is not found (should not happen normally)
+         */
+        get: operations["get_current_user_info_api_v1_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Current User
+         * @description Update the current user's own profile.
+         *
+         *     To change the password, both ``current_password`` and ``new_password`` must
+         *     be provided. The current password is verified before the change is applied.
+         *
+         *     Args:
+         *         request: Profile fields to update
+         *         current_user: The authenticated user
+         *
+         *     Returns:
+         *         The updated user
+         *
+         *     Raises:
+         *         HTTPException: 400 if current password is incorrect or new password is weak
+         *         HTTPException: 404 if user not found
+         */
+        patch: operations["update_current_user_api_v1_auth_me_patch"];
+        trace?: never;
+    };
+    "/api/v1/auth/setup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Setup Admin
+         * @description Set up initial administrator account.
+         *
+         *     This endpoint can only be called once, when no admin user exists. It creates
+         *     the first admin user for the system.
+         *
+         *     Args:
+         *         request: Admin account details (email, display_name, password)
+         *
+         *     Returns:
+         *         SetupResponse containing the created admin user
+         *
+         *     Raises:
+         *         HTTPException: 400 if admin already exists or password is weak
+         *         HTTPException: 403 if multiuser mode is disabled
+         */
+        post: operations["setup_admin_api_v1_auth_setup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/generate-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate Password
+         * @description Generate a strong random password.
+         *
+         *     Returns a cryptographically secure random password of 16 characters
+         *     containing uppercase, lowercase, digits, and punctuation.
+         */
+        get: operations["generate_password_api_v1_auth_generate_password_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Users
+         * @description List all users. Requires admin privileges.
+         *
+         *     The internal 'system' user (created for backward compatibility) is excluded
+         *     from the results since it cannot be managed through this interface.
+         *
+         *     Returns:
+         *         List of all real users (system user excluded)
+         */
+        get: operations["list_users_api_v1_auth_users_get"];
+        put?: never;
+        /**
+         * Create User
+         * @description Create a new user. Requires admin privileges.
+         *
+         *     Args:
+         *         request: New user details
+         *
+         *     Returns:
+         *         The created user
+         *
+         *     Raises:
+         *         HTTPException: 400 if email already exists or password is weak
+         */
+        post: operations["create_user_api_v1_auth_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get User
+         * @description Get a user by ID. Requires admin privileges.
+         *
+         *     Args:
+         *         user_id: The user ID
+         *
+         *     Returns:
+         *         The user
+         *
+         *     Raises:
+         *         HTTPException: 404 if user not found
+         */
+        get: operations["get_user_api_v1_auth_users__user_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete User
+         * @description Delete a user. Requires admin privileges.
+         *
+         *     Admins can delete any user including other admins, but cannot delete the last
+         *     remaining admin.
+         *
+         *     Args:
+         *         user_id: The user ID
+         *
+         *     Raises:
+         *         HTTPException: 400 if attempting to delete the last admin
+         *         HTTPException: 404 if user not found
+         */
+        delete: operations["delete_user_api_v1_auth_users__user_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update User
+         * @description Update a user. Requires admin privileges.
+         *
+         *     Args:
+         *         user_id: The user ID
+         *         request: Fields to update
+         *
+         *     Returns:
+         *         The updated user
+         *
+         *     Raises:
+         *         HTTPException: 400 if password is weak
+         *         HTTPException: 404 if user not found
+         */
+        patch: operations["update_user_api_v1_auth_users__user_id__patch"];
+        trace?: never;
+    };
     "/api/v1/utilities/dynamicprompts": {
         parameters: {
             query?: never;
@@ -643,7 +929,7 @@ export type paths = {
         put?: never;
         /**
          * Upload Image
-         * @description Uploads an image
+         * @description Uploads an image for the current user
          */
         post: operations["upload_image"];
         delete?: never;
@@ -661,7 +947,7 @@ export type paths = {
         };
         /**
          * List Image Dtos
-         * @description Gets a list of image DTOs
+         * @description Gets a list of image DTOs for the current user
          */
         get: operations["list_image_dtos"];
         put?: never;
@@ -986,13 +1272,13 @@ export type paths = {
         };
         /**
          * List Boards
-         * @description Gets a list of boards
+         * @description Gets a list of boards for the current user, including shared boards. Admin users see all boards.
          */
         get: operations["list_boards"];
         put?: never;
         /**
          * Create Board
-         * @description Creates a board
+         * @description Creates a board for the current user
          */
         post: operations["create_board"];
         delete?: never;
@@ -1010,21 +1296,21 @@ export type paths = {
         };
         /**
          * Get Board
-         * @description Gets a board
+         * @description Gets a board (user must have access to it)
          */
         get: operations["get_board"];
         put?: never;
         post?: never;
         /**
          * Delete Board
-         * @description Deletes a board
+         * @description Deletes a board (user must have access to it)
          */
         delete: operations["delete_board"];
         options?: never;
         head?: never;
         /**
          * Update Board
-         * @description Updates a board
+         * @description Updates a board (user must have access to it)
          */
         patch: operations["update_board"];
         trace?: never;
@@ -1360,7 +1646,7 @@ export type paths = {
         put?: never;
         /**
          * Enqueue Batch
-         * @description Processes a batch and enqueues the output graphs for execution.
+         * @description Processes a batch and enqueues the output graphs for execution for the current user.
          */
         post: operations["enqueue_batch"];
         delete?: never;
@@ -1439,7 +1725,7 @@ export type paths = {
         get?: never;
         /**
          * Resume
-         * @description Resumes session processor
+         * @description Resumes session processor. Admin only.
          */
         put: operations["resume"];
         post?: never;
@@ -1459,7 +1745,7 @@ export type paths = {
         get?: never;
         /**
          * Pause
-         * @description Pauses session processor
+         * @description Pauses session processor. Admin only.
          */
         put: operations["pause"];
         post?: never;
@@ -1479,7 +1765,7 @@ export type paths = {
         get?: never;
         /**
          * Cancel All Except Current
-         * @description Immediately cancels all queue items except in-processing items
+         * @description Immediately cancels all queue items except in-processing items. Non-admin users can only cancel their own items.
          */
         put: operations["cancel_all_except_current"];
         post?: never;
@@ -1499,7 +1785,7 @@ export type paths = {
         get?: never;
         /**
          * Delete All Except Current
-         * @description Immediately deletes all queue items except in-processing items
+         * @description Immediately deletes all queue items except in-processing items. Non-admin users can only delete their own items.
          */
         put: operations["delete_all_except_current"];
         post?: never;
@@ -1519,7 +1805,7 @@ export type paths = {
         get?: never;
         /**
          * Cancel By Batch Ids
-         * @description Immediately cancels all queue items from the given batch ids
+         * @description Immediately cancels all queue items from the given batch ids. Non-admin users can only cancel their own items.
          */
         put: operations["cancel_by_batch_ids"];
         post?: never;
@@ -1539,7 +1825,7 @@ export type paths = {
         get?: never;
         /**
          * Cancel By Destination
-         * @description Immediately cancels all queue items with the given origin
+         * @description Immediately cancels all queue items with the given destination. Non-admin users can only cancel their own items.
          */
         put: operations["cancel_by_destination"];
         post?: never;
@@ -1559,7 +1845,7 @@ export type paths = {
         get?: never;
         /**
          * Retry Items By Id
-         * @description Immediately cancels all queue items with the given origin
+         * @description Retries the given queue items. Users can only retry their own items unless they are an admin.
          */
         put: operations["retry_items_by_id"];
         post?: never;
@@ -1579,7 +1865,7 @@ export type paths = {
         get?: never;
         /**
          * Clear
-         * @description Clears the queue entirely, immediately canceling the currently-executing session
+         * @description Clears the queue entirely. Admin users clear all items; non-admin users only clear their own items. If there's a currently-executing item, users can only cancel it if they own it or are an admin.
          */
         put: operations["clear"];
         post?: never;
@@ -1599,7 +1885,7 @@ export type paths = {
         get?: never;
         /**
          * Prune
-         * @description Prunes all completed or errored queue items
+         * @description Prunes all completed or errored queue items. Non-admin users can only prune their own items.
          */
         put: operations["prune"];
         post?: never;
@@ -1705,7 +1991,7 @@ export type paths = {
         post?: never;
         /**
          * Delete Queue Item
-         * @description Deletes a queue item
+         * @description Deletes a queue item. Users can only delete their own items unless they are an admin.
          */
         delete: operations["delete_queue_item"];
         options?: never;
@@ -1723,7 +2009,7 @@ export type paths = {
         get?: never;
         /**
          * Cancel Queue Item
-         * @description Deletes a queue item
+         * @description Cancels a queue item. Users can only cancel their own items unless they are an admin.
          */
         put: operations["cancel_queue_item"];
         post?: never;
@@ -1765,7 +2051,7 @@ export type paths = {
         post?: never;
         /**
          * Delete By Destination
-         * @description Deletes all items with the given destination
+         * @description Deletes all items with the given destination. Non-admin users can only delete their own items.
          */
         delete: operations["delete_by_destination"];
         options?: never;
@@ -2048,7 +2334,7 @@ export type paths = {
         };
         /**
          * Get Client State By Key
-         * @description Gets the client state
+         * @description Gets the client state for the current user (or system user if not authenticated)
          */
         get: operations["get_client_state_by_key"];
         put?: never;
@@ -2070,7 +2356,7 @@ export type paths = {
         put?: never;
         /**
          * Set Client State
-         * @description Sets the client state
+         * @description Sets the client state for the current user (or system user if not authenticated)
          */
         post: operations["set_client_state"];
         delete?: never;
@@ -2090,7 +2376,7 @@ export type paths = {
         put?: never;
         /**
          * Delete Client State
-         * @description Deletes the client state
+         * @description Deletes the client state for the current user (or system user if not authenticated)
          */
         post: operations["delete_client_state"];
         delete?: never;
@@ -2211,6 +2497,59 @@ export type components = {
              * @constant
              */
             type: "add";
+        };
+        /**
+         * AdminUserCreateRequest
+         * @description Request body for admin to create a new user.
+         */
+        AdminUserCreateRequest: {
+            /**
+             * Email
+             * @description User email address
+             */
+            email: string;
+            /**
+             * Display Name
+             * @description Display name
+             */
+            display_name?: string | null;
+            /**
+             * Password
+             * @description User password
+             */
+            password: string;
+            /**
+             * Is Admin
+             * @description Whether user should have admin privileges
+             * @default false
+             */
+            is_admin?: boolean;
+        };
+        /**
+         * AdminUserUpdateRequest
+         * @description Request body for admin to update any user.
+         */
+        AdminUserUpdateRequest: {
+            /**
+             * Display Name
+             * @description Display name
+             */
+            display_name?: string | null;
+            /**
+             * Password
+             * @description New password
+             */
+            password?: string | null;
+            /**
+             * Is Admin
+             * @description Whether user should have admin privileges
+             */
+            is_admin?: boolean | null;
+            /**
+             * Is Active
+             * @description Whether user account should be active
+             */
+            is_active?: boolean | null;
         };
         /**
          * Alpha Mask to Tensor
@@ -2704,6 +3043,11 @@ export type components = {
              */
             board_name: string;
             /**
+             * User Id
+             * @description The user ID of the board owner.
+             */
+            user_id: string;
+            /**
              * Created At
              * @description The created timestamp of the board.
              */
@@ -2738,6 +3082,11 @@ export type components = {
              * @description The number of assets in the board.
              */
             asset_count: number;
+            /**
+             * Owner Username
+             * @description The username of the board owner (for admin view).
+             */
+            owner_username?: string | null;
         };
         /**
          * BoardField
@@ -10192,6 +10541,17 @@ export type components = {
             type: "freeu";
         };
         /**
+         * GeneratePasswordResponse
+         * @description Response containing a generated password.
+         */
+        GeneratePasswordResponse: {
+            /**
+             * Password
+             * @description Generated strong password
+             */
+            password: string;
+        };
+        /**
          * Get Image Mask Bounding Box
          * @description Gets the bounding box of the given mask image.
          */
@@ -13484,6 +13844,12 @@ export type components = {
              */
             destination: string | null;
             /**
+             * User Id
+             * @description The ID of the user who created the queue item
+             * @default system
+             */
+            user_id: string;
+            /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
              */
@@ -13541,6 +13907,12 @@ export type components = {
              * @default null
              */
             destination: string | null;
+            /**
+             * User Id
+             * @description The ID of the user who created the queue item
+             * @default system
+             */
+            user_id: string;
             /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
@@ -13842,6 +14214,12 @@ export type components = {
              */
             destination: string | null;
             /**
+             * User Id
+             * @description The ID of the user who created the queue item
+             * @default system
+             */
+            user_id: string;
+            /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
              */
@@ -13910,6 +14288,12 @@ export type components = {
              * @default null
              */
             destination: string | null;
+            /**
+             * User Id
+             * @description The ID of the user who created the queue item
+             * @default system
+             */
+            user_id: string;
             /**
              * Session Id
              * @description The ID of the session (aka graph execution state)
@@ -13990,6 +14374,7 @@ export type components = {
          *         scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.
          *         unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
          *         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
+         *         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
          */
         InvokeAIAppConfig: {
             /**
@@ -14357,6 +14742,12 @@ export type components = {
              * @default true
              */
             allow_unknown_models?: boolean;
+            /**
+             * Multiuser
+             * @description Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
+             * @default false
+             */
+            multiuser?: boolean;
         };
         /**
          * InvokeAIAppConfigWithSetFields
@@ -16770,6 +17161,57 @@ export type components = {
          * @enum {integer}
          */
         LogLevel: 0 | 10 | 20 | 30 | 40 | 50;
+        /**
+         * LoginRequest
+         * @description Request body for user login.
+         */
+        LoginRequest: {
+            /**
+             * Email
+             * @description User email address
+             */
+            email: string;
+            /**
+             * Password
+             * @description User password
+             */
+            password: string;
+            /**
+             * Remember Me
+             * @description Whether to extend session duration
+             * @default false
+             */
+            remember_me?: boolean;
+        };
+        /**
+         * LoginResponse
+         * @description Response from successful login.
+         */
+        LoginResponse: {
+            /**
+             * Token
+             * @description JWT access token
+             */
+            token: string;
+            /** @description User information */
+            user: components["schemas"]["UserDTO"];
+            /**
+             * Expires In
+             * @description Token expiration time in seconds
+             */
+            expires_in: number;
+        };
+        /**
+         * LogoutResponse
+         * @description Response from logout.
+         */
+        LogoutResponse: {
+            /**
+             * Success
+             * @description Whether logout was successful
+             */
+            success: boolean;
+        };
         /** LoraModelDefaultSettings */
         LoraModelDefaultSettings: {
             /**
@@ -21653,6 +22095,12 @@ export type components = {
              */
             destination: string | null;
             /**
+             * User Id
+             * @description The ID of the user who created the queue item
+             * @default system
+             */
+            user_id: string;
+            /**
              * Status
              * @description The new status of the queue item
              * @enum {string}
@@ -23896,6 +24344,22 @@ export type components = {
              */
             queue_id: string;
             /**
+             * User Id
+             * @description The id of the user who created this queue item
+             * @default system
+             */
+            user_id?: string;
+            /**
+             * User Display Name
+             * @description The display name of the user who created this queue item, if available
+             */
+            user_display_name?: string | null;
+            /**
+             * User Email
+             * @description The email of the user who created this queue item, if available
+             */
+            user_email?: string | null;
+            /**
              * Field Values
              * @description The field values that were used for this queue item
              */
@@ -23962,6 +24426,66 @@ export type components = {
              * @description Total number of queue items
              */
             total: number;
+            /**
+             * User Pending
+             * @description Number of queue items with status 'pending' for the current user
+             */
+            user_pending?: number | null;
+            /**
+             * User In Progress
+             * @description Number of queue items with status 'in_progress' for the current user
+             */
+            user_in_progress?: number | null;
+        };
+        /**
+         * SetupRequest
+         * @description Request body for initial admin setup.
+         */
+        SetupRequest: {
+            /**
+             * Email
+             * @description Admin email address
+             */
+            email: string;
+            /**
+             * Display Name
+             * @description Admin display name
+             */
+            display_name?: string | null;
+            /**
+             * Password
+             * @description Admin password
+             */
+            password: string;
+        };
+        /**
+         * SetupResponse
+         * @description Response from successful admin setup.
+         */
+        SetupResponse: {
+            /**
+             * Success
+             * @description Whether setup was successful
+             */
+            success: boolean;
+            /** @description Created admin user information */
+            user: components["schemas"]["UserDTO"];
+        };
+        /**
+         * SetupStatusResponse
+         * @description Response for setup status check.
+         */
+        SetupStatusResponse: {
+            /**
+             * Setup Required
+             * @description Whether initial setup is required
+             */
+            setup_required: boolean;
+            /**
+             * Multiuser Enabled
+             * @description Whether multiuser mode is enabled
+             */
+            multiuser_enabled: boolean;
         };
         /**
          * Show Image
@@ -26300,6 +26824,77 @@ export type components = {
              */
             unstarred_images: string[];
         };
+        /**
+         * UserDTO
+         * @description User data transfer object.
+         */
+        UserDTO: {
+            /**
+             * User Id
+             * @description Unique user identifier
+             */
+            user_id: string;
+            /**
+             * Email
+             * @description User email address
+             */
+            email: string;
+            /**
+             * Display Name
+             * @description Display name
+             */
+            display_name?: string | null;
+            /**
+             * Is Admin
+             * @description Whether user has admin privileges
+             * @default false
+             */
+            is_admin?: boolean;
+            /**
+             * Is Active
+             * @description Whether user account is active
+             * @default true
+             */
+            is_active?: boolean;
+            /**
+             * Created At
+             * Format: date-time
+             * @description When the user was created
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             * @description When the user was last updated
+             */
+            updated_at: string;
+            /**
+             * Last Login At
+             * @description When user last logged in
+             */
+            last_login_at?: string | null;
+        };
+        /**
+         * UserProfileUpdateRequest
+         * @description Request body for a user to update their own profile.
+         */
+        UserProfileUpdateRequest: {
+            /**
+             * Display Name
+             * @description New display name
+             */
+            display_name?: string | null;
+            /**
+             * Current Password
+             * @description Current password (required when changing password)
+             */
+            current_password?: string | null;
+            /**
+             * New Password
+             * @description New password
+             */
+            new_password?: string | null;
+        };
         /** VAEField */
         VAEField: {
             /** @description Info to load vae submodel */
@@ -28053,6 +28648,336 @@ export type components = {
 };
 export type $defs = Record<string, never>;
 export interface operations {
+    get_setup_status_api_v1_auth_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupStatusResponse"];
+                };
+            };
+        };
+    };
+    login_api_v1_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    logout_api_v1_auth_logout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutResponse"];
+                };
+            };
+        };
+    };
+    get_current_user_info_api_v1_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+        };
+    };
+    update_current_user_api_v1_auth_me_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserProfileUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    setup_admin_api_v1_auth_setup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_password_api_v1_auth_generate_password_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeneratePasswordResponse"];
+                };
+            };
+        };
+    };
+    list_users_api_v1_auth_users_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"][];
+                };
+            };
+        };
+    };
+    create_user_api_v1_auth_users_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_user_api_v1_auth_users__user_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_api_v1_auth_users__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_user_api_v1_auth_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     parse_dynamicprompts: {
         parameters: {
             query?: never;
@@ -32455,7 +33380,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The queue id to perform this operation on */
+                /** @description The queue id (ignored, kept for backwards compatibility) */
                 queue_id: string;
             };
             cookie?: never;
@@ -32490,7 +33415,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                /** @description The queue id to perform this operation on */
+                /** @description The queue id (ignored, kept for backwards compatibility) */
                 queue_id: string;
             };
             cookie?: never;
@@ -32526,7 +33451,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                /** @description The queue id to perform this operation on */
+                /** @description The queue id (ignored, kept for backwards compatibility) */
                 queue_id: string;
             };
             cookie?: never;
