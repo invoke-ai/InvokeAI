@@ -19,8 +19,8 @@ const config: KnipConfig = {
     'src/features/auth/**',
     'src/services/api/endpoints/auth.ts',
   ],
-  ignoreBinaries: ['only-allow'],
-  ignoreDependencies: ['magic-string'],
+  ignoreBinaries: ['only-allow', 'rev-dep'],
+  ignoreDependencies: ['magic-string', 'rev-dep'],
   paths: {
     'public/*': ['public/*'],
   },
