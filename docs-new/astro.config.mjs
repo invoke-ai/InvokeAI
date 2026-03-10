@@ -9,8 +9,9 @@ import starlightContextualMenu from 'starlight-contextual-menu';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://invoke-ai.github.io',
-  // base: '/InvokPeAI',
+  site: 'https://invoke.ai',
+  // base is only needed if no custom domain is available, or if the site is hosted in a subdirectory
+  // base: '/InvokeAI',
   integrations: [
     starlight({
       // Content

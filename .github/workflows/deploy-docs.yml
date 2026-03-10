@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: docs
+        working-directory: docs-new
     steps:
       - name: Checkout
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -32,7 +32,7 @@ jobs:
       - name: Install, build, and upload site output
         uses: withastro/action@fc88a7002f0c62327f26fb1b15f2a1d581249278 # v5.1.0
         with:
-          path: docs # The root location of your Astro project inside the repository. (optional)
+          path: docs-new # The root location of your Astro project inside the repository. (optional)
           # node-version: 22 # The specific version of Node that should be used to build your site. Defaults to 22. (optional)
           # package-manager: pnpm@latest # The Node package manager that should be used to install dependencies and build your site. Automatically detected based on your lockfile. (optional)
           # build-cmd: pnpm run build # The command to run to build your site. Runs the package build script/task by default. (optional)
