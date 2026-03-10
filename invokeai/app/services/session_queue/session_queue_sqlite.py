@@ -155,9 +155,45 @@ class SqliteSessionQueue(SessionQueueBase):
         return enqueue_result
 
     def dequeue(self) -> Optional[SessionQueueItem]:
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
+        config = self.__invoker.services.configuration
+        use_round_robin = config.multiuser and config.session_queue_mode == "round_robin"
+
+        if use_round_robin:
+            query = """--sql
+                WITH user_last_served AS (
+                    -- Track when each user last had an item started, to determine whose turn it is.
+                    SELECT user_id, MAX(started_at) AS last_served_at
+                    FROM session_queue
+                    WHERE started_at IS NOT NULL
+                    GROUP BY user_id
+                ),
+                user_next_item AS (
+                    -- For each user, select their single best pending item (highest priority, then oldest).
+                    SELECT
+                        user_id,
+                        item_id,
+                        ROW_NUMBER() OVER (
+                            PARTITION BY user_id
+                            ORDER BY priority DESC, item_id ASC
+                        ) AS rn
+                    FROM session_queue
+                    WHERE status = 'pending'
+                )
+                SELECT
+                    sq.*,
+                    u.display_name AS user_display_name,
+                    u.email AS user_email
+                FROM session_queue sq
+                LEFT JOIN users u ON sq.user_id = u.user_id
+                JOIN user_next_item uni ON sq.item_id = uni.item_id AND uni.rn = 1
+                LEFT JOIN user_last_served uls ON sq.user_id = uls.user_id
+                ORDER BY
+                    COALESCE(uls.last_served_at, '1970-01-01') ASC,
+                    sq.item_id ASC
+                LIMIT 1
+                """
+        else:
+            query = """--sql
                 SELECT
                     sq.*,
                     u.display_name as user_display_name,
@@ -170,7 +206,9 @@ class SqliteSessionQueue(SessionQueueBase):
                     sq.item_id ASC
                 LIMIT 1
                 """
-            )
+
+        with self._db.transaction() as cursor:
+            cursor.execute(query)
             result = cast(Union[sqlite3.Row, None], cursor.fetchone())
         if result is None:
             return None
