@@ -4,6 +4,7 @@ import starlight from '@astrojs/starlight';
 
 // Plugins
 import starlightLlmsText from 'starlight-llms-txt';
+import starlightChangelogs, { makeChangelogsSidebarLinks } from 'starlight-changelogs';
 
 // https://astro.build/config
 export default defineConfig({
@@ -76,10 +77,12 @@ export default defineConfig({
         {
           label: 'Workflows',
           autogenerate: { directory: 'workflows' },
+          collapsed: true,
         },
         {
           label: 'Development',
           autogenerate: { directory: 'development', collapsed: true },
+          collapsed: true,
         },
         {
           label: 'Contributing',
@@ -89,7 +92,20 @@ export default defineConfig({
         {
           label: 'Troubleshooting',
           autogenerate: { directory: 'troubleshooting' },
+          collapsed: true,
         },
+        {
+          label: 'Releases',
+          collapsed: true,
+          items: [
+            ...makeChangelogsSidebarLinks([
+              {
+                type: 'recent',
+                base: 'releases',
+              }
+            ])
+          ]
+        }
       ],
       components: {
         ThemeProvider: './src/lib/components/ForceDarkTheme.astro',
@@ -97,7 +113,10 @@ export default defineConfig({
         Footer: './src/lib/components/Footer.astro',
         PageFrame: './src/layouts/PageFrameExtended.astro',
       },
-      plugins: [starlightLlmsText()],
+      plugins: [
+        starlightLlmsText(),
+        starlightChangelogs(),
+      ],
     }),
   ],
 });
