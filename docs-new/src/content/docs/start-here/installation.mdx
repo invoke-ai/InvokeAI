@@ -4,8 +4,6 @@ lastUpdated: 2026-02-18
 ---
 
 import { LinkCard, Tabs, TabItem, Steps } from '@astrojs/starlight/components'
-import { externalLinks } from '@lib/utils/links'
-import Link from '@components/Link.astro'
 import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
 
 export const alternateLaunchers = [
@@ -34,7 +32,7 @@ The Launcher manages your Invoke install. Follow these instructions to download 
 <Tabs syncKey="operatingSystem">
   <TabItem label="Windows" icon="seti:windows">
     <Steps>
-      1. <Link label="Download for Windows" href={externalLinks.launcherWindows} />
+      1. [Download for Windows]
       2. Run the `EXE` to install the Launcher and start it.
       3. A desktop shortcut will be created; use this to run the Launcher in the future.
       4. You can delete the `EXE` file you downloaded.
@@ -42,7 +40,7 @@ The Launcher manages your Invoke install. Follow these instructions to download 
   </TabItem>
   <TabItem label="MacOS" icon="apple">
     <Steps>
-      1. <Link label="Download for MacOS" href={externalLinks.launcherMacOS} />
+      1. [Download for MacOS]
       2. Open the `DMG` and drag the app into `Applications`.
       3. Run the launcher from `Applications`.
       4. You can delete the `DMG` file you downloaded.
@@ -50,7 +48,7 @@ The Launcher manages your Invoke install. Follow these instructions to download 
   </TabItem>
   <TabItem label="Linux" icon="linux">
     <Steps>
-      1. <Link label="Download for Linux" href={externalLinks.launcherLinux} />
+      1. [Download for Linux]
       2. You may need to edit the `AppImage` file properties and make it executable.
       3. Optionally move the file to a location that does not require admin privileges and add a desktop shortcut for it.
       4. Run the Launcher by double-clicking the `AppImage` or the shortcut you made.
@@ -85,3 +83,7 @@ When the Launcher detects an update for Invoke, you'll see a small green alert i
     href={href}
   />
 ))}
+
+[Download for Windows]: https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition.Setup.latest.exe
+[Download for MacOS]: https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest-arm64.dmg
+[Download for Linux]: https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest.AppImage
