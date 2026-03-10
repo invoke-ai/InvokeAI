@@ -1,15 +1,17 @@
-# Recall Parameters API - LoRAs, ControlNets, and IP Adapters with Images
+---
+title: Recall Parameters API (Advanced)
+---
 
-## Overview
+# Recall Parameters API - LoRAs, ControlNets, and IP Adapters with Images
 
 The Recall Parameters API supports recalling LoRAs, ControlNets (including T2I Adapters and Control LoRAs), and IP Adapters along with their associated weights and settings. Control Layers and IP Adapters can now include image references from the `INVOKEAI_ROOT/outputs/images` directory for fully functional control and image prompt functionality.
 
 ## Key Features
 
-✅ **LoRAs**: Fully functional - adds to UI, queries model configs, applies weights
-✅ **Control Layers**: Full support with optional images from outputs/images
-✅ **IP Adapters**: Full support with optional reference images from outputs/images
-✅ **Model Name Resolution**: Automatic lookup from human-readable names to internal keys
+✅ **LoRAs**: Fully functional - adds to UI, queries model configs, applies weights<br />
+✅ **Control Layers**: Full support with optional images from outputs/images<br />
+✅ **IP Adapters**: Full support with optional reference images from outputs/images<br />
+✅ **Model Name Resolution**: Automatic lookup from human-readable names to internal keys<br />
 ✅ **Image Validation**: Backend validates that image files exist before sending
 
 ## Endpoints
@@ -37,14 +39,14 @@ All fields are optional. Include only the parameters you want to update.
   height?: number;
   seed?: number;
   // ... other standard parameters
-  
+
   // LoRAs
   loras?: Array<{
     model_name: string;     // LoRA model name
     weight?: number;        // Default: 0.75, Range: -10 to 10
     is_enabled?: boolean;   // Default: true
   }>;
-  
+
   // Control Layers (ControlNet, T2I Adapter, Control LoRA)
   control_layers?: Array<{
     model_name: string;            // Control adapter model name
@@ -54,7 +56,7 @@ All fields are optional. Include only the parameters you want to update.
     end_step_percent?: number;     // Default: 1.0, Range: 0 to 1
     control_mode?: "balanced" | "more_prompt" | "more_control";  // ControlNet only
   }>;
-  
+
   // IP Adapters
   ip_adapters?: Array<{
     model_name: string;            // IP Adapter model name
