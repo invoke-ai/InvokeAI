@@ -1599,9 +1599,7 @@ const resolveModel = async (
   // Second try by hash (most reliable for reinstalled models - hash is content-based)
   if (model.hash) {
     try {
-      const req = store.dispatch(
-        modelsApi.endpoints.getModelConfigByHash.initiate(model.hash, { subscribe: false })
-      );
+      const req = store.dispatch(modelsApi.endpoints.getModelConfigByHash.initiate(model.hash, { subscribe: false }));
       return await req.unwrap();
     } catch {
       // Hash not found - try next fallback
