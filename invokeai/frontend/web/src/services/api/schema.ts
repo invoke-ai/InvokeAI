@@ -14375,6 +14375,7 @@ export type components = {
          *         unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
          *         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
          *         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
+         *         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
          */
         InvokeAIAppConfig: {
             /**
@@ -14748,6 +14749,12 @@ export type components = {
              * @default false
              */
             multiuser?: boolean;
+            /**
+             * Strict Password Checking
+             * @description Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
+             * @default false
+             */
+            strict_password_checking?: boolean;
         };
         /**
          * InvokeAIAppConfigWithSetFields
@@ -24486,6 +24493,11 @@ export type components = {
              * @description Whether multiuser mode is enabled
              */
             multiuser_enabled: boolean;
+            /**
+             * Strict Password Checking
+             * @description Whether strict password requirements are enforced
+             */
+            strict_password_checking: boolean;
         };
         /**
          * Show Image

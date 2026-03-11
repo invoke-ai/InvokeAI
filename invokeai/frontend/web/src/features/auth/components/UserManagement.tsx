@@ -37,6 +37,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
+import { validatePasswordField } from 'features/auth/util/passwordUtils';
 import type { ChangeEvent, FormEvent } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,29 +55,11 @@ import type { UserDTO } from 'services/api/endpoints/auth';
 import {
   useCreateUserMutation,
   useDeleteUserMutation,
+  useGetSetupStatusQuery,
   useLazyGeneratePasswordQuery,
   useListUsersQuery,
   useUpdateUserMutation,
 } from 'services/api/endpoints/auth';
-
-const validatePasswordStrength = (
-  password: string,
-  t: (key: string) => string
-): { isValid: boolean; message: string } => {
-  if (password.length === 0) {
-    return { isValid: true, message: '' };
-  }
-  if (password.length < 8) {
-    return { isValid: false, message: t('auth.setup.passwordTooShort') };
-  }
-  const hasUpper = /[A-Z]/.test(password);
-  const hasLower = /[a-z]/.test(password);
-  const hasDigit = /\d/.test(password);
-  if (!hasUpper || !hasLower || !hasDigit) {
-    return { isValid: false, message: t('auth.setup.passwordMissingRequirements') };
-  }
-  return { isValid: true, message: '' };
-};
 
 const FORM_GRID_COLUMNS = '120px 1fr';
 
@@ -105,9 +88,12 @@ const UserFormModal = memo(({ isOpen, onClose, editUser }: UserFormModalProps) =
   const [createUser, { isLoading: isCreating }] = useCreateUserMutation();
   const [updateUser, { isLoading: isUpdating }] = useUpdateUserMutation();
   const [triggerGeneratePassword] = useLazyGeneratePasswordQuery();
+  const { data: setupStatus } = useGetSetupStatusQuery();
 
   const isLoading = isCreating || isUpdating;
-  const passwordValidation = validatePasswordStrength(password, t);
+  const strictPasswordChecking = setupStatus?.strict_password_checking ?? true;
+  // In edit mode, empty password means "no change" (allowEmpty=true); in create mode password is required (allowEmpty=false)
+  const passwordValidation = validatePasswordField(password, t, strictPasswordChecking, isEdit);
 
   const handleGeneratePassword = useCallback(async () => {
     try {
@@ -299,6 +285,21 @@ const UserFormModal = memo(({ isOpen, onClose, editUser }: UserFormModalProps) =
                     </InputGroup>
                     {password.length > 0 && !passwordValidation.isValid && (
                       <FormErrorMessage>{passwordValidation.message}</FormErrorMessage>
+                    )}
+                    {password.length > 0 && passwordValidation.isValid && passwordValidation.message && (
+                      <Text
+                        mt={1}
+                        fontSize="sm"
+                        color={
+                          passwordValidation.strength === 'weak'
+                            ? 'error.300'
+                            : passwordValidation.strength === 'moderate'
+                              ? 'warning.300'
+                              : 'invokeBlue.300'
+                        }
+                      >
+                        {passwordValidation.message}
+                      </Text>
                     )}
                   </GridItem>
                 </Grid>
