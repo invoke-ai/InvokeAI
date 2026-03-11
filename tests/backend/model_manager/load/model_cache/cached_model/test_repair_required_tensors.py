@@ -22,8 +22,13 @@ class ModelWithRequiredScale(torch.nn.Module):
 @pytest.mark.parametrize(
     "device",
     [
-        pytest.param(torch.device("cuda"), marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")),
-        pytest.param(torch.device("mps"), marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="requires MPS device")),
+        pytest.param(
+            torch.device("cuda"), marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device")
+        ),
+        pytest.param(
+            torch.device("mps"),
+            marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="requires MPS device"),
+        ),
     ],
 )
 @pytest.mark.parametrize("keep_ram_copy", [True, False])
