@@ -1538,7 +1538,19 @@ const parseModelIdentifier = async (raw: unknown, store: AppStore, type: ModelTy
     const modelConfig = await req.unwrap();
     return zModelIdentifierField.parse(modelConfig);
   } catch {
-    // We'll try to parse the old format identifier next
+    // We'll try hash-based lookup next
+  }
+
+  // Try hash-based lookup (handles reinstalled models with new UUID keys)
+  try {
+    const { hash } = zModelIdentifierField.parse(raw);
+    if (hash) {
+      const req = store.dispatch(modelsApi.endpoints.getModelConfigByHash.initiate(hash, options));
+      const modelConfig = await req.unwrap();
+      return zModelIdentifierField.parse(modelConfig);
+    }
+  } catch {
+    // We'll try the old format identifier next
   }
 
   // Fall back to old format identifier: model_name, base_model
@@ -1567,12 +1579,13 @@ const throwIfImageDoesNotExist = async (name: string, store: AppStore): Promise<
 };
 
 /**
- * Resolve a model by key, falling back to name+base+type lookup if the key is not found.
+ * Resolve a model by key, falling back to hash or name+base+type lookup if the key is not found.
  * This handles the case where a model was deleted and reinstalled (getting a new UUID key).
- * Returns the resolved model config, or throws if the model cannot be found by either method.
+ * Fallback order: key → hash → name+base+type
+ * Returns the resolved model config, or throws if the model cannot be found by any method.
  */
 const resolveModel = async (
-  model: { key: string; name: string; base: string; type: string },
+  model: { key: string; hash?: string; name: string; base: string; type: string },
   store: AppStore
 ): Promise<AnyModelConfig> => {
   // First try by key (fast path)
@@ -1583,7 +1596,19 @@ const resolveModel = async (
     // Key not found - try fallback
   }
 
-  // Fallback: look up by name + base + type (handles reinstalled models)
+  // Second try by hash (most reliable for reinstalled models - hash is content-based)
+  if (model.hash) {
+    try {
+      const req = store.dispatch(
+        modelsApi.endpoints.getModelConfigByHash.initiate(model.hash, { subscribe: false })
+      );
+      return await req.unwrap();
+    } catch {
+      // Hash not found - try next fallback
+    }
+  }
+
+  // Last resort: look up by name + base + type
   try {
     const req = store.dispatch(
       modelsApi.endpoints.getModelConfigByAttrs.initiate(
