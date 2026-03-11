@@ -245,6 +245,17 @@ const slice = createSlice({
       // Preserve the existing image when replacing the config
       entity.config = { ...config, image: entity.config.image };
     },
+    refImagesReordered: (state, action: PayloadAction<{ ids: string[] }>) => {
+      const { ids } = action.payload;
+      const sortedEntities: RefImageState[] = [];
+      for (const id of ids) {
+        const entity = state.entities.find((e) => e.id === id);
+        if (entity) {
+          sortedEntities.push(entity);
+        }
+      }
+      state.entities = sortedEntities;
+    },
     refImagesReset: () => getInitialRefImagesState(),
   },
 });
@@ -263,6 +274,7 @@ export const {
   refImageFLUXReduxImageInfluenceChanged,
   refImageIsEnabledToggled,
   refImagesRecalled,
+  refImagesReordered,
 } = slice.actions;
 
 export const refImagesSliceConfig: SliceConfig<typeof slice> = {

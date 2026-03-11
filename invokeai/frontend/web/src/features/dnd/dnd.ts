@@ -109,6 +109,16 @@ export const singleCanvasEntityDndSource: DndSource<SingleCanvasEntityDndSourceD
   getData: buildGetData(_singleCanvasEntity.key, _singleCanvasEntity.type),
 };
 
+//#region Single Ref Image
+const _singleRefImage = buildTypeAndKey('single-ref-image');
+type SingleRefImageDndSourceData = DndData<typeof _singleRefImage.type, typeof _singleRefImage.key, { id: string }>;
+export const singleRefImageDndSource: DndSource<SingleRefImageDndSourceData> = {
+  ..._singleRefImage,
+  typeGuard: buildTypeGuard(_singleRefImage.key),
+  getData: buildGetData(_singleRefImage.key, _singleRefImage.type),
+};
+//#endregion
+
 type DndTarget<TargetData extends DndData, SourceData extends DndData> = {
   key: symbol;
   type: TargetData['type'];

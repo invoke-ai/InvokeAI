@@ -1209,8 +1209,12 @@ class GraphExecutionState(BaseModel):
         # Inputs must be deep-copied, else if a node mutates the object, other nodes that get the same input
         # will see the mutation.
         if isinstance(node, CollectInvocation):
-            item_edges = [e for e in input_edges if e.destination.field == ITEM_FIELD]
-            item_edges.sort(key=lambda e: (self._get_iteration_path(e.source.node_id), e.source.node_id))
+            # Enumerate to preserve insertion order as a tiebreaker when iteration paths are equal.
+            # Using source_node_id as a tiebreaker would produce random ordering for non-iterated
+            # direct connections (e.g. multiple reference images) because node IDs are random UUIDs.
+            item_edges_indexed = list(enumerate(e for e in input_edges if e.destination.field == ITEM_FIELD))
+            item_edges_indexed.sort(key=lambda t: (self._get_iteration_path(t[1].source.node_id), t[0]))
+            item_edges = [e for _, e in item_edges_indexed]
 
             output_collection = [copydeep(getattr(self.results[e.source.node_id], e.source.field)) for e in item_edges]
             node.collection = output_collection

@@ -300,6 +300,33 @@ def test_graph_validate_self_collector_without_item_inputs_raises_invalid_edge_e
         graph.validate_self()
 
 
+def test_collect_preserves_insertion_order():
+    """Items directly connected to a CollectInvocation (no iteration) must be collected in insertion order.
+
+    This guards against the bug where items were sorted by source node ID (random UUID), producing
+    non-deterministic ordering for e.g. multiple Flux.2 reference images.
+    """
+    graph = Graph()
+    prompts = ["first", "second", "third"]
+    graph.add_node(PromptTestInvocation(id="a", prompt=prompts[0]))
+    graph.add_node(PromptTestInvocation(id="b", prompt=prompts[1]))
+    graph.add_node(PromptTestInvocation(id="c", prompt=prompts[2]))
+    graph.add_node(CollectInvocation(id="collect"))
+    # Add edges in the intended left-to-right order
+    graph.add_edge(create_edge("a", "prompt", "collect", "item"))
+    graph.add_edge(create_edge("b", "prompt", "collect", "item"))
+    graph.add_edge(create_edge("c", "prompt", "collect", "item"))
+
+    g = GraphExecutionState(graph=graph)
+    invoke_next(g)  # a
+    invoke_next(g)  # b
+    invoke_next(g)  # c
+    n_collect, result = invoke_next(g)
+
+    assert isinstance(n_collect, CollectInvocation)
+    assert g.results[n_collect.id].collection == prompts
+
+
 def test_are_connection_types_compatible_accepts_subclass_to_base():
     """A subclass output should be connectable to a base-class input.
 

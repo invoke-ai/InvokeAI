@@ -150,6 +150,7 @@ export const RefImagePreview = memo(() => {
             style={{ objectFit: 'contain', aspectRatio: '1 / 1', maxWidth: '100%', maxHeight: '100%' }}
             height={imageDTO.height}
             alt={imageDTO.image_name}
+            draggable={false}
           />
         ) : (
           <Skeleton h="full" aspectRatio="1/1" />
