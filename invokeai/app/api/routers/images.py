@@ -1,7 +1,7 @@
 import io
 import json
 import traceback
-from typing import ClassVar, Optional
+from typing import ClassVar, Literal, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
@@ -36,6 +36,19 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
+
+
+class ImageSearchBody(BaseModel):
+    file_name_term: Optional[str] = Field(default=None)
+    metadata_term: Optional[str] = Field(default=None)
+    width_min: Optional[int] = Field(default=None)
+    width_max: Optional[int] = Field(default=None)
+    width_exact: Optional[int] = Field(default=None)
+    height_min: Optional[int] = Field(default=None)
+    height_max: Optional[int] = Field(default=None)
+    height_exact: Optional[int] = Field(default=None)
+    board_ids: Optional[list[str]] = Field(default=None)
+    starred_mode: Literal["include", "exclude", "only"] = Field(default="include")
 
 
 class ResizeToDimensions(BaseModel):
@@ -389,6 +402,18 @@ async def list_image_dtos(
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    file_name_term: Optional[str] = Query(default=None, description="File name search term"),
+    metadata_term: Optional[str] = Query(default=None, description="Metadata search term"),
+    width_min: Optional[int] = Query(default=None, description="Minimum image width"),
+    width_max: Optional[int] = Query(default=None, description="Maximum image width"),
+    width_exact: Optional[int] = Query(default=None, description="Exact image width"),
+    height_min: Optional[int] = Query(default=None, description="Minimum image height"),
+    height_max: Optional[int] = Query(default=None, description="Maximum image height"),
+    height_exact: Optional[int] = Query(default=None, description="Exact image height"),
+    board_ids: Optional[list[str]] = Query(default=None, description="Boards to include, supports 'none'"),
+    starred_mode: Literal["include", "exclude", "only"] = Query(
+        default="include", description="How to handle starred images"
+    ),
 ) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of image DTOs for the current user"""
 
@@ -402,6 +427,16 @@ async def list_image_dtos(
         is_intermediate,
         board_id,
         search_term,
+        file_name_term,
+        metadata_term,
+        width_min,
+        width_max,
+        width_exact,
+        height_min,
+        height_max,
+        height_exact,
+        board_ids,
+        starred_mode,
         current_user.user_id,
     )
 
@@ -591,6 +626,18 @@ async def get_image_names(
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    file_name_term: Optional[str] = Query(default=None, description="File name search term"),
+    metadata_term: Optional[str] = Query(default=None, description="Metadata search term"),
+    width_min: Optional[int] = Query(default=None, description="Minimum image width"),
+    width_max: Optional[int] = Query(default=None, description="Maximum image width"),
+    width_exact: Optional[int] = Query(default=None, description="Exact image width"),
+    height_min: Optional[int] = Query(default=None, description="Minimum image height"),
+    height_max: Optional[int] = Query(default=None, description="Maximum image height"),
+    height_exact: Optional[int] = Query(default=None, description="Exact image height"),
+    board_ids: Optional[list[str]] = Query(default=None, description="Boards to include, supports 'none'"),
+    starred_mode: Literal["include", "exclude", "only"] = Query(
+        default="include", description="How to handle starred images"
+    ),
 ) -> ImageNamesResult:
     """Gets ordered list of image names with metadata for optimistic updates"""
 
@@ -603,12 +650,82 @@ async def get_image_names(
             is_intermediate=is_intermediate,
             board_id=board_id,
             search_term=search_term,
+            file_name_term=file_name_term,
+            metadata_term=metadata_term,
+            width_min=width_min,
+            width_max=width_max,
+            width_exact=width_exact,
+            height_min=height_min,
+            height_max=height_max,
+            height_exact=height_exact,
+            board_ids=board_ids,
+            starred_mode=starred_mode,
             user_id=current_user.user_id,
             is_admin=current_user.is_admin,
         )
         return result
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get image names")
+
+
+@images_router.post("/search", operation_id="search_images", response_model=OffsetPaginatedResults[ImageDTO])
+async def search_images(
+    body: ImageSearchBody,
+    image_origin: Optional[ResourceOrigin] = Query(default=None),
+    categories: Optional[list[ImageCategory]] = Query(default=None),
+    is_intermediate: Optional[bool] = Query(default=None),
+    offset: int = Query(default=0),
+    limit: int = Query(default=100),
+    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending),
+    starred_first: bool = Query(default=True),
+) -> OffsetPaginatedResults[ImageDTO]:
+    return ApiDependencies.invoker.services.images.get_many(
+        offset=offset,
+        limit=limit,
+        starred_first=starred_first,
+        order_dir=order_dir,
+        image_origin=image_origin,
+        categories=categories,
+        is_intermediate=is_intermediate,
+        file_name_term=body.file_name_term,
+        metadata_term=body.metadata_term,
+        width_min=body.width_min,
+        width_max=body.width_max,
+        width_exact=body.width_exact,
+        height_min=body.height_min,
+        height_max=body.height_max,
+        height_exact=body.height_exact,
+        board_ids=body.board_ids,
+        starred_mode=body.starred_mode,
+    )
+
+
+@images_router.post("/search/names", operation_id="search_image_names", response_model=ImageNamesResult)
+async def search_image_names(
+    body: ImageSearchBody,
+    image_origin: Optional[ResourceOrigin] = Query(default=None),
+    categories: Optional[list[ImageCategory]] = Query(default=None),
+    is_intermediate: Optional[bool] = Query(default=None),
+    order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending),
+    starred_first: bool = Query(default=True),
+) -> ImageNamesResult:
+    return ApiDependencies.invoker.services.images.get_image_names(
+        starred_first=starred_first,
+        order_dir=order_dir,
+        image_origin=image_origin,
+        categories=categories,
+        is_intermediate=is_intermediate,
+        file_name_term=body.file_name_term,
+        metadata_term=body.metadata_term,
+        width_min=body.width_min,
+        width_max=body.width_max,
+        width_exact=body.width_exact,
+        height_min=body.height_min,
+        height_max=body.height_max,
+        height_exact=body.height_exact,
+        board_ids=body.board_ids,
+        starred_mode=body.starred_mode,
+    )
 
 
 @images_router.post(

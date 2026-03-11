@@ -53,7 +53,6 @@ export const selectAutoAssignBoardOnClick = createSelector(
   (gallery) => gallery.autoAssignBoardOnClick
 );
 export const selectBoardSearchText = createSelector(selectGallerySlice, (gallery) => gallery.boardSearchText);
-export const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
 export const selectBoardsListOrderBy = createSelector(selectGallerySlice, (gallery) => gallery.boardsListOrderBy);
 export const selectBoardsListOrderDir = createSelector(selectGallerySlice, (gallery) => gallery.boardsListOrderDir);
 

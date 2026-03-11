@@ -172,7 +172,6 @@ export const {
   orderDirChanged,
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
-  searchTermChanged,
   boardsListOrderByChanged,
   boardsListOrderDirChanged,
 } = slice.actions;

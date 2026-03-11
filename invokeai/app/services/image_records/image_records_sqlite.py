@@ -123,6 +123,125 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             except sqlite3.Error as e:
                 raise ImageRecordSaveException from e
 
+    def _append_search_conditions(
+        self,
+        query_conditions: str,
+        query_params: list[Union[int, str, bool]],
+        *,
+        board_id: Optional[str],
+        search_term: Optional[str],
+        file_name_term: Optional[str],
+        metadata_term: Optional[str],
+        width_min: Optional[int],
+        width_max: Optional[int],
+        width_exact: Optional[int],
+        height_min: Optional[int],
+        height_max: Optional[int],
+        height_exact: Optional[int],
+        board_ids: Optional[list[str]],
+        starred_mode: Optional[str],
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> tuple[str, list[Union[int, str, bool]]]:
+        if board_ids:
+            normalized_board_ids = list(dict.fromkeys(board_ids))
+            include_none = "none" in normalized_board_ids
+            explicit_board_ids = [b for b in normalized_board_ids if b != "none"]
+            board_subconditions: list[str] = []
+            if explicit_board_ids:
+                placeholders = ",".join("?" * len(explicit_board_ids))
+                board_subconditions.append(f"board_images.board_id IN ({placeholders})")
+                query_params.extend(explicit_board_ids)
+            if include_none:
+                board_subconditions.append("board_images.board_id IS NULL")
+            if board_subconditions:
+                query_conditions += f"""--sql
+                AND ({" OR ".join(board_subconditions)})
+                """
+        elif board_id == "none":
+            query_conditions += """--sql
+                AND board_images.board_id IS NULL
+                """
+            # For uncategorized images, filter by user_id to ensure per-user isolation
+            # Admin users can see all uncategorized images from all users
+            if user_id is not None and not is_admin:
+                query_conditions += """--sql
+                AND images.user_id = ?
+                """
+                query_params.append(user_id)
+        elif board_id is not None:
+            query_conditions += """--sql
+                AND board_images.board_id = ?
+                """
+            query_params.append(board_id)
+
+        if search_term:
+            like_term = f"%{search_term.lower()}%"
+            query_conditions += """--sql
+                AND (
+                    images.metadata LIKE ?
+                    OR images.created_at LIKE ?
+                    OR images.image_name LIKE ?
+                )
+                """
+            query_params.extend([like_term, like_term, like_term])
+
+        if file_name_term:
+            query_conditions += """--sql
+                AND images.image_name LIKE ?
+                """
+            query_params.append(f"%{file_name_term.lower()}%")
+
+        if metadata_term:
+            query_conditions += """--sql
+                AND images.metadata LIKE ?
+                """
+            query_params.append(f"%{metadata_term.lower()}%")
+
+        if starred_mode == "only":
+            query_conditions += """--sql
+                AND images.starred = TRUE
+                """
+        elif starred_mode == "exclude":
+            query_conditions += """--sql
+                AND images.starred = FALSE
+                """
+        if width_exact is not None:
+            query_conditions += """--sql
+                AND images.width = ?
+                """
+            query_params.append(width_exact)
+        else:
+            if width_min is not None:
+                query_conditions += """--sql
+                AND images.width >= ?
+                """
+                query_params.append(width_min)
+            if width_max is not None:
+                query_conditions += """--sql
+                AND images.width <= ?
+                """
+                query_params.append(width_max)
+
+        if height_exact is not None:
+            query_conditions += """--sql
+                AND images.height = ?
+                """
+            query_params.append(height_exact)
+        else:
+            if height_min is not None:
+                query_conditions += """--sql
+                AND images.height >= ?
+                """
+                query_params.append(height_min)
+            if height_max is not None:
+                query_conditions += """--sql
+                AND images.height <= ?
+                """
+                query_params.append(height_max)
+
+        return query_conditions, query_params
+
     def get_many(
         self,
         offset: int = 0,
@@ -134,6 +253,16 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        file_name_term: Optional[str] = None,
+        metadata_term: Optional[str] = None,
+        width_min: Optional[int] = None,
+        width_max: Optional[int] = None,
+        width_exact: Optional[int] = None,
+        height_min: Optional[int] = None,
+        height_max: Optional[int] = None,
+        height_exact: Optional[int] = None,
+        board_ids: Optional[list[str]] = None,
+        starred_mode: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageRecord]:
@@ -183,34 +312,24 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
                 query_params.append(is_intermediate)
 
-            # board_id of "none" is reserved for images without a board
-            if board_id == "none":
-                query_conditions += """--sql
-                AND board_images.board_id IS NULL
-                """
-                # For uncategorized images, filter by user_id to ensure per-user isolation
-                # Admin users can see all uncategorized images from all users
-                if user_id is not None and not is_admin:
-                    query_conditions += """--sql
-                    AND images.user_id = ?
-                    """
-                    query_params.append(user_id)
-            elif board_id is not None:
-                query_conditions += """--sql
-                AND board_images.board_id = ?
-                """
-                query_params.append(board_id)
-
-            # Search term condition
-            if search_term:
-                query_conditions += """--sql
-                AND (
-                    images.metadata LIKE ?
-                    OR images.created_at LIKE ?
-                )
-                """
-                query_params.append(f"%{search_term.lower()}%")
-                query_params.append(f"%{search_term.lower()}%")
+            query_conditions, query_params = self._append_search_conditions(
+                query_conditions,
+                query_params,
+                board_id=board_id,
+                search_term=search_term,
+                file_name_term=file_name_term,
+                metadata_term=metadata_term,
+                width_min=width_min,
+                width_max=width_max,
+                width_exact=width_exact,
+                height_min=height_min,
+                height_max=height_max,
+                height_exact=height_exact,
+                board_ids=board_ids,
+                starred_mode=starred_mode,
+                user_id=user_id,
+                is_admin=is_admin,
+            )
 
             if starred_first:
                 query_pagination = f"""--sql
@@ -398,6 +517,16 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        file_name_term: Optional[str] = None,
+        metadata_term: Optional[str] = None,
+        width_min: Optional[int] = None,
+        width_max: Optional[int] = None,
+        width_exact: Optional[int] = None,
+        height_min: Optional[int] = None,
+        height_max: Optional[int] = None,
+        height_exact: Optional[int] = None,
+        board_ids: Optional[list[str]] = None,
+        starred_mode: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> ImageNamesResult:
@@ -427,32 +556,24 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 """
                 query_params.append(is_intermediate)
 
-            if board_id == "none":
-                query_conditions += """--sql
-                AND board_images.board_id IS NULL
-                """
-                # For uncategorized images, filter by user_id to ensure per-user isolation
-                # Admin users can see all uncategorized images from all users
-                if user_id is not None and not is_admin:
-                    query_conditions += """--sql
-                    AND images.user_id = ?
-                    """
-                    query_params.append(user_id)
-            elif board_id is not None:
-                query_conditions += """--sql
-                AND board_images.board_id = ?
-                """
-                query_params.append(board_id)
-
-            if search_term:
-                query_conditions += """--sql
-                AND (
-                    images.metadata LIKE ?
-                    OR images.created_at LIKE ?
-                )
-                """
-                query_params.append(f"%{search_term.lower()}%")
-                query_params.append(f"%{search_term.lower()}%")
+            query_conditions, query_params = self._append_search_conditions(
+                query_conditions,
+                query_params,
+                board_id=board_id,
+                search_term=search_term,
+                file_name_term=file_name_term,
+                metadata_term=metadata_term,
+                width_min=width_min,
+                width_max=width_max,
+                width_exact=width_exact,
+                height_min=height_min,
+                height_max=height_max,
+                height_exact=height_exact,
+                board_ids=board_ids,
+                starred_mode=starred_mode,
+                user_id=user_id,
+                is_admin=is_admin,
+            )
 
             # Get starred count if starred_first is enabled
             starred_count = 0

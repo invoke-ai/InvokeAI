@@ -153,6 +153,9 @@ export const buildOnInvocationComplete = (
 
     // No need to invalidate tags since we're doing optimistic updates
     // Board totals are already updated above via upsertQueryEntries
+    // Custom image search queries cannot be updated optimistically, invalidate to re-run in background.
+    dispatch(imagesApi.util.invalidateTags([{ type: 'ImageSearchNameList', id: 'LIST' }]));
+    dispatch(imagesApi.util.invalidateTags([{ type: 'ImageSearchList', id: 'LIST' }]));
 
     const autoSwitch = selectAutoSwitch(getState());
 

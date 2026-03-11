@@ -1264,6 +1264,40 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search Images */
+        post: operations["search_images"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/search/names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Search Image Names */
+        post: operations["search_image_names"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/images_by_names": {
         parameters: {
             query?: never;
@@ -13115,6 +13149,33 @@ export type components = {
              * @constant
              */
             type: "img_scale";
+        };
+        /** ImageSearchBody */
+        ImageSearchBody: {
+            /** File Name Term */
+            file_name_term?: string | null;
+            /** Metadata Term */
+            metadata_term?: string | null;
+            /** Width Min */
+            width_min?: number | null;
+            /** Width Max */
+            width_max?: number | null;
+            /** Width Exact */
+            width_exact?: number | null;
+            /** Height Min */
+            height_min?: number | null;
+            /** Height Max */
+            height_max?: number | null;
+            /** Height Exact */
+            height_exact?: number | null;
+            /** Board Ids */
+            board_ids?: string[] | null;
+            /**
+             * Starred Mode
+             * @default include
+             * @enum {string}
+             */
+            starred_mode?: "include" | "exclude" | "only";
         };
         /**
          * Image to Latents - SD1.5, SDXL
@@ -30574,6 +30635,26 @@ export interface operations {
                 starred_first?: boolean;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description File name search term */
+                file_name_term?: string | null;
+                /** @description Metadata search term */
+                metadata_term?: string | null;
+                /** @description Minimum image width */
+                width_min?: number | null;
+                /** @description Maximum image width */
+                width_max?: number | null;
+                /** @description Exact image width */
+                width_exact?: number | null;
+                /** @description Minimum image height */
+                height_min?: number | null;
+                /** @description Maximum image height */
+                height_max?: number | null;
+                /** @description Exact image height */
+                height_exact?: number | null;
+                /** @description Boards to include, supports 'none' */
+                board_ids?: string[] | null;
+                /** @description How to handle starred images */
+                starred_mode?: "include" | "exclude" | "only";
             };
             header?: never;
             path?: never;
@@ -31195,12 +31276,112 @@ export interface operations {
                 starred_first?: boolean;
                 /** @description The term to search for */
                 search_term?: string | null;
+                /** @description File name search term */
+                file_name_term?: string | null;
+                /** @description Metadata search term */
+                metadata_term?: string | null;
+                /** @description Minimum image width */
+                width_min?: number | null;
+                /** @description Maximum image width */
+                width_max?: number | null;
+                /** @description Exact image width */
+                width_exact?: number | null;
+                /** @description Minimum image height */
+                height_min?: number | null;
+                /** @description Maximum image height */
+                height_max?: number | null;
+                /** @description Exact image height */
+                height_exact?: number | null;
+                /** @description Boards to include, supports 'none' */
+                board_ids?: string[] | null;
+                /** @description How to handle starred images */
+                starred_mode?: "include" | "exclude" | "only";
             };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageNamesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_images: {
+        parameters: {
+            query?: {
+                image_origin?: components["schemas"]["ResourceOrigin"] | null;
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                is_intermediate?: boolean | null;
+                offset?: number;
+                limit?: number;
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                starred_first?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageSearchBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OffsetPaginatedResults_ImageDTO_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    search_image_names: {
+        parameters: {
+            query?: {
+                image_origin?: components["schemas"]["ResourceOrigin"] | null;
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                is_intermediate?: boolean | null;
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                starred_first?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ImageSearchBody"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

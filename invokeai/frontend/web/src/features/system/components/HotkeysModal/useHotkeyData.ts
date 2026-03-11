@@ -184,6 +184,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('gallery', 'galleryNavLeftAlt', ['alt+left']);
     addHotkey('gallery', 'deleteSelection', ['delete', 'backspace']);
     addHotkey('gallery', 'starImage', ['.']);
+    addHotkey('gallery', 'openSearch', ['ctrl+f', 'alt+f']);
 
     return data;
   }, [customHotkeys, t]);
