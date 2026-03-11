@@ -124,6 +124,54 @@ class ModelLoader(ModelLoaderBase):
             variant=config.repo_variant if isinstance(config, Diffusers_Config_Base) else None,
         )
 
+    def _should_use_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> bool:
+        """Check if FP8 layerwise casting should be applied to a model."""
+        # FP8 storage only works on CUDA
+        if self._torch_device.type != "cuda":
+            return False
+
+        # Don't apply FP8 to text encoders, tokenizers, schedulers, etc.
+        _excluded_submodel_types = {
+            SubModelType.TextEncoder,
+            SubModelType.TextEncoder2,
+            SubModelType.TextEncoder3,
+            SubModelType.Tokenizer,
+            SubModelType.Tokenizer2,
+            SubModelType.Tokenizer3,
+            SubModelType.Scheduler,
+            SubModelType.SafetyChecker,
+        }
+        if submodel_type in _excluded_submodel_types:
+            return False
+
+        # Check default_settings.fp8_storage (Main models, ControlNet)
+        if hasattr(config, "default_settings") and config.default_settings is not None:
+            if hasattr(config.default_settings, "fp8_storage") and config.default_settings.fp8_storage is True:
+                return True
+
+        return False
+
+    def _apply_fp8_layerwise_casting(
+        self, model: AnyModel, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
+    ) -> AnyModel:
+        """Apply FP8 layerwise casting to a model if enabled in its config."""
+        if not self._should_use_fp8(config, submodel_type):
+            return model
+
+        from diffusers.models.modeling_utils import ModelMixin
+
+        if not isinstance(model, ModelMixin):
+            return model
+
+        model.enable_layerwise_casting(
+            storage_dtype=torch.float8_e4m3fn,
+            compute_dtype=self._torch_dtype,
+        )
+        self._logger.info(
+            f"FP8 layerwise casting enabled for {config.name} (storage=float8_e4m3fn, compute={self._torch_dtype})"
+        )
+        return model
+
     # This needs to be implemented in the subclass
     def _load_model(
         self,
