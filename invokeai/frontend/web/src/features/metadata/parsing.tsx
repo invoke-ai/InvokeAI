@@ -1063,7 +1063,8 @@ const CanvasLayers: SingleMetadataHandler<CanvasMetadata> = {
 
     for (const entity of parsed.controlLayers) {
       if (entity.controlAdapter.model) {
-        await throwIfModelDoesNotExist(entity.controlAdapter.model.key, store);
+        const resolvedConfig = await resolveModel(entity.controlAdapter.model, store);
+        entity.controlAdapter.model = zModelIdentifierField.parse(resolvedConfig);
       }
       for (const object of entity.objects) {
         if (object.type === 'image' && 'image_name' in object.image) {
@@ -1099,7 +1100,8 @@ const CanvasLayers: SingleMetadataHandler<CanvasMetadata> = {
           await throwIfImageDoesNotExist(refImage.config.image.image_name, store);
         }
         if (refImage.config.model) {
-          await throwIfModelDoesNotExist(refImage.config.model.key, store);
+          const resolvedConfig = await resolveModel(refImage.config.model, store);
+          refImage.config.model = zModelIdentifierField.parse(resolvedConfig);
         }
       }
     }
@@ -1165,7 +1167,9 @@ const RefImages: CollectionMetadataHandler<RefImageState[]> = {
       }
       // FLUX.2 reference images don't have a model field (built-in support)
       if ('model' in refImage.config && refImage.config.model) {
-        await throwIfModelDoesNotExist(refImage.config.model.key, store);
+        const resolvedConfig = await resolveModel(refImage.config.model, store);
+        // Update the model reference in case the key changed (e.g. model was reinstalled)
+        refImage.config.model = zModelIdentifierField.parse(resolvedConfig);
       }
     }
 
@@ -1562,10 +1566,33 @@ const throwIfImageDoesNotExist = async (name: string, store: AppStore): Promise<
   }
 };
 
-const throwIfModelDoesNotExist = async (key: string, store: AppStore): Promise<void> => {
+/**
+ * Resolve a model by key, falling back to name+base+type lookup if the key is not found.
+ * This handles the case where a model was deleted and reinstalled (getting a new UUID key).
+ * Returns the resolved model config, or throws if the model cannot be found by either method.
+ */
+const resolveModel = async (
+  model: { key: string; name: string; base: string; type: string },
+  store: AppStore
+): Promise<AnyModelConfig> => {
+  // First try by key (fast path)
   try {
-    await store.dispatch(modelsApi.endpoints.getModelConfig.initiate(key, { subscribe: false }));
+    const req = store.dispatch(modelsApi.endpoints.getModelConfig.initiate(model.key, { subscribe: false }));
+    return await req.unwrap();
   } catch {
-    throw new Error(`Model with key ${key} does not exist`);
+    // Key not found - try fallback
+  }
+
+  // Fallback: look up by name + base + type (handles reinstalled models)
+  try {
+    const req = store.dispatch(
+      modelsApi.endpoints.getModelConfigByAttrs.initiate(
+        { name: model.name, base: model.base as any, type: model.type as any },
+        { subscribe: false }
+      )
+    );
+    return await req.unwrap();
+  } catch {
+    throw new Error(`Model "${model.name}" (key: ${model.key}) does not exist`);
   }
 };
