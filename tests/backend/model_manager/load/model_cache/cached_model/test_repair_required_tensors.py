@@ -43,5 +43,5 @@ def test_repair_required_tensors_on_compute_device(device: torch.device, keep_ra
 
     assert repaired_tensors == 1
     assert cached_model._cur_vram_bytes is None
-    assert model.scale.device == device
+    assert model.scale.device.type == device.type
     assert all(param.device.type == "cpu" for param in model.linear.parameters())
