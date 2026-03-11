@@ -15,33 +15,12 @@ import {
   Text,
   VStack,
 } from '@invoke-ai/ui-library';
+import { validatePasswordField } from 'features/auth/util/passwordUtils';
 import type { ChangeEvent, FormEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useGetSetupStatusQuery, useSetupMutation } from 'services/api/endpoints/auth';
-
-const validatePasswordStrength = (
-  password: string,
-  t: (key: string) => string
-): { isValid: boolean; message: string } => {
-  if (password.length < 8) {
-    return { isValid: false, message: t('auth.setup.passwordTooShort') };
-  }
-
-  const hasUpper = /[A-Z]/.test(password);
-  const hasLower = /[a-z]/.test(password);
-  const hasDigit = /\d/.test(password);
-
-  if (!hasUpper || !hasLower || !hasDigit) {
-    return {
-      isValid: false,
-      message: t('auth.setup.passwordMissingRequirements'),
-    };
-  }
-
-  return { isValid: true, message: '' };
-};
 
 export const AdministratorSetup = memo(() => {
   const { t } = useTranslation();
@@ -60,7 +39,8 @@ export const AdministratorSetup = memo(() => {
     }
   }, [setupStatus, isLoadingSetup, navigate]);
 
-  const passwordValidation = validatePasswordStrength(password, t);
+  const strictPasswordChecking = setupStatus?.strict_password_checking ?? true;
+  const passwordValidation = validatePasswordField(password, t, strictPasswordChecking, false);
   const passwordsMatch = password === confirmPassword;
 
   const handleSubmit = useCallback(
@@ -119,6 +99,13 @@ export const AdministratorSetup = memo(() => {
       </Center>
     );
   }
+
+  const passwordStrengthColor =
+    passwordValidation.strength === 'weak'
+      ? 'error.300'
+      : passwordValidation.strength === 'moderate'
+        ? 'warning.300'
+        : 'invokeBlue.300';
 
   return (
     <Center w="100dvw" h="100dvh" bg="base.900">
@@ -192,7 +179,16 @@ export const AdministratorSetup = memo(() => {
                   {password.length > 0 && !passwordValidation.isValid && (
                     <FormErrorMessage>{passwordValidation.message}</FormErrorMessage>
                   )}
-                  {password.length === 0 && <FormHelperText mt={1}>{t('auth.setup.passwordHelper')}</FormHelperText>}
+                  {password.length > 0 && passwordValidation.isValid && passwordValidation.message && (
+                    <Text mt={1} fontSize="sm" color={passwordStrengthColor}>
+                      {passwordValidation.message}
+                    </Text>
+                  )}
+                  {password.length === 0 && (
+                    <FormHelperText mt={1}>
+                      {strictPasswordChecking ? t('auth.setup.passwordHelper') : t('auth.setup.passwordHelperRelaxed')}
+                    </FormHelperText>
+                  )}
                 </GridItem>
               </Grid>
             </FormControl>
