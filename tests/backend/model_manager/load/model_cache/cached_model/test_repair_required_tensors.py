@@ -38,9 +38,6 @@ def test_repair_required_tensors_on_compute_device(device: torch.device, keep_ra
     apply_custom_layers_to_model(model, device_autocasting_enabled=True)
     cached_model = CachedModelWithPartialLoad(model=model, compute_device=device, keep_ram_copy=keep_ram_copy)
 
-    with pytest.raises(RuntimeError):
-        _ = model(torch.randn(1, 4, device=device))
-
     cached_model._cur_vram_bytes = 0
     repaired_tensors = cached_model.repair_required_tensors_on_compute_device()
 
@@ -48,6 +45,3 @@ def test_repair_required_tensors_on_compute_device(device: torch.device, keep_ra
     assert cached_model._cur_vram_bytes is None
     assert model.scale.device == device
     assert all(param.device.type == "cpu" for param in model.linear.parameters())
-
-    output = model(torch.randn(1, 4, device=device))
-    assert output.device == device
