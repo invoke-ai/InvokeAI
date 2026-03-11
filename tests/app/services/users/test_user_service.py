@@ -62,7 +62,7 @@ def test_create_user(user_service: UserService):
 
 
 def test_create_user_weak_password(user_service: UserService):
-    """Test creating a user with weak password."""
+    """Test creating a user with weak password fails when strict checking is enabled."""
     user_data = UserCreateRequest(
         email="test@example.com",
         display_name="Test User",
@@ -71,7 +71,20 @@ def test_create_user_weak_password(user_service: UserService):
     )
 
     with pytest.raises(ValueError, match="at least 8 characters"):
-        user_service.create(user_data)
+        user_service.create(user_data, strict_password_checking=True)
+
+
+def test_create_user_weak_password_non_strict(user_service: UserService):
+    """Test creating a user with weak password succeeds when strict checking is disabled."""
+    user_data = UserCreateRequest(
+        email="weakpass@example.com",
+        display_name="Test User",
+        password="weak",
+        is_admin=False,
+    )
+
+    user = user_service.create(user_data, strict_password_checking=False)
+    assert user.email == "weakpass@example.com"
 
 
 def test_create_duplicate_user(user_service: UserService):
