@@ -116,6 +116,7 @@ export const parseSchema = (
     const version = schema.version;
     const nodePack = schema.node_pack;
     const classification = schema.classification;
+    const category = schema.category ?? 'other';
 
     const inputs = reduce(
       schema.properties,
@@ -263,6 +264,7 @@ export const parseSchema = (
       useCache,
       nodePack,
       classification,
+      category,
     };
 
     Object.assign(invocationsAccumulator, { [type]: invocation });
