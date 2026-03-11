@@ -105,7 +105,7 @@ const zIPMethodV2 = z.enum(['full', 'style', 'composition', 'style_strong', 'sty
 export type IPMethodV2 = z.infer<typeof zIPMethodV2>;
 export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safeParse(v).success;
 
-const _zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'gradient', 'view', 'bbox', 'colorPicker', 'text']);
+const _zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'lasso', 'gradient', 'view', 'bbox', 'colorPicker', 'text']);
 export type Tool = z.infer<typeof _zTool>;
 
 const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, {
@@ -260,6 +260,20 @@ const zCanvasRectState = z.object({
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
+const zCanvasLassoCompositeOperation = z.enum(['source-over', 'destination-out']);
+
+const zCanvasLassoState = z.object({
+  id: zId,
+  type: z.literal('lasso'),
+  /**
+   * Points in the format [x1, y1, x2, y2, ...].
+   * The lasso tool always commits a closed contour.
+   */
+  points: zPoints,
+  compositeOperation: zCanvasLassoCompositeOperation.default('source-over'),
+});
+export type CanvasLassoState = z.infer<typeof zCanvasLassoState>;
+
 // Gradient state includes clip metadata so the tool can optionally clip to drag gesture.
 const zCanvasLinearGradientState = z.object({
   id: zId,
@@ -309,6 +323,7 @@ const zCanvasObjectState = z.union([
   zCanvasBrushLineState,
   zCanvasEraserLineState,
   zCanvasRectState,
+  zCanvasLassoState,
   zCanvasBrushLineWithPressureState,
   zCanvasEraserLineWithPressureState,
   zCanvasGradientState,
@@ -925,6 +940,7 @@ export type EntityEraserLineAddedPayload = EntityIdentifierPayload<{
   eraserLine: CanvasEraserLineState | CanvasEraserLineWithPressureState;
 }>;
 export type EntityRectAddedPayload = EntityIdentifierPayload<{ rect: CanvasRectState }>;
+export type EntityLassoAddedPayload = EntityIdentifierPayload<{ lasso: CanvasLassoState }>;
 export type EntityGradientAddedPayload = EntityIdentifierPayload<{ gradient: CanvasGradientState }>;
 export type EntityRasterizedPayload = EntityIdentifierPayload<{
   imageObject: CanvasImageState;

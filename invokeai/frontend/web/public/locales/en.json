@@ -675,6 +675,10 @@
                 "title": "Rect Tool",
                 "desc": "Select the rect tool."
             },
+            "selectLassoTool": {
+                "title": "Lasso Tool",
+                "desc": "Select the lasso tool."
+            },
             "selectViewTool": {
                 "title": "View Tool",
                 "desc": "Select the view tool."
@@ -2641,10 +2645,16 @@
             "radial": "Radial",
             "clip": "Clip Gradient"
         },
+        "lasso": {
+            "freehand": "Freehand",
+            "polygon": "Polygon",
+            "polygonHint": "Click to add points, click the first point to close."
+        },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
             "rectangle": "Rectangle",
+            "lasso": "Lasso",
             "gradient": "Gradient",
             "bbox": "Bbox",
             "move": "Move",
