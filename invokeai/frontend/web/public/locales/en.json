@@ -46,7 +46,8 @@
             "passwordsDoNotMatch": "Passwords do not match",
             "createAccount": "Create Administrator Account",
             "creatingAccount": "Setting up...",
-            "setupFailed": "Setup failed. Please try again."
+            "setupFailed": "Setup failed. Please try again.",
+            "passwordHelperRelaxed": "Enter any password (strength will be shown)"
         },
         "userMenu": "User Menu",
         "admin": "Admin",
@@ -102,6 +103,11 @@
             "back": "Back",
             "cannotDeleteSelf": "You cannot delete your own account",
             "cannotDeactivateSelf": "You cannot deactivate your own account"
+        },
+        "passwordStrength": {
+            "weak": "Weak password",
+            "moderate": "Moderate password",
+            "strong": "Strong password"
         }
     },
     "boards": {

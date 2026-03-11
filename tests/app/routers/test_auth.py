@@ -300,8 +300,9 @@ def test_setup_admin_already_exists(monkeypatch: Any, mock_invoker: Invoker, cli
 
 
 def test_setup_admin_weak_password(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
-    """Test setup fails with weak password."""
+    """Test setup fails with weak password when strict password checking is enabled."""
     monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+    mock_invoker.services.configuration.strict_password_checking = True
 
     response = client.post(
         "/api/v1/auth/setup",
@@ -314,6 +315,25 @@ def test_setup_admin_weak_password(monkeypatch: Any, mock_invoker: Invoker, clie
 
     assert response.status_code == 400
     assert "Password" in response.json()["detail"]
+
+
+def test_setup_admin_weak_password_non_strict(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    """Test setup succeeds with weak password when strict password checking is disabled (the default)."""
+    monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", MockApiDependencies(mock_invoker))
+    mock_invoker.services.configuration.strict_password_checking = False
+
+    response = client.post(
+        "/api/v1/auth/setup",
+        json={
+            "email": "admin3b@example.com",
+            "display_name": "Admin User",
+            "password": "weak",
+        },
+    )
+
+    assert response.status_code == 200
+    json_response = response.json()
+    assert json_response["success"] is True
 
 
 def test_admin_user_token_has_admin_flag(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:

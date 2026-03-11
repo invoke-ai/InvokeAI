@@ -21,31 +21,17 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectAuthToken, selectCurrentUser, setCredentials } from 'features/auth/store/authSlice';
+import { validatePasswordField } from 'features/auth/util/passwordUtils';
 import type { ChangeEvent, FormEvent } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiEyeBold, PiEyeSlashBold, PiLightningFill } from 'react-icons/pi';
 import { useNavigate } from 'react-router-dom';
-import { useLazyGeneratePasswordQuery, useUpdateCurrentUserMutation } from 'services/api/endpoints/auth';
-
-const validatePasswordStrength = (
-  password: string,
-  t: (key: string) => string
-): { isValid: boolean; message: string } => {
-  if (password.length === 0) {
-    return { isValid: true, message: '' };
-  }
-  if (password.length < 8) {
-    return { isValid: false, message: t('auth.setup.passwordTooShort') };
-  }
-  const hasUpper = /[A-Z]/.test(password);
-  const hasLower = /[a-z]/.test(password);
-  const hasDigit = /\d/.test(password);
-  if (!hasUpper || !hasLower || !hasDigit) {
-    return { isValid: false, message: t('auth.setup.passwordMissingRequirements') };
-  }
-  return { isValid: true, message: '' };
-};
+import {
+  useGetSetupStatusQuery,
+  useLazyGeneratePasswordQuery,
+  useUpdateCurrentUserMutation,
+} from 'services/api/endpoints/auth';
 
 const PASSWORD_GRID_COLUMNS = '180px 1fr';
 
@@ -67,8 +53,10 @@ export const UserProfile = memo(() => {
 
   const [updateCurrentUser, { isLoading }] = useUpdateCurrentUserMutation();
   const [triggerGeneratePassword] = useLazyGeneratePasswordQuery();
+  const { data: setupStatus } = useGetSetupStatusQuery();
 
-  const newPasswordValidation = validatePasswordStrength(newPassword, t);
+  const strictPasswordChecking = setupStatus?.strict_password_checking ?? true;
+  const newPasswordValidation = validatePasswordField(newPassword, t, strictPasswordChecking, true);
 
   const isPasswordChangeAttempted = newPassword.length > 0 || currentPassword.length > 0;
   const passwordsMatch = newPassword.length > 0 && newPassword === confirmPassword;
@@ -304,6 +292,21 @@ export const UserProfile = memo(() => {
                   </InputGroup>
                   {newPassword.length > 0 && !newPasswordValidation.isValid && (
                     <FormErrorMessage>{newPasswordValidation.message}</FormErrorMessage>
+                  )}
+                  {newPassword.length > 0 && newPasswordValidation.isValid && newPasswordValidation.message && (
+                    <Text
+                      mt={1}
+                      fontSize="sm"
+                      color={
+                        newPasswordValidation.strength === 'weak'
+                          ? 'error.300'
+                          : newPasswordValidation.strength === 'moderate'
+                            ? 'warning.300'
+                            : 'invokeBlue.300'
+                      }
+                    >
+                      {newPasswordValidation.message}
+                    </Text>
                   )}
                 </GridItem>
               </Grid>
