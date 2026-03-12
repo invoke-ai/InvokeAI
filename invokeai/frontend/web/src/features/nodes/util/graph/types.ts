@@ -15,7 +15,8 @@ export type ImageOutputNodes =
   | 'flux2_vae_decode'
   | 'sd3_l2i'
   | 'cogview4_l2i'
-  | 'z_image_l2i';
+  | 'z_image_l2i'
+  | 'anima_l2i';
 
 export type LatentToImageNodes =
   | 'l2i'
@@ -48,7 +49,8 @@ export type MainModelLoaderNodes =
   | 'flux2_klein_model_loader'
   | 'sd3_model_loader'
   | 'cogview4_model_loader'
-  | 'z_image_model_loader';
+  | 'z_image_model_loader'
+  | 'anima_model_loader';
 
 export type VaeSourceNodes = 'seamless' | 'vae_loader';
 
