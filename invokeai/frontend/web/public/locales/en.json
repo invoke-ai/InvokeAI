@@ -2884,6 +2884,19 @@
             "copyCanvasToClipboard": "Copy Canvas to Clipboard",
             "copyBboxToClipboard": "Copy Bbox to Clipboard"
         },
+        "canvasProject": {
+            "project": "Project",
+            "saveProject": "Save Canvas Project",
+            "loadProject": "Load Canvas Project",
+            "saveSuccess": "Project Saved",
+            "saveSuccessDesc": "Saved project with {{count}} images",
+            "saveError": "Failed to Save Project",
+            "loadSuccess": "Project Loaded",
+            "loadSuccessDesc": "Canvas state restored from project file",
+            "loadError": "Failed to Load Project",
+            "loadWarning": "Loading a project will replace your current canvas, including all layers, masks, reference images, and generation parameters. This action cannot be undone.",
+            "projectName": "Project Name"
+        },
         "stagingArea": {
             "accept": "Accept",
             "discardAll": "Discard All",

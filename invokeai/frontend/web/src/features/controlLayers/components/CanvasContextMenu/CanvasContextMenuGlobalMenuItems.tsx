@@ -2,6 +2,8 @@ import { Menu, MenuButton, MenuGroup, MenuItem, MenuList } from '@invoke-ai/ui-l
 import { SubMenuButtonContent, useSubMenu } from 'common/hooks/useSubMenu';
 import { CanvasContextMenuItemsCropCanvasToBbox } from 'features/controlLayers/components/CanvasContextMenu/CanvasContextMenuItemsCropCanvasToBbox';
 import { NewLayerIcon } from 'features/controlLayers/components/common/icons';
+import { useLoadCanvasProjectWithDialog } from 'features/controlLayers/components/LoadCanvasProjectConfirmationAlertDialog';
+import { useSaveCanvasProjectWithDialog } from 'features/controlLayers/components/SaveCanvasProjectDialog';
 import { useCopyCanvasToClipboard } from 'features/controlLayers/hooks/copyHooks';
 import {
   useNewControlLayerFromBbox,
@@ -14,16 +16,19 @@ import {
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCopyBold, PiFloppyDiskBold } from 'react-icons/pi';
+import { PiArchiveBold, PiCopyBold, PiFileArrowDownBold, PiFileArrowUpBold, PiFloppyDiskBold } from 'react-icons/pi';
 
 export const CanvasContextMenuGlobalMenuItems = memo(() => {
   const { t } = useTranslation();
   const saveSubMenu = useSubMenu();
+  const projectSubMenu = useSubMenu();
   const newSubMenu = useSubMenu();
   const copySubMenu = useSubMenu();
   const isBusy = useCanvasIsBusy();
   const saveCanvasToGallery = useSaveCanvasToGallery();
   const saveBboxToGallery = useSaveBboxToGallery();
+  const saveCanvasProject = useSaveCanvasProjectWithDialog();
+  const loadCanvasProject = useLoadCanvasProjectWithDialog();
   const newRegionalReferenceImageFromBbox = useNewRegionalReferenceImageFromBbox();
   const newGlobalReferenceImageFromBbox = useNewGlobalReferenceImageFromBbox();
   const newRasterLayerFromBbox = useNewRasterLayerFromBbox();
@@ -46,6 +51,21 @@ export const CanvasContextMenuGlobalMenuItems = memo(() => {
               </MenuItem>
               <MenuItem icon={<PiFloppyDiskBold />} isDisabled={isBusy} onClick={saveBboxToGallery}>
                 {t('controlLayers.canvasContextMenu.saveBboxToGallery')}
+              </MenuItem>
+            </MenuList>
+          </Menu>
+        </MenuItem>
+        <MenuItem {...projectSubMenu.parentMenuItemProps} icon={<PiArchiveBold />}>
+          <Menu {...projectSubMenu.menuProps}>
+            <MenuButton {...projectSubMenu.menuButtonProps}>
+              <SubMenuButtonContent label={t('controlLayers.canvasProject.project')} />
+            </MenuButton>
+            <MenuList {...projectSubMenu.menuListProps}>
+              <MenuItem icon={<PiFileArrowDownBold />} isDisabled={isBusy} onClick={saveCanvasProject}>
+                {t('controlLayers.canvasProject.saveProject')}
+              </MenuItem>
+              <MenuItem icon={<PiFileArrowUpBold />} isDisabled={isBusy} onClick={loadCanvasProject}>
+                {t('controlLayers.canvasProject.loadProject')}
               </MenuItem>
             </MenuList>
           </Menu>
