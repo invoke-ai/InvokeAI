@@ -325,7 +325,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
    */
   selectPosition = createSelector(this.selectState, (entity) => entity?.position);
 
-  syncIsOnscreen = () => {
+  syncIsOnscreen = rafThrottle(() => {
     const stageRect = this.manager.stage.getScaledStageRect();
     const isOnScreen = this.checkIntersection(stageRect);
     const prevIsOnScreen = this.$isOnScreen.get();
@@ -334,9 +334,9 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
       this.log.trace(`Moved ${isOnScreen ? 'on-screen' : 'off-screen'}`);
     }
     this.syncVisibility();
-  };
+  });
 
-  syncIntersectsBbox = () => {
+  syncIntersectsBbox = rafThrottle(() => {
     const bboxRect = this.manager.stateApi.getBbox().rect;
     const intersectsBbox = this.checkIntersection(bboxRect);
     const prevIntersectsBbox = this.$intersectsBbox.get();
@@ -344,7 +344,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
     if (prevIntersectsBbox !== intersectsBbox) {
       this.log.trace(`Moved ${intersectsBbox ? 'into bbox' : 'out of bbox'}`);
     }
-  };
+  });
 
   checkIntersection = (rect: Rect): boolean => {
     const entityRect = this.transformer.$pixelRect.get();
@@ -526,8 +526,13 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
       return;
     }
     this.log.trace(isVisible ? 'Showing' : 'Hiding');
-    this.konva.layer.visible(isVisible);
     if (isVisible) {
+      // Re-attach the layer to the stage before making it visible. The layer was detached from the DOM when hidden
+      // to free browser compositing resources (each Konva.Layer is a separate <canvas> element).
+      if (!this.konva.layer.getParent()) {
+        this.manager.stage.addLayer(this.konva.layer);
+      }
+      this.konva.layer.visible(true);
       /**
        * When a layer is created and initially not visible, its compositing rect won't be set up properly. Then, when
        * we show it in this method, it the layer will not render as it should.
@@ -542,6 +547,13 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
       this.renderer.updateCompositingRectSize();
       this.renderer.updateCompositingRectPosition();
       this.renderer.updateCompositingRectFill();
+      // Restore correct z-order after re-attaching
+      this.manager.entityRenderer.arrangeEntities(this.manager.stateApi.runSelector(selectCanvasSlice), null);
+    } else {
+      this.konva.layer.visible(false);
+      // Detach the layer from the stage to remove its <canvas> element from the DOM. This frees browser compositing
+      // resources. The layer object is kept alive and can be re-attached when shown again.
+      this.konva.layer.remove();
     }
     this.renderer.syncKonvaCache();
   };
