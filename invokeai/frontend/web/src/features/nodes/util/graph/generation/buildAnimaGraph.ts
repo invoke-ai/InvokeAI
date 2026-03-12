@@ -7,12 +7,13 @@ import {
   selectMainModelConfig,
   selectParamsSlice,
 } from 'features/controlLayers/store/paramsSlice';
-import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
+import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
+import { addRegions } from 'features/nodes/util/graph/generation/addRegions';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -70,16 +71,32 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     type: 'anima_text_encoder',
     id: getPrefixedId('pos_prompt'),
   });
+  // Collect node for regional prompting support
+  const posCondCollect = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('pos_cond_collect'),
+  });
 
   // Anima supports negative conditioning when guidance_scale > 1
   let negCond: Invocation<'anima_text_encoder'> | null = null;
+  let negCondCollect: Invocation<'collect'> | null = null;
   if (guidance_scale > 1) {
     negCond = g.addNode({
       type: 'anima_text_encoder',
       id: getPrefixedId('neg_prompt'),
       prompt: prompts.negative,
     });
+    negCondCollect = g.addNode({
+      type: 'collect',
+      id: getPrefixedId('neg_cond_collect'),
+    });
   }
+
+  // Placeholder collect node for IP adapters (not supported for Anima but needed for addRegions)
+  const ipAdapterCollect = g.addNode({
+    type: 'collect',
+    id: getPrefixedId('ip_adapter_collect'),
+  });
 
   const seed = g.addNode({
     id: getPrefixedId('seed'),
@@ -102,14 +119,16 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   g.addEdge(modelLoader, 'qwen3_encoder', posCond, 'qwen3_encoder');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
-  // Connect positive prompt
+  // Connect positive prompt through collector for regional support
   g.addEdge(positivePrompt, 'value', posCond, 'prompt');
-  g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
+  g.addEdge(posCond, 'conditioning', posCondCollect, 'item');
+  g.addEdge(posCondCollect, 'collection', denoise, 'positive_conditioning');
 
   // Connect negative conditioning if guidance_scale > 1
-  if (negCond !== null) {
+  if (negCond !== null && negCondCollect !== null) {
     g.addEdge(modelLoader, 'qwen3_encoder', negCond, 'qwen3_encoder');
-    g.addEdge(negCond, 'conditioning', denoise, 'negative_conditioning');
+    g.addEdge(negCond, 'conditioning', negCondCollect, 'item');
+    g.addEdge(negCondCollect, 'collection', denoise, 'negative_conditioning');
   }
 
   // Connect seed and denoiser to L2I
@@ -130,6 +149,27 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
+
+  // Add regional guidance if canvas manager is available
+  const canvas = selectCanvasSlice(state);
+  if (manager !== null) {
+    await addRegions({
+      manager,
+      regions: canvas.regionalGuidance.entities,
+      g,
+      bbox: canvas.bbox.rect,
+      model,
+      posCond,
+      negCond,
+      posCondCollect,
+      negCondCollect,
+      ipAdapterCollect,
+      fluxReduxCollect: null, // Not supported for Anima
+    });
+  }
+
+  // IP Adapters are not supported for Anima, so delete the unused collector
+  g.deleteNode(ipAdapterCollect.id);
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 

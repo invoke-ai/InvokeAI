@@ -2625,6 +2625,11 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * @description The mask associated with this conditioning tensor for regional prompting. Excluded regions should be set to False, included regions should be set to True.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
         };
         /**
          * AnimaConditioningOutput
@@ -2702,15 +2707,17 @@ export type components = {
              */
             transformer?: components["schemas"]["TransformerField"] | null;
             /**
+             * Positive Conditioning
              * @description Positive conditioning tensor
              * @default null
              */
-            positive_conditioning?: components["schemas"]["AnimaConditioningField"] | null;
+            positive_conditioning?: components["schemas"]["AnimaConditioningField"] | components["schemas"]["AnimaConditioningField"][] | null;
             /**
+             * Negative Conditioning
              * @description Negative conditioning tensor
              * @default null
              */
-            negative_conditioning?: components["schemas"]["AnimaConditioningField"] | null;
+            negative_conditioning?: components["schemas"]["AnimaConditioningField"] | components["schemas"]["AnimaConditioningField"][] | null;
             /**
              * Guidance Scale
              * @description Guidance scale for classifier-free guidance. Recommended: 4.0-5.0 for Anima.
@@ -2972,6 +2979,11 @@ export type components = {
              * @default null
              */
             qwen3_encoder?: components["schemas"]["Qwen3EncoderField"] | null;
+            /**
+             * @description A mask defining the region that this conditioning prompt applies to.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
             /**
              * type
              * @default anima_text_encoder

@@ -70,6 +70,16 @@ export const getRegionalGuidanceWarnings = (
       }
     }
 
+    if (model.base === 'anima') {
+      // Reference images (IP Adapters) are not supported for Anima
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
     entity.referenceImages.forEach(({ config }) => {
       if (!config.model) {
         // No model selected

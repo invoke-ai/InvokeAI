@@ -39,13 +39,16 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.anima.anima_transformer_patch import patch_anima_for_regional_prompting
+from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
+from invokeai.backend.anima.regional_prompting import AnimaRegionalPromptingExtension
 from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_LABELS, ANIMA_SCHEDULER_MAP, ANIMA_SCHEDULER_NAME_VALUES
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
     RectifiedFlowInpaintExtension,
     assert_broadcastable,
 )
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, Range
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.util.devices import TorchDevice
 
@@ -156,7 +159,7 @@ class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
     title="Denoise - Anima",
     tags=["image", "anima"],
     category="image",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseInvocation(BaseInvocation):
@@ -182,10 +185,10 @@ class AnimaDenoiseInvocation(BaseInvocation):
     transformer: TransformerField = InputField(
         description="Anima transformer model.", input=Input.Connection, title="Transformer"
     )
-    positive_conditioning: AnimaConditioningField = InputField(
+    positive_conditioning: AnimaConditioningField | list[AnimaConditioningField] = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
-    negative_conditioning: AnimaConditioningField | None = InputField(
+    negative_conditioning: AnimaConditioningField | list[AnimaConditioningField] | None = InputField(
         default=None, description=FieldDescriptions.negative_cond, input=Input.Connection
     )
     guidance_scale: float = InputField(
@@ -286,32 +289,143 @@ class AnimaDenoiseInvocation(BaseInvocation):
         assert isinstance(cond_info, AnimaConditioningInfo)
         return cond_info.to(dtype=dtype, device=device)
 
+    def _load_text_conditionings(
+        self,
+        context: InvocationContext,
+        cond_field: AnimaConditioningField | list[AnimaConditioningField],
+        img_token_height: int,
+        img_token_width: int,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> list[AnimaTextConditioning]:
+        """Load Anima text conditioning with optional regional masks.
+
+        Args:
+            context: The invocation context.
+            cond_field: Single conditioning field or list of fields.
+            img_token_height: Height of the image token grid (H // patch_size).
+            img_token_width: Width of the image token grid (W // patch_size).
+            dtype: Target dtype.
+            device: Target device.
+
+        Returns:
+            List of AnimaTextConditioning objects with optional masks.
+        """
+        cond_list = cond_field if isinstance(cond_field, list) else [cond_field]
+
+        text_conditionings: list[AnimaTextConditioning] = []
+        for cond in cond_list:
+            cond_info = self._load_conditioning(context, cond, dtype, device)
+
+            # Load the mask, if provided
+            mask: torch.Tensor | None = None
+            if cond.mask is not None:
+                mask = context.tensors.load(cond.mask.tensor_name)
+                mask = mask.to(device=device)
+                mask = AnimaRegionalPromptingExtension.preprocess_regional_prompt_mask(
+                    mask, img_token_height, img_token_width, dtype, device
+                )
+
+            text_conditionings.append(
+                AnimaTextConditioning(
+                    qwen3_embeds=cond_info.qwen3_embeds,
+                    t5xxl_ids=cond_info.t5xxl_ids,
+                    t5xxl_weights=cond_info.t5xxl_weights,
+                    mask=mask,
+                )
+            )
+
+        return text_conditionings
+
+    def _run_llm_adapter_for_regions(
+        self,
+        transformer,
+        text_conditionings: list[AnimaTextConditioning],
+        dtype: torch.dtype,
+    ) -> AnimaRegionalTextConditioning:
+        """Run the LLM Adapter separately for each regional conditioning and concatenate.
+
+        Args:
+            transformer: The AnimaTransformer instance (must be on device).
+            text_conditionings: List of per-region conditioning data.
+            dtype: Inference dtype.
+
+        Returns:
+            AnimaRegionalTextConditioning with concatenated context and masks.
+        """
+        context_embeds_list: list[torch.Tensor] = []
+        context_ranges: list[Range] = []
+        image_masks: list[torch.Tensor | None] = []
+        cur_len = 0
+
+        for tc in text_conditionings:
+            qwen3_embeds = tc.qwen3_embeds.unsqueeze(0)  # (1, seq_len, 1024)
+            t5xxl_ids = tc.t5xxl_ids.unsqueeze(0)  # (1, seq_len)
+            t5xxl_weights = None
+            if tc.t5xxl_weights is not None:
+                t5xxl_weights = tc.t5xxl_weights.unsqueeze(0).unsqueeze(-1)  # (1, seq_len, 1)
+
+            # Run the LLM Adapter to produce context for this region
+            context = transformer.preprocess_text_embeds(
+                qwen3_embeds.to(dtype=dtype),
+                t5xxl_ids,
+                t5xxl_weights=t5xxl_weights.to(dtype=dtype) if t5xxl_weights is not None else None,
+            )
+            # context shape: (1, 512, 1024) — squeeze batch dim
+            context_2d = context.squeeze(0)  # (512, 1024)
+
+            context_embeds_list.append(context_2d)
+            context_ranges.append(Range(start=cur_len, end=cur_len + context_2d.shape[0]))
+            image_masks.append(tc.mask)
+            cur_len += context_2d.shape[0]
+
+        concatenated_context = torch.cat(context_embeds_list, dim=0)
+
+        return AnimaRegionalTextConditioning(
+            context_embeds=concatenated_context,
+            image_masks=image_masks,
+            context_ranges=context_ranges,
+        )
+
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         device = TorchDevice.choose_torch_device()
         inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
 
         transformer_info = context.models.load(self.transformer.transformer)
 
-        # Load positive conditioning
-        pos_cond = self._load_conditioning(context, self.positive_conditioning, inference_dtype, device)
-        pos_qwen3_embeds = pos_cond.qwen3_embeds.unsqueeze(0)  # Add batch dim: (1, seq_len, 1024)
-        pos_t5xxl_ids = pos_cond.t5xxl_ids.unsqueeze(0)  # Add batch dim: (1, seq_len)
-        pos_t5xxl_weights = None
-        if pos_cond.t5xxl_weights is not None:
-            pos_t5xxl_weights = pos_cond.t5xxl_weights.unsqueeze(0).unsqueeze(-1)  # (1, seq_len, 1)
+        # Compute image token grid dimensions for regional prompting
+        # Anima: 8x VAE compression, 2x patch size → 16x total
+        patch_size = 2
+        latent_height = self.height // ANIMA_LATENT_SCALE_FACTOR
+        latent_width = self.width // ANIMA_LATENT_SCALE_FACTOR
+        img_token_height = latent_height // patch_size
+        img_token_width = latent_width // patch_size
+        img_seq_len = img_token_height * img_token_width
+
+        # Load positive conditioning with optional regional masks
+        pos_text_conditionings = self._load_text_conditionings(
+            context=context,
+            cond_field=self.positive_conditioning,
+            img_token_height=img_token_height,
+            img_token_width=img_token_width,
+            dtype=inference_dtype,
+            device=device,
+        )
+        has_regional = len(pos_text_conditionings) > 1 or any(tc.mask is not None for tc in pos_text_conditionings)
 
         # Load negative conditioning if CFG is enabled
         do_cfg = not math.isclose(self.guidance_scale, 1.0) and self.negative_conditioning is not None
-        neg_qwen3_embeds = None
-        neg_t5xxl_ids = None
-        neg_t5xxl_weights = None
+        neg_text_conditionings: list[AnimaTextConditioning] | None = None
         if do_cfg:
             assert self.negative_conditioning is not None
-            neg_cond = self._load_conditioning(context, self.negative_conditioning, inference_dtype, device)
-            neg_qwen3_embeds = neg_cond.qwen3_embeds.unsqueeze(0)
-            neg_t5xxl_ids = neg_cond.t5xxl_ids.unsqueeze(0)
-            if neg_cond.t5xxl_weights is not None:
-                neg_t5xxl_weights = neg_cond.t5xxl_weights.unsqueeze(0).unsqueeze(-1)
+            neg_text_conditionings = self._load_text_conditionings(
+                context=context,
+                cond_field=self.negative_conditioning,
+                img_token_height=img_token_height,
+                img_token_width=img_token_width,
+                dtype=inference_dtype,
+                device=device,
+            )
 
         # Generate sigma schedule
         sigmas = self._get_sigmas(self.steps)
@@ -339,7 +453,6 @@ class AnimaDenoiseInvocation(BaseInvocation):
         # Prepare input latents
         if init_latents is not None:
             if self.add_noise:
-                # Noise the init_latents for img2img: latents = s_0 * noise + (1 - s_0) * init_latents
                 s_0 = sigmas[0]
                 latents = s_0 * noise + (1.0 - s_0) * init_latents
             else:
@@ -350,12 +463,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
             latents = noise
 
         if total_steps <= 0:
-            return latents.squeeze(2)  # Remove temporal dim for output
+            return latents.squeeze(2)
 
-        # Prepare inpaint extension (operates on squeezed 4D latents)
-        # Uses AnimaInpaintExtension which corrects for the time-SNR shift:
-        # - Linear t for gradient mask thresholding (correct progressive reveal)
-        # - Shifted sigma for noise mixing (matches denoiser's noise level)
+        # Prepare inpaint extension
         inpaint_mask = self._prep_inpaint_mask(context, latents.squeeze(2))
         inpaint_extension: AnimaInpaintExtension | None = None
         if inpaint_mask is not None:
@@ -390,6 +500,70 @@ class AnimaDenoiseInvocation(BaseInvocation):
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
 
+            # Run LLM Adapter for each regional conditioning to produce context vectors.
+            # This must happen with the transformer on device since it uses the adapter weights.
+            if has_regional:
+                pos_regional = self._run_llm_adapter_for_regions(transformer, pos_text_conditionings, inference_dtype)
+                pos_context = pos_regional.context_embeds.unsqueeze(0)  # (1, total_ctx_len, 1024)
+
+                # Build regional prompting extension with cross-attention mask
+                regional_extension = AnimaRegionalPromptingExtension.from_regional_conditioning(
+                    pos_regional, img_seq_len
+                )
+
+                # For negative, concatenate all regions without masking (matches Z-Image behavior)
+                neg_context = None
+                if do_cfg and neg_text_conditionings is not None:
+                    neg_regional = self._run_llm_adapter_for_regions(
+                        transformer, neg_text_conditionings, inference_dtype
+                    )
+                    neg_context = neg_regional.context_embeds.unsqueeze(0)
+            else:
+                # Single conditioning — run LLM Adapter via normal forward path
+                tc = pos_text_conditionings[0]
+                pos_qwen3_embeds = tc.qwen3_embeds.unsqueeze(0)
+                pos_t5xxl_ids = tc.t5xxl_ids.unsqueeze(0)
+                pos_t5xxl_weights = None
+                if tc.t5xxl_weights is not None:
+                    pos_t5xxl_weights = tc.t5xxl_weights.unsqueeze(0).unsqueeze(-1)
+
+                # Pre-compute context via LLM Adapter
+                pos_context = transformer.preprocess_text_embeds(
+                    pos_qwen3_embeds.to(dtype=inference_dtype),
+                    pos_t5xxl_ids,
+                    t5xxl_weights=pos_t5xxl_weights.to(dtype=inference_dtype) if pos_t5xxl_weights is not None else None,
+                )
+
+                neg_context = None
+                if do_cfg and neg_text_conditionings is not None:
+                    ntc = neg_text_conditionings[0]
+                    neg_qwen3 = ntc.qwen3_embeds.unsqueeze(0)
+                    neg_ids = ntc.t5xxl_ids.unsqueeze(0)
+                    neg_weights = None
+                    if ntc.t5xxl_weights is not None:
+                        neg_weights = ntc.t5xxl_weights.unsqueeze(0).unsqueeze(-1)
+                    neg_context = transformer.preprocess_text_embeds(
+                        neg_qwen3.to(dtype=inference_dtype),
+                        neg_ids,
+                        t5xxl_weights=neg_weights.to(dtype=inference_dtype) if neg_weights is not None else None,
+                    )
+
+                regional_extension = None
+
+            # Apply regional prompting patch if we have regional masks
+            exit_stack.enter_context(
+                patch_anima_for_regional_prompting(transformer, regional_extension)
+            )
+
+            # Helper to run transformer with pre-computed context (bypasses LLM Adapter)
+            def _run_transformer(ctx: torch.Tensor) -> torch.Tensor:
+                return transformer(
+                    x=latents.to(transformer.dtype if hasattr(transformer, 'dtype') else inference_dtype),
+                    timesteps=timestep,
+                    context=ctx,
+                    # t5xxl_ids=None skips the LLM Adapter — context is already pre-computed
+                )
+
             if use_scheduler and scheduler is not None:
                 # Scheduler-based denoising
                 user_step = 0
@@ -401,31 +575,14 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     is_heun = hasattr(scheduler, "state_in_first_order")
                     in_first_order = scheduler.state_in_first_order if is_heun else True
 
-                    # Anima timestep convention: timestep = sigma * multiplier (1.0)
                     timestep = torch.tensor(
                         [sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
                     ).expand(latents.shape[0])
 
-                    # Run transformer (positive)
-                    model_output = transformer(
-                        x=latents.to(transformer.dtype if hasattr(transformer, 'dtype') else inference_dtype),
-                        timesteps=timestep,
-                        context=pos_qwen3_embeds,
-                        t5xxl_ids=pos_t5xxl_ids,
-                        t5xxl_weights=pos_t5xxl_weights,
-                    )
-                    noise_pred_cond = model_output.float()
+                    noise_pred_cond = _run_transformer(pos_context).float()
 
-                    # Apply CFG
-                    if do_cfg and neg_qwen3_embeds is not None:
-                        model_output_uncond = transformer(
-                            x=latents.to(transformer.dtype if hasattr(transformer, 'dtype') else inference_dtype),
-                            timesteps=timestep,
-                            context=neg_qwen3_embeds,
-                            t5xxl_ids=neg_t5xxl_ids,
-                            t5xxl_weights=neg_t5xxl_weights,
-                        )
-                        noise_pred_uncond = model_output_uncond.float()
+                    if do_cfg and neg_context is not None:
+                        noise_pred_uncond = _run_transformer(neg_context).float()
                         noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
                     else:
                         noise_pred = noise_pred_cond
@@ -433,7 +590,6 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     step_output = scheduler.step(model_output=noise_pred, timestep=sched_timestep, sample=latents)
                     latents = step_output.prev_sample
 
-                    # Get sigma_prev for inpainting
                     if step_index + 1 < len(scheduler.sigmas):
                         sigma_prev = scheduler.sigmas[step_index + 1].item()
                     else:
@@ -470,38 +626,18 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     sigma_curr = sigmas[step_idx]
                     sigma_prev = sigmas[step_idx + 1]
 
-                    # Anima timestep: sigma * multiplier (1.0 = raw sigma)
                     timestep = torch.tensor(
                         [sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
                     ).expand(latents.shape[0])
 
-                    # Run transformer (positive)
-                    model_output = transformer(
-                        x=latents.to(transformer.dtype if hasattr(transformer, 'dtype') else inference_dtype),
-                        timesteps=timestep,
-                        context=pos_qwen3_embeds,
-                        t5xxl_ids=pos_t5xxl_ids,
-                        t5xxl_weights=pos_t5xxl_weights,
-                    )
+                    noise_pred_cond = _run_transformer(pos_context).float()
 
-                    # CONST model: noise_pred = model_output (NO negation, unlike Z-Image v-pred)
-                    noise_pred_cond = model_output.float()
-
-                    # Apply CFG
-                    if do_cfg and neg_qwen3_embeds is not None:
-                        model_output_uncond = transformer(
-                            x=latents.to(transformer.dtype if hasattr(transformer, 'dtype') else inference_dtype),
-                            timesteps=timestep,
-                            context=neg_qwen3_embeds,
-                            t5xxl_ids=neg_t5xxl_ids,
-                            t5xxl_weights=neg_t5xxl_weights,
-                        )
-                        noise_pred_uncond = model_output_uncond.float()
+                    if do_cfg and neg_context is not None:
+                        noise_pred_uncond = _run_transformer(neg_context).float()
                         noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
                     else:
                         noise_pred = noise_pred_cond
 
-                    # Euler step: x_{t-1} = x_t + (sigma_{t-1} - sigma_t) * model_output
                     latents_dtype = latents.dtype
                     latents = latents.to(dtype=torch.float32)
                     latents = latents + (sigma_prev - sigma_curr) * noise_pred
@@ -520,7 +656,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
                             order=1,
                             total_steps=total_steps,
                             timestep=int(sigma_curr * 1000),
-                            latents=latents.squeeze(2),  # Remove temporal dim for preview
+                            latents=latents.squeeze(2),
                         ),
                     )
 

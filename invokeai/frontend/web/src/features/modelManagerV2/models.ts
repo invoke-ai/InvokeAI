@@ -143,7 +143,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   flux2: 'gold',
   cogview4: 'red',
   'z-image': 'cyan',
-  anima: 'pink',
+  anima: 'invokePurple',
   unknown: 'red',
 };
 

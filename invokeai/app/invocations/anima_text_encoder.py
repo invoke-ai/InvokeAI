@@ -24,6 +24,7 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
     InputField,
+    TensorField,
     UIComponent,
 )
 from invokeai.app.invocations.model import Qwen3EncoderField
@@ -51,7 +52,7 @@ T5_TOKENIZER_NAME = "google/t5-v1_1-xxl"
     title="Prompt - Anima",
     tags=["prompt", "conditioning", "anima"],
     category="conditioning",
-    version="1.0.1",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class AnimaTextEncoderInvocation(BaseInvocation):
@@ -67,6 +68,10 @@ class AnimaTextEncoderInvocation(BaseInvocation):
         title="Qwen3 Encoder",
         description=FieldDescriptions.qwen3_encoder,
         input=Input.Connection,
+    )
+    mask: TensorField | None = InputField(
+        default=None,
+        description="A mask defining the region that this conditioning prompt applies to.",
     )
 
     @torch.no_grad()
@@ -89,7 +94,7 @@ class AnimaTextEncoderInvocation(BaseInvocation):
         )
         conditioning_name = context.conditioning.save(conditioning_data)
         return AnimaConditioningOutput(
-            conditioning=AnimaConditioningField(conditioning_name=conditioning_name)
+            conditioning=AnimaConditioningField(conditioning_name=conditioning_name, mask=self.mask)
         )
 
     def _encode_prompt(
