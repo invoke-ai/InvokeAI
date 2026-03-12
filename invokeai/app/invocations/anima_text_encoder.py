@@ -14,6 +14,7 @@ Key differences from Z-Image text encoder:
 """
 
 from contextlib import ExitStack
+from typing import Iterator, Tuple
 
 import torch
 from transformers import PreTrainedModel, PreTrainedTokenizerBase, T5TokenizerFast
@@ -30,15 +31,14 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import AnimaConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_QWEN3_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     AnimaConditioningInfo,
     ConditioningFieldData,
 )
-
-# Qwen3 max sequence length — ComfyUI's SDClipModel uses max_length=77 for Qwen3.
-# We match this to ensure the LLM Adapter's cross-attention sees the same number of
-# source positions (including padding) as during training.
-QWEN3_MAX_SEQ_LEN = 77
+from invokeai.backend.util.devices import TorchDevice
 
 # T5-XXL max sequence length for token IDs
 T5_MAX_SEQ_LEN = 512
@@ -122,6 +122,17 @@ class AnimaTextEncoderInvocation(BaseInvocation):
 
             device = text_encoder.device
 
+            # Apply LoRA models to the text encoder
+            lora_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=text_encoder,
+                    patches=self._lora_iterator(context),
+                    prefix=ANIMA_LORA_QWEN3_PREFIX,
+                    dtype=lora_dtype,
+                )
+            )
+
             if not isinstance(text_encoder, PreTrainedModel):
                 raise TypeError(
                     f"Expected PreTrainedModel for text encoder, got {type(text_encoder).__name__}."
@@ -133,13 +144,13 @@ class AnimaTextEncoderInvocation(BaseInvocation):
 
             context.util.signal_progress("Running Qwen3 0.6B text encoder")
 
-            # Anima uses base Qwen3 (not instruct) — tokenize directly, no chat template
-            # ComfyUI uses max_length=77 (SDClipModel default) for Qwen3
+            # Anima uses base Qwen3 (not instruct) — tokenize directly, no chat template.
+            # No padding or truncation: the LLM Adapter uses rotary position embeddings
+            # with no fixed positional limit, so the Qwen3 source sequence can be any length.
             text_inputs = tokenizer(
                 prompt,
-                padding="max_length",
-                max_length=QWEN3_MAX_SEQ_LEN,
-                truncation=True,
+                padding=False,
+                truncation=False,
                 return_attention_mask=True,
                 return_tensors="pt",
             )
@@ -149,20 +160,13 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             if not isinstance(text_input_ids, torch.Tensor) or not isinstance(attention_mask, torch.Tensor):
                 raise TypeError("Tokenizer returned unexpected types.")
 
-            # Check for truncation
-            untruncated_ids = tokenizer(prompt, padding="longest", return_tensors="pt").input_ids
-            if untruncated_ids.shape[-1] >= text_input_ids.shape[-1] and not torch.equal(
-                text_input_ids, untruncated_ids
-            ):
-                removed_text = tokenizer.batch_decode(untruncated_ids[:, QWEN3_MAX_SEQ_LEN - 1 : -1])
-                context.logger.warning(
-                    f"Prompt truncated at {QWEN3_MAX_SEQ_LEN} tokens. Removed: {removed_text}"
-                )
+            # Ensure at least 1 token (empty prompts produce 0 tokens with padding=False)
+            if text_input_ids.shape[-1] == 0:
+                pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else tokenizer.eos_token_id
+                text_input_ids = torch.tensor([[pad_id]])
+                attention_mask = torch.tensor([[1]])
 
             # Get last hidden state from Qwen3 (ComfyUI uses layer="last")
-            # Pass attention mask so padding tokens don't attend to each other,
-            # but keep ALL positions in the output (including padding) to match
-            # ComfyUI's SDClipModel which returns full padded sequences.
             prompt_mask = attention_mask.to(device).bool()
             outputs = text_encoder(
                 text_input_ids.to(device),
@@ -175,9 +179,8 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             if len(outputs.hidden_states) < 1:
                 raise RuntimeError(f"Expected at least 1 hidden state, got {len(outputs.hidden_states)}.")
 
-            # Use last hidden state — keep all positions (including padding)
-            # ComfyUI's SDClipModel returns all positions without filtering.
-            qwen3_embeds = outputs.hidden_states[-1][0]  # Shape: (QWEN3_MAX_SEQ_LEN, 1024)
+            # Use last hidden state — only real tokens, no padding
+            qwen3_embeds = outputs.hidden_states[-1][0]  # Shape: (seq_len, 1024)
 
         # --- Step 2: Tokenize with T5-XXL tokenizer (IDs only, no model) ---
         context.util.signal_progress("Tokenizing with T5-XXL")
@@ -192,3 +195,15 @@ class AnimaTextEncoderInvocation(BaseInvocation):
         t5xxl_ids = t5_tokens.input_ids[0]  # Shape: (seq_len,)
 
         return qwen3_embeds, t5xxl_ids, None
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+        """Iterate over LoRA models to apply to the Qwen3 text encoder."""
+        for lora in self.qwen3_encoder.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
+                    "The LoRA model may be corrupted or incompatible."
+                )
+            yield (lora_info.model, lora.weight)
+            del lora_info

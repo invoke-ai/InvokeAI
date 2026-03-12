@@ -51,6 +51,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
     LoRA_LyCORIS_SDXL_Config,
+    LoRA_LyCORIS_Anima_Config,
     LoRA_LyCORIS_ZImage_Config,
     LoRA_OMI_FLUX_Config,
     LoRA_OMI_SDXL_Config,
@@ -211,6 +212,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_Flux2_Config, LoRA_LyCORIS_Flux2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_FLUX_Config, LoRA_LyCORIS_FLUX_Config.get_tag()],
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
+        Annotated[LoRA_LyCORIS_Anima_Config, LoRA_LyCORIS_Anima_Config.get_tag()],
         # LoRA - OMI format
         Annotated[LoRA_OMI_SDXL_Config, LoRA_OMI_SDXL_Config.get_tag()],
         Annotated[LoRA_OMI_FLUX_Config, LoRA_OMI_FLUX_Config.get_tag()],

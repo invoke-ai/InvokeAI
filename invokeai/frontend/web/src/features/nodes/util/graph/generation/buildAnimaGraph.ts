@@ -9,6 +9,7 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { addAnimaLoRAs } from 'features/nodes/util/graph/generation/addAnimaLoRAs';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -170,6 +171,9 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
 
   // IP Adapters are not supported for Anima, so delete the unused collector
   g.deleteNode(ipAdapterCollect.id);
+
+  // Add LoRAs
+  addAnimaLoRAs(state, g, denoise, modelLoader, posCond, negCond);
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 

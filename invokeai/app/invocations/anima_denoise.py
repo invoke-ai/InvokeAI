@@ -19,7 +19,7 @@ Key differences from Z-Image denoise:
 import inspect
 import math
 from contextlib import ExitStack
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional, Tuple
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -44,6 +44,9 @@ from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioni
 from invokeai.backend.anima.regional_prompting import AnimaRegionalPromptingExtension
 from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_LABELS, ANIMA_SCHEDULER_MAP, ANIMA_SCHEDULER_NAME_VALUES
 from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
     RectifiedFlowInpaintExtension,
     assert_broadcastable,
@@ -500,6 +503,18 @@ class AnimaDenoiseInvocation(BaseInvocation):
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
 
+            # Apply LoRA models to the transformer.
+            # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=transformer,
+                    patches=self._lora_iterator(context),
+                    prefix=ANIMA_LORA_TRANSFORMER_PREFIX,
+                    dtype=inference_dtype,
+                    cached_weights=cached_weights,
+                )
+            )
+
             # Run LLM Adapter for each regional conditioning to produce context vectors.
             # This must happen with the transformer on device since it uses the adapter weights.
             if has_regional:
@@ -668,3 +683,15 @@ class AnimaDenoiseInvocation(BaseInvocation):
             context.util.sd_step_callback(state, BaseModelType.Anima)
 
         return step_callback
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+        """Iterate over LoRA models to apply to the transformer."""
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
+                    "The LoRA model may be corrupted or incompatible."
+                )
+            yield (lora_info.model, lora.weight)
+            del lora_info

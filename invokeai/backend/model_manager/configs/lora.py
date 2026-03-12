@@ -757,6 +757,88 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         raise NotAMatchError("model does not look like a Z-Image LoRA")
 
 
+class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Anima LoRA models in LyCORIS format."""
+
+    base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Anima LoRAs use Kohya-style keys targeting Cosmos DiT blocks.
+
+        Anima LoRAs have keys like:
+        - lora_unet_blocks_0_cross_attn_k_proj.lora_down.weight (Kohya format)
+        - diffusion_model.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
+        - transformer.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
+        """
+        state_dict = mod.load_state_dict()
+
+        # Check for Kohya-style Anima LoRA keys
+        has_kohya_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "lora_unet_blocks_",
+            },
+        )
+
+        # Check for diffusers PEFT format with Cosmos DiT layer names
+        has_cosmos_dit_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "diffusion_model.blocks.",
+                "transformer.blocks.",
+                "base_model.model.transformer.blocks.",
+            },
+        )
+
+        # Also check for LoRA/LoKR weight suffixes
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+                "dora_scale",
+                ".lokr_w1",
+                ".lokr_w2",
+            },
+        )
+
+        if (has_kohya_keys or has_cosmos_dit_keys) and has_lora_suffix:
+            return
+
+        raise NotAMatchError("model does not match Anima LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        """Anima LoRAs target Cosmos DiT blocks (blocks.X.cross_attn, blocks.X.self_attn, etc.)."""
+        state_dict = mod.load_state_dict()
+
+        # Kohya format: lora_unet_blocks_X_...
+        has_kohya_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "lora_unet_blocks_",
+            },
+        )
+
+        # Diffusers PEFT format with Cosmos DiT structure
+        has_cosmos_dit_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "diffusion_model.blocks.",
+                "transformer.blocks.",
+                "base_model.model.transformer.blocks.",
+            },
+        )
+
+        if has_kohya_keys or has_cosmos_dit_keys:
+            return BaseModelType.Anima
+
+        raise NotAMatchError("model does not look like an Anima LoRA")
+
+
 class ControlAdapter_Config_Base(ABC, BaseModel):
     default_settings: ControlAdapterDefaultSettings | None = Field(None)
 
