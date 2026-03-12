@@ -7,8 +7,11 @@ import Loading from 'common/components/Loading/Loading';
 import { AdministratorSetup } from 'features/auth/components/AdministratorSetup';
 import { LoginPage } from 'features/auth/components/LoginPage';
 import { ProtectedRoute } from 'features/auth/components/ProtectedRoute';
+import { UserManagement } from 'features/auth/components/UserManagement';
+import { UserProfile } from 'features/auth/components/UserProfile';
 import { AppContent } from 'features/ui/components/AppContent';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
+import type { ReactNode } from 'react';
 import { memo, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { Route, Routes, useNavigate } from 'react-router-dom';
@@ -67,6 +70,13 @@ const SetupChecker = () => {
   return null;
 };
 
+/** Full-page wrapper for user management / profile pages rendered inside the protected area */
+const FullPageWrapper = ({ children }: { children: ReactNode }) => (
+  <Box w="100dvw" h="100dvh" overflowY="auto" bg="base.900">
+    {children}
+  </Box>
+);
+
 const App = () => {
   return (
     <ThemeLocaleProvider>
@@ -75,6 +85,26 @@ const App = () => {
           <Route path="/" element={<SetupChecker />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/setup" element={<AdministratorSetup />} />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <FullPageWrapper>
+                  <UserProfile />
+                </FullPageWrapper>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/users"
+            element={
+              <ProtectedRoute requireAdmin>
+                <FullPageWrapper>
+                  <UserManagement />
+                </FullPageWrapper>
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/*"
             element={

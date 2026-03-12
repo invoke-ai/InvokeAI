@@ -117,6 +117,7 @@ class InvokeAIAppConfig(BaseSettings):
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
         external_openai_base_url: Base URL override for OpenAI image generation.
+        strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
@@ -212,6 +213,7 @@ class InvokeAIAppConfig(BaseSettings):
 
     # MULTIUSER
     multiuser:                     bool = Field(default=False,              description="Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.")
+    strict_password_checking:      bool = Field(default=False,              description="Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.")
 
     # EXTERNAL PROVIDERS
     external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
