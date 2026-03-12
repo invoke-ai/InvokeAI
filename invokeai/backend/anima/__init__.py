@@ -1,4 +1,4 @@
-# Copyright (c) 2024, Thhe InvokeAI Development Team
+# Copyright (c) 2024, The InvokeAI Development Team
 """Anima model backend module.
 
 Anima is a 2B-parameter anime-focused text-to-image model built on NVIDIA's

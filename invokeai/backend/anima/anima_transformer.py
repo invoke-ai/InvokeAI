@@ -1,19 +1,16 @@
 """Anima transformer model: Cosmos Predict2 MiniTrainDIT + LLM Adapter.
 
-Ported from the ComfyUI implementation:
-- comfy/ldm/cosmos/predict2.py (MiniTrainDIT backbone)
-- comfy/ldm/anima/model.py (LLMAdapter + Anima wrapper)
-
 The Anima architecture combines:
 1. MiniTrainDIT: A Cosmos Predict2 DiT backbone with 28 blocks, 2048-dim hidden state,
    and 3D RoPE positional embeddings.
 2. LLMAdapter: A 6-layer cross-attention transformer that fuses Qwen3 0.6B hidden states
    with learned T5-XXL token embeddings to produce conditioning for the DiT.
 
-References:
-- https://github.com/comfyanonymous/ComfyUI/blob/master/comfy/ldm/cosmos/predict2.py
-- https://github.com/comfyanonymous/ComfyUI/blob/master/comfy/ldm/anima/model.py
-- https://github.com/nvidia-cosmos/cosmos-predict2
+Original source code:
+- MiniTrainDIT backbone and positional embeddings: https://github.com/nvidia-cosmos/cosmos-predict2
+  SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  SPDX-License-Identifier: Apache-2.0
+- LLMAdapter and Anima wrapper: https://github.com/comfyanonymous/ComfyUI/blob/master/comfy/ldm/anima/model.py
 """
 
 import logging
@@ -30,7 +27,9 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
-# Positional Embeddings (from comfy/ldm/cosmos/position_embedding.py)
+# Positional Embeddings
+# Original source: https://github.com/nvidia-cosmos/cosmos-predict2
+# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. Apache-2.0
 # ============================================================================
 
 
@@ -195,7 +194,9 @@ class LearnablePosEmbAxis(nn.Module):
 
 
 # ============================================================================
-# Cosmos Predict2 MiniTrainDIT (from comfy/ldm/cosmos/predict2.py)
+# Cosmos Predict2 MiniTrainDIT
+# Original source: https://github.com/nvidia-cosmos/cosmos-predict2
+# Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. Apache-2.0
 # ============================================================================
 
 
@@ -740,7 +741,8 @@ class MiniTrainDIT(nn.Module):
 
 
 # ============================================================================
-# LLM Adapter (from comfy/ldm/anima/model.py)
+# LLM Adapter
+# Source: https://github.com/comfyanonymous/ComfyUI/blob/master/comfy/ldm/anima/model.py
 # ============================================================================
 
 
@@ -979,7 +981,8 @@ class LLMAdapter(nn.Module):
 
 
 # ============================================================================
-# Anima: MiniTrainDIT + LLMAdapter (from comfy/ldm/anima/model.py)
+# Anima: MiniTrainDIT + LLMAdapter
+# Source: https://github.com/comfyanonymous/ComfyUI/blob/master/comfy/ldm/anima/model.py
 # ============================================================================
 
 
