@@ -10,7 +10,7 @@ import type { CanvasEntityIdentifier, CompositeOperation } from 'features/contro
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CgPathBack, CgPathExclude, CgPathFront, CgPathIntersect } from 'react-icons/cg';
-import { PiCopyFill } from 'react-icons/pi';
+import { PiIntersectSquareBold } from 'react-icons/pi';
 
 export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
   const { t } = useTranslation();
@@ -49,7 +49,7 @@ export const RasterLayerMenuItemsBooleanSubMenu = memo(() => {
   const disabled = isBusy || !entityIdentifierBelowThisOne;
 
   return (
-    <MenuItem {...subMenu.parentMenuItemProps} isDisabled={disabled} icon={<PiCopyFill />}>
+    <MenuItem {...subMenu.parentMenuItemProps} isDisabled={disabled} icon={<PiIntersectSquareBold />}>
       <Menu {...subMenu.menuProps}>
         <MenuButton {...subMenu.menuButtonProps}>
           <SubMenuButtonContent label={t('controlLayers.booleanOps.label')} />
