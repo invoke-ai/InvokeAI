@@ -4,6 +4,8 @@ import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/c
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
 import {
+  animaQwen3EncoderModelSelected,
+  animaVaeModelSelected,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
   modelChanged,
@@ -39,6 +41,7 @@ import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import {
+  selectAnimaVAEModels,
   selectFluxVAEModels,
   selectGlobalRefImageModels,
   selectQwen3EncoderModels,
@@ -150,6 +153,53 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                     })
                   );
                 }
+              }
+            }
+          }
+        }
+
+        // handle incompatible Anima models - clear if switching away from anima
+        const { animaVaeModel, animaQwen3EncoderModel } = state.params;
+        if (newBase !== 'anima') {
+          if (animaVaeModel) {
+            dispatch(animaVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (animaQwen3EncoderModel) {
+            dispatch(animaQwen3EncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+        } else {
+          // Switching to Anima - set defaults if no valid configuration exists
+          const hasValidConfig = animaVaeModel && animaQwen3EncoderModel;
+
+          if (!hasValidConfig) {
+            const availableQwen3Encoders = selectQwen3EncoderModels(state);
+            const availableAnimaVAEs = selectAnimaVAEModels(state);
+
+            if (availableQwen3Encoders.length > 0 && availableAnimaVAEs.length > 0) {
+              const qwen3Encoder = availableQwen3Encoders[0];
+              const fluxVAE = availableAnimaVAEs[0];
+
+              if (qwen3Encoder && !animaQwen3EncoderModel) {
+                dispatch(
+                  animaQwen3EncoderModelSelected({
+                    key: qwen3Encoder.key,
+                    name: qwen3Encoder.name,
+                    base: qwen3Encoder.base,
+                  })
+                );
+              }
+              if (fluxVAE && !animaVaeModel) {
+                dispatch(
+                  animaVaeModelSelected({
+                    key: fluxVAE.key,
+                    hash: fluxVAE.hash,
+                    name: fluxVAE.name,
+                    base: fluxVAE.base,
+                    type: fluxVAE.type,
+                  })
+                );
               }
             }
           }

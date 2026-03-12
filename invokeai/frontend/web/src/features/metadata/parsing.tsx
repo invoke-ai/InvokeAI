@@ -8,6 +8,8 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { bboxHeightChanged, bboxWidthChanged, canvasMetadataRecalled } from 'features/controlLayers/store/canvasSlice';
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
+  animaQwen3EncoderModelSelected,
+  animaVaeModelSelected,
   heightChanged,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
@@ -15,6 +17,7 @@ import {
   positivePromptChanged,
   refinerModelChanged,
   selectBase,
+  setAnimaScheduler,
   setCfgRescaleMultiplier,
   setCfgScale,
   setClipSkip,
@@ -470,6 +473,11 @@ const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
       // Z-Image supports euler, heun, lcm (but LCM only works well with Turbo, not Base)
       if (value === 'euler' || value === 'heun' || value === 'lcm') {
         store.dispatch(setZImageScheduler(value));
+      }
+    } else if (base === 'anima') {
+      // Anima supports euler, heun, lcm
+      if (value === 'euler' || value === 'heun' || value === 'lcm') {
+        store.dispatch(setAnimaScheduler(value));
       }
     } else {
       // SD, SDXL, SD3, CogView4, etc. use the general scheduler
@@ -933,6 +941,52 @@ const ZImageQwen3SourceModel: SingleMetadataHandler<ModelIdentifierField> = {
 };
 //#endregion ZImageQwen3SourceModel
 
+//#region AnimaVAEModel
+const AnimaVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'AnimaVAEModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'vae');
+    const parsed = await parseModelIdentifier(raw, store, 'vae');
+    assert(parsed.type === 'vae');
+    const base = selectBase(store.getState());
+    assert(base === 'anima', 'AnimaVAEModel handler only works with Anima models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(animaVaeModelSelected(value));
+  },
+  i18nKey: 'metadata.vae',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion AnimaVAEModel
+
+//#region AnimaQwen3EncoderModel
+const AnimaQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'AnimaQwen3EncoderModel',
+  parse: async (metadata, store) => {
+    const raw = getProperty(metadata, 'qwen3_encoder');
+    const parsed = await parseModelIdentifier(raw, store, 'qwen3_encoder');
+    assert(parsed.type === 'qwen3_encoder');
+    const base = selectBase(store.getState());
+    assert(base === 'anima', 'AnimaQwen3EncoderModel handler only works with Anima models');
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(animaQwen3EncoderModelSelected(value));
+  },
+  i18nKey: 'metadata.qwen3Encoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+//#endregion AnimaQwen3EncoderModel
+
 //#region KleinVAEModel
 const KleinVAEModel: SingleMetadataHandler<ModelIdentifierField> = {
   [SingleMetadataKey]: true,
@@ -1228,6 +1282,8 @@ export const ImageMetadataHandlers = {
   Qwen3EncoderModel,
   ZImageVAEModel,
   ZImageQwen3SourceModel,
+  AnimaVAEModel,
+  AnimaQwen3EncoderModel,
   KleinVAEModel,
   KleinQwen3EncoderModel,
   ZImageSeedVarianceEnabled,

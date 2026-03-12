@@ -11,6 +11,7 @@ import {
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isAnimaVAEModelConfig,
   isCLIPEmbedModelConfigOrSubmodel,
   isControlLayerModelConfig,
   isControlNetModelConfig,
@@ -68,6 +69,7 @@ export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
 export const useVAEModels = () => buildModelsHook(isVAEModelConfigOrSubmodel)();
 export const useFlux1VAEModels = () => buildModelsHook(isFlux1VAEModelConfig)();
 export const useFlux2VAEModels = () => buildModelsHook(isFlux2VAEModelConfig)();
+export const useAnimaVAEModels = () => buildModelsHook(isAnimaVAEModelConfig)();
 export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
@@ -106,3 +108,4 @@ export const selectRegionalRefImageModels = buildModelsSelector(
 export const selectQwen3EncoderModels = buildModelsSelector(isQwen3EncoderModelConfig);
 export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
+export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);

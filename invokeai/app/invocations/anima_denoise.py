@@ -19,15 +19,18 @@ Key differences from Z-Image denoise:
 import inspect
 import math
 from contextlib import ExitStack
-from typing import Callable
+from typing import Callable, Optional
 
 import torch
+import torchvision.transforms as tv_transforms
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
+from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
     AnimaConditioningField,
+    DenoiseMaskField,
     FieldDescriptions,
     Input,
     InputField,
@@ -38,6 +41,10 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_LABELS, ANIMA_SCHEDULER_MAP, ANIMA_SCHEDULER_NAME_VALUES
 from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
+    RectifiedFlowInpaintExtension,
+    assert_broadcastable,
+)
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.util.devices import TorchDevice
@@ -70,12 +77,86 @@ def time_snr_shift(alpha: float, t: float) -> float:
     return alpha * t / (1 + (alpha - 1) * t)
 
 
+def inverse_time_snr_shift(alpha: float, sigma: float) -> float:
+    """Recover linear t from a shifted sigma value.
+
+    Inverse of time_snr_shift: given sigma = alpha * t / (1 + (alpha-1) * t),
+    solve for t = sigma / (alpha - (alpha-1) * sigma).
+
+    This is needed for the inpainting extension, which expects linear t values
+    for gradient mask thresholding. With Anima's shift=3.0, the difference
+    between shifted sigma and linear t is large (e.g. at t=0.5, sigma=0.75),
+    causing overly aggressive mask thresholding if sigma is used directly.
+
+    Args:
+        alpha: Shift factor (3.0 for Anima).
+        sigma: Shifted sigma value in [0, 1].
+
+    Returns:
+        Linear t value in [0, 1].
+    """
+    if alpha == 1.0:
+        return sigma
+    denominator = alpha - (alpha - 1) * sigma
+    if abs(denominator) < 1e-8:
+        return 1.0
+    return sigma / denominator
+
+
+class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
+    """Inpaint extension for Anima that accounts for the time-SNR shift.
+
+    Anima uses a fixed shift=3.0 which makes sigma values significantly larger
+    than the corresponding linear t values. The base RectifiedFlowInpaintExtension
+    uses t_prev for both gradient mask thresholding and noise mixing, which assumes
+    linear t values.
+
+    This subclass:
+    - Uses the LINEAR t for gradient mask thresholding (correct progressive reveal)
+    - Uses the SHIFTED sigma for noise mixing (matches the denoiser's noise level)
+    """
+
+    def __init__(
+        self,
+        init_latents: torch.Tensor,
+        inpaint_mask: torch.Tensor,
+        noise: torch.Tensor,
+        shift: float = ANIMA_SHIFT,
+    ):
+        assert_broadcastable(init_latents.shape, inpaint_mask.shape, noise.shape)
+        self._init_latents = init_latents
+        self._inpaint_mask = inpaint_mask
+        self._noise = noise
+        self._shift = shift
+
+    def merge_intermediate_latents_with_init_latents(
+        self, intermediate_latents: torch.Tensor, sigma_prev: float
+    ) -> torch.Tensor:
+        """Merge intermediate latents with init latents, correcting for Anima's shift.
+
+        Args:
+            intermediate_latents: The denoised latents at the current step.
+            sigma_prev: The SHIFTED sigma value for the next step.
+        """
+        # Recover linear t from shifted sigma for gradient mask thresholding.
+        # This ensures the gradient mask is revealed at the correct pace.
+        t_prev = inverse_time_snr_shift(self._shift, sigma_prev)
+        mask = self._apply_mask_gradient_adjustment(t_prev)
+
+        # Use shifted sigma for noise mixing to match the denoiser's noise level.
+        # The Euler step produces latents at noise level sigma_prev, so the
+        # preserved regions must also be at sigma_prev noise level.
+        noised_init_latents = self._noise * sigma_prev + (1.0 - sigma_prev) * self._init_latents
+
+        return intermediate_latents * mask + noised_init_latents * (1.0 - mask)
+
+
 @invocation(
     "anima_denoise",
     title="Denoise - Anima",
     tags=["image", "anima"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseInvocation(BaseInvocation):
@@ -83,8 +164,21 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
     Uses rectified flow sampling with shift=3.0 and the Cosmos Predict2 DiT
     backbone with integrated LLM Adapter for text conditioning.
+
+    Supports txt2img, img2img (via latents input), and inpainting (via denoise_mask).
     """
 
+    # If latents is provided, this means we are doing image-to-image.
+    latents: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
+    # denoise_mask is used for inpainting. Only the masked region is modified.
+    denoise_mask: Optional[DenoiseMaskField] = InputField(
+        default=None, description=FieldDescriptions.denoise_mask, input=Input.Connection
+    )
+    denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
+    denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
+    add_noise: bool = InputField(default=True, description="Add noise based on denoising start.")
     transformer: TransformerField = InputField(
         description="Anima transformer model.", input=Input.Connection, title="Transformer"
     )
@@ -116,6 +210,30 @@ class AnimaDenoiseInvocation(BaseInvocation):
         latents = latents.detach().to("cpu")
         name = context.tensors.save(tensor=latents)
         return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+
+    def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
+        """Prepare the inpaint mask for Anima.
+
+        Anima uses 3D latents [B, C, T, H, W] internally but the mask operates
+        on the spatial dimensions [B, C, H, W] which match the squeezed output.
+        """
+        if self.denoise_mask is None:
+            return None
+        mask = context.tensors.load(self.denoise_mask.mask_name)
+
+        # Invert mask: 0.0 = regions to denoise, 1.0 = regions to preserve
+        mask = 1.0 - mask
+
+        _, _, latent_height, latent_width = latents.shape
+        mask = tv_resize(
+            img=mask,
+            size=[latent_height, latent_width],
+            interpolation=tv_transforms.InterpolationMode.BILINEAR,
+            antialias=False,
+        )
+
+        mask = mask.to(device=latents.device, dtype=latents.dtype)
+        return mask
 
     def _get_noise(
         self,
@@ -197,13 +315,58 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         # Generate sigma schedule
         sigmas = self._get_sigmas(self.steps)
+
+        # Apply denoising_start and denoising_end clipping (for img2img/inpaint)
+        if self.denoising_start > 0 or self.denoising_end < 1:
+            total_sigmas = len(sigmas)
+            start_idx = int(self.denoising_start * (total_sigmas - 1))
+            end_idx = int(self.denoising_end * (total_sigmas - 1)) + 1
+            sigmas = sigmas[start_idx:end_idx]
+
         total_steps = len(sigmas) - 1
 
+        # Load input latents if provided (image-to-image)
+        init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
+        if init_latents is not None:
+            init_latents = init_latents.to(device=device, dtype=inference_dtype)
+            # Anima denoiser works in 3D: add temporal dim if needed
+            if init_latents.ndim == 4:
+                init_latents = init_latents.unsqueeze(2)  # [B, C, H, W] -> [B, C, 1, H, W]
+
         # Generate initial noise (3D latent: [B, C, T, H, W])
-        latents = self._get_noise(self.height, self.width, inference_dtype, device, self.seed)
+        noise = self._get_noise(self.height, self.width, inference_dtype, device, self.seed)
+
+        # Prepare input latents
+        if init_latents is not None:
+            if self.add_noise:
+                # Noise the init_latents for img2img: latents = s_0 * noise + (1 - s_0) * init_latents
+                s_0 = sigmas[0]
+                latents = s_0 * noise + (1.0 - s_0) * init_latents
+            else:
+                latents = init_latents
+        else:
+            if self.denoising_start > 1e-5:
+                raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            latents = noise
 
         if total_steps <= 0:
             return latents.squeeze(2)  # Remove temporal dim for output
+
+        # Prepare inpaint extension (operates on squeezed 4D latents)
+        # Uses AnimaInpaintExtension which corrects for the time-SNR shift:
+        # - Linear t for gradient mask thresholding (correct progressive reveal)
+        # - Shifted sigma for noise mixing (matches denoiser's noise level)
+        inpaint_mask = self._prep_inpaint_mask(context, latents.squeeze(2))
+        inpaint_extension: AnimaInpaintExtension | None = None
+        if inpaint_mask is not None:
+            if init_latents is None:
+                raise ValueError("Initial latents are required when using an inpaint mask (image-to-image inpainting)")
+            inpaint_extension = AnimaInpaintExtension(
+                init_latents=init_latents.squeeze(2),
+                inpaint_mask=inpaint_mask,
+                noise=noise.squeeze(2),
+                shift=ANIMA_SHIFT,
+            )
 
         step_callback = self._build_step_callback(context)
 
@@ -270,6 +433,19 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     step_output = scheduler.step(model_output=noise_pred, timestep=sched_timestep, sample=latents)
                     latents = step_output.prev_sample
 
+                    # Get sigma_prev for inpainting
+                    if step_index + 1 < len(scheduler.sigmas):
+                        sigma_prev = scheduler.sigmas[step_index + 1].item()
+                    else:
+                        sigma_prev = 0.0
+
+                    if inpaint_extension is not None:
+                        latents_4d = latents.squeeze(2)
+                        latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(
+                            latents_4d, sigma_prev
+                        )
+                        latents = latents_4d.unsqueeze(2)
+
                     if is_heun:
                         if not in_first_order:
                             user_step += 1
@@ -330,6 +506,13 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     latents = latents.to(dtype=torch.float32)
                     latents = latents + (sigma_prev - sigma_curr) * noise_pred
                     latents = latents.to(dtype=latents_dtype)
+
+                    if inpaint_extension is not None:
+                        latents_4d = latents.squeeze(2)
+                        latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(
+                            latents_4d, sigma_prev
+                        )
+                        latents = latents_4d.unsqueeze(2)
 
                     step_callback(
                         PipelineIntermediateState(

@@ -500,6 +500,8 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageVaeModel = oldState.zImageVaeModel;
   newState.zImageQwen3EncoderModel = oldState.zImageQwen3EncoderModel;
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
+  newState.animaVaeModel = oldState.animaVaeModel;
+  newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
   return newState;
@@ -576,14 +578,10 @@ export const {
   syncedToOptimalDimension,
 
   paramsReset,
+  animaVaeModelSelected,
+  animaQwen3EncoderModelSelected,
+  setAnimaScheduler,
 } = slice.actions;
-
-/** @knipignore */
-export const animaVaeModelSelected = slice.actions.animaVaeModelSelected;
-/** @knipignore */
-export const animaQwen3EncoderModelSelected = slice.actions.animaQwen3EncoderModelSelected;
-/** @knipignore */
-export const setAnimaScheduler = slice.actions.setAnimaScheduler;
 
 export const paramsSliceConfig: SliceConfig<typeof slice> = {
   slice,
@@ -620,7 +618,6 @@ export const selectIsFLUX = createParamsSelector((params) => params.model?.base 
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
-/** @knipignore */
 export const selectIsAnima = createParamsSelector((params) => params.model?.base === 'anima');
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
 export const selectIsFluxKontext = createParamsSelector((params) => {

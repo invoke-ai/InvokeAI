@@ -1,4 +1,3 @@
-import { objectEquals } from '@observ33r/object-equals';
 import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import {
@@ -10,27 +9,27 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
+import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
+import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
+import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import {
-  getOriginalAndScaledSizesForTextToImage,
-  selectCanvasOutputFields,
-  selectPresetModifiedPrompts,
-} from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
-import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
 import { isNonRefinerMainModelConfig } from 'services/api/types';
+import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const log = logger('system');
 
 export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
-  const { generationMode, state } = arg;
+  const { generationMode, state, manager } = arg;
 
-  log.debug({ generationMode }, 'Building Anima graph');
+  log.debug({ generationMode, manager: manager?.id }, 'Building Anima graph');
 
   const model = selectMainModelConfig(state);
   assert(model, 'No model selected');
@@ -52,15 +51,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   const { cfgScale: guidance_scale, steps } = params;
 
   const prompts = selectPresetModifiedPrompts(state);
-
-  // Anima currently only supports txt2img
-  if (generationMode !== 'txt2img') {
-    throw new UnsupportedGenerationModeError(
-      `Anima does not yet support ${generationMode}. Only txt2img is currently available.`
-    );
-  }
-
-  const { originalSize, scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
 
   const g = new Graph(getPrefixedId('anima_graph'));
 
@@ -100,8 +90,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     id: getPrefixedId('denoise_latents'),
     guidance_scale,
     steps,
-    width: scaledSize.width,
-    height: scaledSize.height,
     scheduler: animaScheduler,
   });
   const l2i = g.addNode({
@@ -137,27 +125,79 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     model: Graph.getModelMetadataField(modelConfig),
     steps,
     scheduler: animaScheduler,
-    width: originalSize.width,
-    height: originalSize.height,
     vae: animaVaeModel ?? undefined,
     qwen3_encoder: animaQwen3EncoderModel ?? undefined,
-    generation_mode: 'txt2img',
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 
-  // Handle output resize if scaled size differs from original
-  let canvasOutput: Invocation<ImageOutputNodes>;
-  if (!objectEquals(scaledSize, originalSize)) {
-    const resizeImageToOriginalSize = g.addNode({
-      id: getPrefixedId('resize_image_to_original_size'),
-      type: 'img_resize',
-      ...originalSize,
+  let canvasOutput: Invocation<ImageOutputNodes> = l2i;
+
+  if (generationMode === 'txt2img') {
+    canvasOutput = addTextToImage({
+      g,
+      state,
+      denoise,
+      l2i,
     });
-    g.addEdge(l2i, 'image', resizeImageToOriginalSize, 'image');
-    canvasOutput = resizeImageToOriginalSize;
+    g.upsertMetadata({ generation_mode: 'anima_txt2img' });
+  } else if (generationMode === 'img2img') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'anima_i2l',
+      id: getPrefixedId('anima_i2l'),
+    });
+
+    canvasOutput = await addImageToImage({
+      g,
+      state,
+      manager,
+      denoise,
+      l2i,
+      i2l,
+      vaeSource: modelLoader,
+    });
+    g.upsertMetadata({ generation_mode: 'anima_img2img' });
+  } else if (generationMode === 'inpaint') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'anima_i2l',
+      id: getPrefixedId('anima_i2l'),
+    });
+
+    canvasOutput = await addInpaint({
+      g,
+      state,
+      manager,
+      l2i,
+      i2l,
+      denoise,
+      vaeSource: modelLoader,
+      modelLoader,
+      seed,
+    });
+    g.upsertMetadata({ generation_mode: 'anima_inpaint' });
+  } else if (generationMode === 'outpaint') {
+    assert(manager !== null);
+    const i2l = g.addNode({
+      type: 'anima_i2l',
+      id: getPrefixedId('anima_i2l'),
+    });
+
+    canvasOutput = await addOutpaint({
+      g,
+      state,
+      manager,
+      l2i,
+      i2l,
+      denoise,
+      vaeSource: modelLoader,
+      modelLoader,
+      seed,
+    });
+    g.upsertMetadata({ generation_mode: 'anima_outpaint' });
   } else {
-    canvasOutput = l2i;
+    assert<Equals<typeof generationMode, never>>(false);
   }
 
   if (state.system.shouldUseNSFWChecker) {
