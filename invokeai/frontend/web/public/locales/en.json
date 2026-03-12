@@ -1503,6 +1503,8 @@
             "noQwen3EncoderModelSelected": "No Qwen3 Encoder model selected for FLUX2 Klein generation",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
+            "noAnimaVaeModelSelected": "No Anima VAE model selected",
+            "noAnimaQwen3EncoderModelSelected": "No Anima Qwen3 Encoder model selected",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox width is {{width}}",
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox height is {{height}}",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), scaled bbox width is {{width}}",
