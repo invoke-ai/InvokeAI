@@ -1,10 +1,34 @@
-import { Badge, Box, Flex, IconButton, Progress, Text, Tooltip } from '@invoke-ai/ui-library';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import {
+  Badge,
+  Box,
+  Button,
+  CircularProgress,
+  Flex,
+  Icon,
+  IconButton,
+  Td,
+  Text,
+  Tooltip,
+  Tr,
+} from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { isNil } from 'es-toolkit/compat';
 import { getApiErrorDetail } from 'features/modelManagerV2/util/getApiErrorDetail';
 import { toast } from 'features/toast/toast';
-import { t } from 'i18next';
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
-import { PiArrowClockwiseBold, PiPauseBold, PiPlayBold, PiXBold } from 'react-icons/pi';
+import { useTranslation } from 'react-i18next';
+import {
+  PiArrowClockwiseBold,
+  PiCheckBold,
+  PiMinusBold,
+  PiPauseFill,
+  PiPlayFill,
+  PiWarningBold,
+  PiWarningDiamondBold,
+  PiWarningFill,
+  PiXBold,
+} from 'react-icons/pi';
 import {
   useCancelModelInstallMutation,
   usePauseModelInstallMutation,
@@ -13,8 +37,9 @@ import {
   useResumeModelInstallMutation,
 } from 'services/api/endpoints/models';
 import type { ModelInstallJob } from 'services/api/types';
+import { $isConnected } from 'services/events/stores';
 
-import ModelInstallQueueBadge from './ModelInstallQueueBadge';
+import { ModelInstallQueueBadge } from './ModelInstallQueueBadge';
 
 type ModelListItemProps = {
   installJob: ModelInstallJob;
@@ -32,7 +57,40 @@ const formatBytes = (bytes: number) => {
   return `${bytes.toFixed(2)} ${units[i]}`;
 };
 
+const ProgressColumnSx: SystemStyleObject = {
+  alignItems: 'center',
+  justifyContent: 'center',
+};
+
+const ModelInfoColumnSx: SystemStyleObject = {
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 0.5,
+};
+
+const BadgesColumnSx: SystemStyleObject = {
+  gap: 1,
+  alignItems: 'flex-start',
+  flexWrap: 'wrap',
+};
+
+const ActionsColumnSx: SystemStyleObject = {
+  gap: 2,
+  alignItems: 'flex-start',
+  justifyContent: 'flex-end',
+};
+
+const CircularProgressSx: SystemStyleObject = {
+  '.chakra-progress__track': {
+    stroke: 'base.600',
+  },
+  '.chakra-progress__indicator': {
+    stroke: 'blue.300',
+  },
+};
+
 export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
+  const { t } = useTranslation();
   const { installJob } = props;
 
   const [deleteImportModel] = useCancelModelInstallMutation();
@@ -41,6 +99,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
   const [restartFailedModelInstall] = useRestartFailedModelInstallMutation();
   const [restartModelInstallFile] = useRestartModelInstallFileMutation();
   const resumeFromScratchShown = useRef(false);
+  const isConnected = useStore($isConnected);
 
   const handleDeleteModelImport = useCallback(() => {
     deleteImportModel(installJob.id)
@@ -59,7 +118,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
           status: 'error',
         });
       });
-  }, [deleteImportModel, installJob]);
+  }, [deleteImportModel, installJob, t]);
 
   const handlePauseModelInstall = useCallback(() => {
     pauseModelInstall(installJob.id)
@@ -78,7 +137,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
           status: 'error',
         });
       });
-  }, [installJob, pauseModelInstall]);
+  }, [installJob, pauseModelInstall, t]);
 
   const hasRestartedFromScratch = useCallback((job: ModelInstallJob) => {
     return (
@@ -116,7 +175,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
           status: 'error',
         });
       });
-  }, [hasRestartedFromScratch, installJob, resumeModelInstall]);
+  }, [hasRestartedFromScratch, installJob, resumeModelInstall, t]);
 
   const handleRestartFailed = useCallback(() => {
     restartFailedModelInstall(installJob.id)
@@ -135,7 +194,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
           status: 'error',
         });
       });
-  }, [installJob.id, restartFailedModelInstall]);
+  }, [installJob.id, restartFailedModelInstall, t]);
 
   const handleRestartFile = useCallback(
     (fileSource: string) => {
@@ -156,7 +215,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
           });
         });
     },
-    [installJob.id, restartModelInstallFile]
+    [installJob.id, restartModelInstallFile, t]
   );
 
   const getRestartFileHandler = useCallback(
@@ -175,7 +234,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       default:
         return t('common.unknown');
     }
-  }, [installJob.source]);
+  }, [installJob.source, t]);
 
   const modelName = useMemo(() => {
     switch (installJob.source.type) {
@@ -193,7 +252,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       default:
         return t('common.unknown');
     }
-  }, [installJob.source]);
+  }, [installJob.source, t]);
 
   const progressValue = useMemo(() => {
     if (installJob.status === 'completed' || installJob.status === 'error' || installJob.status === 'cancelled') {
@@ -219,141 +278,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     return null;
   }, [installJob.bytes, installJob.download_parts, installJob.status, installJob.total_bytes]);
 
-  const restartRequiredParts = useMemo(() => {
-    return installJob.download_parts?.filter((part) => part.resume_required || part.status === 'error') ?? [];
-  }, [installJob.download_parts]);
-
-  useEffect(() => {
-    if (resumeFromScratchShown.current) {
-      return;
-    }
-    const restartedFromScratch = hasRestartedFromScratch(installJob);
-    if (restartedFromScratch) {
-      resumeFromScratchShown.current = true;
-      toast({
-        id: 'MODEL_INSTALL_RESTARTED_FROM_SCRATCH_AUTO',
-        title: t('toast.modelDownloadRestartedFromScratch'),
-        status: 'warning',
-      });
-    }
-  }, [hasRestartedFromScratch, installJob]);
-
-  const hasRestartRequired = restartRequiredParts.length > 0;
-
-  const showPause = installJob.status === 'downloading' || installJob.status === 'waiting';
-  const showResume = installJob.status === 'paused' && !hasRestartRequired;
-  const showCancel =
-    installJob.status === 'downloading' ||
-    installJob.status === 'waiting' ||
-    installJob.status === 'running' ||
-    installJob.status === 'paused';
-
-  return (
-    <>
-      <Flex gap={1} w="full" alignItems="center">
-        <Tooltip maxW={600} label={<TooltipLabel name={modelName} source={sourceLocation} installJob={installJob} />}>
-          <Flex gap={3} w="full" alignItems="center">
-            <Text w={96} whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
-              {modelName}
-            </Text>
-            <Progress
-              w="full"
-              flexGrow={1}
-              value={progressValue ?? 0}
-              isIndeterminate={progressValue === null}
-              aria-label={t('accessibility.invokeProgressBar')}
-              h={2}
-            />
-            <ModelInstallQueueBadge status={installJob.status} />
-          </Flex>
-        </Tooltip>
-        <Flex gap={1} alignItems="center" justifyContent="flex-end" minW="90px">
-          {showResume && (
-            <IconButton
-              size="xs"
-              tooltip={t('modelManager.resume')}
-              aria-label={t('modelManager.resume')}
-              icon={<PiPlayBold />}
-              onClick={handleResumeModelInstall}
-              variant="ghost"
-            />
-          )}
-          {showPause && (
-            <IconButton
-              size="xs"
-              tooltip={t('modelManager.pause')}
-              aria-label={t('modelManager.pause')}
-              icon={<PiPauseBold />}
-              onClick={handlePauseModelInstall}
-              variant="ghost"
-            />
-          )}
-          {hasRestartRequired && (
-            <IconButton
-              size="xs"
-              tooltip={t('modelManager.restartFailed')}
-              aria-label={t('modelManager.restartFailed')}
-              icon={<PiArrowClockwiseBold />}
-              onClick={handleRestartFailed}
-              variant="ghost"
-            />
-          )}
-          {showCancel && (
-            <IconButton
-              size="xs"
-              tooltip={t('modelManager.cancel')}
-              aria-label={t('modelManager.cancel')}
-              icon={<PiXBold />}
-              onClick={handleDeleteModelImport}
-              variant="ghost"
-            />
-          )}
-          {!showResume && !showPause && !showCancel && <Box w="24px" />}
-        </Flex>
-      </Flex>
-      {hasRestartRequired && (
-        <Flex direction="column" gap={1} w="full" mt={1}>
-          {restartRequiredParts.map((part) => {
-            const fileName = part.source.split('/').slice(-1)[0] ?? t('common.unknown');
-            const isResumeRequired = part.resume_required;
-            return (
-              <Flex key={part.source} gap={2} alignItems="center" wrap="wrap">
-                <Text fontSize="xs" color="base.200" maxW="200px" noOfLines={1}>
-                  {fileName}
-                </Text>
-                <Badge colorScheme={isResumeRequired ? 'orange' : 'red'} fontSize="10px">
-                  {isResumeRequired ? t('modelManager.restartRequired') : t('queue.failed')}
-                </Badge>
-                <Text fontSize="xs" color="warning.400">
-                  {isResumeRequired ? t('modelManager.resumeRefused') : t('queue.failed')}
-                </Text>
-                <IconButton
-                  size="xs"
-                  tooltip={t('modelManager.restartFile')}
-                  aria-label={t('modelManager.restartFile')}
-                  icon={<PiArrowClockwiseBold />}
-                  onClick={getRestartFileHandler(part.source)}
-                  variant="ghost"
-                />
-              </Flex>
-            );
-          })}
-        </Flex>
-      )}
-    </>
-  );
-});
-
-ModelInstallQueueItem.displayName = 'ModelInstallQueueItem';
-
-type TooltipLabelProps = {
-  installJob: ModelInstallJob;
-  name: string;
-  source: string;
-};
-
-const TooltipLabel = memo(({ name, source, installJob }: TooltipLabelProps) => {
-  const progressString = useMemo(() => {
+  const progressTooltip = useMemo(() => {
     if (installJob.status !== 'downloading') {
       return '';
     }
@@ -374,22 +299,195 @@ const TooltipLabel = memo(({ name, source, installJob }: TooltipLabelProps) => {
     return '';
   }, [installJob.bytes, installJob.download_parts, installJob.total_bytes, installJob.status]);
 
+  const restartRequiredParts = useMemo(() => {
+    return installJob.download_parts?.filter((part) => part.resume_required || part.status === 'error') ?? [];
+  }, [installJob.download_parts]);
+
+  useEffect(() => {
+    if (resumeFromScratchShown.current) {
+      return;
+    }
+    const restartedFromScratch = hasRestartedFromScratch(installJob);
+    if (restartedFromScratch) {
+      resumeFromScratchShown.current = true;
+      toast({
+        id: 'MODEL_INSTALL_RESTARTED_FROM_SCRATCH_AUTO',
+        title: t('toast.modelDownloadRestartedFromScratch'),
+        status: 'warning',
+      });
+    }
+  }, [hasRestartedFromScratch, installJob, t]);
+
+  const hasRestartRequired = restartRequiredParts.length > 0;
+
+  const canPause = installJob.status === 'downloading' || installJob.status === 'waiting';
+  const canResume = installJob.status === 'paused' && !hasRestartRequired;
+  const canCancel =
+    installJob.status === 'downloading' ||
+    installJob.status === 'waiting' ||
+    installJob.status === 'running' ||
+    installJob.status === 'paused';
+
+  const showDisconnectedIndicator =
+    !isConnected &&
+    (installJob.status === 'downloading' || installJob.status === 'waiting' || installJob.status === 'running');
+
   return (
-    <>
-      <Flex gap={3} justifyContent="space-between">
-        <Text fontWeight="semibold">{name}</Text>
-        {progressString && <Text>{progressString}</Text>}
-      </Flex>
-      <Text fontStyle="italic" wordBreak="break-all">
-        {source}
-      </Text>
-      {installJob.error_reason && (
-        <Text color="error.500">
-          {t('queue.failed')}: {installJob.error}
-        </Text>
-      )}
-    </>
+    <Tr>
+      {/* Progress */}
+      <Td>
+        <Flex sx={ProgressColumnSx}>
+          {installJob.status === 'downloading' || installJob.status === 'waiting' || installJob.status === 'running' ? (
+            <Tooltip label={progressTooltip} isDisabled={!progressTooltip} hasArrow openDelay={0}>
+              <CircularProgress
+                size="20px"
+                value={progressValue ?? 0}
+                isIndeterminate={
+                  !isConnected ||
+                  progressValue === null ||
+                  installJob.status === 'waiting' ||
+                  installJob.status === 'running'
+                }
+                aria-label={t('accessibility.invokeProgressBar')}
+                sx={CircularProgressSx}
+                thickness={12}
+              />
+            </Tooltip>
+          ) : installJob.status === 'paused' ? (
+            <Flex sx={{ color: 'orange.300' }}>
+              <PiPauseFill size={16} />
+            </Flex>
+          ) : installJob.status === 'cancelled' ? (
+            <Flex sx={{ color: 'orange.200' }}>
+              <PiMinusBold size={16} />
+            </Flex>
+          ) : installJob.status === 'error' ? (
+            <Flex sx={{ color: 'red.300' }}>
+              <PiXBold size={16} />
+            </Flex>
+          ) : (
+            <Flex sx={{ color: 'green.300' }}>
+              <PiCheckBold size={16} />
+            </Flex>
+          )}
+        </Flex>
+      </Td>
+
+      {/* Model Info */}
+      <Td>
+        <Flex sx={ModelInfoColumnSx}>
+          <Text fontWeight="semibold">{modelName}</Text>
+          <Text fontStyle="italic" fontSize="2xs" noOfLines={1}>
+            {sourceLocation}
+          </Text>
+          {hasRestartRequired && (
+            <Flex direction="column" gap={1} w="full" mt={1}>
+              {restartRequiredParts.map((part) => {
+                const fileName = part.source.split('/').slice(-1)[0] ?? t('common.unknown');
+                const isResumeRequired = part.resume_required;
+                return (
+                  <Flex key={part.source} gap={2} alignItems="center" wrap="wrap" p={2} bg="base.800" borderRadius="md">
+                    <Icon
+                      as={isResumeRequired ? PiWarningFill : PiWarningDiamondBold}
+                      color={isResumeRequired ? 'orange.500' : 'red.500'}
+                    />
+                    <Text fontSize="xs" color="base.200" maxW="200px" noOfLines={1} title={fileName}>
+                      {fileName}
+                    </Text>
+                    <Badge colorScheme={isResumeRequired ? 'orange' : 'red'} fontSize="10px">
+                      {isResumeRequired ? t('modelManager.restartRequired') : t('queue.failed')}
+                    </Badge>
+                    <Text fontSize="xs" color="warning.400">
+                      {isResumeRequired ? t('modelManager.resumeRefused') : t('queue.failed')}
+                    </Text>
+                    <IconButton
+                      size="xs"
+                      tooltip={t('modelManager.restartFile')}
+                      aria-label={t('modelManager.restartFile')}
+                      icon={<PiArrowClockwiseBold />}
+                      onClick={getRestartFileHandler(part.source)}
+                      variant="ghost"
+                      ml="auto"
+                    />
+                  </Flex>
+                );
+              })}
+            </Flex>
+          )}
+        </Flex>
+      </Td>
+
+      {/* Status */}
+      <Td>
+        <Flex sx={BadgesColumnSx}>
+          {showDisconnectedIndicator && (
+            <Tooltip label={t('modelManager.backendDisconnected')}>
+              <Box padding={1}>
+                <Icon as={PiWarningBold} color="error.300" />
+              </Box>
+            </Tooltip>
+          )}
+          <ModelInstallQueueBadge status={installJob.status} label={installJob.error} />
+          {hasRestartRequired && (
+            <Tooltip label={t('modelManager.restartRequiredTooltip')}>
+              <Box>
+                <Badge colorScheme="red">{t('modelManager.restartRequired')}</Badge>
+              </Box>
+            </Tooltip>
+          )}
+        </Flex>
+      </Td>
+
+      {/* Actions */}
+      <Td textAlign="right" minWidth={130}>
+        <Flex sx={ActionsColumnSx}>
+          {/* Pause/Resume installatino */}
+          {(canResume || canPause) && (
+            <Button
+              size="sm"
+              tooltip={canResume ? t('modelManager.resume') : t('modelManager.pause')}
+              leftIcon={canResume ? <PiPlayFill /> : <PiPauseFill />}
+              onClick={canResume ? handleResumeModelInstall : handlePauseModelInstall}
+              variant={canResume ? 'solid' : 'outline'}
+            >
+              {canResume ? t('modelManager.resume') : t('modelManager.pause')}
+            </Button>
+          )}
+
+          {/* Restart installation if required */}
+          {hasRestartRequired && (
+            <Button
+              tooltip={t('modelManager.restartFailed')}
+              size="sm"
+              leftIcon={<PiArrowClockwiseBold />}
+              onClick={handleRestartFailed}
+              colorScheme="error"
+              variant="ghost"
+            >
+              {t('modelManager.restartFailed')}
+            </Button>
+          )}
+
+          {/* Cancel installation */}
+          {canCancel && (
+            <IconButton
+              tooltip={t('modelManager.cancel')}
+              icon={<PiXBold />}
+              aria-label={t('modelManager.cancel')}
+              onClick={handleDeleteModelImport}
+              size="sm"
+              colorScheme="error"
+            />
+          )}
+
+          {!canCancel && !canPause && !canResume && (
+            // TODO: Add an individual prune action here?
+            <Text fontSize="2xs">No actions available</Text>
+          )}
+        </Flex>
+      </Td>
+    </Tr>
   );
 });
 
-TooltipLabel.displayName = 'TooltipLabel';
+ModelInstallQueueItem.displayName = 'ModelInstallQueueItem';
