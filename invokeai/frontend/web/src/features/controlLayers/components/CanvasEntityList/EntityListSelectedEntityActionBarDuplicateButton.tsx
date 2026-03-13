@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { entityDuplicated } from 'features/controlLayers/store/canvasSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
@@ -20,16 +21,17 @@ export const EntityListSelectedEntityActionBarDuplicateButton = memo(() => {
   }, [dispatch, selectedEntityIdentifier]);
 
   return (
-    <IconButton
-      onClick={onClick}
-      isDisabled={!selectedEntityIdentifier || isBusy}
-      minW={8}
-      variant="link"
-      alignSelf="stretch"
-      aria-label={t('controlLayers.duplicate')}
-      tooltip={t('controlLayers.duplicate')}
-      icon={<PiCopyFill />}
-    />
+    <IAITooltip label={t('controlLayers.duplicate')}>
+      <IconButton
+        onClick={onClick}
+        isDisabled={!selectedEntityIdentifier || isBusy}
+        minW={8}
+        variant="link"
+        alignSelf="stretch"
+        aria-label={t('controlLayers.duplicate')}
+        icon={<PiCopyFill />}
+      />
+    </IAITooltip>
   );
 });
 

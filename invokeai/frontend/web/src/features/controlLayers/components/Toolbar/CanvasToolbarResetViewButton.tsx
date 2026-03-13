@@ -1,4 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -59,14 +60,15 @@ export const CanvasToolbarResetViewButton = memo(() => {
   });
 
   return (
-    <IconButton
-      tooltip={t('hotkeys.canvas.fitLayersToCanvas.title')}
-      aria-label={t('hotkeys.canvas.fitLayersToCanvas.title')}
-      onClick={fitLayersToStage}
-      icon={<PiArrowsOutBold />}
-      variant="link"
-      alignSelf="stretch"
-    />
+    <IAITooltip label={t('hotkeys.canvas.fitLayersToCanvas.title')}>
+      <IconButton
+        aria-label={t('hotkeys.canvas.fitLayersToCanvas.title')}
+        onClick={fitLayersToStage}
+        icon={<PiArrowsOutBold />}
+        variant="link"
+        alignSelf="stretch"
+      />
+    </IAITooltip>
   );
 });
 

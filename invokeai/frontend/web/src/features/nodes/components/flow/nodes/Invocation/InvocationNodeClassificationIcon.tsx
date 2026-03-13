@@ -1,4 +1,5 @@
-import { Icon, Tooltip } from '@invoke-ai/ui-library';
+import { Icon } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useNodeClassification } from 'features/nodes/hooks/useNodeClassification';
 import type { Classification } from 'features/nodes/types/common';
 import { memo } from 'react';
@@ -17,13 +18,13 @@ const InvocationNodeClassificationIcon = (_: Props) => {
   }
 
   return (
-    <Tooltip
+    <IAITooltip
       label={<ClassificationTooltipContent classification={classification} />}
       placement="top"
       shouldWrapChildren
     >
       <ClassificationIcon classification={classification} />
-    </Tooltip>
+    </IAITooltip>
   );
 };
 

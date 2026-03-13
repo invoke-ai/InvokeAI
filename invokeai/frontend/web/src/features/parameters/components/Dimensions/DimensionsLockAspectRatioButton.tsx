@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { aspectRatioLockToggled, selectAspectRatioIsLocked } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,14 +16,15 @@ export const DimensionsLockAspectRatioButton = memo(() => {
   }, [dispatch]);
 
   return (
-    <IconButton
-      tooltip={t('parameters.lockAspectRatio')}
-      aria-label={t('parameters.lockAspectRatio')}
-      onClick={onClick}
-      variant={isLocked ? 'outline' : 'ghost'}
-      size="sm"
-      icon={isLocked ? <PiLockSimpleFill /> : <PiLockSimpleOpenBold />}
-    />
+    <IAITooltip label={t('parameters.lockAspectRatio')}>
+      <IconButton
+        aria-label={t('parameters.lockAspectRatio')}
+        onClick={onClick}
+        variant={isLocked ? 'outline' : 'ghost'}
+        size="sm"
+        icon={isLocked ? <PiLockSimpleFill /> : <PiLockSimpleOpenBold />}
+      />
+    </IAITooltip>
   );
 });
 

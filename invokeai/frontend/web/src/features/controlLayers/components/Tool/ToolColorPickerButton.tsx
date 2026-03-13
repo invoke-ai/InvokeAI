@@ -1,4 +1,5 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo } from 'react';
@@ -19,7 +20,7 @@ export const ToolColorPickerButton = memo(() => {
   });
 
   return (
-    <Tooltip label={`${t('controlLayers.tool.colorPicker')} (I)`} placement="end">
+    <IAITooltip label={`${t('controlLayers.tool.colorPicker')} (I)`} placement="end">
       <IconButton
         aria-label={`${t('controlLayers.tool.colorPicker')} (I)`}
         icon={<PiEyedropperBold />}
@@ -27,7 +28,7 @@ export const ToolColorPickerButton = memo(() => {
         variant="solid"
         onClick={selectColorPicker}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

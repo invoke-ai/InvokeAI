@@ -1,5 +1,6 @@
-import { Badge, Flex, IconButton, Spacer, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Badge, Flex, IconButton, Spacer, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { negativePromptChanged, positivePromptChanged } from 'features/controlLayers/store/paramsSlice';
 import { usePresetModifiedPrompts } from 'features/stylePresets/hooks/usePresetModifiedPrompts';
 import {
@@ -79,7 +80,7 @@ export const ActiveStylePreset = () => {
         {activeStylePreset.name}
       </Badge>
       <Spacer />
-      <Tooltip label={t('stylePresets.toggleViewMode')}>
+      <IAITooltip label={t('stylePresets.toggleViewMode')}>
         <IconButton
           onClick={handleToggleViewMode}
           variant="outline"
@@ -88,8 +89,8 @@ export const ActiveStylePreset = () => {
           colorScheme={viewMode ? 'invokeBlue' : 'base'}
           icon={<PiEyeBold />}
         />
-      </Tooltip>
-      <Tooltip label={t('stylePresets.flatten')}>
+      </IAITooltip>
+      <IAITooltip label={t('stylePresets.flatten')}>
         <IconButton
           onClick={handleFlattenPrompts}
           variant="outline"
@@ -97,8 +98,8 @@ export const ActiveStylePreset = () => {
           aria-label={t('stylePresets.flatten')}
           icon={<PiStackSimpleBold />}
         />
-      </Tooltip>
-      <Tooltip label={t('stylePresets.clearTemplateSelection')}>
+      </IAITooltip>
+      <IAITooltip label={t('stylePresets.clearTemplateSelection')}>
         <IconButton
           onClick={handleClearActiveStylePreset}
           variant="outline"
@@ -106,7 +107,7 @@ export const ActiveStylePreset = () => {
           aria-label={t('stylePresets.clearTemplateSelection')}
           icon={<PiXBold />}
         />
-      </Tooltip>
+      </IAITooltip>
     </Flex>
   );
 };

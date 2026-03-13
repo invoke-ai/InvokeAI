@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useEntityFilter } from 'features/controlLayers/hooks/useEntityFilter';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { isFilterableEntityIdentifier } from 'features/controlLayers/store/types';
@@ -21,16 +22,17 @@ export const EntityListSelectedEntityActionBarFilterButton = memo(() => {
   }
 
   return (
-    <IconButton
-      onClick={filter.start}
-      isDisabled={filter.isDisabled}
-      minW={8}
-      variant="link"
-      alignSelf="stretch"
-      aria-label={t('controlLayers.filter.filter')}
-      tooltip={t('controlLayers.filter.filter')}
-      icon={<PiShootingStarFill />}
-    />
+    <IAITooltip label={t('controlLayers.filter.filter')}>
+      <IconButton
+        onClick={filter.start}
+        isDisabled={filter.isDisabled}
+        minW={8}
+        variant="link"
+        alignSelf="stretch"
+        aria-label={t('controlLayers.filter.filter')}
+        icon={<PiShootingStarFill />}
+      />
+    </IAITooltip>
   );
 });
 

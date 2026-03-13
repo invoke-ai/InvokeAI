@@ -1,5 +1,6 @@
-import { ButtonGroup, IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { ButtonGroup, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { GradientLinearIcon, GradientRadialIcon } from 'features/controlLayers/components/Tool/GradientIcons';
 import { selectGradientType, settingsGradientTypeChanged } from 'features/controlLayers/store/canvasSettingsSlice';
 import { memo, useCallback } from 'react';
@@ -15,7 +16,7 @@ export const ToolGradientModeToggle = memo(() => {
 
   return (
     <ButtonGroup isAttached size="sm">
-      <Tooltip label={t('controlLayers.gradient.linear', { defaultValue: 'Linear' })}>
+      <IAITooltip label={t('controlLayers.gradient.linear', { defaultValue: 'Linear' })}>
         <IconButton
           aria-label={t('controlLayers.gradient.linear', { defaultValue: 'Linear' })}
           icon={<GradientLinearIcon />}
@@ -23,8 +24,8 @@ export const ToolGradientModeToggle = memo(() => {
           variant="solid"
           onClick={onLinearClick}
         />
-      </Tooltip>
-      <Tooltip label={t('controlLayers.gradient.radial', { defaultValue: 'Radial' })}>
+      </IAITooltip>
+      <IAITooltip label={t('controlLayers.gradient.radial', { defaultValue: 'Radial' })}>
         <IconButton
           aria-label={t('controlLayers.gradient.radial', { defaultValue: 'Radial' })}
           icon={<GradientRadialIcon />}
@@ -32,7 +33,7 @@ export const ToolGradientModeToggle = memo(() => {
           variant="solid"
           onClick={onRadialClick}
         />
-      </Tooltip>
+      </IAITooltip>
     </ButtonGroup>
   );
 });

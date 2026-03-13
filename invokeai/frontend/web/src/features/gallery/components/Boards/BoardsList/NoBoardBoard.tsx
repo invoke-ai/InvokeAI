@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Flex, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import type { RemoveImageFromBoardDndTargetData } from 'features/dnd/dnd';
 import { removeImageFromBoardDndTarget } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
@@ -61,7 +62,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
     <Box position="relative" w="full" h={12}>
       <NoBoardBoardContextMenu>
         {(ref) => (
-          <Tooltip
+          <IAITooltip
             label={<BoardTooltip board={null} boardCounts={{ image_count: imagesTotal, asset_count: assetsTotal }} />}
             openDelay={1000}
             placement="right"
@@ -106,7 +107,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
                 {imagesTotal} | {assetsTotal}
               </Text>
             </Flex>
-          </Tooltip>
+          </IAITooltip>
         )}
       </NoBoardBoardContextMenu>
       <DndDropTarget

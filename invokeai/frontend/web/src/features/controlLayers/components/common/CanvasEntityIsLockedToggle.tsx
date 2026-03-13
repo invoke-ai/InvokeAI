@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
@@ -19,16 +20,17 @@ export const CanvasEntityIsLockedToggle = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   return (
-    <IconButton
-      size="sm"
-      aria-label={t(isLocked ? 'controlLayers.locked' : 'controlLayers.unlocked')}
-      tooltip={t(isLocked ? 'controlLayers.locked' : 'controlLayers.unlocked')}
-      variant="link"
-      alignSelf="stretch"
-      icon={isLocked ? <PiLockSimpleFill /> : <PiLockSimpleOpenBold />}
-      onClick={onClick}
-      isDisabled={isBusy}
-    />
+    <IAITooltip label={t(isLocked ? 'controlLayers.locked' : 'controlLayers.unlocked')}>
+      <IconButton
+        size="sm"
+        aria-label={t(isLocked ? 'controlLayers.locked' : 'controlLayers.unlocked')}
+        variant="link"
+        alignSelf="stretch"
+        icon={isLocked ? <PiLockSimpleFill /> : <PiLockSimpleOpenBold />}
+        onClick={onClick}
+        isDisabled={isBusy}
+      />
+    </IAITooltip>
   );
 });
 

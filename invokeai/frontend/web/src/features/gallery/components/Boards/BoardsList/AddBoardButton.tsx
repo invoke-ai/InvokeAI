@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { boardIdSelected, boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,18 +23,19 @@ const AddBoardButton = () => {
   }, [t, createBoard, dispatch]);
 
   return (
-    <IconButton
-      icon={<PiPlusBold />}
-      isLoading={isLoading}
-      tooltip={t('boards.addBoard')}
-      aria-label={t('boards.addBoard')}
-      onClick={handleCreateBoard}
-      size="md"
-      data-testid="add-board-button"
-      variant="link"
-      w={8}
-      h={8}
-    />
+    <IAITooltip label={t('boards.addBoard')}>
+      <IconButton
+        icon={<PiPlusBold />}
+        isLoading={isLoading}
+        aria-label={t('boards.addBoard')}
+        onClick={handleCreateBoard}
+        size="md"
+        data-testid="add-board-button"
+        variant="link"
+        w={8}
+        h={8}
+      />
+    </IAITooltip>
   );
 };
 

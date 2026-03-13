@@ -1,4 +1,5 @@
-import { Flex, IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,14 +18,14 @@ const ToggleRightPanelButton = memo(() => {
   const { t } = useTranslation();
 
   return (
-    <Tooltip label={t('accessibility.toggleRightPanel')} placement="start">
+    <IAITooltip label={t('accessibility.toggleRightPanel')} placement="start">
       <IconButton
         aria-label={t('accessibility.toggleRightPanel')}
         onClick={navigationApi.toggleRightPanel}
         icon={<PiImagesSquareBold />}
         h={48}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 ToggleRightPanelButton.displayName = 'ToggleRightPanelButton';

@@ -1,4 +1,5 @@
-import { Flex, Icon, Image, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, Icon, Image } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { typedMemo } from 'common/util/typedMemo';
 import { PiImage } from 'react-icons/pi';
 
@@ -7,7 +8,7 @@ const FALLBACK_ICON_SIZE = '24px';
 
 const StylePresetImage = ({ presetImageUrl, imageWidth }: { presetImageUrl: string | null; imageWidth?: number }) => {
   return (
-    <Tooltip
+    <IAITooltip
       closeOnScroll
       openDelay={0}
       label={
@@ -48,7 +49,7 @@ const StylePresetImage = ({ presetImageUrl, imageWidth }: { presetImageUrl: stri
         minWidth={imageWidth || IMAGE_THUMBNAIL_SIZE}
         borderRadius="base"
       />
-    </Tooltip>
+    </IAITooltip>
   );
 };
 

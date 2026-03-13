@@ -1,4 +1,5 @@
-import { Flex, Icon, IconButton, Input, InputGroup, InputRightElement, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, Icon, IconButton, Input, InputGroup, InputRightElement, Text } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { map, size } from 'es-toolkit/compat';
 import type { ChangeEventHandler } from 'react';
@@ -55,11 +56,11 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
               <Text color="base.200" fontWeight="semibold">
                 {t('modelManager.starterBundles')}
               </Text>
-              <Tooltip label={t('modelManager.starterBundleHelpText')}>
+              <IAITooltip label={t('modelManager.starterBundleHelpText')}>
                 <Flex alignItems="center">
                   <Icon as={PiInfoBold} color="base.200" />
                 </Flex>
-              </Tooltip>
+              </IAITooltip>
             </Flex>
             <Flex gap={2}>
               {map(results.starter_bundles, (bundle) => (

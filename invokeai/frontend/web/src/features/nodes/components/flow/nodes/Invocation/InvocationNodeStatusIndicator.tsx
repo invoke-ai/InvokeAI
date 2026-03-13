@@ -1,5 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Badge, CircularProgress, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Badge, CircularProgress, Flex, Icon, Image, Text } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useNodeExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import type { NodeExecutionState } from 'features/nodes/types/invocation';
@@ -29,11 +30,11 @@ const InvocationNodeStatusIndicator = ({ nodeId }: Props) => {
   }
 
   return (
-    <Tooltip label={<TooltipLabel nodeExecutionState={nodeExecutionState} />} placement="top">
+    <IAITooltip label={<TooltipLabel nodeExecutionState={nodeExecutionState} />} placement="top">
       <Flex className={DRAG_HANDLE_CLASSNAME} w={5} h="full" alignItems="center" justifyContent="flex-end">
         <StatusIcon nodeExecutionState={nodeExecutionState} />
       </Flex>
-    </Tooltip>
+    </IAITooltip>
   );
 };
 

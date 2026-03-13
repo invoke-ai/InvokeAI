@@ -1,5 +1,6 @@
 import type { MenuItemProps } from '@invoke-ai/ui-library';
-import { Flex, MenuItem, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, MenuItem } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import type { ReactNode } from 'react';
 
 type Props = MenuItemProps & {
@@ -9,7 +10,7 @@ type Props = MenuItemProps & {
 
 export const IconMenuItem = ({ tooltip, icon, ...props }: Props) => {
   return (
-    <Tooltip label={tooltip} placement="top" gutter={12}>
+    <IAITooltip label={tooltip} placement="top" gutter={12}>
       <MenuItem
         display="flex"
         alignItems="center"
@@ -21,7 +22,7 @@ export const IconMenuItem = ({ tooltip, icon, ...props }: Props) => {
       >
         {icon}
       </MenuItem>
-    </Tooltip>
+    </IAITooltip>
   );
 };
 

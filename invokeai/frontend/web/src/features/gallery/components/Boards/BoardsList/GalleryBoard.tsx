@@ -1,7 +1,8 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Icon, Image, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Flex, Icon, Image, Text } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
 import type { AddImageToBoardDndTargetData } from 'features/dnd/dnd';
 import { addImageToBoardDndTarget } from 'features/dnd/dnd';
@@ -66,7 +67,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
     <Box position="relative" w="full" h={12}>
       <BoardContextMenu board={board}>
         {(ref) => (
-          <Tooltip
+          <IAITooltip
             label={<BoardTooltip board={board} boardCounts={boardCounts} />}
             openDelay={1000}
             placement="right"
@@ -105,7 +106,7 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
                 </Text>
               </Flex>
             </Flex>
-          </Tooltip>
+          </IAITooltip>
         )}
       </BoardContextMenu>
       <DndDropTarget dndTarget={addImageToBoardDndTarget} dndTargetData={dndTargetData} label={t('gallery.move')} />

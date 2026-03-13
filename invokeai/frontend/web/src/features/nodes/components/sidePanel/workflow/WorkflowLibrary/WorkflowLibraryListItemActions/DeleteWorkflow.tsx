@@ -1,4 +1,5 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useDeleteWorkflow } from 'features/workflowLibrary/components/DeleteLibraryWorkflowConfirmationAlertDialog';
 import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
@@ -17,7 +18,7 @@ export const DeleteWorkflow = ({ workflowId }: { workflowId: string }) => {
     [deleteWorkflow, workflowId]
   );
   return (
-    <Tooltip label={t('workflows.delete')} closeOnScroll>
+    <IAITooltip label={t('workflows.delete')} closeOnScroll>
       <IconButton
         size="sm"
         variant="link"
@@ -27,6 +28,6 @@ export const DeleteWorkflow = ({ workflowId }: { workflowId: string }) => {
         colorScheme="error"
         icon={<PiTrashBold />}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 };

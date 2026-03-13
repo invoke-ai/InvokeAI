@@ -2,6 +2,7 @@ import { Flex, IconButton, ListItem, Text, UnorderedList } from '@invoke-ai/ui-l
 import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { upperFirst } from 'es-toolkit/compat';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnabled';
@@ -69,17 +70,18 @@ export const CanvasEntityHeaderWarnings = memo(() => {
   return (
     // Using IconButton here bc it matches the styling of the actual buttons in the header without any fanagling, but
     // it's not a button
-    <IconButton
-      as="span"
-      size="sm"
-      variant="link"
-      alignSelf="stretch"
-      aria-label="warnings"
-      tooltip={<TooltipContent warnings={warnings} />}
-      icon={<PiWarningBold />}
-      colorScheme="warning"
-      isDisabled={!isEnabled}
-    />
+    <IAITooltip label={<TooltipContent warnings={warnings} />}>
+      <IconButton
+        as="span"
+        size="sm"
+        variant="link"
+        alignSelf="stretch"
+        aria-label="warnings"
+        icon={<PiWarningBold />}
+        colorScheme="warning"
+        isDisabled={!isEnabled}
+      />
+    </IAITooltip>
   );
 });
 

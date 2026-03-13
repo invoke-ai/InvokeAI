@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useEntitySegmentAnything } from 'features/controlLayers/hooks/useEntitySegmentAnything';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { isSegmentableEntityIdentifier } from 'features/controlLayers/store/types';
@@ -21,16 +22,17 @@ export const EntityListSelectedEntityActionBarSelectObjectButton = memo(() => {
   }
 
   return (
-    <IconButton
-      onClick={segment.start}
-      isDisabled={segment.isDisabled}
-      minW={8}
-      variant="link"
-      alignSelf="stretch"
-      aria-label={t('controlLayers.selectObject.selectObject')}
-      tooltip={t('controlLayers.selectObject.selectObject')}
-      icon={<PiShapesFill />}
-    />
+    <IAITooltip label={t('controlLayers.selectObject.selectObject')}>
+      <IconButton
+        onClick={segment.start}
+        isDisabled={segment.isDisabled}
+        minW={8}
+        variant="link"
+        alignSelf="stretch"
+        aria-label={t('controlLayers.selectObject.selectObject')}
+        icon={<PiShapesFill />}
+      />
+    </IAITooltip>
   );
 });
 

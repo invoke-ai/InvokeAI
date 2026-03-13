@@ -1,5 +1,6 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import {
   selectGradientClipEnabled,
   settingsGradientClipToggled,
@@ -20,7 +21,7 @@ export const ToolGradientClipToggle = memo(() => {
   const label = t('controlLayers.gradient.clip', { defaultValue: 'Clip Gradient' });
 
   return (
-    <Tooltip label={label}>
+    <IAITooltip label={label}>
       <IconButton
         aria-label={label}
         icon={<PiCropBold size={16} />}
@@ -29,7 +30,7 @@ export const ToolGradientClipToggle = memo(() => {
         colorScheme={isEnabled ? 'invokeBlue' : 'base'}
         onClick={onClick}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

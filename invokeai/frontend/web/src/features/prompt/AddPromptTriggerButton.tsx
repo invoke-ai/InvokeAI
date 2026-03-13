@@ -1,4 +1,5 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCodeBold } from 'react-icons/pi';
@@ -12,7 +13,7 @@ export const AddPromptTriggerButton = memo((props: Props) => {
   const { onOpen, isOpen } = props;
   const { t } = useTranslation();
   return (
-    <Tooltip label={t('prompt.addPromptTrigger')}>
+    <IAITooltip label={t('prompt.addPromptTrigger')}>
       <IconButton
         variant="promptOverlay"
         isDisabled={isOpen}
@@ -20,7 +21,7 @@ export const AddPromptTriggerButton = memo((props: Props) => {
         icon={<PiCodeBold />}
         onClick={onOpen}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

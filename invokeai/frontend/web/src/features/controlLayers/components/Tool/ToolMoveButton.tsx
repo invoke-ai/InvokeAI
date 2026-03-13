@@ -1,4 +1,5 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useSelectTool, useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { memo } from 'react';
@@ -19,7 +20,7 @@ export const ToolMoveButton = memo(() => {
   });
 
   return (
-    <Tooltip label={`${t('controlLayers.tool.move')} (V)`} placement="end">
+    <IAITooltip label={`${t('controlLayers.tool.move')} (V)`} placement="end">
       <IconButton
         aria-label={`${t('controlLayers.tool.move')} (V)`}
         icon={<PiCursorBold />}
@@ -27,7 +28,7 @@ export const ToolMoveButton = memo(() => {
         variant="solid"
         onClick={selectMove}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

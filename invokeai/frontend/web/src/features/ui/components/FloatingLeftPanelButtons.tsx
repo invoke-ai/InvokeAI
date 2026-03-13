@@ -1,4 +1,5 @@
-import { ButtonGroup, Flex, Icon, IconButton, spinAnimation, Tooltip, useShiftModifier } from '@invoke-ai/ui-library';
+import { ButtonGroup, Flex, Icon, IconButton, spinAnimation, useShiftModifier } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { ToolChooser } from 'features/controlLayers/components/Tool/ToolChooser';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useDeleteAllExceptCurrentQueueItemDialog } from 'features/queue/components/DeleteAllExceptCurrentQueueItemConfirmationAlertDialog';
@@ -55,14 +56,14 @@ const ToggleLeftPanelButton = memo(() => {
   const { t } = useTranslation();
 
   return (
-    <Tooltip label={t('accessibility.toggleLeftPanel')} placement="end">
+    <IAITooltip label={t('accessibility.toggleLeftPanel')} placement="end">
       <IconButton
         aria-label={t('accessibility.toggleLeftPanel')}
         onClick={navigationApi.toggleLeftPanel}
         icon={<PiSlidersHorizontalBold />}
         flexGrow={1}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 ToggleLeftPanelButton.displayName = 'ToggleLeftPanelButton';
@@ -117,7 +118,7 @@ const DeleteCurrentIconButton = memo(() => {
   const deleteCurrentQueueItem = useDeleteCurrentQueueItem();
 
   return (
-    <Tooltip label={t('queue.cancelTooltip')} placement="end">
+    <IAITooltip label={t('queue.cancelTooltip')} placement="end">
       <IconButton
         onClick={deleteCurrentQueueItem.trigger}
         isDisabled={deleteCurrentQueueItem.isDisabled}
@@ -127,7 +128,7 @@ const DeleteCurrentIconButton = memo(() => {
         colorScheme="error"
         flexGrow={1}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 
@@ -138,7 +139,7 @@ const DeleteAllExceptCurrentIconButton = memo(() => {
   const deleteAllExceptCurrent = useDeleteAllExceptCurrentQueueItemDialog();
 
   return (
-    <Tooltip label={t('queue.cancelAllExceptCurrentTooltip')} placement="end">
+    <IAITooltip label={t('queue.cancelAllExceptCurrentTooltip')} placement="end">
       <IconButton
         isDisabled={deleteAllExceptCurrent.isDisabled}
         isLoading={deleteAllExceptCurrent.isLoading}
@@ -148,7 +149,7 @@ const DeleteAllExceptCurrentIconButton = memo(() => {
         onClick={deleteAllExceptCurrent.openDialog}
         flexGrow={1}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 });
 

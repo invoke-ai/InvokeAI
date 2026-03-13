@@ -1,4 +1,5 @@
-import { IconButton, Tooltip } from '@invoke-ai/ui-library';
+import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useDownloadWorkflowById } from 'features/workflowLibrary/hooks/useDownloadWorkflowById';
 import type { MouseEvent } from 'react';
 import { useCallback } from 'react';
@@ -18,7 +19,7 @@ export const DownloadWorkflow = ({ workflowId }: { workflowId: string }) => {
 
   const { t } = useTranslation();
   return (
-    <Tooltip label={t('workflows.download')} closeOnScroll>
+    <IAITooltip label={t('workflows.download')} closeOnScroll>
       <IconButton
         size="sm"
         variant="link"
@@ -28,6 +29,6 @@ export const DownloadWorkflow = ({ workflowId }: { workflowId: string }) => {
         icon={<PiDownloadSimpleBold />}
         isLoading={downloadWorkflowById.isLoading}
       />
-    </Tooltip>
+    </IAITooltip>
   );
 };

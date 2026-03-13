@@ -1,5 +1,6 @@
-import { Box, Combobox, Flex, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Combobox, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
 import { postProcessingModelChanged, selectPostProcessingModel } from 'features/parameters/store/upscaleSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -39,7 +40,7 @@ const ParamPostProcessingModel = () => {
     <FormControl orientation="vertical">
       <FormLabel>{t('upscaling.postProcessingModel')}</FormLabel>
       <Flex w="full" alignItems="center" gap={2}>
-        <Tooltip label={tooltipLabel}>
+        <IAITooltip label={tooltipLabel}>
           <Box w="full">
             <Combobox
               value={value}
@@ -50,7 +51,7 @@ const ParamPostProcessingModel = () => {
               isDisabled={options.length === 0}
             />
           </Box>
-        </Tooltip>
+        </IAITooltip>
       </Flex>
     </FormControl>
   );

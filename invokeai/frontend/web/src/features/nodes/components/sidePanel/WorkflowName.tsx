@@ -1,5 +1,6 @@
-import { Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Flex, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { selectWorkflowName } from 'features/nodes/store/selectors';
 import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
@@ -18,11 +19,11 @@ export const WorkflowName = () => {
   return (
     <Flex gap="1" alignItems="center">
       {name.length ? (
-        <Tooltip label={<WorkflowInfoTooltipContent />} placement="top">
+        <IAITooltip label={<WorkflowInfoTooltipContent />} placement="top">
           <Text fontSize="lg" userSelect="none" noOfLines={1} wordBreak="break-all" fontWeight="semibold">
             {name}
           </Text>
-        </Tooltip>
+        </IAITooltip>
       ) : (
         <Text fontSize="lg" fontStyle="italic" fontWeight="semibold">
           {t('workflows.unnamedWorkflow')}
@@ -30,11 +31,11 @@ export const WorkflowName = () => {
       )}
 
       {doesWorkflowHaveUnsavedChanges && mode === 'edit' && (
-        <Tooltip label={t('nodes.newWorkflowDesc2')}>
+        <IAITooltip label={t('nodes.newWorkflowDesc2')}>
           <Flex>
             <Icon as={PiDotOutlineFill} boxSize="20px" color="invokeYellow.500" />
           </Flex>
-        </Tooltip>
+        </IAITooltip>
       )}
       <WorkflowWarning />
     </Flex>

@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnabled';
@@ -19,16 +20,17 @@ export const CanvasEntityEnabledToggle = memo(() => {
   }, [dispatch, entityIdentifier]);
 
   return (
-    <IconButton
-      size="sm"
-      aria-label={t(isEnabled ? 'common.enabled' : 'common.disabled')}
-      tooltip={t(isEnabled ? 'common.enabled' : 'common.disabled')}
-      variant="link"
-      alignSelf="stretch"
-      icon={isEnabled ? <PiCircleFill /> : <PiCircleBold />}
-      onClick={onClick}
-      isDisabled={isBusy}
-    />
+    <IAITooltip label={t(isEnabled ? 'common.enabled' : 'common.disabled')}>
+      <IconButton
+        size="sm"
+        aria-label={t(isEnabled ? 'common.enabled' : 'common.disabled')}
+        variant="link"
+        alignSelf="stretch"
+        icon={isEnabled ? <PiCircleFill /> : <PiCircleBold />}
+        onClick={onClick}
+        isDisabled={isBusy}
+      />
+    </IAITooltip>
   );
 });
 

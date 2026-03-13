@@ -2,6 +2,7 @@ import { Box, Button, ButtonGroup, Collapse, Divider, Flex, IconButton, Spacer }
 import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useGallerySearchTerm';
 import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
@@ -70,36 +71,39 @@ export const GalleryPanel = memo(() => {
         </Button>
         <Spacer />
         <ButtonGroup size="sm" variant="outline">
-          <Button
-            tooltip={t('gallery.imagesTab')}
-            onClick={handleClickImages}
-            data-testid="images-tab"
-            colorScheme={galleryView === 'images' ? 'invokeBlue' : undefined}
-          >
-            {t('parameters.images')}
-          </Button>
+          <IAITooltip label={t('gallery.imagesTab')}>
+            <Button
+              onClick={handleClickImages}
+              data-testid="images-tab"
+              colorScheme={galleryView === 'images' ? 'invokeBlue' : undefined}
+            >
+              {t('parameters.images')}
+            </Button>
+          </IAITooltip>
 
-          <Button
-            tooltip={t('gallery.assetsTab')}
-            onClick={handleClickAssets}
-            data-testid="assets-tab"
-            colorScheme={galleryView === 'assets' ? 'invokeBlue' : undefined}
-          >
-            {t('gallery.assets')}
-          </Button>
+          <IAITooltip label={t('gallery.assetsTab')}>
+            <Button
+              onClick={handleClickAssets}
+              data-testid="assets-tab"
+              colorScheme={galleryView === 'assets' ? 'invokeBlue' : undefined}
+            >
+              {t('gallery.assets')}
+            </Button>
+          </IAITooltip>
         </ButtonGroup>
         <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
           <GalleryUploadButton />
           <GallerySettingsPopover />
-          <IconButton
-            size="sm"
-            variant="link"
-            alignSelf="stretch"
-            onClick={handleClickSearch}
-            tooltip={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}
-            aria-label={t('gallery.displaySearch')}
-            icon={<PiMagnifyingGlassBold />}
-          />
+          <IAITooltip label={searchDisclosure.isOpen ? `${t('gallery.exitSearch')}` : `${t('gallery.displaySearch')}`}>
+            <IconButton
+              size="sm"
+              variant="link"
+              alignSelf="stretch"
+              onClick={handleClickSearch}
+              aria-label={t('gallery.displaySearch')}
+              icon={<PiMagnifyingGlassBold />}
+            />
+          </IAITooltip>
         </Flex>
       </Flex>
       <Collapse in={searchDisclosure.isOpen} style={COLLAPSE_STYLES}>

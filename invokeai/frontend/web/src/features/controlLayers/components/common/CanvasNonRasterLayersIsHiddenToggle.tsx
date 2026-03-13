@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { allNonRasterLayersIsHiddenToggled } from 'features/controlLayers/store/canvasSlice';
 import { selectNonRasterLayersIsHidden } from 'features/controlLayers/store/selectors';
 import type { MouseEventHandler } from 'react';
@@ -21,15 +22,16 @@ export const EntityListNonRasterLayerToggle = memo(() => {
   );
 
   return (
-    <IconButton
-      size="sm"
-      aria-label={t(isHidden ? 'controlLayers.showNonRasterLayers' : 'controlLayers.hideNonRasterLayers')}
-      tooltip={t(isHidden ? 'controlLayers.showNonRasterLayers' : 'controlLayers.hideNonRasterLayers')}
-      variant="link"
-      icon={isHidden ? <PiEyeClosedBold /> : <PiEyeBold />}
-      onClick={onClick}
-      alignSelf="stretch"
-    />
+    <IAITooltip label={t(isHidden ? 'controlLayers.showNonRasterLayers' : 'controlLayers.hideNonRasterLayers')}>
+      <IconButton
+        size="sm"
+        aria-label={t(isHidden ? 'controlLayers.showNonRasterLayers' : 'controlLayers.hideNonRasterLayers')}
+        variant="link"
+        icon={isHidden ? <PiEyeClosedBold /> : <PiEyeBold />}
+        onClick={onClick}
+        alignSelf="stretch"
+      />
+    </IAITooltip>
   );
 });
 

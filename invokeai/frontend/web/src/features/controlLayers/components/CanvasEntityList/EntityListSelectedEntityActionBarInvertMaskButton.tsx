@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useInvertMask } from 'features/controlLayers/hooks/useInvertMask';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
@@ -28,16 +29,17 @@ export const EntityListSelectedEntityActionBarInvertMaskButton = memo(() => {
       : t('controlLayers.invertMask');
 
   return (
-    <IconButton
-      onClick={invertMask}
-      isDisabled={isBusy}
-      minW={8}
-      variant="link"
-      alignSelf="stretch"
-      aria-label={label}
-      tooltip={label}
-      icon={<PiSelectionInverseBold />}
-    />
+    <IAITooltip label={label}>
+      <IconButton
+        onClick={invertMask}
+        isDisabled={isBusy}
+        minW={8}
+        variant="link"
+        alignSelf="stretch"
+        aria-label={label}
+        icon={<PiSelectionInverseBold />}
+      />
+    </IAITooltip>
   );
 });
 

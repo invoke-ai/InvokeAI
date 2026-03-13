@@ -1,5 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useEntityTransform } from 'features/controlLayers/hooks/useEntityTransform';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { isTransformableEntityIdentifier } from 'features/controlLayers/store/types';
@@ -21,16 +22,17 @@ export const EntityListSelectedEntityActionBarTransformButton = memo(() => {
   }
 
   return (
-    <IconButton
-      onClick={transform.start}
-      isDisabled={transform.isDisabled}
-      minW={8}
-      variant="link"
-      alignSelf="stretch"
-      aria-label={t('controlLayers.transform.transform')}
-      tooltip={t('controlLayers.transform.transform')}
-      icon={<PiFrameCornersBold />}
-    />
+    <IAITooltip label={t('controlLayers.transform.transform')}>
+      <IconButton
+        onClick={transform.start}
+        isDisabled={transform.isDisabled}
+        minW={8}
+        variant="link"
+        alignSelf="stretch"
+        aria-label={t('controlLayers.transform.transform')}
+        icon={<PiFrameCornersBold />}
+      />
+    </IAITooltip>
   );
 });
 

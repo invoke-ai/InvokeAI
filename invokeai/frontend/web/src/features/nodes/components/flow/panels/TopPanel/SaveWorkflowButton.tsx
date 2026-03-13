@@ -1,4 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useDoesWorkflowHaveUnsavedChanges } from 'features/nodes/components/sidePanel/workflow/IsolatedWorkflowBuilderWatcher';
 import { useSaveOrSaveAsWorkflow } from 'features/workflowLibrary/hooks/useSaveOrSaveAsWorkflow';
 import { memo } from 'react';
@@ -11,14 +12,15 @@ const SaveWorkflowButton = () => {
   const saveOrSaveAsWorkflow = useSaveOrSaveAsWorkflow();
 
   return (
-    <IconButton
-      tooltip={t('workflows.saveWorkflow')}
-      aria-label={t('workflows.saveWorkflow')}
-      icon={<PiFloppyDiskBold />}
-      isDisabled={!doesWorkflowHaveUnsavedChanges}
-      onClick={saveOrSaveAsWorkflow}
-      pointerEvents="auto"
-    />
+    <IAITooltip label={t('workflows.saveWorkflow')}>
+      <IconButton
+        aria-label={t('workflows.saveWorkflow')}
+        icon={<PiFloppyDiskBold />}
+        isDisabled={!doesWorkflowHaveUnsavedChanges}
+        onClick={saveOrSaveAsWorkflow}
+        pointerEvents="auto"
+      />
+    </IAITooltip>
   );
 };
 

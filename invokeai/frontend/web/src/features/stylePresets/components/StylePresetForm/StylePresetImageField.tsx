@@ -1,4 +1,5 @@
-import { Box, Button, Flex, Icon, IconButton, Image, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, Icon, IconButton, Image } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { dropzoneAccept } from 'common/hooks/useImageUploadButton';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -62,7 +63,7 @@ export const StylePresetImageField = (props: UseControllerProps<StylePresetFormD
 
   return (
     <>
-      <Tooltip label={t('stylePresets.uploadImage')}>
+      <IAITooltip label={t('stylePresets.uploadImage')}>
         <Flex
           as={Button}
           w={65}
@@ -76,7 +77,7 @@ export const StylePresetImageField = (props: UseControllerProps<StylePresetFormD
         >
           <Icon as={PiUploadSimpleBold} w={8} h={8} />
         </Flex>
-      </Tooltip>
+      </IAITooltip>
       <input {...getInputProps()} />
     </>
   );

@@ -1,4 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useAutoFitBBoxToMasks } from 'features/controlLayers/hooks/useAutoFitBBoxToMasks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useVisibleEntityCountByType } from 'features/controlLayers/hooks/useVisibleEntityCountByType';
@@ -30,15 +31,16 @@ export const CanvasToolbarFitBboxToMasksButton = memo(() => {
   });
 
   return (
-    <IconButton
-      onClick={onClick}
-      variant="link"
-      alignSelf="stretch"
-      aria-label={t('controlLayers.fitBboxToMasks')}
-      tooltip={t('controlLayers.fitBboxToMasks')}
-      icon={<PiSelectionAllDuotone />}
-      isDisabled={isBusy || !hasVisibleMasks}
-    />
+    <IAITooltip label={t('controlLayers.fitBboxToMasks')}>
+      <IconButton
+        onClick={onClick}
+        variant="link"
+        alignSelf="stretch"
+        aria-label={t('controlLayers.fitBboxToMasks')}
+        icon={<PiSelectionAllDuotone />}
+        isDisabled={isBusy || !hasVisibleMasks}
+      />
+    </IAITooltip>
   );
 });
 

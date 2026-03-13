@@ -1,5 +1,6 @@
-import { Box, Flex, Icon, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Flex, Icon, Text } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { viewModeChanged } from 'features/stylePresets/store/stylePresetSlice';
 import { getViewModeChunks } from 'features/stylePresets/util/getViewModeChunks';
 import { useCallback, useMemo } from 'react';
@@ -59,7 +60,7 @@ export const ViewModePrompt = ({
           </Text>
         </Flex>
 
-        <Tooltip label={t('stylePresets.viewModeTooltip')}>
+        <IAITooltip label={t('stylePresets.viewModeTooltip')}>
           <Flex
             position="absolute"
             insetInlineEnd={0}
@@ -74,7 +75,7 @@ export const ViewModePrompt = ({
           >
             <Icon as={PiEyeBold} color="base.500" boxSize={4} />
           </Flex>
-        </Tooltip>
+        </IAITooltip>
       </Flex>
     </Box>
   );

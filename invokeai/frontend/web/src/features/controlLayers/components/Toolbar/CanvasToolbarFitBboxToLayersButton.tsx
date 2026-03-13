@@ -1,4 +1,5 @@
 import { IconButton } from '@invoke-ai/ui-library';
+import { IAITooltip } from 'common/components/IAITooltip';
 import { useIsRegionFocused } from 'common/hooks/focus';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
@@ -30,15 +31,16 @@ export const CanvasToolbarFitBboxToLayersButton = memo(() => {
   });
 
   return (
-    <IconButton
-      onClick={onClick}
-      variant="link"
-      alignSelf="stretch"
-      aria-label={t('controlLayers.fitBboxToLayers')}
-      tooltip={t('controlLayers.fitBboxToLayers')}
-      icon={<PiResizeBold />}
-      isDisabled={isBusy}
-    />
+    <IAITooltip label={t('controlLayers.fitBboxToLayers')}>
+      <IconButton
+        onClick={onClick}
+        variant="link"
+        alignSelf="stretch"
+        aria-label={t('controlLayers.fitBboxToLayers')}
+        icon={<PiResizeBold />}
+        isDisabled={isBusy}
+      />
+    </IAITooltip>
   );
 });
 
