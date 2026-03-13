@@ -78,6 +78,14 @@ def test_is_state_dict_likely_anima_lora_false_for_random():
         ("lora_unet_blocks_0_adaln_modulation_cross_attn_1", "blocks.0.adaln_modulation_cross_attn.1"),
         ("lora_unet_blocks_0_adaln_modulation_self_attn_1", "blocks.0.adaln_modulation_self_attn.1"),
         ("lora_unet_blocks_0_adaln_modulation_mlp_1", "blocks.0.adaln_modulation_mlp.1"),
+        # LLM Adapter keys
+        ("lora_unet_llm_adapter_blocks_0_cross_attn_k_proj", "llm_adapter.blocks.0.cross_attn.k_proj"),
+        ("lora_unet_llm_adapter_blocks_0_cross_attn_q_proj", "llm_adapter.blocks.0.cross_attn.q_proj"),
+        ("lora_unet_llm_adapter_blocks_0_cross_attn_v_proj", "llm_adapter.blocks.0.cross_attn.v_proj"),
+        ("lora_unet_llm_adapter_blocks_0_self_attn_k_proj", "llm_adapter.blocks.0.self_attn.k_proj"),
+        ("lora_unet_llm_adapter_blocks_0_self_attn_q_proj", "llm_adapter.blocks.0.self_attn.q_proj"),
+        ("lora_unet_llm_adapter_blocks_0_self_attn_v_proj", "llm_adapter.blocks.0.self_attn.v_proj"),
+        ("lora_unet_llm_adapter_blocks_5_cross_attn_k_proj", "llm_adapter.blocks.5.cross_attn.k_proj"),
     ],
 )
 def test_convert_kohya_unet_key(kohya_key: str, expected: str):

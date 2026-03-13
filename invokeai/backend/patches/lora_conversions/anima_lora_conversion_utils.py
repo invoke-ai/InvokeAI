@@ -60,10 +60,12 @@ _KOHYA_UNET_KEY_REPLACEMENTS = [
     ("cross_attn_q_proj", "cross_attn.q_proj"),
     ("cross_attn_v_proj", "cross_attn.v_proj"),
     ("cross_attn_output_proj", "cross_attn.output_proj"),
+    ("cross_attn_o_proj", "cross_attn.o_proj"),
     ("self_attn_k_proj", "self_attn.k_proj"),
     ("self_attn_q_proj", "self_attn.q_proj"),
     ("self_attn_v_proj", "self_attn.v_proj"),
     ("self_attn_output_proj", "self_attn.output_proj"),
+    ("self_attn_o_proj", "self_attn.o_proj"),
     ("mlp_layer1", "mlp.layer1"),
     ("mlp_layer2", "mlp.layer2"),
 ]
@@ -84,10 +86,17 @@ def _convert_kohya_unet_key(kohya_layer_name: str) -> str:
     """Convert a Kohya-style LoRA layer name to a model parameter path.
 
     Example: lora_unet_blocks_0_cross_attn_k_proj -> blocks.0.cross_attn.k_proj
+    Example: lora_unet_llm_adapter_blocks_0_cross_attn_k_proj -> llm_adapter.blocks.0.cross_attn.k_proj
     """
     key = kohya_layer_name
     if key.startswith("lora_unet_"):
         key = key[len("lora_unet_"):]
+
+    # Handle llm_adapter prefix: strip it, run the standard block conversion, then re-add with dot
+    llm_adapter_prefix = ""
+    if key.startswith("llm_adapter_"):
+        key = key[len("llm_adapter_"):]
+        llm_adapter_prefix = "llm_adapter."
 
     # Convert blocks_N_ to blocks.N.
     key = re.sub(r"^blocks_(\d+)_", r"blocks.\1.", key)
@@ -98,7 +107,7 @@ def _convert_kohya_unet_key(kohya_layer_name: str) -> str:
             key = key.replace(old, new)
             break
 
-    return key
+    return llm_adapter_prefix + key
 
 
 def _convert_kohya_te_key(kohya_layer_name: str) -> str:
