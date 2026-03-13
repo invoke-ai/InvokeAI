@@ -10,7 +10,8 @@ Original source code:
 - MiniTrainDIT backbone and positional embeddings: https://github.com/nvidia-cosmos/cosmos-predict2
   SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
   SPDX-License-Identifier: Apache-2.0
-- LLMAdapter and Anima wrapper: https://github.com/comfyanonymous/ComfyUI/blob/master/comfy/ldm/anima/model.py
+- LLMAdapter and Anima wrapper: Clean-room implementation based on
+  https://github.com/hdae/diffusers-anima (Apache-2.0)
 """
 
 import logging
@@ -742,54 +743,48 @@ class MiniTrainDIT(nn.Module):
 
 # ============================================================================
 # LLM Adapter
-# Source: https://github.com/comfyanonymous/ComfyUI/blob/master/comfy/ldm/anima/model.py
+# Reference implementation: https://github.com/hdae/diffusers-anima
+# SPDX-License-Identifier: Apache-2.0
 # ============================================================================
 
 
 def _rotate_half(x: torch.Tensor) -> torch.Tensor:
-    x1 = x[..., : x.shape[-1] // 2]
-    x2 = x[..., x.shape[-1] // 2 :]
-    return torch.cat((-x2, x1), dim=-1)
+    """Split the last dimension in half and negate-swap: [-x2, x1]."""
+    half = x.shape[-1] // 2
+    first, second = x[..., :half], x[..., half:]
+    return torch.cat((-second, first), dim=-1)
 
 
-def _apply_rotary_pos_emb_llm(
-    x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor, unsqueeze_dim: int = 1
-) -> torch.Tensor:
-    cos = cos.unsqueeze(unsqueeze_dim)
-    sin = sin.unsqueeze(unsqueeze_dim)
-    return (x * cos) + (_rotate_half(x) * sin)
+def _apply_rope(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> torch.Tensor:
+    """Apply rotary position embeddings to tensor x given precomputed cos/sin."""
+    return (x * cos.unsqueeze(1)) + (_rotate_half(x) * sin.unsqueeze(1))
 
 
 class LLMAdapterRotaryEmbedding(nn.Module):
     """Rotary position embedding for the LLM Adapter's attention layers."""
 
-    def __init__(self, head_dim: int):
+    def __init__(self, head_dim: int, theta: float = 10000.0):
         super().__init__()
-        self.rope_theta = 10000
-        inv_freq = 1.0 / (self.rope_theta ** (torch.arange(0, head_dim, 2, dtype=torch.int64).float() / head_dim))
+        half_dim = head_dim // 2
+        index = torch.arange(half_dim, dtype=torch.float32)
+        exponent = (2.0 / float(head_dim)) * index
+        inv_freq = torch.reciprocal(
+            torch.pow(torch.tensor(theta, dtype=torch.float32), exponent)
+        )
         self.register_buffer("inv_freq", inv_freq, persistent=False)
 
-    @torch.no_grad()
-    def forward(self, x: torch.Tensor, position_ids: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        inv_freq_expanded = self.inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1).to(x.device)
-        position_ids_expanded = position_ids[:, None, :].float()
-
-        device_type = x.device.type if isinstance(x.device.type, str) and x.device.type != "mps" else "cpu"
-        with torch.autocast(device_type=device_type, enabled=False):
-            freqs = (inv_freq_expanded.float() @ position_ids_expanded.float()).transpose(1, 2)
-            emb = torch.cat((freqs, freqs), dim=-1)
-            cos = emb.cos()
-            sin = emb.sin()
-
-        return cos.to(dtype=x.dtype), sin.to(dtype=x.dtype)
+    def forward(
+        self, x: torch.Tensor, position_ids: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        pos = position_ids.to(device=x.device, dtype=torch.float32)
+        inv = self.inv_freq.to(device=x.device, dtype=torch.float32)
+        freqs = torch.einsum("bl,d->bld", pos, inv)
+        emb = freqs.repeat(1, 1, 2)
+        return emb.cos().to(dtype=x.dtype), emb.sin().to(dtype=x.dtype)
 
 
 class LLMAdapterAttention(nn.Module):
-    """Attention for the LLM Adapter's transformer blocks.
-
-    Supports both self-attention and cross-attention with separate rotary
-    position embeddings for query and key sequences.
-    """
+    """Attention for the LLM Adapter with QK normalization and rotary position embeddings."""
 
     def __init__(self, query_dim: int, context_dim: int, n_heads: int, head_dim: int):
         super().__init__()
@@ -807,40 +802,47 @@ class LLMAdapterAttention(nn.Module):
     def forward(
         self,
         x: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
+        *,
         context: Optional[torch.Tensor] = None,
-        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
-        position_embeddings_context: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        attn_mask: Optional[torch.Tensor] = None,
+        pos_q: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        pos_k: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
     ) -> torch.Tensor:
         context = x if context is None else context
-        input_shape = x.shape[:-1]
-        q_shape = (*input_shape, self.n_heads, self.head_dim)
-        context_shape = context.shape[:-1]
-        kv_shape = (*context_shape, self.n_heads, self.head_dim)
 
-        query_states = self.q_norm(self.q_proj(x).view(q_shape)).transpose(1, 2)
-        key_states = self.k_norm(self.k_proj(context).view(kv_shape)).transpose(1, 2)
-        value_states = self.v_proj(context).view(kv_shape).transpose(1, 2)
+        q = (
+            self.q_proj(x)
+            .view(x.shape[0], x.shape[1], self.n_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        k = (
+            self.k_proj(context)
+            .view(context.shape[0], context.shape[1], self.n_heads, self.head_dim)
+            .transpose(1, 2)
+        )
+        v = (
+            self.v_proj(context)
+            .view(context.shape[0], context.shape[1], self.n_heads, self.head_dim)
+            .transpose(1, 2)
+        )
 
-        if position_embeddings is not None:
-            assert position_embeddings_context is not None
-            cos, sin = position_embeddings
-            query_states = _apply_rotary_pos_emb_llm(query_states, cos, sin)
-            cos, sin = position_embeddings_context
-            key_states = _apply_rotary_pos_emb_llm(key_states, cos, sin)
+        q = self.q_norm(q)
+        k = self.k_norm(k)
 
-        attn_output = F.scaled_dot_product_attention(query_states, key_states, value_states, attn_mask=mask)
-        attn_output = attn_output.transpose(1, 2).reshape(*input_shape, -1).contiguous()
-        return self.o_proj(attn_output)
+        if pos_q is not None and pos_k is not None:
+            q = _apply_rope(q, *pos_q)
+            k = _apply_rope(k, *pos_k)
+
+        y = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+        y = y.transpose(1, 2).reshape(x.shape[0], x.shape[1], -1).contiguous()
+        return self.o_proj(y)
 
 
 class LLMAdapterTransformerBlock(nn.Module):
     """Single transformer block in the LLM Adapter.
 
-    Each block contains:
-    - Optional self-attention on the target (T5 embedding) sequence
-    - Cross-attention: target queries attend to source (Qwen3) keys/values
-    - MLP with GELU activation
+    Each block contains self-attention, cross-attention, and MLP with
+    RMSNorm pre-normalization.
     """
 
     def __init__(
@@ -848,51 +850,46 @@ class LLMAdapterTransformerBlock(nn.Module):
         source_dim: int,
         model_dim: int,
         num_heads: int = 16,
-        mlp_ratio: float = 4.0,
-        use_self_attn: bool = False,
     ):
         super().__init__()
-        self.use_self_attn = use_self_attn
         head_dim = model_dim // num_heads
 
-        if self.use_self_attn:
-            self.norm_self_attn = nn.RMSNorm(model_dim, eps=1e-6)
-            self.self_attn = LLMAdapterAttention(model_dim, model_dim, num_heads, head_dim)
+        self.norm_self_attn = nn.RMSNorm(model_dim, eps=1e-6)
+        self.self_attn = LLMAdapterAttention(model_dim, model_dim, num_heads, head_dim)
 
         self.norm_cross_attn = nn.RMSNorm(model_dim, eps=1e-6)
         self.cross_attn = LLMAdapterAttention(model_dim, source_dim, num_heads, head_dim)
 
         self.norm_mlp = nn.RMSNorm(model_dim, eps=1e-6)
         self.mlp = nn.Sequential(
-            nn.Linear(model_dim, int(model_dim * mlp_ratio)),
+            nn.Linear(model_dim, model_dim * 4),
             nn.GELU(),
-            nn.Linear(int(model_dim * mlp_ratio), model_dim),
+            nn.Linear(model_dim * 4, model_dim),
         )
 
     def forward(
         self,
         x: torch.Tensor,
+        *,
         context: torch.Tensor,
-        target_attention_mask: Optional[torch.Tensor] = None,
-        source_attention_mask: Optional[torch.Tensor] = None,
-        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
-        position_embeddings_context: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
+        target_mask: Optional[torch.Tensor] = None,
+        source_mask: Optional[torch.Tensor] = None,
+        pos_target: Tuple[torch.Tensor, torch.Tensor],
+        pos_source: Tuple[torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        if self.use_self_attn:
-            normed = self.norm_self_attn(x)
-            attn_out = self.self_attn(
-                normed, mask=target_attention_mask,
-                position_embeddings=position_embeddings, position_embeddings_context=position_embeddings,
-            )
-            x = x + attn_out
-
-        normed = self.norm_cross_attn(x)
-        attn_out = self.cross_attn(
-            normed, mask=source_attention_mask, context=context,
-            position_embeddings=position_embeddings, position_embeddings_context=position_embeddings_context,
+        x = x + self.self_attn(
+            self.norm_self_attn(x),
+            attn_mask=target_mask,
+            pos_q=pos_target,
+            pos_k=pos_target,
         )
-        x = x + attn_out
-
+        x = x + self.cross_attn(
+            self.norm_cross_attn(x),
+            context=context,
+            attn_mask=source_mask,
+            pos_q=pos_target,
+            pos_k=pos_source,
+        )
         x = x + self.mlp(self.norm_mlp(x))
         return x
 
@@ -900,48 +897,32 @@ class LLMAdapterTransformerBlock(nn.Module):
 class LLMAdapter(nn.Module):
     """LLM Adapter: bridges Qwen3 hidden states and T5-XXL token embeddings.
 
-    This is the key custom component in Anima. It takes:
-    - source_hidden_states: Qwen3 0.6B hidden states (dim=1024)
-    - target_input_ids: T5-XXL token IDs
-
-    And produces conditioning embeddings for the Cosmos DiT via:
-    1. Embedding T5 token IDs via learned Embedding(32128, 1024)
-    2. Cross-attending T5 embeddings to Qwen3 hidden states through 6 transformer layers
-    3. Projecting and normalizing the output
-
-    The output is zero-padded to 512 tokens for the DiT cross-attention.
+    Takes Qwen3 hidden states and T5-XXL token IDs, produces conditioning
+    embeddings for the Cosmos DiT via cross-attention through 6 transformer layers.
 
     Args:
-        source_dim: Dimension of source (Qwen3) hidden states.
-        target_dim: Dimension of target (T5) embeddings.
-        model_dim: Internal model dimension.
+        vocab_size: Size of the T5 token vocabulary.
+        dim: Model dimension (used for embeddings, projections, and all layers).
         num_layers: Number of transformer layers.
         num_heads: Number of attention heads.
-        use_self_attn: Whether to use self-attention in transformer blocks.
     """
 
     def __init__(
         self,
-        source_dim: int = 1024,
-        target_dim: int = 1024,
-        model_dim: int = 1024,
+        vocab_size: int = 32128,
+        dim: int = 1024,
         num_layers: int = 6,
         num_heads: int = 16,
-        use_self_attn: bool = True,
     ):
         super().__init__()
-        self.embed = nn.Embedding(32128, target_dim)
-        if model_dim != target_dim:
-            self.in_proj = nn.Linear(target_dim, model_dim)
-        else:
-            self.in_proj = nn.Identity()
-        self.rotary_emb = LLMAdapterRotaryEmbedding(model_dim // num_heads)
+        self.embed = nn.Embedding(vocab_size, dim)
         self.blocks = nn.ModuleList([
-            LLMAdapterTransformerBlock(source_dim, model_dim, num_heads=num_heads, use_self_attn=use_self_attn)
+            LLMAdapterTransformerBlock(source_dim=dim, model_dim=dim, num_heads=num_heads)
             for _ in range(num_layers)
         ])
-        self.out_proj = nn.Linear(model_dim, target_dim)
-        self.norm = nn.RMSNorm(target_dim, eps=1e-6)
+        self.out_proj = nn.Linear(dim, dim)
+        self.norm = nn.RMSNorm(dim, eps=1e-6)
+        self.rotary_emb = LLMAdapterRotaryEmbedding(dim // num_heads)
 
     def forward(
         self,
@@ -950,39 +931,42 @@ class LLMAdapter(nn.Module):
         target_attention_mask: Optional[torch.Tensor] = None,
         source_attention_mask: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
+        # Expand attention masks for multi-head attention
         if target_attention_mask is not None:
             target_attention_mask = target_attention_mask.to(torch.bool)
             if target_attention_mask.ndim == 2:
-                target_attention_mask = target_attention_mask.unsqueeze(1).unsqueeze(1)
+                target_attention_mask = target_attention_mask[:, None, None, :]
 
         if source_attention_mask is not None:
             source_attention_mask = source_attention_mask.to(torch.bool)
             if source_attention_mask.ndim == 2:
-                source_attention_mask = source_attention_mask.unsqueeze(1).unsqueeze(1)
+                source_attention_mask = source_attention_mask[:, None, None, :]
 
         context = source_hidden_states
-        # Standard nn.Embedding doesn't support out_dtype; cast after forward
-        x = self.in_proj(self.embed(target_input_ids).to(dtype=context.dtype))
+        x = self.embed(target_input_ids).to(dtype=context.dtype)
 
-        position_ids = torch.arange(x.shape[1], device=x.device).unsqueeze(0)
-        position_ids_context = torch.arange(context.shape[1], device=x.device).unsqueeze(0)
-        position_embeddings = self.rotary_emb(x, position_ids)
-        position_embeddings_context = self.rotary_emb(x, position_ids_context)
+        # Build position IDs and compute rotary embeddings
+        target_pos_ids = torch.arange(x.shape[1], device=x.device, dtype=torch.long).unsqueeze(0)
+        source_pos_ids = torch.arange(context.shape[1], device=x.device, dtype=torch.long).unsqueeze(0)
+        pos_target = self.rotary_emb(x, target_pos_ids)
+        pos_source = self.rotary_emb(x, source_pos_ids)
 
         for block in self.blocks:
             x = block(
-                x, context,
-                target_attention_mask=target_attention_mask,
-                source_attention_mask=source_attention_mask,
-                position_embeddings=position_embeddings,
-                position_embeddings_context=position_embeddings_context,
+                x,
+                context=context,
+                target_mask=target_attention_mask,
+                source_mask=source_attention_mask,
+                pos_target=pos_target,
+                pos_source=pos_source,
             )
         return self.norm(self.out_proj(x))
 
 
 # ============================================================================
 # Anima: MiniTrainDIT + LLMAdapter
-# Source: https://github.com/comfyanonymous/ComfyUI/blob/master/comfy/ldm/anima/model.py
+# Reference implementation: https://github.com/hdae/diffusers-anima
+# SPDX-License-Identifier: Apache-2.0
 # ============================================================================
 
 
@@ -991,18 +975,6 @@ class AnimaTransformer(MiniTrainDIT):
 
     Extends MiniTrainDIT by adding the LLMAdapter component that preprocesses
     text embeddings before they are fed to the DiT cross-attention layers.
-
-    The forward pass:
-    1. Runs the LLM Adapter to produce conditioning from Qwen3 hidden states + T5 token IDs
-    2. Zero-pads the conditioning to 512 tokens
-    3. Passes the conditioning to MiniTrainDIT's cross-attention
-
-    Default configuration for Anima:
-    - model_channels=2048, num_blocks=28, num_heads=16
-    - crossattn_emb_channels=1024, patch_spatial=2, patch_temporal=1
-    - in_channels=16, out_channels=16
-    - use_adaln_lora=True, adaln_lora_dim=256
-    - extra_per_block_abs_pos_emb=True
     """
 
     def __init__(self, *args, **kwargs):
@@ -1025,15 +997,14 @@ class AnimaTransformer(MiniTrainDIT):
         Returns:
             Conditioning tensor. Shape: (batch, 512, 1024), zero-padded if needed.
         """
-        if text_ids is not None:
-            out = self.llm_adapter(text_embeds, text_ids)
-            if t5xxl_weights is not None:
-                out = out * t5xxl_weights
-            if out.shape[1] < 512:
-                out = F.pad(out, (0, 0, 0, 512 - out.shape[1]))
-            return out
-        else:
+        if text_ids is None:
             return text_embeds
+        out = self.llm_adapter(text_embeds, text_ids)
+        if t5xxl_weights is not None:
+            out = out * t5xxl_weights
+        if out.shape[1] < 512:
+            out = F.pad(out, (0, 0, 0, 512 - out.shape[1]))
+        return out
 
     def forward(
         self,
