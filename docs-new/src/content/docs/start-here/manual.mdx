@@ -1,0 +1,193 @@
+---
+title: Manual Installation
+lastUpdated: 2026-02-18
+---
+
+import { LinkCard, Tabs, TabItem, Steps, LinkButton } from '@astrojs/starlight/components'
+import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
+
+<SystemRequirementsLink />
+
+## Are you in the right place?
+
+<LinkCard
+  title="Local Installation Guide"
+  description="If you want to use Invoke locally, you should probably use the launcher instead."
+  href="/getting-started/installation"
+/>
+
+<LinkCard
+  title="Developer Installation Guide"
+  description="If you want to contribute to InvokeAI or run the app on the main branch, follow the developer installation guide instead."
+  href="/contributing/dev-environment"
+/>
+
+## Walkthrough
+
+We'll use [`uv`](https://github.com/astral-sh/uv) to install python and create a virtual environment, then install the `invokeai` package. `uv` is a modern, very fast alternative to `pip`.
+
+The following commands vary depending on the version of Invoke being installed and the system onto which it is being installed.
+
+<Steps>
+
+  1. Install `uv` as described in its [docs](https://docs.astral.sh/uv/getting-started/installation/#standalone-installer). We suggest using the standalone installer method.
+
+      Run `uv --version` to confirm that `uv` is installed and working. After installation, you may need to restart your terminal to get access to `uv`.
+
+  2. Create a directory for your installation, typically in your home directory (e.g. `~/invokeai` or `$Home/invokeai`):
+
+      <Tabs syncKey="operatingSystem">
+        <TabItem label="Windows" icon="seti:windows">
+          ```ps
+          mkdir $Home/invokeai
+          cd $Home/invokeai
+          ```
+        </TabItem>
+        <TabItem label="Linux/MacOS" icon="linux">
+          ```bash
+          mkdir ~/invokeai
+          cd ~/invokeai
+          ```
+        </TabItem>
+      </Tabs>
+
+  3. Create a virtual environment in that directory:
+
+      ```sh
+      uv venv --relocatable --prompt invoke --python 3.12 --python-preference only-managed .venv
+      ```
+
+      This command creates a portable virtual environment at `.venv` complete with a portable python 3.12. It doesn't matter if your system has no python installed, or has a different version - `uv` will handle everything.
+
+  4. Activate the virtual environment:
+
+      <Tabs syncKey="operatingSystem">
+        <TabItem label="Windows" icon="seti:windows">
+          ```ps
+          .venv\Scripts\activate
+          ```
+        </TabItem>
+        <TabItem label="Linux/MacOS" icon="linux">
+          ```bash
+          source .venv/bin/activate
+          ```
+        </TabItem>
+      </Tabs>
+
+  5. Choose a version to install.
+
+      <LinkButton
+        icon="github"
+        iconPlacement="start"
+        href="https://github.com/invoke-ai/InvokeAI/releases"
+        rel="noopener noreferrer"
+      >
+        View Releases
+      </LinkButton>
+
+  6. Determine the package specifier to use when installing. This is a performance optimization.
+
+      - If you have an Nvidia 20xx series GPU or older, use `invokeai[xformers]`.
+      - If you have an Nvidia 30xx series GPU or newer, or do not have an Nvidia GPU, use `invokeai`.
+
+  7. Determine the torch backend to use for installation, if any. This is necessary to get the right version of torch installed. This is acheived by using [UV's built in torch support.](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection)
+
+      :::note[Torch Backend Selection]
+        Pick a torch backend only when it applies to your system. In all other cases, do not use a torch backend.
+      :::
+
+      <Tabs syncKey="operatingSystem">
+        <TabItem label="Windows" icon="seti:windows">
+          <Tabs synkKey="windowsGpuType">
+            <TabItem label="Nvidia GPU">
+              Use:
+              ```sh
+              --torch-backend=cu128
+              ```
+            </TabItem>
+            <TabItem label="Other / no GPU">
+              Do not use a torch backend.
+            </TabItem>
+          </Tabs>
+        </TabItem>
+
+        <TabItem label="Linux/MacOS" icon="linux">
+          <Tabs syncKey="unixGpuType">
+            <TabItem label="Linux + Nvidia GPU">
+              Use:
+              ```sh
+              --torch-backend=cu128
+              ```
+            </TabItem>
+            <TabItem label="Linux + no GPU">
+              Use:
+              ```sh
+              --torch-backend=cpu
+              ```
+            </TabItem>
+            <TabItem label="Linux + AMD GPU">
+              Use:
+              ```sh
+              --torch-backend=rocm6.3
+              ```
+            </TabItem>
+            <TabItem label="All other cases">
+              Do not use a torch backend.
+            </TabItem>
+          </Tabs>
+        </TabItem>
+      </Tabs>
+
+  8. Install the `invokeai` package. Substitute the package specifier and version.
+
+      <Tabs synckKey="torchBackend">
+        <TabItem label="No torch backend">
+          ```sh
+          uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.12 --python-preference only-managed --force-reinstall
+          ```
+        </TabItem>
+        <TabItem label="With torch backend">
+          ```sh
+          uv pip install <PACKAGE_SPECIFIER>==<VERSION> --python 3.12 --python-preference only-managed --torch-backend=<VERSION> --force-reinstall
+          ```
+        </TabItem>
+
+      </Tabs>
+
+  9. Deactivate and reactivate your venv so that the invokeai-specific commands become available in the environment:
+
+      <Tabs syncKey="operatingSystem">
+        <TabItem label="Windows" icon="seti:windows">
+          ```ps
+          deactivate
+          .venv\Scripts\activate
+          ```
+        </TabItem>
+        <TabItem label="Linux/MacOS" icon="linux">
+          ```bash
+          deactivate && source .venv/bin/activate
+          ```
+        </TabItem>
+      </Tabs>
+
+  10. Run the application, specifying the directory you created earlier as the root directory:
+
+      <Tabs syncKey="operatingSystem">
+        <TabItem label="Windows" icon="seti:windows">
+          ```ps
+          invokeai-web --root ~/invokeai
+          ```
+        </TabItem>
+        <TabItem label="Linux/MacOS" icon="linux">
+          ```bash
+          invokeai-web --root $Home/invokeai
+          ```
+        </TabItem>
+      </Tabs>
+</Steps>
+
+If you run Invoke on a headless server, you might want to install and run Invoke on the command line.
+
+We do not plan to maintain scripts to do this moving forward, instead focusing our dev resources on the GUI [launcher](/getting-started/installation).
+
+You can create your own scripts for this by copying the handful of commands in this guide. `uv`'s [`pip` interface docs](https://docs.astral.sh/uv/reference/cli/#uv-pip-install) may be useful.

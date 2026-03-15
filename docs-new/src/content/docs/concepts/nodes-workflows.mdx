@@ -1,0 +1,29 @@
+---
+title: Nodes and Workflows
+sidebar:
+  order: 4
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What are Nodes?
+
+A **Node** is simply a single operation that takes in inputs and returns outputs. Multiple nodes can be linked together to create more complex functionality. All InvokeAI features are added through nodes.
+
+With nodes, you can easily extend the image generation capabilities of InvokeAI and build workflows that suit your specific needs.
+
+### Anatomy of a Node
+
+Individual nodes are made up of the following:
+
+<CardGrid>
+  <Card title="Inputs" icon="left-arrow">
+    Edge points on the **left side** of the node window where you connect outputs from other nodes.
+  </Card>
+  <Card title="Outputs" icon="right-arrow">
+    Edge points on the **right side** of the node window where you connect to inputs on other nodes.
+  </Card>
+  <Card title="Options" icon="setting">
+    Various options which are either manually configured, or overridden by connecting an output from another node to the input.
+  </Card>
+</CardGrid>

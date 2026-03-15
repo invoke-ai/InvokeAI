@@ -1,0 +1,77 @@
+---
+title: Diffusion
+lastUpdated: 2026-02-20
+sidebar:
+  order: 2
+---
+
+import { Card, CardGrid, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Taking the time to understand the diffusion process will help you to understand how to more effectively use InvokeAI.
+
+## Image Space vs. Latent Space
+
+There are two main ways Stable Diffusion works — with images, and latents.
+
+<CardGrid>
+  <Card title="Image Space" icon="seti:image">
+    Represents images in pixel form that you look at. This is the final visual output you see.
+  </Card>
+  <Card title="Latent Space" icon="puzzle">
+    Represents compressed inputs. It's in latent space that Stable Diffusion processes images.
+  </Card>
+</CardGrid>
+
+:::note[What is a VAE?]
+  A **VAE (Variational Auto Encoder)** is responsible for compressing and encoding inputs into *latent space*, as well as decoding outputs back into *image space*.
+:::
+
+## Core Components
+
+To fully understand the diffusion process, we need to understand a few more terms: **U-Net**, **CLIP**, and **conditioning**.
+
+<CardGrid>
+  <Card title="U-Net" icon="setting">
+    A model trained on a large number of latent images with known amounts of random noise added. The U-Net can be given a slightly noisy image and it will predict the pattern of noise needed to subtract from the image in order to recover the original.
+  </Card>
+  <Card title="CLIP & Conditioning" icon="document">
+    **CLIP** is a model that tokenizes and encodes text into **conditioning**. This conditioning guides the model during the denoising steps to produce a new image.
+  </Card>
+</CardGrid>
+
+The U-Net and CLIP work together during the image generation process at each denoising step. The U-Net removes noise so that the result is similar to images in its training set, while CLIP guides the U-Net towards creating images that are most similar to your prompt.
+
+## The Generation Process
+
+<Tabs>
+  <TabItem label="Text-to-Image" icon="seti:default">
+    When you generate an image using text-to-image, multiple steps occur in latent space:
+
+    <Steps>
+      1. **Noise Generation:** Random noise is generated at the chosen height and width. The noise's characteristics are dictated by the seed. This noise tensor is passed into latent space. We'll call this *noise A*.
+      2. **Noise Prediction:** Using a model's U-Net, a noise predictor examines *noise A* and the words tokenized by CLIP from your prompt (conditioning). It generates its own noise tensor to predict what the final image might look like in latent space. We'll call this *noise B*.
+      3. **Subtraction:** *Noise B* is subtracted from *noise A* in an attempt to create a latent image consistent with the prompt. This step is repeated for the number of sampler steps chosen.
+      4. **Decoding:** The VAE decodes the final latent image from latent space into image space.
+    </Steps>
+  </TabItem>
+  <TabItem label="Image-to-Image" icon="seti:image">
+    Image-to-image is a similar process, with only the first step being different:
+
+    <Steps>
+      1. **Encoding & Adding Noise:** The input image is encoded from image space into latent space by the VAE. Noise is then added to the input latent image.
+         * **Denoising Strength** dictates how many noise steps are added, and the amount of noise added at each step.
+         * A strength of `0` means there are 0 steps and no noise added, resulting in an unchanged image.
+         * A strength of `1` results in the image being completely replaced with noise and a full set of denoising steps are performed.
+      2. **Noise Prediction:** Using a model's U-Net, a noise predictor examines the noisy latent image and the conditioning from your prompt. It generates its own noise tensor to predict the final image.
+      3. **Subtraction:** The predicted noise is subtracted from the current noise in an attempt to create a latent image consistent with the prompt. This step is repeated for the remaining sampler steps.
+      4. **Decoding:** The VAE decodes the final latent image from latent space into image space.
+    </Steps>
+  </TabItem>
+</Tabs>
+
+## Summary
+
+<Card title="Putting it all together" icon="star">
+- A **Model** provides the CLIP prompt tokenizer, the VAE, and a U-Net (where noise prediction occurs given a prompt and initial noise tensor).
+- A **Noise Scheduler** (e.g. `DPM++ 2M Karras`) schedules the subtraction of noise from the latent image across the sampler steps chosen. Less noise is usually subtracted at higher sampler steps.
+</Card>
