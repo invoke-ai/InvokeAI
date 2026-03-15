@@ -32,7 +32,7 @@ export const GradientLinearIcon = memo(() => {
   const id = useId();
   const gradientId = `${id}-gradient-linear-diagonal`;
   return (
-    <Box as="svg" viewBox="0 0 24 24" boxSize="22px" aria-hidden focusable={false} display="block">
+    <Box as="svg" viewBox="0 0 20 20" aria-hidden focusable={false} display="block">
       <defs>
         <linearGradient id={gradientId} x1="0" y1="1" x2="1" y2="0">
           <stop offset="0%" stopColor="currentColor" stopOpacity="0.0" />
@@ -40,15 +40,15 @@ export const GradientLinearIcon = memo(() => {
         </linearGradient>
       </defs>
       <rect
-        x="4"
-        y="4"
+        x="2"
+        y="2"
         width="16"
         height="16"
         rx="2"
         fill={`url(#${gradientId})`}
         stroke="currentColor"
         strokeOpacity="0.9"
-        strokeWidth="1"
+        strokeWidth="1.2"
       />
     </Box>
   );
@@ -59,7 +59,7 @@ export const GradientRadialIcon = memo(() => {
   const id = useId();
   const gradientId = `${id}-gradient-radial`;
   return (
-    <Box as="svg" viewBox="0 0 24 24" boxSize="22px" aria-hidden focusable={false} display="block">
+    <Box as="svg" viewBox="0 0 20 20" aria-hidden focusable={false} display="block">
       <defs>
         <radialGradient id={gradientId} cx="0.5" cy="0.5" r="0.5">
           <stop offset="0%" stopColor="currentColor" stopOpacity="0.0" />
@@ -67,13 +67,13 @@ export const GradientRadialIcon = memo(() => {
         </radialGradient>
       </defs>
       <circle
-        cx="12"
-        cy="12"
+        cx="10"
+        cy="10"
         r="8"
         fill={`url(#${gradientId})`}
         stroke="currentColor"
         strokeOpacity="0.9"
-        strokeWidth="1"
+        strokeWidth="1.2"
       />
     </Box>
   );
