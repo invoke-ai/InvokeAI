@@ -1,7 +1,7 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCaretLineDownBold as PhCaretLineDown, PiCaretLineUpBold as PhCaretLineUp } from 'react-icons/pi';
+import { PiCaretLineDownBold, PiCaretLineUpBold } from 'react-icons/pi';
 
 type Props = {
   areThumbnailsVisible: boolean;
@@ -19,7 +19,7 @@ export const StagingAreaToolbarToggleThumbnailsButton = memo(({ areThumbnailsVis
     <IconButton
       tooltip={label}
       aria-label={label}
-      icon={areThumbnailsVisible ? <PhCaretLineDown /> : <PhCaretLineUp />}
+      icon={areThumbnailsVisible ? <PiCaretLineDownBold /> : <PiCaretLineUpBold />}
       onClick={onToggle}
       colorScheme="invokeBlue"
     />
