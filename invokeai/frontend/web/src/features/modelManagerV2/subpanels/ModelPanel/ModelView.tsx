@@ -20,6 +20,7 @@ import type {
   Qwen3EncoderModelConfig,
   SigLIPModelConfig,
   T5EncoderModelConfig,
+  TextLLMModelConfig,
 } from 'services/api/types';
 
 import { isExternalModel } from './isExternalModel';
@@ -36,7 +37,8 @@ type EncoderModelConfig =
   | Qwen3EncoderModelConfig
   | CLIPVisionModelConfig
   | SigLIPModelConfig
-  | LlavaOnevisionModelConfig;
+  | LlavaOnevisionModelConfig
+  | TextLLMModelConfig;
 
 const isEncoderModel = (modelConfig: AnyModelConfig): modelConfig is EncoderModelConfig => {
   return (
@@ -45,7 +47,8 @@ const isEncoderModel = (modelConfig: AnyModelConfig): modelConfig is EncoderMode
     modelConfig.type === 'qwen3_encoder' ||
     modelConfig.type === 'clip_vision' ||
     modelConfig.type === 'siglip' ||
-    modelConfig.type === 'llava_onevision'
+    modelConfig.type === 'llava_onevision' ||
+    modelConfig.type === 'text_llm'
   );
 };
 

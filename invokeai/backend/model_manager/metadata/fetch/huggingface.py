@@ -82,12 +82,11 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
 
         for s in model_info.siblings or []:
             assert s.rfilename is not None
-            assert s.size is not None
             files.append(
                 RemoteModelFile(
                     url=hf_hub_url(repo_id, s.rfilename, revision=variant or "main"),
                     path=Path(name, s.rfilename),
-                    size=s.size,
+                    size=s.size or 0,
                     sha256=s.lfs.get("sha256") if s.lfs else None,
                 )
             )

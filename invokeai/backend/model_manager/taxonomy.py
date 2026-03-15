@@ -76,6 +76,7 @@ class ModelType(str, Enum):
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
+    TextLLM = "text_llm"
     Unknown = "unknown"
 
 

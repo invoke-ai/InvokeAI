@@ -92,6 +92,7 @@ export type CLIPLEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_e
 export type CLIPGEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_embed'; variant: 'gigantic' }>;
 export type CLIPEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_embed' }>;
 export type LlavaOnevisionModelConfig = Extract<S['AnyModelConfig'], { type: 'llava_onevision' }>;
+export type TextLLMModelConfig = Extract<S['AnyModelConfig'], { type: 'text_llm' }>;
 export type T5EncoderModelConfig = Extract<S['AnyModelConfig'], { type: 't5_encoder' }>;
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
   S['AnyModelConfig'],
@@ -216,6 +217,10 @@ export const isCLIPVisionModelConfig = (config: AnyModelConfig): config is CLIPV
 
 export const isLLaVAModelConfig = (config: AnyModelConfig): config is LlavaOnevisionModelConfig => {
   return config.type === 'llava_onevision';
+};
+
+export const isTextLLMModelConfig = (config: AnyModelConfig): config is TextLLMModelConfig => {
+  return config.type === 'text_llm';
 };
 
 export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAdapterModelConfig => {
