@@ -1,0 +1,6386 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+        <meta name="author" content="mauwii">
+      
+      
+        <link rel="canonical" href="https://invoke-ai.github.io/InvokeAI/multiuser/specification/">
+      
+      
+        <link rel="prev" href="../../contributing/MODEL_MANAGER/">
+      
+      
+        <link rel="next" href="../../contributing/LOCAL_DEVELOPMENT/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../img/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+    
+    
+      
+        <title>Specification - Invoke</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,300i,400,400i,700,700i%7CJetBrains+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Inter";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+  
+
+
+  
+  
+
+<script id="__analytics">function __md_analytics(){function e(){dataLayer.push(arguments)}window.dataLayer=window.dataLayer||[],e("js",new Date),e("config","G-2X4JR4S4FB"),document.addEventListener("DOMContentLoaded",(function(){document.forms.search&&document.forms.search.query.addEventListener("blur",(function(){this.value&&e("event","search",{search_term:this.value})}));document$.subscribe((function(){var t=document.forms.feedback;if(void 0!==t)for(var a of t.querySelectorAll("[type=submit]"))a.addEventListener("click",(function(a){a.preventDefault();var n=document.location.pathname,d=this.getAttribute("data-md-value");e("event","feedback",{page:n,data:d}),t.firstElementChild.disabled=!0;var r=t.querySelector(".md-feedback__note [data-md-value='"+d+"']");r&&(r.hidden=!1)})),t.hidden=!1})),location$.subscribe((function(t){e("config","G-2X4JR4S4FB",{page_path:t.pathname})}))}));var t=document.createElement("script");t.async=!0,t.src="https://www.googletagmanager.com/gtag/js?id=G-2X4JR4S4FB",document.getElementById("__analytics").insertAdjacentElement("afterEnd",t)}</script>
+  
+    <script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+  
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#invokeai-multi-user-support-detailed-specification" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="Invoke" class="md-header__button md-logo" aria-label="Invoke" data-md-component="logo">
+      
+  <img src="../../img/invoke-symbol-wht-lrg.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Invoke
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Specification
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../installation/quick_start/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Installation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../nodes/overview/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Workflows & Nodes
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../configuration/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Configuration
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../help/gettingStartedWithAI/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Features
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../user_guide/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Multi-User Mode
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../help/gettingStartedWithAI/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Help
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="Invoke" class="md-nav__button md-logo" aria-label="Invoke" data-md-component="logo">
+      
+  <img src="../../img/invoke-symbol-wht-lrg.svg" alt="logo">
+
+    </a>
+    Invoke
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/invoke-ai/InvokeAI" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    invoke-ai/InvokeAI
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Installation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/quick_start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Detailed Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/manual/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual Install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/docker/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Docker
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/patchmatch/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PatchMatch
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../installation/models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows & Nodes
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Workflows & Nodes
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nodes Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/NODES/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow Editor Basics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/defaultNodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    List of Default Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/communityNodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Community Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/comfyToInvoke/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ComfyUI to InvokeAI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/detailedNodes/faceTools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Facetool Node
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/contributingNodes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/NODES_MIGRATION_V3_V4/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Migrating from v3 to v4
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../nodes/invocation-api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Invocation API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Features
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Features
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New to InvokeAI?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/low-vram/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Low VRAM mode
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/database/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Database
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../features/hotkeys/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hot Keys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Multi-User Mode
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Multi-User Mode
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../admin_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Administrator Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specification
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Overview
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Overview">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-user-roles-and-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. User Roles and Permissions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. User Roles and Permissions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-administrator-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Administrator Role
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-regular-user-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Regular User Role
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-future-role-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Future Role Considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-authentication-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Authentication System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Authentication System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-authentication-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Authentication Method
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-initial-administrator-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Initial Administrator Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-password-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Password Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-login-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Login Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-logout-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Logout Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-future-authentication-enhancements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Future Authentication Enhancements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-user-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. User Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. User Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-user-creation-administrator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 User Creation (Administrator)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-user-profile-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 User Profile Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-password-reset-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Password Reset Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-data-model-and-database-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Data Model and Database Schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Data Model and Database Schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-new-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 New Tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6.1 New Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#611-users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1.1 users
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#612-user_sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1.2 user_sessions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#613-user_invitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1.3 user_invitations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#614-shared_boards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1.4 shared_boards
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-modified-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Modified Tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6.2 Modified Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#621-boards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2.1 boards
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#622-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2.2 images
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#623-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2.3 workflows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#624-session_queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2.4 session_queue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#625-style_presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2.5 style_presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-migration-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Migration Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-migration-for-existing-installations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Migration for Existing Installations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-api-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. API Endpoints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. API Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-authentication-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Authentication Endpoints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7.1 Authentication Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1authsetup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/auth/setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1authlogin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/auth/login
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1authlogout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/auth/logout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1authme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/auth/me
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1authchange-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/auth/change-password
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-user-management-endpoints-admin-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 User Management Endpoints (Admin Only)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7.2 User Management Endpoints (Admin Only)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/users
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/users
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1usersuser_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/users/{user_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-apiv1usersuser_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PATCH /api/v1/users/{user_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apiv1usersuser_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /api/v1/users/{user_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1usersuser_idreset-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/users/{user_id}/reset-password
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-shared-boards-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Shared Boards Endpoints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7.3 Shared Boards Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1boardsboard_idshare" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/boards/{board_id}/share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1boardsboard_idshares" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/boards/{board_id}/shares
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apiv1boardsboard_idshareuser_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /api/v1/boards/{board_id}/share/{user_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-modified-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Modified Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-frontend-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Frontend Changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Frontend Changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-new-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 New Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.1 New Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loginpage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoginPage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#administratorsetup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AdministratorSetup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usermanagementpage-admin-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UserManagementPage (Admin only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#userprofilepage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UserProfilePage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#boardsharingdialog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BoardSharingDialog
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-modified-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Modified Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.2 Modified Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#app-root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        App Root
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#navigationheader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Navigation/Header
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modelmanagertab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModelManagerTab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuepanel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QueuePanel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#boardspanel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BoardsPanel
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-state-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 State Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-new-config-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 New Config Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-backward-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Backward Compatibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Security Considerations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Security Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-password-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Password Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-session-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 Session Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 Authorization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#104-data-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.4 Data Isolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#105-api-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.5 API Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#106-deployment-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.6 Deployment Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-email-integration-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Email Integration (Optional)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Email Integration (Optional)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#111-email-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.1 Email Templates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11.1 Email Templates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#user-invitation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        User Invitation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#password-reset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Password Reset
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#112-email-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.2 Email Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-testing-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Testing Requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12. Testing Requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#121-unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.1 Unit Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#122-integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.2 Integration Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#123-security-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.3 Security Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#124-performance-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.4 Performance Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-documentation-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Documentation Requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="13. Documentation Requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#131-user-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13.1 User Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#132-administrator-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13.2 Administrator Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#133-developer-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13.3 Developer Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#134-migration-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13.4 Migration Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-future-enhancements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Future Enhancements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="14. Future Enhancements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#141-phase-2-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.1 Phase 2 Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#142-phase-3-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.2 Phase 3 Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-success-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Success Metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="15. Success Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#151-functionality-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.1 Functionality Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#152-usability-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.2 Usability Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#153-security-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.3 Security Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Risks and Mitigations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="16. Risks and Mitigations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#161-technical-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.1 Technical Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#162-ux-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.2 UX Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#163-operational-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.3 Operational Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-implementation-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Implementation Phases
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="17. Implementation Phases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-foundation-weeks-1-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Foundation (Weeks 1-2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-backend-api-weeks-3-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Backend API (Weeks 3-4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-frontend-auth-weeks-5-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Frontend Auth (Weeks 5-6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-multi-tenancy-weeks-7-9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Multi-tenancy (Weeks 7-9)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-admin-interface-weeks-10-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Admin Interface (Weeks 10-11)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-6-testing-polish-weeks-12-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Testing &amp; Polish (Weeks 12-13)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-7-beta-release-week-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 7: Beta &amp; Release (Week 14+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18-acceptance-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Acceptance Criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#19-design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19. Design Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#20-conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20. Conclusion
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../contributing/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../CODE_OF_CONDUCT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code of Conduct
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/dev-environment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dev Environment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7_4" id="__nav_7_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/newContributorChecklist/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New Contributors
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/MODEL_MANAGER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Manager v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specification
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Specification
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-executive-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Executive Summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Overview
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Overview">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-user-roles-and-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. User Roles and Permissions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. User Roles and Permissions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-administrator-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Administrator Role
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-regular-user-role" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Regular User Role
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-future-role-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Future Role Considerations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-authentication-system" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Authentication System
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Authentication System">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-authentication-method" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Authentication Method
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-initial-administrator-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Initial Administrator Setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-password-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Password Requirements
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-login-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 Login Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#45-logout-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.5 Logout Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#46-future-authentication-enhancements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.6 Future Authentication Enhancements
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-user-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. User Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. User Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-user-creation-administrator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 User Creation (Administrator)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-user-profile-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 User Profile Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-password-reset-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Password Reset Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-data-model-and-database-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Data Model and Database Schema
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Data Model and Database Schema">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-new-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 New Tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6.1 New Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#611-users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1.1 users
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#612-user_sessions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1.2 user_sessions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#613-user_invitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1.3 user_invitations
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#614-shared_boards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1.4 shared_boards
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-modified-tables" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 Modified Tables
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6.2 Modified Tables">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#621-boards" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2.1 boards
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#622-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2.2 images
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#623-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2.3 workflows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#624-session_queue" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2.4 session_queue
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#625-style_presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2.5 style_presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-migration-strategy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Migration Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-migration-for-existing-installations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Migration for Existing Installations
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-api-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. API Endpoints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7. API Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-authentication-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Authentication Endpoints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7.1 Authentication Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1authsetup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/auth/setup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1authlogin" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/auth/login
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1authlogout" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/auth/logout
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1authme" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/auth/me
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1authchange-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/auth/change-password
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-user-management-endpoints-admin-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 User Management Endpoints (Admin Only)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7.2 User Management Endpoints (Admin Only)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/users
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1users" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/users
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1usersuser_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/users/{user_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#patch-apiv1usersuser_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PATCH /api/v1/users/{user_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apiv1usersuser_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /api/v1/users/{user_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1usersuser_idreset-password" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/users/{user_id}/reset-password
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-shared-boards-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Shared Boards Endpoints
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="7.3 Shared Boards Endpoints">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#post-apiv1boardsboard_idshare" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        POST /api/v1/boards/{board_id}/share
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#get-apiv1boardsboard_idshares" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /api/v1/boards/{board_id}/shares
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#delete-apiv1boardsboard_idshareuser_id" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DELETE /api/v1/boards/{board_id}/share/{user_id}
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#74-modified-endpoints" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.4 Modified Endpoints
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-frontend-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Frontend Changes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. Frontend Changes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-new-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 New Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.1 New Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#loginpage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LoginPage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#administratorsetup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AdministratorSetup
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#usermanagementpage-admin-only" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UserManagementPage (Admin only)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#userprofilepage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UserProfilePage
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#boardsharingdialog" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BoardSharingDialog
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-modified-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Modified Components
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8.2 Modified Components">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#app-root" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        App Root
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#navigationheader" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Navigation/Header
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modelmanagertab" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ModelManagerTab
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#queuepanel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QueuePanel
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#boardspanel" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BoardsPanel
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-state-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 State Management
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-new-config-options" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 New Config Options
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-backward-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Backward Compatibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-security-considerations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Security Considerations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Security Considerations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-password-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Password Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-session-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 Session Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 Authorization
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#104-data-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.4 Data Isolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#105-api-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.5 API Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#106-deployment-security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.6 Deployment Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-email-integration-optional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Email Integration (Optional)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11. Email Integration (Optional)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#111-email-templates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.1 Email Templates
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="11.1 Email Templates">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#user-invitation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        User Invitation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#password-reset" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Password Reset
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#112-email-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11.2 Email Service
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-testing-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Testing Requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12. Testing Requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#121-unit-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.1 Unit Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#122-integration-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.2 Integration Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#123-security-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.3 Security Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#124-performance-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12.4 Performance Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-documentation-requirements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Documentation Requirements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="13. Documentation Requirements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#131-user-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13.1 User Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#132-administrator-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13.2 Administrator Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#133-developer-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13.3 Developer Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#134-migration-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13.4 Migration Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-future-enhancements" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Future Enhancements
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="14. Future Enhancements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#141-phase-2-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.1 Phase 2 Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#142-phase-3-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14.2 Phase 3 Features
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-success-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Success Metrics
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="15. Success Metrics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#151-functionality-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.1 Functionality Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#152-usability-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.2 Usability Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#153-security-metrics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15.3 Security Metrics
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Risks and Mitigations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="16. Risks and Mitigations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#161-technical-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.1 Technical Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#162-ux-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.2 UX Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#163-operational-risks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16.3 Operational Risks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-implementation-phases" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Implementation Phases
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="17. Implementation Phases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-foundation-weeks-1-2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Foundation (Weeks 1-2)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-backend-api-weeks-3-4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Backend API (Weeks 3-4)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-frontend-auth-weeks-5-6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Frontend Auth (Weeks 5-6)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-multi-tenancy-weeks-7-9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Multi-tenancy (Weeks 7-9)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-admin-interface-weeks-10-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Admin Interface (Weeks 10-11)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-6-testing-polish-weeks-12-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 6: Testing &amp; Polish (Weeks 12-13)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-7-beta-release-week-14" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 7: Beta &amp; Release (Week 14+)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#18-acceptance-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        18. Acceptance Criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#19-design-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        19. Design Decisions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#20-conclusion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        20. Conclusion
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/LOCAL_DEVELOPMENT/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Local Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/ARCHITECTURE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/HOTKEYS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hotkeys
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/TESTS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../contributing/frontend/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_7_5" id="__nav_7_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_7_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Frontend
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/frontend/state-management/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    State Management
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/frontend/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows - Design and Implementation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/documentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/INVOCATIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Nodes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/MODEL_MANAGER/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model Manager v2
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/DOWNLOAD_QUEUE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Download Queue
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/translation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Translation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/contribution_guides/tutorials/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Help
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Help
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/gettingStartedWithAI/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    New to InvokeAI?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/diffusion/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Diffusion Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../help/SAMPLER_CONVERGENCE/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Sampler Convergence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../../contributing/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Contributing
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../../contributing/contribution_guides/development/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    Development
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="invokeai-multi-user-support-detailed-specification">InvokeAI Multi-User Support - Detailed Specification<a class="headerlink" href="#invokeai-multi-user-support-detailed-specification" title="Permanent link">#</a></h1>
+<h2 id="1-executive-summary">1. Executive Summary<a class="headerlink" href="#1-executive-summary" title="Permanent link">#</a></h2>
+<p>This document provides a comprehensive specification for adding multi-user support to InvokeAI. The feature will enable a single InvokeAI instance to support multiple isolated users, each with their own generation settings, image boards, and workflows, while maintaining administrative controls for model management and system configuration.</p>
+<h2 id="2-overview">2. Overview<a class="headerlink" href="#2-overview" title="Permanent link">#</a></h2>
+<h3 id="21-goals">2.1 Goals<a class="headerlink" href="#21-goals" title="Permanent link">#</a></h3>
+<ul>
+<li>Enable multiple users to share a single InvokeAI instance</li>
+<li>Provide user isolation for personal content (boards, images, workflows, settings)</li>
+<li>Maintain centralized model management by administrators</li>
+<li>Support shared boards for collaboration</li>
+<li>Provide secure authentication and authorization</li>
+<li>Minimize impact on existing single-user installations</li>
+</ul>
+<h3 id="22-non-goals">2.2 Non-Goals<a class="headerlink" href="#22-non-goals" title="Permanent link">#</a></h3>
+<ul>
+<li>Real-time collaboration features (multiple users editing same workflow simultaneously)</li>
+<li>Advanced team management features (in initial release)</li>
+<li>Migration of existing multi-user enterprise edition data</li>
+<li>Support for external identity providers (in initial release, can be added later)</li>
+</ul>
+<h2 id="3-user-roles-and-permissions">3. User Roles and Permissions<a class="headerlink" href="#3-user-roles-and-permissions" title="Permanent link">#</a></h2>
+<h3 id="31-administrator-role">3.1 Administrator Role<a class="headerlink" href="#31-administrator-role" title="Permanent link">#</a></h3>
+<p><strong>Capabilities:</strong></p>
+<ul>
+<li>Full access to all InvokeAI features</li>
+<li>Model management (add, delete, configure models)</li>
+<li>User management (create, edit, delete users)</li>
+<li>View and manage all users' queue sessions</li>
+<li>Access system configuration</li>
+<li>Create and manage shared boards</li>
+<li>Grant/revoke administrative privileges to other users</li>
+</ul>
+<p><strong>Restrictions:</strong></p>
+<ul>
+<li>Cannot delete their own account if they are the last administrator</li>
+<li>Cannot revoke their own admin privileges if they are the last administrator</li>
+</ul>
+<h3 id="32-regular-user-role">3.2 Regular User Role<a class="headerlink" href="#32-regular-user-role" title="Permanent link">#</a></h3>
+<p><strong>Capabilities:</strong></p>
+<ul>
+<li>Create, edit, and delete their own image boards</li>
+<li>Upload and manage their own assets</li>
+<li>Use all image generation tools (linear, canvas, upscale, workflow tabs)</li>
+<li>Create, edit, save, and load workflows</li>
+<li>Access public/shared workflows</li>
+<li>View and manage their own queue sessions</li>
+<li>Adjust personal UI preferences (theme, hotkeys, etc.)</li>
+<li>Access shared boards (read/write based on permissions)</li>
+<li><strong>View model configurations</strong> (read-only access to model manager)</li>
+<li><strong>View model details, default settings, and metadata</strong></li>
+</ul>
+<p><strong>Restrictions:</strong></p>
+<ul>
+<li>Cannot add, delete, or edit models</li>
+<li><strong>Can view but cannot modify model manager settings</strong> (read-only access)</li>
+<li>Cannot reidentify, convert, or update model paths</li>
+<li>Cannot upload or change model thumbnail images</li>
+<li>Cannot save changes to model default settings</li>
+<li>Cannot perform bulk delete operations on models</li>
+<li>Cannot view or modify other users' boards, images, or workflows</li>
+<li>Cannot cancel or modify other users' queue sessions</li>
+<li>Cannot access system configuration</li>
+<li>Cannot manage users or permissions</li>
+</ul>
+<h3 id="33-future-role-considerations">3.3 Future Role Considerations<a class="headerlink" href="#33-future-role-considerations" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Viewer Role</strong>: Read-only access (future enhancement)</li>
+<li><strong>Team/Group-based Permissions</strong>: Organizational hierarchy (future enhancement)</li>
+</ul>
+<h2 id="4-authentication-system">4. Authentication System<a class="headerlink" href="#4-authentication-system" title="Permanent link">#</a></h2>
+<h3 id="41-authentication-method">4.1 Authentication Method<a class="headerlink" href="#41-authentication-method" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Primary Method</strong>: Username and password authentication with secure password hashing</li>
+<li><strong>Password Hashing</strong>: Use bcrypt or Argon2 for password storage</li>
+<li><strong>Session Management</strong>: JWT tokens or secure session cookies</li>
+<li><strong>Token Expiration</strong>: Configurable session timeout (default: 7 days for "remember me", 24 hours otherwise)</li>
+</ul>
+<h3 id="42-initial-administrator-setup">4.2 Initial Administrator Setup<a class="headerlink" href="#42-initial-administrator-setup" title="Permanent link">#</a></h3>
+<p><strong>First-time Launch Flow:</strong></p>
+<ol>
+<li>Application detects no administrator account exists</li>
+<li>Displays mandatory setup dialog (cannot be skipped)</li>
+<li>Prompts for:</li>
+<li>Administrator username (email format recommended)</li>
+<li>Administrator display name</li>
+<li>Strong password (minimum requirements enforced)</li>
+<li>Password confirmation</li>
+<li>Stores hashed credentials in configuration</li>
+<li>Creates administrator account in database</li>
+<li>Proceeds to normal login screen</li>
+</ol>
+<p><strong>Reset Capability:</strong></p>
+<ul>
+<li>Administrators can be reset by manually editing the config file</li>
+<li>Requires access to server filesystem (intentional security measure)</li>
+<li>Database maintains user records; config file contains root admin credentials</li>
+</ul>
+<h3 id="43-password-requirements">4.3 Password Requirements<a class="headerlink" href="#43-password-requirements" title="Permanent link">#</a></h3>
+<ul>
+<li>Minimum 8 characters</li>
+<li>At least one uppercase letter</li>
+<li>At least one lowercase letter</li>
+<li>At least one number</li>
+<li>At least one special character (optional but recommended)</li>
+<li>Not in common password list</li>
+</ul>
+<h3 id="44-login-flow">4.4 Login Flow<a class="headerlink" href="#44-login-flow" title="Permanent link">#</a></h3>
+<ol>
+<li>User navigates to InvokeAI URL</li>
+<li>If not authenticated, redirect to login page</li>
+<li>User enters username/email and password</li>
+<li>Optional "Remember me" checkbox for extended session</li>
+<li>Backend validates credentials</li>
+<li>On success: Generate session token, redirect to application</li>
+<li>On failure: Display error, allow retry with rate limiting (prevent brute force)</li>
+</ol>
+<h3 id="45-logout-flow">4.5 Logout Flow<a class="headerlink" href="#45-logout-flow" title="Permanent link">#</a></h3>
+<ul>
+<li>User clicks logout button</li>
+<li>Frontend clears session token</li>
+<li>Backend invalidates session (if using server-side sessions)</li>
+<li>Redirect to login page</li>
+</ul>
+<h3 id="46-future-authentication-enhancements">4.6 Future Authentication Enhancements<a class="headerlink" href="#46-future-authentication-enhancements" title="Permanent link">#</a></h3>
+<ul>
+<li>OAuth2/OpenID Connect support</li>
+<li>Two-factor authentication (2FA)</li>
+<li>SSO integration</li>
+<li>API key authentication for programmatic access</li>
+</ul>
+<h2 id="5-user-management">5. User Management<a class="headerlink" href="#5-user-management" title="Permanent link">#</a></h2>
+<h3 id="51-user-creation-administrator">5.1 User Creation (Administrator)<a class="headerlink" href="#51-user-creation-administrator" title="Permanent link">#</a></h3>
+<p><strong>Flow:</strong></p>
+<ol>
+<li>Administrator navigates to user management interface</li>
+<li>Clicks "Add User" button</li>
+<li>Enters user information:</li>
+<li>Email address (required, used as username)</li>
+<li>Display name (optional, defaults to email)</li>
+<li>Role (User or Administrator)</li>
+<li>Initial password or "Send invitation email"</li>
+<li>System validates email uniqueness</li>
+<li>System creates user account</li>
+<li>If invitation mode:</li>
+<li>Generate one-time secure token</li>
+<li>Send email with setup link</li>
+<li>Link expires after 7 days</li>
+<li>If direct password mode:</li>
+<li>Administrator provides initial password</li>
+<li>User must change on first login</li>
+</ol>
+<p><strong>Invitation Email Flow:</strong></p>
+<ol>
+<li>User receives email with unique link</li>
+<li>Link contains secure token</li>
+<li>User clicks link, redirected to setup page</li>
+<li>User enters desired password</li>
+<li>Token validated and consumed (single-use)</li>
+<li>Account activated</li>
+<li>User redirected to login page</li>
+</ol>
+<h3 id="52-user-profile-management">5.2 User Profile Management<a class="headerlink" href="#52-user-profile-management" title="Permanent link">#</a></h3>
+<p><strong>User Self-Service:</strong></p>
+<ul>
+<li>Update display name</li>
+<li>Change password (requires current password)</li>
+<li>Update email address (requires verification)</li>
+<li>Manage UI preferences</li>
+<li>View account creation date and last login</li>
+</ul>
+<p><strong>Administrator Actions:</strong></p>
+<ul>
+<li>Edit user information (name, email)</li>
+<li>Reset user password (generates reset link)</li>
+<li>Toggle administrator privileges</li>
+<li>Assign to groups (future feature)</li>
+<li>Suspend/unsuspend account</li>
+<li>Delete account (with data retention options)</li>
+</ul>
+<h3 id="53-password-reset-flow">5.3 Password Reset Flow<a class="headerlink" href="#53-password-reset-flow" title="Permanent link">#</a></h3>
+<p><strong>User-Initiated (Future Enhancement):</strong></p>
+<ol>
+<li>User clicks "Forgot Password" on login page</li>
+<li>Enters email address</li>
+<li>System sends password reset link (if email exists)</li>
+<li>User clicks link, enters new password</li>
+<li>Password updated, user can login</li>
+</ol>
+<p><strong>Administrator-Initiated:</strong></p>
+<ol>
+<li>Administrator selects user</li>
+<li>Clicks "Send Password Reset"</li>
+<li>System generates reset token and link</li>
+<li>Email sent to user</li>
+<li>User follows same flow as user-initiated reset</li>
+</ol>
+<h2 id="6-data-model-and-database-schema">6. Data Model and Database Schema<a class="headerlink" href="#6-data-model-and-database-schema" title="Permanent link">#</a></h2>
+<h3 id="61-new-tables">6.1 New Tables<a class="headerlink" href="#61-new-tables" title="Permanent link">#</a></h3>
+<h4 id="611-users">6.1.1 users<a class="headerlink" href="#611-users" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">users</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="n">user_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="n">email</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">UNIQUE</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="n">display_name</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="n">password_hash</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="n">is_admin</span><span class="w"> </span><span class="nb">BOOLEAN</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="k">FALSE</span><span class="p">,</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="n">is_active</span><span class="w"> </span><span class="nb">BOOLEAN</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="k">TRUE</span><span class="p">,</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="n">created_at</span><span class="w"> </span><span class="n">DATETIME</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="p">(</span><span class="n">STRFTIME</span><span class="p">(</span><span class="s1">&#39;%Y-%m-%d %H:%M:%f&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;NOW&#39;</span><span class="p">)),</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="n">updated_at</span><span class="w"> </span><span class="n">DATETIME</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="p">(</span><span class="n">STRFTIME</span><span class="p">(</span><span class="s1">&#39;%Y-%m-%d %H:%M:%f&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;NOW&#39;</span><span class="p">)),</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="n">last_login_at</span><span class="w"> </span><span class="n">DATETIME</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">);</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_users_email</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">email</span><span class="p">);</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_users_is_admin</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">is_admin</span><span class="p">);</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_users_is_active</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">is_active</span><span class="p">);</span>
+</code></pre></div>
+<h4 id="612-user_sessions">6.1.2 user_sessions<a class="headerlink" href="#612-user_sessions" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">user_sessions</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">    </span><span class="n">session_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="n">user_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="n">token_hash</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="n">expires_at</span><span class="w"> </span><span class="n">DATETIME</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">    </span><span class="n">created_at</span><span class="w"> </span><span class="n">DATETIME</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="p">(</span><span class="n">STRFTIME</span><span class="p">(</span><span class="s1">&#39;%Y-%m-%d %H:%M:%f&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;NOW&#39;</span><span class="p">)),</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">    </span><span class="n">last_activity_at</span><span class="w"> </span><span class="n">DATETIME</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="p">(</span><span class="n">STRFTIME</span><span class="p">(</span><span class="s1">&#39;%Y-%m-%d %H:%M:%f&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;NOW&#39;</span><span class="p">)),</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">    </span><span class="n">user_agent</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">    </span><span class="n">ip_address</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">,</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="w">    </span><span class="k">FOREIGN</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">DELETE</span><span class="w"> </span><span class="k">CASCADE</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="p">);</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_user_sessions_user_id</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">user_sessions</span><span class="p">(</span><span class="n">user_id</span><span class="p">);</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_user_sessions_expires_at</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">user_sessions</span><span class="p">(</span><span class="n">expires_at</span><span class="p">);</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_user_sessions_token_hash</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">user_sessions</span><span class="p">(</span><span class="n">token_hash</span><span class="p">);</span>
+</code></pre></div>
+<h4 id="613-user_invitations">6.1.3 user_invitations<a class="headerlink" href="#613-user_invitations" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">user_invitations</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">    </span><span class="n">invitation_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="p">,</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="n">email</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="n">token_hash</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="n">invited_by_user_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="n">expires_at</span><span class="w"> </span><span class="n">DATETIME</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="n">used_at</span><span class="w"> </span><span class="n">DATETIME</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="n">created_at</span><span class="w"> </span><span class="n">DATETIME</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="p">(</span><span class="n">STRFTIME</span><span class="p">(</span><span class="s1">&#39;%Y-%m-%d %H:%M:%f&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;NOW&#39;</span><span class="p">)),</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="k">FOREIGN</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">invited_by_user_id</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">DELETE</span><span class="w"> </span><span class="k">CASCADE</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">);</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_user_invitations_email</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">user_invitations</span><span class="p">(</span><span class="n">email</span><span class="p">);</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_user_invitations_token_hash</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">user_invitations</span><span class="p">(</span><span class="n">token_hash</span><span class="p">);</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_user_invitations_expires_at</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">user_invitations</span><span class="p">(</span><span class="n">expires_at</span><span class="p">);</span>
+</code></pre></div>
+<h4 id="614-shared_boards">6.1.4 shared_boards<a class="headerlink" href="#614-shared_boards" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">shared_boards</span><span class="w"> </span><span class="p">(</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="n">board_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="n">user_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="n">permission</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">CHECK</span><span class="p">(</span><span class="n">permission</span><span class="w"> </span><span class="k">IN</span><span class="w"> </span><span class="p">(</span><span class="s1">&#39;read&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;write&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;admin&#39;</span><span class="p">)),</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="n">created_at</span><span class="w"> </span><span class="n">DATETIME</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="p">(</span><span class="n">STRFTIME</span><span class="p">(</span><span class="s1">&#39;%Y-%m-%d %H:%M:%f&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;NOW&#39;</span><span class="p">)),</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="k">PRIMARY</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">board_id</span><span class="p">,</span><span class="w"> </span><span class="n">user_id</span><span class="p">),</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">    </span><span class="k">FOREIGN</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">board_id</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">boards</span><span class="p">(</span><span class="n">board_id</span><span class="p">)</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">DELETE</span><span class="w"> </span><span class="k">CASCADE</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">    </span><span class="k">FOREIGN</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">DELETE</span><span class="w"> </span><span class="k">CASCADE</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="p">);</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_shared_boards_user_id</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">shared_boards</span><span class="p">(</span><span class="n">user_id</span><span class="p">);</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_shared_boards_board_id</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">shared_boards</span><span class="p">(</span><span class="n">board_id</span><span class="p">);</span>
+</code></pre></div>
+<h3 id="62-modified-tables">6.2 Modified Tables<a class="headerlink" href="#62-modified-tables" title="Permanent link">#</a></h3>
+<h4 id="621-boards">6.2.1 boards<a class="headerlink" href="#621-boards" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">-- Add columns:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">boards</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">user_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">&#39;system&#39;</span><span class="p">;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">boards</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">is_shared</span><span class="w"> </span><span class="nb">BOOLEAN</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="k">FALSE</span><span class="p">;</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">boards</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">created_by_user_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="p">;</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1">-- Add foreign key (requires recreation in SQLite):</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="k">FOREIGN</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">DELETE</span><span class="w"> </span><span class="k">CASCADE</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="k">FOREIGN</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">created_by_user_id</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">DELETE</span><span class="w"> </span><span class="k">SET</span><span class="w"> </span><span class="k">NULL</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1">-- Add indices:</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_boards_user_id</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">boards</span><span class="p">(</span><span class="n">user_id</span><span class="p">);</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_boards_is_shared</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">boards</span><span class="p">(</span><span class="n">is_shared</span><span class="p">);</span>
+</code></pre></div>
+<h4 id="622-images">6.2.2 images<a class="headerlink" href="#622-images" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1">-- Add column:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">images</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">user_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">&#39;system&#39;</span><span class="p">;</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1">-- Add foreign key:</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="k">FOREIGN</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">DELETE</span><span class="w"> </span><span class="k">CASCADE</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="c1">-- Add index:</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_images_user_id</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">images</span><span class="p">(</span><span class="n">user_id</span><span class="p">);</span>
+</code></pre></div>
+<h4 id="623-workflows">6.2.3 workflows<a class="headerlink" href="#623-workflows" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1">-- Add columns:</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">workflows</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">user_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">&#39;system&#39;</span><span class="p">;</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">workflows</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">is_public</span><span class="w"> </span><span class="nb">BOOLEAN</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="k">FALSE</span><span class="p">;</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1">-- Add foreign key:</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="k">FOREIGN</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">DELETE</span><span class="w"> </span><span class="k">CASCADE</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="c1">-- Add indices:</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_workflows_user_id</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">workflows</span><span class="p">(</span><span class="n">user_id</span><span class="p">);</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_workflows_is_public</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">workflows</span><span class="p">(</span><span class="n">is_public</span><span class="p">);</span>
+</code></pre></div>
+<h4 id="624-session_queue">6.2.4 session_queue<a class="headerlink" href="#624-session_queue" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1">-- Add column:</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">session_queue</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">user_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">&#39;system&#39;</span><span class="p">;</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1">-- Add foreign key:</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="k">FOREIGN</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">DELETE</span><span class="w"> </span><span class="k">CASCADE</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1">-- Add index:</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_session_queue_user_id</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">session_queue</span><span class="p">(</span><span class="n">user_id</span><span class="p">);</span>
+</code></pre></div>
+<h4 id="625-style_presets">6.2.5 style_presets<a class="headerlink" href="#625-style_presets" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1">-- Add columns:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">style_presets</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">user_id</span><span class="w"> </span><span class="nb">TEXT</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="s1">&#39;system&#39;</span><span class="p">;</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="k">ALTER</span><span class="w"> </span><span class="k">TABLE</span><span class="w"> </span><span class="n">style_presets</span><span class="w"> </span><span class="k">ADD</span><span class="w"> </span><span class="k">COLUMN</span><span class="w"> </span><span class="n">is_public</span><span class="w"> </span><span class="nb">BOOLEAN</span><span class="w"> </span><span class="k">NOT</span><span class="w"> </span><span class="k">NULL</span><span class="w"> </span><span class="k">DEFAULT</span><span class="w"> </span><span class="k">FALSE</span><span class="p">;</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="c1">-- Add foreign key:</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="k">FOREIGN</span><span class="w"> </span><span class="k">KEY</span><span class="w"> </span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">REFERENCES</span><span class="w"> </span><span class="n">users</span><span class="p">(</span><span class="n">user_id</span><span class="p">)</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="k">DELETE</span><span class="w"> </span><span class="k">CASCADE</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="c1">-- Add indices:</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_style_presets_user_id</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">style_presets</span><span class="p">(</span><span class="n">user_id</span><span class="p">);</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="k">CREATE</span><span class="w"> </span><span class="k">INDEX</span><span class="w"> </span><span class="n">idx_style_presets_is_public</span><span class="w"> </span><span class="k">ON</span><span class="w"> </span><span class="n">style_presets</span><span class="p">(</span><span class="n">is_public</span><span class="p">);</span>
+</code></pre></div>
+<h3 id="63-migration-strategy">6.3 Migration Strategy<a class="headerlink" href="#63-migration-strategy" title="Permanent link">#</a></h3>
+<ol>
+<li>Create new user tables (users, user_sessions, user_invitations, shared_boards)</li>
+<li>Create default 'system' user for backward compatibility</li>
+<li>Update existing data to reference 'system' user</li>
+<li>Add foreign key constraints</li>
+<li>Version as database migration (e.g., migration_25.py)</li>
+</ol>
+<h3 id="64-migration-for-existing-installations">6.4 Migration for Existing Installations<a class="headerlink" href="#64-migration-for-existing-installations" title="Permanent link">#</a></h3>
+<ul>
+<li>Single-user installations: Prompt to create admin account on first launch after update</li>
+<li>Existing data migration: Administrator can specify an arbitrary user account to hold legacy data (can be the admin account or a separate user)</li>
+<li>System provides UI during migration to choose destination user for existing data</li>
+</ul>
+<h2 id="7-api-endpoints">7. API Endpoints<a class="headerlink" href="#7-api-endpoints" title="Permanent link">#</a></h2>
+<h3 id="71-authentication-endpoints">7.1 Authentication Endpoints<a class="headerlink" href="#71-authentication-endpoints" title="Permanent link">#</a></h3>
+<h4 id="post-apiv1authsetup">POST /api/v1/auth/setup<a class="headerlink" href="#post-apiv1authsetup" title="Permanent link">#</a></h4>
+<ul>
+<li>Initialize first administrator account</li>
+<li>Only works if no admin exists</li>
+<li>Body: <code>{ email, display_name, password }</code></li>
+<li>Response: <code>{ success, user }</code></li>
+</ul>
+<h4 id="post-apiv1authlogin">POST /api/v1/auth/login<a class="headerlink" href="#post-apiv1authlogin" title="Permanent link">#</a></h4>
+<ul>
+<li>Authenticate user</li>
+<li>Body: <code>{ email, password, remember_me? }</code></li>
+<li>Response: <code>{ token, user, expires_at }</code></li>
+</ul>
+<h4 id="post-apiv1authlogout">POST /api/v1/auth/logout<a class="headerlink" href="#post-apiv1authlogout" title="Permanent link">#</a></h4>
+<ul>
+<li>Invalidate current session</li>
+<li>Headers: <code>Authorization: Bearer &lt;token&gt;</code></li>
+<li>Response: <code>{ success }</code></li>
+</ul>
+<h4 id="get-apiv1authme">GET /api/v1/auth/me<a class="headerlink" href="#get-apiv1authme" title="Permanent link">#</a></h4>
+<ul>
+<li>Get current user information</li>
+<li>Headers: <code>Authorization: Bearer &lt;token&gt;</code></li>
+<li>Response: <code>{ user }</code></li>
+</ul>
+<h4 id="post-apiv1authchange-password">POST /api/v1/auth/change-password<a class="headerlink" href="#post-apiv1authchange-password" title="Permanent link">#</a></h4>
+<ul>
+<li>Change current user's password</li>
+<li>Body: <code>{ current_password, new_password }</code></li>
+<li>Headers: <code>Authorization: Bearer &lt;token&gt;</code></li>
+<li>Response: <code>{ success }</code></li>
+</ul>
+<h3 id="72-user-management-endpoints-admin-only">7.2 User Management Endpoints (Admin Only)<a class="headerlink" href="#72-user-management-endpoints-admin-only" title="Permanent link">#</a></h3>
+<h4 id="get-apiv1users">GET /api/v1/users<a class="headerlink" href="#get-apiv1users" title="Permanent link">#</a></h4>
+<ul>
+<li>List all users (paginated)</li>
+<li>Query params: <code>offset</code>, <code>limit</code>, <code>search</code>, <code>role_filter</code></li>
+<li>Response: <code>{ users[], total, offset, limit }</code></li>
+</ul>
+<h4 id="post-apiv1users">POST /api/v1/users<a class="headerlink" href="#post-apiv1users" title="Permanent link">#</a></h4>
+<ul>
+<li>Create new user</li>
+<li>Body: <code>{ email, display_name, is_admin, send_invitation?, initial_password? }</code></li>
+<li>Response: <code>{ user, invitation_link? }</code></li>
+</ul>
+<h4 id="get-apiv1usersuser_id">GET /api/v1/users/{user_id}<a class="headerlink" href="#get-apiv1usersuser_id" title="Permanent link">#</a></h4>
+<ul>
+<li>Get user details</li>
+<li>Response: <code>{ user }</code></li>
+</ul>
+<h4 id="patch-apiv1usersuser_id">PATCH /api/v1/users/{user_id}<a class="headerlink" href="#patch-apiv1usersuser_id" title="Permanent link">#</a></h4>
+<ul>
+<li>Update user</li>
+<li>Body: <code>{ display_name?, is_admin?, is_active? }</code></li>
+<li>Response: <code>{ user }</code></li>
+</ul>
+<h4 id="delete-apiv1usersuser_id">DELETE /api/v1/users/{user_id}<a class="headerlink" href="#delete-apiv1usersuser_id" title="Permanent link">#</a></h4>
+<ul>
+<li>Delete user</li>
+<li>Query params: <code>delete_data</code> (true/false)</li>
+<li>Response: <code>{ success }</code></li>
+</ul>
+<h4 id="post-apiv1usersuser_idreset-password">POST /api/v1/users/{user_id}/reset-password<a class="headerlink" href="#post-apiv1usersuser_idreset-password" title="Permanent link">#</a></h4>
+<ul>
+<li>Send password reset email</li>
+<li>Response: <code>{ success, reset_link }</code></li>
+</ul>
+<h3 id="73-shared-boards-endpoints">7.3 Shared Boards Endpoints<a class="headerlink" href="#73-shared-boards-endpoints" title="Permanent link">#</a></h3>
+<h4 id="post-apiv1boardsboard_idshare">POST /api/v1/boards/{board_id}/share<a class="headerlink" href="#post-apiv1boardsboard_idshare" title="Permanent link">#</a></h4>
+<ul>
+<li>Share board with users</li>
+<li>Body: <code>{ user_ids[], permission: 'read' | 'write' | 'admin' }</code></li>
+<li>Response: <code>{ success, shared_with[] }</code></li>
+</ul>
+<h4 id="get-apiv1boardsboard_idshares">GET /api/v1/boards/{board_id}/shares<a class="headerlink" href="#get-apiv1boardsboard_idshares" title="Permanent link">#</a></h4>
+<ul>
+<li>Get board sharing information</li>
+<li>Response: <code>{ shares[] }</code></li>
+</ul>
+<h4 id="delete-apiv1boardsboard_idshareuser_id">DELETE /api/v1/boards/{board_id}/share/{user_id}<a class="headerlink" href="#delete-apiv1boardsboard_idshareuser_id" title="Permanent link">#</a></h4>
+<ul>
+<li>Remove board sharing</li>
+<li>Response: <code>{ success }</code></li>
+</ul>
+<h3 id="74-modified-endpoints">7.4 Modified Endpoints<a class="headerlink" href="#74-modified-endpoints" title="Permanent link">#</a></h3>
+<p>All existing endpoints will be modified to:</p>
+<ol>
+<li>Require authentication (except setup/login)</li>
+<li>Filter data by current user (unless admin viewing all)</li>
+<li>Enforce permissions (e.g., model management requires admin)</li>
+<li>Include user context in operations</li>
+</ol>
+<p>Example modifications:
+- <code>GET /api/v1/boards</code> → Returns only user's boards + shared boards
+- <code>POST /api/v1/session/queue</code> → Associates queue item with current user
+- <code>GET /api/v1/queue</code> → Returns all items for admin, only user's items for regular users</p>
+<h2 id="8-frontend-changes">8. Frontend Changes<a class="headerlink" href="#8-frontend-changes" title="Permanent link">#</a></h2>
+<h3 id="81-new-components">8.1 New Components<a class="headerlink" href="#81-new-components" title="Permanent link">#</a></h3>
+<h4 id="loginpage">LoginPage<a class="headerlink" href="#loginpage" title="Permanent link">#</a></h4>
+<ul>
+<li>Email/password form</li>
+<li>"Remember me" checkbox</li>
+<li>Login button</li>
+<li>Forgot password link (future)</li>
+<li>Branding and welcome message</li>
+</ul>
+<h4 id="administratorsetup">AdministratorSetup<a class="headerlink" href="#administratorsetup" title="Permanent link">#</a></h4>
+<ul>
+<li>Modal dialog (cannot be dismissed)</li>
+<li>Administrator account creation form</li>
+<li>Password strength indicator</li>
+<li>Terms/welcome message</li>
+</ul>
+<h4 id="usermanagementpage-admin-only">UserManagementPage (Admin only)<a class="headerlink" href="#usermanagementpage-admin-only" title="Permanent link">#</a></h4>
+<ul>
+<li>User list table</li>
+<li>Add user button</li>
+<li>User actions (edit, delete, reset password)</li>
+<li>Search and filter</li>
+<li>Role toggle</li>
+</ul>
+<h4 id="userprofilepage">UserProfilePage<a class="headerlink" href="#userprofilepage" title="Permanent link">#</a></h4>
+<ul>
+<li>Display user information</li>
+<li>Change password form</li>
+<li>UI preferences</li>
+<li>Account details</li>
+</ul>
+<h4 id="boardsharingdialog">BoardSharingDialog<a class="headerlink" href="#boardsharingdialog" title="Permanent link">#</a></h4>
+<ul>
+<li>User picker/search</li>
+<li>Permission selector</li>
+<li>Share button</li>
+<li>Current shares list</li>
+</ul>
+<h3 id="82-modified-components">8.2 Modified Components<a class="headerlink" href="#82-modified-components" title="Permanent link">#</a></h3>
+<h4 id="app-root">App Root<a class="headerlink" href="#app-root" title="Permanent link">#</a></h4>
+<ul>
+<li>Add authentication check</li>
+<li>Redirect to login if not authenticated</li>
+<li>Handle session expiration</li>
+<li>Add global error boundary for auth errors</li>
+</ul>
+<h4 id="navigationheader">Navigation/Header<a class="headerlink" href="#navigationheader" title="Permanent link">#</a></h4>
+<ul>
+<li>Add user menu with logout</li>
+<li>Display current user name</li>
+<li>Admin indicator badge</li>
+</ul>
+<h4 id="modelmanagertab">ModelManagerTab<a class="headerlink" href="#modelmanagertab" title="Permanent link">#</a></h4>
+<ul>
+<li>Hide/disable for non-admin users</li>
+<li>Show "Admin only" message</li>
+</ul>
+<h4 id="queuepanel">QueuePanel<a class="headerlink" href="#queuepanel" title="Permanent link">#</a></h4>
+<ul>
+<li>Filter by current user (for non-admin)</li>
+<li>Show all with user indicators (for admin)</li>
+<li>Disable actions on other users' items (for non-admin)</li>
+</ul>
+<h4 id="boardspanel">BoardsPanel<a class="headerlink" href="#boardspanel" title="Permanent link">#</a></h4>
+<ul>
+<li>Show personal boards section</li>
+<li>Show shared boards section</li>
+<li>Add sharing controls to board actions</li>
+</ul>
+<h3 id="83-state-management">8.3 State Management<a class="headerlink" href="#83-state-management" title="Permanent link">#</a></h3>
+<p>New Redux slices/zustand stores:
+- <code>authSlice</code>: Current user, authentication status, token
+- <code>usersSlice</code>: User list for admin interface
+- <code>sharingSlice</code>: Board sharing state</p>
+<p>Updated slices:
+- <code>boardsSlice</code>: Include shared boards, ownership info
+- <code>queueSlice</code>: Include user filtering
+- <code>workflowsSlice</code>: Include public/private status</p>
+<h2 id="9-configuration">9. Configuration<a class="headerlink" href="#9-configuration" title="Permanent link">#</a></h2>
+<h3 id="91-new-config-options">9.1 New Config Options<a class="headerlink" href="#91-new-config-options" title="Permanent link">#</a></h3>
+<p>Add to <code>InvokeAIAppConfig</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Authentication</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">auth_enabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>  <span class="c1"># Enable/disable multi-user auth</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">session_expiry_hours</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">24</span>  <span class="c1"># Default session expiration</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">session_expiry_hours_remember</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">168</span>  <span class="c1"># &quot;Remember me&quot; expiration (7 days)</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">password_min_length</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span>  <span class="c1"># Minimum password length</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="n">require_strong_passwords</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>  <span class="c1"># Enforce password complexity</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="c1"># Session tracking</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="n">enable_server_side_sessions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># Optional server-side session tracking</span>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="c1"># Audit logging</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="n">audit_log_auth_events</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>  <span class="c1"># Log authentication events</span>
+<a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="n">audit_log_admin_actions</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>  <span class="c1"># Log administrative actions</span>
+<a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>
+<a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a><span class="c1"># Email (optional - for invitations and password reset)</span>
+<a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a><span class="n">email_enabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="n">smtp_host</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+<a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a><span class="n">smtp_port</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">587</span>
+<a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a><span class="n">smtp_username</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+<a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a><span class="n">smtp_password</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+<a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a><span class="n">smtp_from_address</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+<a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a><span class="n">smtp_from_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;InvokeAI&quot;</span>
+<a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a>
+<a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a><span class="c1"># Initial admin (stored as hash)</span>
+<a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a><span class="n">admin_email</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+<a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a><span class="n">admin_password_hash</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+<h3 id="92-backward-compatibility">9.2 Backward Compatibility<a class="headerlink" href="#92-backward-compatibility" title="Permanent link">#</a></h3>
+<ul>
+<li>If <code>auth_enabled = False</code>, system runs in legacy single-user mode</li>
+<li>All data belongs to implicit "system" user</li>
+<li>No authentication required</li>
+<li>Smooth upgrade path for existing installations</li>
+</ul>
+<h2 id="10-security-considerations">10. Security Considerations<a class="headerlink" href="#10-security-considerations" title="Permanent link">#</a></h2>
+<h3 id="101-password-security">10.1 Password Security<a class="headerlink" href="#101-password-security" title="Permanent link">#</a></h3>
+<ul>
+<li>Never store passwords in plain text</li>
+<li>Use bcrypt or Argon2id for password hashing</li>
+<li>Implement proper salt generation</li>
+<li>Enforce password complexity requirements</li>
+<li>Implement rate limiting on login attempts</li>
+<li>Consider password breach checking (Have I Been Pwned API)</li>
+</ul>
+<h3 id="102-session-security">10.2 Session Security<a class="headerlink" href="#102-session-security" title="Permanent link">#</a></h3>
+<ul>
+<li>Use cryptographically secure random tokens</li>
+<li>Implement token rotation</li>
+<li>Set appropriate cookie flags (HttpOnly, Secure, SameSite)</li>
+<li>Implement session timeout and renewal</li>
+<li>Invalidate sessions on logout</li>
+<li>Clean up expired sessions periodically</li>
+</ul>
+<h3 id="103-authorization">10.3 Authorization<a class="headerlink" href="#103-authorization" title="Permanent link">#</a></h3>
+<ul>
+<li>Always verify user identity from session token (never trust client)</li>
+<li>Check permissions on every API call</li>
+<li>Implement principle of least privilege</li>
+<li>Validate user ownership of resources before operations</li>
+<li>Implement proper error messages (avoid information leakage)</li>
+</ul>
+<h3 id="104-data-isolation">10.4 Data Isolation<a class="headerlink" href="#104-data-isolation" title="Permanent link">#</a></h3>
+<ul>
+<li>Strict separation of user data in database queries</li>
+<li>Prevent SQL injection via parameterized queries</li>
+<li>Validate all user inputs</li>
+<li>Implement proper access control checks</li>
+<li>Audit trail for sensitive operations</li>
+</ul>
+<h3 id="105-api-security">10.5 API Security<a class="headerlink" href="#105-api-security" title="Permanent link">#</a></h3>
+<ul>
+<li>Implement rate limiting on sensitive endpoints</li>
+<li>Use HTTPS in production (enforce via config)</li>
+<li>Implement CSRF protection</li>
+<li>Validate and sanitize all inputs</li>
+<li>Implement proper CORS configuration</li>
+<li>Add security headers (CSP, X-Frame-Options, etc.)</li>
+</ul>
+<h3 id="106-deployment-security">10.6 Deployment Security<a class="headerlink" href="#106-deployment-security" title="Permanent link">#</a></h3>
+<ul>
+<li>Document secure deployment practices</li>
+<li>Recommend reverse proxy configuration (nginx, Apache)</li>
+<li>Provide example configurations for HTTPS</li>
+<li>Document firewall requirements</li>
+<li>Recommend network isolation strategies</li>
+</ul>
+<h2 id="11-email-integration-optional">11. Email Integration (Optional)<a class="headerlink" href="#11-email-integration-optional" title="Permanent link">#</a></h2>
+<p><strong>Note</strong>: Email/SMTP configuration is optional. Many administrators will not have ready access to an outgoing SMTP server. When email is not configured, the system provides fallback mechanisms by displaying setup links directly in the admin UI.</p>
+<h3 id="111-email-templates">11.1 Email Templates<a class="headerlink" href="#111-email-templates" title="Permanent link">#</a></h3>
+<h4 id="user-invitation">User Invitation<a class="headerlink" href="#user-invitation" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Subject: You&#39;ve been invited to InvokeAI
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>Hello,
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>You&#39;ve been invited to join InvokeAI by [Administrator Name].
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>Click the link below to set up your account:
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>[Setup Link]
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>This link expires in 7 days.
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>---
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>InvokeAI
+</code></pre></div>
+<h4 id="password-reset">Password Reset<a class="headerlink" href="#password-reset" title="Permanent link">#</a></h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>Subject: Reset your InvokeAI password
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>Hello [User Name],
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>A password reset was requested for your account.
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>Click the link below to reset your password:
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>[Reset Link]
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a>This link expires in 24 hours.
+<a id="__codelineno-11-11" name="__codelineno-11-11" href="#__codelineno-11-11"></a>
+<a id="__codelineno-11-12" name="__codelineno-11-12" href="#__codelineno-11-12"></a>If you didn&#39;t request this, please ignore this email.
+<a id="__codelineno-11-13" name="__codelineno-11-13" href="#__codelineno-11-13"></a>
+<a id="__codelineno-11-14" name="__codelineno-11-14" href="#__codelineno-11-14"></a>---
+<a id="__codelineno-11-15" name="__codelineno-11-15" href="#__codelineno-11-15"></a>InvokeAI
+</code></pre></div>
+<h3 id="112-email-service">11.2 Email Service<a class="headerlink" href="#112-email-service" title="Permanent link">#</a></h3>
+<ul>
+<li>Support SMTP configuration</li>
+<li>Use secure connection (TLS)</li>
+<li>Handle email failures gracefully</li>
+<li>Implement email queue for reliability</li>
+<li>Log email activities (without sensitive data)</li>
+<li>Provide fallback for no-email deployments (show links in admin UI)</li>
+</ul>
+<h2 id="12-testing-requirements">12. Testing Requirements<a class="headerlink" href="#12-testing-requirements" title="Permanent link">#</a></h2>
+<h3 id="121-unit-tests">12.1 Unit Tests<a class="headerlink" href="#121-unit-tests" title="Permanent link">#</a></h3>
+<ul>
+<li>Authentication service (password hashing, validation)</li>
+<li>Authorization checks</li>
+<li>Token generation and validation</li>
+<li>User management operations</li>
+<li>Shared board permissions</li>
+<li>Data isolation queries</li>
+</ul>
+<h3 id="122-integration-tests">12.2 Integration Tests<a class="headerlink" href="#122-integration-tests" title="Permanent link">#</a></h3>
+<ul>
+<li>Complete authentication flows</li>
+<li>User creation and invitation</li>
+<li>Password reset flow</li>
+<li>Multi-user data isolation</li>
+<li>Shared board access</li>
+<li>Session management</li>
+<li>Admin operations</li>
+</ul>
+<h3 id="123-security-tests">12.3 Security Tests<a class="headerlink" href="#123-security-tests" title="Permanent link">#</a></h3>
+<ul>
+<li>SQL injection prevention</li>
+<li>XSS prevention</li>
+<li>CSRF protection</li>
+<li>Session hijacking prevention</li>
+<li>Brute force protection</li>
+<li>Authorization bypass attempts</li>
+</ul>
+<h3 id="124-performance-tests">12.4 Performance Tests<a class="headerlink" href="#124-performance-tests" title="Permanent link">#</a></h3>
+<ul>
+<li>Authentication overhead</li>
+<li>Query performance with user filters</li>
+<li>Concurrent user sessions</li>
+<li>Database scalability with many users</li>
+</ul>
+<h2 id="13-documentation-requirements">13. Documentation Requirements<a class="headerlink" href="#13-documentation-requirements" title="Permanent link">#</a></h2>
+<h3 id="131-user-documentation">13.1 User Documentation<a class="headerlink" href="#131-user-documentation" title="Permanent link">#</a></h3>
+<ul>
+<li>Getting started with multi-user InvokeAI</li>
+<li>Login and account management</li>
+<li>Using shared boards</li>
+<li>Understanding permissions</li>
+<li>Troubleshooting authentication issues</li>
+</ul>
+<h3 id="132-administrator-documentation">13.2 Administrator Documentation<a class="headerlink" href="#132-administrator-documentation" title="Permanent link">#</a></h3>
+<ul>
+<li>Setting up multi-user InvokeAI</li>
+<li>User management guide</li>
+<li>Creating and managing shared boards</li>
+<li>Email configuration</li>
+<li>Security best practices</li>
+<li>Backup and restore with user data</li>
+</ul>
+<h3 id="133-developer-documentation">13.3 Developer Documentation<a class="headerlink" href="#133-developer-documentation" title="Permanent link">#</a></h3>
+<ul>
+<li>Authentication architecture</li>
+<li>API authentication requirements</li>
+<li>Adding new multi-user features</li>
+<li>Database schema changes</li>
+<li>Testing multi-user features</li>
+</ul>
+<h3 id="134-migration-documentation">13.4 Migration Documentation<a class="headerlink" href="#134-migration-documentation" title="Permanent link">#</a></h3>
+<ul>
+<li>Upgrading from single-user to multi-user</li>
+<li>Data migration strategies</li>
+<li>Rollback procedures</li>
+<li>Common issues and solutions</li>
+</ul>
+<h2 id="14-future-enhancements">14. Future Enhancements<a class="headerlink" href="#14-future-enhancements" title="Permanent link">#</a></h2>
+<h3 id="141-phase-2-features">14.1 Phase 2 Features<a class="headerlink" href="#141-phase-2-features" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>OAuth2/OpenID Connect integration</strong> (deferred from initial release to keep scope manageable)</li>
+<li>Two-factor authentication</li>
+<li>API keys for programmatic access</li>
+<li>Enhanced team/group management</li>
+<li>Advanced permission system (roles and capabilities)</li>
+</ul>
+<h3 id="142-phase-3-features">14.2 Phase 3 Features<a class="headerlink" href="#142-phase-3-features" title="Permanent link">#</a></h3>
+<ul>
+<li>SSO integration (SAML, LDAP)</li>
+<li>User quotas and limits</li>
+<li>Resource usage tracking</li>
+<li>Advanced collaboration features</li>
+<li>Workflow template library with permissions</li>
+<li>Model access controls per user/group</li>
+</ul>
+<h2 id="15-success-metrics">15. Success Metrics<a class="headerlink" href="#15-success-metrics" title="Permanent link">#</a></h2>
+<h3 id="151-functionality-metrics">15.1 Functionality Metrics<a class="headerlink" href="#151-functionality-metrics" title="Permanent link">#</a></h3>
+<ul>
+<li>Successful user authentication rate</li>
+<li>Zero unauthorized data access incidents</li>
+<li>All tests passing (unit, integration, security)</li>
+<li>API response time within acceptable limits</li>
+</ul>
+<h3 id="152-usability-metrics">15.2 Usability Metrics<a class="headerlink" href="#152-usability-metrics" title="Permanent link">#</a></h3>
+<ul>
+<li>User setup completion time &lt; 2 minutes</li>
+<li>Login time &lt; 2 seconds</li>
+<li>Clear error messages for all auth failures</li>
+<li>Positive user feedback on multi-user features</li>
+</ul>
+<h3 id="153-security-metrics">15.3 Security Metrics<a class="headerlink" href="#153-security-metrics" title="Permanent link">#</a></h3>
+<ul>
+<li>No critical security vulnerabilities identified</li>
+<li>CodeQL scan passes</li>
+<li>Penetration testing completed</li>
+<li>Security best practices followed</li>
+</ul>
+<h2 id="16-risks-and-mitigations">16. Risks and Mitigations<a class="headerlink" href="#16-risks-and-mitigations" title="Permanent link">#</a></h2>
+<h3 id="161-technical-risks">16.1 Technical Risks<a class="headerlink" href="#161-technical-risks" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Impact</th>
+<th>Probability</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Performance degradation with user filtering</td>
+<td>Medium</td>
+<td>Low</td>
+<td>Index optimization, query caching</td>
+</tr>
+<tr>
+<td>Database migration failures</td>
+<td>High</td>
+<td>Low</td>
+<td>Thorough testing, rollback procedures</td>
+</tr>
+<tr>
+<td>Session management complexity</td>
+<td>Medium</td>
+<td>Medium</td>
+<td>Use proven libraries (PyJWT), extensive testing</td>
+</tr>
+<tr>
+<td>Auth bypass vulnerabilities</td>
+<td>High</td>
+<td>Low</td>
+<td>Security review, penetration testing</td>
+</tr>
+</tbody>
+</table>
+<h3 id="162-ux-risks">16.2 UX Risks<a class="headerlink" href="#162-ux-risks" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Impact</th>
+<th>Probability</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Confusion in migration for existing users</td>
+<td>Medium</td>
+<td>High</td>
+<td>Clear documentation, migration wizard</td>
+</tr>
+<tr>
+<td>Friction from additional login step</td>
+<td>Low</td>
+<td>High</td>
+<td>Remember me option, long session timeout</td>
+</tr>
+<tr>
+<td>Complexity of admin interface</td>
+<td>Medium</td>
+<td>Medium</td>
+<td>Intuitive UI design, user testing</td>
+</tr>
+</tbody>
+</table>
+<h3 id="163-operational-risks">16.3 Operational Risks<a class="headerlink" href="#163-operational-risks" title="Permanent link">#</a></h3>
+<table>
+<thead>
+<tr>
+<th>Risk</th>
+<th>Impact</th>
+<th>Probability</th>
+<th>Mitigation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Email delivery failures</td>
+<td>Low</td>
+<td>Medium</td>
+<td>Show links in UI, document manual methods</td>
+</tr>
+<tr>
+<td>Lost admin password</td>
+<td>High</td>
+<td>Low</td>
+<td>Document recovery procedure, config reset</td>
+</tr>
+<tr>
+<td>User data conflicts in migration</td>
+<td>Medium</td>
+<td>Low</td>
+<td>Data validation, backup requirements</td>
+</tr>
+</tbody>
+</table>
+<h2 id="17-implementation-phases">17. Implementation Phases<a class="headerlink" href="#17-implementation-phases" title="Permanent link">#</a></h2>
+<h3 id="phase-1-foundation-weeks-1-2">Phase 1: Foundation (Weeks 1-2)<a class="headerlink" href="#phase-1-foundation-weeks-1-2" title="Permanent link">#</a></h3>
+<ul>
+<li>Database schema design and migration</li>
+<li>Basic authentication service</li>
+<li>Password hashing and validation</li>
+<li>Session management</li>
+</ul>
+<h3 id="phase-2-backend-api-weeks-3-4">Phase 2: Backend API (Weeks 3-4)<a class="headerlink" href="#phase-2-backend-api-weeks-3-4" title="Permanent link">#</a></h3>
+<ul>
+<li>Authentication endpoints</li>
+<li>User management endpoints</li>
+<li>Authorization middleware</li>
+<li>Update existing endpoints with auth</li>
+</ul>
+<h3 id="phase-3-frontend-auth-weeks-5-6">Phase 3: Frontend Auth (Weeks 5-6)<a class="headerlink" href="#phase-3-frontend-auth-weeks-5-6" title="Permanent link">#</a></h3>
+<ul>
+<li>Login page and flow</li>
+<li>Administrator setup</li>
+<li>Session management</li>
+<li>Auth state management</li>
+</ul>
+<h3 id="phase-4-multi-tenancy-weeks-7-9">Phase 4: Multi-tenancy (Weeks 7-9)<a class="headerlink" href="#phase-4-multi-tenancy-weeks-7-9" title="Permanent link">#</a></h3>
+<ul>
+<li>User isolation in all services</li>
+<li>Shared boards implementation</li>
+<li>Queue permission filtering</li>
+<li>Workflow public/private</li>
+</ul>
+<h3 id="phase-5-admin-interface-weeks-10-11">Phase 5: Admin Interface (Weeks 10-11)<a class="headerlink" href="#phase-5-admin-interface-weeks-10-11" title="Permanent link">#</a></h3>
+<ul>
+<li>User management UI</li>
+<li>Board sharing UI</li>
+<li>Admin-specific features</li>
+<li>User profile page</li>
+</ul>
+<h3 id="phase-6-testing-polish-weeks-12-13">Phase 6: Testing &amp; Polish (Weeks 12-13)<a class="headerlink" href="#phase-6-testing-polish-weeks-12-13" title="Permanent link">#</a></h3>
+<ul>
+<li>Comprehensive testing</li>
+<li>Security audit</li>
+<li>Performance optimization</li>
+<li>Documentation</li>
+<li>Bug fixes</li>
+</ul>
+<h3 id="phase-7-beta-release-week-14">Phase 7: Beta &amp; Release (Week 14+)<a class="headerlink" href="#phase-7-beta-release-week-14" title="Permanent link">#</a></h3>
+<ul>
+<li>Beta testing with selected users</li>
+<li>Feedback incorporation</li>
+<li>Final testing</li>
+<li>Release preparation</li>
+<li>Documentation finalization</li>
+</ul>
+<h2 id="18-acceptance-criteria">18. Acceptance Criteria<a class="headerlink" href="#18-acceptance-criteria" title="Permanent link">#</a></h2>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Administrator can set up initial account on first launch</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Users can log in with email and password</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Users can change their password</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Administrators can create, edit, and delete users</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> User data is properly isolated (boards, images, workflows)</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Shared boards work correctly with permissions</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Non-admin users cannot access model management</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Queue filtering works correctly for users and admins</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Session management works correctly (expiry, renewal, logout)</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> All security tests pass</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> API documentation is updated</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> User and admin documentation is complete</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Migration from single-user works smoothly</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Performance is acceptable with multiple concurrent users</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Backward compatibility mode works (auth disabled)</li>
+</ul>
+<h2 id="19-design-decisions">19. Design Decisions<a class="headerlink" href="#19-design-decisions" title="Permanent link">#</a></h2>
+<p>The following design decisions have been approved for implementation:</p>
+<ol>
+<li>
+<p><strong>OAuth2 Priority</strong>: OAuth2/OpenID Connect integration will be a <strong>future enhancement</strong>. The initial release will focus on username/password authentication to keep scope manageable.</p>
+</li>
+<li>
+<p><strong>Email Requirement</strong>: Email/SMTP configuration is <strong>optional</strong>. Many administrators will not have ready access to an outgoing SMTP server. The system will provide fallback mechanisms (showing setup links directly in the admin UI) when email is not configured.</p>
+</li>
+<li>
+<p><strong>Data Migration</strong>: During migration from single-user to multi-user mode, the administrator will be given the <strong>option to specify an arbitrary user account</strong> to hold legacy data. The admin account can be used for this purpose if the administrator wishes.</p>
+</li>
+<li>
+<p><strong>API Compatibility</strong>: Authentication will be <strong>required on all APIs</strong>, but authentication will not be required if multi-user support is disabled (backward compatibility mode with <code>auth_enabled: false</code>).</p>
+</li>
+<li>
+<p><strong>Session Storage</strong>: The system will use <strong>JWT tokens with optional server-side session tracking</strong>. This provides scalability while allowing administrators to enable server-side tracking if needed.</p>
+</li>
+<li>
+<p><strong>Audit Logging</strong>: The system will <strong>log authentication events and admin actions</strong>. This provides accountability and security monitoring for critical operations.</p>
+</li>
+</ol>
+<h2 id="20-conclusion">20. Conclusion<a class="headerlink" href="#20-conclusion" title="Permanent link">#</a></h2>
+<p>This specification provides a comprehensive blueprint for implementing multi-user support in InvokeAI. The design prioritizes:</p>
+<ul>
+<li><strong>Security</strong>: Proper authentication, authorization, and data isolation</li>
+<li><strong>Usability</strong>: Intuitive UI, smooth migration, minimal friction</li>
+<li><strong>Scalability</strong>: Efficient database design, performant queries</li>
+<li><strong>Maintainability</strong>: Clean architecture, comprehensive testing</li>
+<li><strong>Flexibility</strong>: Future enhancement paths, optional features</li>
+</ul>
+<p>The phased implementation approach allows for iterative development and testing, while the detailed specifications ensure all stakeholders have clear expectations of the final system.</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 15, 2026 15:14:35 UTC">March 15, 2026</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 15, 2026 15:14:35 UTC">March 15, 2026</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+  
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2022-2024 InvokeAI Team
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["navigation.instant", "navigation.tabs", "navigation.tabs.sticky", "navigation.tracking", "navigation.indexes", "navigation.path", "search.highlight", "search.suggest", "toc.integrate"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
