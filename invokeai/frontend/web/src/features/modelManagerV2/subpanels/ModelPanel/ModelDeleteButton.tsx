@@ -7,11 +7,11 @@ import { memo, type MouseEvent, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiTrashSimpleBold } from 'react-icons/pi';
 import { useDeleteModelsMutation } from 'services/api/endpoints/models';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfigWithExternal } from 'services/api/types';
 
 type Props = {
   showLabel?: boolean;
-  modelConfig: AnyModelConfig;
+  modelConfig: AnyModelConfigWithExternal;
 };
 
 export const ModelDeleteButton = memo(({ showLabel = true, modelConfig }: Props) => {

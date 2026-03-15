@@ -12,6 +12,7 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { addZImageControl } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -73,7 +74,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     model,
     vae_model: zImageVaeModel ?? undefined,
     qwen3_encoder_model: zImageQwen3EncoderModel ?? undefined,
-    qwen3_source_model: zImageQwen3SourceModel ?? undefined,
+    qwen3_source_model: (zImageQwen3SourceModel as ModelIdentifierField | null) ?? undefined,
   });
 
   const positivePrompt = g.addNode({

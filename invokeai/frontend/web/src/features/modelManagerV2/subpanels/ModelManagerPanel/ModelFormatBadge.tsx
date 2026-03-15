@@ -3,10 +3,10 @@ import type { ModelFormat } from 'features/nodes/types/common';
 import { memo } from 'react';
 
 type Props = {
-  format: ModelFormat;
+  format: ModelFormat | 'external_api';
 };
 
-const FORMAT_NAME_MAP: Record<ModelFormat, string> = {
+const FORMAT_NAME_MAP: Record<ModelFormat | 'external_api', string> = {
   diffusers: 'diffusers',
   lycoris: 'lycoris',
   checkpoint: 'checkpoint',
@@ -19,12 +19,13 @@ const FORMAT_NAME_MAP: Record<ModelFormat, string> = {
   bnb_quantized_nf4b: 'quantized',
   gguf_quantized: 'gguf',
   omi: 'omi',
+  external_api: 'external_api',
   unknown: 'unknown',
   olive: 'olive',
   onnx: 'onnx',
 };
 
-const FORMAT_COLOR_MAP: Record<ModelFormat, string> = {
+const FORMAT_COLOR_MAP: Record<ModelFormat | 'external_api', string> = {
   diffusers: 'base',
   omi: 'base',
   lycoris: 'base',
@@ -40,6 +41,7 @@ const FORMAT_COLOR_MAP: Record<ModelFormat, string> = {
   unknown: 'red',
   olive: 'base',
   onnx: 'base',
+  external_api: 'base',
 };
 
 const ModelFormatBadge = ({ format }: Props) => {

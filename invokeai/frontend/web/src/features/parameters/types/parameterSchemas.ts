@@ -2,6 +2,7 @@ import { NUMPY_RAND_MAX } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import {
+  zExternalModelIdentifierField,
   zFluxDypeExponentField,
   zFluxDypePresetField,
   zFluxDypeScaleField,
@@ -115,7 +116,7 @@ export const isParameterHeight = isParameterImageDimension;
 // #endregion
 
 // #region Model
-export const zParameterModel = zModelIdentifierField;
+export const zParameterModel = z.union([zModelIdentifierField, zExternalModelIdentifierField]);
 export type ParameterModel = z.infer<typeof zParameterModel>;
 // #endregion
 

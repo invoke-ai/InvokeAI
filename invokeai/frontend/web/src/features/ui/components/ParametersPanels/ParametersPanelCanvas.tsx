@@ -2,7 +2,7 @@ import { Box, Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { overlayScrollbarsParams } from 'common/components/OverlayScrollbars/constants';
-import { selectIsCogView4, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
+import { selectIsCogView4, selectIsExternal, selectIsSDXL } from 'features/controlLayers/store/paramsSlice';
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
@@ -24,6 +24,7 @@ const overlayScrollbarsStyles: CSSProperties = {
 export const ParametersPanelCanvas = memo(() => {
   const isSDXL = useAppSelector(selectIsSDXL);
   const isCogview4 = useAppSelector(selectIsCogView4);
+  const isExternal = useAppSelector(selectIsExternal);
   const isStylePresetsMenuOpen = useStore($isStylePresetsMenuOpen);
 
   return (
@@ -43,9 +44,9 @@ export const ParametersPanelCanvas = memo(() => {
               <Prompts />
               <CanvasTabImageSettingsAccordion />
               <GenerationSettingsAccordion />
-              <CompositingSettingsAccordion />
+              {!isExternal && <CompositingSettingsAccordion />}
               {isSDXL && <RefinerSettingsAccordion />}
-              {!isCogview4 && <AdvancedSettingsAccordion />}
+              {!isCogview4 && !isExternal && <AdvancedSettingsAccordion />}
             </Flex>
           </OverlayScrollbarsComponent>
         </Box>

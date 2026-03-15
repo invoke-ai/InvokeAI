@@ -168,7 +168,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
         }
 
-        if (SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
+        if (newModel.base !== 'external' && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
           // Handle incompatible reference image models - switch to first compatible model, with some smart logic
           // to choose the best available model based on the new main model.
           const allRefImageModels = selectGlobalRefImageModels(state).filter(({ base }) => base === newBase);

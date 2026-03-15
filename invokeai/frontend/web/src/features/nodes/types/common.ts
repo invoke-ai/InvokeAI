@@ -180,6 +180,17 @@ export const zModelIdentifierField = z.object({
   submodel_type: zSubModelType.nullish(),
 });
 export type ModelIdentifierField = z.infer<typeof zModelIdentifierField>;
+
+// Frontend-only identifier for external API models (not part of the backend schema)
+export const zExternalModelIdentifierField = z.object({
+  key: z.string().min(1),
+  hash: z.string().min(1),
+  name: z.string().min(1),
+  base: z.literal('external'),
+  type: z.literal('external_image_generator'),
+  submodel_type: zSubModelType.nullish(),
+});
+export type ExternalModelIdentifierField = z.infer<typeof zExternalModelIdentifierField>;
 // #endregion
 
 // #region Control Adapters

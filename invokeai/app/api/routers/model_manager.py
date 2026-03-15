@@ -30,6 +30,7 @@ from invokeai.app.services.model_records import (
 )
 from invokeai.app.services.orphaned_models import OrphanedModelInfo
 from invokeai.app.util.suppress_output import SuppressOutput
+from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SD1_Config,
@@ -75,8 +76,7 @@ class CacheType(str, Enum):
 def add_cover_image_to_model_config(config: AnyModelConfig, dependencies: Type[ApiDependencies]) -> AnyModelConfig:
     """Add a cover image URL to a model configuration."""
     cover_image = dependencies.invoker.services.model_images.get_url(config.key)
-    config.cover_image = cover_image
-    return config
+    return config.model_copy(update={"cover_image": cover_image})
 
 
 ##############################################################################
@@ -145,8 +145,19 @@ async def list_model_records(
         found_models.extend(
             record_store.search_by_attr(model_type=model_type, model_name=model_name, model_format=model_format)
         )
-    for model in found_models:
+    for index, model in enumerate(found_models):
         model = add_cover_image_to_model_config(model, ApiDependencies)
+        if isinstance(model, ExternalApiModelConfig):
+            starter_match = next((starter for starter in STARTER_MODELS if starter.source == model.source), None)
+            if starter_match is not None:
+                model_updates: dict[str, object] = {}
+                if starter_match.capabilities is not None:
+                    model_updates["capabilities"] = starter_match.capabilities
+                if starter_match.default_settings is not None:
+                    model_updates["default_settings"] = starter_match.default_settings
+                if model_updates:
+                    model = model.model_copy(update=model_updates)
+        found_models[index] = model
     return ModelsList(models=found_models)
 
 
@@ -166,6 +177,8 @@ async def list_missing_models() -> ModelsList:
 
     missing_models: list[AnyModelConfig] = []
     for model_config in record_store.all_models():
+        if model_config.base == BaseModelType.External or model_config.format == ModelFormat.ExternalApi:
+            continue
         if not (models_path / model_config.path).resolve().exists():
             missing_models.append(model_config)
 
@@ -268,7 +281,7 @@ async def reidentify_model(
         result.config.name = config.name
         result.config.description = config.description
         result.config.cover_image = config.cover_image
-        if hasattr(config, "trigger_phrases") and hasattr(result.config, "trigger_phrases"):
+        if hasattr(result.config, "trigger_phrases") and hasattr(config, "trigger_phrases"):
             result.config.trigger_phrases = config.trigger_phrases
         result.config.source = config.source
         result.config.source_type = config.source_type

@@ -22,6 +22,7 @@ from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
 INIT_FILE = Path("invokeai.yaml")
+API_KEYS_FILE = Path("api_keys.yaml")
 DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
@@ -30,6 +31,7 @@ ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
 CONFIG_SCHEMA_VERSION = "4.0.2"
+EXTERNAL_API_KEY_FIELDS = ("external_gemini_api_key", "external_openai_api_key")
 
 
 class URLRegexTokenPair(BaseModel):
@@ -111,6 +113,10 @@ class InvokeAIAppConfig(BaseSettings):
         unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
+        external_gemini_api_key: API key for Gemini image generation.
+        external_openai_api_key: API key for OpenAI image generation.
+        external_gemini_base_url: Base URL override for Gemini image generation.
+        external_openai_base_url: Base URL override for OpenAI image generation.
         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
     """
 
@@ -209,6 +215,16 @@ class InvokeAIAppConfig(BaseSettings):
     multiuser:                     bool = Field(default=False,              description="Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.")
     strict_password_checking:      bool = Field(default=False,              description="Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.")
 
+    # EXTERNAL PROVIDERS
+    external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
+    external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")
+    external_gemini_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Gemini image generation."
+    )
+    external_openai_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for OpenAI image generation."
+    )
+
     # fmt: on
 
     model_config = SettingsConfigDict(env_prefix="INVOKEAI_", env_ignore_empty=True)
@@ -287,6 +303,13 @@ class InvokeAIAppConfig(BaseSettings):
     def config_file_path(self) -> Path:
         """Path to invokeai.yaml, resolved to an absolute path.."""
         resolved_path = self._resolve(self._config_file or INIT_FILE)
+        assert resolved_path is not None
+        return resolved_path
+
+    @property
+    def api_keys_file_path(self) -> Path:
+        """Path to api_keys.yaml, resolved to an absolute path.."""
+        resolved_path = self._resolve(API_KEYS_FILE)
         assert resolved_path is not None
         return resolved_path
 
@@ -502,6 +525,36 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
         raise RuntimeError(f"Failed to load config file {config_path}: {e}") from e
 
 
+def load_external_api_keys(api_keys_file_path: Path) -> dict[str, str]:
+    """Load external provider API keys from a dedicated YAML file."""
+    if not api_keys_file_path.exists():
+        return {}
+
+    with open(api_keys_file_path, "rt", encoding=locale.getpreferredencoding()) as file:
+        loaded_api_keys: Any = yaml.safe_load(file)
+
+    if loaded_api_keys is None:
+        return {}
+
+    if not isinstance(loaded_api_keys, dict):
+        raise RuntimeError(f"Failed to load api keys file {api_keys_file_path}: expected a mapping")
+
+    parsed_api_keys: dict[str, str] = {}
+    for field_name in EXTERNAL_API_KEY_FIELDS:
+        value = loaded_api_keys.get(field_name)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise RuntimeError(
+                f"Failed to load api keys file {api_keys_file_path}: value for '{field_name}' must be a string"
+            )
+        stripped_value = value.strip()
+        if stripped_value:
+            parsed_api_keys[field_name] = stripped_value
+
+    return parsed_api_keys
+
+
 @lru_cache(maxsize=1)
 def get_config() -> InvokeAIAppConfig:
     """Get the global singleton app config.
@@ -518,6 +571,7 @@ def get_config() -> InvokeAIAppConfig:
     """
     # This object includes environment variables, as parsed by pydantic-settings
     config = InvokeAIAppConfig()
+    env_fields_set = set(config.model_fields_set)
 
     args = InvokeAIArgs.args
 
@@ -578,5 +632,12 @@ def get_config() -> InvokeAIAppConfig:
         # We should never write env vars to the config file
         default_config = DefaultInvokeAIAppConfig()
         default_config.write_file(config.config_file_path, as_example=False)
+
+    api_keys_from_file = load_external_api_keys(config.api_keys_file_path)
+    if api_keys_from_file:
+        # API keys file should take precedence over invokeai.yaml, but not over environment variables.
+        api_keys_to_apply = {key: value for key, value in api_keys_from_file.items() if key not in env_fields_set}
+        if api_keys_to_apply:
+            config.update_config(api_keys_to_apply, clobber=True)
 
     return config
