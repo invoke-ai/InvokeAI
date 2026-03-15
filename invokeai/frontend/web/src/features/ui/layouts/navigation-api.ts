@@ -472,6 +472,55 @@ export class NavigationApi {
   };
 
   /**
+   * Collapse the right panel in the currently active tab.
+   */
+  collapseRightPanel = (): boolean => {
+    const activeTab = this._app?.activeTab.get() ?? null;
+    if (!activeTab) {
+      log.warn('No active tab found to collapse right panel');
+      return false;
+    }
+
+    const rightPanel = this.getPanel(activeTab, RIGHT_PANEL_ID);
+    if (!rightPanel) {
+      log.warn(`Right panel not found in active tab "${activeTab}"`);
+      return false;
+    }
+
+    if (!(rightPanel instanceof GridviewPanel)) {
+      log.error(`Right panels must be instances of GridviewPanel`);
+      return false;
+    }
+
+    this._collapsePanel(rightPanel);
+    return true;
+  };
+
+  /**
+   * Check if the right panel in the currently active tab is collapsed.
+   */
+  isRightPanelCollapsed = (): boolean => {
+    const activeTab = this._app?.activeTab.get() ?? null;
+    if (!activeTab) {
+      log.warn('No active tab found to check right panel state');
+      return false;
+    }
+
+    const rightPanel = this.getPanel(activeTab, RIGHT_PANEL_ID);
+    if (!rightPanel) {
+      log.warn(`Right panel not found in active tab "${activeTab}"`);
+      return false;
+    }
+
+    if (!(rightPanel instanceof GridviewPanel)) {
+      log.error(`Right panels must be instances of GridviewPanel`);
+      return false;
+    }
+
+    return rightPanel.width === 0;
+  };
+
+  /**
    * Get a panel by its tab and ID.
    *
    * This method will not wait for the panel to be registered.

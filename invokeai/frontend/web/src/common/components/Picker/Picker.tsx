@@ -207,6 +207,10 @@ type PickerProps<T extends object> = {
    */
   searchable?: boolean;
   /**
+   * An initial search term to populate the search input with.
+   */
+  searchTerm?: string;
+  /**
    * Initial state for group toggles. If provided, groups will start with these states instead of all being disabled.
    */
   initialGroupStates?: GroupStatusMap;
@@ -535,6 +539,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
     OptionComponent = DefaultOptionComponent,
     NextToSearchBar,
     searchable,
+    searchTerm = '',
     initialGroupStates,
   } = props;
   const rootRef = useRef<HTMLDivElement>(null);
@@ -553,7 +558,7 @@ export const Picker = typedMemo(<T extends object>(props: PickerProps<T>) => {
   const $filteredOptionsCount = useComputed([$flattenedFilteredOptions], (options) => options.length);
   const $hasFilteredOptions = useComputed([$filteredOptionsCount], (count) => count > 0);
   const $selectedItem = useAtom<T | undefined>(undefined);
-  const $searchTerm = useAtom('');
+  const $searchTerm = useAtom(searchTerm);
   const $selectedItemId = useComputed([$selectedItem], (item) => (item ? getOptionId(item) : undefined));
 
   const selectIsCompactView = useMemo(() => buildSelectIsCompactView(pickerId), [pickerId]);
