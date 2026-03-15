@@ -162,9 +162,9 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
       <Flex flexDir="column" gap={2} position="absolute" top={0} insetInlineStart={0} alignItems="flex-start">
         <CanvasAlertsInvocationProgress />
       </Flex>
-      {shouldShowItemDetails && imageToRender && !withProgress && (
+      {shouldShowItemDetails && imageDTO && !withProgress && (
         <Box position="absolute" opacity={0.8} top={0} width="full" height="full" borderRadius="base">
-          <ImageMetadataViewer image={imageToRender} />
+          <ImageMetadataViewer image={imageDTO} />
         </Box>
       )}
       <AnimatePresence>

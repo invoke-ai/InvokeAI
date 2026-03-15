@@ -21,7 +21,7 @@ const getInitialState = (): GalleryState => ({
   shouldAutoSwitch: true,
   autoAssignBoardOnClick: true,
   autoAddBoardId: 'none',
-  galleryImageMinimumWidth: 90,
+  galleryColumns: 8,
   alwaysShowImageSizeBadge: false,
   selectedBoardId: 'none',
   galleryView: 'images',
@@ -35,6 +35,7 @@ const getInitialState = (): GalleryState => ({
   shouldShowArchivedBoards: false,
   boardsListOrderBy: 'created_at',
   boardsListOrderDir: 'DESC',
+  showAspectRatioThumbnails: false,
 });
 
 const slice = createSlice({
@@ -75,8 +76,8 @@ const slice = createSlice({
     shouldAutoSwitchChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldAutoSwitch = action.payload;
     },
-    setGalleryImageMinimumWidth: (state, action: PayloadAction<number>) => {
-      state.galleryImageMinimumWidth = action.payload;
+    setGalleryColumns: (state, action: PayloadAction<number>) => {
+      state.galleryColumns = action.payload;
     },
     autoAssignBoardOnClickChanged: (state, action: PayloadAction<boolean>) => {
       state.autoAssignBoardOnClick = action.payload;
@@ -142,6 +143,9 @@ const slice = createSlice({
     boardsListOrderDirChanged: (state, action: PayloadAction<OrderDir>) => {
       state.boardsListOrderDir = action.payload;
     },
+    showAspectRatioThumbnailsChanged: (state, action: PayloadAction<boolean>) => {
+      state.showAspectRatioThumbnails = action.payload;
+    },
   },
   extraReducers(builder) {
     // Clear board-related state on logout to prevent stale data when switching users
@@ -156,8 +160,8 @@ const slice = createSlice({
 export const {
   imageSelected,
   shouldAutoSwitchChanged,
+  setGalleryColumns,
   autoAssignBoardOnClickChanged,
-  setGalleryImageMinimumWidth,
   boardIdSelected,
   autoAddBoardIdChanged,
   galleryViewChanged,
@@ -172,9 +176,10 @@ export const {
   orderDirChanged,
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
-  searchTermChanged,
   boardsListOrderByChanged,
   boardsListOrderDirChanged,
+  searchTermChanged,
+  showAspectRatioThumbnailsChanged,
 } = slice.actions;
 
 export const selectGallerySlice = (state: RootState) => state.gallery;

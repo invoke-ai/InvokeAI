@@ -3,7 +3,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { GalleryImageGridContent } from 'features/gallery/components/GalleryImageGrid';
 import { GalleryPaginationPaged } from 'features/gallery/components/ImageGrid/GalleryPaginationPaged';
 import { useGalleryImageNames } from 'features/gallery/components/use-gallery-image-names';
-import { selectGalleryImageMinimumWidth, selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
+import { selectGalleryColumns, selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { getItemsPerPage } from './getItemsPerPage';
@@ -13,7 +13,7 @@ const FALLBACK_PAGE_SIZE = 200;
 export const GalleryImageGridPaged = memo(() => {
   const { queryArgs, imageNames, isLoading } = useGalleryImageNames();
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
-  const galleryImageMinimumWidth = useAppSelector(selectGalleryImageMinimumWidth);
+  const galleryColumns = useAppSelector(selectGalleryColumns);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageSize, setPageSize] = useState(FALLBACK_PAGE_SIZE);
   const gridRootRef = useRef<HTMLDivElement>(null);
@@ -101,7 +101,7 @@ export const GalleryImageGridPaged = memo(() => {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [galleryImageMinimumWidth, imageNames.length, isLoading, pageIndex, pageSize]);
+  }, [galleryColumns, imageNames.length, isLoading, pageIndex, pageSize]);
 
   useEffect(() => {
     if (isLoading) {
@@ -112,7 +112,7 @@ export const GalleryImageGridPaged = memo(() => {
       requestAnimationFrame(recalculatePageSize);
     }, 350);
     return () => clearTimeout(timeout);
-  }, [galleryImageMinimumWidth, isLoading, recalculatePageSize]);
+  }, [galleryColumns, isLoading, recalculatePageSize]);
 
   useEffect(() => {
     const rootEl = gridRootRef.current;
@@ -124,7 +124,7 @@ export const GalleryImageGridPaged = memo(() => {
     });
     observer.observe(rootEl);
     return () => observer.disconnect();
-  }, [galleryImageMinimumWidth, recalculatePageSize]);
+  }, [galleryColumns, recalculatePageSize]);
 
   useEffect(() => {
     const rootEl = gridRootRef.current;
@@ -178,13 +178,14 @@ export const GalleryImageGridPaged = memo(() => {
         onGoToPage={handleTabChange}
         onPageInputChange={handlePageInputChange}
       />
-      <Flex w="full" h="full">
+      <Flex w="full" h="full" px={2}>
         <GalleryImageGridContent
           imageNames={pageImageNames}
           navigationImageNames={imageNames}
           isLoading={false}
           queryArgs={queryArgs}
           rootRef={gridRootRef}
+          showProgressTiles={pageIndex === 0}
         />
       </Flex>
     </Flex>

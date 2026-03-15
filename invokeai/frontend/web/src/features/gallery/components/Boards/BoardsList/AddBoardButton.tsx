@@ -1,4 +1,5 @@
-import { IconButton } from '@invoke-ai/ui-library';
+import type { IconButtonProps } from '@invoke-ai/ui-library';
+import { Button, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch } from 'app/store/storeHooks';
 import { boardIdSelected, boardSearchTextChanged } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
@@ -6,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { PiPlusBold } from 'react-icons/pi';
 import { useCreateBoardMutation } from 'services/api/endpoints/boards';
 
-const AddBoardButton = () => {
+const useAddBoard = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const [createBoard, { isLoading }] = useCreateBoardMutation();
@@ -21,20 +22,47 @@ const AddBoardButton = () => {
     }
   }, [t, createBoard, dispatch]);
 
-  return (
-    <IconButton
-      icon={<PiPlusBold />}
-      isLoading={isLoading}
-      tooltip={t('boards.addBoard')}
-      aria-label={t('boards.addBoard')}
-      onClick={handleCreateBoard}
-      size="md"
-      data-testid="add-board-button"
-      variant="link"
-      w={8}
-      h={8}
-    />
-  );
+  return { handleCreateBoard, isLoading, t };
 };
 
-export default memo(AddBoardButton);
+export const AddBoardButton = memo(() => {
+  const { handleCreateBoard, isLoading, t } = useAddBoard();
+
+  return (
+    <Button
+      leftIcon={<PiPlusBold />}
+      isLoading={isLoading}
+      onClick={handleCreateBoard}
+      size="sm"
+      data-testid="add-board-button"
+      variant="ghost"
+      flex={1}
+      justifyContent="start"
+    >
+      {t('boards.addBoard')}
+    </Button>
+  );
+});
+
+AddBoardButton.displayName = 'AddBoardButton';
+
+export const AddBoardIconButton = memo((props: Partial<IconButtonProps>) => {
+  const { handleCreateBoard, isLoading, t } = useAddBoard();
+  const { 'aria-label': ariaLabel = t('boards.addBoard'), ...rest } = props;
+
+  return (
+    <IconButton
+      aria-label={ariaLabel}
+      size="sm"
+      variant="link"
+      tooltip={t('boards.addBoard')}
+      icon={<PiPlusBold />}
+      isLoading={isLoading}
+      onClick={handleCreateBoard}
+      data-testid="add-board-icon-button"
+      {...rest}
+    />
+  );
+});
+
+AddBoardIconButton.displayName = 'AddBoardIconButton';

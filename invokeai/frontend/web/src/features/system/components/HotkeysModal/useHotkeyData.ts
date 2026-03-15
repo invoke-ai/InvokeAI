@@ -107,6 +107,8 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('app', 'focusPrompt', ['alt+a']);
     addHotkey('app', 'toggleLeftPanel', ['t', 'o']);
     addHotkey('app', 'toggleRightPanel', ['g']);
+    // addHotkey('app', 'toggleGalleryPanel', ['g']);
+    // addHotkey('app', 'toggleLayersPanel', ['l']);
     addHotkey('app', 'resetPanelLayout', ['shift+r']);
     addHotkey('app', 'togglePanels', ['f']);
 

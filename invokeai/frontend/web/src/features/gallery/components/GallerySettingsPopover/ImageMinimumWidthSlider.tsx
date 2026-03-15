@@ -1,27 +1,27 @@
 import { CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectGalleryImageMinimumWidth } from 'features/gallery/store/gallerySelectors';
-import { setGalleryImageMinimumWidth } from 'features/gallery/store/gallerySlice';
+import { selectGalleryColumns } from 'features/gallery/store/gallerySelectors';
+import { setGalleryColumns } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const GallerySettingsPopover = () => {
+const GalleryColumnsSlider = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const galleryImageMinimumWidth = useAppSelector(selectGalleryImageMinimumWidth);
+  const galleryColumns = useAppSelector(selectGalleryColumns);
 
   const onChange = useCallback(
     (v: number) => {
-      dispatch(setGalleryImageMinimumWidth(v));
+      dispatch(setGalleryColumns(v));
     },
     [dispatch]
   );
   return (
     <FormControl>
-      <FormLabel>{t('gallery.galleryImageSize')}</FormLabel>
-      <CompositeSlider value={galleryImageMinimumWidth} onChange={onChange} min={45} max={256} defaultValue={90} />
+      <FormLabel>{t('gallery.columns')}</FormLabel>
+      <CompositeSlider value={galleryColumns} onChange={onChange} min={2} max={15} defaultValue={5} />
     </FormControl>
   );
 };
 
-export default memo(GallerySettingsPopover);
+export default memo(GalleryColumnsSlider);

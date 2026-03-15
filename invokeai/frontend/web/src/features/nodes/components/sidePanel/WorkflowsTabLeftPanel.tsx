@@ -13,7 +13,7 @@ const WorkflowsTabLeftPanel = () => {
   const mode = useAppSelector(selectWorkflowMode);
 
   return (
-    <Flex flexDir="column" w="full" h="full" gap={2}>
+    <Flex flexDir="column" w="full" h="full" gap={2} p={2}>
       <QueueControls />
       <Flex w="full" h="full" gap={2} flexDir="column">
         <ActiveWorkflowNameAndActions />

@@ -5,7 +5,7 @@ import { memo } from 'react';
 
 export const CanvasTabLeftPanel = memo(() => {
   return (
-    <Flex flexDir="column" w="full" h="full" gap={2}>
+    <Flex flexDir="column" w="full" h="full" gap={2} p={2}>
       <QueueControls />
       <Box position="relative" w="full" h="full">
         <ParametersPanelCanvas />

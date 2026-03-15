@@ -1,6 +1,6 @@
 import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import type { FlexProps } from '@invoke-ai/ui-library';
+import type { FlexProps, SystemStyleObject } from '@invoke-ai/ui-library';
 import { Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
@@ -18,6 +18,7 @@ import {
   selectGetImageNamesQueryArgs,
   selectSelectedBoardId,
   selectSelection,
+  selectShowAspectRatioThumbnails,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -102,6 +103,25 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     [imageDTO.image_name]
   );
   const isSelected = useAppSelector(selectIsSelected);
+  const showAspectRatio = useAppSelector(selectShowAspectRatioThumbnails);
+
+  const galleryItemImageSx = useMemo(() => {
+    const baseSx: SystemStyleObject = {
+      w: 'full',
+      h: 'full',
+      borderRadius: 'base',
+    };
+    if (showAspectRatio) {
+      return {
+        ...baseSx,
+        objectFit: 'cover',
+      };
+    }
+    return {
+      ...baseSx,
+      objectFit: 'contain',
+    };
+  }, [showAspectRatio]);
 
   useEffect(() => {
     const element = ref.current;
@@ -210,12 +230,8 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         <Image
           pointerEvents="none"
           src={imageDTO.thumbnail_url}
-          w={imageDTO.width}
           fallback={<GalleryImagePlaceholder />}
-          objectFit="contain"
-          maxW="full"
-          maxH="full"
-          borderRadius="base"
+          sx={galleryItemImageSx}
         />
         <GalleryItemHoverIcons imageDTO={imageDTO} isHovered={isHovered} />
       </Flex>

@@ -23,6 +23,12 @@ import type {
   RefImageState,
 } from 'features/controlLayers/store/types';
 import { getControlLayerState, getReferenceImageState } from 'features/controlLayers/store/util';
+import {
+  clearGalleryProgressItems,
+  removeGalleryProgressItem,
+  setGalleryProgressItemInProgress,
+  updateGalleryProgressItemProgress,
+} from 'features/gallery/store/galleryProgressStore';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { modelSelected } from 'features/parameters/store/actions';
@@ -72,12 +78,14 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     socket.emit('subscribe_queue', { queue_id: 'default' });
     socket.emit('subscribe_bulk_download', { bulk_download_id: 'default' });
     $lastProgressEvent.set(null);
+    clearGalleryProgressItems();
   });
 
   socket.on('connect_error', (error) => {
     log.debug('Connect error');
     setIsConnected(false);
     $lastProgressEvent.set(null);
+    clearGalleryProgressItems();
     if (error && error.message) {
       const data: string | undefined = (error as unknown as { data: string | undefined }).data;
       if (data === 'ERR_UNAUTHENTICATED') {
@@ -94,6 +102,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('disconnect', () => {
     log.debug('Disconnected');
     $lastProgressEvent.set(null);
+    clearGalleryProgressItems();
     setIsConnected(false);
   });
 
@@ -129,6 +138,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.trace({ data } as JsonObject, _message);
 
     $lastProgressEvent.set(data);
+
+    // Update gallery progress tile with the latest progress image and percentage
+    updateGalleryProgressItemProgress(data.item_id, image ?? null, percentage ?? null, message ?? null);
 
     if (origin === 'workflows') {
       const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
@@ -426,6 +438,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
 
     if (status === 'in_progress') {
+      setGalleryProgressItemInProgress(item_id);
       forEach($nodeExecutionStates.get(), (nes) => {
         if (!nes) {
           return;
@@ -440,6 +453,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       });
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       finishedQueueItemIds.set(item_id, true);
+      removeGalleryProgressItem(item_id);
       if (status === 'failed' && error_type) {
         toast({
           id: `INVOCATION_ERROR_${error_type}`,
@@ -470,6 +484,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         { type: 'SessionQueueItem', id: LIST_ALL_TAG },
       ])
     );
+    clearGalleryProgressItems();
   });
 
   socket.on('batch_enqueued', (data) => {
