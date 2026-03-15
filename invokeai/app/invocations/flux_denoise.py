@@ -280,10 +280,28 @@ class FluxDenoiseInvocation(BaseInvocation):
             transformer_config.base is BaseModelType.Flux and transformer_config.variant is FluxVariantType.Schnell
         )
 
+        # Prepare DyPE config early to adjust schedule if needed.
+        dype_config = get_dype_config_from_preset(
+            preset=self.dype_preset,
+            width=self.width,
+            height=self.height,
+            custom_scale=self.dype_scale,
+            custom_exponent=self.dype_exponent,
+        )
+
         # Calculate the timestep schedule.
+        # When DyPE is active, cap image_seq_len at the base resolution's seq_len
+        # to prevent excessive mu/shift values. DyPE handles position extrapolation,
+        # so the scheduler shouldn't also compensate for higher resolution.
+        schedule_seq_len = packed_h * packed_w
+        if dype_config is not None:
+            base_patches = dype_config.base_resolution // 8 // 2
+            base_seq_len = base_patches * base_patches
+            schedule_seq_len = min(schedule_seq_len, base_seq_len)
+
         timesteps = get_schedule(
             num_steps=self.num_steps,
-            image_seq_len=packed_h * packed_w,
+            image_seq_len=schedule_seq_len,
             shift=not is_schnell,
         )
 
@@ -461,14 +479,8 @@ class FluxDenoiseInvocation(BaseInvocation):
                 img_cond_seq, img_cond_seq_ids = kontext_extension.kontext_latents, kontext_extension.kontext_ids
 
             # Prepare DyPE extension for high-resolution generation
+            # (dype_config was already computed above for schedule adjustment)
             dype_extension: DyPEExtension | None = None
-            dype_config = get_dype_config_from_preset(
-                preset=self.dype_preset,
-                width=self.width,
-                height=self.height,
-                custom_scale=self.dype_scale,
-                custom_exponent=self.dype_exponent,
-            )
             if dype_config is not None:
                 dype_extension = DyPEExtension(
                     config=dype_config,
