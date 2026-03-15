@@ -10,7 +10,7 @@ Follow the [dev environment](../dev-environment.md) guide to get set up. Run the
 
 - `dev`: run the frontend in dev mode, enabling hot reloading
 - `build`: run all checks (dpdm, eslint, prettier, tsc, knip) and then build the frontend
-- `lint:dpdm`: check circular dependencies
+- `lint:circular`: check circular dependencies
 - `lint:eslint`: check code quality
 - `lint:prettier`: check code formatting
 - `lint:tsc`: check type issues

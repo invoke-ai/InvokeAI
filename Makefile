@@ -67,7 +67,7 @@ frontend-typegen:
 frontend-lint:
 	cd invokeai/frontend/web/src && \
 	pnpm lint:tsc && \
-	pnpm lint:dpdm && \
+	pnpm lint:circular && \
 	pnpm lint:eslint --fix && \
 	pnpm lint:prettier --write 
 
