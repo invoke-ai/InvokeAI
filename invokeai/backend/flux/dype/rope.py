@@ -60,7 +60,7 @@ def rope_dype(
     scale_w = target_width / base_res
     scale = max(scale_h, scale_w)
 
-    # If no scaling needed and DyPE disabled, use base method
+    # If no scaling needed or DyPE disabled, use base method
     if not dype_config.enable_dype or scale <= 1.0:
         return _rope_base(pos, dim, theta)
 
@@ -79,7 +79,7 @@ def rope_dype(
     method = dype_config.method
 
     if method == "vision_yarn":
-        # Compute timestep-dependent mscale (matches ComfyUI-DyPE's _get_mscale)
+        # Compute timestep-dependent mscale
         mscale = compute_timestep_mscale(ntk_scale, current_sigma, dype_config)
         cos, sin = compute_vision_yarn_freqs(
             pos=pos,

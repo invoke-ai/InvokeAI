@@ -53,7 +53,7 @@ def get_mscale(scale: float) -> float:
 
 
 def find_correction_factor(
-    num_rotations: int,
+    num_rotations: float,
     dim: int,
     base: int,
     max_position_embeddings: int,
@@ -186,7 +186,6 @@ def compute_timestep_mscale(
     """Compute timestep-dependent magnitude scaling.
 
     Interpolates from aggressive mscale at early steps to 1.0 at late steps.
-    Matches ComfyUI-DyPE's _get_mscale behavior.
 
     Args:
         ntk_scale: Global NTK scaling factor
@@ -199,7 +198,7 @@ def compute_timestep_mscale(
     if ntk_scale <= 1.0:
         return 1.0
 
-    # Aggressive mscale formula (start value at high sigma)
+    # Aggressive mscale formula
     mscale_start = 0.1 * math.log(ntk_scale) + 1.0
     mscale_end = 1.0
 

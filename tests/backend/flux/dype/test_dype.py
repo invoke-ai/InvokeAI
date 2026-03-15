@@ -406,8 +406,8 @@ class TestDyPEPresets:
         assert config.enable_dype is True
         assert config.method == "vision_yarn"
 
-    def test_get_dype_config_for_resolution_dynamic_scale(self):
-        """Higher resolution should result in higher dype_scale."""
+    def test_get_dype_config_for_resolution_fixed_scale(self):
+        """All resolutions above threshold should use fixed dype_scale=2.0."""
         config_2k = get_dype_config_for_resolution(
             width=2048,
             height=2048,
@@ -423,7 +423,8 @@ class TestDyPEPresets:
 
         assert config_2k is not None
         assert config_4k is not None
-        assert config_4k.dype_scale > config_2k.dype_scale
+        assert config_2k.dype_scale == 2.0
+        assert config_4k.dype_scale == 2.0
 
     def test_get_dype_config_for_area_below_threshold(self):
         """When area is below threshold area, should return None."""
