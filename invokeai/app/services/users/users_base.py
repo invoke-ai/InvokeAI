@@ -9,17 +9,19 @@ class UserServiceBase(ABC):
     """High-level service for user management."""
 
     @abstractmethod
-    def create(self, user_data: UserCreateRequest) -> UserDTO:
+    def create(self, user_data: UserCreateRequest, strict_password_checking: bool = True) -> UserDTO:
         """Create a new user.
 
         Args:
             user_data: User creation data
+            strict_password_checking: If True (default), passwords must meet strength requirements.
+                If False, any non-empty password is accepted.
 
         Returns:
             The created user
 
         Raises:
-            ValueError: If email already exists or password is weak
+            ValueError: If email already exists or (when strict) password is weak
         """
         pass
 
@@ -48,18 +50,20 @@ class UserServiceBase(ABC):
         pass
 
     @abstractmethod
-    def update(self, user_id: str, changes: UserUpdateRequest) -> UserDTO:
+    def update(self, user_id: str, changes: UserUpdateRequest, strict_password_checking: bool = True) -> UserDTO:
         """Update user.
 
         Args:
             user_id: The user ID
             changes: Fields to update
+            strict_password_checking: If True (default), passwords must meet strength requirements.
+                If False, any non-empty password is accepted.
 
         Returns:
             The updated user
 
         Raises:
-            ValueError: If user not found or password is weak
+            ValueError: If user not found or (when strict) password is weak
         """
         pass
 
@@ -98,17 +102,19 @@ class UserServiceBase(ABC):
         pass
 
     @abstractmethod
-    def create_admin(self, user_data: UserCreateRequest) -> UserDTO:
+    def create_admin(self, user_data: UserCreateRequest, strict_password_checking: bool = True) -> UserDTO:
         """Create an admin user (for initial setup).
 
         Args:
             user_data: User creation data
+            strict_password_checking: If True (default), passwords must meet strength requirements.
+                If False, any non-empty password is accepted.
 
         Returns:
             The created admin user
 
         Raises:
-            ValueError: If admin already exists or password is weak
+            ValueError: If admin already exists or (when strict) password is weak
         """
         pass
 

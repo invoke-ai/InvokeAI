@@ -3139,6 +3139,11 @@
             "back": "Indietro",
             "cannotDeleteSelf": "Non puoi eliminare il tuo account",
             "cannotDeactivateSelf": "Non puoi disattivare il tuo account"
+        },
+        "passwordStrength": {
+            "weak": "Password debole",
+            "moderate": "Password moderata",
+            "strong": "Password forte"
         }
     }
 }
