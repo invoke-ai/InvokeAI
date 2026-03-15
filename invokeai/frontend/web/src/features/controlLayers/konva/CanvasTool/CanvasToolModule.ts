@@ -9,6 +9,7 @@ import { CanvasMoveToolModule } from 'features/controlLayers/konva/CanvasTool/Ca
 import { CanvasRectToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasRectToolModule';
 import { CanvasTextToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasTextToolModule';
 import { CanvasViewToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasViewToolModule';
+import { ZOOM_DRAG_CURSOR } from 'features/controlLayers/konva/cursors/zoomDragCursor';
 import {
   calculateNewBrushSizeFromWheelDelta,
   getIsPrimaryMouseDown,
@@ -171,7 +172,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
     const selectedEntityAdapter = this.manager.stateApi.getSelectedEntityAdapter();
 
-    if (this.manager.stage.getIsDragging()) {
+    if (this.manager.stage.getIsZoomDragging()) {
+      stage.setCursor(ZOOM_DRAG_CURSOR);
+    } else if (this.manager.stage.getIsDragging()) {
       stage.setCursor('grabbing');
     } else if (tool === 'view') {
       this.tools.view.syncCursorStyle();
