@@ -52,7 +52,18 @@ export const CanvasToolbar = memo(() => {
   useCanvasToggleBboxHotkey();
 
   return (
-    <Flex w="full" gap={2} alignItems="center" px={2}>
+    <Flex
+      w="full"
+      gap={2}
+      alignItems="center"
+      px={2}
+      sx={{
+        '& svg': {
+          width: '16px',
+          height: '16px',
+        },
+      }}
+    >
       <ToolOptionsRowContainer gap={4} alignItems="center" h="full">
         <ToolFillColorPicker />
         {isShapeSelected && (
