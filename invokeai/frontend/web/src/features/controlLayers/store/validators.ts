@@ -70,6 +70,16 @@ export const getRegionalGuidanceWarnings = (
       }
     }
 
+    if (model.base === 'anima') {
+      // Reference images (IP Adapters) are not supported for Anima
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
     entity.referenceImages.forEach(({ config }) => {
       if (!config.model) {
         // No model selected
@@ -117,7 +127,7 @@ export const getGlobalReferenceImageWarnings = (
   const warnings: WarningTKey[] = [];
 
   if (model) {
-    if (model.base === 'sd-3' || model.base === 'sd-2') {
+    if (model.base === 'sd-3' || model.base === 'sd-2' || model.base === 'anima') {
       // Unsupported model architecture
       warnings.push(WARNINGS.UNSUPPORTED_MODEL);
       return warnings;
@@ -160,7 +170,7 @@ export const getControlLayerWarnings = (
     // No model selected
     warnings.push(WARNINGS.CONTROL_ADAPTER_NO_MODEL_SELECTED);
   } else if (model) {
-    if (model.base === 'sd-3' || model.base === 'sd-2') {
+    if (model.base === 'sd-3' || model.base === 'sd-2' || model.base === 'anima') {
       // Unsupported model architecture
       warnings.push(WARNINGS.UNSUPPORTED_MODEL);
     } else if (entity.controlAdapter.model.base !== model.base) {

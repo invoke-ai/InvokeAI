@@ -54,6 +54,7 @@ from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils 
 )
 from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
 from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
+from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import lora_model_from_anima_state_dict
 from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils import lora_model_from_z_image_state_dict
 
 
@@ -155,6 +156,9 @@ class LoRALoader(ModelLoader):
             # Z-Image LoRAs use diffusers PEFT format with transformer and/or Qwen3 encoder layers.
             # We set alpha=None to use rank as alpha (common default).
             model = lora_model_from_z_image_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.Anima:
+            # Anima LoRAs use Kohya-style or diffusers PEFT format targeting Cosmos DiT blocks.
+            model = lora_model_from_anima_state_dict(state_dict=state_dict, alpha=None)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 

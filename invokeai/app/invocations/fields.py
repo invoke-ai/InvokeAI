@@ -340,6 +340,21 @@ class ZImageConditioningField(BaseModel):
     )
 
 
+class AnimaConditioningField(BaseModel):
+    """An Anima conditioning tensor primitive value.
+
+    Anima conditioning contains Qwen3 0.6B hidden states and T5-XXL token IDs,
+    which are combined by the LLM Adapter inside the transformer.
+    """
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+    mask: Optional[TensorField] = Field(
+        default=None,
+        description="The mask associated with this conditioning tensor for regional prompting. "
+        "Excluded regions should be set to False, included regions should be set to True.",
+    )
+
+
 class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 

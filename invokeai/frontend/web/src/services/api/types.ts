@@ -196,6 +196,13 @@ export const isFlux2VAEModelConfig = (config: AnyModelConfig, excludeSubmodels?:
   );
 };
 
+export const isAnimaVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
+    config.base === 'anima'
+  );
+};
+
 export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
   return config.type === 'controlnet';
 };
