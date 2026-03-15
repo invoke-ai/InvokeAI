@@ -6,6 +6,7 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import GlmEncoderField
 from invokeai.app.invocations.primitives import CogView4ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     CogView4ConditioningInfo,
     ConditioningFieldData,
@@ -46,10 +47,18 @@ class CogView4TextEncoderInvocation(BaseInvocation):
         prompt = [self.prompt]
 
         # TODO(ryand): Add model inputs to the invocation rather than hard-coding.
+        glm_text_encoder_info = context.models.load(self.glm_encoder.text_encoder)
         with (
-            context.models.load(self.glm_encoder.text_encoder).model_on_device() as (_, glm_text_encoder),
+            glm_text_encoder_info.model_on_device() as (_, glm_text_encoder),
             context.models.load(self.glm_encoder.tokenizer).model_on_device() as (_, glm_tokenizer),
         ):
+            repaired_tensors = glm_text_encoder_info.repair_required_tensors_on_device()
+            device = get_effective_device(glm_text_encoder)
+            if repaired_tensors > 0:
+                context.logger.warning(
+                    f"Recovered {repaired_tensors} required GLM tensor(s) onto {device} after a partial device mismatch."
+                )
+
             context.util.signal_progress("Running GLM text encoder")
             assert isinstance(glm_text_encoder, GlmModel)
             assert isinstance(glm_tokenizer, PreTrainedTokenizerFast)
@@ -85,9 +94,7 @@ class CogView4TextEncoderInvocation(BaseInvocation):
                     device=text_input_ids.device,
                 )
                 text_input_ids = torch.cat([pad_ids, text_input_ids], dim=1)
-            prompt_embeds = glm_text_encoder(
-                text_input_ids.to(glm_text_encoder.device), output_hidden_states=True
-            ).hidden_states[-2]
+            prompt_embeds = glm_text_encoder(text_input_ids.to(device), output_hidden_states=True).hidden_states[-2]
 
         assert isinstance(prompt_embeds, torch.Tensor)
         return prompt_embeds
