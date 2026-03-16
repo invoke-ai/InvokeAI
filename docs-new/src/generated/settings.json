@@ -701,6 +701,17 @@
       "required": false,
       "type": "<class 'bool'>",
       "validation": {}
+    },
+    {
+      "category": "MULTIUSER",
+      "default": false,
+      "description": "Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.",
+      "env_var": "INVOKEAI_STRICT_PASSWORD_CHECKING",
+      "literal_values": [],
+      "name": "strict_password_checking",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
     }
   ]
 }

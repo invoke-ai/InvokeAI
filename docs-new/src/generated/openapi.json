@@ -27102,236 +27102,236 @@
           }
         },
         "required": [
-          "metadata_to_lora_collection",
-          "sdxl_model_loader",
-          "t2i_adapter",
-          "normal_map",
-          "pbr_maps",
-          "denoise_latents",
-          "flux_lora_loader",
-          "show_image",
-          "metadata_to_model",
-          "lineart_anime_edge_detection",
-          "img_conv",
-          "metadata_from_image",
-          "img_ilerp",
-          "img_hue_adjust",
-          "noise",
-          "grounding_dino",
-          "mlsd_detection",
-          "conditioning",
-          "image",
-          "invokeai_img_enhance",
-          "invokeai_img_val_thresholds",
-          "expand_mask_with_fade",
-          "invokeai_img_hue_adjust_plus",
-          "flux2_vae_decode",
-          "flux_redux",
-          "calculate_image_tiles_min_overlap",
-          "crop_image_to_bounding_box",
-          "metadata_to_controlnets",
-          "infill_lama",
-          "denoise_latents_meta",
-          "sd3_l2i",
-          "img_channel_multiply",
-          "flux_kontext",
-          "img_resize",
-          "float_range",
-          "lora_collection_loader",
-          "integer_collection",
-          "metadata_to_string_collection",
-          "model_identifier",
-          "sd3_text_encoder",
-          "l2i",
-          "z_image_i2l",
-          "flux_fill",
-          "img_channel_offset",
-          "flux2_klein_text_encoder",
-          "core_metadata",
-          "img_mul",
-          "metadata_item",
-          "invokeai_img_blend",
-          "face_identifier",
-          "float_collection",
-          "flux_ip_adapter",
-          "sdxl_refiner_model_loader",
-          "img_pad_crop",
-          "metadata_to_loras",
-          "i2l",
-          "canny_edge_detection",
-          "img_watermark",
-          "flux_lora_collection_loader",
-          "infill_patchmatch",
-          "string_join",
-          "metadata_to_float",
-          "metadata_field_extractor",
-          "img_noise",
-          "sdxl_lora_collection_loader",
-          "cv_inpaint",
-          "z_image_denoise_meta",
-          "mask_edge",
-          "collect",
-          "metadata_to_t2i_adapters",
-          "create_gradient_mask",
-          "sd3_denoise",
-          "metadata",
-          "calculate_image_tiles_even_split",
-          "face_mask_detection",
-          "range_of_size",
-          "tensor_mask_to_image",
-          "integer",
-          "add",
-          "random_range",
-          "clip_skip",
-          "sd3_i2l",
-          "blank_image",
-          "flux2_denoise",
-          "metadata_to_sdlx_loras",
-          "lresize",
-          "img_lerp",
-          "merge_tiles_to_image",
-          "color_map",
-          "z_image_l2i",
-          "flux2_klein_lora_collection_loader",
-          "vae_loader",
-          "infill_cv2",
-          "invokeai_img_dilate_erode",
-          "mask_combine",
-          "z_image_lora_collection_loader",
-          "string_split_neg",
-          "scheduler",
-          "lora_selector",
-          "z_image_denoise",
-          "bounding_box",
-          "lora_loader",
-          "flux_vae_encode",
-          "calculate_image_tiles",
-          "pair_tile_image",
-          "depth_anything_depth_estimation",
-          "boolean",
-          "dynamic_prompt",
-          "save_image",
-          "mul",
-          "tiled_multi_diffusion_denoise_latents",
-          "image_generator",
-          "metadata_to_bool_collection",
-          "range",
-          "metadata_item_linked",
-          "float_to_int",
-          "metadata_to_integer",
-          "invokeai_ealightness",
-          "latents_collection",
+          "tile_to_properties",
           "color_correct",
           "string_batch",
-          "cogview4_text_encoder",
-          "string_collection",
-          "flux_control_lora_loader",
-          "rand_float",
-          "controlnet",
+          "cogview4_i2l",
+          "z_image_lora_loader",
+          "flux_denoise_meta",
           "img_scale",
-          "spandrel_image_to_image",
-          "flux2_klein_lora_loader",
-          "ideal_size",
-          "img_crop",
-          "metadata_to_ip_adapters",
-          "string_split",
-          "create_denoise_mask",
-          "flux_vae_decode",
-          "canvas_paste_back",
-          "string_generator",
-          "infill_rgba",
-          "infill_tile",
-          "flux_controlnet",
-          "crop_latents",
-          "image_panel_layout",
-          "cogview4_l2i",
-          "flux_text_encoder",
-          "heuristic_resize",
-          "integer_batch",
           "metadata_to_scheduler",
+          "mul",
+          "rand_float",
+          "z_image_control",
           "invert_tensor_mask",
-          "string_join_three",
-          "integer_generator",
-          "img_blur",
+          "merge_metadata",
+          "tiled_multi_diffusion_denoise_latents",
+          "lineart_edge_detection",
+          "img_crop",
           "metadata_to_vae",
+          "flux2_denoise",
+          "lscale",
+          "alpha_mask_to_tensor",
+          "canvas_paste_back",
+          "infill_rgba",
+          "string_generator",
+          "infill_tile",
+          "crop_latents",
+          "conditioning",
+          "metadata_to_float_collection",
+          "sdxl_refiner_compel_prompt",
+          "sdxl_compel_prompt",
+          "image",
+          "flux_denoise",
+          "invokeai_img_val_thresholds",
+          "compel",
           "segment_anything",
+          "integer_batch",
+          "img_blur",
+          "integer_generator",
+          "ideal_size",
+          "controlnet",
           "tomask",
           "float_batch",
+          "t2i_adapter",
           "apply_mask_to_image",
-          "alpha_mask_to_tensor",
-          "float",
-          "sdxl_lora_loader",
-          "llava_onevision_vllm",
           "float_generator",
-          "iterate",
-          "rand_int",
-          "z_image_text_encoder",
+          "flux_kontext",
           "face_off",
-          "cogview4_i2l",
-          "sdxl_compel_prompt",
-          "sdxl_refiner_compel_prompt",
-          "compel",
-          "flux_denoise_meta",
-          "latents",
+          "flux_vae_decode",
+          "rectangle_mask",
+          "lora_collection_loader",
+          "integer_collection",
+          "sdxl_model_loader",
+          "pbr_maps",
           "hed_edge_detection",
           "flux_kontext_image_prep",
-          "metadata_to_integer_collection",
-          "invokeai_img_composite",
-          "flux_model_loader",
+          "rand_int",
           "round_float",
+          "heuristic_resize",
           "unsharp_mask",
-          "mediapipe_face_detection",
-          "cogview4_model_loader",
+          "model_identifier",
+          "sd3_text_encoder",
+          "invokeai_img_hue_adjust_plus",
           "img_paste",
-          "prompt_from_file",
-          "pidi_edge_detection",
+          "cogview4_model_loader",
+          "core_metadata",
           "flux2_klein_model_loader",
-          "rectangle_mask",
+          "invokeai_img_enhance",
+          "float_collection",
+          "grounding_dino",
           "float_math",
-          "metadata_to_float_collection",
-          "freeu",
-          "spandrel_image_to_image_autoscale",
-          "content_shuffle",
-          "div",
-          "integer_math",
-          "mask_from_id",
-          "paste_image_into_bounding_box",
-          "boolean_collection",
-          "canvas_v2_mask_and_crop",
-          "seamless",
-          "flux2_vae_encode",
-          "sd3_model_loader",
-          "ip_adapter",
-          "prompt_template",
-          "conditioning_collection",
-          "string_replace",
           "get_image_mask_bounding_box",
+          "integer_math",
           "metadata_to_string",
-          "img_chan",
-          "tile_to_properties",
-          "esrgan",
+          "flux_model_loader",
+          "string_join",
+          "create_denoise_mask",
+          "mask_from_id",
           "metadata_to_sdxl_model",
-          "lscale",
-          "z_image_lora_loader",
-          "flux_denoise",
-          "z_image_control",
+          "paste_image_into_bounding_box",
+          "prompt_template",
+          "canvas_v2_mask_and_crop",
+          "float_range",
+          "sd3_l2i",
+          "sd3_model_loader",
+          "flux2_vae_encode",
+          "sdxl_lora_collection_loader",
+          "flux2_klein_text_encoder",
+          "l2i",
           "image_mask_to_tensor",
+          "z_image_text_encoder",
           "apply_tensor_mask_to_image",
+          "div",
+          "metadata_item",
+          "img_chan",
+          "metadata_to_lora_collection",
+          "invokeai_img_blend",
+          "integer",
+          "cv_inpaint",
+          "metadata_field_extractor",
+          "calculate_image_tiles_min_overlap",
+          "metadata_to_bool",
           "z_image_model_loader",
-          "image_collection",
-          "sub",
-          "string",
+          "i2l",
           "image_batch",
-          "cogview4_denoise",
-          "lineart_edge_detection",
-          "merge_metadata",
-          "z_image_seed_variance_enhancer",
-          "color",
-          "main_model_loader",
+          "string_split_neg",
+          "metadata",
+          "vae_loader",
+          "lora_selector",
           "img_nsfw",
+          "metadata_to_model",
           "lblend",
+          "metadata_from_image",
+          "lora_loader",
+          "calculate_image_tiles_even_split",
+          "metadata_to_controlnets",
+          "create_gradient_mask",
+          "sub",
+          "normal_map",
+          "metadata_to_string_collection",
+          "lresize",
+          "z_image_seed_variance_enhancer",
+          "lineart_anime_edge_detection",
+          "mediapipe_face_detection",
+          "show_image",
+          "latents_collection",
+          "img_conv",
+          "flux_lora_loader",
           "dw_openpose_detection",
-          "metadata_to_bool"
+          "img_ilerp",
+          "main_model_loader",
+          "esrgan",
+          "pidi_edge_detection",
+          "img_hue_adjust",
+          "scheduler",
+          "boolean",
+          "invokeai_img_dilate_erode",
+          "denoise_latents_meta",
+          "cogview4_denoise",
+          "merge_tiles_to_image",
+          "mlsd_detection",
+          "flux2_klein_lora_collection_loader",
+          "metadata_to_ip_adapters",
+          "expand_mask_with_fade",
+          "denoise_latents",
+          "z_image_lora_collection_loader",
+          "string_split",
+          "sdxl_refiner_model_loader",
+          "flux_ip_adapter",
+          "flux2_vae_decode",
+          "flux_redux",
+          "collect",
+          "calculate_image_tiles",
+          "metadata_to_loras",
+          "crop_image_to_bounding_box",
+          "infill_lama",
+          "string_join_three",
+          "noise",
+          "dynamic_prompt",
+          "img_channel_multiply",
+          "invokeai_ealightness",
+          "metadata_to_t2i_adapters",
+          "img_resize",
+          "float",
+          "spandrel_image_to_image",
+          "sd3_denoise",
+          "sdxl_lora_loader",
+          "flux_control_lora_loader",
+          "latents",
+          "z_image_i2l",
+          "img_channel_offset",
+          "metadata_to_float",
+          "pair_tile_image",
+          "flux_fill",
+          "img_mul",
+          "face_identifier",
+          "z_image_denoise_meta",
+          "img_watermark",
+          "flux_text_encoder",
+          "flux2_klein_lora_loader",
+          "img_pad_crop",
+          "metadata_to_sdlx_loras",
+          "flux_lora_collection_loader",
+          "llava_onevision_vllm",
+          "infill_patchmatch",
+          "mask_edge",
+          "img_noise",
+          "freeu",
+          "tensor_mask_to_image",
+          "metadata_to_bool_collection",
+          "clip_skip",
+          "invokeai_img_composite",
+          "canny_edge_detection",
+          "seamless",
+          "conditioning_collection",
+          "image_generator",
+          "flux_vae_encode",
+          "face_mask_detection",
+          "boolean_collection",
+          "string_replace",
+          "range_of_size",
+          "random_range",
+          "content_shuffle",
+          "sd3_i2l",
+          "blank_image",
+          "z_image_denoise",
+          "spandrel_image_to_image_autoscale",
+          "img_lerp",
+          "prompt_from_file",
+          "ip_adapter",
+          "z_image_l2i",
+          "mask_combine",
+          "infill_cv2",
+          "image_collection",
+          "add",
+          "string",
+          "metadata_item_linked",
+          "metadata_to_integer",
+          "cogview4_l2i",
+          "color",
+          "iterate",
+          "depth_anything_depth_estimation",
+          "image_panel_layout",
+          "string_collection",
+          "color_map",
+          "save_image",
+          "bounding_box",
+          "metadata_to_integer_collection",
+          "cogview4_text_encoder",
+          "float_to_int",
+          "flux_controlnet",
+          "range"
         ],
         "type": "object"
       },
@@ -28926,7 +28926,7 @@
       },
       "InvokeAIAppConfig": {
         "additionalProperties": false,
-        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    clear_queue_on_startup: Empties session queue on startup.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.",
+        "description": "Invoke's global app configuration.\n\nTypically, you won't need to interact with this class directly. Instead, use the `get_config` function from `invokeai.app.services.config` to get a singleton config object.\n\nAttributes:\n    host: IP address to bind to. Use `0.0.0.0` to serve to your local network.\n    port: Port to bind to.\n    allow_origins: Allowed CORS origins.\n    allow_credentials: Allow CORS credentials.\n    allow_methods: Methods allowed for CORS.\n    allow_headers: Headers allowed for CORS.\n    ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.\n    ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.\n    log_tokenization: Enable logging of parsed prompt tokens.\n    patchmatch: Enable patchmatch inpaint code.\n    models_dir: Path to the models directory.\n    convert_cache_dir: Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).\n    download_cache_dir: Path to the directory that contains dynamically downloaded models.\n    legacy_conf_dir: Path to directory of legacy checkpoint config files.\n    db_dir: Path to InvokeAI databases directory.\n    outputs_dir: Path to directory for outputs.\n    custom_nodes_dir: Path to directory for custom nodes.\n    style_presets_dir: Path to directory for style presets.\n    workflow_thumbnails_dir: Path to directory for workflow thumbnails.\n    log_handlers: Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".\n    log_format: Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`\n    log_level: Emit logging messages at this level or higher.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    log_sql: Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.\n    log_level_network: Log level for network-related messages. 'info' and 'debug' are very verbose.<br>Valid values: `debug`, `info`, `warning`, `error`, `critical`\n    use_memory_db: Use in-memory database. Useful for development.\n    dev_reload: Automatically reload when Python sources are changed. Does not reload node definitions.\n    profile_graphs: Enable graph profiling using `cProfile`.\n    profile_prefix: An optional prefix for profile output files.\n    profiles_dir: Path to profiles output directory.\n    max_cache_ram_gb: The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.\n    max_cache_vram_gb: The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.\n    log_memory_usage: If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.\n    model_cache_keep_alive_min: How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.\n    device_working_mem_gb: The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.\n    enable_partial_loading: Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.\n    keep_ram_copy_of_weights: Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.\n    ram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    vram: DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.\n    lazy_offload: DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.\n    pytorch_cuda_alloc_conf: Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.\n    device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)\n    precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`\n    sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.\n    attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`\n    attention_slice_size: Slice size, valid when attention_type==\"sliced\".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`\n    force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).\n    pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.\n    max_queue_size: Maximum number of items in the session queue.\n    clear_queue_on_startup: Empties session queue on startup.\n    allow_nodes: List of nodes to allow. Omit to allow all.\n    deny_nodes: List of nodes to deny. Omit to deny none.\n    node_cache_size: How many cached nodes to keep in memory.\n    hashing_algorithm: Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.<br>Valid values: `blake3_multi`, `blake3_single`, `random`, `md5`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `blake2b`, `blake2s`, `sha3_224`, `sha3_256`, `sha3_384`, `sha3_512`, `shake_128`, `shake_256`\n    remote_api_tokens: List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.\n    scan_models_on_startup: Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.\n    unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.\n    allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.\n    multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.\n    strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.",
         "properties": {
           "allow_credentials": {
             "default": true,
@@ -29431,6 +29431,12 @@
             ],
             "description": "SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.",
             "title": "Ssl Keyfile"
+          },
+          "strict_password_checking": {
+            "default": false,
+            "description": "Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.",
+            "title": "Strict Password Checking",
+            "type": "boolean"
           },
           "style_presets_dir": {
             "default": "style_presets",
@@ -50535,11 +50541,17 @@
             "description": "Whether initial setup is required",
             "title": "Setup Required",
             "type": "boolean"
+          },
+          "strict_password_checking": {
+            "description": "Whether strict password requirements are enforced",
+            "title": "Strict Password Checking",
+            "type": "boolean"
           }
         },
         "required": [
           "setup_required",
-          "multiuser_enabled"
+          "multiuser_enabled",
+          "strict_password_checking"
         ],
         "title": "SetupStatusResponse",
         "type": "object"
@@ -64891,6 +64903,293 @@
           }
         },
         "summary": "Get Model Records By Attrs",
+        "tags": [
+          "model_manager"
+        ]
+      }
+    },
+    "/api/v2/models/get_by_hash": {
+      "get": {
+        "description": "Gets a model by its hash. This is useful for recalling models that were deleted and reinstalled,\nas the hash remains stable across reinstallations while the key (UUID) changes.",
+        "operationId": "get_model_records_by_hash",
+        "parameters": [
+          {
+            "description": "The hash of the model",
+            "in": "query",
+            "name": "hash",
+            "required": true,
+            "schema": {
+              "description": "The hash of the model",
+              "title": "Hash",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_SDXLRefiner_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_SD3_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_SDXLRefiner_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_BnBNF4_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Checkpoint_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Diffusers_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Diffusers_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlNet_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_OMI_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_OMI_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Flux2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/ControlLoRA_LyCORIS_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_T5Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_BnBLLMint8_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_Qwen3Encoder_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Qwen3Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_File_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_File_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_File_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_Folder_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_Folder_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TI_Folder_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_InvokeAI_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_InvokeAI_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_InvokeAI_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_SD2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/IPAdapter_Checkpoint_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T2IAdapter_Diffusers_SD1_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T2IAdapter_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Spandrel_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Diffusers_G_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPEmbed_Diffusers_L_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CLIPVision_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/SigLIP_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Unknown_Config"
+                    }
+                  ],
+                  "title": "Response Get Model Records By Hash"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Model Records By Hash",
         "tags": [
           "model_manager"
         ]
