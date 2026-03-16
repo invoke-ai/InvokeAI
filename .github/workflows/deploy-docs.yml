@@ -1,49 +1,89 @@
-name: Deploy Docs to Github Pages
+name: 'docs'
 
 on:
-  # Trigger the workflow every time you push to the `main` branch
-  # Using a different branch name? Replace `main` with your branch’s name
   push:
-    branches: [main]
-  # Allows you to run this workflow manually from the Actions tab on GitHub.
+    branches:
+      - 'main'
+  pull_request:
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
   workflow_dispatch:
 
-# Allow this job to clone the repo and create a page deployment
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow one concurrent deployment
 concurrency:
   group: 'pages'
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: docs-new
+  check-and-build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
     steps:
-      - name: Checkout
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - name: checkout
+        uses: actions/checkout@v4
 
-      - name: Install, build, and upload site output
-        uses: withastro/action@fc88a7002f0c62327f26fb1b15f2a1d581249278 # v5.1.0
+      # Python (needed for generate-docs-data)
+      - name: setup uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: docs-new # The root location of your Astro project inside the repository. (optional)
-          # node-version: 22 # The specific version of Node that should be used to build your site. Defaults to 22. (optional)
-          # package-manager: pnpm@latest # The Node package manager that should be used to install dependencies and build your site. Automatically detected based on your lockfile. (optional)
-          # build-cmd: pnpm run build # The command to run to build your site. Runs the package build script/task by default. (optional)
+          version: '0.6.10'
+          enable-cache: true
+          python-version: '3.11'
+
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: install python dependencies
+        run: uv pip install --editable .[test]
+
+      # Node (needed for docs build)
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: install docs dependencies
+        run: pnpm install --prefer-frozen-lockfile
+        working-directory: docs-new
+
+      # Checks
+      - name: verify generated docs data
+        run: pnpm run check-docs-data
+        working-directory: docs-new
+
+      - name: build docs
+        run: pnpm build
+        working-directory: docs-new
+
+      # Upload artifact for deploy (main branch only)
+      - name: upload pages artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-new/dist
 
   deploy:
-    needs: build
+    if: github.ref == 'refs/heads/main'
+    needs: check-and-build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
+      - name: deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+        uses: actions/deploy-pages@v4

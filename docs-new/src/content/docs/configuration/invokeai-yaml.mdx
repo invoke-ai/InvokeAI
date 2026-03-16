@@ -3,6 +3,7 @@ title: YAML Config
 ---
 
 import { FileTree } from '@astrojs/starlight/components'
+import SettingsDocs from '../../../lib/components/SettingsDocs.astro'
 
 Runtime settings, including the location of files and directories, memory usage, and performance, are managed via the `invokeai.yaml` config file or environment variables. A subset of settings may be set via commandline arguments.
 
@@ -81,4 +82,4 @@ export INVOKEAI_REMOTE_API_TOKENS='[{"url_regex":"modelmarketplace", "token": "1
 
 We suggest using `invokeai.yaml`, as it is more user-friendly.
 
-{/* TODO: Insert auto-generated settings table here. */}
+<SettingsDocs />

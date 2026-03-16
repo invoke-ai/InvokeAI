@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
+    "generate-docs-data": "uv run python ../scripts/generate_docs_json.py",
+    "check-docs-data": "pnpm run generate-docs-data && git diff --exit-code -- src/generated",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"

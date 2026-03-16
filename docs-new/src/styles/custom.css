@@ -1,4 +1,7 @@
 :root {
+  /* Page Layout */
+  --sl-content-width: 84ch;
+
   /* Typography */
   --__sl-font: 'Inter', sans-serif;
   --__sl-font-mono:
@@ -189,6 +192,10 @@ a[rel='next'],
 a[rel='prev'] {
   background: var(--sl-color-bg);
   transition: border-color 100ms ease-in-out;
+}
+
+.text-xs {
+  font-size: var(--sl-text-xs);
 }
 
 .sl-steps {

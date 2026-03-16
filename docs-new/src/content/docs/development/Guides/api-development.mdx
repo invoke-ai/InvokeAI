@@ -2,6 +2,8 @@
 title: API Development
 ---
 
+import InvocationContextDocs from '../../../../lib/components/InvocationContextDocs.astro'
+
 Each invocation's `invoke` method is provided a single arg - the Invocation Context.
 
 This object provides an API the invocation can use to interact with application services, for example:
@@ -27,7 +29,7 @@ class MyInvocation(BaseInvocation):
       ...
 ```
 
-The full API is documented below.
+The full generated API reference is documented below.
 
 ## Mixins
 
@@ -45,4 +47,4 @@ Inherit from this class (in addition to `BaseInvocation`) to add a `board` input
 
 When you call `context.images.save()`, if a board was selected, the image will added to that board as it is saved.
 
-{/* TODO: Insert generated API documentation */}
+<InvocationContextDocs />
