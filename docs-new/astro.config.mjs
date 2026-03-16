@@ -3,9 +3,10 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 // Plugins
+import starlightLinksValidator from 'starlight-links-validator';
 import starlightLlmsText from 'starlight-llms-txt';
 import starlightChangelogs, { makeChangelogsSidebarLinks } from 'starlight-changelogs';
-import starlightContextualMenu from 'starlight-contextual-menu';
+// import starlightContextualMenu from 'starlight-contextual-menu';
 
 // https://astro.build/config
 export default defineConfig({
@@ -116,13 +117,14 @@ export default defineConfig({
         PageFrame: './src/layouts/PageFrameExtended.astro',
       },
       plugins: [
+        starlightLinksValidator(),
         starlightLlmsText(),
         starlightChangelogs(),
-        starlightContextualMenu({
-          actions: [
-            'copy', 'view', 'chatgpt', 'claude'
-          ]
-        }),
+        // starlightContextualMenu({
+        //   actions: [
+        //     'copy', 'view', 'chatgpt', 'claude'
+        //   ]
+        // }),
       ],
     }),
   ],
