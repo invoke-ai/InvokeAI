@@ -277,6 +277,9 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     if (!params.animaQwen3EncoderModel) {
       reasons.push({ content: i18n.t('parameters.invoke.noAnimaQwen3EncoderModelSelected') });
     }
+    if (!params.animaT5EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noAnimaT5EncoderModelSelected') });
+    }
   }
 
   if (model) {
@@ -663,6 +666,9 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
     if (!params.animaQwen3EncoderModel) {
       reasons.push({ content: i18n.t('parameters.invoke.noAnimaQwen3EncoderModelSelected') });
+    }
+    if (!params.animaT5EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noAnimaT5EncoderModelSelected') });
     }
   }
 

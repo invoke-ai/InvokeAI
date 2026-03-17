@@ -5,6 +5,7 @@ import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLay
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
 import {
   animaQwen3EncoderModelSelected,
+  animaT5EncoderModelSelected,
   animaVaeModelSelected,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
@@ -46,6 +47,7 @@ import {
   selectGlobalRefImageModels,
   selectQwen3EncoderModels,
   selectRegionalRefImageModels,
+  selectT5EncoderModels,
   selectZImageDiffusersModels,
 } from 'services/api/hooks/modelsByType';
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
@@ -159,7 +161,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
 
         // handle incompatible Anima models - clear if switching away from anima
-        const { animaVaeModel, animaQwen3EncoderModel } = state.params;
+        const { animaVaeModel, animaQwen3EncoderModel, animaT5EncoderModel } = state.params;
         if (newBase !== 'anima') {
           if (animaVaeModel) {
             dispatch(animaVaeModelSelected(null));
@@ -169,13 +171,18 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             dispatch(animaQwen3EncoderModelSelected(null));
             modelsUpdatedDisabledOrCleared += 1;
           }
+          if (animaT5EncoderModel) {
+            dispatch(animaT5EncoderModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
         } else {
           // Switching to Anima - set defaults if no valid configuration exists
-          const hasValidConfig = animaVaeModel && animaQwen3EncoderModel;
+          const hasValidConfig = animaVaeModel && animaQwen3EncoderModel && animaT5EncoderModel;
 
           if (!hasValidConfig) {
             const availableQwen3Encoders = selectQwen3EncoderModels(state);
             const availableAnimaVAEs = selectAnimaVAEModels(state);
+            const availableT5Encoders = selectT5EncoderModels(state);
 
             if (availableQwen3Encoders.length > 0 && availableAnimaVAEs.length > 0) {
               const qwen3Encoder = availableQwen3Encoders[0];
@@ -198,6 +205,16 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                     name: fluxVAE.name,
                     base: fluxVAE.base,
                     type: fluxVAE.type,
+                  })
+                );
+              }
+              const t5Encoder = availableT5Encoders[0];
+              if (t5Encoder && !animaT5EncoderModel) {
+                dispatch(
+                  animaT5EncoderModelSelected({
+                    key: t5Encoder.key,
+                    name: t5Encoder.name,
+                    base: t5Encoder.base,
                   })
                 );
               }

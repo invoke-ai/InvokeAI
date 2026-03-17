@@ -11,10 +11,15 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import (
     ModelIdentifierField,
     Qwen3EncoderField,
+    T5EncoderField,
     TransformerField,
     VAEField,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.app.util.t5_model_identifier import (
+    preprocess_t5_encoder_model_identifier,
+    preprocess_t5_tokenizer_model_identifier,
+)
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 
 
@@ -25,6 +30,7 @@ class AnimaModelLoaderOutput(BaseInvocationOutput):
     transformer: TransformerField = OutputField(description=FieldDescriptions.transformer, title="Transformer")
     qwen3_encoder: Qwen3EncoderField = OutputField(description=FieldDescriptions.qwen3_encoder, title="Qwen3 Encoder")
     vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
+    t5_encoder: T5EncoderField = OutputField(description=FieldDescriptions.t5_encoder, title="T5 Encoder")
 
 
 @invocation(
@@ -32,7 +38,7 @@ class AnimaModelLoaderOutput(BaseInvocationOutput):
     title="Main Model - Anima",
     tags=["model", "anima"],
     category="model",
-    version="1.0.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class AnimaModelLoaderInvocation(BaseInvocation):
@@ -42,6 +48,7 @@ class AnimaModelLoaderInvocation(BaseInvocation):
     - Transformer: Cosmos Predict2 DiT + LLM Adapter (from single-file checkpoint)
     - Qwen3 Encoder: Qwen3 0.6B (standalone single-file)
     - VAE: AutoencoderKLQwenImage / Wan 2.1 VAE (standalone single-file or FLUX VAE)
+    - T5 Encoder: T5-XXL model (only the tokenizer submodel is used, for LLM Adapter token IDs)
     """
 
     model: ModelIdentifierField = InputField(
@@ -69,6 +76,14 @@ class AnimaModelLoaderInvocation(BaseInvocation):
         title="Qwen3 Encoder",
     )
 
+    t5_encoder_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="T5-XXL encoder model. The tokenizer submodel is used for Anima text encoding.",
+        input=Input.Direct,
+        ui_model_type=ModelType.T5Encoder,
+        title="T5 Encoder",
+    )
+
     def invoke(self, context: InvocationContext) -> AnimaModelLoaderOutput:
         # Transformer always comes from the main model
         transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
@@ -91,8 +106,18 @@ class AnimaModelLoaderInvocation(BaseInvocation):
                 "No Qwen3 Encoder source provided. Set 'Qwen3 Encoder' to a Qwen3 0.6B model."
             )
 
+        # T5 Encoder (only tokenizer submodel is used by Anima)
+        if self.t5_encoder_model is not None:
+            t5_tokenizer = preprocess_t5_tokenizer_model_identifier(self.t5_encoder_model)
+            t5_encoder = preprocess_t5_encoder_model_identifier(self.t5_encoder_model)
+        else:
+            raise ValueError(
+                "No T5 Encoder source provided. Set 'T5 Encoder' to a T5-XXL encoder model."
+            )
+
         return AnimaModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),
             qwen3_encoder=Qwen3EncoderField(tokenizer=qwen3_tokenizer, text_encoder=qwen3_encoder),
             vae=VAEField(vae=vae),
+            t5_encoder=T5EncoderField(tokenizer=t5_tokenizer, text_encoder=t5_encoder, loras=[]),
         )

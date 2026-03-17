@@ -17,7 +17,7 @@ from contextlib import ExitStack
 from typing import Iterator, Tuple
 
 import torch
-from transformers import PreTrainedModel, PreTrainedTokenizerBase, T5TokenizerFast
+from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
@@ -28,7 +28,7 @@ from invokeai.app.invocations.fields import (
     TensorField,
     UIComponent,
 )
-from invokeai.app.invocations.model import Qwen3EncoderField
+from invokeai.app.invocations.model import Qwen3EncoderField, T5EncoderField
 from invokeai.app.invocations.primitives import AnimaConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.patches.layer_patcher import LayerPatcher
@@ -43,16 +43,13 @@ from invokeai.backend.util.devices import TorchDevice
 # T5-XXL max sequence length for token IDs
 T5_MAX_SEQ_LEN = 512
 
-# T5-XXL tokenizer source (same vocabulary regardless of T5 model variant)
-T5_TOKENIZER_NAME = "google/t5-v1_1-xxl"
-
 
 @invocation(
     "anima_text_encoder",
     title="Prompt - Anima",
     tags=["prompt", "conditioning", "anima"],
     category="conditioning",
-    version="1.1.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class AnimaTextEncoderInvocation(BaseInvocation):
@@ -67,6 +64,11 @@ class AnimaTextEncoderInvocation(BaseInvocation):
     qwen3_encoder: Qwen3EncoderField = InputField(
         title="Qwen3 Encoder",
         description=FieldDescriptions.qwen3_encoder,
+        input=Input.Connection,
+    )
+    t5_encoder: T5EncoderField = InputField(
+        title="T5 Encoder",
+        description=FieldDescriptions.t5_encoder,
         input=Input.Connection,
     )
     mask: TensorField | None = InputField(
@@ -184,15 +186,16 @@ class AnimaTextEncoderInvocation(BaseInvocation):
 
         # --- Step 2: Tokenize with T5-XXL tokenizer (IDs only, no model) ---
         context.util.signal_progress("Tokenizing with T5-XXL")
-        t5_tokenizer = T5TokenizerFast.from_pretrained(T5_TOKENIZER_NAME)
-        t5_tokens = t5_tokenizer(
-            prompt,
-            padding=False,
-            truncation=True,
-            max_length=T5_MAX_SEQ_LEN,
-            return_tensors="pt",
-        )
-        t5xxl_ids = t5_tokens.input_ids[0]  # Shape: (seq_len,)
+        t5_tokenizer_info = context.models.load(self.t5_encoder.tokenizer)
+        with t5_tokenizer_info.model_on_device() as (_, t5_tokenizer):
+            t5_tokens = t5_tokenizer(
+                prompt,
+                padding=False,
+                truncation=True,
+                max_length=T5_MAX_SEQ_LEN,
+                return_tensors="pt",
+            )
+            t5xxl_ids = t5_tokens.input_ids[0]  # Shape: (seq_len,)
 
         return qwen3_embeds, t5xxl_ids, None
 

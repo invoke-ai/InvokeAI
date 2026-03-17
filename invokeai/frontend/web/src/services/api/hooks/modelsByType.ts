@@ -109,3 +109,4 @@ export const selectQwen3EncoderModels = buildModelsSelector(isQwen3EncoderModelC
 export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
+export const selectT5EncoderModels = buildModelsSelector(isT5EncoderModelConfigOrSubmodel);

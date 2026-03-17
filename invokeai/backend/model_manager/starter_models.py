@@ -888,7 +888,7 @@ anima_preview2 = StarterModel(
     description="Anima Preview 2 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
     type=ModelType.Main,
     format=ModelFormat.Checkpoint,
-    dependencies=[anima_qwen3_encoder, anima_vae],
+    dependencies=[anima_qwen3_encoder, anima_vae, t5_base_encoder],
 )
 # endregion
 
@@ -1062,6 +1062,7 @@ anima_bundle: list[StarterModel] = [
     anima_preview2,
     anima_qwen3_encoder,
     anima_vae,
+    t5_base_encoder,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {

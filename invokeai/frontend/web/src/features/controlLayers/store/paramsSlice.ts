@@ -228,6 +228,13 @@ const slice = createSlice({
       }
       state.animaQwen3EncoderModel = result.data;
     },
+    animaT5EncoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+      const result = zParamsState.shape.animaT5EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaT5EncoderModel = result.data;
+    },
     setAnimaScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
       state.animaScheduler = action.payload;
     },
@@ -502,6 +509,7 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
   newState.animaVaeModel = oldState.animaVaeModel;
   newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
+  newState.animaT5EncoderModel = oldState.animaT5EncoderModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
   return newState;
@@ -580,6 +588,7 @@ export const {
   paramsReset,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
+  animaT5EncoderModelSelected,
   setAnimaScheduler,
 } = slice.actions;
 
@@ -642,6 +651,7 @@ export const selectZImageQwen3EncoderModel = createParamsSelector((params) => pa
 export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
 export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
 export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
+export const selectAnimaT5EncoderModel = createParamsSelector((params) => params.animaT5EncoderModel);
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
