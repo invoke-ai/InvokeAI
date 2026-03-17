@@ -141,3 +141,48 @@ def test_model_manager_external_starter_model_applies_panel_schema_overrides(
     assert [control["name"] for control in payload["panel_schema"]["prompts"]] == ["reference_images"]
     assert [control["name"] for control in payload["panel_schema"]["image"]] == ["dimensions"]
     assert payload["panel_schema"]["generation"] == []
+
+
+def test_model_manager_gemini_starter_model_applies_reference_and_resolution_overrides(
+    monkeypatch: Any, client: TestClient, mm2_model_manager: Any, mm2_app_config: Any
+) -> None:
+    config = ExternalApiModelConfig(
+        key="external_gemini_schema",
+        name="Gemini Starter Schema Test",
+        provider_id="gemini",
+        provider_model_id="gemini-3.1-flash-image-preview",
+        capabilities=ExternalModelCapabilities(modes=["txt2img"]),
+        source="external://gemini/gemini-3.1-flash-image-preview",
+    )
+    mm2_model_manager.store.add_model(config)
+
+    services = type("Services", (), {})()
+    services.model_manager = mm2_model_manager
+    services.model_images = DummyModelImages()
+    services.configuration = mm2_app_config
+
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+
+    response = client.get("/api/v2/models/i/external_gemini_schema")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["capabilities"]["max_reference_images"] == 14
+    assert payload["capabilities"]["max_image_size"] == {"width": 4096, "height": 4096}
+    assert payload["capabilities"]["allowed_aspect_ratios"] == [
+        "1:1",
+        "1:4",
+        "1:8",
+        "2:3",
+        "3:2",
+        "3:4",
+        "4:1",
+        "4:3",
+        "4:5",
+        "5:4",
+        "8:1",
+        "9:16",
+        "16:9",
+        "21:9",
+    ]
