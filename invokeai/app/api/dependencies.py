@@ -18,6 +18,7 @@ from invokeai.app.services.download.download_default import DownloadQueueService
 from invokeai.app.services.events.events_fastapievents import FastAPIEventService
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.app.services.external_generation.providers import GeminiProvider, OpenAIProvider
+from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
@@ -212,6 +213,16 @@ class ApiDependencies:
         )
 
         ApiDependencies.invoker = Invoker(services)
+        configured_external_providers = {
+            provider_id
+            for provider_id, status in external_generation.get_provider_statuses().items()
+            if status.configured
+        }
+        sync_configured_external_starter_models(
+            configured_provider_ids=configured_external_providers,
+            model_manager=model_manager,
+            logger=logger,
+        )
         db.clean()
 
     @staticmethod
