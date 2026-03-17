@@ -14,6 +14,9 @@ import torch
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
+from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_with_partial_load import (
+    CachedModelWithPartialLoad,
+)
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
 
@@ -79,6 +82,13 @@ class LoadedModelWithoutConfig:
     def model(self) -> AnyModel:
         """Return the model without locking it."""
         return self._cache_record.cached_model.model
+
+    def repair_required_tensors_on_device(self) -> int:
+        """Repair required tensors that should be resident on the cached model's execution device."""
+        cached_model = self._cache_record.cached_model
+        if not isinstance(cached_model, CachedModelWithPartialLoad):
+            return 0
+        return cached_model.repair_required_tensors_on_compute_device()
 
 
 class LoadedModel(LoadedModelWithoutConfig):
