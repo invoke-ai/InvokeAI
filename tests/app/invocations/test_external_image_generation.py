@@ -4,7 +4,10 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
-from invokeai.app.invocations.external_image_generation import ExternalImageGenerationInvocation
+from invokeai.app.invocations.external_image_generation import (
+    ExternalImageGenerationInvocation,
+    OpenAIImageGenerationInvocation,
+)
 from invokeai.app.invocations.fields import ImageField
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.external_generation.external_generation_common import (
@@ -92,6 +95,23 @@ def test_external_invocation_rejects_mismatched_reference_weights() -> None:
     )
 
     with pytest.raises(ValueError, match="reference_image_weights"):
+        invocation.invoke(context)
+
+
+def test_provider_specific_external_invocation_rejects_wrong_provider() -> None:
+    model_config = _build_model().model_copy(update={"provider_id": "gemini"})
+    model_field = ModelIdentifierField.from_config(model_config)
+    generated_image = Image.new("RGB", (16, 16), color="black")
+    context = _build_context(model_config, generated_image)
+
+    invocation = OpenAIImageGenerationInvocation(
+        id="external_node",
+        model=model_field,
+        mode="txt2img",
+        prompt="A prompt",
+    )
+
+    with pytest.raises(ValueError, match="does not match node provider"):
         invocation.invoke(context)
 
 

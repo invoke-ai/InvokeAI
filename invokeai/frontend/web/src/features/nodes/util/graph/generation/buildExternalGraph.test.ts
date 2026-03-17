@@ -7,7 +7,6 @@ import type {
   ExternalImageSize,
   ExternalModelCapabilities,
   ImageDTO,
-  Invocation,
 } from 'services/api/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -119,19 +118,22 @@ describe('buildExternalGraph', () => {
       manager: null,
     });
     const graph = g.getGraph();
-    const externalNode = Object.values(graph.nodes).find(
-      (node) => node.type === 'external_image_generation'
-    ) as Invocation<'external_image_generation'>;
+    const externalNode = Object.values(graph.nodes).find((node) => node.type === 'openai_image_generation') as
+      | Record<string, unknown>
+      | undefined;
 
     expect(externalNode).toBeDefined();
-    expect(externalNode.mode).toBe('txt2img');
-    expect(externalNode.width).toBe(768);
-    expect(externalNode.height).toBe(512);
-    expect(externalNode.negative_prompt).toBe('bad prompt');
-    expect(externalNode.steps).toBe(20);
-    expect(externalNode.guidance).toBe(4.5);
-    expect(externalNode.reference_images?.[0]).toEqual({ image_name: 'ref.png' });
-    expect(externalNode.reference_image_weights).toEqual([0.5]);
+    expect(externalNode?.type).toBe('openai_image_generation');
+    expect(externalNode?.mode).toBe('txt2img');
+    expect(externalNode?.width).toBe(768);
+    expect(externalNode?.height).toBe(512);
+    expect(externalNode?.negative_prompt).toBe('bad prompt');
+    expect(externalNode?.steps).toBe(20);
+    expect(externalNode?.guidance).toBe(4.5);
+    expect((externalNode?.reference_images as Array<{ image_name: string }> | undefined)?.[0]).toEqual({
+      image_name: 'ref.png',
+    });
+    expect(externalNode?.reference_image_weights).toEqual([0.5]);
 
     const seedEdge = graph.edges.find((edge) => edge.destination.field === 'seed');
     expect(seedEdge).toBeDefined();
@@ -156,11 +158,33 @@ describe('buildExternalGraph', () => {
       manager: null,
     });
     const graph = g.getGraph();
-    const externalNode = Object.values(graph.nodes).find(
-      (node) => node.type === 'external_image_generation'
-    ) as Invocation<'external_image_generation'>;
+    const externalNode = Object.values(graph.nodes).find((node) => node.type === 'openai_image_generation') as
+      | Record<string, unknown>
+      | undefined;
 
-    expect(externalNode.steps).toBeNull();
+    expect(externalNode?.steps).toBeNull();
+  });
+
+  it('uses provider-specific node types', async () => {
+    mockModelConfig = createExternalModel({
+      provider_id: 'gemini',
+      provider_model_id: 'gemini-2.5-flash-image',
+      path: 'external://gemini/gemini-2.5-flash-image',
+      source: 'external://gemini/gemini-2.5-flash-image',
+      hash: 'external:gemini:gemini-2.5-flash-image',
+    });
+
+    const { g } = await buildExternalGraph({
+      generationMode: 'txt2img',
+      state: {} as RootState,
+      manager: null,
+    });
+
+    const graph = g.getGraph();
+    const externalNode = Object.values(graph.nodes).find((node) => node.type === 'gemini_image_generation');
+
+    expect(externalNode).toBeDefined();
+    expect(externalNode?.type).toBe('gemini_image_generation');
   });
 
   it('throws when mode is unsupported', async () => {

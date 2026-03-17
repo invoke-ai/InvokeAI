@@ -1,6 +1,6 @@
-from typing import Any
+from typing import Any, ClassVar
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -21,15 +21,10 @@ from invokeai.backend.model_manager.configs.external_api import ExternalApiModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
 
-@invocation(
-    "external_image_generation",
-    title="External Image Generation",
-    tags=["external", "generation"],
-    category="image",
-    version="1.0.0",
-)
-class ExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBoard):
+class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generate images using an external provider."""
+
+    provider_id: ClassVar[str | None] = None
 
     model: ModelIdentifierField = InputField(
         description=FieldDescriptions.main_model,
@@ -56,6 +51,11 @@ class ExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBoard)
         model_config = context.models.get_config(self.model)
         if not isinstance(model_config, ExternalApiModelConfig):
             raise ValueError("Selected model is not an external API model")
+
+        if self.provider_id is not None and model_config.provider_id != self.provider_id:
+            raise ValueError(
+                f"Selected model provider '{model_config.provider_id}' does not match node provider '{self.provider_id}'"
+            )
 
         init_image = None
         if self.init_image is not None:
@@ -146,3 +146,41 @@ class ExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBoard)
         if not metadata:
             return None
         return MetadataField(root=metadata)
+
+
+@invocation(
+    "external_image_generation",
+    title="External Image Generation (Legacy)",
+    tags=["external", "generation"],
+    category="image",
+    version="1.1.0",
+    classification=Classification.Internal,
+)
+class ExternalImageGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Legacy external image generation node kept for backward compatibility."""
+
+
+@invocation(
+    "openai_image_generation",
+    title="OpenAI Image Generation",
+    tags=["external", "generation", "openai"],
+    category="image",
+    version="1.0.0",
+)
+class OpenAIImageGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Generate images using an OpenAI-hosted external model."""
+
+    provider_id = "openai"
+
+
+@invocation(
+    "gemini_image_generation",
+    title="Gemini Image Generation",
+    tags=["external", "generation", "gemini"],
+    category="image",
+    version="1.0.0",
+)
+class GeminiImageGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Generate images using a Gemini-hosted external model."""
+
+    provider_id = "gemini"

@@ -15,8 +15,18 @@ import {
   type GraphBuilderReturn,
   UnsupportedGenerationModeError,
 } from 'features/nodes/util/graph/types';
-import { type AnyModelConfigWithExternal, type Invocation, isExternalApiModelConfig } from 'services/api/types';
+import {
+  type AnyInvocation,
+  type AnyModelConfigWithExternal,
+  type Invocation,
+  isExternalApiModelConfig,
+} from 'services/api/types';
 import { assert } from 'tsafe';
+
+const EXTERNAL_PROVIDER_NODE_TYPES = {
+  gemini: 'gemini_image_generation',
+  openai: 'openai_image_generation',
+} as const;
 
 export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
   const { generationMode, state, manager } = arg;
@@ -49,21 +59,23 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
     type: 'string',
   });
 
-  const externalNode = g.addNode({
+  const externalNodeType = EXTERNAL_PROVIDER_NODE_TYPES[model.provider_id as keyof typeof EXTERNAL_PROVIDER_NODE_TYPES];
+  const externalNode: Record<string, unknown> = {
     id: getPrefixedId('external_image_generation'),
-    type: 'external_image_generation',
+    type: externalNodeType ?? 'external_image_generation',
     model: model as unknown as ModelIdentifierField,
     mode: requestedMode,
     negative_prompt: model.capabilities.supports_negative_prompt ? prompts.negative : null,
     steps: model.capabilities.supports_steps ? params.steps : null,
     guidance: model.capabilities.supports_guidance ? params.guidance : null,
     num_images: 1,
-  });
+  };
+  g.addNode(externalNode as AnyInvocation);
 
   if (seed) {
-    g.addEdge(seed, 'value', externalNode, 'seed');
+    g.addEdge(seed, 'value', externalNode as AnyInvocation, 'seed');
   }
-  g.addEdge(positivePrompt, 'value', externalNode, 'prompt');
+  g.addEdge(positivePrompt, 'value', externalNode as AnyInvocation, 'prompt');
 
   if (model.capabilities.supports_reference_images) {
     const referenceImages = refImages.entities
@@ -120,7 +132,7 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
     }
   }
 
-  g.updateNode(externalNode, selectCanvasOutputFields(state));
+  g.updateNode(externalNode as AnyInvocation, selectCanvasOutputFields(state));
 
   return {
     g,
