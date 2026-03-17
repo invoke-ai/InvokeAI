@@ -12264,6 +12264,12 @@ export type components = {
              */
             has_workflow: boolean;
             /**
+             * Image Subfolder
+             * @description The subfolder where the image is stored on disk.
+             * @default
+             */
+            image_subfolder?: string;
+            /**
              * Board Id
              * @description The id of the board the image belongs to, if one exists.
              */
@@ -14354,6 +14360,7 @@ export type components = {
          *         legacy_conf_dir: Path to directory of legacy checkpoint config files.
          *         db_dir: Path to InvokeAI databases directory.
          *         outputs_dir: Path to directory for outputs.
+         *         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder (default). 'date' organizes by YYYY/MM/DD. 'type' organizes by image category (general, intermediate, etc.). 'hash' uses first 2 characters of UUID for filesystem performance.
          *         custom_nodes_dir: Path to directory for custom nodes.
          *         style_presets_dir: Path to directory for style presets.
          *         workflow_thumbnails_dir: Path to directory for workflow thumbnails.
@@ -14402,7 +14409,7 @@ export type components = {
             /**
              * Schema Version
              * @description Schema version of the config file. This is not a user-configurable setting.
-             * @default 4.0.2
+             * @default 4.0.3
              */
             schema_version?: string;
             /**
@@ -14514,6 +14521,13 @@ export type components = {
              * @default outputs
              */
             outputs_dir?: string;
+            /**
+             * Image Subfolder Strategy
+             * @description Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.
+             * @default flat
+             * @enum {string}
+             */
+            image_subfolder_strategy?: "flat" | "date" | "type" | "hash";
             /**
              * Custom Nodes Dir
              * Format: path
