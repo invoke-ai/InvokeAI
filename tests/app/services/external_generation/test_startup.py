@@ -31,11 +31,13 @@ def test_sync_configured_external_starter_models_queues_missing_models_for_confi
 
     assert "external://openai/gpt-image-1" not in queued_sources
     assert "external://gemini/gemini-2.5-flash-image" in queued_sources
+    assert "external://gemini/gemini-3.1-flash-image-preview" in queued_sources
     assert "external://gemini/gemini-3-pro-image-preview" in queued_sources
 
     install_calls = [call.args[0] for call in model_manager.install.heuristic_import.call_args_list]
     assert "external://openai/gpt-image-1" not in install_calls
     assert "external://gemini/gemini-2.5-flash-image" in install_calls
+    assert "external://gemini/gemini-3.1-flash-image-preview" in install_calls
     assert "external://gemini/gemini-3-pro-image-preview" in install_calls
 
 

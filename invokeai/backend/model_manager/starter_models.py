@@ -956,6 +956,48 @@ gemini_pro_image_preview = StarterModel(
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
 )
+gemini_3_1_flash_image_preview = StarterModel(
+    name="Gemini 3.1 Flash Image Preview",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-3.1-flash-image-preview",
+    description="Google Gemini 3.1 Flash image generation preview model (external API). Requires a configured Gemini API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img", "inpaint"],
+        supports_negative_prompt=True,
+        supports_seed=True,
+        supports_guidance=True,
+        supports_reference_images=True,
+        max_images_per_request=1,
+        allowed_aspect_ratios=[
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9",
+        ],
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "2:3": ExternalImageSize(width=832, height=1248),
+            "3:2": ExternalImageSize(width=1248, height=832),
+            "3:4": ExternalImageSize(width=864, height=1184),
+            "4:3": ExternalImageSize(width=1184, height=864),
+            "4:5": ExternalImageSize(width=896, height=1152),
+            "5:4": ExternalImageSize(width=1152, height=896),
+            "9:16": ExternalImageSize(width=768, height=1344),
+            "16:9": ExternalImageSize(width=1344, height=768),
+            "21:9": ExternalImageSize(width=1536, height=672),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
 openai_gpt_image_1 = StarterModel(
     name="ChatGPT Image",
     base=BaseModelType.External,
@@ -1073,6 +1115,7 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_controlnet_tile,
     gemini_flash_image,
     gemini_pro_image_preview,
+    gemini_3_1_flash_image_preview,
     openai_gpt_image_1,
 ]
 
