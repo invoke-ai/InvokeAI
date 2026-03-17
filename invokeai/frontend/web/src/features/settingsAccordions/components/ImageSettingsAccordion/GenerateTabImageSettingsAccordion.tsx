@@ -6,6 +6,7 @@ import {
   selectAspectRatioID,
   selectAspectRatioIsLocked,
   selectHeight,
+  selectModelSupportsDimensions,
   selectModelSupportsSeed,
   selectShouldRandomizeSeed,
   selectWidth,
@@ -51,11 +52,16 @@ const selectBadges = createMemoizedSelector(
 export const GenerateTabImageSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const badges = useAppSelector(selectBadges);
+  const modelSupportsDimensions = useAppSelector(selectModelSupportsDimensions);
   const modelSupportsSeed = useAppSelector(selectModelSupportsSeed);
   const { isOpen: isOpenAccordion, onToggle: onToggleAccordion } = useStandaloneAccordionToggle({
     id: 'image-settings-generate-tab',
     defaultIsOpen: true,
   });
+
+  if (!modelSupportsDimensions && !modelSupportsSeed) {
+    return null;
+  }
 
   return (
     <StandaloneAccordion
@@ -65,7 +71,7 @@ export const GenerateTabImageSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} pb={4} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
-        <Dimensions />
+        {modelSupportsDimensions && <Dimensions />}
         {modelSupportsSeed && <ParamSeed py={3} />}
       </Flex>
     </StandaloneAccordion>

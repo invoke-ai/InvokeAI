@@ -42,6 +42,7 @@ import type {
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
+import { hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type { AnyModelConfigWithExternal } from 'services/api/types';
@@ -676,7 +677,7 @@ export const selectModelSupportsNegativePrompt = createSelector(
       return false;
     }
     if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-      return modelConfig.capabilities.supports_negative_prompt ?? false;
+      return hasExternalPanelControl(modelConfig, 'prompts', 'negative_prompt');
     }
     if (model.base === 'external') {
       return false;
@@ -689,7 +690,7 @@ export const selectModelSupportsRefImages = createSelector(selectModel, selectMo
     return false;
   }
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-    return modelConfig.capabilities.supports_reference_images ?? false;
+    return hasExternalPanelControl(modelConfig, 'prompts', 'reference_images');
   }
   if (model.base === 'external') {
     return false;
@@ -705,7 +706,7 @@ export const selectModelSupportsGuidance = createSelector(selectModel, selectMod
     return false;
   }
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-    return modelConfig.capabilities.supports_guidance ?? false;
+    return hasExternalPanelControl(modelConfig, 'generation', 'guidance');
   }
   return true;
 });
@@ -714,7 +715,7 @@ export const selectModelSupportsSeed = createSelector(selectModel, selectModelCo
     return false;
   }
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-    return modelConfig.capabilities.supports_seed ?? false;
+    return hasExternalPanelControl(modelConfig, 'image', 'seed');
   }
   return true;
 });
@@ -723,7 +724,16 @@ export const selectModelSupportsSteps = createSelector(selectModel, selectModelC
     return false;
   }
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-    return modelConfig.capabilities.supports_steps ?? false;
+    return hasExternalPanelControl(modelConfig, 'generation', 'steps');
+  }
+  return true;
+});
+export const selectModelSupportsDimensions = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+  if (!model) {
+    return false;
+  }
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return hasExternalPanelControl(modelConfig, 'image', 'dimensions');
   }
   return true;
 });

@@ -1,13 +1,14 @@
-import { zModelIdentifierField } from 'features/nodes/types/common';
 import type {
   ExternalApiModelConfig,
   ExternalApiModelDefaultSettings,
   ExternalImageSize,
   ExternalModelCapabilities,
+  ExternalModelPanelSchema,
 } from 'services/api/types';
 import { describe, expect, it } from 'vitest';
 
 import {
+  selectModelSupportsDimensions,
   selectModelSupportsGuidance,
   selectModelSupportsNegativePrompt,
   selectModelSupportsRefImages,
@@ -15,7 +16,19 @@ import {
   selectModelSupportsSteps,
 } from './paramsSlice';
 
-const createExternalConfig = (capabilities: ExternalModelCapabilities): ExternalApiModelConfig => {
+const buildExternalModelIdentifier = (config: ExternalApiModelConfig) =>
+  ({
+    key: config.key,
+    hash: config.hash,
+    name: config.name,
+    base: config.base,
+    type: config.type,
+  }) as const;
+
+const createExternalConfig = (
+  capabilities: ExternalModelCapabilities,
+  panelSchema?: ExternalModelPanelSchema
+): ExternalApiModelConfig => {
   const maxImageSize: ExternalImageSize = { width: 1024, height: 1024 };
   const defaultSettings: ExternalApiModelDefaultSettings = { width: 1024, height: 1024, steps: 30 };
 
@@ -37,6 +50,7 @@ const createExternalConfig = (capabilities: ExternalModelCapabilities): External
     provider_model_id: 'gpt-image-1',
     capabilities: { ...capabilities, max_image_size: maxImageSize },
     default_settings: defaultSettings,
+    panel_schema: panelSchema,
     tags: ['external'],
     is_default: false,
   };
@@ -49,7 +63,7 @@ describe('paramsSlice selectors for external models', () => {
       supports_negative_prompt: true,
       supports_reference_images: false,
     });
-    const model = zModelIdentifierField.parse(config);
+    const model = buildExternalModelIdentifier(config);
 
     expect(selectModelSupportsNegativePrompt.resultFunc(model, config)).toBe(true);
   });
@@ -60,7 +74,7 @@ describe('paramsSlice selectors for external models', () => {
       supports_negative_prompt: false,
       supports_reference_images: false,
     });
-    const model = zModelIdentifierField.parse(config);
+    const model = buildExternalModelIdentifier(config);
 
     expect(selectModelSupportsRefImages.resultFunc(model, config)).toBe(false);
   });
@@ -72,7 +86,7 @@ describe('paramsSlice selectors for external models', () => {
       supports_reference_images: false,
       supports_guidance: true,
     });
-    const model = zModelIdentifierField.parse(config);
+    const model = buildExternalModelIdentifier(config);
 
     expect(selectModelSupportsGuidance.resultFunc(model, config)).toBe(true);
   });
@@ -84,7 +98,7 @@ describe('paramsSlice selectors for external models', () => {
       supports_reference_images: false,
       supports_seed: false,
     });
-    const model = zModelIdentifierField.parse(config);
+    const model = buildExternalModelIdentifier(config);
 
     expect(selectModelSupportsSeed.resultFunc(model, config)).toBe(false);
   });
@@ -96,8 +110,34 @@ describe('paramsSlice selectors for external models', () => {
       supports_reference_images: false,
       supports_steps: false,
     });
-    const model = zModelIdentifierField.parse(config);
+    const model = buildExternalModelIdentifier(config);
 
     expect(selectModelSupportsSteps.resultFunc(model, config)).toBe(false);
+  });
+
+  it('prefers panel schema over capabilities for control visibility', () => {
+    const config = createExternalConfig(
+      {
+        modes: ['txt2img'],
+        supports_negative_prompt: true,
+        supports_reference_images: true,
+        supports_guidance: true,
+        supports_seed: true,
+        supports_steps: true,
+      },
+      {
+        prompts: [{ name: 'reference_images' }],
+        image: [{ name: 'dimensions' }],
+        generation: [],
+      }
+    );
+    const model = buildExternalModelIdentifier(config);
+
+    expect(selectModelSupportsNegativePrompt.resultFunc(model, config)).toBe(false);
+    expect(selectModelSupportsRefImages.resultFunc(model, config)).toBe(true);
+    expect(selectModelSupportsGuidance.resultFunc(model, config)).toBe(false);
+    expect(selectModelSupportsSeed.resultFunc(model, config)).toBe(false);
+    expect(selectModelSupportsSteps.resultFunc(model, config)).toBe(false);
+    expect(selectModelSupportsDimensions.resultFunc(model, config)).toBe(true);
   });
 });

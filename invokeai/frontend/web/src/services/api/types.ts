@@ -154,6 +154,31 @@ export type ExternalApiModelDefaultSettings = {
   num_images?: number | null;
 };
 
+export type ExternalPanelControlName =
+  | 'negative_prompt'
+  | 'reference_images'
+  | 'dimensions'
+  | 'seed'
+  | 'steps'
+  | 'guidance';
+
+export type ExternalModelPanelControl = {
+  name: ExternalPanelControlName;
+  slider_min?: number | null;
+  slider_max?: number | null;
+  number_input_min?: number | null;
+  number_input_max?: number | null;
+  fine_step?: number | null;
+  coarse_step?: number | null;
+  marks?: number[] | null;
+};
+
+export type ExternalModelPanelSchema = {
+  prompts: ExternalModelPanelControl[];
+  image: ExternalModelPanelControl[];
+  generation: ExternalModelPanelControl[];
+};
+
 export type ExternalApiModelConfig = {
   key: string;
   hash: string;
@@ -172,6 +197,7 @@ export type ExternalApiModelConfig = {
   provider_model_id: string;
   capabilities: ExternalModelCapabilities;
   default_settings?: ExternalApiModelDefaultSettings | null;
+  panel_schema?: ExternalModelPanelSchema | null;
   tags?: string[] | null;
   is_default?: boolean;
 };

@@ -6,6 +6,7 @@ import type {
   ExternalApiModelDefaultSettings,
   ExternalImageSize,
   ExternalModelCapabilities,
+  ExternalModelPanelSchema,
   ImageDTO,
 } from 'services/api/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -43,6 +44,7 @@ const createExternalModel = (overrides: Partial<ExternalApiModelConfig> = {}): E
     provider_model_id: 'gpt-image-1',
     capabilities,
     default_settings: defaultSettings,
+    panel_schema: undefined,
     tags: ['external'],
     is_default: false,
     ...overrides,
@@ -163,6 +165,37 @@ describe('buildExternalGraph', () => {
       | undefined;
 
     expect(externalNode?.steps).toBeNull();
+  });
+
+  it('prefers panel schema over capabilities when building node inputs', async () => {
+    const panelSchema: ExternalModelPanelSchema = {
+      prompts: [{ name: 'reference_images' }],
+      image: [{ name: 'dimensions' }],
+      generation: [],
+    };
+    mockModelConfig = createExternalModel({
+      panel_schema: panelSchema,
+    });
+
+    const { g } = await buildExternalGraph({
+      generationMode: 'txt2img',
+      state: {} as RootState,
+      manager: null,
+    });
+    const graph = g.getGraph();
+    const externalNode = Object.values(graph.nodes).find((node) => node.type === 'openai_image_generation') as
+      | Record<string, unknown>
+      | undefined;
+
+    expect(externalNode?.negative_prompt).toBeNull();
+    expect(externalNode?.steps).toBeNull();
+    expect(externalNode?.guidance).toBeNull();
+    expect((externalNode?.reference_images as Array<{ image_name: string }> | undefined)?.[0]).toEqual({
+      image_name: 'ref.png',
+    });
+
+    const seedEdge = graph.edges.find((edge) => edge.destination.field === 'seed');
+    expect(seedEdge).toBeUndefined();
   });
 
   it('uses provider-specific node types', async () => {

@@ -4,6 +4,7 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
+  selectModelSupportsDimensions,
   selectModelSupportsOptimizedDenoising,
   selectModelSupportsSeed,
   selectShouldRandomizeSeed,
@@ -64,6 +65,7 @@ export const CanvasTabImageSettingsAccordion = memo(() => {
     id: 'image-settings-advanced',
     defaultIsOpen: false,
   });
+  const modelSupportsDimensions = useAppSelector(selectModelSupportsDimensions);
   const modelSupportsOptimizedDenoising = useAppSelector(selectModelSupportsOptimizedDenoising);
   const modelSupportsSeed = useAppSelector(selectModelSupportsSeed);
 
@@ -75,7 +77,7 @@ export const CanvasTabImageSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} pb={0} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
-        <BboxSettings />
+        {modelSupportsDimensions && <BboxSettings />}
         {modelSupportsSeed && <ParamSeed pt={3} pb={0} />}
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">

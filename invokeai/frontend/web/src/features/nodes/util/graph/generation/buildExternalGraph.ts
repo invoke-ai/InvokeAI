@@ -4,6 +4,7 @@ import { selectModelConfig, selectParamsSlice } from 'features/controlLayers/sto
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { type ModelIdentifierField, zImageField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
+import { hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
 import {
   getOriginalAndScaledSizesForOtherModes,
   getOriginalAndScaledSizesForTextToImage,
@@ -46,8 +47,13 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
   const prompts = selectPresetModifiedPrompts(state);
 
   const g = new Graph(getPrefixedId('external_graph'));
+  const supportsSeed = hasExternalPanelControl(model, 'image', 'seed');
+  const supportsNegativePrompt = hasExternalPanelControl(model, 'prompts', 'negative_prompt');
+  const supportsSteps = hasExternalPanelControl(model, 'generation', 'steps');
+  const supportsGuidance = hasExternalPanelControl(model, 'generation', 'guidance');
+  const supportsReferenceImages = hasExternalPanelControl(model, 'prompts', 'reference_images');
 
-  const seed = model.capabilities.supports_seed
+  const seed = supportsSeed
     ? g.addNode({
         id: getPrefixedId('seed'),
         type: 'integer',
@@ -65,9 +71,9 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
     type: externalNodeType ?? 'external_image_generation',
     model: model as unknown as ModelIdentifierField,
     mode: requestedMode,
-    negative_prompt: model.capabilities.supports_negative_prompt ? prompts.negative : null,
-    steps: model.capabilities.supports_steps ? params.steps : null,
-    guidance: model.capabilities.supports_guidance ? params.guidance : null,
+    negative_prompt: supportsNegativePrompt ? prompts.negative : null,
+    steps: supportsSteps ? params.steps : null,
+    guidance: supportsGuidance ? params.guidance : null,
     num_images: 1,
   };
   g.addNode(externalNode as AnyInvocation);
@@ -77,7 +83,7 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
   }
   g.addEdge(positivePrompt, 'value', externalNode as AnyInvocation, 'prompt');
 
-  if (model.capabilities.supports_reference_images) {
+  if (supportsReferenceImages) {
     const referenceImages = refImages.entities
       .filter((entity) => entity.isEnabled)
       .map((entity) => entity.config)
