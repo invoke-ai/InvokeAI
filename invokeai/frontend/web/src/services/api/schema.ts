@@ -14360,7 +14360,7 @@ export type components = {
          *         legacy_conf_dir: Path to directory of legacy checkpoint config files.
          *         db_dir: Path to InvokeAI databases directory.
          *         outputs_dir: Path to directory for outputs.
-         *         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder (default). 'date' organizes by YYYY/MM/DD. 'type' organizes by image category (general, intermediate, etc.). 'hash' uses first 2 characters of UUID for filesystem performance.
+         *         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
          *         custom_nodes_dir: Path to directory for custom nodes.
          *         style_presets_dir: Path to directory for style presets.
          *         workflow_thumbnails_dir: Path to directory for workflow thumbnails.
