@@ -9,6 +9,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, 
 
 ExternalGenerationMode = Literal["txt2img", "img2img", "inpaint"]
 ExternalMaskFormat = Literal["alpha", "binary", "none"]
+ExternalPanelControlName = Literal["negative_prompt", "reference_images", "dimensions", "seed", "steps", "guidance"]
 
 
 class ExternalImageSize(BaseModel):
@@ -46,6 +47,27 @@ class ExternalApiModelDefaultSettings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ExternalModelPanelControl(BaseModel):
+    name: ExternalPanelControlName
+    slider_min: float | None = Field(default=None)
+    slider_max: float | None = Field(default=None)
+    number_input_min: float | None = Field(default=None)
+    number_input_max: float | None = Field(default=None)
+    fine_step: float | None = Field(default=None)
+    coarse_step: float | None = Field(default=None)
+    marks: list[float] | None = Field(default=None)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExternalModelPanelSchema(BaseModel):
+    prompts: list[ExternalModelPanelControl] = Field(default_factory=list)
+    image: list[ExternalModelPanelControl] = Field(default_factory=list)
+    generation: list[ExternalModelPanelControl] = Field(default_factory=list)
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ExternalApiModelConfig(Config_Base):
     base: Literal[BaseModelType.External] = Field(default=BaseModelType.External)
     type: Literal[ModelType.ExternalImageGenerator] = Field(default=ModelType.ExternalImageGenerator)
@@ -55,6 +77,7 @@ class ExternalApiModelConfig(Config_Base):
     provider_model_id: str = Field(min_length=1, description="Provider-specific model ID")
     capabilities: ExternalModelCapabilities = Field(description="Provider capability matrix")
     default_settings: ExternalApiModelDefaultSettings | None = Field(default=None)
+    panel_schema: ExternalModelPanelSchema | None = Field(default=None)
     tags: list[str] | None = Field(default=None)
     is_default: bool = Field(default=False)
 

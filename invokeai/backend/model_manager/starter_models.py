@@ -6,6 +6,7 @@ from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelDefaultSettings,
     ExternalImageSize,
     ExternalModelCapabilities,
+    ExternalModelPanelSchema,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
@@ -20,6 +21,7 @@ class StarterModelWithoutDependencies(BaseModel):
     is_installed: bool = False
     capabilities: ExternalModelCapabilities | None = None
     default_settings: ExternalApiModelDefaultSettings | None = None
+    panel_schema: ExternalModelPanelSchema | None = None
     # allows us to track what models a user has installed across name changes within starter models
     # if you update a starter model name, please add the old one to this list for that starter model
     previous_names: list[str] = []
@@ -910,6 +912,7 @@ gemini_flash_image = StarterModel(
         },
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
 )
 gemini_pro_image_preview = StarterModel(
     name="Gemini 3 Pro Image Preview",
@@ -951,6 +954,7 @@ gemini_pro_image_preview = StarterModel(
         },
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
 )
 openai_gpt_image_1 = StarterModel(
     name="ChatGPT Image",
@@ -968,6 +972,7 @@ openai_gpt_image_1 = StarterModel(
         max_images_per_request=1,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
 )
 # endregion
 
