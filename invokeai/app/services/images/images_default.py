@@ -8,6 +8,7 @@ from invokeai.app.services.image_files.image_files_common import (
     ImageFileNotFoundException,
     ImageFileSaveException,
 )
+from invokeai.app.services.image_files.image_subfolder_strategy import create_subfolder_strategy
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageNamesResult,
@@ -55,6 +56,11 @@ class ImageService(ImageServiceABC):
 
         image_name = self.__invoker.services.names.create_image_name()
 
+        # Compute subfolder based on configured strategy
+        strategy_name = self.__invoker.services.configuration.image_subfolder_strategy
+        strategy = create_subfolder_strategy(strategy_name)
+        image_subfolder = strategy.get_subfolder(image_name, image_category, is_intermediate or False)
+
         (width, height) = image.size
 
         try:
@@ -74,6 +80,7 @@ class ImageService(ImageServiceABC):
                 metadata=metadata,
                 session_id=session_id,
                 user_id=user_id,
+                image_subfolder=image_subfolder,
             )
             if board_id is not None:
                 try:
@@ -83,7 +90,12 @@ class ImageService(ImageServiceABC):
                 except Exception as e:
                     self.__invoker.services.logger.warning(f"Failed to add image to board {board_id}: {str(e)}")
             self.__invoker.services.image_files.save(
-                image_name=image_name, image=image, metadata=metadata, workflow=workflow, graph=graph
+                image_name=image_name,
+                image=image,
+                metadata=metadata,
+                workflow=workflow,
+                graph=graph,
+                image_subfolder=image_subfolder,
             )
             image_dto = self.get_dto(image_name)
 
@@ -118,7 +130,8 @@ class ImageService(ImageServiceABC):
 
     def get_pil_image(self, image_name: str) -> PILImageType:
         try:
-            return self.__invoker.services.image_files.get(image_name)
+            record = self.__invoker.services.image_records.get(image_name)
+            return self.__invoker.services.image_files.get(image_name, image_subfolder=record.image_subfolder)
         except ImageFileNotFoundException:
             self.__invoker.services.logger.error("Failed to get image file")
             raise
@@ -167,7 +180,8 @@ class ImageService(ImageServiceABC):
 
     def get_workflow(self, image_name: str) -> Optional[str]:
         try:
-            return self.__invoker.services.image_files.get_workflow(image_name)
+            record = self.__invoker.services.image_records.get(image_name)
+            return self.__invoker.services.image_files.get_workflow(image_name, image_subfolder=record.image_subfolder)
         except ImageFileNotFoundException:
             self.__invoker.services.logger.error("Image file not found")
             raise
@@ -177,7 +191,8 @@ class ImageService(ImageServiceABC):
 
     def get_graph(self, image_name: str) -> Optional[str]:
         try:
-            return self.__invoker.services.image_files.get_graph(image_name)
+            record = self.__invoker.services.image_records.get(image_name)
+            return self.__invoker.services.image_files.get_graph(image_name, image_subfolder=record.image_subfolder)
         except ImageFileNotFoundException:
             self.__invoker.services.logger.error("Image file not found")
             raise
@@ -187,7 +202,12 @@ class ImageService(ImageServiceABC):
 
     def get_path(self, image_name: str, thumbnail: bool = False) -> str:
         try:
-            return str(self.__invoker.services.image_files.get_path(image_name, thumbnail))
+            record = self.__invoker.services.image_records.get(image_name)
+            return str(
+                self.__invoker.services.image_files.get_path(
+                    image_name, thumbnail, image_subfolder=record.image_subfolder
+                )
+            )
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting image path")
             raise e
@@ -257,7 +277,8 @@ class ImageService(ImageServiceABC):
 
     def delete(self, image_name: str):
         try:
-            self.__invoker.services.image_files.delete(image_name)
+            record = self.__invoker.services.image_records.get(image_name)
+            self.__invoker.services.image_files.delete(image_name, image_subfolder=record.image_subfolder)
             self.__invoker.services.image_records.delete(image_name)
             self._on_deleted(image_name)
         except ImageRecordDeleteException:
@@ -278,7 +299,11 @@ class ImageService(ImageServiceABC):
                 is_intermediate=None,
             )
             for image_name in image_names:
-                self.__invoker.services.image_files.delete(image_name)
+                try:
+                    record = self.__invoker.services.image_records.get(image_name)
+                    self.__invoker.services.image_files.delete(image_name, image_subfolder=record.image_subfolder)
+                except Exception:
+                    pass
             self.__invoker.services.image_records.delete_many(image_names)
             for image_name in image_names:
                 self._on_deleted(image_name)
@@ -294,10 +319,10 @@ class ImageService(ImageServiceABC):
 
     def delete_intermediates(self) -> int:
         try:
-            image_names = self.__invoker.services.image_records.delete_intermediates()
-            count = len(image_names)
-            for image_name in image_names:
-                self.__invoker.services.image_files.delete(image_name)
+            image_name_subfolder_pairs = self.__invoker.services.image_records.delete_intermediates()
+            count = len(image_name_subfolder_pairs)
+            for image_name, image_subfolder in image_name_subfolder_pairs:
+                self.__invoker.services.image_files.delete(image_name, image_subfolder=image_subfolder)
                 self._on_deleted(image_name)
             return count
         except ImageRecordDeleteException:

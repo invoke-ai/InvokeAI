@@ -146,17 +146,15 @@ def load_image_file(image_name: str) -> Optional[dict[str, Any]]:
     """
     logger = ApiDependencies.invoker.services.logger
     try:
-        # Prefer using the image_files service to validate & open images
-        image_files = ApiDependencies.invoker.services.image_files
-        # Resolve a safe path inside outputs
-        image_path = image_files.get_path(image_name)
+        images_service = ApiDependencies.invoker.services.images
+        # Use images service which handles subfolder resolution via DB record
+        path = images_service.get_path(image_name)
 
-        if not image_files.validate_path(str(image_path)):
-            logger.warning(f"Image file not found: {image_name} (searched in {image_path.parent})")
+        if not images_service.validate_path(path):
+            logger.warning(f"Image file not found: {image_name}")
             return None
 
-        # Open the image via service to leverage caching
-        pil_image = image_files.get(image_name)
+        pil_image = images_service.get_pil_image(image_name)
         width, height = pil_image.size
         logger.info(f"Found image file: {image_name} ({width}x{height})")
         return {"image_name": image_name, "width": width, "height": height}

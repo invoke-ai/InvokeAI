@@ -280,17 +280,21 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             count = cast(int, cursor.fetchone()[0])
         return count
 
-    def delete_intermediates(self) -> list[str]:
+    def delete_intermediates(self) -> list[tuple[str, str]]:
+        """Deletes all intermediate image records.
+
+        Returns a list of (image_name, image_subfolder) tuples for file cleanup.
+        """
         with self._db.transaction() as cursor:
             try:
                 cursor.execute(
                     """--sql
-                    SELECT image_name FROM images
+                    SELECT image_name, image_subfolder FROM images
                     WHERE is_intermediate = TRUE;
                     """
                 )
                 result = cast(list[sqlite3.Row], cursor.fetchall())
-                image_names = [r[0] for r in result]
+                image_name_subfolder_pairs = [(r[0], r[1]) for r in result]
                 cursor.execute(
                     """--sql
                     DELETE FROM images
@@ -299,7 +303,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                 )
             except sqlite3.Error as e:
                 raise ImageRecordDeleteException from e
-        return image_names
+        return image_name_subfolder_pairs
 
     def save(
         self,
@@ -315,6 +319,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
         node_id: Optional[str] = None,
         metadata: Optional[str] = None,
         user_id: Optional[str] = None,
+        image_subfolder: str = "",
     ) -> datetime:
         with self._db.transaction() as cursor:
             try:
@@ -332,9 +337,10 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                         is_intermediate,
                         starred,
                         has_workflow,
-                        user_id
+                        user_id,
+                        image_subfolder
                         )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                     """,
                     (
                         image_name,
@@ -349,6 +355,7 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
                         starred,
                         has_workflow,
                         user_id or "system",
+                        image_subfolder,
                     ),
                 )
 
