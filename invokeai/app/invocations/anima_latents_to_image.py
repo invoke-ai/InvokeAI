@@ -5,8 +5,7 @@ compatible FLUX VAE as fallback.
 
 Latents from the denoiser are in normalized space (zero-centered). Before
 VAE decode, they must be denormalized using the Wan 2.1 per-channel
-mean/std: latents = latents * std + mean (matching diffusers WanPipeline
-and ComfyUI's Wan21 latent_format.process_out).
+mean/std: latents = latents * std + mean (matching diffusers WanPipeline).
 
 The VAE expects 5D latents [B, C, T, H, W] — for single images, T=1.
 """

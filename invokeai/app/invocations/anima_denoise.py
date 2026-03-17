@@ -1,8 +1,8 @@
 """Anima denoising invocation.
 
 Implements the rectified flow denoising loop for Anima models:
-- CONST model type: denoised = input - output * sigma
-- Fixed shift=3.0 via time_snr_shift (same formula as Flux)
+- Direct prediction: denoised = input - output * sigma
+- Fixed shift=3.0 via loglinear_timestep_shift (Flux paper by Black Forest Labs)
 - Timestep convention: timestep = sigma * 1.0 (raw sigma, NOT 1-sigma like Z-Image)
 - NO v-prediction negation (unlike Z-Image)
 - 3D latent space: [B, C, T, H, W] with T=1 for images
@@ -11,7 +11,7 @@ Implements the rectified flow denoising loop for Anima models:
 Key differences from Z-Image denoise:
 - Anima uses fixed shift=3.0, Z-Image uses dynamic shift based on resolution
 - Anima: timestep = sigma (raw), Z-Image: model_t = 1.0 - sigma
-- Anima: noise_pred = model_output (CONST), Z-Image: noise_pred = -model_output (v-pred)
+- Anima: noise_pred = model_output (direct), Z-Image: noise_pred = -model_output (v-pred)
 - Anima transformer takes (x, timesteps, context, t5xxl_ids, t5xxl_weights)
 - Anima uses 3D latents directly, Z-Image converts 4D -> list of 5D
 """
@@ -61,18 +61,21 @@ ANIMA_LATENT_SCALE_FACTOR = 8
 ANIMA_LATENT_CHANNELS = 16
 # Anima uses fixed shift=3.0 for the rectified flow schedule
 ANIMA_SHIFT = 3.0
-# Anima uses multiplier=1.0 (raw sigma values as timesteps, per ComfyUI config)
+# Anima uses raw sigma values as timesteps (no rescaling)
 ANIMA_MULTIPLIER = 1.0
 
 
-def time_snr_shift(alpha: float, t: float) -> float:
-    """Apply time-SNR shift to a timestep value.
+def loglinear_timestep_shift(alpha: float, t: float) -> float:
+    """Apply log-linear timestep shift to a noise schedule value.
 
-    This is the same formula used by Flux and ComfyUI's ModelSamplingDiscreteFlow.
-    With alpha=3.0, this shifts the noise schedule to spend more time at higher noise levels.
+    This shift biases the noise schedule toward higher noise levels, as described
+    in the Flux model (Black Forest Labs, 2024). With alpha > 1, the model spends
+    proportionally more denoising steps at higher noise levels.
+
+    Formula: sigma = alpha * t / (1 + (alpha - 1) * t)
 
     Args:
-        alpha: Shift factor (3.0 for Anima).
+        alpha: Shift factor (3.0 for Anima, resolution-dependent for Flux).
         t: Timestep value in [0, 1].
 
     Returns:
@@ -83,10 +86,10 @@ def time_snr_shift(alpha: float, t: float) -> float:
     return alpha * t / (1 + (alpha - 1) * t)
 
 
-def inverse_time_snr_shift(alpha: float, sigma: float) -> float:
+def inverse_loglinear_timestep_shift(alpha: float, sigma: float) -> float:
     """Recover linear t from a shifted sigma value.
 
-    Inverse of time_snr_shift: given sigma = alpha * t / (1 + (alpha-1) * t),
+    Inverse of loglinear_timestep_shift: given sigma = alpha * t / (1 + (alpha-1) * t),
     solve for t = sigma / (alpha - (alpha-1) * sigma).
 
     This is needed for the inpainting extension, which expects linear t values
@@ -146,7 +149,7 @@ class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
         """
         # Recover linear t from shifted sigma for gradient mask thresholding.
         # This ensures the gradient mask is revealed at the correct pace.
-        t_prev = inverse_time_snr_shift(self._shift, sigma_prev)
+        t_prev = inverse_loglinear_timestep_shift(self._shift, sigma_prev)
         mask = self._apply_mask_gradient_adjustment(t_prev)
 
         # Use shifted sigma for noise mixing to match the denoiser's noise level.
@@ -265,8 +268,8 @@ class AnimaDenoiseInvocation(BaseInvocation):
     def _get_sigmas(self, num_steps: int) -> list[float]:
         """Generate sigma schedule with fixed shift=3.0.
 
-        Uses the same time_snr_shift formula as Flux/ComfyUI but with
-        a fixed shift factor of 3.0 (no dynamic resolution-based shift).
+        Uses the log-linear timestep shift from the Flux model (Black Forest Labs)
+        with a fixed shift factor of 3.0 (no dynamic resolution-based shift).
 
         Returns:
             List of num_steps + 1 sigma values from ~1.0 (noise) to 0.0 (clean).
@@ -274,7 +277,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
         sigmas = []
         for i in range(num_steps + 1):
             t = 1.0 - i / num_steps
-            sigma = time_snr_shift(ANIMA_SHIFT, t)
+            sigma = loglinear_timestep_shift(ANIMA_SHIFT, t)
             sigmas.append(sigma)
         return sigmas
 

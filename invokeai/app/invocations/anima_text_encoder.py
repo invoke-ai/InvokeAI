@@ -10,7 +10,7 @@ the LLM Adapter inside the transformer during denoising.
 Key differences from Z-Image text encoder:
 - Anima uses Qwen3 0.6B (base model, NOT instruct) — no chat template
 - Anima additionally tokenizes with T5-XXL tokenizer to get token IDs
-- Qwen3 output includes all positions (including padding) to match ComfyUI
+- Qwen3 output uses all positions (including padding) for full context
 """
 
 from contextlib import ExitStack
@@ -106,7 +106,7 @@ class AnimaTextEncoderInvocation(BaseInvocation):
         Returns:
             Tuple of (qwen3_embeds, t5xxl_ids, t5xxl_weights).
             - qwen3_embeds: Shape (max_seq_len, 1024) — includes all positions (including padding)
-              to match ComfyUI's SDClipModel behavior.
+              to preserve full sequence context for the LLM Adapter.
             - t5xxl_ids: Shape (seq_len,) — T5-XXL token IDs (unpadded).
             - t5xxl_weights: None (uniform weights for now).
         """
@@ -166,7 +166,7 @@ class AnimaTextEncoderInvocation(BaseInvocation):
                 text_input_ids = torch.tensor([[pad_id]])
                 attention_mask = torch.tensor([[1]])
 
-            # Get last hidden state from Qwen3 (ComfyUI uses layer="last")
+            # Get last hidden state from Qwen3 (final layer output)
             prompt_mask = attention_mask.to(device).bool()
             outputs = text_encoder(
                 text_input_ids.to(device),
