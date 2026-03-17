@@ -148,15 +148,15 @@ class DiskImageFileStorage(ImageFileStorageBase):
         """Validates a subfolder path to prevent directory traversal while allowing controlled subdirectories."""
         if not subfolder:
             return
-        if '\\' in subfolder:
+        if "\\" in subfolder:
             raise ValueError("Backslashes not allowed in subfolder path")
-        if subfolder.startswith('/'):
+        if subfolder.startswith("/"):
             raise ValueError("Absolute paths not allowed in subfolder path")
-        parts = subfolder.split('/')
+        parts = subfolder.split("/")
         for part in parts:
-            if part == '..':
+            if part == "..":
                 raise ValueError("Parent directory references not allowed in subfolder path")
-            if part == '':
+            if part == "":
                 raise ValueError("Empty path segments not allowed in subfolder path")
 
     def validate_path(self, path: Union[str, Path]) -> bool:
