@@ -49,6 +49,32 @@ def test_is_state_dict_likely_anima_lora_false_for_flux():
     assert not is_state_dict_likely_anima_lora(state_dict)
 
 
+def test_is_state_dict_likely_anima_lora_false_for_generic_blocks():
+    """Test that is_state_dict_likely_anima_lora() returns False for a hypothetical architecture
+    that uses lora_unet_blocks_ but with non-Cosmos DiT subcomponent names."""
+    state_dict = {
+        # Has lora_unet_blocks_ prefix but uses 'attention' and 'ff' instead of
+        # Cosmos DiT subcomponents (cross_attn, self_attn, mlp, adaln_modulation)
+        "lora_unet_blocks_0_attention_to_q.lora_down.weight": torch.empty([16, 512]),
+        "lora_unet_blocks_0_attention_to_q.lora_up.weight": torch.empty([512, 16]),
+        "lora_unet_blocks_0_ff_net_0_proj.lora_down.weight": torch.empty([16, 512]),
+        "lora_unet_blocks_0_ff_net_0_proj.lora_up.weight": torch.empty([2048, 16]),
+    }
+    assert not is_state_dict_likely_anima_lora(state_dict)
+
+
+def test_is_state_dict_likely_anima_lora_false_for_generic_peft_blocks():
+    """Test that is_state_dict_likely_anima_lora() returns False for a hypothetical architecture
+    that uses transformer.blocks. in PEFT format but with non-Cosmos subcomponents."""
+    state_dict = {
+        "transformer.blocks.0.attention.to_q.lora_A.weight": torch.empty([16, 512]),
+        "transformer.blocks.0.attention.to_q.lora_B.weight": torch.empty([512, 16]),
+        "transformer.blocks.0.ff.net.0.proj.lora_A.weight": torch.empty([16, 512]),
+        "transformer.blocks.0.ff.net.0.proj.lora_B.weight": torch.empty([2048, 16]),
+    }
+    assert not is_state_dict_likely_anima_lora(state_dict)
+
+
 def test_is_state_dict_likely_anima_lora_false_for_random():
     """Test that is_state_dict_likely_anima_lora() returns False for unrelated state dicts."""
     state_dict = {

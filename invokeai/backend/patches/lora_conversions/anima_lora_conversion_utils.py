@@ -22,6 +22,8 @@ logger = InvokeAILogger.get_logger(__name__)
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     ANIMA_LORA_QWEN3_PREFIX,
     ANIMA_LORA_TRANSFORMER_PREFIX,
+    has_cosmos_dit_kohya_keys,
+    has_cosmos_dit_peft_keys,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
@@ -30,24 +32,16 @@ def is_state_dict_likely_anima_lora(state_dict: dict[str | int, torch.Tensor]) -
     """Checks if the provided state dict is likely an Anima LoRA.
 
     Anima LoRAs use Kohya-style naming with lora_unet_ prefix and underscore-separated
-    model key paths targeting Cosmos DiT blocks.
+    model key paths targeting Cosmos DiT blocks.  Detection requires Cosmos DiT-specific
+    subcomponent names (cross_attn, self_attn, mlp, adaln_modulation) to avoid
+    false-positives on other architectures that also use ``blocks`` in their paths.
     """
     str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-    # Anima LoRAs use Kohya-style keys: lora_unet_blocks_X_...
-    has_kohya_keys = any(k.startswith("lora_unet_blocks_") for k in str_keys)
-
-    if has_kohya_keys:
+    if has_cosmos_dit_kohya_keys(str_keys):
         return True
 
-    # Also check for diffusers PEFT format with Anima-specific layer names
-    # (blocks.X.cross_attn, blocks.X.self_attn, blocks.X.mlp — Cosmos DiT structure)
-    has_cosmos_dit_keys = any(
-        k.startswith(("diffusion_model.blocks.", "transformer.blocks.", "base_model.model.transformer.blocks."))
-        for k in str_keys
-    )
-
-    return has_cosmos_dit_keys
+    return has_cosmos_dit_peft_keys(str_keys)
 
 
 # Mapping from Kohya underscore-style substrings to model parameter names.

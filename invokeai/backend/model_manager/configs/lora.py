@@ -31,6 +31,10 @@ from invokeai.backend.model_manager.taxonomy import (
     ZImageVariantType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
+from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
+    has_cosmos_dit_kohya_keys,
+    has_cosmos_dit_peft_keys,
+)
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
 
 
@@ -637,6 +641,13 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
             return BaseModelType.Flux
 
         state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        # Rule out Anima LoRAs — their lora_te_ keys have shapes that
+        # lora_token_vector_length() misidentifies as SD2/SDXL.
+        if has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys):
+            raise NotAMatchError("model looks like an Anima LoRA, not a Stable Diffusion LoRA")
+
         # If we've gotten here, we assume that the model is a Stable Diffusion model
         token_vector_length = lora_token_vector_length(state_dict)
         if token_vector_length == 768:
@@ -770,26 +781,15 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         - lora_unet_blocks_0_cross_attn_k_proj.lora_down.weight (Kohya format)
         - diffusion_model.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
         - transformer.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
+
+        Detection requires Cosmos DiT-specific subcomponent names (cross_attn,
+        self_attn, mlp, adaln_modulation) to avoid false-positives on other
+        architectures that also use ``blocks`` in their paths.
         """
         state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        # Check for Kohya-style Anima LoRA keys
-        has_kohya_keys = state_dict_has_any_keys_starting_with(
-            state_dict,
-            {
-                "lora_unet_blocks_",
-            },
-        )
-
-        # Check for diffusers PEFT format with Cosmos DiT layer names
-        has_cosmos_dit_keys = state_dict_has_any_keys_starting_with(
-            state_dict,
-            {
-                "diffusion_model.blocks.",
-                "transformer.blocks.",
-                "base_model.model.transformer.blocks.",
-            },
-        )
+        has_cosmos_keys = has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys)
 
         # Also check for LoRA/LoKR weight suffixes
         has_lora_suffix = state_dict_has_any_keys_ending_with(
@@ -805,35 +805,21 @@ class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             },
         )
 
-        if (has_kohya_keys or has_cosmos_dit_keys) and has_lora_suffix:
+        if has_cosmos_keys and has_lora_suffix:
             return
 
         raise NotAMatchError("model does not match Anima LoRA heuristics")
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
-        """Anima LoRAs target Cosmos DiT blocks (blocks.X.cross_attn, blocks.X.self_attn, etc.)."""
+        """Anima LoRAs target Cosmos DiT blocks (blocks.X.cross_attn, blocks.X.self_attn, etc.).
+
+        Uses Cosmos DiT-specific subcomponent names to avoid false-positives.
+        """
         state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
 
-        # Kohya format: lora_unet_blocks_X_...
-        has_kohya_keys = state_dict_has_any_keys_starting_with(
-            state_dict,
-            {
-                "lora_unet_blocks_",
-            },
-        )
-
-        # Diffusers PEFT format with Cosmos DiT structure
-        has_cosmos_dit_keys = state_dict_has_any_keys_starting_with(
-            state_dict,
-            {
-                "diffusion_model.blocks.",
-                "transformer.blocks.",
-                "base_model.model.transformer.blocks.",
-            },
-        )
-
-        if has_kohya_keys or has_cosmos_dit_keys:
+        if has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys):
             return BaseModelType.Anima
 
         raise NotAMatchError("model does not look like an Anima LoRA")
