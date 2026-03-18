@@ -18,8 +18,8 @@ from invokeai.app.services.image_records.image_records_common import (
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 
 
 class SqliteImageRecordStorage(ImageRecordStorageBase):
