@@ -1420,6 +1420,46 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/virtual_boards/by_date": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Virtual Boards By Date
+         * @description Gets a list of virtual sub-boards grouped by date.
+         */
+        get: operations["list_virtual_boards_by_date"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/virtual_boards/by_date/{date}/image_names": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Virtual Board Image Names By Date
+         * @description Gets ordered image names for a specific date.
+         */
+        get: operations["list_virtual_board_image_names_by_date"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/model_relationships/i/{model_key}": {
         parameters: {
             query?: never;
@@ -27580,6 +27620,42 @@ export type components = {
             /** Error Type */
             type: string;
         };
+        /**
+         * VirtualSubBoardDTO
+         * @description A virtual sub-board computed from image metadata, not stored in the database.
+         */
+        VirtualSubBoardDTO: {
+            /**
+             * Virtual Board Id
+             * @description The virtual board ID, e.g. 'by_date:2026-03-18'.
+             */
+            virtual_board_id: string;
+            /**
+             * Board Name
+             * @description The display name of the virtual sub-board, e.g. '2026-03-18'.
+             */
+            board_name: string;
+            /**
+             * Date
+             * @description The ISO date string, e.g. '2026-03-18'.
+             */
+            date: string;
+            /**
+             * Image Count
+             * @description The number of general images for this date.
+             */
+            image_count: number;
+            /**
+             * Asset Count
+             * @description The number of asset images for this date.
+             */
+            asset_count: number;
+            /**
+             * Cover Image Name
+             * @description The most recent image name for this date.
+             */
+            cover_image_name?: string | null;
+        };
         /** Workflow */
         Workflow: {
             /**
@@ -31588,6 +31664,67 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RemoveImagesFromBoardResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_virtual_boards_by_date: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VirtualSubBoardDTO"][];
+                };
+            };
+        };
+    };
+    list_virtual_board_image_names_by_date: {
+        parameters: {
+            query?: {
+                /** @description Whether to sort starred images first */
+                starred_first?: boolean;
+                /** @description The sort direction */
+                order_dir?: components["schemas"]["SQLiteDirection"];
+                /** @description The categories of images to include */
+                categories?: components["schemas"]["ImageCategory"][] | null;
+                /** @description Search term to filter images */
+                search_term?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description The ISO date string, e.g. '2026-03-18' */
+                date: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageNamesResult"];
                 };
             };
             /** @description Validation Error */
