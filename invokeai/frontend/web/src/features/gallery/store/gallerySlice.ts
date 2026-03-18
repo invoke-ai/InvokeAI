@@ -209,6 +209,13 @@ export const gallerySliceConfig: SliceConfig<typeof slice> = {
       if (!('_version' in state)) {
         state._version = 1;
       }
+      // Add virtual boards fields if missing (added in virtual boards feature)
+      if (!('showVirtualBoards' in state)) {
+        state.showVirtualBoards = false;
+      }
+      if (!('virtualBoardsSectionOpen' in state)) {
+        state.virtualBoardsSectionOpen = true;
+      }
       return zGalleryState.parse(state);
     },
     persistDenylist: ['selection', 'galleryView', 'imageToCompare'],
