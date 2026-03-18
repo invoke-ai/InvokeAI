@@ -88,10 +88,12 @@ def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoke
     api_keys_path = get_config().api_keys_file_path
     file_config = load_and_migrate_config(config_path)
     assert file_config.external_openai_api_key is None
-    assert file_config.external_openai_base_url == "https://api.openai.test"
+    assert file_config.external_openai_base_url is None
     assert "external_openai_api_key" not in config_path.read_text()
+    assert "external_openai_base_url" not in config_path.read_text()
     api_keys = load_external_api_keys(api_keys_path)
     assert api_keys["external_openai_api_key"] == "openai-key"
+    assert api_keys["external_openai_base_url"] == "https://api.openai.test"
 
     response = client.delete("/api/v1/app/external_providers/config/openai")
     assert response.status_code == 200
@@ -105,6 +107,7 @@ def test_external_provider_config_update_and_reset(monkeypatch: Any, mock_invoke
     assert file_config.external_openai_base_url is None
     assert "external_openai_api_key" not in config_path.read_text()
     assert "external_openai_api_key" not in api_keys
+    assert "external_openai_base_url" not in api_keys
 
 
 def test_reset_external_provider_config_removes_provider_models(

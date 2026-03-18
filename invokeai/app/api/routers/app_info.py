@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.config.config_default import (
     DefaultInvokeAIAppConfig,
-    EXTERNAL_API_KEY_FIELDS,
+    EXTERNAL_PROVIDER_CONFIG_FIELDS,
     InvokeAIAppConfig,
     get_config,
     load_external_api_keys,
@@ -213,20 +213,20 @@ def _apply_external_provider_update(updates: dict[str, str | None]) -> None:
             file_config = DefaultInvokeAIAppConfig()
 
         runtime_config.update_config(updates)
-        key_fields = set(EXTERNAL_API_KEY_FIELDS)
-        key_updates = {field: value for field, value in updates.items() if field in key_fields}
-        non_key_updates = {field: value for field, value in updates.items() if field not in key_fields}
+        provider_config_fields = set(EXTERNAL_PROVIDER_CONFIG_FIELDS)
+        provider_updates = {field: value for field, value in updates.items() if field in provider_config_fields}
+        non_provider_updates = {field: value for field, value in updates.items() if field not in provider_config_fields}
 
-        if non_key_updates:
-            file_config.update_config(non_key_updates)
+        if non_provider_updates:
+            file_config.update_config(non_provider_updates)
 
         persisted_api_keys = load_external_api_keys(api_keys_file_path)
-        for field_name in EXTERNAL_API_KEY_FIELDS:
+        for field_name in EXTERNAL_PROVIDER_CONFIG_FIELDS:
             file_value = getattr(file_config, field_name, None)
             if field_name not in persisted_api_keys and isinstance(file_value, str) and file_value.strip():
                 persisted_api_keys[field_name] = file_value
 
-        for field_name, value in key_updates.items():
+        for field_name, value in provider_updates.items():
             if value is None:
                 persisted_api_keys.pop(field_name, None)
             else:
@@ -234,7 +234,7 @@ def _apply_external_provider_update(updates: dict[str, str | None]) -> None:
 
         _write_external_api_keys_file(api_keys_file_path, persisted_api_keys)
 
-        for field_name in EXTERNAL_API_KEY_FIELDS:
+        for field_name in EXTERNAL_PROVIDER_CONFIG_FIELDS:
             setattr(file_config, field_name, None)
 
         file_config_to_write = type(file_config).model_validate(

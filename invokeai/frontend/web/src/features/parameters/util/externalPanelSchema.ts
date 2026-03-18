@@ -22,10 +22,10 @@ const buildExternalPanelSchemaFromCapabilities = (
   ],
 });
 
-export const getExternalPanelSchema = (modelConfig: ExternalApiModelConfig): ExternalModelPanelSchema =>
+const getExternalPanelSchema = (modelConfig: ExternalApiModelConfig): ExternalModelPanelSchema =>
   modelConfig.panel_schema ?? buildExternalPanelSchemaFromCapabilities(modelConfig.capabilities);
 
-export const getExternalPanelControl = (
+const getExternalPanelControl = (
   modelConfig: ExternalApiModelConfig,
   panel: ExternalPanelName,
   controlName: ExternalPanelControlName

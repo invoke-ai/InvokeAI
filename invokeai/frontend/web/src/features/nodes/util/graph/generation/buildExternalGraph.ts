@@ -4,7 +4,6 @@ import { selectModelConfig, selectParamsSlice } from 'features/controlLayers/sto
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { type ModelIdentifierField, zImageField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import { hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
 import {
   getOriginalAndScaledSizesForOtherModes,
   getOriginalAndScaledSizesForTextToImage,
@@ -16,6 +15,7 @@ import {
   type GraphBuilderReturn,
   UnsupportedGenerationModeError,
 } from 'features/nodes/util/graph/types';
+import { hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
 import {
   type AnyInvocation,
   type AnyModelConfigWithExternal,
@@ -79,9 +79,15 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
   g.addNode(externalNode as AnyInvocation);
 
   if (seed) {
-    g.addEdge(seed, 'value', externalNode as AnyInvocation, 'seed');
+    g.addEdgeFromObj({
+      source: { node_id: seed.id, field: 'value' },
+      destination: { node_id: externalNode.id as string, field: 'seed' },
+    });
   }
-  g.addEdge(positivePrompt, 'value', externalNode as AnyInvocation, 'prompt');
+  g.addEdgeFromObj({
+    source: { node_id: positivePrompt.id, field: 'value' },
+    destination: { node_id: externalNode.id as string, field: 'prompt' },
+  });
 
   if (supportsReferenceImages) {
     const referenceImages = refImages.entities

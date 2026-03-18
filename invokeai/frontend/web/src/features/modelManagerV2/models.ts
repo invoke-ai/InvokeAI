@@ -138,7 +138,7 @@ export const MODEL_CATEGORIES_AS_LIST = objectEntries(MODEL_CATEGORIES).map(([ca
 /**
  * Mapping of model base to its color
  */
-export const MODEL_BASE_TO_COLOR: Record<BaseModelType | 'external', string> = {
+export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   any: 'base',
   'sd-1': 'green',
   'sd-2': 'teal',
@@ -156,7 +156,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType | 'external', string> = {
 /**
  * Mapping of model type to human readable name
  */
-export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType | 'external_image_generator', string> = {
+export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   main: 'Main',
   vae: 'VAE',
   lora: 'LoRA',
@@ -181,7 +181,7 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType | 'external_image_generat
 /**
  * Mapping of model base to human readable name
  */
-export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType | 'external', string> = {
+export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   any: 'Any',
   'sd-1': 'Stable Diffusion 1.x',
   'sd-2': 'Stable Diffusion 2.x',
@@ -199,7 +199,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType | 'external', string>
 /**
  * Mapping of model base to short human readable name
  */
-export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType | 'external', string> = {
+export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   any: 'Any',
   'sd-1': 'SD1.X',
   'sd-2': 'SD2.X',
@@ -232,7 +232,7 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   qwen3_8b: 'Qwen3 8B',
 };
 
-export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat | 'external_api', string> = {
+export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   omi: 'OMI',
   diffusers: 'Diffusers',
   checkpoint: 'Checkpoint',

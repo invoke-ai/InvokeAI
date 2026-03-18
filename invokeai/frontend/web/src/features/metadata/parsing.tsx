@@ -1009,7 +1009,8 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
           const key = getProperty(rawItem, 'lora.key');
           assert(isString(key));
           // No need to catch here - if this throws, we move on to the next item
-          identifier = await getModelIdentiferFromKey(key, store);
+          const modelConfig = await getModelIdentiferFromKey(key, store);
+          identifier = zModelIdentifierField.parse(modelConfig);
         }
 
         assert(identifier.type === 'lora');

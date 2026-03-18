@@ -437,7 +437,7 @@ const PickerOptionComponent = typedMemo(
 );
 PickerOptionComponent.displayName = 'PickerItemComponent';
 
-const BASE_KEYWORDS: { [key in BaseModelType | 'external']?: string[] } = {
+const BASE_KEYWORDS: { [key in BaseModelType]?: string[] } = {
   'sd-1': ['sd1', 'sd1.4', 'sd1.5', 'sd-1'],
   'sd-2': ['sd2', 'sd2.0', 'sd2.1', 'sd-2'],
   'sd-3': ['sd3', 'sd3.0', 'sd3.5', 'sd-3'],

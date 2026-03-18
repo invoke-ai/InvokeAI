@@ -3,10 +3,10 @@ import type { ModelFormat } from 'features/nodes/types/common';
 import { memo } from 'react';
 
 type Props = {
-  format: ModelFormat | 'external_api';
+  format: ModelFormat;
 };
 
-const FORMAT_NAME_MAP: Record<ModelFormat | 'external_api', string> = {
+const FORMAT_NAME_MAP: Record<ModelFormat, string> = {
   diffusers: 'diffusers',
   lycoris: 'lycoris',
   checkpoint: 'checkpoint',
@@ -25,7 +25,7 @@ const FORMAT_NAME_MAP: Record<ModelFormat | 'external_api', string> = {
   onnx: 'onnx',
 };
 
-const FORMAT_COLOR_MAP: Record<ModelFormat | 'external_api', string> = {
+const FORMAT_COLOR_MAP: Record<ModelFormat, string> = {
   diffusers: 'base',
   omi: 'base',
   lycoris: 'base',

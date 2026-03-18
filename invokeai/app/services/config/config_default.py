@@ -31,7 +31,12 @@ ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
 CONFIG_SCHEMA_VERSION = "4.0.2"
-EXTERNAL_API_KEY_FIELDS = ("external_gemini_api_key", "external_openai_api_key")
+EXTERNAL_PROVIDER_CONFIG_FIELDS = (
+    "external_gemini_api_key",
+    "external_openai_api_key",
+    "external_gemini_base_url",
+    "external_openai_base_url",
+)
 
 
 class URLRegexTokenPair(BaseModel):
@@ -526,7 +531,7 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
 
 
 def load_external_api_keys(api_keys_file_path: Path) -> dict[str, str]:
-    """Load external provider API keys from a dedicated YAML file."""
+    """Load external provider config (API keys and base URLs) from a dedicated YAML file."""
     if not api_keys_file_path.exists():
         return {}
 
@@ -540,7 +545,7 @@ def load_external_api_keys(api_keys_file_path: Path) -> dict[str, str]:
         raise RuntimeError(f"Failed to load api keys file {api_keys_file_path}: expected a mapping")
 
     parsed_api_keys: dict[str, str] = {}
-    for field_name in EXTERNAL_API_KEY_FIELDS:
+    for field_name in EXTERNAL_PROVIDER_CONFIG_FIELDS:
         value = loaded_api_keys.get(field_name)
         if value is None:
             continue

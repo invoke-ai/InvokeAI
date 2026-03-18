@@ -16,7 +16,7 @@ import { setSelectedModelMode } from 'features/modelManagerV2/store/modelManager
 import { ModelHeader } from 'features/modelManagerV2/subpanels/ModelPanel/ModelHeader';
 import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
-import { type SubmitHandler, useForm, useWatch } from 'react-hook-form';
+import { type Control, type SubmitHandler, useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { PiCheckBold, PiXBold } from 'react-icons/pi';
 import { type UpdateModelArg, useUpdateModelMutation } from 'services/api/endpoints/models';
@@ -181,19 +181,19 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
             <SimpleGrid columns={2} gap={4}>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.modelType')}</FormLabel>
-                <ModelTypeSelect control={form.control} />
+                <ModelTypeSelect control={form.control as unknown as Control<UpdateModelBody>} />
               </FormControl>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.modelFormat')}</FormLabel>
-                <ModelFormatSelect control={form.control} />
+                <ModelFormatSelect control={form.control as unknown as Control<UpdateModelBody>} />
               </FormControl>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.baseModel')}</FormLabel>
-                <BaseModelSelect control={form.control} />
+                <BaseModelSelect control={form.control as unknown as Control<UpdateModelBody>} />
               </FormControl>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.variant')}</FormLabel>
-                <ModelVariantSelect control={form.control} />
+                <ModelVariantSelect control={form.control as unknown as Control<UpdateModelBody>} />
               </FormControl>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.pathToConfig')}</FormLabel>
@@ -201,7 +201,7 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
               </FormControl>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.predictionType')}</FormLabel>
-                <PredictionTypeSelect control={form.control} />
+                <PredictionTypeSelect control={form.control as unknown as Control<UpdateModelBody>} />
               </FormControl>
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.upcastAttention')}</FormLabel>
