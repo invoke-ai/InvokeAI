@@ -64,6 +64,7 @@ def _build_request(
         num_images=1,
         width=256,
         height=256,
+        image_size=None,
         steps=20,
         guidance=5.5,
         init_image=init_image,

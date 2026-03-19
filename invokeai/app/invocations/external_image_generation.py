@@ -39,6 +39,7 @@ class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBo
     num_images: int = InputField(default=1, gt=0, description="Number of images to generate")
     width: int = InputField(default=1024, gt=0, description=FieldDescriptions.width)
     height: int = InputField(default=1024, gt=0, description=FieldDescriptions.height)
+    image_size: str | None = InputField(default=None, description="Image size preset (e.g. 1K, 2K, 4K)")
     steps: int | None = InputField(default=None, gt=0, description=FieldDescriptions.steps)
     guidance: float | None = InputField(default=None, ge=0, description="Guidance strength")
     init_image: ImageField | None = InputField(default=None, description="Init image for img2img/inpaint")
@@ -91,6 +92,7 @@ class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBo
             num_images=self.num_images,
             width=self.width,
             height=self.height,
+            image_size=self.image_size,
             steps=self.steps,
             guidance=self.guidance,
             init_image=init_image,

@@ -757,6 +757,7 @@ export const zParamsState = z.object({
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
   zImageSeedVarianceRandomizePercent: z.number().min(1).max(100),
+  imageSize: z.string().nullable().default(null),
   dimensions: zDimensionsState,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
@@ -820,6 +821,7 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,
+  imageSize: null,
   dimensions: {
     width: 512,
     height: 512,

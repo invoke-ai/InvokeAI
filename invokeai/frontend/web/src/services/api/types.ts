@@ -131,6 +131,14 @@ export type ExternalImageSize = {
   height: number;
 };
 
+type ExternalResolutionPreset = {
+  label: string;
+  aspect_ratio: string;
+  image_size: string;
+  width: number;
+  height: number;
+};
+
 export type ExternalModelCapabilities = {
   modes: ('txt2img' | 'img2img' | 'inpaint')[];
   supports_reference_images?: boolean;
@@ -141,6 +149,8 @@ export type ExternalModelCapabilities = {
   max_images_per_request?: number | null;
   max_image_size?: ExternalImageSize | null;
   allowed_aspect_ratios?: string[] | null;
+  aspect_ratio_sizes?: Record<string, ExternalImageSize> | null;
+  resolution_presets?: ExternalResolutionPreset[] | null;
   max_reference_images?: number | null;
   mask_format?: 'alpha' | 'binary' | 'none';
   input_image_required_for?: ('txt2img' | 'img2img' | 'inpaint')[] | null;

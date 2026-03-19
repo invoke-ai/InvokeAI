@@ -74,6 +74,7 @@ def _build_request(
         num_images=num_images,
         width=width,
         height=height,
+        image_size=None,
         steps=10,
         guidance=guidance,
         init_image=init_image,

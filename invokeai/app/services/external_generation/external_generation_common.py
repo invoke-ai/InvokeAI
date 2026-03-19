@@ -25,6 +25,7 @@ class ExternalGenerationRequest:
     num_images: int
     width: int
     height: int
+    image_size: str | None
     steps: int | None
     guidance: float | None
     init_image: PILImageType | None

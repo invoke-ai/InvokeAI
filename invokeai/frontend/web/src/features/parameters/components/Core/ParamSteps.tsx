@@ -1,8 +1,8 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectSteps, setSteps } from 'features/controlLayers/store/paramsSlice';
-import { memo, useCallback } from 'react';
+import { selectSteps, selectStepsControl, setSteps } from 'features/controlLayers/store/paramsSlice';
+import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const CONSTRAINTS = {
@@ -19,6 +19,7 @@ export const MARKS = [CONSTRAINTS.sliderMin, Math.floor(CONSTRAINTS.sliderMax / 
 
 const ParamSteps = () => {
   const steps = useAppSelector(selectSteps);
+  const externalControl = useAppSelector(selectStepsControl);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const onChange = useCallback(
@@ -26,6 +27,17 @@ const ParamSteps = () => {
       dispatch(setSteps(v));
     },
     [dispatch]
+  );
+
+  const sliderMin = externalControl?.slider_min ?? CONSTRAINTS.sliderMin;
+  const sliderMax = externalControl?.slider_max ?? CONSTRAINTS.sliderMax;
+  const numberInputMin = externalControl?.number_input_min ?? CONSTRAINTS.numberInputMin;
+  const numberInputMax = externalControl?.number_input_max ?? CONSTRAINTS.numberInputMax;
+  const fineStep = externalControl?.fine_step ?? CONSTRAINTS.fineStep;
+  const coarseStep = externalControl?.coarse_step ?? CONSTRAINTS.coarseStep;
+  const marks = useMemo(
+    () => externalControl?.marks ?? [sliderMin, Math.floor(sliderMax / 2), sliderMax],
+    [externalControl?.marks, sliderMin, sliderMax]
   );
 
   return (
@@ -36,20 +48,20 @@ const ParamSteps = () => {
       <CompositeSlider
         value={steps}
         defaultValue={CONSTRAINTS.initial}
-        min={CONSTRAINTS.sliderMin}
-        max={CONSTRAINTS.sliderMax}
-        step={CONSTRAINTS.coarseStep}
-        fineStep={CONSTRAINTS.fineStep}
+        min={sliderMin}
+        max={sliderMax}
+        step={coarseStep}
+        fineStep={fineStep}
         onChange={onChange}
-        marks={MARKS}
+        marks={marks}
       />
       <CompositeNumberInput
         value={steps}
         defaultValue={CONSTRAINTS.initial}
-        min={CONSTRAINTS.numberInputMin}
-        max={CONSTRAINTS.numberInputMax}
-        step={CONSTRAINTS.coarseStep}
-        fineStep={CONSTRAINTS.fineStep}
+        min={numberInputMin}
+        max={numberInputMax}
+        step={coarseStep}
+        fineStep={fineStep}
         onChange={onChange}
       />
     </FormControl>

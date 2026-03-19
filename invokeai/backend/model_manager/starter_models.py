@@ -7,6 +7,7 @@ from invokeai.backend.model_manager.configs.external_api import (
     ExternalImageSize,
     ExternalModelCapabilities,
     ExternalModelPanelSchema,
+    ExternalResolutionPreset,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
@@ -890,6 +891,45 @@ GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS = [
 ]
 GEMINI_3_IMAGE_MAX_SIZE = ExternalImageSize(width=4096, height=4096)
 
+
+def _gemini_3_resolution_presets(
+    image_sizes: list[str],
+    aspect_ratios: list[str] | None = None,
+) -> list[ExternalResolutionPreset]:
+    """Build resolution presets for Gemini 3 models.
+
+    Each preset combines an aspect ratio with an image size preset (512/1K/2K/4K).
+    Pixel dimensions are approximations based on the preset name (longest side).
+    """
+    if aspect_ratios is None:
+        aspect_ratios = GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS
+    base_pixels = {"512": 512, "1K": 1024, "2K": 2048, "4K": 4096}
+    presets: list[ExternalResolutionPreset] = []
+    for image_size in image_sizes:
+        base = base_pixels[image_size]
+        for ratio_str in aspect_ratios:
+            w_part, h_part = (int(x) for x in ratio_str.split(":"))
+            if w_part >= h_part:
+                w = base
+                h = max(1, round(base * h_part / w_part))
+            else:
+                h = base
+                w = max(1, round(base * w_part / h_part))
+            presets.append(
+                ExternalResolutionPreset(
+                    label=f"{ratio_str} ({image_size}) — {w}\u00d7{h}",
+                    aspect_ratio=ratio_str,
+                    image_size=image_size,
+                    width=w,
+                    height=h,
+                )
+            )
+    return presets
+
+
+GEMINI_3_PRO_RESOLUTION_PRESETS = _gemini_3_resolution_presets(["1K", "2K", "4K"])
+GEMINI_3_1_FLASH_RESOLUTION_PRESETS = _gemini_3_resolution_presets(["512", "1K", "2K", "4K"])
+
 gemini_flash_image = StarterModel(
     name="Gemini 2.5 Flash Image",
     base=BaseModelType.External,
@@ -936,7 +976,7 @@ gemini_pro_image_preview = StarterModel(
     name="Gemini 3 Pro Image Preview",
     base=BaseModelType.External,
     source="external://gemini/gemini-3-pro-image-preview",
-    description="Google Gemini 3 Pro image generation preview model (external API). Supports up to 14 reference images, including up to 6 object references and up to 5 character references. Supports 512/1K/2K/4K resolution presets. Requires a configured Gemini API key and may incur provider usage costs.",
+    description="Google Gemini 3 Pro image generation preview model (external API). Supports up to 14 reference images, including up to 6 object references and up to 5 character references. Supports 1K/2K/4K resolution presets. Requires a configured Gemini API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
@@ -949,6 +989,7 @@ gemini_pro_image_preview = StarterModel(
         max_images_per_request=1,
         max_image_size=GEMINI_3_IMAGE_MAX_SIZE,
         allowed_aspect_ratios=GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS,
+        resolution_presets=GEMINI_3_PRO_RESOLUTION_PRESETS,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
@@ -970,6 +1011,7 @@ gemini_3_1_flash_image_preview = StarterModel(
         max_images_per_request=1,
         max_image_size=GEMINI_3_IMAGE_MAX_SIZE,
         allowed_aspect_ratios=GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS,
+        resolution_presets=GEMINI_3_1_FLASH_RESOLUTION_PRESETS,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),

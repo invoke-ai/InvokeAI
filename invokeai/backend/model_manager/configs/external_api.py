@@ -19,6 +19,16 @@ class ExternalImageSize(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ExternalResolutionPreset(BaseModel):
+    label: str = Field(min_length=1, description="Display label, e.g. '1:1 (1K)'")
+    aspect_ratio: str = Field(min_length=1, description="Aspect ratio string, e.g. '1:1'")
+    image_size: str = Field(min_length=1, description="Image size preset, e.g. '1K'")
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ExternalModelCapabilities(BaseModel):
     modes: list[ExternalGenerationMode] = Field(default_factory=lambda: ["txt2img"])
     supports_reference_images: bool = Field(default=False)
@@ -30,6 +40,7 @@ class ExternalModelCapabilities(BaseModel):
     max_image_size: ExternalImageSize | None = Field(default=None)
     allowed_aspect_ratios: list[str] | None = Field(default=None)
     aspect_ratio_sizes: dict[str, ExternalImageSize] | None = Field(default=None)
+    resolution_presets: list[ExternalResolutionPreset] | None = Field(default=None)
     max_reference_images: int | None = Field(default=None, gt=0)
     mask_format: ExternalMaskFormat = Field(default="none")
     input_image_required_for: list[ExternalGenerationMode] | None = Field(default=None)

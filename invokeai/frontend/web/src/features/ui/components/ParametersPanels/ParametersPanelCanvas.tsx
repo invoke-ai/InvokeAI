@@ -6,6 +6,7 @@ import { selectIsCogView4, selectIsExternal, selectIsSDXL } from 'features/contr
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { CompositingSettingsAccordion } from 'features/settingsAccordions/components/CompositingSettingsAccordion/CompositingSettingsAccordion';
+import { ExternalSettingsAccordion } from 'features/settingsAccordions/components/ExternalSettingsAccordion/ExternalSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
 import { CanvasTabImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/CanvasTabImageSettingsAccordion';
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
@@ -47,6 +48,7 @@ export const ParametersPanelCanvas = memo(() => {
               {!isExternal && <CompositingSettingsAccordion />}
               {isSDXL && <RefinerSettingsAccordion />}
               {!isCogview4 && !isExternal && <AdvancedSettingsAccordion />}
+              {isExternal && <ExternalSettingsAccordion />}
             </Flex>
           </OverlayScrollbarsComponent>
         </Box>

@@ -74,6 +74,7 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
     negative_prompt: supportsNegativePrompt ? prompts.negative : null,
     steps: supportsSteps ? params.steps : null,
     guidance: supportsGuidance ? params.guidance : null,
+    image_size: params.imageSize ?? null,
     num_images: 1,
   };
   g.addNode(externalNode as AnyInvocation);

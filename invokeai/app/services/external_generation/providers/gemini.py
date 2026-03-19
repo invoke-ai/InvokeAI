@@ -73,6 +73,15 @@ class GeminiProvider(ExternalProvider):
             request.height,
             request.model.capabilities.allowed_aspect_ratios,
         )
+        uses_image_config = request.model.capabilities.resolution_presets is not None
+        if uses_image_config:
+            image_config: dict[str, str] = {}
+            if aspect_ratio is not None:
+                image_config["aspectRatio"] = aspect_ratio
+            if request.image_size is not None:
+                image_config["imageSize"] = request.image_size
+            if image_config:
+                generation_config["imageConfig"] = image_config
         system_instruction = self._SYSTEM_INSTRUCTION
         if request.init_image is not None:
             system_instruction = (
@@ -80,7 +89,7 @@ class GeminiProvider(ExternalProvider):
                 "Treat the prompt as an edit instruction and modify the image accordingly. "
                 "Do not return the original image unchanged."
             )
-        if aspect_ratio is not None:
+        if not uses_image_config and aspect_ratio is not None:
             system_instruction = f"{system_instruction} Use an aspect ratio of {aspect_ratio}."
 
         payload: dict[str, object] = {

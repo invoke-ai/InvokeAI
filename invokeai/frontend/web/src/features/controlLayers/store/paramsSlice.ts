@@ -42,7 +42,7 @@ import type {
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
+import { getExternalPanelControl, hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type { AnyModelConfigWithExternal } from 'services/api/types';
@@ -366,21 +366,30 @@ const slice = createSlice({
     aspectRatioLockToggled: (state) => {
       state.dimensions.aspectRatio.isLocked = !state.dimensions.aspectRatio.isLocked;
     },
-    aspectRatioIdChanged: (state, action: PayloadAction<{ id: AspectRatioID }>) => {
-      const { id } = action.payload;
+    aspectRatioIdChanged: (
+      state,
+      action: PayloadAction<{ id: AspectRatioID; fixedSize?: { width: number; height: number } }>
+    ) => {
+      const { id, fixedSize } = action.payload;
       state.dimensions.aspectRatio.id = id;
       if (id === 'Free') {
         state.dimensions.aspectRatio.isLocked = false;
       } else {
         state.dimensions.aspectRatio.isLocked = true;
-        state.dimensions.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
-        const { width, height } = calculateNewSize(
-          state.dimensions.aspectRatio.value,
-          state.dimensions.width * state.dimensions.height,
-          state.model?.base as BaseModelType | undefined
-        );
-        state.dimensions.width = width;
-        state.dimensions.height = height;
+        if (fixedSize) {
+          state.dimensions.aspectRatio.value = fixedSize.width / fixedSize.height;
+          state.dimensions.width = fixedSize.width;
+          state.dimensions.height = fixedSize.height;
+        } else {
+          state.dimensions.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
+          const { width, height } = calculateNewSize(
+            state.dimensions.aspectRatio.value,
+            state.dimensions.width * state.dimensions.height,
+            state.model?.base as BaseModelType | undefined
+          );
+          state.dimensions.width = width;
+          state.dimensions.height = height;
+        }
       }
     },
     dimensionsSwapped: (state) => {
@@ -435,6 +444,21 @@ const slice = createSlice({
         state.dimensions.width = bboxDims.width;
         state.dimensions.height = bboxDims.height;
       }
+    },
+    imageSizeChanged: (state, action: PayloadAction<string | null>) => {
+      state.imageSize = action.payload;
+    },
+    resolutionPresetSelected: (
+      state,
+      action: PayloadAction<{ imageSize: string; aspectRatio: string; width: number; height: number }>
+    ) => {
+      const { imageSize, aspectRatio, width, height } = action.payload;
+      state.imageSize = imageSize;
+      state.dimensions.width = width;
+      state.dimensions.height = height;
+      state.dimensions.aspectRatio.id = aspectRatio as AspectRatioID;
+      state.dimensions.aspectRatio.value = width / height;
+      state.dimensions.aspectRatio.isLocked = true;
     },
     paramsReset: (state) => resetState(state),
   },
@@ -567,6 +591,7 @@ export const {
   sizeOptimized,
   syncedToOptimalDimension,
 
+  resolutionPresetSelected,
   paramsReset,
 } = slice.actions;
 
@@ -737,6 +762,24 @@ export const selectModelSupportsDimensions = createSelector(selectModel, selectM
   }
   return true;
 });
+export const selectStepsControl = createSelector(selectModelConfig, (modelConfig) => {
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return getExternalPanelControl(modelConfig, 'generation', 'steps');
+  }
+  return null;
+});
+export const selectGuidanceControl = createSelector(selectModelConfig, (modelConfig) => {
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return getExternalPanelControl(modelConfig, 'generation', 'guidance');
+  }
+  return null;
+});
+export const selectSeedControl = createSelector(selectModelConfig, (modelConfig) => {
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return getExternalPanelControl(modelConfig, 'image', 'seed');
+  }
+  return null;
+});
 export const selectScheduler = createParamsSelector((params) => params.scheduler);
 export const selectFluxScheduler = createParamsSelector((params) => params.fluxScheduler);
 export const selectFluxDypePreset = createParamsSelector((params) => params.fluxDypePreset);
@@ -786,6 +829,24 @@ export const selectAllowedAspectRatioIDs = createSelector(selectModelConfig, (mo
   const allowed = modelConfig.capabilities.allowed_aspect_ratios;
   return allowed?.length ? allowed : null;
 });
+export const selectAspectRatioSizes = createSelector(selectModelConfig, (modelConfig) => {
+  if (!modelConfig || !isExternalApiModelConfig(modelConfig)) {
+    return null;
+  }
+  return modelConfig.capabilities.aspect_ratio_sizes ?? null;
+});
+export const selectResolutionPresets = createSelector(selectModelConfig, (modelConfig) => {
+  if (!modelConfig || !isExternalApiModelConfig(modelConfig)) {
+    return null;
+  }
+  return modelConfig.capabilities.resolution_presets ?? null;
+});
+export const selectHasFixedDimensionSizes = createSelector(
+  selectAspectRatioSizes,
+  selectResolutionPresets,
+  (sizes, presets) => sizes !== null || (presets !== null && presets.length > 0)
+);
+export const selectImageSize = createParamsSelector((params) => params.imageSize);
 
 export const selectMainModelConfig = createSelector(selectModelConfig, (modelConfig) => {
   if (!modelConfig) {
