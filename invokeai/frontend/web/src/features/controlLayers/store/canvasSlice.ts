@@ -1710,6 +1710,17 @@ const slice = createSlice({
       state.regionalGuidance.entities = regionalGuidance;
       return state;
     },
+    canvasSnapshotRestored: (state, action: PayloadAction<CanvasState>) => {
+      const snapshot = action.payload;
+      state.controlLayers = snapshot.controlLayers;
+      state.inpaintMasks = snapshot.inpaintMasks;
+      state.rasterLayers = snapshot.rasterLayers;
+      state.regionalGuidance = snapshot.regionalGuidance;
+      state.bbox = snapshot.bbox;
+      state.selectedEntityIdentifier = snapshot.selectedEntityIdentifier;
+      state.bookmarkedEntityIdentifier = snapshot.bookmarkedEntityIdentifier;
+      return state;
+    },
     canvasUndo: () => {},
     canvasRedo: () => {},
     canvasClearHistory: () => {},
@@ -1768,6 +1779,7 @@ const resetState = (state: CanvasState) => {
 
 export const {
   canvasMetadataRecalled,
+  canvasSnapshotRestored,
   canvasUndo,
   canvasRedo,
   canvasClearHistory,

@@ -2898,6 +2898,20 @@
             "off": "Off",
             "switchOnStart": "On Start",
             "switchOnFinish": "On Finish"
+        },
+        "snapshot": {
+            "snapshots": "Save or Load Canvas Snapshot",
+            "saveSnapshot": "Save Snapshot",
+            "restoreSnapshot": "Restore Snapshot",
+            "snapshotNamePlaceholder": "Snapshot name",
+            "save": "Save",
+            "delete": "Delete",
+            "snapshotSaved": "Snapshot \"{{name}}\" saved",
+            "snapshotRestored": "Snapshot \"{{name}}\" restored",
+            "snapshotDeleted": "Snapshot \"{{name}}\" deleted",
+            "snapshotSaveFailed": "Failed to save snapshot",
+            "snapshotRestoreFailed": "Failed to restore snapshot",
+            "snapshotDeleteFailed": "Failed to delete snapshot"
         }
     },
     "upscaling": {

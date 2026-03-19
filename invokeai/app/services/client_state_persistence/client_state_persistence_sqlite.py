@@ -44,6 +44,28 @@ class ClientStatePersistenceSqlite(ClientStatePersistenceABC):
                 return None
             return row[0]
 
+    def get_keys_by_prefix(self, user_id: str, prefix: str) -> list[str]:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """
+                SELECT key FROM client_state
+                WHERE user_id = ? AND key LIKE ?
+                ORDER BY rowid DESC
+                """,
+                (user_id, f"{prefix}%"),
+            )
+            return [row[0] for row in cursor.fetchall()]
+
+    def delete_by_key(self, user_id: str, key: str) -> None:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """
+                DELETE FROM client_state
+                WHERE user_id = ? AND key = ?
+                """,
+                (user_id, key),
+            )
+
     def delete(self, user_id: str) -> None:
         with self._db.transaction() as cursor:
             cursor.execute(
