@@ -27,7 +27,6 @@ def _build_model() -> ExternalApiModelConfig:
         capabilities=ExternalModelCapabilities(
             modes=["txt2img"],
             supports_reference_images=True,
-            supports_negative_prompt=True,
             supports_seed=True,
         ),
     )
@@ -57,45 +56,20 @@ def test_external_invocation_builds_request_and_outputs() -> None:
         model=model_field,
         mode="txt2img",
         prompt="A prompt",
-        negative_prompt="bad",
         seed=123,
         num_images=1,
         width=512,
         height=512,
-        steps=10,
-        guidance=4.5,
         reference_images=[ImageField(image_name="ref.png")],
-        reference_image_weights=[0.6],
     )
 
     output = invocation.invoke(context)
 
     request = context._services.external_generation.generate.call_args[0][0]
     assert request.prompt == "A prompt"
-    assert request.negative_prompt == "bad"
     assert request.seed == 123
     assert len(request.reference_images) == 1
-    assert request.reference_images[0].weight == 0.6
     assert output.collection[0].image_name == "result.png"
-
-
-def test_external_invocation_rejects_mismatched_reference_weights() -> None:
-    model_config = _build_model()
-    model_field = ModelIdentifierField.from_config(model_config)
-    generated_image = Image.new("RGB", (16, 16), color="black")
-    context = _build_context(model_config, generated_image)
-
-    invocation = ExternalImageGenerationInvocation(
-        id="external_node",
-        model=model_field,
-        mode="txt2img",
-        prompt="A prompt",
-        reference_images=[ImageField(image_name="ref.png")],
-        reference_image_weights=[0.1, 0.2],
-    )
-
-    with pytest.raises(ValueError, match="reference_image_weights"):
-        invocation.invoke(context)
 
 
 def test_provider_specific_external_invocation_rejects_wrong_provider() -> None:

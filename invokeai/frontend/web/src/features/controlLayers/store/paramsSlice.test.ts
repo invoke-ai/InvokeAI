@@ -30,7 +30,7 @@ const createExternalConfig = (
   panelSchema?: ExternalModelPanelSchema
 ): ExternalApiModelConfig => {
   const maxImageSize: ExternalImageSize = { width: 1024, height: 1024 };
-  const defaultSettings: ExternalApiModelDefaultSettings = { width: 1024, height: 1024, steps: 30 };
+  const defaultSettings: ExternalApiModelDefaultSettings = { width: 1024, height: 1024 };
 
   return {
     key: 'external-test',
@@ -57,21 +57,19 @@ const createExternalConfig = (
 };
 
 describe('paramsSlice selectors for external models', () => {
-  it('uses external capabilities for negative prompt support', () => {
+  it('returns false for negative prompt support on external models', () => {
     const config = createExternalConfig({
       modes: ['txt2img'],
-      supports_negative_prompt: true,
       supports_reference_images: false,
     });
     const model = buildExternalModelIdentifier(config);
 
-    expect(selectModelSupportsNegativePrompt.resultFunc(model, config)).toBe(true);
+    expect(selectModelSupportsNegativePrompt.resultFunc(model)).toBe(false);
   });
 
   it('uses external capabilities for ref image support', () => {
     const config = createExternalConfig({
       modes: ['txt2img'],
-      supports_negative_prompt: false,
       supports_reference_images: false,
     });
     const model = buildExternalModelIdentifier(config);
@@ -79,22 +77,19 @@ describe('paramsSlice selectors for external models', () => {
     expect(selectModelSupportsRefImages.resultFunc(model, config)).toBe(false);
   });
 
-  it('uses external capabilities for guidance support', () => {
+  it('returns false for guidance support on external models', () => {
     const config = createExternalConfig({
       modes: ['txt2img'],
-      supports_negative_prompt: true,
       supports_reference_images: false,
-      supports_guidance: true,
     });
     const model = buildExternalModelIdentifier(config);
 
-    expect(selectModelSupportsGuidance.resultFunc(model, config)).toBe(true);
+    expect(selectModelSupportsGuidance.resultFunc(model)).toBe(false);
   });
 
   it('uses external capabilities for seed support', () => {
     const config = createExternalConfig({
       modes: ['txt2img'],
-      supports_negative_prompt: true,
       supports_reference_images: false,
       supports_seed: false,
     });
@@ -103,27 +98,22 @@ describe('paramsSlice selectors for external models', () => {
     expect(selectModelSupportsSeed.resultFunc(model, config)).toBe(false);
   });
 
-  it('uses external capabilities for steps support', () => {
+  it('returns false for steps support on external models', () => {
     const config = createExternalConfig({
       modes: ['txt2img'],
-      supports_negative_prompt: true,
       supports_reference_images: false,
-      supports_steps: false,
     });
     const model = buildExternalModelIdentifier(config);
 
-    expect(selectModelSupportsSteps.resultFunc(model, config)).toBe(false);
+    expect(selectModelSupportsSteps.resultFunc(model)).toBe(false);
   });
 
   it('prefers panel schema over capabilities for control visibility', () => {
     const config = createExternalConfig(
       {
         modes: ['txt2img'],
-        supports_negative_prompt: true,
         supports_reference_images: true,
-        supports_guidance: true,
         supports_seed: true,
-        supports_steps: true,
       },
       {
         prompts: [{ name: 'reference_images' }],
@@ -133,11 +123,11 @@ describe('paramsSlice selectors for external models', () => {
     );
     const model = buildExternalModelIdentifier(config);
 
-    expect(selectModelSupportsNegativePrompt.resultFunc(model, config)).toBe(false);
+    expect(selectModelSupportsNegativePrompt.resultFunc(model)).toBe(false);
     expect(selectModelSupportsRefImages.resultFunc(model, config)).toBe(true);
-    expect(selectModelSupportsGuidance.resultFunc(model, config)).toBe(false);
+    expect(selectModelSupportsGuidance.resultFunc(model)).toBe(false);
     expect(selectModelSupportsSeed.resultFunc(model, config)).toBe(false);
-    expect(selectModelSupportsSteps.resultFunc(model, config)).toBe(false);
+    expect(selectModelSupportsSteps.resultFunc(model)).toBe(false);
     expect(selectModelSupportsDimensions.resultFunc(model, config)).toBe(true);
   });
 });

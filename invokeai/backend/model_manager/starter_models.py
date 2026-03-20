@@ -939,9 +939,9 @@ gemini_flash_image = StarterModel(
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
         modes=["txt2img", "img2img", "inpaint"],
-        supports_negative_prompt=True,
+
         supports_seed=True,
-        supports_guidance=True,
+
         supports_reference_images=True,
         max_images_per_request=1,
         allowed_aspect_ratios=[
@@ -981,9 +981,9 @@ gemini_pro_image_preview = StarterModel(
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
         modes=["txt2img", "img2img", "inpaint"],
-        supports_negative_prompt=True,
+
         supports_seed=True,
-        supports_guidance=True,
+
         supports_reference_images=True,
         max_reference_images=14,
         max_images_per_request=1,
@@ -1003,9 +1003,9 @@ gemini_3_1_flash_image_preview = StarterModel(
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
         modes=["txt2img", "img2img", "inpaint"],
-        supports_negative_prompt=True,
+
         supports_seed=True,
-        supports_guidance=True,
+
         supports_reference_images=True,
         max_reference_images=14,
         max_images_per_request=1,
@@ -1016,23 +1016,104 @@ gemini_3_1_flash_image_preview = StarterModel(
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
 )
-openai_gpt_image_1 = StarterModel(
-    name="ChatGPT Image",
+OPENAI_GPT_IMAGE_ASPECT_RATIOS = ["1:1", "3:2", "2:3"]
+OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES = {
+    "1:1": ExternalImageSize(width=1024, height=1024),
+    "3:2": ExternalImageSize(width=1536, height=1024),
+    "2:3": ExternalImageSize(width=1024, height=1536),
+}
+OPENAI_GPT_IMAGE_PANEL_SCHEMA = ExternalModelPanelSchema(
+    prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]
+)
+
+openai_gpt_image_1_5 = StarterModel(
+    name="GPT Image 1.5",
     base=BaseModelType.External,
-    source="external://openai/gpt-image-1",
-    description="OpenAI GPT-Image-1 image generation model (external API). Requires a configured OpenAI API key and may incur provider usage costs.",
+    source="external://openai/gpt-image-1.5",
+    description="OpenAI GPT-Image-1.5 image generation model. Fastest and most affordable GPT image model. Requires a configured OpenAI API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
         modes=["txt2img", "img2img", "inpaint"],
-        supports_negative_prompt=True,
-        supports_seed=True,
-        supports_guidance=True,
         supports_reference_images=True,
-        max_images_per_request=1,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
-    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_gpt_image_1 = StarterModel(
+    name="GPT Image 1",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1",
+    description="OpenAI GPT-Image-1 image generation model. High quality image generation. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img", "inpaint"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_gpt_image_1_mini = StarterModel(
+    name="GPT Image 1 Mini",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1-mini",
+    description="OpenAI GPT-Image-1-Mini image generation model. Cost-efficient option, 80%% cheaper than GPT-Image-1. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img", "inpaint"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_dall_e_3 = StarterModel(
+    name="DALL-E 3",
+    base=BaseModelType.External,
+    source="external://openai/dall-e-3",
+    description="OpenAI DALL-E 3 image generation model. Supports vivid and natural styles. Only text-to-image, no editing. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        max_images_per_request=1,
+        allowed_aspect_ratios=["1:1", "7:4", "4:7"],
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "7:4": ExternalImageSize(width=1792, height=1024),
+            "4:7": ExternalImageSize(width=1024, height=1792),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+openai_dall_e_2 = StarterModel(
+    name="DALL-E 2",
+    base=BaseModelType.External,
+    source="external://openai/dall-e-2",
+    description="OpenAI DALL-E 2 image generation model. Supports square images only. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img", "inpaint"],
+        max_images_per_request=10,
+        allowed_aspect_ratios=["1:1"],
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
 # endregion
 
@@ -1134,7 +1215,11 @@ STARTER_MODELS: list[StarterModel] = [
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
+    openai_gpt_image_1_5,
     openai_gpt_image_1,
+    openai_gpt_image_1_mini,
+    openai_dall_e_3,
+    openai_dall_e_2,
 ]
 
 sd1_bundle: list[StarterModel] = [

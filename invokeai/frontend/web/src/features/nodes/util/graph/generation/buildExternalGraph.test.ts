@@ -15,14 +15,11 @@ import { buildExternalGraph } from './buildExternalGraph';
 
 const createExternalModel = (overrides: Partial<ExternalApiModelConfig> = {}): ExternalApiModelConfig => {
   const maxImageSize: ExternalImageSize = { width: 1024, height: 1024 };
-  const defaultSettings: ExternalApiModelDefaultSettings = { width: 1024, height: 1024, steps: 30 };
+  const defaultSettings: ExternalApiModelDefaultSettings = { width: 1024, height: 1024 };
   const capabilities: ExternalModelCapabilities = {
     modes: ['txt2img'],
-    supports_negative_prompt: true,
     supports_reference_images: true,
     supports_seed: true,
-    supports_guidance: true,
-    supports_steps: true,
     max_image_size: maxImageSize,
   };
 
@@ -54,7 +51,6 @@ const createExternalModel = (overrides: Partial<ExternalApiModelConfig> = {}): E
 let mockModelConfig: ExternalApiModelConfig | null = null;
 let mockParams: ParamsState;
 let mockRefImages: RefImagesState;
-let mockPrompts: { positive: string; negative: string };
 let mockSizes: { scaledSize: { width: number; height: number } };
 
 const mockOutputFields = {
@@ -80,7 +76,6 @@ vi.mock('features/nodes/util/graph/graphBuilderUtils', () => ({
     rect: { x: 0, y: 0, width: 512, height: 512 },
   }),
   selectCanvasOutputFields: () => mockOutputFields,
-  selectPresetModifiedPrompts: () => mockPrompts,
 }));
 
 beforeEach(() => {
@@ -88,7 +83,6 @@ beforeEach(() => {
     steps: 20,
     guidance: 4.5,
   } as ParamsState;
-  mockPrompts = { positive: 'a test prompt', negative: 'bad prompt' };
   mockSizes = { scaledSize: { width: 768, height: 512 } };
 
   const imageDTO = { image_name: 'ref.png', width: 64, height: 64 } as ImageDTO;
@@ -129,42 +123,12 @@ describe('buildExternalGraph', () => {
     expect(externalNode?.mode).toBe('txt2img');
     expect(externalNode?.width).toBe(768);
     expect(externalNode?.height).toBe(512);
-    expect(externalNode?.negative_prompt).toBe('bad prompt');
-    expect(externalNode?.steps).toBe(20);
-    expect(externalNode?.guidance).toBe(4.5);
     expect((externalNode?.reference_images as Array<{ image_name: string }> | undefined)?.[0]).toEqual({
       image_name: 'ref.png',
     });
-    expect(externalNode?.reference_image_weights).toEqual([0.5]);
 
     const seedEdge = graph.edges.find((edge) => edge.destination.field === 'seed');
     expect(seedEdge).toBeDefined();
-  });
-
-  it('does not include steps when model does not support them', async () => {
-    const modelConfig = createExternalModel({
-      capabilities: {
-        modes: ['txt2img'],
-        supports_negative_prompt: true,
-        supports_reference_images: true,
-        supports_seed: true,
-        supports_guidance: true,
-        supports_steps: false,
-      },
-    });
-    mockModelConfig = modelConfig;
-
-    const { g } = await buildExternalGraph({
-      generationMode: 'txt2img',
-      state: {} as RootState,
-      manager: null,
-    });
-    const graph = g.getGraph();
-    const externalNode = Object.values(graph.nodes).find((node) => node.type === 'openai_image_generation') as
-      | Record<string, unknown>
-      | undefined;
-
-    expect(externalNode?.steps).toBeNull();
   });
 
   it('prefers panel schema over capabilities when building node inputs', async () => {
@@ -187,9 +151,6 @@ describe('buildExternalGraph', () => {
       | Record<string, unknown>
       | undefined;
 
-    expect(externalNode?.negative_prompt).toBeNull();
-    expect(externalNode?.steps).toBeNull();
-    expect(externalNode?.guidance).toBeNull();
     expect((externalNode?.reference_images as Array<{ image_name: string }> | undefined)?.[0]).toEqual({
       image_name: 'ref.png',
     });

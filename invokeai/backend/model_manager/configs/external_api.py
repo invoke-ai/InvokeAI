@@ -9,7 +9,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, 
 
 ExternalGenerationMode = Literal["txt2img", "img2img", "inpaint"]
 ExternalMaskFormat = Literal["alpha", "binary", "none"]
-ExternalPanelControlName = Literal["negative_prompt", "reference_images", "dimensions", "seed", "steps", "guidance"]
+ExternalPanelControlName = Literal["reference_images", "dimensions", "seed"]
 
 
 class ExternalImageSize(BaseModel):
@@ -51,8 +51,6 @@ class ExternalModelCapabilities(BaseModel):
 class ExternalApiModelDefaultSettings(BaseModel):
     width: int | None = Field(default=None, gt=0)
     height: int | None = Field(default=None, gt=0)
-    steps: int | None = Field(default=None, gt=0)
-    guidance: float | None = Field(default=None, gt=0)
     num_images: int | None = Field(default=None, gt=0)
 
     model_config = ConfigDict(extra="forbid")

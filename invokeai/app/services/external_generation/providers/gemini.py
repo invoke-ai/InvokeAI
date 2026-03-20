@@ -6,7 +6,7 @@ import uuid
 import requests
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.services.external_generation.errors import ExternalProviderRequestError
+from invokeai.app.services.external_generation.errors import ExternalProviderRateLimitError, ExternalProviderRequestError
 from invokeai.app.services.external_generation.external_generation_base import ExternalProvider
 from invokeai.app.services.external_generation.external_generation_common import (
     ExternalGeneratedImage,
@@ -64,10 +64,14 @@ class GeminiProvider(ExternalProvider):
                 }
             )
 
+        opts = request.provider_options or {}
+
         generation_config: dict[str, object] = {
             "candidateCount": request.num_images,
             "responseModalities": ["IMAGE"],
         }
+        if "temperature" in opts:
+            generation_config["temperature"] = opts["temperature"]
         aspect_ratio = _select_aspect_ratio(
             request.width,
             request.height,
@@ -97,6 +101,8 @@ class GeminiProvider(ExternalProvider):
             "contents": [{"role": "user", "parts": request_parts}],
             "generationConfig": generation_config,
         }
+        if "thinking_level" in opts:
+            payload["thinkingConfig"] = {"thinkingLevel": opts["thinking_level"].upper()}
 
         self._dump_debug_payload("request", payload)
 
@@ -108,6 +114,12 @@ class GeminiProvider(ExternalProvider):
         )
 
         if not response.ok:
+            if response.status_code == 429:
+                retry_after = _parse_retry_after(response.headers.get("retry-after"))
+                raise ExternalProviderRateLimitError(
+                    f"Gemini rate limit exceeded. {f'Retry after {retry_after:.0f}s.' if retry_after else 'Please try again later.'}",
+                    retry_after=retry_after,
+                )
             raise ExternalProviderRequestError(
                 f"Gemini request failed with status {response.status_code} for model '{model_id}': {response.text}"
             )
@@ -250,6 +262,15 @@ def _parse_ratio(value: str) -> float | None:
     if denominator == 0:
         return None
     return numerator / denominator
+
+
+def _parse_retry_after(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        return None
 
 
 def _gcd(a: int, b: int) -> int:

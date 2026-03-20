@@ -224,6 +224,7 @@ const ProviderCard = memo(({ provider, onInstallModels }: ProviderCardProps) => 
           <FormLabel>{t('modelManager.externalApiKey')}</FormLabel>
           <Input
             type="password"
+            autoComplete="off"
             placeholder={
               provider.api_key_configured
                 ? t('modelManager.externalApiKeyPlaceholderSet')

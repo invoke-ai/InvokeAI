@@ -448,6 +448,21 @@ const slice = createSlice({
     imageSizeChanged: (state, action: PayloadAction<string | null>) => {
       state.imageSize = action.payload;
     },
+    openaiQualityChanged: (state, action: PayloadAction<'auto' | 'high' | 'medium' | 'low'>) => {
+      state.openaiQuality = action.payload;
+    },
+    openaiBackgroundChanged: (state, action: PayloadAction<'auto' | 'transparent' | 'opaque'>) => {
+      state.openaiBackground = action.payload;
+    },
+    openaiInputFidelityChanged: (state, action: PayloadAction<'low' | 'high' | null>) => {
+      state.openaiInputFidelity = action.payload;
+    },
+    geminiTemperatureChanged: (state, action: PayloadAction<number | null>) => {
+      state.geminiTemperature = action.payload;
+    },
+    geminiThinkingLevelChanged: (state, action: PayloadAction<'minimal' | 'high' | null>) => {
+      state.geminiThinkingLevel = action.payload;
+    },
     resolutionPresetSelected: (
       state,
       action: PayloadAction<{ imageSize: string; aspectRatio: string; width: number; height: number }>
@@ -593,6 +608,11 @@ export const {
 
   resolutionPresetSelected,
   paramsReset,
+  openaiQualityChanged,
+  openaiBackgroundChanged,
+  openaiInputFidelityChanged,
+  geminiTemperatureChanged,
+  geminiThinkingLevelChanged,
 } = slice.actions;
 
 export const paramsSliceConfig: SliceConfig<typeof slice> = {
@@ -694,22 +714,15 @@ export const selectModelConfig = createSelector(
   }
 );
 export const selectHasNegativePrompt = createParamsSelector((params) => params.negativePrompt !== null);
-export const selectModelSupportsNegativePrompt = createSelector(
-  selectModel,
-  selectModelConfig,
-  (model, modelConfig) => {
-    if (!model) {
-      return false;
-    }
-    if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-      return hasExternalPanelControl(modelConfig, 'prompts', 'negative_prompt');
-    }
-    if (model.base === 'external') {
-      return false;
-    }
-    return SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base);
+export const selectModelSupportsNegativePrompt = createSelector(selectModel, (model) => {
+  if (!model) {
+    return false;
   }
-);
+  if (model.base === 'external') {
+    return false;
+  }
+  return SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base);
+});
 export const selectModelSupportsRefImages = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
   if (!model) {
     return false;
@@ -726,12 +739,12 @@ export const selectModelSupportsOptimizedDenoising = createSelector(
   selectModel,
   (model) => !!model && model.base !== 'external' && SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS.includes(model.base)
 );
-export const selectModelSupportsGuidance = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+export const selectModelSupportsGuidance = createSelector(selectModel, (model) => {
   if (!model) {
     return false;
   }
-  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-    return hasExternalPanelControl(modelConfig, 'generation', 'guidance');
+  if (model.base === 'external') {
+    return false;
   }
   return true;
 });
@@ -744,12 +757,12 @@ export const selectModelSupportsSeed = createSelector(selectModel, selectModelCo
   }
   return true;
 });
-export const selectModelSupportsSteps = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+export const selectModelSupportsSteps = createSelector(selectModel, (model) => {
   if (!model) {
     return false;
   }
-  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-    return hasExternalPanelControl(modelConfig, 'generation', 'steps');
+  if (model.base === 'external') {
+    return false;
   }
   return true;
 });
@@ -761,18 +774,6 @@ export const selectModelSupportsDimensions = createSelector(selectModel, selectM
     return hasExternalPanelControl(modelConfig, 'image', 'dimensions');
   }
   return true;
-});
-export const selectStepsControl = createSelector(selectModelConfig, (modelConfig) => {
-  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-    return getExternalPanelControl(modelConfig, 'generation', 'steps');
-  }
-  return null;
-});
-export const selectGuidanceControl = createSelector(selectModelConfig, (modelConfig) => {
-  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-    return getExternalPanelControl(modelConfig, 'generation', 'guidance');
-  }
-  return null;
 });
 export const selectSeedControl = createSelector(selectModelConfig, (modelConfig) => {
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
@@ -847,6 +848,17 @@ export const selectHasFixedDimensionSizes = createSelector(
   (sizes, presets) => sizes !== null || (presets !== null && presets.length > 0)
 );
 export const selectImageSize = createParamsSelector((params) => params.imageSize);
+export const selectOpenaiQuality = createParamsSelector((params) => params.openaiQuality);
+export const selectOpenaiBackground = createParamsSelector((params) => params.openaiBackground);
+export const selectOpenaiInputFidelity = createParamsSelector((params) => params.openaiInputFidelity);
+export const selectGeminiTemperature = createParamsSelector((params) => params.geminiTemperature);
+export const selectGeminiThinkingLevel = createParamsSelector((params) => params.geminiThinkingLevel);
+export const selectExternalProviderId = createSelector(selectModelConfig, (modelConfig) => {
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return modelConfig.provider_id;
+  }
+  return null;
+});
 
 export const selectMainModelConfig = createSelector(selectModelConfig, (modelConfig) => {
   if (!modelConfig) {
