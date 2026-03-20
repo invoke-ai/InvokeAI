@@ -463,6 +463,12 @@ const slice = createSlice({
     geminiThinkingLevelChanged: (state, action: PayloadAction<'minimal' | 'high' | null>) => {
       state.geminiThinkingLevel = action.payload;
     },
+    seedreamWatermarkChanged: (state, action: PayloadAction<boolean>) => {
+      state.seedreamWatermark = action.payload;
+    },
+    seedreamOptimizePromptChanged: (state, action: PayloadAction<boolean>) => {
+      state.seedreamOptimizePrompt = action.payload;
+    },
     resolutionPresetSelected: (
       state,
       action: PayloadAction<{ imageSize: string; aspectRatio: string; width: number; height: number }>
@@ -613,6 +619,8 @@ export const {
   openaiInputFidelityChanged,
   geminiTemperatureChanged,
   geminiThinkingLevelChanged,
+  seedreamWatermarkChanged,
+  seedreamOptimizePromptChanged,
 } = slice.actions;
 
 export const paramsSliceConfig: SliceConfig<typeof slice> = {
@@ -853,6 +861,8 @@ export const selectOpenaiBackground = createParamsSelector((params) => params.op
 export const selectOpenaiInputFidelity = createParamsSelector((params) => params.openaiInputFidelity);
 export const selectGeminiTemperature = createParamsSelector((params) => params.geminiTemperature);
 export const selectGeminiThinkingLevel = createParamsSelector((params) => params.geminiThinkingLevel);
+export const selectSeedreamWatermark = createParamsSelector((params) => params.seedreamWatermark);
+export const selectSeedreamOptimizePrompt = createParamsSelector((params) => params.seedreamOptimizePrompt);
 export const selectExternalProviderId = createSelector(selectModelConfig, (modelConfig) => {
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
     return modelConfig.provider_id;

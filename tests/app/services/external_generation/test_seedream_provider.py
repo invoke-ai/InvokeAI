@@ -38,10 +38,8 @@ def _build_model(provider_model_id: str, modes: list[str] | None = None) -> Exte
         provider_model_id=provider_model_id,
         capabilities=ExternalModelCapabilities(
             modes=modes or ["txt2img", "img2img"],
-            supports_negative_prompt=False,
             supports_reference_images=True,
             supports_seed=True,
-            supports_guidance=True,
         ),
     )
 
@@ -52,24 +50,23 @@ def _build_request(
     init_image: Image.Image | None = None,
     reference_images: list[ExternalReferenceImage] | None = None,
     num_images: int = 1,
-    guidance: float | None = None,
     seed: int | None = 123,
+    provider_options: dict | None = None,
 ) -> ExternalGenerationRequest:
     return ExternalGenerationRequest(
         model=model,
         mode=mode,  # type: ignore[arg-type]
         prompt="A test prompt",
-        negative_prompt="",
         seed=seed,
         num_images=num_images,
         width=2048,
         height=2048,
-        steps=20,
-        guidance=guidance,
+        image_size=None,
         init_image=init_image,
         mask_image=None,
         reference_images=reference_images or [],
         metadata=None,
+        provider_options=provider_options,
     )
 
 
@@ -128,7 +125,7 @@ def test_seedream_3_0_t2i_sends_seed_and_guidance(monkeypatch: pytest.MonkeyPatc
     config = InvokeAIAppConfig(external_seedream_api_key="seedream-key")
     provider = SeedreamProvider(config, logging.getLogger("test"))
     model = _build_model("seedream-3-0-t2i-250415", modes=["txt2img"])
-    request = _build_request(model, seed=42, guidance=2.5)
+    request = _build_request(model, seed=42, provider_options={"guidance_scale": 2.5})
     encoded = encode_image_base64(_make_image("green"))
     captured: dict[str, object] = {}
 
@@ -184,7 +181,7 @@ def test_seedream_img2img_with_reference_images(monkeypatch: pytest.MonkeyPatch)
         model,
         mode="img2img",
         init_image=init_image,
-        reference_images=[ExternalReferenceImage(image=ref_image, weight=0.5)],
+        reference_images=[ExternalReferenceImage(image=ref_image)],
     )
     encoded = encode_image_base64(_make_image("green"))
     captured: dict[str, object] = {}
@@ -212,7 +209,7 @@ def test_seedream_single_image_not_array(monkeypatch: pytest.MonkeyPatch) -> Non
     provider = SeedreamProvider(config, logging.getLogger("test"))
     model = _build_model("seedream-3-0-t2i-250415", modes=["txt2img"])
     init_image = _make_image("blue")
-    request = _build_request(model, mode="txt2img", init_image=init_image, guidance=5.5)
+    request = _build_request(model, mode="txt2img", init_image=init_image, provider_options={"guidance_scale": 5.5})
     encoded = encode_image_base64(_make_image("green"))
     captured: dict[str, object] = {}
 

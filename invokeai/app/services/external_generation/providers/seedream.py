@@ -15,7 +15,7 @@ from invokeai.app.services.external_generation.external_generation_common import
 )
 from invokeai.app.services.external_generation.image_utils import decode_image_base64, encode_image_base64
 
-_SEEDREAM_4X_PREFIXES = ("seedream-4.5", "seedream-4.0", "seedream-4-5", "seedream-4-0")
+_SEEDREAM_BATCH_PREFIXES = ("seedream-5", "seedream-4.5", "seedream-4.0", "seedream-4-5", "seedream-4-0", "seedream-5-0")
 
 
 class SeedreamProvider(ExternalProvider):
@@ -34,27 +34,29 @@ class SeedreamProvider(ExternalProvider):
         headers = {"Authorization": f"Bearer {api_key}"}
 
         model_id = request.model.provider_model_id
-        is_4x = any(model_id.startswith(prefix) for prefix in _SEEDREAM_4X_PREFIXES)
+        is_batch_model = any(model_id.startswith(prefix) for prefix in _SEEDREAM_BATCH_PREFIXES)
+
+        opts = request.provider_options or {}
 
         payload: dict[str, object] = {
             "model": model_id,
             "prompt": request.prompt,
             "size": f"{request.width}x{request.height}",
             "response_format": "b64_json",
-            "watermark": False,
+            "watermark": opts.get("watermark", False),
         }
 
-        # Seed is only supported on 3.0 models
-        if not is_4x and request.seed is not None and request.seed >= 0:
-            payload["seed"] = request.seed
+        if opts.get("optimize_prompt"):
+            payload["optimize_prompt_options"] = {"optimize_prompt": True}
 
-        # guidance_scale is only supported on 3.0 models
-        opts = request.provider_options or {}
-        if not is_4x and opts.get("guidance_scale") is not None:
+        # Seed and guidance_scale are only supported on 3.0 models
+        if not is_batch_model and request.seed is not None and request.seed >= 0:
+            payload["seed"] = request.seed
+        if not is_batch_model and opts.get("guidance_scale") is not None:
             payload["guidance_scale"] = opts["guidance_scale"]
 
-        # Batch generation for 4.x models
-        if is_4x:
+        # Batch generation for 4.x/5.x models
+        if is_batch_model:
             if request.num_images > 1:
                 payload["sequential_image_generation"] = "auto"
                 payload["sequential_image_generation_options"] = {"max_images": request.num_images}

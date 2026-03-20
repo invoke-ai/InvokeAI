@@ -201,3 +201,25 @@ class GeminiImageGenerationInvocation(BaseExternalImageGenerationInvocation):
         if self.thinking_level is not None:
             options["thinking_level"] = self.thinking_level
         return options or None
+
+
+@invocation(
+    "seedream_image_generation",
+    title="Seedream Image Generation",
+    tags=["external", "generation", "seedream"],
+    category="image",
+    version="1.0.0",
+)
+class SeedreamImageGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Generate images using a BytePlus Seedream model."""
+
+    provider_id = "seedream"
+
+    watermark: bool = InputField(default=False, description="Add watermark to generated images")
+    optimize_prompt: bool = InputField(default=False, description="Let the model optimize the prompt before generation")
+
+    def _build_provider_options(self) -> dict[str, Any]:
+        return {
+            "watermark": self.watermark,
+            "optimize_prompt": self.optimize_prompt,
+        }
