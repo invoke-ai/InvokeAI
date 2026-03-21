@@ -130,6 +130,13 @@ class ModelLoader(ModelLoaderBase):
         if self._torch_device.type != "cuda":
             return False
 
+        # Z-Image has dtype mismatch issues with diffusers' layerwise casting
+        # (skipped modules produce bf16, hooked modules expect fp16).
+        from invokeai.backend.model_manager.taxonomy import BaseModelType
+
+        if hasattr(config, "base") and config.base == BaseModelType.ZImage:
+            return False
+
         # Don't apply FP8 to text encoders, tokenizers, schedulers, etc.
         _excluded_submodel_types = {
             SubModelType.TextEncoder,
