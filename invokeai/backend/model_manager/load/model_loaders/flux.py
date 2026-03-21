@@ -487,7 +487,9 @@ class FluxCheckpointModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Transformer:
-                return self._load_from_singlefile(config)
+                model = self._load_from_singlefile(config)
+                model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
+                return model
 
         raise ValueError(
             f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
@@ -736,7 +738,9 @@ class Flux2CheckpointModel(ModelLoader):
 
         match submodel_type:
             case SubModelType.Transformer:
-                return self._load_from_singlefile(config)
+                model = self._load_from_singlefile(config)
+                model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
+                return model
 
         raise ValueError(
             f"Only Transformer submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
