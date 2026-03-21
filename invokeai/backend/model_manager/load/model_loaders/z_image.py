@@ -288,8 +288,6 @@ class ZImageCheckpointModel(ModelLoader):
             sd[k] = sd[k].to(model_dtype)
 
         model.load_state_dict(sd, assign=True)
-
-        model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
         return model
 
 
