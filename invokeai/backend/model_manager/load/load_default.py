@@ -168,6 +168,13 @@ class ModelLoader(ModelLoaderBase):
         storage_dtype = torch.float8_e4m3fn
         compute_dtype = self._torch_dtype
 
+        # Detect the model's current dtype to use as compute dtype, since models
+        # (e.g. Flux) may require a specific dtype (bf16) that differs from the global torch dtype (fp16).
+        if isinstance(model, torch.nn.Module):
+            first_param = next(model.parameters(), None)
+            if first_param is not None:
+                compute_dtype = first_param.dtype
+
         from diffusers.models.modeling_utils import ModelMixin
 
         if isinstance(model, ModelMixin):
@@ -176,12 +183,6 @@ class ModelLoader(ModelLoaderBase):
                 compute_dtype=compute_dtype,
             )
         elif isinstance(model, torch.nn.Module):
-            # Detect the model's current dtype to use as compute dtype, since custom models
-            # (e.g. Flux checkpoint) may require a specific dtype (bf16) that differs from
-            # the global torch dtype (fp16).
-            first_param = next(model.parameters(), None)
-            if first_param is not None:
-                compute_dtype = first_param.dtype
             self._apply_fp8_to_nn_module(model, storage_dtype=storage_dtype, compute_dtype=compute_dtype)
         else:
             return model
