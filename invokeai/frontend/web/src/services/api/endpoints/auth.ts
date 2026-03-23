@@ -33,6 +33,7 @@ type LogoutResponse = {
 type SetupStatusResponse = {
   setup_required: boolean;
   multiuser_enabled: boolean;
+  strict_password_checking: boolean;
 };
 
 export type UserDTO = components['schemas']['UserDTO'];
