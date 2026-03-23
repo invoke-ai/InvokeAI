@@ -70,9 +70,7 @@ def is_state_dict_likely_in_flux_onetrainer_bfl_format(
 
     # Must have split QKV pattern (qkv.0, qkv.1, qkv.2) to distinguish from other formats
     # that might use transformer. prefix in the future.
-    has_split_qkv = any(
-        ".qkv.0." in k or ".qkv.1." in k or ".qkv.2." in k or ".linear1.0." in k for k in str_keys
-    )
+    has_split_qkv = any(".qkv.0." in k or ".qkv.1." in k or ".qkv.2." in k or ".linear1.0." in k for k in str_keys)
     if not has_split_qkv:
         return False
 
