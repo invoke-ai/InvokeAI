@@ -111,7 +111,25 @@ export type paths = {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Update Current User
+         * @description Update the current user's own profile.
+         *
+         *     To change the password, both ``current_password`` and ``new_password`` must
+         *     be provided. The current password is verified before the change is applied.
+         *
+         *     Args:
+         *         request: Profile fields to update
+         *         current_user: The authenticated user
+         *
+         *     Returns:
+         *         The updated user
+         *
+         *     Raises:
+         *         HTTPException: 400 if current password is incorrect or new password is weak
+         *         HTTPException: 404 if user not found
+         */
+        patch: operations["update_current_user_api_v1_auth_me_patch"];
         trace?: never;
     };
     "/api/v1/auth/setup": {
@@ -145,6 +163,126 @@ export type paths = {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/generate-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Generate Password
+         * @description Generate a strong random password.
+         *
+         *     Returns a cryptographically secure random password of 16 characters
+         *     containing uppercase, lowercase, digits, and punctuation.
+         */
+        get: operations["generate_password_api_v1_auth_generate_password_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Users
+         * @description List all users. Requires admin privileges.
+         *
+         *     The internal 'system' user (created for backward compatibility) is excluded
+         *     from the results since it cannot be managed through this interface.
+         *
+         *     Returns:
+         *         List of all real users (system user excluded)
+         */
+        get: operations["list_users_api_v1_auth_users_get"];
+        put?: never;
+        /**
+         * Create User
+         * @description Create a new user. Requires admin privileges.
+         *
+         *     Args:
+         *         request: New user details
+         *
+         *     Returns:
+         *         The created user
+         *
+         *     Raises:
+         *         HTTPException: 400 if email already exists or password is weak
+         */
+        post: operations["create_user_api_v1_auth_users_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get User
+         * @description Get a user by ID. Requires admin privileges.
+         *
+         *     Args:
+         *         user_id: The user ID
+         *
+         *     Returns:
+         *         The user
+         *
+         *     Raises:
+         *         HTTPException: 404 if user not found
+         */
+        get: operations["get_user_api_v1_auth_users__user_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete User
+         * @description Delete a user. Requires admin privileges.
+         *
+         *     Admins can delete any user including other admins, but cannot delete the last
+         *     remaining admin.
+         *
+         *     Args:
+         *         user_id: The user ID
+         *
+         *     Raises:
+         *         HTTPException: 400 if attempting to delete the last admin
+         *         HTTPException: 404 if user not found
+         */
+        delete: operations["delete_user_api_v1_auth_users__user_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update User
+         * @description Update a user. Requires admin privileges.
+         *
+         *     Args:
+         *         user_id: The user ID
+         *         request: Fields to update
+         *
+         *     Returns:
+         *         The updated user
+         *
+         *     Raises:
+         *         HTTPException: 400 if password is weak
+         *         HTTPException: 404 if user not found
+         */
+        patch: operations["update_user_api_v1_auth_users__user_id__patch"];
         trace?: never;
     };
     "/api/v1/utilities/dynamicprompts": {
@@ -223,6 +361,27 @@ export type paths = {
          *     model manager, which identified models by a combination of name, base and type.
          */
         get: operations["get_model_records_by_attrs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/models/get_by_hash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Model Records By Hash
+         * @description Gets a model by its hash. This is useful for recalling models that were deleted and reinstalled,
+         *     as the hash remains stable across reinstallations while the key (UUID) changes.
+         */
+        get: operations["get_model_records_by_hash"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2359,6 +2518,59 @@ export type components = {
              * @constant
              */
             type: "add";
+        };
+        /**
+         * AdminUserCreateRequest
+         * @description Request body for admin to create a new user.
+         */
+        AdminUserCreateRequest: {
+            /**
+             * Email
+             * @description User email address
+             */
+            email: string;
+            /**
+             * Display Name
+             * @description Display name
+             */
+            display_name?: string | null;
+            /**
+             * Password
+             * @description User password
+             */
+            password: string;
+            /**
+             * Is Admin
+             * @description Whether user should have admin privileges
+             * @default false
+             */
+            is_admin?: boolean;
+        };
+        /**
+         * AdminUserUpdateRequest
+         * @description Request body for admin to update any user.
+         */
+        AdminUserUpdateRequest: {
+            /**
+             * Display Name
+             * @description Display name
+             */
+            display_name?: string | null;
+            /**
+             * Password
+             * @description New password
+             */
+            password?: string | null;
+            /**
+             * Is Admin
+             * @description Whether user should have admin privileges
+             */
+            is_admin?: boolean | null;
+            /**
+             * Is Active
+             * @description Whether user account should be active
+             */
+            is_active?: boolean | null;
         };
         /**
          * Alpha Mask to Tensor
@@ -10350,6 +10562,17 @@ export type components = {
             type: "freeu";
         };
         /**
+         * GeneratePasswordResponse
+         * @description Response containing a generated password.
+         */
+        GeneratePasswordResponse: {
+            /**
+             * Password
+             * @description Generated strong password
+             */
+            password: string;
+        };
+        /**
          * Get Image Mask Bounding Box
          * @description Gets the bounding box of the given mask image.
          */
@@ -14173,6 +14396,7 @@ export type components = {
          *         unsafe_disable_picklescan: UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.
          *         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
          *         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
+         *         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
          */
         InvokeAIAppConfig: {
             /**
@@ -14546,6 +14770,12 @@ export type components = {
              * @default false
              */
             multiuser?: boolean;
+            /**
+             * Strict Password Checking
+             * @description Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
+             * @default false
+             */
+            strict_password_checking?: boolean;
         };
         /**
          * InvokeAIAppConfigWithSetFields
@@ -24284,6 +24514,11 @@ export type components = {
              * @description Whether multiuser mode is enabled
              */
             multiuser_enabled: boolean;
+            /**
+             * Strict Password Checking
+             * @description Whether strict password requirements are enforced
+             */
+            strict_password_checking: boolean;
         };
         /**
          * Show Image
@@ -26672,6 +26907,27 @@ export type components = {
              */
             last_login_at?: string | null;
         };
+        /**
+         * UserProfileUpdateRequest
+         * @description Request body for a user to update their own profile.
+         */
+        UserProfileUpdateRequest: {
+            /**
+             * Display Name
+             * @description New display name
+             */
+            display_name?: string | null;
+            /**
+             * Current Password
+             * @description Current password (required when changing password)
+             */
+            current_password?: string | null;
+            /**
+             * New Password
+             * @description New password
+             */
+            new_password?: string | null;
+        };
         /** VAEField */
         VAEField: {
             /** @description Info to load vae submodel */
@@ -28518,6 +28774,39 @@ export interface operations {
             };
         };
     };
+    update_current_user_api_v1_auth_me_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserProfileUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     setup_admin_api_v1_auth_setup_post: {
         parameters: {
             query?: never;
@@ -28538,6 +28827,177 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SetupResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_password_api_v1_auth_generate_password_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GeneratePasswordResponse"];
+                };
+            };
+        };
+    };
+    list_users_api_v1_auth_users_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"][];
+                };
+            };
+        };
+    };
+    create_user_api_v1_auth_users_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserCreateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_user_api_v1_auth_users__user_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_user_api_v1_auth_users__user_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_user_api_v1_auth_users__user_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description User ID */
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminUserUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDTO"];
                 };
             };
             /** @description Validation Error */
@@ -28651,6 +29111,38 @@ export interface operations {
                 type: components["schemas"]["ModelType"];
                 /** @description The base model of the model */
                 base: components["schemas"]["BaseModelType"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Unknown_Config"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_model_records_by_hash: {
+        parameters: {
+            query: {
+                /** @description The hash of the model */
+                hash: string;
             };
             header?: never;
             path?: never;
