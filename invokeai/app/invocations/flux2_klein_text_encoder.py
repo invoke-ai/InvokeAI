@@ -25,6 +25,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import FluxConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_T5_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -100,7 +101,12 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
         tokenizer_info = context.models.load(self.qwen3_encoder.tokenizer)
         (_, tokenizer) = exit_stack.enter_context(tokenizer_info.model_on_device())
 
-        device = text_encoder.device
+        repaired_tensors = text_encoder_info.repair_required_tensors_on_device()
+        device = get_effective_device(text_encoder)
+        if repaired_tensors > 0:
+            context.logger.warning(
+                f"Recovered {repaired_tensors} required Qwen3 tensor(s) onto {device} after a partial device mismatch."
+            )
 
         # Apply LoRA models
         lora_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
