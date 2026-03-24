@@ -8,7 +8,7 @@
         "back": "戻る",
         "statusDisconnected": "切断済",
         "cancel": "キャンセル",
-        "accept": "同意",
+        "accept": "確定",
         "img2img": "img2img",
         "loading": "ロード中",
         "githubLabel": "Github",
@@ -33,9 +33,9 @@
         "batch": "バッチマネージャー",
         "advanced": "高度",
         "created": "作成済",
-        "green": "緑",
-        "blue": "青",
-        "alpha": "アルファ",
+        "green": "G",
+        "blue": "B",
+        "alpha": "α",
         "outpaint": "outpaint",
         "unknown": "不明",
         "updated": "更新済",
@@ -44,7 +44,7 @@
         "copyError": "$t(gallery.copy) エラー",
         "data": "データ",
         "template": "テンプレート",
-        "red": "赤",
+        "red": "R",
         "or": "または",
         "checkpoint": "Checkpoint",
         "direction": "方向",
@@ -194,7 +194,7 @@
         "assets": "アセット",
         "useForPromptGeneration": "プロンプト生成に使用する",
         "jump": "ジャンプ",
-        "noImagesInGallery": "ディスプレイに画像がありません",
+        "noImagesInGallery": "表示する画像がありません",
         "unableToLoad": "ギャラリーを読み込めません",
         "selectAnImageToCompare": "比較する画像を選択",
         "openViewer": "ビューアーを開く",
@@ -211,7 +211,7 @@
             },
             "useSize": {
                 "title": "サイズを使用",
-                "desc": "現画像のサイズをbboxサイズとして使用する."
+                "desc": "現画像のサイズをバウンディングボックスのサイズとして使用する."
             },
             "recallPrompts": {
                 "title": "プロンプトを再使用",
@@ -366,8 +366,8 @@
                 "desc": "矩形ツールを選択します。"
             },
             "settings": {
-                "behavior": "行動",
-                "display": "ディスプレイ",
+                "behavior": "挙動",
+                "display": "表示",
                 "grid": "グリッド",
                 "debug": "デバッグ"
             },
@@ -388,25 +388,25 @@
                 "desc": "選択したインペイント マスクを反転し、反対の透明度を持つ新しいマスクを作成します。"
             },
             "fitBboxToLayers": {
-                "title": "Bboxをレイヤーに合わせる",
-                "desc": "表示レイヤーに合わせて生成境界ボックスを自動的に調整します"
+                "title": "バウンディングボックスをレイヤー群に合わせる",
+                "desc": "表示されているレイヤーに合わせて生成バウンディングボックスを自動的に調整します"
             },
             "fitBboxToMasks": {
-                "title": "Bboxをマスクにフィットさせる",
-                "desc": "目に見えるインペイントマスクに合わせて生成境界ボックスを自動的に調整します"
+                "title": "バウンディングボックスをマスクにフィットさせる",
+                "desc": "可視のインペイントマスクに合わせて生成バウンディングボックスを自動的に調整します"
             },
             "toggleBbox": {
-                "title": "Bboxの表示/非表示を切り替える",
-                "desc": "生成境界ボックスを非表示または表示する"
+                "title": "バウンディングボックスの表示/非表示を切り替える",
+                "desc": "生成バウンディングボックスを非表示または表示する"
             },
             "applySegmentAnything": {
-                "title": "何でもセグメント化を適用する",
-                "desc": "現在の「何でもセグメント」マスクを適用します。",
+                "title": "Segment Anythingを適用する",
+                "desc": "現在のSegment Anythingマスクを適用します。",
                 "key": "入力"
             },
             "cancelSegmentAnything": {
                 "title": "セグメントをキャンセル",
-                "desc": "現在の「何でもセグメント」操作をキャンセルします。",
+                "desc": "現在のSegment Anything操作をキャンセルします。",
                 "key": "エスケープ"
             }
         },
@@ -468,8 +468,8 @@
                 "title": "キャンバスタブを選択"
             },
             "selectUpscalingTab": {
-                "desc": "アップスケーリングタブを選択します。",
-                "title": "アップスケーリングタブを選択"
+                "desc": "アップスケールタブを選択します。",
+                "title": "アップスケールタブを選択"
             },
             "toggleRightPanel": {
                 "desc": "右パネルを表示または非表示。",
@@ -504,7 +504,7 @@
                 "desc": "カーソルをポジティブプロンプト欄に移動します。"
             },
             "promptHistoryPrev": {
-                "title": "履歴の前のプロンプト",
+                "title": "ヒストリーの以前のプロンプト",
                 "desc": "プロンプトにフォーカスがある場合は、履歴内の前の（古い）プロンプトに移動します。"
             },
             "promptHistoryNext": {
@@ -636,9 +636,9 @@
         "controlLora": "コントロールLoRA",
         "triggerPhrases": "トリガーフレーズ",
         "t5Encoder": "T5エンコーダー",
-        "textualInversions": "テキスト反転",
+        "textualInversions": "Textual Inversions",
         "fluxRedux": "FLUX リダックス",
-        "installQueue": "キューをインストール",
+        "installQueue": "インストール進捗状況",
         "noMatchingModels": "マッチするモデルがありません",
         "noDefaultSettings": "このモデルには構成されたデフォルト設定がありません.デフォルト設定を追加するためにモデルマネージャーにアクセスしてください.",
         "usingDefaultSettings": "モデルのデフォルト設定を使用する",
@@ -651,7 +651,7 @@
         "main": "メイン",
         "defaultSettings": "デフォルト設定",
         "deleteModelImage": "モデル画像を削除",
-        "hfTokenInvalid": "ハギングフェイストークンが無効または見つかりません",
+        "hfTokenInvalid": "HuggingFaceトークンが無効または見つかりません",
         "hfForbiddenErrorMessage": "リポジトリにアクセスすることを勧めます.所有者はダウンロードにあたり利用規約への同意を要求する場合があります.",
         "noModelsInstalled": "インストールされているモデルがありません",
         "pathToConfig": "設定へのパス",
@@ -665,8 +665,8 @@
         "installRepo": "リポジトリをインストール",
         "localOnly": "ローカルのみ",
         "huggingFaceHelper": "いくつかのモデルがこのリポジトリで見つかった場合，1つを選択してインストールするように求められます.",
-        "hfTokenInvalidErrorMessage": "ハギングフェイストークンが無効または見つかりません.",
-        "hfTokenRequired": "有効なハギングフェイストークンが必要なモデルをダウンロードしようとしています.",
+        "hfTokenInvalidErrorMessage": "HuggingFaceトークンが無効または見つかりません。",
+        "hfTokenRequired": "有効なHuggingFaceトークンが必要なモデルをダウンロードしようとしています。",
         "hfTokenInvalidErrorMessage2": "更新してください ",
         "modelImageDeleted": "モデル画像削除",
         "repoVariant": "リポジトリバリアント",
@@ -679,17 +679,17 @@
         "urlOrLocalPath": "URLかローカルパス",
         "clipLEmbed": "クリップ-L 埋め込み",
         "defaultSettingsSaved": "デフォルト設定を保存しました",
-        "hfTokenUnableToVerify": "ハギングフェイストークンを確認できません",
-        "hfForbidden": "このハギングフェイスモデルにアクセスできません",
-        "hfTokenLabel": "ハギングフェイストークン(いくつかのモデルに必要)",
+        "hfTokenUnableToVerify": "HuggingFaceトークンを確認できません",
+        "hfForbidden": "このHuggingFaceモデルにアクセスできません",
+        "hfTokenLabel": "HuggingFaceトークン(いくつかのモデルに必要)",
         "noModelSelected": "モデルが選択されていません",
         "prune": "除去",
-        "hfTokenHelperText": "いくつかのモデルにハギングフェイストークンが必要です.ここをクリックしてあなたのトークンを作成してください.",
+        "hfTokenHelperText": "いくつかのモデルにHuggingFaceトークンが必要です。ここをクリックしてあなたのトークンを作成してください。",
         "starterBundleHelpText": "メインモデル，コントロールネット，IPアダプターなど，ベースモデルから始めるのに必要なすべてのモデルを簡単にインストールできます.バンドルを選択すると，すでにインストールされているモデルはスキップされます.",
         "inplaceInstallDesc": "ファイルを移動せずにモデルをインストールします.このモデルを使ったとき、元の場所からロードされます.利用できない場合、モデルファイルはInvoke管理モデルディレクトリにインストールしている間に移動されます。",
-        "hfTokenUnableToVerifyErrorMessage": "ハギングフェイストークンを確認できません.ネットワークによるエラーの可能性があります.後ほどトライしてください.",
+        "hfTokenUnableToVerifyErrorMessage": "HuggingFaceトークンを確認できません。ネットワークによるエラーの可能性があります。後ほどトライしてください。",
         "restoreDefaultSettings": "クリックするとモデルのデフォルト設定が使用されます.",
-        "hfTokenSaved": "ハギングフェイストークンを保存しました",
+        "hfTokenSaved": "HuggingFaceトークンを保存しました",
         "imageEncoderModelId": "画像エンコーダーモデルID",
         "includesNModels": "{{n}}個のモデルとこれらの依存関係を含みます。",
         "learnMoreAboutSupportedModels": "私たちのサポートしているモデルについて更に学ぶ",
@@ -711,7 +711,7 @@
         "modelPickerFallbackNoModelsInstalled2": "<LinkComponent>モデルマネージャー</LinkComponent> にアクセスしてモデルをインストールしてください.",
         "modelPickerFallbackNoModelsInstalled": "モデルがインストールされていません.",
         "manageModels": "モデル管理",
-        "hfTokenReset": "ハギングフェイストークンリセット",
+        "hfTokenReset": "HuggingFaceトークンをリセット",
         "relatedModels": "関連のあるモデル",
         "installedModelsCount": "{{total}} モデルのうち {{installed}} 個がインストールされています。",
         "allNModelsInstalled": "{{count}} 個のモデルがすべてインストールされています",
@@ -719,7 +719,7 @@
         "nAlreadyInstalled": "{{count}} 個すでにインストールされています",
         "bundleAlreadyInstalled": "バンドルがすでにインストールされています",
         "bundleAlreadyInstalledDesc": "{{bundleName}} バンドル内のすべてのモデルはすでにインストールされています。",
-        "launchpadTab": "ランチパッド",
+        "launchpadTab": "ローンチパッド",
         "launchpad": {
             "welcome": "モデルマネジメントへようこそ",
             "description": "Invoke プラットフォームのほとんどの機能を利用するには、モデルのインストールが必要です。手動インストールオプションから選択するか、厳選されたスターターモデルをご覧ください。",
@@ -742,7 +742,10 @@
         "installBundleMsg2": "このバンドルでは、次の {{count}} モデルがインストールされます:",
         "ipAdapters": "IPアダプター",
         "showOnlyRelatedModels": "関連している",
-        "starterModelsInModelManager": "スターターモデルはモデルマネージャーにあります"
+        "starterModelsInModelManager": "スターターモデルはモデルマネージャーにあります",
+        "actions": "一括操作",
+        "selectAll": "全て選択",
+        "deselectAll": "全て選択解除"
     },
     "parameters": {
         "images": "画像",
@@ -752,7 +755,7 @@
         "seed": "シード値",
         "shuffle": "シャッフル",
         "strength": "強度",
-        "upscaling": "アップスケーリング",
+        "upscaling": "アップスケール",
         "scale": "スケール",
         "scaleBeforeProcessing": "処理前のスケール",
         "scaledWidth": "幅のスケール",
@@ -794,10 +797,10 @@
             "systemDisconnected": "システムが切断されました",
             "canvasIsTransforming": "キャンバスがビジー状態(変換)",
             "canvasIsRasterizing": "キャンバスがビジー状態(ラスタライズ)",
-            "modelIncompatibleBboxHeight": "Bboxの高さは{{height}}ですが，{{model}}は{{multiple}}の倍数が必要です",
-            "modelIncompatibleScaledBboxHeight": "bboxの高さは{{height}}ですが，{{model}}は{{multiple}}の倍数を必要です",
-            "modelIncompatibleBboxWidth": "Bboxの幅は{{width}}ですが, {{model}}は{{multiple}}の倍数が必要です",
-            "modelIncompatibleScaledBboxWidth": "bboxの幅は{{width}}ですが，{{model}}は{{multiple}}の倍数が必要です",
+            "modelIncompatibleBboxHeight": "バウンディングボックスの高さは{{height}}ですが，{{model}}は{{multiple}}の倍数が必要です",
+            "modelIncompatibleScaledBboxHeight": "バウンディングボックスの高さは{{height}}ですが，{{model}}は{{multiple}}の倍数を必要です",
+            "modelIncompatibleBboxWidth": "バウンディングボックスの幅は{{width}}ですが, {{model}}は{{multiple}}の倍数が必要です",
+            "modelIncompatibleScaledBboxWidth": "バウンディングボックスの幅は{{width}}ですが，{{model}}は{{multiple}}の倍数が必要です",
             "canvasIsSelectingObject": "キャンバスがビジー状態(オブジェクトの選択)",
             "noFLUXVAEModelSelected": "FLUX生成にVAEモデルが選択されていません",
             "noT5EncoderModelSelected": "FLUX生成にT5エンコーダモデルが選択されていません",
@@ -806,10 +809,10 @@
             "promptExpansionResultPending": "プロンプト拡張結果を受け入れるか破棄してください",
             "emptyBatches": "空のバッチ",
             "noStartingFrameImage": "開始フレーム画像がありません",
-            "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、bboxの幅は{{width}}です",
-            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、bboxの高さは{{height}}です",
-            "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、スケールされたbboxの幅は{{width}}です",
-            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、スケールされた bbox の高さは {{height}} です",
+            "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、バウンディングボックスの幅は{{width}}です",
+            "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、バウンディングボックスの高さは{{height}}です",
+            "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、スケールされたバウンディングボックスの幅は{{width}}です",
+            "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、スケールされたバウンディングボックスの高さは {{height}} です",
             "incompatibleLoRAs": "互換性のない LoRA が追加されました"
         },
         "aspect": "縦横比",
@@ -818,7 +821,7 @@
         "sendToUpscale": "アップスケーラーに転送",
         "useSize": "サイズを使用",
         "postProcessing": "ポストプロセス (Shift + U)",
-        "denoisingStrength": "ノイズ除去強度",
+        "denoisingStrength": "除去ノイズ強度",
         "recallMetadata": "メタデータを再使用",
         "copyImage": "画像をコピー",
         "positivePromptPlaceholder": "ポジティブプロンプト",
@@ -834,7 +837,7 @@
         "imageFit": "初期画像を出力サイズに合わせる",
         "setToOptimalSizeTooLarge": "$t(parameters.setToOptimalSize) (おそらく大きすぎます)",
         "coherenceEdgeSize": "エッジサイズ",
-        "swapDimensions": "スワップ次元",
+        "swapDimensions": "縦横サイズを入れ替え",
         "controlNetControlMode": "制御モード",
         "infillColorValue": "塗りつぶし色",
         "coherenceMinDenoise": "最小ノイズ除去",
@@ -845,7 +848,7 @@
         "infillMethod": "充填法",
         "patchmatchDownScaleSize": "ダウンスケール",
         "boxBlur": "ボックスぼかし",
-        "remixImage": "リミックス画像",
+        "remixImage": "画像をリミックス",
         "processImage": "プロセス画像",
         "useCpuNoise": "CPUノイズの使用",
         "staged": "ステージ",
@@ -997,8 +1000,8 @@
         "noVisibleMasksDesc": "少なくとも1つのインペイントマスクを作成または有効にして反転します",
         "noInpaintMaskSelected": "インペイントマスクが選択されていません",
         "noInpaintMaskSelectedDesc": "反転するインペイントマスクを選択",
-        "invalidBbox": "無効な境界ボックス",
-        "invalidBboxDesc": "境界ボックスに有効な寸法がありません"
+        "invalidBbox": "無効なバウンディングボックス",
+        "invalidBboxDesc": "バウンディングボックスの寸法が有効ではありません"
     },
     "accessibility": {
         "invokeProgressBar": "進捗バー",
@@ -1179,7 +1182,7 @@
         "cannotConnectInputToInput": "入力から入力には接続できません",
         "cannotConnectOutputToOutput": "出力から出力には接続できません",
         "cannotConnectToSelf": "自身のノードには接続できません",
-        "colorCodeEdges": "カラーコードエッジ",
+        "colorCodeEdges": "エッジのカラー化",
         "loadingNodes": "ノードを読み込み中...",
         "scheduler": "スケジューラー",
         "version": "バージョン",
@@ -1197,7 +1200,7 @@
         "enum": "Enum",
         "arithmeticSequence": "等差数列",
         "linearDistribution": "線形分布",
-        "animatedEdges": "アニメーションエッジ",
+        "animatedEdges": "エッジのアニメーション",
         "uniformRandomDistribution": "一様ランダム分布",
         "noBatchGroup": "グループなし",
         "parseString": "文字列の解析",
@@ -1232,7 +1235,7 @@
         "unableToUpdateNode": "ノードアップロード失敗:ノード {{node}} のタイプ {{type}} (削除か再生成が必要かもしれません)",
         "deletedInvalidEdge": "無効なエッジを削除しました{{source}} -> {{target}}",
         "collectionFieldType": "{{name}} (コレクション)",
-        "colorCodeEdgesHelp": "接続されたフィールドによるカラーコードエッジ",
+        "colorCodeEdgesHelp": "接続されたフィールド種ごとにエッジをカラー化",
         "showEdgeLabelsHelp": "エッジのラベルを表示，接続されているノードを示す",
         "sourceNodeFieldDoesNotExist": "無効なエッジ:ソース/アウトプットフィールド{{node}}.{{field}}が存在しません",
         "deletedMissingNodeFieldFormElement": "不足しているフォームフィールドを削除しました: ノード {{nodeId}} フィールド {{fieldName}}",
@@ -1602,13 +1605,13 @@
         "compositingMaskAdjustments": {
             "heading": "マスク調整",
             "paragraphs": [
-                "マスクを調整する."
+                "マスクを調整する"
             ]
         },
         "compositingCoherenceMinDenoise": {
             "paragraphs": [
-                "コヒーレンスモードの最小ノイズ除去強度",
-                "インペインティングまたはアウトペインティング時のコヒーレンス領域の最小ノイズ除去強度"
+                "コヒーレンスモードの最小除去ノイズ強度",
+                "インペイント・アウトペイント時のコヒーレンス領域の最小除去ノイズ強度"
             ],
             "heading": "最小ノイズ除去"
         },
@@ -1691,7 +1694,7 @@
                 "たとえば, プロンプトが 5 つある場合, 各画像は同じシードを使用します.",
                 "「画像ごと」では, 画像ごとに固有のシード値が使用されます. これにより、より多くのバリエーションが得られます."
             ],
-            "heading": "シード行動"
+            "heading": "シードの挙動"
         },
         "imageFit": {
             "paragraphs": [
@@ -1730,7 +1733,7 @@
         "optimizedDenoising": {
             "heading": "イメージtoイメージの最適化",
             "paragraphs": [
-                "「イメージtoイメージを最適化」を有効にすると、Fluxモデルを用いた画像間変換およびインペインティング変換において、より段階的なノイズ除去強度スケールが適用されます。この設定により、画像に適用される変化量を制御する能力が向上しますが、標準のノイズ除去強度スケールを使用したい場合はオフにすることができます。この設定は現在調整中で、ベータ版です。"
+                "「イメージtoイメージを最適化」を有効にすると、Fluxモデルを用いた画像間変換およびインペイント変換において、より段階的な除去ノイズ強度スケールが適用されます。この設定により、画像に適用される変化量を制御する能力が向上しますが、標準の除去ノイズ強度スケールを使用したい場合はオフにすることができます。この設定は現在調整中で、ベータ版です。"
             ]
         },
         "refinerPositiveAestheticScore": {
@@ -1756,8 +1759,8 @@
         "refinerModel": {
             "heading": "リファイナーモデル",
             "paragraphs": [
-                "生成プロセスの精製部分で使用されるモデル。",
-                "世代モデルに似ています。"
+                "生成プロセスのリファイナー部分で使用されるモデル。",
+                "生成モデルに似ています。"
             ]
         },
         "refinerCfgScale": {
@@ -1833,7 +1836,7 @@
         "tileOverlap": {
             "heading": "タイルオーバーラップ",
             "paragraphs": [
-                "アップスケーリング時の隣接するタイルの重なり具合を制御します。重なり具合の値を大きくするとタイル間の継ぎ目が見えにくくなりますが、メモリ使用量は増加します。",
+                "アップスケール時の隣接するタイルの重なり具合を制御します。重なり具合の値を大きくするとタイル間の継ぎ目が見えにくくなりますが、メモリ使用量は増加します。",
                 "デフォルト値の 128 はほとんどの場合に適していますが、特定のニーズやメモリの制約に基づいて調整できます。"
             ]
         }
@@ -1881,8 +1884,8 @@
         "resultTitle": "プロンプト拡張完了",
         "resultSubtitle": "拡張プロンプトの処理方法を選択します:",
         "insert": "挿入",
-        "noPromptHistory": "プロンプト履歴が記録されていません。",
-        "noMatchingPrompts": "履歴にマッチするプロンプトがありません。",
+        "noPromptHistory": "プロンプトヒストリーが記録されていません。",
+        "noMatchingPrompts": "マッチするプロンプトがヒストリーにありません。",
         "toSwitchBetweenPrompts": "プロンプトを切り替えます。"
     },
     "ui": {
@@ -1894,7 +1897,7 @@
             "gallery": "ギャラリー",
             "workflowsTab": "$t(ui.tabs.workflows) $t(common.tab)",
             "modelsTab": "$t(ui.tabs.models) $t(common.tab)",
-            "upscaling": "アップスケーリング",
+            "upscaling": "アップスケール",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
             "generate": "生成"
         },
@@ -1904,7 +1907,7 @@
                 "scale": "スケール",
                 "helpText": {
                     "promptAdvice": "アップスケールする際は、媒体とスタイルを説明するプロンプトを使用してください。画像内の具体的なコンテンツの詳細を説明することは避けてください。",
-                    "styleAdvice": "アップスケーリングは、画像の全体的なスタイルに最適です。"
+                    "styleAdvice": "アップスケールは、画像の全体的なスタイルに最適です。"
                 },
                 "uploadImage": {
                     "title": "アップスケール用の画像をアップロードする",
@@ -1957,19 +1960,19 @@
             "browseAndLoadWorkflows": "既存のワークフローを参照して読み込む",
             "addStyleRef": {
                 "title": "スタイル参照を追加する",
-                "description": "画像を追加して外観を転送します。"
+                "description": "外観を参照するための画像を追加しましょう。"
             },
             "editImage": {
                 "title": "画像を編集",
-                "description": "絞り込むために画像を追加します。"
+                "description": "リファインする画像を追加しましょう。"
             },
             "generateFromText": {
                 "title": "テキストから生成",
-                "description": "プロンプトを入力して呼び出します。"
+                "description": "プロンプトを入力して生成しましょう。"
             },
             "useALayoutImage": {
                 "title": "レイアウト画像を使用",
-                "description": "構成を制御するために画像を追加します。"
+                "description": "構図を制御するための画像を追加しましょう。"
             },
             "generate": {
                 "canvasCalloutTitle": "画像をさらに細かく制御、編集、反復したいですか?",
@@ -1997,13 +2000,13 @@
             "canvasGroup": "キャンバス",
             "saveToGalleryGroup": "ギャラリーに保存",
             "saveCanvasToGallery": "キャンバスをギャラリーに保存",
-            "saveBboxToGallery": "Bボックスをギャラリーに保存",
+            "saveBboxToGallery": "バウンディングボックスをギャラリーに保存",
             "newControlLayer": "新規コントロールレイヤー",
             "newRasterLayer": "新規ラスターレイヤー",
             "newInpaintMask": "新規インペイントマスク",
             "copyToClipboard": "クリップボードにコピー",
             "copyCanvasToClipboard": "キャンバスをクリップボードにコピー",
-            "copyBboxToClipboard": "Bボックスをクリップボードにコピー",
+            "copyBboxToClipboard": "バウンディングボックスをクリップボードにコピー",
             "newResizedControlLayer": "新しくサイズ変更されたコントロールレイヤー"
         },
         "regionalGuidance": "領域ガイダンス",
@@ -2030,7 +2033,7 @@
             "rectangle": "矩形",
             "move": "移動",
             "eraser": "消しゴム",
-            "bbox": "Bbox",
+            "bbox": "バウンディングボックス",
             "view": "ビュー"
         },
         "saveCanvasToGallery": "キャンバスをギャラリーに保存",
@@ -2064,7 +2067,7 @@
                 "label": "グリッドにスナップ"
             },
             "preserveMask": {
-                "label": "マスクされた領域を保持",
+                "label": "マスクされた領域を保護",
                 "alert": "マスクされた領域の保存"
             },
             "isolatedStagingPreview": "分離されたステージングプレビュー",
@@ -2072,10 +2075,10 @@
             "isolatedLayerPreview": "分離されたレイヤーのプレビュー",
             "isolatedLayerPreviewDesc": "フィルタリングや変換などの操作を実行するときに、このレイヤーのみを表示するかどうか。",
             "invertBrushSizeScrollDirection": "ブラシサイズのスクロール反転",
-            "pressureSensitivity": "圧力感度",
+            "pressureSensitivity": "筆圧検知",
             "saveAllImagesToGallery": {
-                "label": "ギャラリーに新しい生成を送る",
-                "alert": "キャンバスを経由せず、ギャラリーに新しい生成を送り込む"
+                "label": "ギャラリーに新しい生成画像を送る",
+                "alert": "キャンバスを経由せず、ギャラリーに新しい生成を送る"
             }
         },
         "filter": {
@@ -2093,14 +2096,14 @@
             "cancel": "キャンセル",
             "filters": "フィルター",
             "filterType": "フィルタータイプ",
-            "autoProcess": "オートプロセス",
+            "autoProcess": "自動で実行",
             "process": "プロセス",
-            "advanced": "アドバンスド",
+            "advanced": "詳細設定",
             "processingLayerWith": "{{type}} フィルターを使用した処理レイヤー。",
             "forMoreControl": "さらに細かく制御するには、以下の「詳細設定」をクリックしてください。",
             "canny_edge_detection": {
-                "label": "キャニーエッジ検出",
-                "description": "Canny エッジ検出アルゴリズムを使用して、選択したレイヤーからエッジ マップを生成します。",
+                "label": "エッジ検出（Canny）",
+                "description": "Canny エッジ検出アルゴリズムを使用して、選択したレイヤーから線画を生成します。",
                 "low_threshold": "低閾値",
                 "high_threshold": "高閾値"
             },
@@ -2115,8 +2118,8 @@
                 "scale_factor": "スケール係数"
             },
             "depth_anything_depth_estimation": {
-                "label": "デプスエニシング",
-                "description": "デプスエニシングモデルを使用して、選択したレイヤーから深度マップを生成します。",
+                "label": "深度抽出（Depth Anything）",
+                "description": "Depth Anthingモデルを使用して、選択したレイヤーから深度マップを生成します。",
                 "model_size": "モデルサイズ",
                 "model_size_small": "スモール",
                 "model_size_small_v2": "スモールv2",
@@ -2124,50 +2127,50 @@
                 "model_size_large": "ラージ"
             },
             "dw_openpose_detection": {
-                "label": "DW オープンポーズ検出",
+                "label": "ポーズ検出（DW Openpose）",
                 "description": "DW Openpose モデルを使用して、選択したレイヤー内の人間のポーズを検出します。",
                 "draw_hands": "手を描く",
                 "draw_face": "顔を描く",
                 "draw_body": "体を描く"
             },
             "hed_edge_detection": {
-                "label": "HEDエッジ検出",
-                "description": "HED エッジ検出モデルを使用して、選択したレイヤーからエッジ マップを生成します。",
+                "label": "エッジ検出（HED）",
+                "description": "HED エッジ検出モデルを使用して、選択したレイヤーから線画を生成します。",
                 "scribble": "落書き"
             },
             "lineart_anime_edge_detection": {
-                "label": "線画アニメのエッジ検出",
-                "description": "線画アニメエッジ検出モデルを使用して、選択したレイヤーからエッジ マップを生成します。"
+                "label": "エッジ検出（Lineart Anime）",
+                "description": "Lineart Animeエッジ検出モデルを使用して、選択したレイヤーから線画を生成します。"
             },
             "lineart_edge_detection": {
-                "label": "線画エッジ検出",
-                "description": "線画エッジ検出モデルを使用して、選択したレイヤーからエッジ マップを生成します。",
-                "coarse": "粗い"
+                "label": "エッジ検出（Lineart）",
+                "description": "Linartエッジ検出モデルを使用して、選択したレイヤーから線画を生成します。",
+                "coarse": "粗く"
             },
             "mediapipe_face_detection": {
-                "label": "メディアパイプ顔検出",
-                "description": "メディアパイプ顔検出モデルを使用して、選択したレイヤー内の顔を検出します。",
-                "max_faces": "マックスフェイス",
+                "label": "顔検出（MediaPipe）",
+                "description": "MediaPipe顔検出モデルを使用して、選択したレイヤー内の顔を検出します。",
+                "max_faces": "最大顔数",
                 "min_confidence": "最小信頼度"
             },
             "mlsd_detection": {
-                "label": "線分検出",
-                "description": "MLSD 線分検出モデルを使用して、選択したレイヤーから線分マップを生成します。",
+                "label": "直線検出（MLSD）",
+                "description": "MLSD 線分検出モデルを使用して、選択したレイヤーから直線部分を抽出します。",
                 "score_threshold": "スコア閾値",
                 "distance_threshold": "距離閾値"
             },
             "normal_map": {
-                "label": "ノーマルマップ",
+                "label": "ノーマルマップ推定",
                 "description": "選択したレイヤーからノーマルマップを生成します。"
             },
             "pidi_edge_detection": {
-                "label": "PiDiNetエッジ検出",
-                "description": "PiDiNet エッジ検出モデルを使用して、選択したレイヤーからエッジ マップを生成します。",
+                "label": "エッジ検出（PiDiNet）",
+                "description": "PiDiNet エッジ検出モデルを使用して、選択したレイヤーから線画を生成します。",
                 "scribble": "落書き",
                 "quantize_edges": "エッジを量子化する"
             },
             "img_blur": {
-                "label": "画像をぼかす",
+                "label": "ぼかし",
                 "description": "選択したレイヤーをぼかします。",
                 "blur_type": "ぼかしの種類",
                 "blur_radius": "半径",
@@ -2175,7 +2178,7 @@
                 "box_type": "ボックス"
             },
             "img_noise": {
-                "label": "ノイズ画像",
+                "label": "ノイズ",
                 "description": "選択したレイヤーにノイズを追加します。",
                 "noise_type": "ノイズの種類",
                 "noise_amount": "総計",
@@ -2219,26 +2222,26 @@
         "newGlobalReferenceImageError": "グローバル参照イメージの作成中に問題が発生しました",
         "newRegionalReferenceImageOk": "地域参照画像の作成",
         "newRegionalReferenceImageError": "地域参照画像の作成中に問題が発生しました",
-        "newControlLayerOk": "制御レイヤーの作成",
+        "newControlLayerOk": "作成されたコントロールレイヤー",
         "newControlLayerError": "制御層の作成中に問題が発生しました",
         "newRasterLayerOk": "ラスターレイヤーを作成しました",
         "newRasterLayerError": "ラスターレイヤーの作成中に問題が発生しました",
-        "pullBboxIntoLayerOk": "Bbox をレイヤーにプル",
-        "pullBboxIntoLayerError": "BBox をレイヤーにプルする際に問題が発生しました",
-        "pullBboxIntoReferenceImageOk": "Bbox が ReferenceImage にプルされました",
-        "pullBboxIntoReferenceImageError": "BBox を ReferenceImage にプルする際に問題が発生しました",
+        "pullBboxIntoLayerOk": "バウンディングボックスをレイヤーに",
+        "pullBboxIntoLayerError": "バウンディングボックスをレイヤーにする際に問題が発生しました",
+        "pullBboxIntoReferenceImageOk": "バウンディングボックスが参照画像にされました",
+        "pullBboxIntoReferenceImageError": "バウンディングボックスを参照画像にする際に問題が発生しました",
         "regionIsEmpty": "選択した領域は空です",
         "mergeVisible": "マージを可視化",
         "mergeVisibleOk": "マージされたレイヤー",
         "mergeVisibleError": "レイヤーの結合エラー",
         "mergingLayers": "レイヤーのマージ",
         "clearHistory": "履歴をクリア",
-        "bboxOverlay": "Bboxオーバーレイを表示",
+        "bboxOverlay": "バウンディングボックスのオーバーレイを表示",
         "ruleOfThirds": "三分割法を表示",
         "newSession": "新しいセッション",
         "clearCaches": "キャッシュをクリア",
         "recalculateRects": "長方形を再計算する",
-        "clipToBbox": "ストロークをBboxにクリップ",
+        "clipToBbox": "ストロークをバウンディングボックス内に制限",
         "outputOnlyMaskedRegions": "生成された領域のみを出力する",
         "width": "幅",
         "autoNegative": "オートネガティブ",
@@ -2284,13 +2287,13 @@
         "pasteTo": "貼り付け先",
         "pasteToAssets": "アセット",
         "pasteToAssetsDesc": "アセットに貼り付け",
-        "pasteToBbox": "Bボックス",
-        "pasteToBboxDesc": "新しいレイヤー（Bbox内）",
+        "pasteToBbox": "バウンディングボックス",
+        "pasteToBboxDesc": "新しいレイヤー（バウンディングボックス内）",
         "pasteToCanvas": "キャンバス",
         "pasteToCanvasDesc": "新しいレイヤー（キャンバス内）",
-        "transparency": "透明性",
-        "enableTransparencyEffect": "透明効果を有効にする",
-        "disableTransparencyEffect": "透明効果を無効にする",
+        "transparency": "透過表示",
+        "enableTransparencyEffect": "透過表示を有効にする",
+        "disableTransparencyEffect": "透過表示を無効にする",
         "hidingType": "{{type}} を非表示",
         "showingType": "{{type}}を表示",
         "showNonRasterLayers": "非ラスターレイヤーを表示 (Shift+H)",
@@ -2301,24 +2304,24 @@
         "unlocked": "ロック解除",
         "deleteSelected": "選択項目を削除",
         "replaceLayer": "レイヤーの置き換え",
-        "pullBboxIntoLayer": "Bboxをレイヤーに引き込む",
-        "pullBboxIntoReferenceImage": "Bboxを参照画像に取り込む",
+        "pullBboxIntoLayer": "バウンディングボックスをレイヤーに",
+        "pullBboxIntoReferenceImage": "バウンディングボックスを参照画像に",
         "showProgressOnCanvas": "キャンバスに進捗状況を表示",
         "useImage": "画像を使う",
         "negativePrompt": "ネガティブプロンプト",
         "beginEndStepPercentShort": "開始/終了 %",
-        "resetCanvasLayers": "キャンバスレイヤーをリセット",
+        "resetCanvasLayers": "キャンバスとレイヤーをリセット",
         "resetGenerationSettings": "生成設定をリセット",
-        "controlLayerEmptyState": "<UploadButton>画像をアップロード</UploadButton>、ギャラリーからこのレイヤーに画像をドラッグ、<PullBboxButton>境界ボックスをこのレイヤーにプル</PullBboxButton>、またはキャンバスに描画して開始します。",
-        "referenceImageEmptyStateWithCanvasOptions": "開始するには、<UploadButton>画像をアップロード</UploadButton>するか、ギャラリーからこの参照画像に画像をドラッグするか、<PullBboxButton>境界ボックスをこの参照画像に引き込みます</PullBboxButton>。",
+        "controlLayerEmptyState": "<UploadButton>画像をアップロード</UploadButton>、ギャラリーからこのレイヤーに画像をドラッグ、<PullBboxButton>バウンディングボックスをこのレイヤーにする</PullBboxButton>、またはキャンバスに描画して開始します。",
+        "referenceImageEmptyStateWithCanvasOptions": "開始するには、<UploadButton>画像をアップロード</UploadButton>するか、ギャラリーからこの参照画像に画像をドラッグするか、<PullBboxButton>バウンディングボックスをこの参照画像にします</PullBboxButton>。",
         "referenceImageEmptyState": "開始するには、<UploadButton>画像をアップロード</UploadButton>するか、ギャラリーからこの参照画像に画像をドラッグします。",
         "imageNoise": "画像ノイズ",
         "denoiseLimit": "ノイズ除去制限",
         "warnings": {
             "problemsFound": "問題が見つかりました",
             "unsupportedModel": "選択したベースモデルではレイヤーがサポートされていません",
-            "controlAdapterNoModelSelected": "制御レイヤーモデルが選択されていません",
-            "controlAdapterIncompatibleBaseModel": "互換性のない制御レイヤーベースモデル",
+            "controlAdapterNoModelSelected": "コントロールレイヤーのモデルが選択されていません",
+            "controlAdapterIncompatibleBaseModel": "コントロールレイヤーのベースモデルに互換性がありません",
             "controlAdapterNoControl": "コントロールが選択/描画されていません",
             "ipAdapterNoModelSelected": "参照画像モデルが選択されていません",
             "ipAdapterIncompatibleBaseModel": "互換性のない参照画像ベースモデル",
@@ -2329,7 +2332,7 @@
             "rgAutoNegativeNotSupported": "選択したベースモデルでは自動否定はサポートされていません",
             "rgNoRegion": "領域が描画されていません",
             "fluxFillIncompatibleWithControlLoRA": "コントロールLoRAはFLUX Fillと互換性がありません",
-            "bboxHidden": "境界ボックスは非表示です（Shift+O で切り替えます）"
+            "bboxHidden": "バウンディングボックスは非表示です（Shift+O で切り替え）"
         },
         "errors": {
             "unableToFindImage": "画像が見つかりません",
@@ -2370,7 +2373,7 @@
         },
         "selectObject": {
             "selectObject": "オブジェクトを選択",
-            "pointType": "ポイントタイプ",
+            "pointType": "点タイプ",
             "invertSelection": "選択範囲を反転",
             "include": "含む",
             "exclude": "除外",
@@ -2384,7 +2387,7 @@
             "dragToMove": "ポイントをドラッグして移動します",
             "clickToRemove": "ポイントをクリックして削除します",
             "desc": "対象オブジェクトを1つ選択します。選択が完了したら、<Bold>適用</Bold> をクリックして選択範囲外のすべてを削除するか、選択範囲を新しいレイヤーとして保存します。",
-            "visualModeDesc": "ビジュアル モードでは、ボックスとポイントの入力を使用してオブジェクトを選択します。",
+            "visualModeDesc": "ビジュアル モードでは、ボックスと点の入力を使用してオブジェクトを選択します。",
             "visualMode1": "クリック＆ドラッグして、選択したいオブジェクトの周囲にボックスを描きます。オブジェクトより少し大きいか小さいボックスを描くと、より良い結果が得られる場合があります。",
             "visualMode2": "クリックして緑の <Bold>include</Bold> ポイントを追加するか、Shift キーを押しながらクリックして赤の <Bold>exclude</Bold> ポイントを追加し、モデルに含める内容と除外する内容を指示します。",
             "visualMode3": "ポイントは、ボックスの選択を絞り込むために使用することも、独立して使用することもできます。",
@@ -2392,13 +2395,13 @@
             "promptMode1": "選択するオブジェクトの簡単な説明を入力します。",
             "promptMode2": "複雑な説明や複数のオブジェクトを避け、簡単な言葉を使用してください。",
             "model": "モデル",
-            "segmentAnything1": "何でもセグメント1",
-            "segmentAnything2": "何でもセグメント2",
+            "segmentAnything1": "Segment Anything 1",
+            "segmentAnything2": "Segment Anything 2",
             "prompt": "プロンプト選択"
         },
         "HUD": {
-            "bbox": "Bボックス",
-            "scaledBbox": "スケールされたBボックス",
+            "bbox": "バウンディングボックス",
+            "scaledBbox": "スケールされたバウンディングボックス",
             "entityStatus": {
                 "isFiltering": "{{title}} はフィルタリング中です",
                 "isTransforming": "{{title}}は変化しています",
@@ -2418,20 +2421,20 @@
             "showResultsOn": "結果を表示",
             "showResultsOff": "結果を隠す"
         },
-        "fitBboxToMasks": "Bboxをマスクにフィットさせる",
+        "fitBboxToMasks": "バウンディングボックスをマスクにフィットさせる",
         "addAdjustments": "調整を追加",
         "removeAdjustments": "調整を削除",
         "adjustments": {
             "simple": "シンプル",
-            "curves": "曲線",
+            "curves": "カーブ",
             "heading": "調整",
             "expand": "調整を拡張",
             "collapse": "折りたたみ調整",
             "brightness": "輝度",
             "contrast": "コントラスト",
-            "saturation": "飽和",
-            "temperature": "温度",
-            "tint": "色合い",
+            "saturation": "彩度",
+            "temperature": "色温度",
+            "tint": "色相",
             "sharpness": "シャープネス",
             "finish": "終了",
             "reset": "リセット",
@@ -2475,7 +2478,8 @@
             "off": "オフ",
             "switchOnStart": "開始時",
             "switchOnFinish": "終了時"
-        }
+        },
+        "extractRegion": "領域を抽出"
     },
     "stylePresets": {
         "clearTemplateSelection": "選択したテンプレートをクリア",
@@ -2541,18 +2545,18 @@
         "missingUpscaleInitialImage": "アップスケール用の初期画像がありません",
         "missingUpscaleModel": "アップスケールモデルがありません",
         "missingTileControlNetModel": "有効なタイル コントロールネットモデルがインストールされていません",
-        "incompatibleBaseModel": "アップスケーリングにサポートされていないメインモデルアーキテクチャです",
-        "incompatibleBaseModelDesc": "アップスケーリングはSD1.5およびSDXLアーキテクチャモデルでのみサポートされています。アップスケーリングを有効にするには、メインモデルを変更してください。",
+        "incompatibleBaseModel": "アップスケールにサポートされていないメインモデルアーキテクチャです",
+        "incompatibleBaseModelDesc": "アップスケールはSD1.5およびSDXLアーキテクチャモデルでのみサポートされています。アップスケールを有効にするには、メインモデルを変更してください。",
         "tileControl": "タイルコントロール",
         "tileSize": "タイルサイズ",
         "tileOverlap": "タイルオーバーラップ"
     },
     "sdxl": {
-        "denoisingStrength": "ノイズ除去強度",
+        "denoisingStrength": "除去ノイズ強度",
         "scheduler": "スケジューラー",
         "loading": "ロード中...",
         "steps": "ステップ",
-        "refiner": "Refiner",
+        "refiner": "リファイナー",
         "noModelsAvailable": "利用できるモデルがありません",
         "cfgScale": "CFGスケール",
         "posAestheticScore": "ポジティブ美的スコア",
@@ -2594,7 +2598,7 @@
             "builder": "フォームビルダー",
             "text": "テキスト",
             "row": "行",
-            "multiLine": "マルチライン",
+            "multiLine": "テキスト(複数行)",
             "resetAllNodeFields": "すべてのノードフィールドをリセット",
             "slider": "スライダー",
             "layout": "レイアウト",
@@ -2604,7 +2608,7 @@
             "component": "コンポーネント",
             "textPlaceholder": "空のテキスト",
             "addOption": "オプションを追加",
-            "singleLine": "単線",
+            "singleLine": "テキスト",
             "numberInput": "数値入力",
             "column": "列",
             "container": "コンテナ",
@@ -2682,7 +2686,7 @@
         "delete": "削除",
         "loadMore": "もっと読み込む",
         "saveWorkflowToProject": "ワークフローをプロジェクトに保存",
-        "created": "作成されました",
+        "created": "作成順",
         "workflowEditorMenu": "ワークフローエディターメニュー",
         "recentlyOpened": "最近開いた",
         "opened": "オープン",
@@ -2736,9 +2740,9 @@
         "seedBehaviour": {
             "label": "シードの挙動",
             "perPromptLabel": "画像ごとのシード",
-            "perIterationLabel": "いてレーションごとのシード",
+            "perIterationLabel": "イテレーションごとのシード",
             "perPromptDesc": "それぞれの画像に足して別のシードを使う",
-            "perIterationDesc": "それぞれのいてレーションに別のシードを使う"
+            "perIterationDesc": "それぞれのイテレーションに別のシードを使う"
         },
         "showDynamicPrompts": "ダイナミックプロンプトを表示する",
         "dynamicPrompts": "ダイナミックプロンプト",
@@ -2758,7 +2762,7 @@
         "whatsNewInInvoke": "Invokeの新機能",
         "items": [
             "オブジェクトの選択 v2: ポイントおよびボックス入力またはテキスト プロンプトによるオブジェクト選択が改善されました。",
-            "ラスター レイヤーの調整: レイヤーの明るさ、コントラスト、彩度、曲線などを簡単に調整できます。"
+            "ラスター レイヤーの調整: レイヤーの明度、コントラスト、彩度、カーブなどを簡単に調整できます。"
         ],
         "readReleaseNotes": "リリースノートを読む",
         "watchRecentReleaseVideos": "最近のリリースビデオを見る",
