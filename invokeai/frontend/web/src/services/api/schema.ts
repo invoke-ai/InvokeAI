@@ -4988,7 +4988,7 @@ export type components = {
             item?: unknown | null;
             /**
              * Collection
-             * @description The collection, will be provided on execution
+             * @description An optional collection to append to
              * @default []
              */
             collection?: unknown[];
