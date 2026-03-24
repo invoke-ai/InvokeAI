@@ -108,6 +108,24 @@ export const validateConnection: ValidateConnectionFunc = (
       }
     }
 
+    if (
+      sourceNode.data.type === 'collect' &&
+      c.sourceHandle === 'collection' &&
+      targetNode.data.type === 'collect' &&
+      c.targetHandle === 'collection'
+    ) {
+      // Chained collect nodes should preserve a single item type when both ends are already typed.
+      const sourceCollectItemType = getCollectItemType(templates, nodes, edges, sourceNode.id);
+      const targetCollectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
+      if (
+        sourceCollectItemType &&
+        targetCollectItemType &&
+        !areTypesEqual(sourceCollectItemType, targetCollectItemType)
+      ) {
+        return 'nodes.cannotMixAndMatchCollectionItemTypes';
+      }
+    }
+
     if (filteredEdges.find(getTargetEqualityPredicate(c))) {
       // CollectionItemField inputs can have multiple input connections
       if (targetFieldTemplate.type.name !== 'CollectionItemField') {
