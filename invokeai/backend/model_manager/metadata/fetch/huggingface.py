@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 import requests
-from huggingface_hub import HfApi, configure_http_backend, hf_hub_url
+from huggingface_hub import HfApi, hf_hub_url
 from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
@@ -47,7 +47,6 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         this module without an internet connection.
         """
         self._requests = session or requests.Session()
-        configure_http_backend(backend_factory=lambda: self._requests)
 
     @classmethod
     def from_json(cls, json: str) -> HuggingFaceMetadata:

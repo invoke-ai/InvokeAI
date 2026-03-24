@@ -370,6 +370,13 @@ const zFlux2ReferenceImageConfig = z.object({
 });
 export type Flux2ReferenceImageConfig = z.infer<typeof zFlux2ReferenceImageConfig>;
 
+// Qwen Image Edit has built-in reference image support - no separate model needed
+const zQwenImageEditReferenceImageConfig = z.object({
+  type: z.literal('qwen_image_edit_reference_image'),
+  image: zCroppableImageWithDims.nullable(),
+});
+export type QwenImageEditReferenceImageConfig = z.infer<typeof zQwenImageEditReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -385,6 +392,7 @@ export const zRefImageState = z.object({
     zFLUXReduxConfig,
     zFluxKontextReferenceImageConfig,
     zFlux2ReferenceImageConfig,
+    zQwenImageEditReferenceImageConfig,
   ]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
@@ -401,6 +409,10 @@ export const isFluxKontextReferenceImageConfig = (
 
 export const isFlux2ReferenceImageConfig = (config: RefImageState['config']): config is Flux2ReferenceImageConfig =>
   config.type === 'flux2_reference_image';
+
+export const isQwenImageEditReferenceImageConfig = (
+  config: RefImageState['config']
+): config is QwenImageEditReferenceImageConfig => config.type === 'qwen_image_edit_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -753,6 +765,10 @@ export const zParamsState = z.object({
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
+  // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
+  qwenImageEditComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
+  qwenImageEditQuantization: z.enum(['none', 'int8', 'nf4']), // BitsAndBytes quantization for Qwen VL encoder
+  qwenImageEditShift: z.number().nullable(), // Sigma schedule shift override (e.g. 3.0 for Lightning LoRAs)
   // Z-Image Seed Variance Enhancer settings
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
@@ -817,6 +833,9 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageQwen3SourceModel: null,
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
+  qwenImageEditComponentSource: null,
+  qwenImageEditQuantization: 'none' as const,
+  qwenImageEditShift: null,
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,

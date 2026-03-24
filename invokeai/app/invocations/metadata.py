@@ -166,6 +166,10 @@ GENERATION_MODES = Literal[
     "z_image_img2img",
     "z_image_inpaint",
     "z_image_outpaint",
+    "qwen_image_edit_txt2img",
+    "qwen_image_edit_img2img",
+    "qwen_image_edit_inpaint",
+    "qwen_image_edit_outpaint",
 ]
 
 

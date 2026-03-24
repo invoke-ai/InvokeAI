@@ -89,6 +89,23 @@ class ZImageConditioningInfo:
 
 
 @dataclass
+class QwenImageEditConditioningInfo:
+    """Qwen Image Edit conditioning information from Qwen2.5-VL encoder."""
+
+    prompt_embeds: torch.Tensor
+    """Text/image embeddings from Qwen2.5-VL encoder. Shape: (batch_size, seq_len, hidden_size)."""
+
+    prompt_embeds_mask: torch.Tensor | None = None
+    """Attention mask for prompt_embeds. Shape: (batch_size, seq_len). 1 for valid, 0 for padding."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        if self.prompt_embeds_mask is not None:
+            self.prompt_embeds_mask = self.prompt_embeds_mask.to(device=device)
+        return self
+
+
+@dataclass
 class ConditioningFieldData:
     # If you change this class, adding more types, you _must_ update the instantiation of ObjectSerializerDisk in
     # invokeai/app/api/dependencies.py, adding the types to the list of safe globals. If you do not, torch will be
@@ -100,6 +117,7 @@ class ConditioningFieldData:
         | List[SD3ConditioningInfo]
         | List[CogView4ConditioningInfo]
         | List[ZImageConditioningInfo]
+        | List[QwenImageEditConditioningInfo]
     )
 
 

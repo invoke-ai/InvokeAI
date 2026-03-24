@@ -757,6 +757,45 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         raise NotAMatchError("model does not look like a Z-Image LoRA")
 
 
+class LoRA_LyCORIS_QwenImageEdit_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Qwen Image Edit LoRA models in LyCORIS format."""
+
+    base: Literal[BaseModelType.QwenImageEdit] = Field(default=BaseModelType.QwenImageEdit)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Qwen Image Edit LoRAs have keys like transformer_blocks.X.attn.to_k.lora_down.weight."""
+        state_dict = mod.load_state_dict()
+
+        has_qwen_ie_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {"transformer_blocks."},
+        )
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {"lora_A.weight", "lora_B.weight", "lora_down.weight", "lora_up.weight", "dora_scale"},
+        )
+        # Must NOT have diffusion_model.layers (Z-Image) or double_blocks/single_blocks (Flux)
+        has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        has_flux_keys = state_dict_has_any_keys_starting_with(state_dict, {"double_blocks.", "single_blocks."})
+
+        if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_flux_keys:
+            return
+
+        raise NotAMatchError("model does not match Qwen Image Edit LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        state_dict = mod.load_state_dict()
+        has_qwen_ie_keys = state_dict_has_any_keys_starting_with(state_dict, {"transformer_blocks."})
+        has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        has_flux_keys = state_dict_has_any_keys_starting_with(state_dict, {"double_blocks.", "single_blocks."})
+
+        if has_qwen_ie_keys and not has_z_image_keys and not has_flux_keys:
+            return BaseModelType.QwenImageEdit
+        raise NotAMatchError("model does not look like a Qwen Image Edit LoRA")
+
+
 class ControlAdapter_Config_Base(ABC, BaseModel):
     default_settings: ControlAdapterDefaultSettings | None = Field(None)
 

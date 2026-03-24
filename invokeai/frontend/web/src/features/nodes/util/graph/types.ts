@@ -15,6 +15,7 @@ export type ImageOutputNodes =
   | 'flux2_vae_decode'
   | 'sd3_l2i'
   | 'cogview4_l2i'
+  | 'qwen_image_edit_l2i'
   | 'z_image_l2i';
 
 export type LatentToImageNodes =
@@ -23,6 +24,7 @@ export type LatentToImageNodes =
   | 'flux2_vae_decode'
   | 'sd3_l2i'
   | 'cogview4_l2i'
+  | 'qwen_image_edit_l2i'
   | 'z_image_l2i';
 
 export type ImageToLatentsNodes =
@@ -31,6 +33,7 @@ export type ImageToLatentsNodes =
   | 'flux2_vae_encode'
   | 'sd3_i2l'
   | 'cogview4_i2l'
+  | 'qwen_image_edit_i2l'
   | 'z_image_i2l';
 
 export type DenoiseLatentsNodes =
@@ -39,6 +42,7 @@ export type DenoiseLatentsNodes =
   | 'flux2_denoise'
   | 'sd3_denoise'
   | 'cogview4_denoise'
+  | 'qwen_image_edit_denoise'
   | 'z_image_denoise';
 
 export type MainModelLoaderNodes =
@@ -48,6 +52,7 @@ export type MainModelLoaderNodes =
   | 'flux2_klein_model_loader'
   | 'sd3_model_loader'
   | 'cogview4_model_loader'
+  | 'qwen_image_edit_model_loader'
   | 'z_image_model_loader';
 
 export type VaeSourceNodes = 'seamless' | 'vae_loader';

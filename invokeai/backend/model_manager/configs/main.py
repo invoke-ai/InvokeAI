@@ -84,6 +84,8 @@ class MainModelDefaultSettings(BaseModel):
                 else:
                     # Distilled models (Klein 4B, Klein 9B) use fewer steps
                     return cls(steps=4, cfg_scale=1.0, width=1024, height=1024)
+            case BaseModelType.QwenImageEdit:
+                return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
             case _:
                 # TODO(psyche): Do we want defaults for other base types?
                 return None
@@ -1199,3 +1201,67 @@ class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
         has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
         if not has_ggml_tensors:
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
+class Main_Diffusers_QwenImageEdit_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Qwen Image Edit 2511 diffusers models."""
+
+    base: Literal[BaseModelType.QwenImageEdit] = Field(BaseModelType.QwenImageEdit)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # This check implies the base type - no further validation needed.
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {
+                "QwenImageEditPlusPipeline",
+            },
+        )
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+        )
+
+
+def _has_qwen_image_edit_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Qwen Image Edit transformer keys.
+
+    Qwen Image Edit uses 'txt_in' and 'txt_norm' instead of 'context_embedder' (FLUX).
+    This distinguishes it from FLUX and other architectures.
+    """
+    has_txt_in = any(isinstance(k, str) and k.startswith("txt_in.") for k in state_dict.keys())
+    has_txt_norm = any(isinstance(k, str) and k.startswith("txt_norm.") for k in state_dict.keys())
+    has_img_in = any(isinstance(k, str) and k.startswith("img_in.") for k in state_dict.keys())
+    # Must NOT have context_embedder (which would indicate FLUX)
+    has_context_embedder = any(isinstance(k, str) and "context_embedder" in k for k in state_dict.keys())
+    return has_txt_in and has_txt_norm and has_img_in and not has_context_embedder
+
+
+class Main_GGUF_QwenImageEdit_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Qwen Image Edit transformer models."""
+
+    base: Literal[BaseModelType.QwenImageEdit] = Field(default=BaseModelType.QwenImageEdit)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+
+        if not _has_qwen_image_edit_keys(sd):
+            raise NotAMatchError("state dict does not look like a Qwen Image Edit model")
+
+        if not _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        return cls(**override_fields)

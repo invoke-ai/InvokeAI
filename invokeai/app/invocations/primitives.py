@@ -24,6 +24,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     LatentsField,
     OutputField,
+    QwenImageEditConditioningField,
     SD3ConditioningField,
     TensorField,
     UIComponent,
@@ -471,6 +472,17 @@ class ZImageConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "ZImageConditioningOutput":
         return cls(conditioning=ZImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("qwen_image_edit_conditioning_output")
+class QwenImageEditConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a Qwen Image Edit conditioning tensor."""
+
+    conditioning: QwenImageEditConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "QwenImageEditConditioningOutput":
+        return cls(conditioning=QwenImageEditConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("conditioning_output")

@@ -649,6 +649,70 @@ cogview4 = StarterModel(
 )
 # endregion
 
+# region Qwen Image Edit
+qwen_image_edit = StarterModel(
+    name="Qwen Image Edit 2511",
+    base=BaseModelType.QwenImageEdit,
+    source="Qwen/Qwen-Image-Edit-2511",
+    description="Qwen Image Edit 2511 full diffusers model. Supports text-guided image editing with multiple reference images. (~40GB)",
+    type=ModelType.Main,
+)
+
+qwen_image_edit_gguf_q4_k_m = StarterModel(
+    name="Qwen Image Edit 2511 (Q4_K_M)",
+    base=BaseModelType.QwenImageEdit,
+    source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q4_K_M.gguf",
+    description="Qwen Image Edit 2511 - Q4_K_M quantized transformer. Good quality/size balance. (~13GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+)
+
+qwen_image_edit_gguf_q2_k = StarterModel(
+    name="Qwen Image Edit 2511 (Q2_K)",
+    base=BaseModelType.QwenImageEdit,
+    source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q2_K.gguf",
+    description="Qwen Image Edit 2511 - Q2_K heavily quantized transformer. Smallest size, lower quality. (~7.5GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+)
+
+qwen_image_edit_gguf_q6_k = StarterModel(
+    name="Qwen Image Edit 2511 (Q6_K)",
+    base=BaseModelType.QwenImageEdit,
+    source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q6_K.gguf",
+    description="Qwen Image Edit 2511 - Q6_K quantized transformer. Near-lossless quality. (~17GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+)
+
+qwen_image_edit_gguf_q8_0 = StarterModel(
+    name="Qwen Image Edit 2511 (Q8_0)",
+    base=BaseModelType.QwenImageEdit,
+    source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q8_0.gguf",
+    description="Qwen Image Edit 2511 - Q8_0 quantized transformer. Highest quality quantization. (~22GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+)
+
+qwen_image_edit_lightning_4step = StarterModel(
+    name="Qwen Image Edit Lightning (4-step, bf16)",
+    base=BaseModelType.QwenImageEdit,
+    source="https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+    description="Lightning distillation LoRA for Qwen Image Edit — enables generation in just 4 steps. "
+    "Settings: Steps=4, CFG=1, Shift Override=3.",
+    type=ModelType.LoRA,
+)
+
+qwen_image_edit_lightning_8step = StarterModel(
+    name="Qwen Image Edit Lightning (8-step, bf16)",
+    base=BaseModelType.QwenImageEdit,
+    source="https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors",
+    description="Lightning distillation LoRA for Qwen Image Edit — enables generation in 8 steps with better quality. "
+    "Settings: Steps=8, CFG=1, Shift Override=3.",
+    type=ModelType.LoRA,
+)
+# endregion
+
 # region SigLIP
 siglip = StarterModel(
     name="SigLIP - google/siglip-so400m-patch14-384",
@@ -948,6 +1012,13 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
     flux2_klein_qwen3_8b_encoder,
     cogview4,
+    qwen_image_edit,
+    qwen_image_edit_gguf_q2_k,
+    qwen_image_edit_gguf_q4_k_m,
+    qwen_image_edit_gguf_q6_k,
+    qwen_image_edit_gguf_q8_0,
+    qwen_image_edit_lightning_4step,
+    qwen_image_edit_lightning_8step,
     flux_krea,
     flux_krea_quantized,
     z_image_turbo,
@@ -1025,12 +1096,21 @@ flux2_klein_bundle: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
 ]
 
+qwen_image_edit_bundle: list[StarterModel] = [
+    qwen_image_edit,
+    qwen_image_edit_gguf_q4_k_m,
+    qwen_image_edit_gguf_q8_0,
+    qwen_image_edit_lightning_4step,
+    qwen_image_edit_lightning_8step,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
     BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
     BaseModelType.Flux2: StarterModelBundle(name="FLUX.2 Klein", models=flux2_klein_bundle),
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
+    BaseModelType.QwenImageEdit: StarterModelBundle(name="Qwen Image Edit", models=qwen_image_edit_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"

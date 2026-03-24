@@ -228,6 +228,19 @@ const slice = createSlice({
       }
       state.kleinQwen3EncoderModel = result.data;
     },
+    qwenImageEditComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.qwenImageEditComponentSource.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageEditComponentSource = result.data;
+    },
+    qwenImageEditQuantizationChanged: (state, action: PayloadAction<'none' | 'int8' | 'nf4'>) => {
+      state.qwenImageEditQuantization = action.payload;
+    },
+    qwenImageEditShiftChanged: (state, action: PayloadAction<number | null>) => {
+      state.qwenImageEditShift = action.payload;
+    },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
     },
@@ -482,6 +495,9 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
+  newState.qwenImageEditComponentSource = oldState.qwenImageEditComponentSource;
+  newState.qwenImageEditQuantization = oldState.qwenImageEditQuantization;
+  newState.qwenImageEditShift = oldState.qwenImageEditShift;
   return newState;
 };
 
@@ -528,6 +544,9 @@ export const {
   zImageQwen3SourceModelSelected,
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
+  qwenImageEditComponentSourceSelected,
+  qwenImageEditQuantizationChanged,
+  qwenImageEditShiftChanged,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   setColorCompensation,
@@ -594,6 +613,7 @@ export const selectIsSD3 = createParamsSelector((params) => params.model?.base =
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
+export const selectIsQwenImageEdit = createParamsSelector((params) => params.model?.base === 'qwen-image-edit');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -616,6 +636,9 @@ export const selectZImageQwen3EncoderModel = createParamsSelector((params) => pa
 export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
+export const selectQwenImageEditComponentSource = createParamsSelector((params) => params.qwenImageEditComponentSource);
+export const selectQwenImageEditQuantization = createParamsSelector((params) => params.qwenImageEditQuantization);
+export const selectQwenImageEditShift = createParamsSelector((params) => params.qwenImageEditShift);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);

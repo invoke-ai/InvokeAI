@@ -6,6 +6,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectIsFLUX,
   selectIsFlux2,
+  selectIsQwenImageEdit,
   selectIsSD3,
   selectIsZImage,
   selectParamsSlice,
@@ -17,6 +18,9 @@ import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/
 import ParamCLIPLEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPLEmbedModelSelect';
 import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip';
 import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
+import ParamQwenImageEditComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageEditComponentSourceSelect';
+import ParamQwenImageEditQuantization from 'features/parameters/components/Advanced/ParamQwenImageEditQuantization';
+import ParamQwenImageEditShift from 'features/parameters/components/Advanced/ParamQwenImageEditShift';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
@@ -45,6 +49,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isFlux2 = useAppSelector(selectIsFlux2);
   const isSD3 = useAppSelector(selectIsSD3);
   const isZImage = useAppSelector(selectIsZImage);
+  const isQwenImageEdit = useAppSelector(selectIsQwenImageEdit);
 
   const selectBadges = useMemo(
     () =>
@@ -94,13 +99,13 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && !isFlux2 && (
+        {!isZImage && !isFlux2 && !isQwenImageEdit && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
           </Flex>
         )}
-        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && (
+        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImageEdit && (
           <>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamClipSkip />
@@ -140,6 +145,13 @@ export const AdvancedSettingsAccordion = memo(() => {
         {isZImage && (
           <FormControlGroup>
             <ParamZImageQwen3VaeModelSelect />
+          </FormControlGroup>
+        )}
+        {isQwenImageEdit && (
+          <FormControlGroup>
+            <ParamQwenImageEditComponentSourceSelect />
+            <ParamQwenImageEditQuantization />
+            <ParamQwenImageEditShift />
           </FormControlGroup>
         )}
       </Flex>

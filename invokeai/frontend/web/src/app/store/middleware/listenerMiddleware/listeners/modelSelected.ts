@@ -7,6 +7,7 @@ import {
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
   modelChanged,
+  qwenImageEditComponentSourceSelected,
   setZImageScheduler,
   syncedToOptimalDimension,
   vaeSelected,
@@ -24,12 +25,17 @@ import {
   selectBboxModelBase,
   selectCanvasSlice,
 } from 'features/controlLayers/store/selectors';
-import { getEntityIdentifier, isFlux2ReferenceImageConfig } from 'features/controlLayers/store/types';
+import {
+  getEntityIdentifier,
+  isFlux2ReferenceImageConfig,
+  isQwenImageEditReferenceImageConfig,
+} from 'features/controlLayers/store/types';
 import {
   initialFlux2ReferenceImage,
   initialFluxKontextReferenceImage,
   initialFLUXRedux,
   initialIPAdapter,
+  initialQwenImageEditReferenceImage,
 } from 'features/controlLayers/store/util';
 import { SUPPORTS_REF_IMAGES_BASE_MODELS } from 'features/modelManagerV2/models';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -168,6 +174,15 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
         }
 
+        // handle incompatible Qwen Image Edit component source - clear if switching away
+        const { qwenImageEditComponentSource } = state.params;
+        if (newBase !== 'qwen-image-edit') {
+          if (qwenImageEditComponentSource) {
+            dispatch(qwenImageEditComponentSourceSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+        }
+
         if (SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
           // Handle incompatible reference image models - switch to first compatible model, with some smart logic
           // to choose the best available model based on the new main model.
@@ -210,8 +225,46 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
               continue;
             }
 
+            if (newBase === 'qwen-image-edit') {
+              // Switching TO Qwen Image Edit - convert any non-qwen configs to qwen_image_edit_reference_image
+              if (!isQwenImageEditReferenceImageConfig(entity.config)) {
+                dispatch(
+                  refImageConfigChanged({
+                    id: entity.id,
+                    config: { ...initialQwenImageEditReferenceImage },
+                  })
+                );
+                modelsUpdatedDisabledOrCleared += 1;
+              }
+              continue;
+            }
+
             if (isFlux2ReferenceImageConfig(entity.config)) {
               // Switching AWAY from FLUX.2 - convert flux2_reference_image to the appropriate config type
+              let newConfig;
+              if (newGlobalRefImageModel) {
+                const parsedModel = zModelIdentifierField.parse(newGlobalRefImageModel);
+                if (newModel.base === 'flux' && newModel.name.toLowerCase().includes('kontext')) {
+                  newConfig = { ...initialFluxKontextReferenceImage, model: parsedModel };
+                } else if (newGlobalRefImageModel.type === 'flux_redux') {
+                  newConfig = { ...initialFLUXRedux, model: parsedModel };
+                } else {
+                  newConfig = { ...initialIPAdapter, model: parsedModel };
+                  if (parsedModel.base === 'flux') {
+                    newConfig.clipVisionModel = 'ViT-L';
+                  }
+                }
+              } else {
+                // No compatible model found - fall back to an empty IP adapter config
+                newConfig = { ...initialIPAdapter };
+              }
+              dispatch(refImageConfigChanged({ id: entity.id, config: newConfig }));
+              modelsUpdatedDisabledOrCleared += 1;
+              continue;
+            }
+
+            if (isQwenImageEditReferenceImageConfig(entity.config)) {
+              // Switching AWAY from Qwen Image Edit - convert to the appropriate config type
               let newConfig;
               if (newGlobalRefImageModel) {
                 const parsedModel = zModelIdentifierField.parse(newGlobalRefImageModel);

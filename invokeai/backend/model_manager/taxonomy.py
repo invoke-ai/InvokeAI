@@ -52,6 +52,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
     """Indicates the model is associated with Z-Image model architecture, including Z-Image-Turbo."""
+    QwenImageEdit = "qwen-image-edit"
+    """Indicates the model is associated with Qwen Image Edit 2511 model architecture."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 

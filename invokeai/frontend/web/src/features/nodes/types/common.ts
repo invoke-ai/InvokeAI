@@ -93,11 +93,22 @@ export const zBaseModelType = z.enum([
   'flux',
   'flux2',
   'cogview4',
+  'qwen-image-edit',
   'z-image',
   'unknown',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModelType>;
-export const zMainModelBase = z.enum(['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'flux2', 'cogview4', 'z-image']);
+export const zMainModelBase = z.enum([
+  'sd-1',
+  'sd-2',
+  'sd-3',
+  'sdxl',
+  'flux',
+  'flux2',
+  'cogview4',
+  'qwen-image-edit',
+  'z-image',
+]);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
 export const zModelType = z.enum([
