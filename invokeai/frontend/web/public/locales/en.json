@@ -2774,7 +2774,8 @@
         "shape": {
             "rect": "Rect",
             "oval": "Oval",
-            "polygon": "Polygon"
+            "polygon": "Polygon",
+            "freehand": "Freehand"
         },
         "tool": {
             "brush": "Brush",

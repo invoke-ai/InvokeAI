@@ -603,10 +603,14 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.render();
   };
 
-  onWindowPointerUp = (_: PointerEvent) => {
+  onWindowPointerUp = async (_: PointerEvent) => {
     try {
       this.$isPrimaryPointerDown.set(false);
       void this.tools.lasso.onWindowPointerUp();
+
+      if (this.$tool.get() === 'rect') {
+        await this.tools.rect.onWindowPointerUp();
+      }
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
       if (

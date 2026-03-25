@@ -66,6 +66,7 @@ export class CanvasObjectPolygon extends CanvasModuleBase {
         ? [...state.points, state.previewPoint.x, state.previewPoint.y]
         : state.points;
       const hasRenderablePolygon = combinedPoints.length >= 6;
+      const isBufferPreview = this.parent.type === 'buffer_renderer';
       const fill =
         state.compositeOperation === 'destination-out' ? 'rgba(255,255,255,1)' : rgbaColorToString(state.color);
 
@@ -78,7 +79,7 @@ export class CanvasObjectPolygon extends CanvasModuleBase {
 
       this.konva.previewStroke.setAttrs({
         points: combinedPoints,
-        visible: Boolean(state.previewPoint) && combinedPoints.length >= 4,
+        visible: (Boolean(state.previewPoint) || isBufferPreview) && combinedPoints.length >= 4,
         stroke: getPreviewStrokeColor(state.color),
         globalCompositeOperation: 'source-over',
       });

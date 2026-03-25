@@ -2,7 +2,7 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { addCoords, floorCoord, getPrefixedId, offsetCoord } from 'features/controlLayers/konva/util';
+import { addCoords, floorCoord, getPrefixedId, isDistanceMoreThanMin, offsetCoord } from 'features/controlLayers/konva/util';
 import { selectShapeType } from 'features/controlLayers/store/canvasSettingsSlice';
 import type {
   CanvasEntityIdentifier,
@@ -10,6 +10,7 @@ import type {
   CanvasRectState,
   Coordinate,
 } from 'features/controlLayers/store/types';
+import { simplifyFlatNumbersArray } from 'features/controlLayers/util/simplify';
 import Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type { Logger } from 'roarr';
@@ -19,6 +20,10 @@ type CanvasShapeToolModuleConfig = {
   START_POINT_STROKE_WIDTH_PX: number;
   START_POINT_HOVER_RADIUS_DELTA_PX: number;
   POLYGON_CLOSE_RADIUS_PX: number;
+  MIN_FREEHAND_POINT_DISTANCE_PX: number;
+  MAX_FREEHAND_SEGMENT_LENGTH_PX: number;
+  FREEHAND_SIMPLIFY_MIN_POINTS: number;
+  FREEHAND_SIMPLIFY_TOLERANCE: number;
   PREVIEW_STROKE_COLOR: string;
 };
 
@@ -27,6 +32,10 @@ const DEFAULT_CONFIG: CanvasShapeToolModuleConfig = {
   START_POINT_STROKE_WIDTH_PX: 2,
   START_POINT_HOVER_RADIUS_DELTA_PX: 2,
   POLYGON_CLOSE_RADIUS_PX: 10,
+  MIN_FREEHAND_POINT_DISTANCE_PX: 1,
+  MAX_FREEHAND_SEGMENT_LENGTH_PX: 2,
+  FREEHAND_SIMPLIFY_MIN_POINTS: 200,
+  FREEHAND_SIMPLIFY_TOLERANCE: 0.6,
   PREVIEW_STROKE_COLOR: rgbaColorToString({ r: 90, g: 175, b: 255, a: 1 }),
 };
 
@@ -63,6 +72,8 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
   private shapeId: string | null = null;
   private dragStartPoint: Coordinate | null = null;
   private dragCurrentPoint: Coordinate | null = null;
+  private freehandPoints: Coordinate[] = [];
+  private isDrawingFreehand = false;
   private polygonPoints: Coordinate[] = [];
   private polygonPointer: Coordinate | null = null;
 
@@ -109,11 +120,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
   }
 
   hasActiveSession = (): boolean => {
-    return Boolean(this.dragStartPoint || this.polygonPoints.length);
+    return Boolean(this.dragStartPoint || this.isDrawingFreehand || this.freehandPoints.length || this.polygonPoints.length);
   };
 
   hasActiveDragSession = (): boolean => {
-    return Boolean(this.dragStartPoint);
+    return Boolean(this.dragStartPoint || this.isDrawingFreehand);
   };
 
   hasActivePolygonSession = (): boolean => {
@@ -174,6 +185,15 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (shapeType === 'freehand') {
+      if (!this.parent.$isPrimaryPointerDown.get()) {
+        return;
+      }
+
+      await this.startFreehandSession(point, selectedEntity.entityIdentifier);
+      return;
+    }
+
     if (!this.parent.$isPrimaryPointerDown.get()) {
       return;
     }
@@ -208,6 +228,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (shapeType === 'freehand') {
+      await this.handleFreehandPointerMove(point);
+      return;
+    }
+
     if (!this.parent.$isPrimaryPointerDown.get() || !this.dragStartPoint) {
       return;
     }
@@ -218,24 +243,38 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   onWindowPointerMove = async () => {
     const shapeType = this.manager.stateApi.getSettings().shapeType;
-    if (shapeType !== 'rect' && shapeType !== 'oval') {
-      return;
-    }
-
     const activeEntity = this.getActiveEntityAdapter();
     const cursorPos = this.parent.$cursorPos.get();
 
-    if (!activeEntity || !cursorPos || !this.dragStartPoint || !this.parent.$isPrimaryPointerDown.get()) {
+    if (!activeEntity || !cursorPos || !this.parent.$isPrimaryPointerDown.get()) {
       return;
     }
 
-    this.dragCurrentPoint = this.getEntityRelativePoint(cursorPos.relative, activeEntity.state.position);
+    const point = this.getEntityRelativePoint(cursorPos.relative, activeEntity.state.position);
+
+    if (shapeType === 'freehand') {
+      await this.handleFreehandPointerMove(point);
+      return;
+    }
+
+    if (shapeType !== 'rect' && shapeType !== 'oval' || !this.dragStartPoint) {
+      return;
+    }
+
+    this.dragCurrentPoint = point;
     await this.updateDragBuffer();
   };
 
-  onStagePointerUp = (_e: KonvaEventObject<PointerEvent>) => {
-    if (this.manager.stateApi.getSettings().shapeType === 'polygon') {
+  onStagePointerUp = async (_e: KonvaEventObject<PointerEvent>) => {
+    const shapeType = this.manager.stateApi.getSettings().shapeType;
+
+    if (shapeType === 'polygon') {
       this.render();
+      return;
+    }
+
+    if (shapeType === 'freehand') {
+      await this.commitFreehand();
       return;
     }
 
@@ -262,6 +301,14 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     this.render();
   };
 
+  onWindowPointerUp = async () => {
+    if (this.manager.stateApi.getSettings().shapeType !== 'freehand') {
+      return;
+    }
+
+    await this.commitFreehand();
+  };
+
   repr = () => {
     return {
       id: this.id,
@@ -271,6 +318,8 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       shapeId: this.shapeId,
       dragStartPoint: this.dragStartPoint,
       dragCurrentPoint: this.dragCurrentPoint,
+      freehandPoints: this.freehandPoints,
+      isDrawingFreehand: this.isDrawingFreehand,
       polygonPoints: this.polygonPoints,
       polygonPointer: this.polygonPointer,
     };
@@ -304,9 +353,39 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (this.isDrawingFreehand || this.freehandPoints.length > 0) {
+      await this.updateFreehandBuffer();
+      return;
+    }
+
     if (this.hasActivePolygonSession()) {
       await this.updatePolygonBuffer();
     }
+  };
+
+  private startFreehandSession = async (point: Coordinate, entityIdentifier: CanvasEntityIdentifier) => {
+    this.clearActiveBuffer();
+    this.resetState();
+    this.activeEntityIdentifier = entityIdentifier;
+    this.shapeId = getPrefixedId('polygon');
+    this.freehandPoints = [point];
+    this.isDrawingFreehand = true;
+    await this.updateFreehandBuffer();
+  };
+
+  private handleFreehandPointerMove = async (point: Coordinate) => {
+    if (!this.isDrawingFreehand || !this.parent.$isPrimaryPointerDown.get()) {
+      return;
+    }
+
+    const minDistance = this.manager.stage.unscale(this.config.MIN_FREEHAND_POINT_DISTANCE_PX);
+    const lastPoint = this.freehandPoints.at(-1) ?? null;
+    if (!isDistanceMoreThanMin(point, lastPoint, minDistance)) {
+      return;
+    }
+
+    this.appendFreehandPoint(point);
+    await this.updateFreehandBuffer();
   };
 
   private onPolygonPointerDown = async (
@@ -373,6 +452,39 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     this.render();
   };
 
+  private commitFreehand = async () => {
+    if (!this.isDrawingFreehand) {
+      return;
+    }
+
+    const activeEntity = this.getActiveEntityAdapter();
+    if (!activeEntity || !this.shapeId) {
+      this.cancel();
+      return;
+    }
+
+    const simplifiedPoints = this.simplifyFreehandContour(this.freehandPoints);
+    if (simplifiedPoints.length < 3) {
+      activeEntity.bufferRenderer.clearBuffer();
+      this.resetState();
+      this.render();
+      return;
+    }
+
+    const polygonState: CanvasPolygonState = {
+      id: this.shapeId,
+      type: 'polygon',
+      points: simplifiedPoints.flatMap((point) => [point.x, point.y]),
+      color: this.manager.stateApi.getCurrentColor(),
+      compositeOperation: this.getCompositeOperation(),
+    };
+
+    await activeEntity.bufferRenderer.setBuffer(polygonState);
+    activeEntity.bufferRenderer.commitBuffer();
+    this.resetState();
+    this.render();
+  };
+
   private updateDragBuffer = async () => {
     const activeEntity = this.getActiveEntityAdapter();
     if (!activeEntity || !this.dragStartPoint || !this.dragCurrentPoint || !this.shapeId) {
@@ -409,6 +521,21 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       type: 'polygon',
       points: this.polygonPoints.flatMap((point) => [point.x, point.y]),
       previewPoint: this.polygonPointer ?? this.polygonPoints.at(-1),
+      color: this.manager.stateApi.getCurrentColor(),
+      compositeOperation: this.getCompositeOperation(),
+    });
+  };
+
+  private updateFreehandBuffer = async () => {
+    const activeEntity = this.getActiveEntityAdapter();
+    if (!activeEntity || !this.shapeId || this.freehandPoints.length === 0) {
+      return;
+    }
+
+    await activeEntity.bufferRenderer.setBuffer({
+      id: this.shapeId,
+      type: 'polygon',
+      points: this.freehandPoints.flatMap((point) => [point.x, point.y]),
       color: this.manager.stateApi.getCurrentColor(),
       compositeOperation: this.getCompositeOperation(),
     });
@@ -539,6 +666,68 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     return { x: point.x, y: startPoint.y };
   };
 
+  private appendFreehandPoint = (point: Coordinate) => {
+    const lastPoint = this.freehandPoints.at(-1) ?? null;
+    if (!lastPoint) {
+      this.freehandPoints.push(point);
+      return;
+    }
+
+    const maxSegmentLength = this.manager.stage.unscale(this.config.MAX_FREEHAND_SEGMENT_LENGTH_PX);
+    const dx = point.x - lastPoint.x;
+    const dy = point.y - lastPoint.y;
+    const distance = Math.hypot(dx, dy);
+
+    if (distance <= maxSegmentLength) {
+      this.freehandPoints.push(point);
+      return;
+    }
+
+    const steps = Math.ceil(distance / maxSegmentLength);
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      this.freehandPoints.push({
+        x: lastPoint.x + dx * t,
+        y: lastPoint.y + dy * t,
+      });
+    }
+  };
+
+  private simplifyFreehandContour = (points: Coordinate[]): Coordinate[] => {
+    if (points.length < this.config.FREEHAND_SIMPLIFY_MIN_POINTS) {
+      return points;
+    }
+
+    const simplifiedFlatPoints = simplifyFlatNumbersArray(points.flatMap((point) => [point.x, point.y]), {
+      tolerance: this.config.FREEHAND_SIMPLIFY_TOLERANCE,
+      highestQuality: true,
+    });
+
+    if (simplifiedFlatPoints.length < 6) {
+      return points;
+    }
+
+    const simplifiedPoints = this.flatNumbersToCoords(simplifiedFlatPoints);
+    if (simplifiedPoints.length < 3) {
+      return points;
+    }
+
+    return simplifiedPoints;
+  };
+
+  private flatNumbersToCoords = (points: number[]): Coordinate[] => {
+    const coords: Coordinate[] = [];
+    for (let i = 0; i < points.length; i += 2) {
+      const x = points[i];
+      const y = points[i + 1];
+      if (x === undefined || y === undefined) {
+        continue;
+      }
+      coords.push({ x, y });
+    }
+    return coords;
+  };
+
   private getDragRect = (
     start: Coordinate,
     end: Coordinate,
@@ -584,6 +773,8 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     this.shapeId = null;
     this.dragStartPoint = null;
     this.dragCurrentPoint = null;
+    this.freehandPoints = [];
+    this.isDrawingFreehand = false;
     this.polygonPoints = [];
     this.polygonPointer = null;
     this.konva.startPointIndicator.visible(false);

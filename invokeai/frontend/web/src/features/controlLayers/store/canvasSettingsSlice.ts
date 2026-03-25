@@ -14,7 +14,7 @@ export type TransformSmoothingMode = z.infer<typeof zTransformSmoothingMode>;
 
 const zGradientType = z.enum(['linear', 'radial']);
 const zLassoMode = z.enum(['freehand', 'polygon']);
-const zShapeType = z.enum(['rect', 'oval', 'polygon']);
+const zShapeType = z.enum(['rect', 'oval', 'polygon', 'freehand']);
 
 const zCanvasSettingsState = z.object({
   /**
