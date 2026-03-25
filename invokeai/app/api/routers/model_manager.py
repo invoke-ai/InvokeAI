@@ -194,6 +194,23 @@ async def get_model_records_by_attrs(
 
 
 @model_manager_router.get(
+    "/get_by_hash",
+    operation_id="get_model_records_by_hash",
+    response_model=AnyModelConfig,
+)
+async def get_model_records_by_hash(
+    hash: str = Query(description="The hash of the model"),
+) -> AnyModelConfig:
+    """Gets a model by its hash. This is useful for recalling models that were deleted and reinstalled,
+    as the hash remains stable across reinstallations while the key (UUID) changes."""
+    configs = ApiDependencies.invoker.services.model_manager.store.search_by_hash(hash)
+    if not configs:
+        raise HTTPException(status_code=404, detail="No model found with this hash")
+
+    return configs[0]
+
+
+@model_manager_router.get(
     "/i/{key}",
     operation_id="get_model_record",
     responses={
@@ -246,11 +263,13 @@ async def reidentify_model(
             raise InvalidModelException("Unable to identify model format")
 
         # Retain user-editable fields from the original config
+        result.config.path = config.path
         result.config.key = config.key
         result.config.name = config.name
         result.config.description = config.description
         result.config.cover_image = config.cover_image
-        result.config.trigger_phrases = config.trigger_phrases
+        if hasattr(config, "trigger_phrases") and hasattr(result.config, "trigger_phrases"):
+            result.config.trigger_phrases = config.trigger_phrases
         result.config.source = config.source
         result.config.source_type = config.source_type
 
