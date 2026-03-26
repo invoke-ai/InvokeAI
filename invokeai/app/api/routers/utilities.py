@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 from pathlib import Path
 from typing import Optional, Union
 
@@ -12,6 +13,7 @@ from pyparsing import ParseException
 from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
 from invokeai.backend.model_manager.taxonomy import ModelType
@@ -21,6 +23,9 @@ from invokeai.backend.util.devices import TorchDevice
 logger = logging.getLogger(__name__)
 
 utilities_router = APIRouter(prefix="/v1/utilities", tags=["utilities"])
+
+# The underlying model loader is not thread-safe, so we serialize load_model calls.
+_model_load_lock = threading.Lock()
 
 
 class DynamicPromptsResponse(BaseModel):
@@ -90,9 +95,10 @@ def _run_expand_prompt(prompt: str, model_key: str, max_tokens: int, system_prom
     if model_config.type != ModelType.TextLLM:
         raise ValueError(f"Model '{model_key}' is not a TextLLM model (got {model_config.type})")
 
-    loaded_model = model_manager.load.load_model(model_config)
+    with _model_load_lock:
+        loaded_model = model_manager.load.load_model(model_config)
 
-    with loaded_model.model_on_device() as (_, model):
+    with torch.no_grad(), loaded_model.model_on_device() as (_, model):
         model_abs_path = _resolve_model_path(model_config.path)
         tokenizer = AutoTokenizer.from_pretrained(model_abs_path, local_files_only=True)
 
@@ -119,14 +125,13 @@ def _run_expand_prompt(prompt: str, model_key: str, max_tokens: int, system_prom
 async def expand_prompt(body: ExpandPromptRequest) -> ExpandPromptResponse:
     """Expand a brief prompt into a detailed image generation prompt using a text LLM."""
     try:
-        with torch.no_grad():
-            expanded = await asyncio.to_thread(
-                _run_expand_prompt,
-                body.prompt,
-                body.model_key,
-                body.max_tokens,
-                body.system_prompt,
-            )
+        expanded = await asyncio.to_thread(
+            _run_expand_prompt,
+            body.prompt,
+            body.model_key,
+            body.max_tokens,
+            body.system_prompt,
+        )
         return ExpandPromptResponse(expanded_prompt=expanded)
     except UnknownModelException:
         raise HTTPException(status_code=404, detail=f"Model '{body.model_key}' not found")
@@ -159,13 +164,14 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
     if model_config.type != ModelType.LlavaOnevision:
         raise ValueError(f"Model '{model_key}' is not a LLaVA OneVision model (got {model_config.type})")
 
-    loaded_model = model_manager.load.load_model(model_config)
+    with _model_load_lock:
+        loaded_model = model_manager.load.load_model(model_config)
 
     # Load the image from InvokeAI's image store
     image = ApiDependencies.invoker.services.images.get_pil_image(image_name)
     image = image.convert("RGB")
 
-    with loaded_model.model_on_device() as (_, model):
+    with torch.no_grad(), loaded_model.model_on_device() as (_, model):
         if not isinstance(model, LlavaOnevisionForConditionalGeneration):
             raise TypeError(f"Expected LlavaOnevisionForConditionalGeneration, got {type(model).__name__}")
 
@@ -196,16 +202,17 @@ def _run_image_to_prompt(image_name: str, model_key: str, instruction: str) -> s
 async def image_to_prompt(body: ImageToPromptRequest) -> ImageToPromptResponse:
     """Generate a descriptive prompt from an image using a vision-language model."""
     try:
-        with torch.no_grad():
-            prompt = await asyncio.to_thread(
-                _run_image_to_prompt,
-                body.image_name,
-                body.model_key,
-                body.instruction,
-            )
+        prompt = await asyncio.to_thread(
+            _run_image_to_prompt,
+            body.image_name,
+            body.model_key,
+            body.instruction,
+        )
         return ImageToPromptResponse(prompt=prompt)
     except UnknownModelException:
         raise HTTPException(status_code=404, detail=f"Model '{body.model_key}' not found")
+    except ImageFileNotFoundException:
+        raise HTTPException(status_code=404, detail=f"Image '{body.image_name}' not found")
     except (ValueError, TypeError) as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
