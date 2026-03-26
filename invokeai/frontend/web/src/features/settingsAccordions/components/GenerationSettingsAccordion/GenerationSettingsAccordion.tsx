@@ -83,10 +83,13 @@ export const GenerationSettingsAccordion = memo(() => {
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
               {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && <ParamScheduler />}
-              {isFLUX && <ParamFluxScheduler />}
+              {(isFLUX || isFlux2) && <ParamFluxScheduler />}
               {isZImage && <ParamZImageScheduler />}
               <ParamSteps />
-              {(isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
+              {isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
+              {isFlux2 && modelConfig && 'variant' in modelConfig && modelConfig.variant === 'klein_9b_base' && (
+                <ParamGuidance />
+              )}
               {!isFLUX && !isFlux2 && <ParamCFGScale />}
               {isFLUX && <ParamFluxDypePreset />}
               {isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeScale />}

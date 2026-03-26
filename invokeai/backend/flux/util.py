@@ -133,11 +133,26 @@ _flux_transformer_params: dict[AnyVariant, FluxParams] = {
         axes_dim=[16, 56, 56],
         theta=10_000,
         qkv_bias=True,
-        guidance_embed=True,
+        guidance_embed=False,
     ),
     # Flux2 Klein 9B uses Qwen3 8B text encoder with stacked embeddings from layers [9, 18, 27]
     # The context_in_dim is 3 * hidden_size of Qwen3 (3 * 4096 = 12288)
     Flux2VariantType.Klein9B: FluxParams(
+        in_channels=64,
+        vec_in_dim=4096,  # Qwen3-8B hidden size (used for pooled output)
+        context_in_dim=12288,  # 3 layers * 4096 = 12288 for Qwen3-8B
+        hidden_size=3072,
+        mlp_ratio=4.0,
+        num_heads=24,
+        depth=19,
+        depth_single_blocks=38,
+        axes_dim=[16, 56, 56],
+        theta=10_000,
+        qkv_bias=True,
+        guidance_embed=False,
+    ),
+    # Flux2 Klein 9B Base is the undistilled foundation model with guidance_embeds=True
+    Flux2VariantType.Klein9BBase: FluxParams(
         in_channels=64,
         vec_in_dim=4096,  # Qwen3-8B hidden size (used for pooled output)
         context_in_dim=12288,  # 3 layers * 4096 = 12288 for Qwen3-8B

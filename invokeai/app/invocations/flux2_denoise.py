@@ -101,6 +101,13 @@ class Flux2DenoiseInvocation(BaseInvocation):
         description="Negative conditioning tensor. Can be None if cfg_scale is 1.0.",
         input=Input.Connection,
     )
+    guidance: float = InputField(
+        default=4.0,
+        ge=0,
+        le=20,
+        description="The guidance strength. Only used by undistilled models (Klein 9B Base). "
+        "Ignored by distilled models (Klein 4B, Klein 9B).",
+    )
     cfg_scale: float = InputField(
         default=1.0,
         description=FieldDescriptions.cfg_scale,
@@ -467,6 +474,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 txt_ids=txt_ids,
                 timesteps=timesteps,
                 step_callback=self._build_step_callback(context),
+                guidance=self.guidance,
                 cfg_scale=cfg_scale_list,
                 neg_txt=neg_txt,
                 neg_txt_ids=neg_txt_ids,

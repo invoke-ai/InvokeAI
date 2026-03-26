@@ -8873,6 +8873,12 @@ export type components = {
              */
             negative_text_conditioning?: components["schemas"]["FluxConditioningField"] | null;
             /**
+             * Guidance
+             * @description The guidance strength. Only used by undistilled models (Klein 9B Base). Ignored by distilled models (Klein 4B, Klein 9B).
+             * @default 4
+             */
+            guidance?: number;
+            /**
              * CFG Scale
              * @description Classifier-Free Guidance scale
              * @default 1

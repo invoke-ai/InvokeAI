@@ -59,6 +59,8 @@ export const ImageMetadataActions = memo((props: Props) => {
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerSteps} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CanvasLayers} />
       <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefImages} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.KleinVAEModel} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.KleinQwen3EncoderModel} />
       <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.LoRAs} />
     </Flex>
   );
