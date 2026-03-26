@@ -21,6 +21,7 @@ import { positivePromptChanged, selectPositivePrompt } from 'features/controlLay
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { setPromptUndo } from 'features/prompt/promptUndo';
 import { memo, useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiImageBold } from 'react-icons/pi';
 import { useImageToPromptMutation } from 'services/api/endpoints/utilities';
 import { useLlavaModels } from 'services/api/hooks/modelsByType';
@@ -36,6 +37,7 @@ type Props = {
 };
 
 export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: Props) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const currentPrompt = useAppSelector(selectPositivePrompt);
   const [modelConfigs] = useLlavaModels();
@@ -107,11 +109,11 @@ export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: 
     >
       <PopoverTrigger>
         <span>
-          <Tooltip label="Image to Prompt">
+          <Tooltip label={t('prompt.imageToPrompt')}>
             <IconButton
               size="sm"
               variant="promptOverlay"
-              aria-label="Image to Prompt"
+              aria-label={t('prompt.imageToPrompt')}
               icon={<PiImageBold />}
               sx={isLoading ? loadingStyles : undefined}
               isDisabled={isLoading}
@@ -125,18 +127,18 @@ export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: 
           <PopoverBody p={0}>
             <Flex flexDir="column" gap={3}>
               <Text fontWeight="semibold" fontSize="sm">
-                Image to Prompt
+                {t('prompt.imageToPrompt')}
               </Text>
               <ModelPicker
                 pickerId="image-to-prompt-model"
                 modelConfigs={modelConfigs}
                 selectedModelConfig={selectedModel}
                 onChange={handleModelChange}
-                placeholder="Select Vision Model..."
+                placeholder={t('prompt.selectVisionModel')}
               />
               <Flex gap={2} alignItems="center">
                 <Button size="sm" variant="outline" flexGrow={1} {...getUploadButtonProps()}>
-                  {uploadedImage ? 'Change Image' : 'Upload Image'}
+                  {uploadedImage ? t('prompt.changeImage') : t('prompt.uploadImage')}
                 </Button>
                 <input {...getUploadInputProps()} />
                 {uploadedImage && (
@@ -156,7 +158,7 @@ export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: 
                 isLoading={isLoading}
                 isDisabled={!selectedModel || !uploadedImage}
               >
-                Generate Prompt
+                {t('prompt.generatePrompt')}
               </Button>
             </Flex>
           </PopoverBody>

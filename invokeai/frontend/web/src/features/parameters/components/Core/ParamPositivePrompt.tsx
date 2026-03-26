@@ -34,6 +34,7 @@ import type { HotkeyCallback } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 import { useClickAway } from 'react-use';
 import { useListStylePresetsQuery } from 'services/api/endpoints/stylePresets';
+import { useLlavaModels } from 'services/api/hooks/modelsByType';
 import type { ImageDTO } from 'services/api/types';
 
 import { PositivePromptHistoryIconButton } from './PositivePromptHistory';
@@ -122,6 +123,8 @@ export const ParamPositivePrompt = memo(() => {
   const viewMode = useAppSelector(selectStylePresetViewMode);
   const activeStylePresetId = useAppSelector(selectStylePresetActivePresetId);
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
+  const [llavaModels] = useLlavaModels();
+  const hasLlavaModels = llavaModels.length > 0;
 
   const promptHistoryApi = usePromptHistory();
 
@@ -244,7 +247,7 @@ export const ParamPositivePrompt = memo(() => {
 
   useEffect(() => {
     const element = dropTargetRef.current;
-    if (!element) {
+    if (!element || !hasLlavaModels) {
       return;
     }
 
@@ -267,7 +270,7 @@ export const ParamPositivePrompt = memo(() => {
         onDrop: () => setDndState('idle'),
       })
     );
-  }, []);
+  }, [hasLlavaModels]);
 
   return (
     <Box pos="relative" ref={dropTargetRef}>
@@ -311,7 +314,7 @@ export const ParamPositivePrompt = memo(() => {
           )}
         </Box>
       </PromptPopover>
-      <DndDropOverlay dndState={dndState} label="Image to Prompt" />
+      {hasLlavaModels && <DndDropOverlay dndState={dndState} label={t('prompt.imageToPrompt')} />}
     </Box>
   );
 });

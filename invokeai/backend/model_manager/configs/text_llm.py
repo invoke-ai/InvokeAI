@@ -41,4 +41,12 @@ class TextLLM_Diffusers_Config(Diffusers_Config_Base, Config_Base):
         if not class_name.endswith("ForCausalLM"):
             raise NotAMatchError(f"model architecture '{class_name}' is not a causal language model")
 
+        # Verify tokenizer files exist to avoid runtime failures
+        tokenizer_files = {"tokenizer.json", "tokenizer.model", "tokenizer_config.json"}
+        if not any((mod.path / f).exists() for f in tokenizer_files):
+            raise NotAMatchError(
+                f"no tokenizer files found in '{mod.path}' "
+                f"(expected at least one of: {', '.join(sorted(tokenizer_files))})"
+            )
+
         return cls(**override_fields)

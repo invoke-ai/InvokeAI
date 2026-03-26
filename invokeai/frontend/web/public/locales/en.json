@@ -343,7 +343,16 @@
         "discard": "Discard",
         "noPromptHistory": "No prompt history recorded.",
         "noMatchingPrompts": "No matching prompts in history.",
-        "toSwitchBetweenPrompts": "to switch between prompts."
+        "toSwitchBetweenPrompts": "to switch between prompts.",
+        "imageToPrompt": "Image to Prompt",
+        "selectVisionModel": "Select Vision Model...",
+        "changeImage": "Change Image",
+        "uploadImage": "Upload Image",
+        "generatePrompt": "Generate Prompt",
+        "expandPromptWithLLM": "Expand Prompt with LLM",
+        "expandPrompt": "Expand Prompt",
+        "selectTextLLM": "Select Text LLM...",
+        "expand": "Expand"
     },
     "queue": {
         "queue": "Queue",
@@ -1170,6 +1179,7 @@
         },
         "controlLora": "Control LoRA",
         "llavaOnevision": "LLaVA OneVision",
+        "textLLM": "Text LLM",
         "syncModels": "Sync Models",
         "syncModelsTooltip": "Identify and remove unused model files in the InvokeAI root directory.",
         "syncModelsDirectory": "Synchronize Models Directory",

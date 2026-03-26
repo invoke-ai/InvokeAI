@@ -19,6 +19,7 @@ import { positivePromptChanged, selectPositivePrompt } from 'features/controlLay
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
 import { setPromptUndo } from 'features/prompt/promptUndo';
 import { memo, useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiSparkleBold } from 'react-icons/pi';
 import { useExpandPromptMutation } from 'services/api/endpoints/utilities';
 import { useTextLLMModels } from 'services/api/hooks/modelsByType';
@@ -29,6 +30,7 @@ const loadingStyles: SystemStyleObject = {
 };
 
 export const ExpandPromptButton = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const prompt = useAppSelector(selectPositivePrompt);
   const [modelConfigs] = useTextLLMModels();
@@ -75,11 +77,11 @@ export const ExpandPromptButton = memo(() => {
     >
       <PopoverTrigger>
         <span>
-          <Tooltip label="Expand Prompt with LLM">
+          <Tooltip label={t('prompt.expandPromptWithLLM')}>
             <IconButton
               size="sm"
               variant="promptOverlay"
-              aria-label="Expand Prompt with LLM"
+              aria-label={t('prompt.expandPromptWithLLM')}
               icon={<PiSparkleBold />}
               sx={isLoading ? loadingStyles : undefined}
               isDisabled={isLoading || !prompt.trim()}
@@ -93,14 +95,14 @@ export const ExpandPromptButton = memo(() => {
           <PopoverBody p={0}>
             <Flex flexDir="column" gap={3}>
               <Text fontWeight="semibold" fontSize="sm">
-                Expand Prompt
+                {t('prompt.expandPrompt')}
               </Text>
               <ModelPicker
                 pickerId="expand-prompt-model"
                 modelConfigs={modelConfigs}
                 selectedModelConfig={selectedModel}
                 onChange={handleModelChange}
-                placeholder="Select Text LLM..."
+                placeholder={t('prompt.selectTextLLM')}
               />
               <Button
                 size="sm"
@@ -109,7 +111,7 @@ export const ExpandPromptButton = memo(() => {
                 isLoading={isLoading}
                 isDisabled={!selectedModel || !prompt.trim()}
               >
-                Expand
+                {t('prompt.expand')}
               </Button>
             </Flex>
           </PopoverBody>
