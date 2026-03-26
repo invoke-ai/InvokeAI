@@ -76,6 +76,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
     source: Optional[str] = Field(description="original source of the model", default=None)
     source_type: Optional[ModelSourceType] = Field(description="type of model source", default=None)
     source_api_response: Optional[str] = Field(description="metadata from remote source", default=None)
+    source_url: Optional[str] = Field(description="Optional URL for the model (e.g. download page)", default=None)
     name: Optional[str] = Field(description="Name of the model.", default=None)
     path: Optional[str] = Field(description="Path to the model.", default=None)
     description: Optional[str] = Field(description="Model description", default=None)

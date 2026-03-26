@@ -77,6 +77,10 @@ class Config_Base(ABC, BaseModel):
         default=None,
         description="The original API response from the source, as stringified JSON.",
     )
+    source_url: str | None = Field(
+        default=None,
+        description="Optional URL for the model (e.g. download page or model page).",
+    )
     cover_image: str | None = Field(
         default=None,
         description="Url for image to preview model",

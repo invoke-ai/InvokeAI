@@ -1,4 +1,4 @@
-import { Flex, Heading, Spacer, Text } from '@invoke-ai/ui-library';
+import { Flex, Heading, Link, Spacer, Text } from '@invoke-ai/ui-library';
 import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import ModelImageUpload from 'features/modelManagerV2/subpanels/ModelPanel/Fields/ModelImageUpload';
 import type { PropsWithChildren } from 'react';
@@ -28,6 +28,14 @@ export const ModelHeader = memo(({ modelConfig, children }: Props) => {
         {modelConfig.source && (
           <Text variant="subtext" noOfLines={1} wordBreak="break-all">
             {t('modelManager.source')}: {modelConfig.source}
+          </Text>
+        )}
+        {modelConfig.source_url && (
+          <Text variant="subtext" noOfLines={1} wordBreak="break-all">
+            {t('modelManager.sourceUrl')}:{' '}
+            <Link href={modelConfig.source_url} isExternal color="invokeBlue.300">
+              {modelConfig.source_url}
+            </Link>
           </Text>
         )}
         <Text noOfLines={3}>{modelConfig.description}</Text>
