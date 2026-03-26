@@ -30,7 +30,7 @@ export type Language = z.infer<typeof zLanguage>;
 export const isLanguage = (v: unknown): v is Language => zLanguage.safeParse(v).success;
 
 export const zSystemState = z.object({
-  _version: z.literal(2),
+  _version: z.literal(3),
   shouldConfirmOnDelete: z.boolean(),
   shouldAntialiasProgressImage: z.boolean(),
   shouldConfirmOnNewSession: z.boolean(),
@@ -44,6 +44,7 @@ export const zSystemState = z.object({
   logNamespaces: z.array(zLogNamespace),
   shouldShowInvocationProgressDetail: z.boolean(),
   shouldHighlightFocusedRegions: z.boolean(),
+  shouldUseMiddleClickToOpenInNewTab: z.boolean(),
   prefersNumericAttentionWeights: z.boolean(),
 });
 export type SystemState = z.infer<typeof zSystemState>;
