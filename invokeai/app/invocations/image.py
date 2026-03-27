@@ -4,6 +4,7 @@ from typing import Literal, Optional
 
 import cv2
 import numpy
+import torch
 from PIL import Image, ImageChops, ImageFilter, ImageOps
 
 from invokeai.app.invocations.baseinvocation import (
@@ -419,11 +420,12 @@ class OklabUnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
     radius: float = InputField(gt=0, description="Unsharp mask radius", default=2)
     strength: float = InputField(ge=0, description="Unsharp mask strength", default=50)
 
-    def pil_from_array(self, arr: numpy.ndarray) -> Image.Image:
-        return Image.fromarray((numpy.clip(arr, 0.0, 1.0) * 255).astype("uint8"))
+    def pil_from_tensor(self, tensor: torch.Tensor) -> Image.Image:
+        array = torch.clamp(tensor, 0.0, 1.0).permute(1, 2, 0).cpu().numpy()
+        return Image.fromarray((array * 255).astype("uint8"))
 
-    def array_from_pil(self, img: Image.Image) -> numpy.ndarray:
-        return numpy.array(img, dtype=numpy.float32) / 255.0
+    def tensor_from_pil(self, img: Image.Image) -> torch.Tensor:
+        return torch.from_numpy(numpy.array(img, dtype=numpy.float32) / 255.0).permute(2, 0, 1)
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
@@ -432,16 +434,16 @@ class OklabUnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
         alpha_channel = image.getchannel("A") if mode == "RGBA" else None
         image = image.convert("RGB")
 
-        image_blurred = self.array_from_pil(image.filter(ImageFilter.GaussianBlur(radius=self.radius)))
-        image_arr = self.array_from_pil(image)
+        image_blurred = self.tensor_from_pil(image.filter(ImageFilter.GaussianBlur(radius=self.radius)))
+        image_tensor = self.tensor_from_pil(image)
 
-        image_oklab = oklab_from_linear_srgb(linear_srgb_from_srgb(image_arr))
+        image_oklab = oklab_from_linear_srgb(linear_srgb_from_srgb(image_tensor))
         image_blurred_oklab = oklab_from_linear_srgb(linear_srgb_from_srgb(image_blurred))
 
-        image_oklab += (image_oklab - image_blurred_oklab) * (self.strength / 100.0)
-        image_oklab = numpy.clip(image_oklab, -1.0, 1.0)
+        image_oklab[0, ...] += (image_oklab[0, ...] - image_blurred_oklab[0, ...]) * (self.strength / 100.0)
+        image_oklab = torch.clamp(image_oklab, -1.0, 1.0)
 
-        image = self.pil_from_array(srgb_from_linear_srgb(linear_srgb_from_oklab(image_oklab))).convert(mode)
+        image = self.pil_from_tensor(srgb_from_linear_srgb(linear_srgb_from_oklab(image_oklab))).convert(mode)
 
         if alpha_channel is not None:
             image.putalpha(alpha_channel)
@@ -873,12 +875,18 @@ class OklchImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard)
         mode = image.mode
         alpha_channel = image.getchannel("A") if mode == "RGBA" else None
 
-        rgb = numpy.asarray(image.convert("RGB"), dtype=numpy.float32) / 255.0
+        rgb = torch.from_numpy(numpy.asarray(image.convert("RGB"), dtype=numpy.float32) / 255.0).permute(2, 0, 1)
         oklch = oklch_from_oklab(oklab_from_linear_srgb(linear_srgb_from_srgb(rgb)))
-        oklch[..., 2] = (oklch[..., 2] + self.hue) % 360.0
+        oklch[2, ...] = (oklch[2, ...] + self.hue) % 360.0
 
         image = Image.fromarray(
-            numpy.clip(srgb_from_linear_srgb(linear_srgb_from_oklch(oklch)) * 255.0, 0.0, 255.0).astype(numpy.uint8),
+            (
+                torch.clamp(srgb_from_linear_srgb(linear_srgb_from_oklch(oklch)), 0.0, 1.0)
+                .permute(1, 2, 0)
+                .cpu()
+                .numpy()
+                * 255.0
+            ).astype(numpy.uint8),
             mode="RGB",
         ).convert(mode)
 

@@ -14,6 +14,14 @@ from typing import Literal, Optional
 import torch
 from PIL import Image
 
+from invokeai.backend.image_util.color_conversion import (
+    linear_srgb_from_oklab,
+    linear_srgb_from_srgb,
+    oklab_from_linear_srgb,
+)
+from invokeai.backend.image_util.color_conversion import (
+    srgb_from_linear_srgb as shared_srgb_from_linear_srgb,
+)
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 
 MAX_FLOAT = torch.finfo(torch.tensor(1.0).dtype).max
@@ -60,23 +68,7 @@ def srgb_from_linear_srgb(linear_srgb_tensor: torch.Tensor, alpha: float = 0.0, 
 
     if 0.0 < alpha:
         linear_srgb_tensor = gamut_clip_tensor(linear_srgb_tensor, alpha=alpha, steps=steps)
-    linear_srgb_tensor = linear_srgb_tensor.clamp(0.0, 1.0)
-    mask = torch.lt(linear_srgb_tensor, 0.0404482362771082 / 12.92)
-    rgb_tensor = torch.sub(torch.mul(torch.pow(linear_srgb_tensor, (1 / 2.4)), 1.055), 0.055)
-    rgb_tensor[mask] = torch.mul(linear_srgb_tensor[mask], 12.92)
-
-    return rgb_tensor
-
-
-def linear_srgb_from_srgb(srgb_tensor: torch.Tensor):
-    """Get linear-light sRGB from a standard gamma-corrected sRGB image tensor"""
-
-    linear_srgb_tensor = torch.pow(torch.div(torch.add(srgb_tensor, 0.055), 1.055), 2.4)
-    linear_srgb_tensor_1 = torch.div(srgb_tensor, 12.92)
-    mask = torch.le(srgb_tensor, 0.0404482362771082)
-    linear_srgb_tensor[mask] = linear_srgb_tensor_1[mask]
-
-    return linear_srgb_tensor
+    return shared_srgb_from_linear_srgb(linear_srgb_tensor)
 
 
 def max_srgb_saturation_tensor(units_ab_tensor: torch.Tensor, steps: int = 1):
@@ -173,63 +165,6 @@ def max_srgb_saturation_tensor(units_ab_tensor: torch.Tensor, steps: int = 1):
         )
 
     return s_tensor
-
-
-def linear_srgb_from_oklab(oklab_tensor: torch.Tensor):
-    """Get linear-light sRGB from an Oklab image tensor"""
-
-    # L*a*b* to LMS
-    lms_matrix_1 = torch.tensor(
-        [[1.0, 0.3963377774, 0.2158037573], [1.0, -0.1055613458, -0.0638541728], [1.0, -0.0894841775, -1.2914855480]]
-    )
-
-    lms_tensor_1 = torch.einsum("lwh, kl -> kwh", oklab_tensor, lms_matrix_1)
-    lms_tensor = torch.pow(lms_tensor_1, 3.0)
-
-    # LMS to linear RGB
-    rgb_matrix = torch.tensor(
-        [
-            [4.0767416621, -3.3077115913, 0.2309699292],
-            [-1.2684380046, 2.6097574011, -0.3413193965],
-            [-0.0041960863, -0.7034186147, 1.7076147010],
-        ]
-    )
-
-    linear_srgb_tensor = torch.einsum("kwh, sk -> swh", lms_tensor, rgb_matrix)
-
-    return linear_srgb_tensor
-
-
-def oklab_from_linear_srgb(linear_srgb_tensor: torch.Tensor):
-    """Get an Oklab image tensor from a tensor of linear-light sRGB"""
-    # linear RGB to LMS
-    lms_matrix = torch.tensor(
-        [
-            [0.4122214708, 0.5363325363, 0.0514459929],
-            [0.2119034982, 0.6806995451, 0.1073969566],
-            [0.0883024619, 0.2817188376, 0.6299787005],
-        ]
-    )
-
-    lms_tensor = torch.einsum("cwh, kc -> kwh", linear_srgb_tensor, lms_matrix)
-
-    # LMS to L*a*b*
-    lms_tensor_neg_mask = torch.lt(lms_tensor, 0.0)
-    lms_tensor[lms_tensor_neg_mask] = torch.mul(lms_tensor[lms_tensor_neg_mask], -1.0)
-    lms_tensor_1 = torch.pow(lms_tensor, 1.0 / 3.0)
-    lms_tensor[lms_tensor_neg_mask] = torch.mul(lms_tensor[lms_tensor_neg_mask], -1.0)
-    lms_tensor_1[lms_tensor_neg_mask] = torch.mul(lms_tensor_1[lms_tensor_neg_mask], -1.0)
-    lab_matrix = torch.tensor(
-        [
-            [0.2104542553, 0.7936177850, -0.0040720468],
-            [1.9779984951, -2.4285922050, 0.4505937099],
-            [0.0259040371, 0.7827717662, -0.8086757660],
-        ]
-    )
-
-    lab_tensor = torch.einsum("kwh, lk -> lwh", lms_tensor_1, lab_matrix)
-
-    return lab_tensor
 
 
 def find_cusp_tensor(units_ab_tensor: torch.Tensor, steps: int = 1):
