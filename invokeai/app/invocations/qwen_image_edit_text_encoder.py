@@ -233,20 +233,17 @@ class QwenImageEditTextEncoderInvocation(BaseInvocation):
         """Load the text encoder with BitsAndBytes quantization, bypassing the model cache.
 
         BnB-quantized models are pinned to GPU and can't be moved between devices,
-        so they can't go through the standard model cache. We keep a module-level
-        cache keyed on (model_key, quantization) to avoid reloading on every call.
+        so they can't go through the standard model cache. The model is loaded fresh
+        each time and freed after use via the cleanup callback.
         """
+        import gc
+        import warnings
+
         from transformers import BitsAndBytesConfig, Qwen2_5_VLForConditionalGeneration
 
         encoder_config = context.models.get_config(self.qwen_vl_encoder.text_encoder)
         model_root = context.models.get_absolute_path(encoder_config)
         encoder_path = model_root / "text_encoder"
-
-        cache_key = (encoder_config.key, self.quantization)
-        if cache_key in _quantized_encoder_cache:
-            text_encoder = _quantized_encoder_cache[cache_key]
-            device = next(text_encoder.parameters()).device
-            return text_encoder, device, None
 
         if self.quantization == "nf4":
             bnb_config = BitsAndBytesConfig(
@@ -258,19 +255,23 @@ class QwenImageEditTextEncoderInvocation(BaseInvocation):
             bnb_config = BitsAndBytesConfig(load_in_8bit=True)
 
         context.util.signal_progress("Loading Qwen2.5-VL encoder (quantized)")
-        text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-            str(encoder_path),
-            quantization_config=bnb_config,
-            device_map="auto",
-            torch_dtype=torch.bfloat16,
-            local_files_only=True,
-        )
+        with warnings.catch_warnings():
+            # BnB int8 internally casts bfloat16→float16; the warning is harmless
+            warnings.filterwarnings("ignore", message="MatMul8bitLt.*cast.*float16")
+            text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                str(encoder_path),
+                quantization_config=bnb_config,
+                device_map="auto",
+                torch_dtype=torch.bfloat16,
+                local_files_only=True,
+            )
 
-        _quantized_encoder_cache[cache_key] = text_encoder
         device = next(text_encoder.parameters()).device
-        return text_encoder, device, None
 
+        def cleanup():
+            nonlocal text_encoder
+            del text_encoder
+            gc.collect()
+            torch.cuda.empty_cache()
 
-# Module-level cache for BnB-quantized encoders (they can't go through the model cache
-# because they're pinned to GPU). Keyed by (model_key, quantization_type).
-_quantized_encoder_cache: dict[tuple[str, str], object] = {}
+        return text_encoder, device, cleanup
