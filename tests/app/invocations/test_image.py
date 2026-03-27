@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import numpy
+import torch
 from PIL import Image, ImageFilter
 
 from invokeai.app.invocations.image import ImageField, OklabUnsharpMaskInvocation, OklchImageHueAdjustmentInvocation
@@ -15,7 +16,22 @@ from invokeai.backend.image_util.color_conversion import (
 )
 
 
-def test_oklab_unsharp_mask_invocation_preserves_alpha_and_sharpens_in_oklab() -> None:
+def _build_context(input_image: Image.Image) -> MagicMock:
+    context = MagicMock()
+    context.images.get_pil.return_value = input_image
+    context.images.save.side_effect = lambda image: SimpleNamespace(
+        image_name="out", width=image.width, height=image.height
+    )
+    return context
+
+
+def _max_abs_diff_uint8(left: Image.Image, right: Image.Image) -> int:
+    left_arr = numpy.asarray(left, dtype=numpy.int16)
+    right_arr = numpy.asarray(right, dtype=numpy.int16)
+    return int(numpy.abs(left_arr - right_arr).max())
+
+
+def test_oklab_unsharp_mask_invocation_preserves_alpha_and_sharpens_lightness_only() -> None:
     input_image = Image.new("RGBA", (3, 1))
     input_image.putdata(
         [
@@ -25,11 +41,7 @@ def test_oklab_unsharp_mask_invocation_preserves_alpha_and_sharpens_in_oklab() -
         ]
     )
 
-    context = MagicMock()
-    context.images.get_pil.return_value = input_image
-    context.images.save.side_effect = lambda image: SimpleNamespace(
-        image_name="out", width=image.width, height=image.height
-    )
+    context = _build_context(input_image)
 
     invocation = OklabUnsharpMaskInvocation(image=ImageField(image_name="in"), radius=1.0, strength=50.0)
     output = invocation.invoke(context)
@@ -40,31 +52,28 @@ def test_oklab_unsharp_mask_invocation_preserves_alpha_and_sharpens_in_oklab() -
     assert output.height == 1
     assert numpy.asarray(saved_image.getchannel("A")).reshape(-1).tolist() == [32, 128, 224]
 
-    rgb = numpy.asarray(input_image.convert("RGB"), dtype=numpy.float32) / 255.0
-    blurred_rgb = (
+    rgb = torch.from_numpy(numpy.asarray(input_image.convert("RGB"), dtype=numpy.float32) / 255.0).permute(2, 0, 1)
+    blurred_rgb = torch.from_numpy(
         numpy.asarray(input_image.convert("RGB").filter(ImageFilter.GaussianBlur(radius=1.0)), dtype=numpy.float32)
         / 255.0
-    )
+    ).permute(2, 0, 1)
 
-    rgb_unsharp = numpy.clip(rgb + (rgb - blurred_rgb) * 0.5, 0.0, 1.0)
-    oklab_unsharp = srgb_from_linear_srgb(
-        linear_srgb_from_oklab(
-            numpy.clip(
-                oklab_from_linear_srgb(linear_srgb_from_srgb(rgb))
-                + (
-                    oklab_from_linear_srgb(linear_srgb_from_srgb(rgb))
-                    - oklab_from_linear_srgb(linear_srgb_from_srgb(blurred_rgb))
-                )
-                * 0.5,
-                -1.0,
-                1.0,
-            )
-        )
+    rgb_unsharp = torch.clamp(rgb + (rgb - blurred_rgb) * 0.5, 0.0, 1.0)
+    rgb_oklab = oklab_from_linear_srgb(linear_srgb_from_srgb(rgb))
+    blurred_oklab = oklab_from_linear_srgb(linear_srgb_from_srgb(blurred_rgb))
+    expected_oklab = rgb_oklab.clone()
+    expected_oklab[0, ...] = torch.clamp(
+        rgb_oklab[0, ...] + (rgb_oklab[0, ...] - blurred_oklab[0, ...]) * 0.5,
+        -1.0,
+        1.0,
     )
+    oklab_unsharp = srgb_from_linear_srgb(linear_srgb_from_oklab(expected_oklab))
 
-    assert not numpy.allclose(oklab_unsharp, rgb_unsharp, atol=1e-3)
+    assert not torch.allclose(oklab_unsharp, rgb_unsharp, atol=1e-3)
     assert numpy.allclose(
-        numpy.asarray(saved_image.convert("RGB"), dtype=numpy.float32) / 255.0, oklab_unsharp, atol=1 / 255.0
+        numpy.asarray(saved_image.convert("RGB"), dtype=numpy.float32) / 255.0,
+        oklab_unsharp.permute(1, 2, 0).numpy(),
+        atol=1 / 255.0,
     )
 
 
@@ -77,20 +86,16 @@ def test_oklch_hue_adjustment_invocation_preserves_alpha_and_rotates_hue_in_oklc
         ]
     )
 
-    context = MagicMock()
-    context.images.get_pil.return_value = input_image
-    context.images.save.side_effect = lambda image: SimpleNamespace(
-        image_name="out", width=image.width, height=image.height
-    )
+    context = _build_context(input_image)
 
     invocation = OklchImageHueAdjustmentInvocation(image=ImageField(image_name="in"), hue=180)
     output = invocation.invoke(context)
     saved_image = context.images.save.call_args.kwargs["image"]
 
-    rgb = numpy.asarray(input_image.convert("RGB"), dtype=numpy.float32) / 255.0
+    rgb = torch.from_numpy(numpy.asarray(input_image.convert("RGB"), dtype=numpy.float32) / 255.0).permute(2, 0, 1)
     oklch = oklch_from_oklab(oklab_from_linear_srgb(linear_srgb_from_srgb(rgb)))
-    rotated_oklch = oklch.copy()
-    rotated_oklch[..., 2] = (rotated_oklch[..., 2] + 180.0) % 360.0
+    rotated_oklch = oklch.clone()
+    rotated_oklch[2, ...] = (rotated_oklch[2, ...] + 180.0) % 360.0
     expected_rgb = srgb_from_linear_srgb(linear_srgb_from_oklch(rotated_oklch))
 
     assert output.image.image_name == "out"
@@ -98,5 +103,84 @@ def test_oklch_hue_adjustment_invocation_preserves_alpha_and_rotates_hue_in_oklc
     assert output.height == 1
     assert numpy.asarray(saved_image.getchannel("A")).reshape(-1).tolist() == [64, 192]
     assert numpy.allclose(
-        numpy.asarray(saved_image.convert("RGB"), dtype=numpy.float32) / 255.0, expected_rgb, atol=1 / 255.0
+        numpy.asarray(saved_image.convert("RGB"), dtype=numpy.float32) / 255.0,
+        expected_rgb.permute(1, 2, 0).numpy(),
+        atol=1 / 255.0,
     )
+
+
+def test_oklab_unsharp_mask_invocation_zero_strength_returns_original_image() -> None:
+    input_image = Image.new("RGBA", (2, 2))
+    input_image.putdata(
+        [
+            (12, 34, 56, 78),
+            (90, 123, 45, 67),
+            (210, 40, 80, 90),
+            (255, 200, 10, 255),
+        ]
+    )
+    context = _build_context(input_image)
+
+    invocation = OklabUnsharpMaskInvocation(image=ImageField(image_name="in"), radius=1.5, strength=0.0)
+    invocation.invoke(context)
+    saved_image = context.images.save.call_args.kwargs["image"]
+
+    assert _max_abs_diff_uint8(saved_image, input_image) <= 1
+
+
+def test_oklab_unsharp_mask_invocation_does_not_introduce_color_on_grayscale_image() -> None:
+    input_image = Image.new("RGB", (3, 1))
+    input_image.putdata([(32, 32, 32), (128, 128, 128), (224, 224, 224)])
+    context = _build_context(input_image)
+
+    invocation = OklabUnsharpMaskInvocation(image=ImageField(image_name="in"), radius=1.0, strength=80.0)
+    invocation.invoke(context)
+    saved_image = context.images.save.call_args.kwargs["image"]
+    saved_rgb = numpy.asarray(saved_image.convert("RGB"), dtype=numpy.uint8)
+
+    assert numpy.abs(saved_rgb[..., 0].astype(numpy.int16) - saved_rgb[..., 1].astype(numpy.int16)).max() <= 1
+    assert numpy.abs(saved_rgb[..., 1].astype(numpy.int16) - saved_rgb[..., 2].astype(numpy.int16)).max() <= 1
+
+
+def test_oklab_unsharp_mask_invocation_clips_extreme_values_to_valid_rgb_range() -> None:
+    input_image = Image.new("RGB", (3, 1))
+    input_image.putdata([(255, 255, 255), (0, 0, 0), (255, 255, 255)])
+    context = _build_context(input_image)
+
+    invocation = OklabUnsharpMaskInvocation(image=ImageField(image_name="in"), radius=2.0, strength=500.0)
+    invocation.invoke(context)
+    saved_rgb = numpy.asarray(context.images.save.call_args.kwargs["image"].convert("RGB"), dtype=numpy.uint8)
+
+    assert saved_rgb.min() >= 0
+    assert saved_rgb.max() <= 255
+
+
+def test_oklch_hue_adjustment_invocation_wraps_hue_values_and_supports_rgb_input() -> None:
+    input_image = Image.new("RGB", (2, 1))
+    input_image.putdata([(210, 80, 30), (40, 160, 220)])
+
+    base_context = _build_context(input_image)
+    zero_output = OklchImageHueAdjustmentInvocation(image=ImageField(image_name="in"), hue=0).invoke(base_context)
+    zero_saved = base_context.images.save.call_args.kwargs["image"]
+
+    full_turn_context = _build_context(input_image)
+    full_turn_output = OklchImageHueAdjustmentInvocation(image=ImageField(image_name="in"), hue=360).invoke(
+        full_turn_context
+    )
+    full_turn_saved = full_turn_context.images.save.call_args.kwargs["image"]
+
+    negative_context = _build_context(input_image)
+    OklchImageHueAdjustmentInvocation(image=ImageField(image_name="in"), hue=-180).invoke(negative_context)
+    negative_saved = negative_context.images.save.call_args.kwargs["image"]
+
+    positive_context = _build_context(input_image)
+    OklchImageHueAdjustmentInvocation(image=ImageField(image_name="in"), hue=180).invoke(positive_context)
+    positive_saved = positive_context.images.save.call_args.kwargs["image"]
+
+    assert zero_output.width == 2
+    assert zero_output.height == 1
+    assert full_turn_output.width == 2
+    assert full_turn_output.height == 1
+    assert _max_abs_diff_uint8(zero_saved, input_image) <= 1
+    assert _max_abs_diff_uint8(full_turn_saved, input_image) <= 1
+    assert _max_abs_diff_uint8(negative_saved, positive_saved) <= 1
