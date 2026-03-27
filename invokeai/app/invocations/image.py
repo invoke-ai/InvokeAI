@@ -25,6 +25,14 @@ from invokeai.app.invocations.primitives import ImageOutput, StringOutput
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
+from invokeai.backend.image_util.color_conversion import (
+    linear_srgb_from_oklab,
+    linear_srgb_from_oklch,
+    linear_srgb_from_srgb,
+    oklab_from_linear_srgb,
+    oklch_from_oklab,
+    srgb_from_linear_srgb,
+)
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
@@ -395,6 +403,51 @@ class UnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
             width=image.width,
             height=image.height,
         )
+
+
+@invocation(
+    "unsharp_mask_oklab",
+    title="Unsharp Mask (Oklab)",
+    tags=["image", "unsharp_mask", "oklab"],
+    category="image",
+    version="1.0.0",
+)
+class OklabUnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Applies an unsharp mask filter to an image in the Oklab color space"""
+
+    image: ImageField = InputField(description="The image to use")
+    radius: float = InputField(gt=0, description="Unsharp mask radius", default=2)
+    strength: float = InputField(ge=0, description="Unsharp mask strength", default=50)
+
+    def pil_from_array(self, arr: numpy.ndarray) -> Image.Image:
+        return Image.fromarray((numpy.clip(arr, 0.0, 1.0) * 255).astype("uint8"))
+
+    def array_from_pil(self, img: Image.Image) -> numpy.ndarray:
+        return numpy.array(img, dtype=numpy.float32) / 255.0
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+        mode = image.mode
+
+        alpha_channel = image.getchannel("A") if mode == "RGBA" else None
+        image = image.convert("RGB")
+
+        image_blurred = self.array_from_pil(image.filter(ImageFilter.GaussianBlur(radius=self.radius)))
+        image_arr = self.array_from_pil(image)
+
+        image_oklab = oklab_from_linear_srgb(linear_srgb_from_srgb(image_arr))
+        image_blurred_oklab = oklab_from_linear_srgb(linear_srgb_from_srgb(image_blurred))
+
+        image_oklab += (image_oklab - image_blurred_oklab) * (self.strength / 100.0)
+        image_oklab = numpy.clip(image_oklab, -1.0, 1.0)
+
+        image = self.pil_from_array(srgb_from_linear_srgb(linear_srgb_from_oklab(image_oklab))).convert(mode)
+
+        if alpha_channel is not None:
+            image.putalpha(alpha_channel)
+
+        image_dto = context.images.save(image=image)
+        return ImageOutput.build(image_dto)
 
 
 PIL_RESAMPLING_MODES = Literal[
@@ -799,6 +852,40 @@ class ImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         image_dto = context.images.save(image=pil_image)
 
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "img_hue_adjust_oklch",
+    title="Adjust Image Hue (Oklch)",
+    tags=["image", "hue", "oklch"],
+    category="image",
+    version="1.0.0",
+)
+class OklchImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Adjusts the hue of an image in Oklch space."""
+
+    image: ImageField = InputField(description="The image to adjust")
+    hue: int = InputField(default=0, description="The degrees by which to rotate the hue, 0-360")
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+        mode = image.mode
+        alpha_channel = image.getchannel("A") if mode == "RGBA" else None
+
+        rgb = numpy.asarray(image.convert("RGB"), dtype=numpy.float32) / 255.0
+        oklch = oklch_from_oklab(oklab_from_linear_srgb(linear_srgb_from_srgb(rgb)))
+        oklch[..., 2] = (oklch[..., 2] + self.hue) % 360.0
+
+        image = Image.fromarray(
+            numpy.clip(srgb_from_linear_srgb(linear_srgb_from_oklch(oklch)) * 255.0, 0.0, 255.0).astype(numpy.uint8),
+            mode="RGB",
+        ).convert(mode)
+
+        if alpha_channel is not None:
+            image.putalpha(alpha_channel)
+
+        image_dto = context.images.save(image=image)
         return ImageOutput.build(image_dto)
 
 
