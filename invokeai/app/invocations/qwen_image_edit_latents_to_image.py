@@ -65,11 +65,8 @@ class QwenImageEditLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBo
                     .view(1, vae.config.z_dim, 1, 1, 1)
                     .to(latents.device, latents.dtype)
                 )
-                latents_std = (
-                    1.0
-                    / torch.tensor(vae.config.latents_std)
-                    .view(1, vae.config.z_dim, 1, 1, 1)
-                    .to(latents.device, latents.dtype)
+                latents_std = 1.0 / torch.tensor(vae.config.latents_std).view(1, vae.config.z_dim, 1, 1, 1).to(
+                    latents.device, latents.dtype
                 )
                 latents = latents / latents_std + latents_mean
 

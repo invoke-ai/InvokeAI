@@ -70,13 +70,35 @@ class QwenImageEditTextEncoderInvocation(BaseInvocation):
         "'nf4' (4-bit) saves the most memory, 'int8' (8-bit) is a middle ground.",
     )
 
+    @staticmethod
+    def _resize_for_vl_encoder(image: PILImage.Image, target_pixels: int = 512 * 512) -> PILImage.Image:
+        """Resize image to fit within target_pixels while preserving aspect ratio.
+
+        Matches the diffusers pipeline's calculate_dimensions logic: the image is resized
+        so its total pixel count is approximately target_pixels, with dimensions rounded to
+        multiples of 32. This prevents large images from producing too many vision tokens
+        which can overwhelm the text prompt.
+        """
+        w, h = image.size
+        aspect = w / h
+        # Compute dimensions that preserve aspect ratio at ~target_pixels total
+        new_w = int((target_pixels * aspect) ** 0.5)
+        new_h = int(target_pixels / new_w)
+        # Round to multiples of 32
+        new_w = max(32, (new_w // 32) * 32)
+        new_h = max(32, (new_h // 32) * 32)
+        if new_w != w or new_h != h:
+            image = image.resize((new_w, new_h), resample=PILImage.LANCZOS)
+        return image
+
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> QwenImageEditConditioningOutput:
-        # Load reference images
+        # Load and resize reference images to ~1M pixels (matching diffusers pipeline)
         pil_images: list[PILImage.Image] = []
         for img_field in self.reference_images:
             pil_img = context.images.get_pil(img_field.image_name)
-            pil_images.append(pil_img.convert("RGB"))
+            pil_img = self._resize_for_vl_encoder(pil_img.convert("RGB"))
+            pil_images.append(pil_img)
 
         prompt_embeds, prompt_mask = self._encode(context, pil_images)
         prompt_embeds = prompt_embeds.detach().to("cpu")
@@ -99,7 +121,7 @@ class QwenImageEditTextEncoderInvocation(BaseInvocation):
         3. Extract valid (non-padding) tokens and drop the system prefix
         4. Return padded embeddings + attention mask
         """
-        from transformers import AutoTokenizer, Qwen2_5_VLForConditionalGeneration, Qwen2_5_VLProcessor
+        from transformers import AutoTokenizer, Qwen2_5_VLProcessor
 
         try:
             from transformers import Qwen2_5_VLImageProcessor as _ImageProcessorCls

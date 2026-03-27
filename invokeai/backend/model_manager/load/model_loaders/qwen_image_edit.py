@@ -44,17 +44,27 @@ class QwenImageEditDiffusersModel(GenericDiffusersLoader):
         model_path = model_path / submodel_type.value
 
         # We force bfloat16 for Qwen Image Edit models.
-        dtype = torch.bfloat16
+        # Use `dtype` (newer) with fallback to `torch_dtype` (older diffusers).
+        dtype_kwarg = {"dtype": torch.bfloat16}
         try:
             result: AnyModel = load_class.from_pretrained(
                 model_path,
-                torch_dtype=dtype,
+                **dtype_kwarg,
+                variant=variant,
+                local_files_only=True,
+            )
+        except TypeError:
+            # Older diffusers uses torch_dtype instead of dtype
+            dtype_kwarg = {"torch_dtype": torch.bfloat16}
+            result = load_class.from_pretrained(
+                model_path,
+                **dtype_kwarg,
                 variant=variant,
                 local_files_only=True,
             )
         except OSError as e:
             if variant and "no file named" in str(e):
-                result = load_class.from_pretrained(model_path, torch_dtype=dtype, local_files_only=True)
+                result = load_class.from_pretrained(model_path, **dtype_kwarg, local_files_only=True)
             else:
                 raise e
 
@@ -138,7 +148,7 @@ class QwenImageEditGGUFCheckpointModel(ModelLoader):
             shape = w.tensor_shape if isinstance(w, GGMLTensor) else w.shape
             joint_attention_dim = shape[1]
 
-        model_config = {
+        model_config: dict = {
             "patch_size": 2,
             "in_channels": in_channels if "img_in.weight" in sd else 64,
             "out_channels": 16,
@@ -148,8 +158,13 @@ class QwenImageEditGGUFCheckpointModel(ModelLoader):
             "joint_attention_dim": joint_attention_dim,
             "guidance_embeds": False,
             "axes_dims_rope": (16, 56, 56),
-            "zero_cond_t": True,
         }
+
+        # zero_cond_t was added in diffusers 0.37+; skip it on older versions
+        import inspect
+
+        if "zero_cond_t" in inspect.signature(QwenImageTransformer2DModel.__init__).parameters:
+            model_config["zero_cond_t"] = True
 
         with accelerate.init_empty_weights():
             model = QwenImageTransformer2DModel(**model_config)

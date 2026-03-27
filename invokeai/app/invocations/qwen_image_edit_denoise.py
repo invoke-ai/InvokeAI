@@ -22,7 +22,6 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.qwen_image_edit_lora_constants import (
@@ -266,28 +265,44 @@ class QwenImageEditDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # exactly matching the diffusers pipeline.
         from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
-        scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
-            str(context.models.get_absolute_path(context.models.get_config(self.transformer.transformer)) / "scheduler"),
-            local_files_only=True,
-        )
-
         import math
+
         import numpy as np
+
+        # Try to load the scheduler config from the model's directory (Diffusers models
+        # have a scheduler/ subdir). For GGUF models this path doesn't exist, so fall
+        # back to instantiating the scheduler with the known Qwen Image Edit defaults.
+        model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
+        scheduler_path = model_path / "scheduler"
+        if scheduler_path.is_dir() and (scheduler_path / "scheduler_config.json").exists():
+            scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
+                str(scheduler_path), local_files_only=True
+            )
+        else:
+            scheduler = FlowMatchEulerDiscreteScheduler(
+                use_dynamic_shifting=True,
+                base_shift=0.5,
+                max_shift=0.9,
+                base_image_seq_len=256,
+                max_image_seq_len=8192,
+                shift_terminal=0.02,
+                num_train_timesteps=1000,
+                time_shift_type="exponential",
+            )
 
         if self.shift is not None:
             # Lightning LoRA: fixed shift
             mu = math.log(self.shift)
         else:
-            # Default dynamic shifting from scheduler config
-            from diffusers.pipelines.qwenimage.pipeline_qwenimage_edit import calculate_shift
-
-            mu = calculate_shift(
-                image_seq_len,
-                scheduler.config.get("base_image_seq_len", 256),
-                scheduler.config.get("max_image_seq_len", 4096),
-                scheduler.config.get("base_shift", 0.5),
-                scheduler.config.get("max_shift", 1.15),
-            )
+            # Default dynamic shifting
+            # Linear interpolation matching diffusers' calculate_shift
+            base_shift = scheduler.config.get("base_shift", 0.5)
+            max_shift = scheduler.config.get("max_shift", 0.9)
+            base_seq = scheduler.config.get("base_image_seq_len", 256)
+            max_seq = scheduler.config.get("max_image_seq_len", 4096)
+            m = (max_shift - base_shift) / (max_seq - base_seq)
+            b = base_shift - m * base_seq
+            mu = image_seq_len * m + b
 
         init_sigmas = np.linspace(1.0, 1.0 / self.steps, self.steps).tolist()
         scheduler.set_timesteps(sigmas=init_sigmas, mu=mu, device=device)
@@ -352,7 +367,9 @@ class QwenImageEditDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         else:
             # No reference image provided — use zeros so the model still gets the
             # expected sequence layout.
-            ref_latents = torch.zeros(1, out_channels, latent_height, latent_width, device=device, dtype=inference_dtype)
+            ref_latents = torch.zeros(
+                1, out_channels, latent_height, latent_width, device=device, dtype=inference_dtype
+            )
         ref_latents_packed = self._pack_latents(ref_latents, 1, out_channels, latent_height, latent_width)
 
         # img_shapes tells the transformer the spatial layout of noisy and reference patches.

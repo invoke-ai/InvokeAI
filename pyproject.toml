@@ -35,8 +35,8 @@ dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
-  "compel==2.3.1",
-  "diffusers[torch]==0.37.1",
+  "compel==2.1.1",
+  "diffusers[torch]==0.37.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",
@@ -46,7 +46,7 @@ dependencies = [
   "safetensors",
   "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
   "spandrel",
-  "torch~=2.10.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
+  "torch~=2.7.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
   "transformers>=4.56.0",
