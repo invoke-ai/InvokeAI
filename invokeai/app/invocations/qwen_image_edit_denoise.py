@@ -263,11 +263,10 @@ class QwenImageEditDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Use the actual FlowMatchEulerDiscreteScheduler to compute sigmas/timesteps,
         # exactly matching the diffusers pipeline.
-        from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
-
         import math
 
         import numpy as np
+        from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
         # Try to load the scheduler config from the model's directory (Diffusers models
         # have a scheduler/ subdir). For GGUF models this path doesn't exist, so fall
@@ -275,9 +274,7 @@ class QwenImageEditDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
         scheduler_path = model_path / "scheduler"
         if scheduler_path.is_dir() and (scheduler_path / "scheduler_config.json").exists():
-            scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(
-                str(scheduler_path), local_files_only=True
-            )
+            scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(str(scheduler_path), local_files_only=True)
         else:
             scheduler = FlowMatchEulerDiscreteScheduler(
                 use_dynamic_shifting=True,
