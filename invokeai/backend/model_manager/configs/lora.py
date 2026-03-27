@@ -769,7 +769,7 @@ class LoRA_LyCORIS_QwenImageEdit_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
         has_qwen_ie_keys = state_dict_has_any_keys_starting_with(
             state_dict,
-            {"transformer_blocks."},
+            {"transformer_blocks.", "transformer.transformer_blocks."},
         )
         has_lora_suffix = state_dict_has_any_keys_ending_with(
             state_dict,
@@ -787,7 +787,9 @@ class LoRA_LyCORIS_QwenImageEdit_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
         state_dict = mod.load_state_dict()
-        has_qwen_ie_keys = state_dict_has_any_keys_starting_with(state_dict, {"transformer_blocks."})
+        has_qwen_ie_keys = state_dict_has_any_keys_starting_with(
+            state_dict, {"transformer_blocks.", "transformer.transformer_blocks."}
+        )
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
         has_flux_keys = state_dict_has_any_keys_starting_with(state_dict, {"double_blocks.", "single_blocks."})
 

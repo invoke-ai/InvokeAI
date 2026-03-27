@@ -30,12 +30,21 @@ def lora_model_from_qwen_image_edit_state_dict(
     """
     layers: dict[str, BaseLayerPatch] = {}
 
+    # Some LoRAs use a "transformer." prefix on keys (e.g. "transformer.transformer_blocks.0.attn.to_k")
+    # while the model's module paths start at "transformer_blocks.0.attn.to_k". Strip it if present.
+    strip_prefixes = ["transformer."]
+
     grouped = _group_by_layer(state_dict)
 
     for layer_key, layer_dict in grouped.items():
         values = _normalize_lora_keys(layer_dict, alpha)
         layer = any_lora_layer_from_state_dict(values)
-        final_key = f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}{layer_key}"
+        clean_key = layer_key
+        for prefix in strip_prefixes:
+            if clean_key.startswith(prefix):
+                clean_key = clean_key[len(prefix) :]
+                break
+        final_key = f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}{clean_key}"
         layers[final_key] = layer
 
     return ModelPatchRaw(layers=layers)
