@@ -401,8 +401,8 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
 
   const model = params.model;
 
-  if (model && !['sd-1', 'sdxl'].includes(model.base)) {
-    // When we are using an upsupported model, do not add the other warnings
+  if (model && !['sd-1', 'sdxl', 'flux', 'z-image'].includes(model.base)) {
+    // When we are using an unsupported model, do not add the other warnings
     reasons.push({ content: i18n.t('upscaling.incompatibleBaseModel') });
   } else {
     // Using a compatible model, add all warnings
@@ -414,6 +414,27 @@ const getReasonsWhyCannotEnqueueUpscaleTab = (arg: {
     }
     if (!upscale.tileControlnetModel) {
       reasons.push({ content: i18n.t('upscaling.missingTileControlNetModel') });
+    }
+    // FLUX models require additional encoder/VAE models
+    if (model?.base === 'flux') {
+      if (!params.t5EncoderModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noT5EncoderModelSelected') });
+      }
+      if (!params.clipEmbedModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noCLIPEmbedModelSelected') });
+      }
+      if (!params.fluxVAE) {
+        reasons.push({ content: i18n.t('parameters.invoke.noFLUXVAEModelSelected') });
+      }
+    }
+    // Z-Image models require a VAE (FLUX VAE) and Qwen3 encoder - either standalone or from a Diffusers source model
+    if (model?.base === 'z-image') {
+      if (!params.zImageVaeModel && !params.zImageQwen3SourceModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageVaeSourceSelected') });
+      }
+      if (!params.zImageQwen3EncoderModel && !params.zImageQwen3SourceModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+      }
     }
     if (model) {
       for (const lora of loras.filter(({ isEnabled }) => isEnabled === true)) {

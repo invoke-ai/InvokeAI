@@ -22,7 +22,8 @@ export const UpscaleWarning = () => {
 
   useEffect(() => {
     const validModel = modelConfigs.find((cnetModel) => {
-      return cnetModel.base === model?.base && cnetModel.name.toLowerCase().includes('tile');
+      const nameLC = cnetModel.name.toLowerCase();
+      return cnetModel.base === model?.base && (nameLC.includes('tile') || nameLC.includes('union'));
     });
     if (tileControlnetModel?.key !== validModel?.key) {
       dispatch(tileControlnetModelChanged(validModel || null));
@@ -30,7 +31,7 @@ export const UpscaleWarning = () => {
   }, [dispatch, model?.base, modelConfigs, tileControlnetModel?.key]);
 
   const isBaseModelCompatible = useMemo(() => {
-    return model && ['sd-1', 'sdxl'].includes(model.base);
+    return model && ['sd-1', 'sdxl', 'flux', 'z-image'].includes(model.base);
   }, [model]);
 
   const warnings = useMemo(() => {
