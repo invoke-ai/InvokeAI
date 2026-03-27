@@ -80,6 +80,15 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
+from invokeai.backend.image_util.color_conversion import (
+    linear_srgb_from_oklab,
+    linear_srgb_from_oklch,
+    linear_srgb_from_srgb,
+    oklab_from_linear_srgb,
+    oklab_from_oklch,
+    oklch_from_oklab,
+    srgb_from_linear_srgb,
+)
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.taxonomy import (
@@ -207,6 +216,14 @@ __all__ = [
     # invokeai.app.util.misc
     "SEED_MAX",
     "get_random_seed",
+    # invokeai.backend.image_util.color_conversion
+    "linear_srgb_from_srgb",
+    "srgb_from_linear_srgb",
+    "oklab_from_linear_srgb",
+    "linear_srgb_from_oklab",
+    "oklch_from_oklab",
+    "oklab_from_oklch",
+    "linear_srgb_from_oklch",
     # invokeai.backend.model_manager.taxonomy
     "BaseModelType",
     "ModelType",
