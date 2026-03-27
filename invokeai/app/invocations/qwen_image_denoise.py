@@ -353,29 +353,44 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Pack latents into 2x2 patches: (B, C, H, W) -> (B, H/2*W/2, C*4)
         latents = self._pack_latents(latents, 1, out_channels, latent_height, latent_width)
 
-        # Pack reference image latents and concatenate along the sequence dimension.
-        # The edit transformer always expects [noisy_patches ; ref_patches] in its sequence.
-        if ref_latents is not None:
-            _, ref_ch, rh, rw = ref_latents.shape
-            if rh != latent_height or rw != latent_width:
-                ref_latents = torch.nn.functional.interpolate(
-                    ref_latents, size=(latent_height, latent_width), mode="bilinear"
-                )
-        else:
-            # No reference image provided — use zeros so the model still gets the
-            # expected sequence layout.
-            ref_latents = torch.zeros(
-                1, out_channels, latent_height, latent_width, device=device, dtype=inference_dtype
-            )
-        ref_latents_packed = self._pack_latents(ref_latents, 1, out_channels, latent_height, latent_width)
+        # Determine whether the model uses reference latent conditioning (zero_cond_t).
+        # Edit models (zero_cond_t=True) expect [noisy_patches ; ref_patches] in the sequence.
+        # Txt2img models (zero_cond_t=False) only take noisy patches.
+        has_zero_cond_t = getattr(transformer_info.model, "zero_cond_t", False) or getattr(
+            transformer_info.model.config, "zero_cond_t", False
+        )
+        use_ref_latents = has_zero_cond_t
 
-        # img_shapes tells the transformer the spatial layout of noisy and reference patches.
-        img_shapes = [
-            [
-                (1, latent_height // 2, latent_width // 2),
-                (1, latent_height // 2, latent_width // 2),
+        ref_latents_packed = None
+        if use_ref_latents:
+            if ref_latents is not None:
+                _, ref_ch, rh, rw = ref_latents.shape
+                if rh != latent_height or rw != latent_width:
+                    ref_latents = torch.nn.functional.interpolate(
+                        ref_latents, size=(latent_height, latent_width), mode="bilinear"
+                    )
+            else:
+                # No reference image provided — use zeros so the model still gets the
+                # expected sequence layout.
+                ref_latents = torch.zeros(
+                    1, out_channels, latent_height, latent_width, device=device, dtype=inference_dtype
+                )
+            ref_latents_packed = self._pack_latents(ref_latents, 1, out_channels, latent_height, latent_width)
+
+        # img_shapes tells the transformer the spatial layout of patches.
+        if use_ref_latents:
+            img_shapes = [
+                [
+                    (1, latent_height // 2, latent_width // 2),
+                    (1, latent_height // 2, latent_width // 2),
+                ]
             ]
-        ]
+        else:
+            img_shapes = [
+                [
+                    (1, latent_height // 2, latent_width // 2),
+                ]
+            ]
 
         # Prepare inpaint extension (operates in 4D space, so unpack/repack around it)
         inpaint_mask = self._prep_inpaint_mask(context, noise)  # noise has the right 4D shape
@@ -428,8 +443,12 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 # The pipeline passes timestep / 1000 to the transformer
                 timestep = t.expand(latents.shape[0]).to(inference_dtype)
 
-                # Concatenate noisy and reference patches along the sequence dim
-                model_input = torch.cat([latents, ref_latents_packed], dim=1)
+                # For edit models: concatenate noisy and reference patches along the sequence dim
+                # For txt2img models: just use noisy patches
+                if ref_latents_packed is not None:
+                    model_input = torch.cat([latents, ref_latents_packed], dim=1)
+                else:
+                    model_input = latents
 
                 noise_pred_cond = transformer(
                     hidden_states=model_input,
