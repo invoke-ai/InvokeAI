@@ -15,11 +15,7 @@ import { addQwenImageLoRAs } from 'features/nodes/util/graph/generation/addQwenI
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
-import {
-  getOriginalAndScaledSizesForTextToImage,
-  selectCanvasOutputFields,
-  selectPresetModifiedPrompts,
-} from 'features/nodes/util/graph/graphBuilderUtils';
+import { selectCanvasOutputFields, selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { Invocation } from 'services/api/types';
@@ -139,14 +135,12 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     const firstImgField = zImageField.parse(
       firstConfig.config.image?.crop?.image ?? firstConfig.config.image?.original.image
     );
-    // Resize the reference image to the generation dimensions before VAE encoding,
-    // matching the diffusers pipeline which resizes in pixel space, not latent space.
-    const { scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
+    // Don't force-resize the reference image to the output dimensions — that would
+    // distort the aspect ratio when they differ. The I2L encodes at the image's
+    // native size; the denoise node handles dimension mismatches via interpolation.
     const refI2l = g.addNode({
       type: 'qwen_image_i2l',
       id: getPrefixedId('qwen_ref_i2l'),
-      width: scaledSize.width,
-      height: scaledSize.height,
     });
     const refImageNode = g.addNode({
       type: 'image',
