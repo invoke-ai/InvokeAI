@@ -1208,7 +1208,7 @@ class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, C
     """Model config for Qwen Image diffusers models (both txt2img and edit)."""
 
     base: Literal[BaseModelType.QwenImage] = Field(BaseModelType.QwenImage)
-    variant: QwenImageVariantType = Field(default=QwenImageVariantType.Generate)
+    variant: QwenImageVariantType | None = Field(default=None)
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -1269,7 +1269,7 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
 
     base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
     format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
-    variant: QwenImageVariantType = Field(default=QwenImageVariantType.Generate)
+    variant: QwenImageVariantType | None = Field(default=None)
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:

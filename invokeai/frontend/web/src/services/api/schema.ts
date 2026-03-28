@@ -18500,8 +18500,7 @@ export type components = {
              * @constant
              */
             base: "qwen-image";
-            /** @default generate */
-            variant: components["schemas"]["QwenImageVariantType"];
+            variant: components["schemas"]["QwenImageVariantType"] | null;
         };
         /** Main_Diffusers_SD1_Config */
         Main_Diffusers_SD1_Config: {
@@ -19234,8 +19233,7 @@ export type components = {
              * @constant
              */
             format: "gguf_quantized";
-            /** @default generate */
-            variant: components["schemas"]["QwenImageVariantType"];
+            variant: components["schemas"]["QwenImageVariantType"] | null;
         };
         /**
          * Main_GGUF_ZImage_Config
