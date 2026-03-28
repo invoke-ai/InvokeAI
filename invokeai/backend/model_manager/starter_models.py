@@ -2,7 +2,13 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from invokeai.backend.model_manager.taxonomy import AnyVariant, BaseModelType, ModelFormat, ModelType, QwenImageVariantType
+from invokeai.backend.model_manager.taxonomy import (
+    AnyVariant,
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    QwenImageVariantType,
+)
 
 
 class StarterModelWithoutDependencies(BaseModel):
