@@ -330,7 +330,7 @@ class ModelInstallService(ModelInstallServiceBase):
     def stop(self, invoker: Optional[Invoker] = None) -> None:
         """Stop the installer thread; after this the object can be deleted and garbage collected."""
         if not self._running:
-            raise Exception("Attempt to stop the install service before it was started")
+            return
         self._logger.debug("calling stop_event.set()")
         self._stop_event.set()
         self._clear_pending_jobs()
@@ -663,10 +663,12 @@ class ModelInstallService(ModelInstallServiceBase):
         # directory. However, the path we store in the model record may be either a file within the key directory,
         # or the directory itself. So we have to handle both cases.
         if model_path.is_file() or model_path.is_symlink():
-            # Sanity check - file models should be in their own directory under the models dir. The parent of the
-            # file should be the model's directory, not the Invoke models dir!
-            assert model_path.parent != self.app_config.models_path
-            rmtree(model_path.parent)
+            # Delete the individual model file, not the entire parent directory.
+            # Other unrelated files may exist in the same directory.
+            model_path.unlink()
+            # Clean up the parent directory only if it is now empty
+            if model_path.parent != self.app_config.models_path and not any(model_path.parent.iterdir()):
+                model_path.parent.rmdir()
         elif model_path.is_dir():
             # Sanity check - folder models should be in their own directory under the models dir. The path should
             # not be the Invoke models dir itself!

@@ -4,7 +4,8 @@
         "uploadImage": "Lataa kuva",
         "invokeProgressBar": "Invoken edistymispalkki",
         "nextImage": "Seuraava kuva",
-        "previousImage": "Edellinen kuva"
+        "previousImage": "Edellinen kuva",
+        "uploadImages": "Lähetä Kuva(t)"
     },
     "common": {
         "languagePickerLabel": "Kielen valinta",
@@ -29,5 +30,28 @@
         "galleryImageSize": "Kuvan koko",
         "gallerySettings": "Gallerian asetukset",
         "autoSwitchNewImages": "Vaihda uusiin kuviin automaattisesti"
+    },
+    "modelManager": {
+        "t5Encoder": "T5-kooderi",
+        "qwen3Encoder": "Qwen3-kooderi",
+        "zImageVae": "VAE (valinnainen)",
+        "zImageQwen3Encoder": "Qwen3-kooderi (valinnainen)",
+        "zImageQwen3SourcePlaceholder": "Pakollinen, jos VAE/Enkooderi on tyhjä",
+        "flux2KleinVae": "VAE (valinnainen)",
+        "flux2KleinQwen3Encoder": "Qwen3-kooderi (valinnainen)"
+    },
+    "auth": {
+        "login": {
+            "title": "Kirjaudu sisään InvokeAI:hin",
+            "password": "Salasana",
+            "passwordPlaceholder": "Salasana",
+            "signIn": "Kirjaudu sisään",
+            "signingIn": "Kirjaudutaan sisään...",
+            "loginFailed": "Kirjautuminen epäonnistui. Tarkista käyttäjätunnuksesi tiedot."
+        },
+        "setup": {
+            "title": "Tervetuloa InvokeAI:hin",
+            "subtitle": "Määritä ensimmäiseksi järjestelmänvalvojan tili"
+        }
     }
 }
