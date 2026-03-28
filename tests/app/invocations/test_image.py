@@ -1,3 +1,5 @@
+import importlib.util
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -10,10 +12,24 @@ from invokeai.backend.image_util.color_conversion import (
     linear_srgb_from_oklab,
     linear_srgb_from_oklch,
     linear_srgb_from_srgb,
+    okhsl_from_srgb,
     oklab_from_linear_srgb,
     oklch_from_oklab,
+    srgb_from_hsl,
     srgb_from_linear_srgb,
+    srgb_from_okhsl,
 )
+
+_COMPOSITION_NODES_SPEC = importlib.util.spec_from_file_location(
+    "invokeai.app.invocations.composition_nodes",
+    Path(__file__).resolve().parents[3] / "invokeai/app/invocations/composition-nodes.py",
+)
+assert _COMPOSITION_NODES_SPEC is not None
+assert _COMPOSITION_NODES_SPEC.loader is not None
+composition_nodes = importlib.util.module_from_spec(_COMPOSITION_NODES_SPEC)
+_COMPOSITION_NODES_SPEC.loader.exec_module(composition_nodes)
+InvokeAdjustImageHuePlusInvocation = composition_nodes.InvokeAdjustImageHuePlusInvocation
+InvokeImageBlendInvocation = composition_nodes.InvokeImageBlendInvocation
 
 
 def _build_context(input_image: Image.Image) -> MagicMock:
@@ -184,3 +200,204 @@ def test_oklch_hue_adjustment_invocation_wraps_hue_values_and_supports_rgb_input
     assert _max_abs_diff_uint8(zero_saved, input_image) <= 1
     assert _max_abs_diff_uint8(full_turn_saved, input_image) <= 1
     assert _max_abs_diff_uint8(negative_saved, positive_saved) <= 1
+
+
+def test_new_oklab_nodes_preserve_alpha_for_non_rgba_alpha_modes() -> None:
+    la_image = Image.new("LA", (2, 1))
+    la_image.putdata([(32, 64), (192, 224)])
+
+    unsharp_context = _build_context(la_image)
+    OklabUnsharpMaskInvocation(image=ImageField(image_name="in"), radius=1.0, strength=25.0).invoke(unsharp_context)
+    unsharp_saved = unsharp_context.images.save.call_args.kwargs["image"]
+
+    hue_context = _build_context(la_image)
+    OklchImageHueAdjustmentInvocation(image=ImageField(image_name="in"), hue=45).invoke(hue_context)
+    hue_saved = hue_context.images.save.call_args.kwargs["image"]
+
+    assert unsharp_saved.mode == "LA"
+    assert hue_saved.mode == "LA"
+    assert numpy.asarray(unsharp_saved.getchannel("A")).reshape(-1).tolist() == [64, 224]
+    assert numpy.asarray(hue_saved.getchannel("A")).reshape(-1).tolist() == [64, 224]
+
+
+def test_hue_adjust_plus_oklch_uses_degree_based_oklch_contract() -> None:
+    input_image = Image.new("RGB", (2, 1))
+    input_image.putdata([(210, 80, 30), (40, 160, 220)])
+
+    context = _build_context(input_image)
+    invocation = InvokeAdjustImageHuePlusInvocation(
+        image=ImageField(image_name="in"),
+        space="*Oklch / Oklab",
+        degrees=180.0,
+        ok_adaptive_gamut=0.0,
+    )
+
+    output = invocation.invoke(context)
+    saved_image = context.images.save.call_args.args[0]
+
+    rgb = torch.from_numpy(numpy.asarray(input_image, dtype=numpy.float32) / 255.0).permute(2, 0, 1)
+    oklch = oklch_from_oklab(oklab_from_linear_srgb(linear_srgb_from_srgb(rgb)))
+    rotated_oklch = oklch.clone()
+    rotated_oklch[2, ...] = (rotated_oklch[2, ...] + 180.0) % 360.0
+    expected_rgb = srgb_from_linear_srgb(linear_srgb_from_oklch(rotated_oklch))
+
+    assert output.width == 2
+    assert output.height == 1
+    assert numpy.allclose(
+        numpy.asarray(saved_image.convert("RGB"), dtype=numpy.float32) / 255.0,
+        expected_rgb.permute(1, 2, 0).numpy(),
+        atol=1 / 255.0,
+    )
+
+
+def test_hue_adjust_plus_hsv_uses_degree_hue_contract() -> None:
+    input_image = Image.new("RGB", (2, 1))
+    input_image.putdata([(210, 80, 30), (40, 160, 220)])
+
+    context = _build_context(input_image)
+    invocation = InvokeAdjustImageHuePlusInvocation(
+        image=ImageField(image_name="in"),
+        space="HSV / HSL / RGB",
+        degrees=90.0,
+    )
+
+    output = invocation.invoke(context)
+    saved_image = context.images.save.call_args.args[0]
+
+    hsv = numpy.asarray(input_image.convert("HSV"), dtype=numpy.float32) / 255.0
+    hsv[..., 0] = ((hsv[..., 0] * 360.0) + 90.0) % 360.0 / 360.0
+    expected_rgb = Image.fromarray((hsv * 255.0).astype(numpy.uint8), mode="HSV").convert("RGB")
+
+    assert output.width == 2
+    assert output.height == 1
+    assert _max_abs_diff_uint8(saved_image.convert("RGB"), expected_rgb) <= 1
+
+
+def test_hue_adjust_plus_okhsl_uses_degree_hue_contract() -> None:
+    input_image = Image.new("RGB", (2, 1))
+    input_image.putdata([(210, 80, 30), (40, 160, 220)])
+
+    context = _build_context(input_image)
+    invocation = InvokeAdjustImageHuePlusInvocation(
+        image=ImageField(image_name="in"),
+        space="Okhsl",
+        degrees=90.0,
+        ok_adaptive_gamut=0.0,
+    )
+
+    output = invocation.invoke(context)
+    saved_image = context.images.save.call_args.args[0]
+
+    rgb = torch.from_numpy(numpy.asarray(input_image, dtype=numpy.float32) / 255.0).permute(2, 0, 1)
+    okhsl = okhsl_from_srgb(rgb)
+    rotated_okhsl = okhsl.clone()
+    rotated_okhsl[0, ...] = (rotated_okhsl[0, ...] + 90.0) % 360.0
+    expected_rgb = srgb_from_okhsl(rotated_okhsl)
+
+    assert output.width == 2
+    assert output.height == 1
+    assert numpy.allclose(
+        numpy.asarray(saved_image.convert("RGB"), dtype=numpy.float32) / 255.0,
+        expected_rgb.permute(1, 2, 0).numpy(),
+        atol=1 / 255.0,
+    )
+
+
+def test_image_blend_oklch_subtract_wraps_hue_in_degrees() -> None:
+    invocation = InvokeImageBlendInvocation(
+        layer_upper=ImageField(image_name="upper"),
+        layer_base=ImageField(image_name="base"),
+        blend_mode="Subtract",
+        color_space="Oklch (Oklab)",
+        opacity=1.0,
+        adaptive_gamut=0.0,
+    )
+
+    upper_oklch = torch.tensor([[[0.0]], [[0.0]], [[20.0]]], dtype=torch.float32)
+    lower_oklch = torch.tensor([[[0.6]], [[0.18]], [[350.0]]], dtype=torch.float32)
+    expected_linear_srgb = linear_srgb_from_oklch(torch.tensor([[[0.6]], [[0.18]], [[330.0]]], dtype=torch.float32))
+
+    blank_rgb = torch.zeros((3, 1, 1), dtype=torch.float32)
+    blank_alpha = torch.ones((1, 1), dtype=torch.float32)
+    image_tensors = (
+        blank_rgb,
+        blank_rgb,
+        blank_rgb,
+        blank_rgb,
+        blank_alpha,
+        blank_alpha,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        upper_oklch,
+        lower_oklch,
+        None,
+        None,
+        None,
+        None,
+    )
+
+    blended = invocation.apply_blend(image_tensors)
+
+    assert torch.allclose(blended, expected_linear_srgb, atol=1e-5)
+
+
+def test_image_blend_hsl_subtract_wraps_hue_in_degrees() -> None:
+    invocation = InvokeImageBlendInvocation(
+        layer_upper=ImageField(image_name="upper"),
+        layer_base=ImageField(image_name="base"),
+        blend_mode="Subtract",
+        color_space="HSL (RGB)",
+        opacity=1.0,
+        adaptive_gamut=0.0,
+    )
+
+    upper_hsl = torch.tensor([[[20.0]], [[0.0]], [[0.0]]], dtype=torch.float32)
+    lower_hsl = torch.tensor([[[350.0]], [[1.0]], [[0.5]]], dtype=torch.float32)
+    expected_linear_srgb = linear_srgb_from_srgb(
+        srgb_from_hsl(torch.tensor([[[330.0]], [[1.0]], [[0.5]]], dtype=torch.float32))
+    )
+
+    blank_rgb = torch.zeros((3, 1, 1), dtype=torch.float32)
+    blank_alpha = torch.ones((1, 1), dtype=torch.float32)
+    image_tensors = (
+        blank_rgb,
+        blank_rgb,
+        blank_rgb,
+        blank_rgb,
+        blank_alpha,
+        blank_alpha,
+        None,
+        None,
+        None,
+        upper_hsl,
+        lower_hsl,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+
+    blended = invocation.apply_blend(image_tensors)
+
+    assert torch.allclose(blended, expected_linear_srgb, atol=1e-5)

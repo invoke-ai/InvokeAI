@@ -38,6 +38,29 @@ from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
 
+def _extract_alpha_channel(image: Image.Image) -> Image.Image | None:
+    if image.mode in ("RGBA", "LA", "PA"):
+        return image.getchannel("A")
+    return None
+
+
+def _restore_original_mode(image: Image.Image, mode: str, alpha_channel: Image.Image | None) -> Image.Image:
+    if alpha_channel is None:
+        return image.convert(mode)
+
+    if mode == "RGBA":
+        image = image.convert("RGB")
+    elif mode == "LA":
+        image = image.convert("L")
+    elif mode == "PA":
+        image = image.convert("P")
+    else:
+        return image.convert(mode)
+
+    image.putalpha(alpha_channel)
+    return image
+
+
 @invocation("show_image", title="Show Image", tags=["image"], category="image", version="1.0.1")
 class ShowImageInvocation(BaseInvocation):
     """Displays a provided image using the OS image viewer, and passes it forward in the pipeline."""
@@ -382,7 +405,7 @@ class UnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
         image = context.images.get_pil(self.image.image_name)
         mode = image.mode
 
-        alpha_channel = image.getchannel("A") if mode == "RGBA" else None
+        alpha_channel = _extract_alpha_channel(image)
         image = image.convert("RGB")
         image_blurred = self.array_from_pil(image.filter(ImageFilter.GaussianBlur(radius=self.radius)))
 
@@ -431,7 +454,7 @@ class OklabUnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
         image = context.images.get_pil(self.image.image_name)
         mode = image.mode
 
-        alpha_channel = image.getchannel("A") if mode == "RGBA" else None
+        alpha_channel = _extract_alpha_channel(image)
         image = image.convert("RGB")
 
         image_blurred = self.tensor_from_pil(image.filter(ImageFilter.GaussianBlur(radius=self.radius)))
@@ -443,10 +466,11 @@ class OklabUnsharpMaskInvocation(BaseInvocation, WithMetadata, WithBoard):
         image_oklab[0, ...] += (image_oklab[0, ...] - image_blurred_oklab[0, ...]) * (self.strength / 100.0)
         image_oklab = torch.clamp(image_oklab, -1.0, 1.0)
 
-        image = self.pil_from_tensor(srgb_from_linear_srgb(linear_srgb_from_oklab(image_oklab))).convert(mode)
-
-        if alpha_channel is not None:
-            image.putalpha(alpha_channel)
+        image = _restore_original_mode(
+            self.pil_from_tensor(srgb_from_linear_srgb(linear_srgb_from_oklab(image_oklab))),
+            mode,
+            alpha_channel,
+        )
 
         image_dto = context.images.save(image=image)
         return ImageOutput.build(image_dto)
@@ -873,25 +897,26 @@ class OklchImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard)
     def invoke(self, context: InvocationContext) -> ImageOutput:
         image = context.images.get_pil(self.image.image_name)
         mode = image.mode
-        alpha_channel = image.getchannel("A") if mode == "RGBA" else None
+        alpha_channel = _extract_alpha_channel(image)
 
         rgb = torch.from_numpy(numpy.asarray(image.convert("RGB"), dtype=numpy.float32) / 255.0).permute(2, 0, 1)
         oklch = oklch_from_oklab(oklab_from_linear_srgb(linear_srgb_from_srgb(rgb)))
         oklch[2, ...] = (oklch[2, ...] + self.hue) % 360.0
 
-        image = Image.fromarray(
-            (
-                torch.clamp(srgb_from_linear_srgb(linear_srgb_from_oklch(oklch)), 0.0, 1.0)
-                .permute(1, 2, 0)
-                .cpu()
-                .numpy()
-                * 255.0
-            ).astype(numpy.uint8),
-            mode="RGB",
-        ).convert(mode)
-
-        if alpha_channel is not None:
-            image.putalpha(alpha_channel)
+        image = _restore_original_mode(
+            Image.fromarray(
+                (
+                    torch.clamp(srgb_from_linear_srgb(linear_srgb_from_oklch(oklch)), 0.0, 1.0)
+                    .permute(1, 2, 0)
+                    .cpu()
+                    .numpy()
+                    * 255.0
+                ).astype(numpy.uint8),
+                mode="RGB",
+            ),
+            mode,
+            alpha_channel,
+        )
 
         image_dto = context.images.save(image=image)
         return ImageOutput.build(image_dto)
