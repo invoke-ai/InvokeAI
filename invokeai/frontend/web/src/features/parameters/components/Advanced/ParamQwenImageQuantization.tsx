@@ -1,10 +1,7 @@
 import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import {
-  qwenImageQuantizationChanged,
-  selectQwenImageQuantization,
-} from 'features/controlLayers/store/paramsSlice';
+import { qwenImageQuantizationChanged, selectQwenImageQuantization } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 

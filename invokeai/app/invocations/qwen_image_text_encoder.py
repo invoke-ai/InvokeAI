@@ -58,7 +58,7 @@ def _build_prompt(user_prompt: str, num_images: int) -> str:
             f"<|im_start|>system\n{_GENERATE_SYSTEM_PROMPT}<|im_end|>\n"
             f"<|im_start|>user\n{user_prompt}<|im_end|>\n"
             "<|im_start|>assistant\n"
-    )
+        )
 
 
 @invocation(

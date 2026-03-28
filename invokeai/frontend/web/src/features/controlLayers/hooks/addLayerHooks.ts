@@ -80,11 +80,7 @@ export const selectDefaultControlAdapter = createSelector(
 
 export const getDefaultRefImageConfig = (
   getState: AppGetState
-):
-  | IPAdapterConfig
-  | FluxKontextReferenceImageConfig
-  | Flux2ReferenceImageConfig
-  | QwenImageReferenceImageConfig => {
+): IPAdapterConfig | FluxKontextReferenceImageConfig | Flux2ReferenceImageConfig | QwenImageReferenceImageConfig => {
   const state = getState();
 
   const mainModelConfig = selectMainModelConfig(state);

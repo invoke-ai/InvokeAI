@@ -25,8 +25,8 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelSourceType,
     ModelType,
     ModelVariantType,
-    QwenImageVariantType,
     Qwen3VariantType,
+    QwenImageVariantType,
     SchedulerPredictionType,
     ZImageVariantType,
 )
@@ -95,7 +95,13 @@ class ModelRecordChanges(BaseModelExcludeNull):
     # Checkpoint-specific changes
     # TODO(MM2): Should we expose these? Feels footgun-y...
     variant: Optional[
-        ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | ZImageVariantType | QwenImageVariantType | Qwen3VariantType
+        ModelVariantType
+        | ClipVariantType
+        | FluxVariantType
+        | Flux2VariantType
+        | ZImageVariantType
+        | QwenImageVariantType
+        | Qwen3VariantType
     ] = Field(description="The variant of the model.", default=None)
     prediction_type: Optional[SchedulerPredictionType] = Field(
         description="The prediction type of the model.", default=None
