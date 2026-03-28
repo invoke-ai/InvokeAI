@@ -25605,6 +25605,8 @@ export type components = {
             base: components["schemas"]["BaseModelType"];
             type: components["schemas"]["ModelType"];
             format?: components["schemas"]["ModelFormat"] | null;
+            /** Variant */
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
             /**
              * Is Installed
              * @default false
@@ -25645,6 +25647,8 @@ export type components = {
             base: components["schemas"]["BaseModelType"];
             type: components["schemas"]["ModelType"];
             format?: components["schemas"]["ModelFormat"] | null;
+            /** Variant */
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
             /**
              * Is Installed
              * @default false

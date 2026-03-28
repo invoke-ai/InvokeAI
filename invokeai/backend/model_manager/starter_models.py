@@ -2,7 +2,7 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.model_manager.taxonomy import AnyVariant, BaseModelType, ModelFormat, ModelType, QwenImageVariantType
 
 
 class StarterModelWithoutDependencies(BaseModel):
@@ -12,6 +12,7 @@ class StarterModelWithoutDependencies(BaseModel):
     base: BaseModelType
     type: ModelType
     format: Optional[ModelFormat] = None
+    variant: Optional[AnyVariant] = None
     is_installed: bool = False
     # allows us to track what models a user has installed across name changes within starter models
     # if you update a starter model name, please add the old one to this list for that starter model
@@ -656,6 +657,7 @@ qwen_image_edit = StarterModel(
     source="Qwen/Qwen-Image-Edit-2511",
     description="Qwen Image Edit 2511 full diffusers model. Supports text-guided image editing with multiple reference images. (~40GB)",
     type=ModelType.Main,
+    variant=QwenImageVariantType.Edit,
 )
 
 qwen_image_edit_gguf_q4_k_m = StarterModel(
@@ -665,6 +667,7 @@ qwen_image_edit_gguf_q4_k_m = StarterModel(
     description="Qwen Image Edit 2511 - Q4_K_M quantized transformer. Good quality/size balance. (~13GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    variant=QwenImageVariantType.Edit,
 )
 
 qwen_image_edit_gguf_q2_k = StarterModel(
@@ -674,6 +677,7 @@ qwen_image_edit_gguf_q2_k = StarterModel(
     description="Qwen Image Edit 2511 - Q2_K heavily quantized transformer. Smallest size, lower quality. (~7.5GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    variant=QwenImageVariantType.Edit,
 )
 
 qwen_image_edit_gguf_q6_k = StarterModel(
@@ -683,6 +687,7 @@ qwen_image_edit_gguf_q6_k = StarterModel(
     description="Qwen Image Edit 2511 - Q6_K quantized transformer. Near-lossless quality. (~17GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    variant=QwenImageVariantType.Edit,
 )
 
 qwen_image_edit_gguf_q8_0 = StarterModel(
@@ -692,6 +697,7 @@ qwen_image_edit_gguf_q8_0 = StarterModel(
     description="Qwen Image Edit 2511 - Q8_0 quantized transformer. Highest quality quantization. (~22GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    variant=QwenImageVariantType.Edit,
 )
 
 qwen_image_edit_lightning_4step = StarterModel(
