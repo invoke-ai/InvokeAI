@@ -8,18 +8,31 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { ParamNegativePrompt } from 'features/parameters/components/Core/ParamNegativePrompt';
 import { ParamPositivePrompt } from 'features/parameters/components/Core/ParamPositivePrompt';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
+import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
 
 export const Prompts = memo(() => {
   const modelSupportsNegativePrompt = useAppSelector(selectModelSupportsNegativePrompt);
   const modelSupportsRefImages = useAppSelector(selectModelSupportsRefImages);
   const hasNegativePrompt = useAppSelector(selectHasNegativePrompt);
+  const modelConfig = useSelectedModelConfig();
+
+  // Qwen Image models only support ref images in the "edit" variant
+  const showRefImages = useMemo(() => {
+    if (!modelSupportsRefImages) {
+      return false;
+    }
+    if (modelConfig?.base === 'qwen-image' && 'variant' in modelConfig && modelConfig.variant !== 'edit') {
+      return false;
+    }
+    return true;
+  }, [modelSupportsRefImages, modelConfig]);
 
   return (
     <Flex flexDir="column" gap={2}>
       <ParamPositivePrompt />
       {modelSupportsNegativePrompt && hasNegativePrompt && <ParamNegativePrompt />}
-      {modelSupportsRefImages && <RefImageList />}
+      {showRefImages && <RefImageList />}
     </Flex>
   );
 });

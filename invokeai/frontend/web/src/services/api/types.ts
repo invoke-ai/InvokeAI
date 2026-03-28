@@ -330,6 +330,10 @@ export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): con
   return config.type === 'main' && config.base === 'qwen-image' && config.format === 'diffusers';
 };
 
+export const isQwenImageEditMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'qwen-image' && 'variant' in config && config.variant === 'edit';
+};
+
 export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'embedding';
 };

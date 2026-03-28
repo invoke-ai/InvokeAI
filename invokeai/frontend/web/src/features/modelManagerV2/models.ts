@@ -221,6 +221,8 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   zbase: 'Z-Image Base',
   large: 'CLIP L',
   gigantic: 'CLIP G',
+  generate: 'Qwen Image',
+  edit: 'Qwen Image Edit',
   qwen3_4b: 'Qwen3 4B',
   qwen3_8b: 'Qwen3 8B',
 };

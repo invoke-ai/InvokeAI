@@ -18423,7 +18423,7 @@ export type components = {
         };
         /**
          * Main_Diffusers_QwenImage_Config
-         * @description Model config for Qwen Image Edit 2511 diffusers models.
+         * @description Model config for Qwen Image diffusers models (both txt2img and edit).
          */
         Main_Diffusers_QwenImage_Config: {
             /**
@@ -18500,6 +18500,8 @@ export type components = {
              * @constant
              */
             base: "qwen-image";
+            /** @default generate */
+            variant: components["schemas"]["QwenImageVariantType"];
         };
         /** Main_Diffusers_SD1_Config */
         Main_Diffusers_SD1_Config: {
@@ -19152,7 +19154,7 @@ export type components = {
         };
         /**
          * Main_GGUF_QwenImage_Config
-         * @description Model config for GGUF-quantized Qwen Image Edit transformer models.
+         * @description Model config for GGUF-quantized Qwen Image transformer models.
          */
         Main_GGUF_QwenImage_Config: {
             /**
@@ -19232,6 +19234,8 @@ export type components = {
              * @constant
              */
             format: "gguf_quantized";
+            /** @default generate */
+            variant: components["schemas"]["QwenImageVariantType"];
         };
         /**
          * Main_GGUF_ZImage_Config
@@ -21527,7 +21531,7 @@ export type components = {
              * Variant
              * @description The variant of the model.
              */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
             /** @description The prediction type of the model. */
             prediction_type?: components["schemas"]["SchedulerPredictionType"] | null;
             /**
@@ -23209,6 +23213,12 @@ export type components = {
              */
             type: "qwen_image_text_encoder";
         };
+        /**
+         * QwenImageVariantType
+         * @description Qwen Image model variants.
+         * @enum {string}
+         */
+        QwenImageVariantType: "generate" | "edit";
         /**
          * QwenVLEncoderField
          * @description Field for Qwen2.5-VL encoder used by Qwen Image Edit models.
@@ -26153,7 +26163,7 @@ export type components = {
             path_or_prefix: string;
             model_type: components["schemas"]["ModelType"];
             /** Variant */
-            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
+            variant?: components["schemas"]["ModelVariantType"] | components["schemas"]["ClipVariantType"] | components["schemas"]["FluxVariantType"] | components["schemas"]["Flux2VariantType"] | components["schemas"]["ZImageVariantType"] | components["schemas"]["QwenImageVariantType"] | components["schemas"]["Qwen3VariantType"] | null;
         };
         /**
          * Subtract Integers

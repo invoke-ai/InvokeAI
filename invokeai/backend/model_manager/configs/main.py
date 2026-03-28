@@ -28,6 +28,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelFormat,
     ModelType,
     ModelVariantType,
+    QwenImageVariantType,
     SchedulerPredictionType,
     SubModelType,
     ZImageVariantType,
@@ -1204,9 +1205,10 @@ class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
 
 
 class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
-    """Model config for Qwen Image Edit 2511 diffusers models."""
+    """Model config for Qwen Image diffusers models (both txt2img and edit)."""
 
     base: Literal[BaseModelType.QwenImage] = Field(BaseModelType.QwenImage)
+    variant: QwenImageVariantType = Field(default=QwenImageVariantType.Generate)
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -1219,15 +1221,33 @@ class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, C
             common_config_paths(mod.path),
             {
                 "QwenImagePlusPipeline",
+                "QwenImageEditPlusPipeline",
+                "QwenImagePipeline",
             },
         )
 
         repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+        variant = override_fields.get("variant") or cls._get_qwen_image_variant(mod)
 
         return cls(
             **override_fields,
             repo_variant=repo_variant,
+            variant=variant,
         )
+
+    @classmethod
+    def _get_qwen_image_variant(cls, mod: ModelOnDisk) -> QwenImageVariantType:
+        """Detect whether this is an edit or txt2img model from the pipeline class name."""
+        import json
+
+        model_index = mod.path / "model_index.json"
+        if model_index.exists():
+            with open(model_index) as f:
+                config = json.load(f)
+            class_name = config.get("_class_name", "")
+            if "Edit" in class_name:
+                return QwenImageVariantType.Edit
+        return QwenImageVariantType.Generate
 
 
 def _has_qwen_image_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -1245,10 +1265,11 @@ def _has_qwen_image_keys(state_dict: dict[str | int, Any]) -> bool:
 
 
 class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
-    """Model config for GGUF-quantized Qwen Image Edit transformer models."""
+    """Model config for GGUF-quantized Qwen Image transformer models."""
 
     base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
     format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: QwenImageVariantType = Field(default=QwenImageVariantType.Generate)
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
