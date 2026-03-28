@@ -8069,10 +8069,6 @@ export type components = {
             width?: number | null;
             /** Height */
             height?: number | null;
-            /** Steps */
-            steps?: number | null;
-            /** Guidance */
-            guidance?: number | null;
             /** Num Images */
             num_images?: number | null;
         };
@@ -8127,12 +8123,6 @@ export type components = {
              */
             prompt?: string | null;
             /**
-             * Negative Prompt
-             * @description Negative prompt
-             * @default null
-             */
-            negative_prompt?: string | null;
-            /**
              * Seed
              * @description Seed for random number generation
              * @default null
@@ -8157,17 +8147,11 @@ export type components = {
              */
             height?: number;
             /**
-             * Steps
-             * @description Number of steps to run
+             * Image Size
+             * @description Image size preset (e.g. 1K, 2K, 4K)
              * @default null
              */
-            steps?: number | null;
-            /**
-             * Guidance
-             * @description Guidance strength
-             * @default null
-             */
-            guidance?: number | null;
+            image_size?: string | null;
             /**
              * @description Init image for img2img/inpaint
              * @default null
@@ -8184,18 +8168,6 @@ export type components = {
              * @default []
              */
             reference_images?: components["schemas"]["ImageField"][];
-            /**
-             * Reference Image Weights
-             * @description Reference image weights
-             * @default null
-             */
-            reference_image_weights?: number[] | null;
-            /**
-             * Reference Image Modes
-             * @description Reference image modes
-             * @default null
-             */
-            reference_image_modes?: string[] | null;
             /**
              * type
              * @default external_image_generation
@@ -8248,6 +8220,8 @@ export type components = {
             aspect_ratio_sizes?: {
                 [key: string]: components["schemas"]["ExternalImageSize"];
             } | null;
+            /** Resolution Presets */
+            resolution_presets?: components["schemas"]["ExternalResolutionPreset"][] | null;
             /** Max Reference Images */
             max_reference_images?: number | null;
             /**
@@ -8265,7 +8239,7 @@ export type components = {
              * Name
              * @enum {string}
              */
-            name: "negative_prompt" | "reference_images" | "dimensions" | "seed" | "steps" | "guidance";
+            name: "reference_images" | "dimensions" | "seed";
             /** Slider Min */
             slider_min?: number | null;
             /** Slider Max */
@@ -8353,6 +8327,28 @@ export type components = {
              * @description Optional provider status detail
              */
             message?: string | null;
+        };
+        /** ExternalResolutionPreset */
+        ExternalResolutionPreset: {
+            /**
+             * Label
+             * @description Display label, e.g. '1:1 (1K)'
+             */
+            label: string;
+            /**
+             * Aspect Ratio
+             * @description Aspect ratio string, e.g. '1:1'
+             */
+            aspect_ratio: string;
+            /**
+             * Image Size
+             * @description Image size preset, e.g. '1K'
+             */
+            image_size: string;
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
         };
         /**
          * Apply LoRA Collection - FLUX
@@ -11044,12 +11040,6 @@ export type components = {
              */
             prompt?: string | null;
             /**
-             * Negative Prompt
-             * @description Negative prompt
-             * @default null
-             */
-            negative_prompt?: string | null;
-            /**
              * Seed
              * @description Seed for random number generation
              * @default null
@@ -11074,17 +11064,11 @@ export type components = {
              */
             height?: number;
             /**
-             * Steps
-             * @description Number of steps to run
+             * Image Size
+             * @description Image size preset (e.g. 1K, 2K, 4K)
              * @default null
              */
-            steps?: number | null;
-            /**
-             * Guidance
-             * @description Guidance strength
-             * @default null
-             */
-            guidance?: number | null;
+            image_size?: string | null;
             /**
              * @description Init image for img2img/inpaint
              * @default null
@@ -11102,17 +11086,17 @@ export type components = {
              */
             reference_images?: components["schemas"]["ImageField"][];
             /**
-             * Reference Image Weights
-             * @description Reference image weights
+             * Temperature
+             * @description Sampling temperature
              * @default null
              */
-            reference_image_weights?: number[] | null;
+            temperature?: number | null;
             /**
-             * Reference Image Modes
-             * @description Reference image modes
+             * Thinking Level
+             * @description Thinking level for image generation
              * @default null
              */
-            reference_image_modes?: string[] | null;
+            thinking_level?: ("minimal" | "high") | null;
             /**
              * type
              * @default gemini_image_generation
@@ -22221,12 +22205,6 @@ export type components = {
              */
             prompt?: string | null;
             /**
-             * Negative Prompt
-             * @description Negative prompt
-             * @default null
-             */
-            negative_prompt?: string | null;
-            /**
              * Seed
              * @description Seed for random number generation
              * @default null
@@ -22251,17 +22229,11 @@ export type components = {
              */
             height?: number;
             /**
-             * Steps
-             * @description Number of steps to run
+             * Image Size
+             * @description Image size preset (e.g. 1K, 2K, 4K)
              * @default null
              */
-            steps?: number | null;
-            /**
-             * Guidance
-             * @description Guidance strength
-             * @default null
-             */
-            guidance?: number | null;
+            image_size?: string | null;
             /**
              * @description Init image for img2img/inpaint
              * @default null
@@ -22279,17 +22251,25 @@ export type components = {
              */
             reference_images?: components["schemas"]["ImageField"][];
             /**
-             * Reference Image Weights
-             * @description Reference image weights
-             * @default null
+             * Quality
+             * @description Output image quality
+             * @default auto
+             * @enum {string}
              */
-            reference_image_weights?: number[] | null;
+            quality?: "auto" | "high" | "medium" | "low";
             /**
-             * Reference Image Modes
-             * @description Reference image modes
+             * Background
+             * @description Background transparency handling
+             * @default auto
+             * @enum {string}
+             */
+            background?: "auto" | "transparent" | "opaque";
+            /**
+             * Input Fidelity
+             * @description Fidelity to source images (edits only)
              * @default null
              */
-            reference_image_modes?: string[] | null;
+            input_fidelity?: ("low" | "high") | null;
             /**
              * type
              * @default openai_image_generation
