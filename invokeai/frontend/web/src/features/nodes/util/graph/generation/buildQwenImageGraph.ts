@@ -167,6 +167,9 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     cfg_scale,
     negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(modelConfig),
+    qwen_image_component_source: params.qwenImageComponentSource,
+    qwen_image_quantization: params.qwenImageQuantization,
+    qwen_image_shift: params.qwenImageShift,
     steps,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
