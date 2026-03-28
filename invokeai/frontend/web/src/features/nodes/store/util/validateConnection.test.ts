@@ -122,6 +122,52 @@ describe(validateConnection.name, () => {
     expect(r).toEqual(null);
   });
 
+  it('should accept chaining collect collection output to collect collection input', () => {
+    const n1 = buildNode(collect);
+    const n2 = buildNode(collect);
+    const nodes = [n1, n2];
+    const c = { source: n1.id, sourceHandle: 'collection', target: n2.id, targetHandle: 'collection' };
+    const r = validateConnection(c, nodes, [], templates, null);
+    expect(r).toEqual(null);
+  });
+
+  it('should reject multiple connections to collect collection input', () => {
+    const n1 = buildNode(collect);
+    const n2 = buildNode(collect);
+    const n3 = buildNode(collect);
+    const nodes = [n1, n2, n3];
+    const e1 = buildEdge(n1.id, 'collection', n2.id, 'collection');
+    const c = { source: n3.id, sourceHandle: 'collection', target: n2.id, targetHandle: 'collection' };
+    const r = validateConnection(c, nodes, [e1], templates, null);
+    expect(r).toEqual('nodes.inputMayOnlyHaveOneConnection');
+  });
+
+  it('should reject mismatched item connection when collect is typed via chained collection', () => {
+    const n1 = buildNode(add);
+    const n2 = buildNode(collect);
+    const n3 = buildNode(collect);
+    const n4 = buildNode(main_model_loader);
+    const nodes = [n1, n2, n3, n4];
+    const e1 = buildEdge(n1.id, 'value', n2.id, 'item');
+    const e2 = buildEdge(n2.id, 'collection', n3.id, 'collection');
+    const c = { source: n4.id, sourceHandle: 'vae', target: n3.id, targetHandle: 'item' };
+    const r = validateConnection(c, nodes, [e1, e2], templates, null);
+    expect(r).toEqual('nodes.cannotMixAndMatchCollectionItemTypes');
+  });
+
+  it('should reject chaining collection-to-collection for differently typed collects', () => {
+    const n1 = buildNode(add);
+    const n2 = buildNode(img_resize);
+    const n3 = buildNode(collect);
+    const n4 = buildNode(collect);
+    const nodes = [n1, n2, n3, n4];
+    const e1 = buildEdge(n1.id, 'value', n3.id, 'item');
+    const e2 = buildEdge(n2.id, 'image', n4.id, 'item');
+    const c = { source: n3.id, sourceHandle: 'collection', target: n4.id, targetHandle: 'collection' };
+    const r = validateConnection(c, nodes, [e1, e2], templates, null);
+    expect(r).toEqual('nodes.cannotMixAndMatchCollectionItemTypes');
+  });
+
   it('should reject connections to target field that is already connected', () => {
     const n1 = buildNode(add);
     const n2 = buildNode(add);
