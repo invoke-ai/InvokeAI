@@ -650,7 +650,7 @@ cogview4 = StarterModel(
 # endregion
 
 # region Qwen Image Edit
-qwen_image = StarterModel(
+qwen_image_edit = StarterModel(
     name="Qwen Image Edit 2511",
     base=BaseModelType.QwenImage,
     source="Qwen/Qwen-Image-Edit-2511",
@@ -658,7 +658,7 @@ qwen_image = StarterModel(
     type=ModelType.Main,
 )
 
-qwen_image_gguf_q4_k_m = StarterModel(
+qwen_image_edit_gguf_q4_k_m = StarterModel(
     name="Qwen Image Edit 2511 (Q4_K_M)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-2511-Q4_K_M.gguf",
@@ -667,7 +667,7 @@ qwen_image_gguf_q4_k_m = StarterModel(
     format=ModelFormat.GGUFQuantized,
 )
 
-qwen_image_gguf_q2_k = StarterModel(
+qwen_image_edit_gguf_q2_k = StarterModel(
     name="Qwen Image Edit 2511 (Q2_K)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-2511-Q2_K.gguf",
@@ -676,7 +676,7 @@ qwen_image_gguf_q2_k = StarterModel(
     format=ModelFormat.GGUFQuantized,
 )
 
-qwen_image_gguf_q6_k = StarterModel(
+qwen_image_edit_gguf_q6_k = StarterModel(
     name="Qwen Image Edit 2511 (Q6_K)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-2511-Q6_K.gguf",
@@ -685,7 +685,7 @@ qwen_image_gguf_q6_k = StarterModel(
     format=ModelFormat.GGUFQuantized,
 )
 
-qwen_image_gguf_q8_0 = StarterModel(
+qwen_image_edit_gguf_q8_0 = StarterModel(
     name="Qwen Image Edit 2511 (Q8_0)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-2511-Q8_0.gguf",
@@ -694,7 +694,7 @@ qwen_image_gguf_q8_0 = StarterModel(
     format=ModelFormat.GGUFQuantized,
 )
 
-qwen_image_lightning_4step = StarterModel(
+qwen_image_edit_lightning_4step = StarterModel(
     name="Qwen Image Edit Lightning (4-step, bf16)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
@@ -703,7 +703,7 @@ qwen_image_lightning_4step = StarterModel(
     type=ModelType.LoRA,
 )
 
-qwen_image_lightning_8step = StarterModel(
+qwen_image_edit_lightning_8step = StarterModel(
     name="Qwen Image Edit Lightning (8-step, bf16)",
     base=BaseModelType.QwenImage,
     source="https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors",
@@ -1012,13 +1012,13 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
     flux2_klein_qwen3_8b_encoder,
     cogview4,
-    qwen_image,
-    qwen_image_gguf_q2_k,
-    qwen_image_gguf_q4_k_m,
-    qwen_image_gguf_q6_k,
-    qwen_image_gguf_q8_0,
-    qwen_image_lightning_4step,
-    qwen_image_lightning_8step,
+    qwen_image_edit,
+    qwen_image_edit_gguf_q2_k,
+    qwen_image_edit_gguf_q4_k_m,
+    qwen_image_edit_gguf_q6_k,
+    qwen_image_edit_gguf_q8_0,
+    qwen_image_edit_lightning_4step,
+    qwen_image_edit_lightning_8step,
     flux_krea,
     flux_krea_quantized,
     z_image_turbo,
@@ -1097,11 +1097,11 @@ flux2_klein_bundle: list[StarterModel] = [
 ]
 
 qwen_image_bundle: list[StarterModel] = [
-    qwen_image,
-    qwen_image_gguf_q4_k_m,
-    qwen_image_gguf_q8_0,
-    qwen_image_lightning_4step,
-    qwen_image_lightning_8step,
+    qwen_image_edit,
+    qwen_image_edit_gguf_q4_k_m,
+    qwen_image_edit_gguf_q8_0,
+    qwen_image_edit_lightning_4step,
+    qwen_image_edit_lightning_8step,
 ]
 
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
