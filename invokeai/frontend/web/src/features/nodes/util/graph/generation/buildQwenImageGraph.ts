@@ -103,14 +103,18 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
   // Add Qwen Image Edit LoRAs if any are enabled
   addQwenImageLoRAs(state, g, denoise, modelLoader);
 
-  // Collect enabled Qwen Image Edit reference images that have an image set (image is optional for txt2img)
-  const validRefImageConfigs = selectRefImagesSlice(state).entities.filter(
-    (entity) =>
-      entity.isEnabled &&
-      isQwenImageReferenceImageConfig(entity.config) &&
-      entity.config.image !== null &&
-      getGlobalReferenceImageWarnings(entity, model).length === 0
-  );
+  // Only collect reference images for edit-variant models.
+  // For txt2img (generate) models, reference images are not used even if they exist in state.
+  const isEditModel = 'variant' in model && model.variant === 'edit';
+  const validRefImageConfigs = isEditModel
+    ? selectRefImagesSlice(state).entities.filter(
+        (entity) =>
+          entity.isEnabled &&
+          isQwenImageReferenceImageConfig(entity.config) &&
+          entity.config.image !== null &&
+          getGlobalReferenceImageWarnings(entity, model).length === 0
+      )
+    : [];
 
   if (validRefImageConfigs.length > 0) {
     const refImgCollect = g.addNode({
