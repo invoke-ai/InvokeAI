@@ -15,6 +15,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
     ModelType,
+    QwenImageVariantType,
     SubModelType,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
@@ -160,10 +161,13 @@ class QwenImageGGUFCheckpointModel(ModelLoader):
             "axes_dims_rope": (16, 56, 56),
         }
 
-        # zero_cond_t was added in diffusers 0.37+; skip it on older versions
+        # zero_cond_t is only used by edit-variant models. It enables dual modulation
+        # for noisy vs reference patches. Setting it on txt2img models produces garbage.
+        # Also requires diffusers 0.37+ (the parameter doesn't exist in older versions).
         import inspect
 
-        if "zero_cond_t" in inspect.signature(QwenImageTransformer2DModel.__init__).parameters:
+        is_edit = getattr(config, "variant", None) == QwenImageVariantType.Edit
+        if is_edit and "zero_cond_t" in inspect.signature(QwenImageTransformer2DModel.__init__).parameters:
             model_config["zero_cond_t"] = True
 
         with accelerate.init_empty_weights():
