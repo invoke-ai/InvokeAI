@@ -781,7 +781,12 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
         has_flux_keys = state_dict_has_any_keys_starting_with(
             state_dict,
-            {"double_blocks.", "single_blocks.", "single_transformer_blocks.", "transformer.single_transformer_blocks."},
+            {
+                "double_blocks.",
+                "single_blocks.",
+                "single_transformer_blocks.",
+                "transformer.single_transformer_blocks.",
+            },
         )
 
         if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_flux_keys:
@@ -798,7 +803,12 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
         has_flux_keys = state_dict_has_any_keys_starting_with(
             state_dict,
-            {"double_blocks.", "single_blocks.", "single_transformer_blocks.", "transformer.single_transformer_blocks."},
+            {
+                "double_blocks.",
+                "single_blocks.",
+                "single_transformer_blocks.",
+                "transformer.single_transformer_blocks.",
+            },
         )
 
         if has_qwen_ie_keys and not has_z_image_keys and not has_flux_keys:
