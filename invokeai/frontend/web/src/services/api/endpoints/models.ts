@@ -239,6 +239,18 @@ export const modelsApi = api.injectEndpoints({
       },
       serializeQueryArgs: ({ queryArgs }) => `${queryArgs.name}.${queryArgs.base}.${queryArgs.type}`,
     }),
+    getModelConfigByHash: build.query<AnyModelConfig, string>({
+      query: (hash) => buildModelsUrl(`get_by_hash?${queryString.stringify({ hash })}`),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = [];
+
+        if (result) {
+          tags.push({ type: 'ModelConfig', id: result.key });
+        }
+
+        return tags;
+      },
+    }),
     scanFolder: build.query<ScanFolderResponse, ScanFolderArg>({
       query: (arg) => {
         const folderQueryStr = arg ? queryString.stringify(arg, {}) : '';

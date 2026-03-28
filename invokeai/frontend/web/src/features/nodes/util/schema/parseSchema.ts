@@ -39,9 +39,6 @@ const isReservedInputField = (nodeType: string, fieldName: string) => {
   if (RESERVED_INPUT_FIELD_NAMES.includes(fieldName)) {
     return true;
   }
-  if (nodeType === 'collect' && fieldName === 'collection') {
-    return true;
-  }
   if (nodeType === 'iterate' && fieldName === 'index') {
     return true;
   }
