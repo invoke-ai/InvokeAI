@@ -50,7 +50,7 @@ from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
     category="image",
-    version="1.4.0",
+    version="1.5.0",
     classification=Classification.Prototype,
 )
 class ZImageDenoiseInvocation(BaseInvocation):
@@ -103,6 +103,15 @@ class ZImageDenoiseInvocation(BaseInvocation):
         default=None,
         description=FieldDescriptions.vae + " Required for control conditioning.",
         input=Input.Connection,
+    )
+    # Shift override for the sigma schedule. If None, shift is auto-calculated from image dimensions.
+    shift: Optional[float] = InputField(
+        default=None,
+        ge=0.0,
+        description="Override the timestep shift (mu) for the sigma schedule. "
+        "Leave blank to auto-calculate based on image dimensions (recommended). "
+        "Lower values (~0.5) produce less noise shifting, higher values (~1.15) produce more.",
+        title="Shift",
     )
     # Scheduler selection for the denoising process
     scheduler: ZIMAGE_SCHEDULER_NAME_VALUES = InputField(
@@ -313,8 +322,11 @@ class ZImageDenoiseInvocation(BaseInvocation):
             # Concatenate all negative embeddings
             neg_prompt_embeds = torch.cat([tc.prompt_embeds for tc in neg_text_conditionings], dim=0)
 
-        # Calculate shift based on image sequence length
-        mu = self._calculate_shift(img_seq_len)
+        # Calculate shift based on image sequence length, or use override
+        if self.shift is not None:
+            mu = self.shift
+        else:
+            mu = self._calculate_shift(img_seq_len)
 
         # Generate sigma schedule with time shift
         sigmas = self._get_sigmas(mu, self.steps)
