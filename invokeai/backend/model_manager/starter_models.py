@@ -939,9 +939,7 @@ gemini_flash_image = StarterModel(
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
         modes=["txt2img", "img2img", "inpaint"],
-
         supports_seed=True,
-
         supports_reference_images=True,
         max_images_per_request=1,
         allowed_aspect_ratios=[
@@ -981,9 +979,7 @@ gemini_pro_image_preview = StarterModel(
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
         modes=["txt2img", "img2img", "inpaint"],
-
         supports_seed=True,
-
         supports_reference_images=True,
         max_reference_images=14,
         max_images_per_request=1,
@@ -1003,9 +999,7 @@ gemini_3_1_flash_image_preview = StarterModel(
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
         modes=["txt2img", "img2img", "inpaint"],
-
         supports_seed=True,
-
         supports_reference_images=True,
         max_reference_images=14,
         max_images_per_request=1,

@@ -12,12 +12,12 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.config.config_default import (
-    DefaultInvokeAIAppConfig,
     EXTERNAL_PROVIDER_CONFIG_FIELDS,
+    DefaultInvokeAIAppConfig,
     InvokeAIAppConfig,
     get_config,
-    load_external_api_keys,
     load_and_migrate_config,
+    load_external_api_keys,
 )
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
