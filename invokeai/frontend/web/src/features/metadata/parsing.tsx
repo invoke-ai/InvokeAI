@@ -13,6 +13,9 @@ import {
   kleinVaeModelSelected,
   negativePromptChanged,
   positivePromptChanged,
+  qwenImageComponentSourceSelected,
+  qwenImageQuantizationChanged,
+  qwenImageShiftChanged,
   refinerModelChanged,
   selectBase,
   setCfgRescaleMultiplier,
@@ -39,9 +42,6 @@ import {
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceRandomizePercent,
   setZImageSeedVarianceStrength,
-  qwenImageComponentSourceSelected,
-  qwenImageQuantizationChanged,
-  qwenImageShiftChanged,
   vaeSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
@@ -684,7 +684,7 @@ const ZImageSeedVarianceRandomizePercent: SingleMetadataHandler<number> = {
 const QwenImageComponentSource: SingleMetadataHandler<ModelIdentifierField | null> = {
   [SingleMetadataKey]: true,
   type: 'QwenImageComponentSource',
-  parse: async (metadata, _store) => {
+  parse: (metadata, _store) => {
     try {
       const raw = getProperty(metadata, 'qwen_image_component_source');
       if (raw === null || raw === undefined) {
