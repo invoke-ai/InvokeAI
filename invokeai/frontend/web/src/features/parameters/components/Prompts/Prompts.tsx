@@ -22,8 +22,11 @@ export const Prompts = memo(() => {
     if (!modelSupportsRefImages) {
       return false;
     }
-    if (modelConfig?.base === 'qwen-image' && 'variant' in modelConfig && modelConfig.variant !== 'edit') {
-      return false;
+    if (modelConfig?.base === 'qwen-image') {
+      const variant = 'variant' in modelConfig ? modelConfig.variant : null;
+      if (variant !== 'edit') {
+        return false;
+      }
     }
     return true;
   }, [modelSupportsRefImages, modelConfig]);
