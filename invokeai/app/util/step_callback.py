@@ -207,7 +207,7 @@ def diffusion_step_callback(
         smooth_matrix = SDXL_SMOOTH_MATRIX
     elif base_model == BaseModelType.StableDiffusion3:
         latent_rgb_factors = SD3_5_LATENT_RGB_FACTORS
-    elif base_model in (BaseModelType.CogView4, BaseModelType.QwenImageEdit):
+    elif base_model in (BaseModelType.CogView4, BaseModelType.QwenImage):
         latent_rgb_factors = COGVIEW4_LATENT_RGB_FACTORS
     elif base_model == BaseModelType.Flux:
         latent_rgb_factors = FLUX_LATENT_RGB_FACTORS

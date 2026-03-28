@@ -21,14 +21,14 @@ from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
-    "qwen_image_edit_i2l",
+    "qwen_image_i2l",
     title="Image to Latents - Qwen Image Edit",
-    tags=["image", "latents", "vae", "i2l", "qwen_image_edit"],
+    tags=["image", "latents", "vae", "i2l", "qwen_image"],
     category="image",
     version="1.0.0",
     classification=Classification.Prototype,
 )
-class QwenImageEditImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
+class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates latents from an image using the Qwen Image Edit VAE."""
 
     image: ImageField = InputField(description="The image to encode.")

@@ -3,7 +3,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
-import { isQwenImageEditReferenceImageConfig } from 'features/controlLayers/store/types';
+import { isQwenImageReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { zImageField } from 'features/nodes/types/common';
@@ -11,7 +11,7 @@ import { addImageToImage } from 'features/nodes/util/graph/generation/addImageTo
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
 import { addOutpaint } from 'features/nodes/util/graph/generation/addOutpaint';
-import { addQwenImageEditLoRAs } from 'features/nodes/util/graph/generation/addQwenImageEditLoRAs';
+import { addQwenImageLoRAs } from 'features/nodes/util/graph/generation/addQwenImageLoRAs';
 import { addTextToImage } from 'features/nodes/util/graph/generation/addTextToImage';
 import { addWatermarker } from 'features/nodes/util/graph/generation/addWatermarker';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
@@ -29,14 +29,14 @@ import { assert } from 'tsafe';
 
 const log = logger('system');
 
-export const buildQwenImageEditGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
+export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
   const { generationMode, state, manager } = arg;
 
   log.debug({ generationMode, manager: manager?.id }, 'Building Qwen Image Edit graph');
 
   const model = selectMainModelConfig(state);
   assert(model, 'No model selected');
-  assert(model.base === 'qwen-image-edit', 'Selected model is not a Qwen Image Edit model');
+  assert(model.base === 'qwen-image', 'Selected model is not a Qwen Image Edit model');
 
   const params = selectParamsSlice(state);
 
@@ -44,13 +44,13 @@ export const buildQwenImageEditGraph = async (arg: GraphBuilderArg): Promise<Gra
 
   const prompts = selectPresetModifiedPrompts(state);
 
-  const g = new Graph(getPrefixedId('qwen_image_edit_graph'));
+  const g = new Graph(getPrefixedId('qwen_image_graph'));
 
   const modelLoader = g.addNode({
-    type: 'qwen_image_edit_model_loader',
-    id: getPrefixedId('qwen_image_edit_model_loader'),
+    type: 'qwen_image_model_loader',
+    id: getPrefixedId('qwen_image_model_loader'),
     model,
-    component_source: params.qwenImageEditComponentSource,
+    component_source: params.qwenImageComponentSource,
   });
 
   const positivePrompt = g.addNode({
@@ -58,17 +58,17 @@ export const buildQwenImageEditGraph = async (arg: GraphBuilderArg): Promise<Gra
     type: 'string',
   });
   const posCond = g.addNode({
-    type: 'qwen_image_edit_text_encoder',
+    type: 'qwen_image_text_encoder',
     id: getPrefixedId('pos_prompt'),
-    quantization: params.qwenImageEditQuantization,
+    quantization: params.qwenImageQuantization,
   });
 
   // Negative conditioning with a blank prompt for CFG
   const negCond = g.addNode({
-    type: 'qwen_image_edit_text_encoder',
+    type: 'qwen_image_text_encoder',
     id: getPrefixedId('neg_prompt'),
     prompt: prompts.negative || ' ',
-    quantization: params.qwenImageEditQuantization,
+    quantization: params.qwenImageQuantization,
   });
 
   const seed = g.addNode({
@@ -76,14 +76,14 @@ export const buildQwenImageEditGraph = async (arg: GraphBuilderArg): Promise<Gra
     type: 'integer',
   });
   const denoise = g.addNode({
-    type: 'qwen_image_edit_denoise',
+    type: 'qwen_image_denoise',
     id: getPrefixedId('denoise_latents'),
     cfg_scale,
     steps,
-    shift: params.qwenImageEditShift,
+    shift: params.qwenImageShift,
   });
   const l2i = g.addNode({
-    type: 'qwen_image_edit_l2i',
+    type: 'qwen_image_l2i',
     id: getPrefixedId('l2i'),
   });
 
@@ -101,13 +101,13 @@ export const buildQwenImageEditGraph = async (arg: GraphBuilderArg): Promise<Gra
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
   // Add Qwen Image Edit LoRAs if any are enabled
-  addQwenImageEditLoRAs(state, g, denoise, modelLoader);
+  addQwenImageLoRAs(state, g, denoise, modelLoader);
 
   // Collect enabled Qwen Image Edit reference images that have an image set (image is optional for txt2img)
   const validRefImageConfigs = selectRefImagesSlice(state).entities.filter(
     (entity) =>
       entity.isEnabled &&
-      isQwenImageEditReferenceImageConfig(entity.config) &&
+      isQwenImageReferenceImageConfig(entity.config) &&
       entity.config.image !== null &&
       getGlobalReferenceImageWarnings(entity, model).length === 0
   );
@@ -139,7 +139,7 @@ export const buildQwenImageEditGraph = async (arg: GraphBuilderArg): Promise<Gra
     // matching the diffusers pipeline which resizes in pixel space, not latent space.
     const { scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
     const refI2l = g.addNode({
-      type: 'qwen_image_edit_i2l',
+      type: 'qwen_image_i2l',
       id: getPrefixedId('qwen_ref_i2l'),
       width: scaledSize.width,
       height: scaledSize.height,
@@ -157,7 +157,7 @@ export const buildQwenImageEditGraph = async (arg: GraphBuilderArg): Promise<Gra
   }
 
   const modelConfig = await fetchModelConfigWithTypeGuard(model.key, isNonRefinerMainModelConfig);
-  assert(modelConfig.base === 'qwen-image-edit');
+  assert(modelConfig.base === 'qwen-image');
 
   g.upsertMetadata({
     cfg_scale,
@@ -177,12 +177,12 @@ export const buildQwenImageEditGraph = async (arg: GraphBuilderArg): Promise<Gra
       denoise,
       l2i,
     });
-    g.upsertMetadata({ generation_mode: 'qwen_image_edit_txt2img' });
+    g.upsertMetadata({ generation_mode: 'qwen_image_txt2img' });
   } else if (generationMode === 'img2img') {
     assert(manager !== null);
     const i2l = g.addNode({
-      type: 'qwen_image_edit_i2l',
-      id: getPrefixedId('qwen_image_edit_i2l'),
+      type: 'qwen_image_i2l',
+      id: getPrefixedId('qwen_image_i2l'),
     });
 
     canvasOutput = await addImageToImage({
@@ -194,12 +194,12 @@ export const buildQwenImageEditGraph = async (arg: GraphBuilderArg): Promise<Gra
       i2l,
       vaeSource: modelLoader,
     });
-    g.upsertMetadata({ generation_mode: 'qwen_image_edit_img2img' });
+    g.upsertMetadata({ generation_mode: 'qwen_image_img2img' });
   } else if (generationMode === 'inpaint') {
     assert(manager !== null);
     const i2l = g.addNode({
-      type: 'qwen_image_edit_i2l',
-      id: getPrefixedId('qwen_image_edit_i2l'),
+      type: 'qwen_image_i2l',
+      id: getPrefixedId('qwen_image_i2l'),
     });
 
     canvasOutput = await addInpaint({
@@ -213,12 +213,12 @@ export const buildQwenImageEditGraph = async (arg: GraphBuilderArg): Promise<Gra
       modelLoader,
       seed,
     });
-    g.upsertMetadata({ generation_mode: 'qwen_image_edit_inpaint' });
+    g.upsertMetadata({ generation_mode: 'qwen_image_inpaint' });
   } else if (generationMode === 'outpaint') {
     assert(manager !== null);
     const i2l = g.addNode({
-      type: 'qwen_image_edit_i2l',
-      id: getPrefixedId('qwen_image_edit_i2l'),
+      type: 'qwen_image_i2l',
+      id: getPrefixedId('qwen_image_i2l'),
     });
 
     canvasOutput = await addOutpaint({
@@ -232,7 +232,7 @@ export const buildQwenImageEditGraph = async (arg: GraphBuilderArg): Promise<Gra
       modelLoader,
       seed,
     });
-    g.upsertMetadata({ generation_mode: 'qwen_image_edit_outpaint' });
+    g.upsertMetadata({ generation_mode: 'qwen_image_outpaint' });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
   }

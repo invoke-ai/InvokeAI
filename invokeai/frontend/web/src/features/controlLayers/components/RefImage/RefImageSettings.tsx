@@ -38,7 +38,7 @@ import {
   isFlux2ReferenceImageConfig,
   isFLUXReduxConfig,
   isIPAdapterConfig,
-  isQwenImageEditReferenceImageConfig,
+  isQwenImageReferenceImageConfig,
 } from 'features/controlLayers/store/types';
 import type { SetGlobalReferenceImageDndTargetData } from 'features/dnd/dnd';
 import { setGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
@@ -127,7 +127,7 @@ const RefImageSettingsContent = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
 
   // FLUX.2 Klein and Qwen Image Edit have built-in reference image support - no model selector needed
-  const showModelSelector = !isFlux2ReferenceImageConfig(config) && !isQwenImageEditReferenceImageConfig(config);
+  const showModelSelector = !isFlux2ReferenceImageConfig(config) && !isQwenImageReferenceImageConfig(config);
 
   return (
     <Flex flexDir="column" gap={2} position="relative" w="full">

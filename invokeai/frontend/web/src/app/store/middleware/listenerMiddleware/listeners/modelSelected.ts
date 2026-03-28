@@ -7,7 +7,7 @@ import {
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
   modelChanged,
-  qwenImageEditComponentSourceSelected,
+  qwenImageComponentSourceSelected,
   setZImageScheduler,
   syncedToOptimalDimension,
   vaeSelected,
@@ -28,14 +28,14 @@ import {
 import {
   getEntityIdentifier,
   isFlux2ReferenceImageConfig,
-  isQwenImageEditReferenceImageConfig,
+  isQwenImageReferenceImageConfig,
 } from 'features/controlLayers/store/types';
 import {
   initialFlux2ReferenceImage,
   initialFluxKontextReferenceImage,
   initialFLUXRedux,
   initialIPAdapter,
-  initialQwenImageEditReferenceImage,
+  initialQwenImageReferenceImage,
 } from 'features/controlLayers/store/util';
 import { SUPPORTS_REF_IMAGES_BASE_MODELS } from 'features/modelManagerV2/models';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -175,10 +175,10 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
 
         // handle incompatible Qwen Image Edit component source - clear if switching away
-        const { qwenImageEditComponentSource } = state.params;
-        if (newBase !== 'qwen-image-edit') {
-          if (qwenImageEditComponentSource) {
-            dispatch(qwenImageEditComponentSourceSelected(null));
+        const { qwenImageComponentSource } = state.params;
+        if (newBase !== 'qwen-image') {
+          if (qwenImageComponentSource) {
+            dispatch(qwenImageComponentSourceSelected(null));
             modelsUpdatedDisabledOrCleared += 1;
           }
         }
@@ -225,13 +225,13 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
               continue;
             }
 
-            if (newBase === 'qwen-image-edit') {
-              // Switching TO Qwen Image Edit - convert any non-qwen configs to qwen_image_edit_reference_image
-              if (!isQwenImageEditReferenceImageConfig(entity.config)) {
+            if (newBase === 'qwen-image') {
+              // Switching TO Qwen Image Edit - convert any non-qwen configs to qwen_image_reference_image
+              if (!isQwenImageReferenceImageConfig(entity.config)) {
                 dispatch(
                   refImageConfigChanged({
                     id: entity.id,
-                    config: { ...initialQwenImageEditReferenceImage },
+                    config: { ...initialQwenImageReferenceImage },
                   })
                 );
                 modelsUpdatedDisabledOrCleared += 1;
@@ -263,7 +263,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
               continue;
             }
 
-            if (isQwenImageEditReferenceImageConfig(entity.config)) {
+            if (isQwenImageReferenceImageConfig(entity.config)) {
               // Switching AWAY from Qwen Image Edit - convert to the appropriate config type
               let newConfig;
               if (newGlobalRefImageModel) {

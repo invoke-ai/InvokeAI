@@ -15,7 +15,7 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
-    QwenImageEditConditioningField,
+    QwenImageConditioningField,
     WithBoard,
     WithMetadata,
 )
@@ -24,25 +24,25 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
-from invokeai.backend.patches.lora_conversions.qwen_image_edit_lora_constants import (
+from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import (
     QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImageEditConditioningInfo
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
-    "qwen_image_edit_denoise",
+    "qwen_image_denoise",
     title="Denoise - Qwen Image Edit",
-    tags=["image", "qwen_image_edit"],
+    tags=["image", "qwen_image"],
     category="image",
     version="1.0.0",
     classification=Classification.Prototype,
 )
-class QwenImageEditDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Run the denoising process with a Qwen Image Edit model."""
 
     # If latents is provided, this means we are doing image-to-image.
@@ -62,12 +62,12 @@ class QwenImageEditDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
     denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
     transformer: TransformerField = InputField(
-        description=FieldDescriptions.qwen_image_edit_model, input=Input.Connection, title="Transformer"
+        description=FieldDescriptions.qwen_image_model, input=Input.Connection, title="Transformer"
     )
-    positive_conditioning: QwenImageEditConditioningField = InputField(
+    positive_conditioning: QwenImageConditioningField = InputField(
         description=FieldDescriptions.positive_cond, input=Input.Connection
     )
-    negative_conditioning: Optional[QwenImageEditConditioningField] = InputField(
+    negative_conditioning: Optional[QwenImageConditioningField] = InputField(
         default=None, description=FieldDescriptions.negative_cond, input=Input.Connection
     )
     cfg_scale: float | list[float] = InputField(default=4.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
@@ -117,7 +117,7 @@ class QwenImageEditDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         cond_data = context.conditioning.load(conditioning_name)
         assert len(cond_data.conditionings) == 1
         conditioning = cond_data.conditionings[0]
-        assert isinstance(conditioning, QwenImageEditConditioningInfo)
+        assert isinstance(conditioning, QwenImageConditioningInfo)
         conditioning = conditioning.to(dtype=dtype, device=device)
         return conditioning.prompt_embeds, conditioning.prompt_embeds_mask
 
@@ -483,7 +483,7 @@ class QwenImageEditDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
-            context.util.sd_step_callback(state, BaseModelType.QwenImageEdit)
+            context.util.sd_step_callback(state, BaseModelType.QwenImage)
 
         return step_callback
 

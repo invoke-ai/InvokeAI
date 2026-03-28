@@ -326,8 +326,8 @@ export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config
   return config.type === 'main' && config.base === 'z-image' && config.format === 'diffusers';
 };
 
-export const isQwenImageEditDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
-  return config.type === 'main' && config.base === 'qwen-image-edit' && config.format === 'diffusers';
+export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'qwen-image' && config.format === 'diffusers';
 };
 
 export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

@@ -1,22 +1,22 @@
 import { Checkbox, CompositeNumberInput, Flex, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { qwenImageEditShiftChanged, selectQwenImageEditShift } from 'features/controlLayers/store/paramsSlice';
+import { qwenImageShiftChanged, selectQwenImageShift } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const ParamQwenImageEditShift = memo(() => {
+const ParamQwenImageShift = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const shift = useAppSelector(selectQwenImageEditShift);
+  const shift = useAppSelector(selectQwenImageShift);
   const isEnabled = shift !== null;
 
   const onToggle = useCallback(() => {
-    dispatch(qwenImageEditShiftChanged(isEnabled ? null : 3.0));
+    dispatch(qwenImageShiftChanged(isEnabled ? null : 3.0));
   }, [dispatch, isEnabled]);
 
   const onChange = useCallback(
     (value: number) => {
-      dispatch(qwenImageEditShiftChanged(value));
+      dispatch(qwenImageShiftChanged(value));
     },
     [dispatch]
   );
@@ -25,7 +25,7 @@ const ParamQwenImageEditShift = memo(() => {
     <FormControl>
       <Flex gap={2} alignItems="center">
         <Checkbox isChecked={isEnabled} onChange={onToggle} />
-        <FormLabel m={0}>{t('modelManager.qwenImageEditShift')}</FormLabel>
+        <FormLabel m={0}>{t('modelManager.qwenImageShift')}</FormLabel>
       </Flex>
       {isEnabled && (
         <CompositeNumberInput
@@ -42,6 +42,6 @@ const ParamQwenImageEditShift = memo(() => {
   );
 });
 
-ParamQwenImageEditShift.displayName = 'ParamQwenImageEditShift';
+ParamQwenImageShift.displayName = 'ParamQwenImageShift';
 
-export default ParamQwenImageEditShift;
+export default ParamQwenImageShift;

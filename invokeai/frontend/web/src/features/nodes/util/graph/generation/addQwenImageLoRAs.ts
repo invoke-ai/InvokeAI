@@ -4,13 +4,13 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation, S } from 'services/api/types';
 
-export const addQwenImageEditLoRAs = (
+export const addQwenImageLoRAs = (
   state: RootState,
   g: Graph,
-  denoise: Invocation<'qwen_image_edit_denoise'>,
-  modelLoader: Invocation<'qwen_image_edit_model_loader'>
+  denoise: Invocation<'qwen_image_denoise'>,
+  modelLoader: Invocation<'qwen_image_model_loader'>
 ): void => {
-  const enabledLoRAs = state.loras.loras.filter((l) => l.isEnabled && l.model.base === 'qwen-image-edit');
+  const enabledLoRAs = state.loras.loras.filter((l) => l.isEnabled && l.model.base === 'qwen-image');
   const loraCount = enabledLoRAs.length;
 
   if (loraCount === 0) {
@@ -25,8 +25,8 @@ export const addQwenImageEditLoRAs = (
     type: 'collect',
   });
   const loraCollectionLoader = g.addNode({
-    type: 'qwen_image_edit_lora_collection_loader',
-    id: getPrefixedId('qwen_image_edit_lora_collection_loader'),
+    type: 'qwen_image_lora_collection_loader',
+    id: getPrefixedId('qwen_image_lora_collection_loader'),
   });
 
   g.addEdge(loraCollector, 'collection', loraCollectionLoader, 'loras');

@@ -18,8 +18,8 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 
 
-@invocation_output("qwen_image_edit_model_loader_output")
-class QwenImageEditModelLoaderOutput(BaseInvocationOutput):
+@invocation_output("qwen_image_model_loader_output")
+class QwenImageModelLoaderOutput(BaseInvocationOutput):
     """Qwen Image Edit base model loader output."""
 
     transformer: TransformerField = OutputField(description=FieldDescriptions.transformer, title="Transformer")
@@ -30,14 +30,14 @@ class QwenImageEditModelLoaderOutput(BaseInvocationOutput):
 
 
 @invocation(
-    "qwen_image_edit_model_loader",
+    "qwen_image_model_loader",
     title="Main Model - Qwen Image Edit",
-    tags=["model", "qwen_image_edit"],
+    tags=["model", "qwen_image"],
     category="model",
     version="1.1.0",
     classification=Classification.Prototype,
 )
-class QwenImageEditModelLoaderInvocation(BaseInvocation):
+class QwenImageModelLoaderInvocation(BaseInvocation):
     """Loads a Qwen Image Edit model, outputting its submodels.
 
     The transformer is always loaded from the main model (Diffusers or GGUF).
@@ -50,9 +50,9 @@ class QwenImageEditModelLoaderInvocation(BaseInvocation):
     """
 
     model: ModelIdentifierField = InputField(
-        description=FieldDescriptions.qwen_image_edit_model,
+        description=FieldDescriptions.qwen_image_model,
         input=Input.Direct,
-        ui_model_base=BaseModelType.QwenImageEdit,
+        ui_model_base=BaseModelType.QwenImage,
         ui_model_type=ModelType.Main,
         title="Transformer",
     )
@@ -63,13 +63,13 @@ class QwenImageEditModelLoaderInvocation(BaseInvocation):
         "Required when using a GGUF quantized transformer. "
         "Ignored when the main model is already in Diffusers format.",
         input=Input.Direct,
-        ui_model_base=BaseModelType.QwenImageEdit,
+        ui_model_base=BaseModelType.QwenImage,
         ui_model_type=ModelType.Main,
         ui_model_format=ModelFormat.Diffusers,
         title="Component Source (Diffusers)",
     )
 
-    def invoke(self, context: InvocationContext) -> QwenImageEditModelLoaderOutput:
+    def invoke(self, context: InvocationContext) -> QwenImageModelLoaderOutput:
         main_config = context.models.get_config(self.model)
         main_is_diffusers = main_config.format == ModelFormat.Diffusers
 
@@ -100,7 +100,7 @@ class QwenImageEditModelLoaderInvocation(BaseInvocation):
                 "to provide the VAE and text encoder."
             )
 
-        return QwenImageEditModelLoaderOutput(
+        return QwenImageModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),
             qwen_vl_encoder=QwenVLEncoderField(tokenizer=tokenizer, text_encoder=text_encoder),
             vae=VAEField(vae=vae),

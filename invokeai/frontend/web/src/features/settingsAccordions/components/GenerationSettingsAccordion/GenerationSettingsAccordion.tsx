@@ -9,7 +9,7 @@ import {
   selectIsCogView4,
   selectIsFLUX,
   selectIsFlux2,
-  selectIsQwenImageEdit,
+  selectIsQwenImage,
   selectIsSD3,
   selectIsZImage,
 } from 'features/controlLayers/store/paramsSlice';
@@ -45,7 +45,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
-  const isQwenImageEdit = useAppSelector(selectIsQwenImageEdit);
+  const isQwenImage = useAppSelector(selectIsQwenImage);
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
 
   const selectBadges = useMemo(
@@ -84,7 +84,7 @@ export const GenerationSettingsAccordion = memo(() => {
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && !isQwenImageEdit && <ParamScheduler />}
+              {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && !isQwenImage && <ParamScheduler />}
               {isFLUX && <ParamFluxScheduler />}
               {isZImage && <ParamZImageScheduler />}
               <ParamSteps />

@@ -635,9 +635,9 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     }
   }
 
-  if (model?.base === 'qwen-image-edit') {
+  if (model?.base === 'qwen-image') {
     const { bbox } = canvas;
-    const gridSize = getGridSize('qwen-image-edit');
+    const gridSize = getGridSize('qwen-image');
 
     if (bbox.scaleMethod === 'none') {
       if (bbox.rect.width % gridSize !== 0) {

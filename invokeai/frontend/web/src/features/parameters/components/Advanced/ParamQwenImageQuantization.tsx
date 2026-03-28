@@ -2,8 +2,8 @@ import type { ComboboxOnChange, ComboboxOption } from '@invoke-ai/ui-library';
 import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import {
-  qwenImageEditQuantizationChanged,
-  selectQwenImageEditQuantization,
+  qwenImageQuantizationChanged,
+  selectQwenImageQuantization,
 } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,10 +18,10 @@ const isValidQuantization = (value: string | undefined): value is 'none' | 'int8
   return value === 'none' || value === 'int8' || value === 'nf4';
 };
 
-const ParamQwenImageEditQuantization = memo(() => {
+const ParamQwenImageQuantization = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const quantization = useAppSelector(selectQwenImageEditQuantization);
+  const quantization = useAppSelector(selectQwenImageQuantization);
 
   const value = useMemo(() => QUANTIZATION_OPTIONS.find((o) => o.value === quantization), [quantization]);
 
@@ -30,19 +30,19 @@ const ParamQwenImageEditQuantization = memo(() => {
       if (!isValidQuantization(v?.value)) {
         return;
       }
-      dispatch(qwenImageEditQuantizationChanged(v.value));
+      dispatch(qwenImageQuantizationChanged(v.value));
     },
     [dispatch]
   );
 
   return (
     <FormControl minW={0} flexGrow={1} gap={2}>
-      <FormLabel m={0}>{t('modelManager.qwenImageEditQuantization')}</FormLabel>
+      <FormLabel m={0}>{t('modelManager.qwenImageQuantization')}</FormLabel>
       <Combobox value={value} options={QUANTIZATION_OPTIONS} onChange={onChange} />
     </FormControl>
   );
 });
 
-ParamQwenImageEditQuantization.displayName = 'ParamQwenImageEditQuantization';
+ParamQwenImageQuantization.displayName = 'ParamQwenImageQuantization';
 
-export default ParamQwenImageEditQuantization;
+export default ParamQwenImageQuantization;

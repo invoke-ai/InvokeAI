@@ -89,7 +89,7 @@ class ZImageConditioningInfo:
 
 
 @dataclass
-class QwenImageEditConditioningInfo:
+class QwenImageConditioningInfo:
     """Qwen Image Edit conditioning information from Qwen2.5-VL encoder."""
 
     prompt_embeds: torch.Tensor
@@ -117,7 +117,7 @@ class ConditioningFieldData:
         | List[SD3ConditioningInfo]
         | List[CogView4ConditioningInfo]
         | List[ZImageConditioningInfo]
-        | List[QwenImageEditConditioningInfo]
+        | List[QwenImageConditioningInfo]
     )
 
 

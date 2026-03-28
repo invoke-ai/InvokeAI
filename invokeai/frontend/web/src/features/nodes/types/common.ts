@@ -93,7 +93,7 @@ export const zBaseModelType = z.enum([
   'flux',
   'flux2',
   'cogview4',
-  'qwen-image-edit',
+  'qwen-image',
   'z-image',
   'unknown',
 ]);
@@ -106,7 +106,7 @@ export const zMainModelBase = z.enum([
   'flux',
   'flux2',
   'cogview4',
-  'qwen-image-edit',
+  'qwen-image',
   'z-image',
 ]);
 type MainModelBase = z.infer<typeof zMainModelBase>;

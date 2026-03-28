@@ -15,7 +15,7 @@ import type {
   FLUXReduxConfig,
   ImageWithDims,
   IPAdapterConfig,
-  QwenImageEditReferenceImageConfig,
+  QwenImageReferenceImageConfig,
   RasterLayerAdjustments,
   RefImageState,
   RegionalGuidanceIPAdapterConfig,
@@ -118,8 +118,8 @@ export const initialFlux2ReferenceImage: Flux2ReferenceImageConfig = {
   type: 'flux2_reference_image',
   image: null,
 };
-export const initialQwenImageEditReferenceImage: QwenImageEditReferenceImageConfig = {
-  type: 'qwen_image_edit_reference_image',
+export const initialQwenImageReferenceImage: QwenImageReferenceImageConfig = {
+  type: 'qwen_image_reference_image',
   image: null,
 };
 export const initialT2IAdapter: T2IAdapterConfig = {

@@ -10,13 +10,13 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
-from invokeai.backend.patches.lora_conversions.qwen_image_edit_lora_constants import (
+from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import (
     QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 
-def lora_model_from_qwen_image_edit_state_dict(
+def lora_model_from_qwen_image_state_dict(
     state_dict: Dict[str, torch.Tensor], alpha: float | None = None
 ) -> ModelPatchRaw:
     """Convert a Qwen Image Edit LoRA state dict to a ModelPatchRaw.

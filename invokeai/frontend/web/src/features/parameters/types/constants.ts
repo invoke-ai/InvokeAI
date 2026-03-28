@@ -37,7 +37,7 @@ export const CLIP_SKIP_MAP: { [key in BaseModelType]?: { maxClip: number; marker
     maxClip: 0,
     markers: [],
   },
-  'qwen-image-edit': {
+  'qwen-image': {
     maxClip: 0,
     markers: [],
   },

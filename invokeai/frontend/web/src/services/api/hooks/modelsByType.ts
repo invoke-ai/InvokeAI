@@ -23,7 +23,7 @@ import {
   isLoRAModelConfig,
   isNonRefinerMainModelConfig,
   isQwen3EncoderModelConfig,
-  isQwenImageEditDiffusersMainModelConfig,
+  isQwenImageDiffusersMainModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
@@ -70,7 +70,7 @@ export const useVAEModels = () => buildModelsHook(isVAEModelConfigOrSubmodel)();
 export const useFlux1VAEModels = () => buildModelsHook(isFlux1VAEModelConfig)();
 export const useFlux2VAEModels = () => buildModelsHook(isFlux2VAEModelConfig)();
 export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
-export const useQwenImageEditDiffusersModels = () => buildModelsHook(isQwenImageEditDiffusersMainModelConfig)();
+export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiffusersMainModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isFluxKontextModelConfig(config)

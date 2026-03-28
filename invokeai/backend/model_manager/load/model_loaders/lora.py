@@ -52,8 +52,8 @@ from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils 
     is_state_dict_likely_in_flux_xlabs_format,
     lora_model_from_flux_xlabs_state_dict,
 )
-from invokeai.backend.patches.lora_conversions.qwen_image_edit_lora_conversion_utils import (
-    lora_model_from_qwen_image_edit_state_dict,
+from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils import (
+    lora_model_from_qwen_image_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
 from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
@@ -158,8 +158,8 @@ class LoRALoader(ModelLoader):
             # Z-Image LoRAs use diffusers PEFT format with transformer and/or Qwen3 encoder layers.
             # We set alpha=None to use rank as alpha (common default).
             model = lora_model_from_z_image_state_dict(state_dict=state_dict, alpha=None)
-        elif self._model_base == BaseModelType.QwenImageEdit:
-            model = lora_model_from_qwen_image_edit_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.QwenImage:
+            model = lora_model_from_qwen_image_state_dict(state_dict=state_dict, alpha=None)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 

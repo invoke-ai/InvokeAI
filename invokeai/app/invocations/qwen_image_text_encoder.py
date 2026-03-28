@@ -12,17 +12,17 @@ from invokeai.app.invocations.fields import (
     UIComponent,
 )
 from invokeai.app.invocations.model import QwenVLEncoderField
-from invokeai.app.invocations.primitives import QwenImageEditConditioningOutput
+from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
-    QwenImageEditConditioningInfo,
+    QwenImageConditioningInfo,
 )
 
 # The Qwen Image Edit pipeline uses a specific system prompt and drops the first
 # N tokens (the system prompt prefix) from the embeddings.  These constants are
-# taken directly from the diffusers QwenImageEditPipeline.
+# taken directly from the diffusers QwenImagePipeline.
 _SYSTEM_PROMPT = (
     "Describe the key features of the input image (color, shape, size, texture, objects, background), "
     "then explain how the user's text instruction should alter or modify the image. "
@@ -44,14 +44,14 @@ def _build_prompt(user_prompt: str, num_images: int) -> str:
 
 
 @invocation(
-    "qwen_image_edit_text_encoder",
+    "qwen_image_text_encoder",
     title="Prompt - Qwen Image Edit",
-    tags=["prompt", "conditioning", "qwen_image_edit"],
+    tags=["prompt", "conditioning", "qwen_image"],
     category="conditioning",
     version="1.2.0",
     classification=Classification.Prototype,
 )
-class QwenImageEditTextEncoderInvocation(BaseInvocation):
+class QwenImageTextEncoderInvocation(BaseInvocation):
     """Encodes text and reference images for Qwen Image Edit using Qwen2.5-VL."""
 
     prompt: str = InputField(description="Text prompt describing the desired edit.", ui_component=UIComponent.Textarea)
@@ -92,7 +92,7 @@ class QwenImageEditTextEncoderInvocation(BaseInvocation):
         return image
 
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> QwenImageEditConditioningOutput:
+    def invoke(self, context: InvocationContext) -> QwenImageConditioningOutput:
         # Load and resize reference images to ~1M pixels (matching diffusers pipeline)
         pil_images: list[PILImage.Image] = []
         for img_field in self.reference_images:
@@ -105,17 +105,17 @@ class QwenImageEditTextEncoderInvocation(BaseInvocation):
         prompt_mask = prompt_mask.detach().to("cpu") if prompt_mask is not None else None
 
         conditioning_data = ConditioningFieldData(
-            conditionings=[QwenImageEditConditioningInfo(prompt_embeds=prompt_embeds, prompt_embeds_mask=prompt_mask)]
+            conditionings=[QwenImageConditioningInfo(prompt_embeds=prompt_embeds, prompt_embeds_mask=prompt_mask)]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
-        return QwenImageEditConditioningOutput.build(conditioning_name)
+        return QwenImageConditioningOutput.build(conditioning_name)
 
     def _encode(
         self, context: InvocationContext, images: list[PILImage.Image]
     ) -> tuple[torch.Tensor, torch.Tensor | None]:
         """Encode text prompt and reference images using Qwen2.5-VL.
 
-        Matches the diffusers QwenImageEditPipeline._get_qwen_prompt_embeds logic:
+        Matches the diffusers QwenImagePipeline._get_qwen_prompt_embeds logic:
         1. Format prompt with the edit-specific system template
         2. Run through Qwen2.5-VL to get hidden states
         3. Extract valid (non-padding) tokens and drop the system prefix

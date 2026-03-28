@@ -142,7 +142,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   flux: 'gold',
   flux2: 'gold',
   cogview4: 'red',
-  'qwen-image-edit': 'orange',
+  'qwen-image': 'orange',
   'z-image': 'cyan',
   unknown: 'red',
 };
@@ -184,7 +184,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   flux: 'FLUX',
   flux2: 'FLUX.2',
   cogview4: 'CogView4',
-  'qwen-image-edit': 'Qwen Image Edit',
+  'qwen-image': 'Qwen Image',
   'z-image': 'Z-Image',
   unknown: 'Unknown',
 };
@@ -202,7 +202,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   flux: 'FLUX',
   flux2: 'FLUX.2',
   cogview4: 'CogView4',
-  'qwen-image-edit': 'QwenEdit',
+  'qwen-image': 'QwenImg',
   'z-image': 'Z-Image',
   unknown: 'Unknown',
 };
@@ -245,14 +245,14 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
 
 export const SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS: BaseModelType[] = ['flux', 'sd-3', 'z-image'];
 
-export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image-edit'];
+export const SUPPORTS_REF_IMAGES_BASE_MODELS: BaseModelType[] = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image'];
 
 export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
   'sd-1',
   'sd-2',
   'sdxl',
   'cogview4',
-  'qwen-image-edit',
+  'qwen-image',
   'sd-3',
   'z-image',
 ];
