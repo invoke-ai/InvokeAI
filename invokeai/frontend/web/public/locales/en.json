@@ -1501,6 +1501,7 @@
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
             "noQwen3EncoderModelSelected": "No Qwen3 Encoder model selected for FLUX2 Klein generation",
+            "noQwenImageComponentSourceSelected": "GGUF Qwen Image models require a Diffusers Component Source for VAE/encoder",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
             "fluxModelIncompatibleBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), bbox width is {{width}}",
