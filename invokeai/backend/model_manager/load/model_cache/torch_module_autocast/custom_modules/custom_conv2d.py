@@ -54,20 +54,17 @@ class CustomConv2d(torch.nn.Conv2d, CustomModuleMixin):
             return self._autocast_forward_with_patches(input)
         elif self._device_autocasting_enabled:
             return self._autocast_forward(input)
-        elif (
-            input.is_floating_point()
-            and (
-                (
-                    self.weight.is_floating_point()
-                    and not isinstance(self.weight, GGMLTensor)
-                    and self.weight.dtype != input.dtype
-                )
-                or (
-                    self.bias is not None
-                    and self.bias.is_floating_point()
-                    and not isinstance(self.bias, GGMLTensor)
-                    and self.bias.dtype != input.dtype
-                )
+        elif input.is_floating_point() and (
+            (
+                self.weight.is_floating_point()
+                and not isinstance(self.weight, GGMLTensor)
+                and self.weight.dtype != input.dtype
+            )
+            or (
+                self.bias is not None
+                and self.bias.is_floating_point()
+                and not isinstance(self.bias, GGMLTensor)
+                and self.bias.dtype != input.dtype
             )
         ):
             weight = self._cast_tensor_for_input(self.weight, input)
