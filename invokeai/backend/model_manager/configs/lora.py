@@ -703,14 +703,25 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         - diffusion_model.layers.X.attention.to_k.lora_down.weight (DoRA format)
         - diffusion_model.layers.X.attention.to_k.lora_A.weight (PEFT format)
         - diffusion_model.layers.X.attention.to_k.dora_scale (DoRA scale)
+        - lora_unet__layers_X_attention_to_k.lora_down.weight (Kohya format)
         """
+        from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils import (
+            is_state_dict_likely_z_image_kohya_lora,
+        )
+
         state_dict = mod.load_state_dict()
 
-        # Check for Z-Image specific LoRA patterns
+        # Check for Kohya format first
+        if is_state_dict_likely_z_image_kohya_lora(state_dict):
+            return
+
+        # Check for Z-Image specific LoRA patterns (dot-notation formats)
         has_z_image_lora_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {
                 "diffusion_model.layers.",  # Z-Image S3-DiT layer pattern
+                "diffusion_model.context_refiner.",
+                "diffusion_model.noise_refiner.",
             },
         )
 
@@ -738,15 +749,26 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         Z-Image uses S3-DiT architecture with layer names like:
         - diffusion_model.layers.0.attention.to_k.lora_A.weight
         - diffusion_model.layers.0.feed_forward.w1.lora_A.weight
+        - lora_unet__layers_0_attention_to_k.lora_down.weight (Kohya format)
         """
+        from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils import (
+            is_state_dict_likely_z_image_kohya_lora,
+        )
+
         state_dict = mod.load_state_dict()
 
-        # Check for Z-Image transformer layer patterns
+        # Check for Kohya format
+        if is_state_dict_likely_z_image_kohya_lora(state_dict):
+            return BaseModelType.ZImage
+
+        # Check for Z-Image transformer layer patterns (dot-notation formats)
         # Z-Image uses diffusion_model.layers.X structure (unlike Flux which uses double_blocks/single_blocks)
         has_z_image_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {
                 "diffusion_model.layers.",  # Z-Image S3-DiT layer pattern
+                "diffusion_model.context_refiner.",
+                "diffusion_model.noise_refiner.",
             },
         )
 
