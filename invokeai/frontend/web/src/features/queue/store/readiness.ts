@@ -257,6 +257,18 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
 
   // FLUX.2 (Klein) extracts Qwen3 encoder and VAE from main model - no separate selections needed
 
+  if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
+    if (!params.qwenImageComponentSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noQwenImageComponentSourceSelected') });
+    }
+  }
+
+  if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
+    if (!params.qwenImageComponentSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noQwenImageComponentSourceSelected') });
+    }
+  }
+
   if (model?.base === 'z-image') {
     // Check if VAE source is available (either separate VAE or Qwen3 Source)
     const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
@@ -677,6 +689,12 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
           }),
         });
       }
+    }
+  }
+
+  if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
+    if (!params.qwenImageComponentSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noQwenImageComponentSourceSelected') });
     }
   }
 

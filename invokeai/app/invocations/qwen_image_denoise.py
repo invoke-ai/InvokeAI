@@ -304,8 +304,19 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         init_sigmas = np.linspace(1.0, 1.0 / self.steps, self.steps).tolist()
         scheduler.set_timesteps(sigmas=init_sigmas, mu=mu, device=device)
 
-        timesteps_sched = scheduler.timesteps
-        sigmas_sched = scheduler.sigmas
+        # Clip the schedule based on denoising_start/denoising_end to support img2img strength.
+        # The scheduler's sigmas go from high (noisy) to 0 (clean). We clip to the fractional range.
+        sigmas_sched = scheduler.sigmas  # (N+1,) including terminal 0
+        if self.denoising_start > 0 or self.denoising_end < 1:
+            total_sigmas = len(sigmas_sched) - 1  # exclude terminal
+            start_idx = int(round(self.denoising_start * total_sigmas))
+            end_idx = int(round(self.denoising_end * total_sigmas))
+            sigmas_sched = sigmas_sched[start_idx : end_idx + 1]  # +1 to include the next sigma for dt
+            # Rebuild timesteps from clipped sigmas (exclude terminal 0)
+            timesteps_sched = sigmas_sched[:-1] * scheduler.config.num_train_timesteps
+        else:
+            timesteps_sched = scheduler.timesteps
+
         total_steps = len(timesteps_sched)
 
         cfg_scale = self._prepare_cfg_scale(total_steps)
@@ -437,8 +448,6 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
             )
 
-            scheduler.set_begin_index(0)
-
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
                 # The pipeline passes timestep / 1000 to the transformer
                 timestep = t.expand(latents.shape[0]).to(inference_dtype)
@@ -476,8 +485,12 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 else:
                     noise_pred = noise_pred_cond
 
-                # Use the scheduler's step method — exactly matching the pipeline
-                latents = scheduler.step(noise_pred, t, latents, return_dict=False)[0]
+                # Euler step using the (possibly clipped) sigma schedule
+                sigma_curr = sigmas_sched[step_idx]
+                sigma_next = sigmas_sched[step_idx + 1]
+                dt = sigma_next - sigma_curr
+                latents = latents.to(torch.float32) + dt * noise_pred.to(torch.float32)
+                latents = latents.to(inference_dtype)
 
                 if inpaint_extension is not None:
                     sigma_next = sigmas_sched[step_idx + 1].item()
