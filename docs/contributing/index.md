@@ -18,7 +18,7 @@ If you’d like to add a Node, please see our [nodes contribution guide](../node
 
 Helping support other users in [Discord](https://discord.gg/ZmtBAhwWhy) and on Github are valuable forms of contribution that we greatly appreciate.
 
-We receive many issues and requests for help from users. We're limited in bandwidth relative to our the user base, so providing answers to questions or helping identify causes of issues is very helpful. By doing this, you enable us to spend time on the highest priority work.
+We receive many issues and requests for help from users. We're limited in bandwidth relative to our user base, so providing answers to questions or helping identify causes of issues is very helpful. By doing this, you enable us to spend time on the highest priority work.
 
 ## Documentation
 
