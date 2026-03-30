@@ -284,7 +284,12 @@ export const ModelInstallQueue = memo(() => {
 
           {/* Destructive Actions go to the dropdown menu */}
           <Menu>
-            <MenuButton as={IconButton} size="sm" icon={<PiCaretDownBold />} />
+            <MenuButton
+              as={IconButton}
+              size="sm"
+              icon={<PiCaretDownBold />}
+              disabled={!pruneAvailable && !hasCancelableInstalls}
+            />
             <MenuList>
               {!isPrunePriority && (
                 <MenuItem
