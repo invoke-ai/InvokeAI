@@ -1,8 +1,6 @@
 """Tests for the Qwen Image denoise invocation."""
 
-import math
 
-import numpy as np
 import pytest
 
 from invokeai.app.invocations.qwen_image_denoise import QwenImageDenoiseInvocation
@@ -62,7 +60,7 @@ class TestComputeSigmas:
         assert default_sigmas[-1] == shifted_sigmas[-1] == 0.0
         # At least one intermediate value should differ
         assert any(
-            abs(d - s) > 1e-6 for d, s in zip(default_sigmas[1:-1], shifted_sigmas[1:-1])
+            abs(d - s) > 1e-6 for d, s in zip(default_sigmas[1:-1], shifted_sigmas[1:-1], strict=False)
         ), "Shift override should change intermediate sigma values"
 
     def test_shift_override_uses_log(self):
@@ -104,7 +102,7 @@ class TestComputeSigmas:
         sigmas_large = inv._compute_sigmas(image_seq_len=8192, num_steps=4, shift_override=None)
         # Both same length but different values
         assert len(sigmas_small) == len(sigmas_large)
-        assert any(abs(s - l) > 1e-6 for s, l in zip(sigmas_small[1:-1], sigmas_large[1:-1]))
+        assert any(abs(sigma - len) > 1e-6 for sigma, len in zip(sigmas_small[1:-1], sigmas_large[1:-1], strict=False))
 
 
 class TestPackUnpackLatents:

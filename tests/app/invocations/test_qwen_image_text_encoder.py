@@ -1,6 +1,5 @@
 """Tests for the Qwen Image text encoder prompt building and image resizing."""
 
-import pytest
 from PIL import Image
 
 from invokeai.app.invocations.qwen_image_text_encoder import (
