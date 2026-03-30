@@ -117,6 +117,11 @@ body {
     &:not([aria-current='page']):active {
       background: var(--sl-color-hairline-light);
     }
+
+    &[aria-current='page'] span,
+    span {
+      font-weight: normal;
+    }
   }
 }
 

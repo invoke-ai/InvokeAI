@@ -1,11 +1,11 @@
 ---
 title: Image Generation
-lastUpdated: 2026-02-20
+lastUpdated: 2026-03-30
 sidebar:
   order: 1
 ---
 
-import { Card, CardGrid, Steps } from '@astrojs/starlight/components';
+import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
 
 :::tip[New to image generation with AI?]
   You're in the right place! This is a high-level walkthrough of some of the concepts and terms you'll see as you start using Invoke. Please note, this is not an exhaustive guide and may be out of date due to the rapidly changing nature of the space.
@@ -37,6 +37,26 @@ There are two prompt boxes: **Positive Prompt** & **Negative Prompt**.
 - *A detailed oil painting of a tranquil forest at sunset with vibrant colors and soft, golden light filtering through the trees*
 - *friends sharing beers in a busy city, realistic colored pencil sketch, twilight, masterpiece, bright, lively*
 
+### Advanced Prompting
+
+<CardGrid>
+  <LinkCard
+    title="Prompting Guide"
+    description="Learn how to structure prompts, use positive and negative prompts well, and iterate toward better results."
+    href="/concepts/prompting-guide"
+  />
+  <LinkCard
+    title="Prompting Syntax"
+    description="Learn InvokeAI's advanced prompt weighting and composition syntax, including `+`, `-`, `.blend()`, and `.and()`."
+    href="/concepts/prompt-syntax"
+  />
+  <LinkCard
+    title="Dynamic Prompting"
+    description="Expand one prompt into many prompt variations with curly-brace syntax."
+    href="/concepts/dynamic-prompting"
+  />
+</CardGrid>
+
 ### Generation Workflows
 
 Invoke offers a number of different workflows for interacting with models to produce images. Each is extremely powerful on its own, but together provide you an unparalleled way of producing high quality creative outputs that align with your vision.
@@ -58,7 +78,7 @@ Invoke offers a number of different workflows for interacting with models to pro
 <Steps>
   1. **Fine-tuning your prompt:**
 
-      The more specific you are, the closer the image will turn out to what is in your head! Adding more details in the Positive or Negative Prompt can help add/remove pieces of your image to improve it. You can also use advanced techniques like upweighting and downweighting to control the influence of certain words. [Learn more here](https://invoke-ai.github.io/InvokeAI/features/PROMPTS/#prompt-syntax-features).
+      The more specific you are, the closer the image will turn out to what is in your head. Adding more details in the Positive or Negative Prompt can help add or remove parts of the image. You can also use advanced techniques like upweighting and downweighting to control the influence of specific words. Learn more in the [Prompting Guide](/concepts/prompting-guide) and [Prompting Syntax](/concepts/prompt-syntax).
 
       :::tip
         If you're seeing poor results, try adding the things you don't like about the image to your negative prompt. E.g. *distorted, low quality, unrealistic, etc.*
