@@ -104,7 +104,7 @@ export const ModelInstallQueue = memo(() => {
         continue;
       }
 
-      if (model.status === 'running') {
+      if (model.status === 'running' || model.status === 'downloads_done') {
         cancelable.push(model.id);
       }
     }
@@ -287,6 +287,7 @@ export const ModelInstallQueue = memo(() => {
             <MenuButton
               as={IconButton}
               size="sm"
+              aria-label={t('accessibility.menu')}
               icon={<PiCaretDownBold />}
               disabled={!pruneAvailable && !hasCancelableInstalls}
             />

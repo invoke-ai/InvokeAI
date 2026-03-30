@@ -16,7 +16,7 @@ import { useStore } from '@nanostores/react';
 import { isNil } from 'es-toolkit/compat';
 import { getApiErrorDetail } from 'features/modelManagerV2/util/getApiErrorDetail';
 import { toast } from 'features/toast/toast';
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiArrowClockwiseBold,
@@ -36,7 +36,7 @@ import {
   useRestartModelInstallFileMutation,
   useResumeModelInstallMutation,
 } from 'services/api/endpoints/models';
-import type { ModelInstallJob } from 'services/api/types';
+import type { ModelInstallJob, ModelInstallStatus } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
 import { ModelInstallQueueBadge } from './ModelInstallQueueBadge';
@@ -44,6 +44,22 @@ import { ModelInstallQueueBadge } from './ModelInstallQueueBadge';
 type ModelListItemProps = {
   installJob: ModelInstallJob;
 };
+
+type QueueItemAction = 'cancel' | 'pause' | 'resume' | 'restartFailed' | 'restartFile';
+type OptimisticStatusState = {
+  status: ModelInstallStatus;
+  previousStatus: ModelInstallStatus | undefined;
+};
+
+const OPTIMISTIC_STATUS_BY_ACTION: Record<QueueItemAction, ModelInstallStatus> = {
+  cancel: 'cancelled',
+  pause: 'paused',
+  resume: 'waiting',
+  restartFailed: 'waiting',
+  restartFile: 'waiting',
+};
+
+const isRestartableStatus = (status?: ModelInstallStatus) => status === 'paused' || status === 'error';
 
 const formatBytes = (bytes: number) => {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -98,46 +114,81 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
   const [resumeModelInstall] = useResumeModelInstallMutation();
   const [restartFailedModelInstall] = useRestartFailedModelInstallMutation();
   const [restartModelInstallFile] = useRestartModelInstallFileMutation();
+  const [actionInFlight, setActionInFlight] = useState<QueueItemAction | null>(null);
+  const [optimisticStatus, setOptimisticStatus] = useState<OptimisticStatusState | null>(null);
+  const actionInFlightRef = useRef<QueueItemAction | null>(null);
   const resumeFromScratchShown = useRef(false);
   const isConnected = useStore($isConnected);
 
+  useEffect(() => {
+    if (!optimisticStatus) {
+      return;
+    }
+
+    if (installJob.status !== optimisticStatus.previousStatus) {
+      setOptimisticStatus(null);
+    }
+  }, [installJob.status, optimisticStatus]);
+
+  const withRowActionLock = useCallback(
+    async (action: QueueItemAction, previousStatus: ModelInstallStatus | undefined, fn: () => Promise<void>) => {
+      if (actionInFlightRef.current) {
+        return;
+      }
+
+      actionInFlightRef.current = action;
+      setActionInFlight(action);
+      setOptimisticStatus({ status: OPTIMISTIC_STATUS_BY_ACTION[action], previousStatus });
+
+      try {
+        await fn();
+      } finally {
+        actionInFlightRef.current = null;
+        setActionInFlight(null);
+      }
+    },
+    []
+  );
+
   const handleDeleteModelImport = useCallback(() => {
-    deleteImportModel(installJob.id)
-      .unwrap()
-      .then((_) => {
+    void withRowActionLock('cancel', installJob.status, async () => {
+      try {
+        await deleteImportModel(installJob.id).unwrap();
         toast({
           id: 'MODEL_INSTALL_CANCELED',
           title: t('toast.modelImportCanceled'),
           status: 'success',
         });
-      })
-      .catch((error) => {
+      } catch (error) {
+        setOptimisticStatus(null);
         toast({
           id: 'MODEL_INSTALL_CANCEL_FAILED',
           title: getApiErrorDetail(error),
           status: 'error',
         });
-      });
-  }, [deleteImportModel, installJob, t]);
+      }
+    });
+  }, [deleteImportModel, installJob.id, installJob.status, t, withRowActionLock]);
 
   const handlePauseModelInstall = useCallback(() => {
-    pauseModelInstall(installJob.id)
-      .unwrap()
-      .then(() => {
+    void withRowActionLock('pause', installJob.status, async () => {
+      try {
+        await pauseModelInstall(installJob.id).unwrap();
         toast({
           id: 'MODEL_INSTALL_PAUSED',
           title: t('toast.modelDownloadPaused'),
           status: 'success',
         });
-      })
-      .catch((error) => {
+      } catch (error) {
+        setOptimisticStatus(null);
         toast({
           id: 'MODEL_INSTALL_PAUSE_FAILED',
           title: getApiErrorDetail(error),
           status: 'error',
         });
-      });
-  }, [installJob, pauseModelInstall, t]);
+      }
+    });
+  }, [installJob.id, installJob.status, pauseModelInstall, t, withRowActionLock]);
 
   const hasRestartedFromScratch = useCallback((job: ModelInstallJob) => {
     return (
@@ -149,9 +200,9 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
   }, []);
 
   const handleResumeModelInstall = useCallback(() => {
-    resumeModelInstall(installJob.id)
-      .unwrap()
-      .then((job) => {
+    void withRowActionLock('resume', installJob.status, async () => {
+      try {
+        const job = await resumeModelInstall(installJob.id).unwrap();
         const restartedFromScratch = hasRestartedFromScratch(job);
         if (restartedFromScratch && !resumeFromScratchShown.current) {
           resumeFromScratchShown.current = true;
@@ -167,55 +218,58 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
           title: t('toast.modelDownloadResumed'),
           status: 'success',
         });
-      })
-      .catch((error) => {
+      } catch (error) {
+        setOptimisticStatus(null);
         toast({
           id: 'MODEL_INSTALL_RESUME_FAILED',
           title: getApiErrorDetail(error),
           status: 'error',
         });
-      });
-  }, [hasRestartedFromScratch, installJob, resumeModelInstall, t]);
+      }
+    });
+  }, [hasRestartedFromScratch, installJob.id, installJob.status, resumeModelInstall, t, withRowActionLock]);
 
   const handleRestartFailed = useCallback(() => {
-    restartFailedModelInstall(installJob.id)
-      .unwrap()
-      .then(() => {
+    void withRowActionLock('restartFailed', installJob.status, async () => {
+      try {
+        await restartFailedModelInstall(installJob.id).unwrap();
         toast({
           id: 'MODEL_INSTALL_RESTART_FAILED',
           title: t('toast.modelDownloadRestartFailed'),
           status: 'success',
         });
-      })
-      .catch((error) => {
+      } catch (error) {
+        setOptimisticStatus(null);
         toast({
           id: 'MODEL_INSTALL_RESTART_FAILED_ERROR',
           title: getApiErrorDetail(error),
           status: 'error',
         });
-      });
-  }, [installJob.id, restartFailedModelInstall, t]);
+      }
+    });
+  }, [installJob.id, installJob.status, restartFailedModelInstall, t, withRowActionLock]);
 
   const handleRestartFile = useCallback(
     (fileSource: string) => {
-      restartModelInstallFile({ id: installJob.id, file_source: fileSource })
-        .unwrap()
-        .then(() => {
+      void withRowActionLock('restartFile', installJob.status, async () => {
+        try {
+          await restartModelInstallFile({ id: installJob.id, file_source: fileSource }).unwrap();
           toast({
             id: 'MODEL_INSTALL_RESTART_FILE',
             title: t('toast.modelDownloadRestartFile'),
             status: 'success',
           });
-        })
-        .catch((error) => {
+        } catch (error) {
+          setOptimisticStatus(null);
           toast({
             id: 'MODEL_INSTALL_RESTART_FILE_ERROR',
             title: getApiErrorDetail(error),
             status: 'error',
           });
-        });
+        }
+      });
     },
-    [installJob.id, restartModelInstallFile, t]
+    [installJob.id, installJob.status, restartModelInstallFile, t, withRowActionLock]
   );
 
   const getRestartFileHandler = useCallback(
@@ -236,6 +290,8 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     }
   }, [installJob.source, t]);
 
+  const displayStatus = optimisticStatus?.status ?? installJob.status;
+
   const modelName = useMemo(() => {
     switch (installJob.source.type) {
       case 'hf': {
@@ -248,14 +304,14 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       case 'url':
         return installJob.source.url.split('/').slice(-1)[0] ?? t('common.unknown');
       case 'local':
-        return installJob.source.path.split('\\').slice(-1)[0] ?? t('common.unknown');
+        return installJob.source.path.split(/[/\\]/).slice(-1)[0] ?? t('common.unknown');
       default:
         return t('common.unknown');
     }
   }, [installJob.source, t]);
 
   const progressValue = useMemo(() => {
-    if (installJob.status === 'completed' || installJob.status === 'error' || installJob.status === 'cancelled') {
+    if (displayStatus === 'completed' || displayStatus === 'error' || displayStatus === 'cancelled') {
       return 100;
     }
 
@@ -276,10 +332,10 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     }
 
     return null;
-  }, [installJob.bytes, installJob.download_parts, installJob.status, installJob.total_bytes]);
+  }, [displayStatus, installJob.bytes, installJob.download_parts, installJob.total_bytes]);
 
   const progressTooltip = useMemo(() => {
-    if (installJob.status !== 'downloading') {
+    if (displayStatus !== 'downloading' && displayStatus !== 'downloads_done') {
       return '';
     }
     const parts = installJob.download_parts;
@@ -297,7 +353,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       return `${formatBytes(installJob.bytes)} / ${formatBytes(installJob.total_bytes)}`;
     }
     return '';
-  }, [installJob.bytes, installJob.download_parts, installJob.total_bytes, installJob.status]);
+  }, [displayStatus, installJob.bytes, installJob.download_parts, installJob.total_bytes]);
 
   const restartRequiredParts = useMemo(() => {
     return installJob.download_parts?.filter((part) => part.resume_required || part.status === 'error') ?? [];
@@ -318,26 +374,36 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     }
   }, [hasRestartedFromScratch, installJob, t]);
 
-  const hasRestartRequired = restartRequiredParts.length > 0;
+  const hasRestartRequired = isRestartableStatus(displayStatus) && restartRequiredParts.length > 0;
 
-  const canPause = installJob.status === 'downloading' || installJob.status === 'waiting';
-  const canResume = installJob.status === 'paused' && !hasRestartRequired;
+  const canPause = displayStatus === 'downloading' || displayStatus === 'waiting';
+  const canResume = displayStatus === 'paused' && !hasRestartRequired;
   const canCancel =
-    installJob.status === 'downloading' ||
-    installJob.status === 'waiting' ||
-    installJob.status === 'running' ||
-    installJob.status === 'paused';
+    displayStatus === 'downloading' ||
+    displayStatus === 'waiting' ||
+    displayStatus === 'downloads_done' ||
+    displayStatus === 'running' ||
+    displayStatus === 'paused';
+
+  const isActiveInstall =
+    displayStatus === 'downloading' ||
+    displayStatus === 'waiting' ||
+    displayStatus === 'downloads_done' ||
+    displayStatus === 'running';
+
+  const hasVisibleError = displayStatus === 'error' ? installJob.error : null;
+  const isActionInFlight = actionInFlight !== null;
 
   const showDisconnectedIndicator =
     !isConnected &&
-    (installJob.status === 'downloading' || installJob.status === 'waiting' || installJob.status === 'running');
+    isActiveInstall;
 
   return (
     <Tr>
       {/* Progress */}
       <Td>
         <Flex sx={ProgressColumnSx}>
-          {installJob.status === 'downloading' || installJob.status === 'waiting' || installJob.status === 'running' ? (
+          {isActiveInstall ? (
             <Tooltip label={progressTooltip} isDisabled={!progressTooltip} hasArrow openDelay={0}>
               <CircularProgress
                 size="20px"
@@ -345,23 +411,24 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
                 isIndeterminate={
                   !isConnected ||
                   progressValue === null ||
-                  installJob.status === 'waiting' ||
-                  installJob.status === 'running'
+                  displayStatus === 'waiting' ||
+                  displayStatus === 'downloads_done' ||
+                  displayStatus === 'running'
                 }
                 aria-label={t('accessibility.invokeProgressBar')}
                 sx={CircularProgressSx}
                 thickness={12}
               />
             </Tooltip>
-          ) : installJob.status === 'paused' ? (
+          ) : displayStatus === 'paused' ? (
             <Flex sx={{ color: 'orange.300' }}>
               <PiPauseFill size={16} />
             </Flex>
-          ) : installJob.status === 'cancelled' ? (
+          ) : displayStatus === 'cancelled' ? (
             <Flex sx={{ color: 'orange.200' }}>
               <PiMinusBold size={16} />
             </Flex>
-          ) : installJob.status === 'error' ? (
+          ) : displayStatus === 'error' ? (
             <Flex sx={{ color: 'red.300' }}>
               <PiXBold size={16} />
             </Flex>
@@ -377,13 +444,13 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
       <Td>
         <Flex sx={ModelInfoColumnSx}>
           <Text fontWeight="semibold">{modelName}</Text>
-          <Text fontStyle="italic" fontSize="2xs" noOfLines={1}>
+          <Text fontStyle="italic" fontSize="2xs">
             {sourceLocation}
           </Text>
           {hasRestartRequired && (
             <Flex direction="column" gap={1} w="full" mt={1}>
               {restartRequiredParts.map((part) => {
-                const fileName = part.source.split('/').slice(-1)[0] ?? t('common.unknown');
+                const fileName = part.source.split(/[/\\]/).slice(-1)[0] ?? t('common.unknown');
                 const isResumeRequired = part.resume_required;
                 return (
                   <Flex key={part.source} gap={2} alignItems="center" wrap="wrap" p={2} bg="base.800" borderRadius="md">
@@ -408,6 +475,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
                       onClick={getRestartFileHandler(part.source)}
                       variant="ghost"
                       ml="auto"
+                      isDisabled={isActionInFlight}
                     />
                   </Flex>
                 );
@@ -427,7 +495,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
               </Box>
             </Tooltip>
           )}
-          <ModelInstallQueueBadge status={installJob.status} label={installJob.error} />
+          <ModelInstallQueueBadge status={displayStatus} label={hasVisibleError} />
           {hasRestartRequired && (
             <Tooltip label={t('modelManager.restartRequiredTooltip')}>
               <Box>
@@ -449,6 +517,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
               leftIcon={canResume ? <PiPlayFill /> : <PiPauseFill />}
               onClick={canResume ? handleResumeModelInstall : handlePauseModelInstall}
               variant={canResume ? 'solid' : 'outline'}
+              isDisabled={isActionInFlight}
             >
               {canResume ? t('modelManager.resume') : t('modelManager.pause')}
             </Button>
@@ -463,6 +532,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
               onClick={handleRestartFailed}
               colorScheme="error"
               variant="ghost"
+              isDisabled={isActionInFlight}
             >
               {t('modelManager.restartFailed')}
             </Button>
@@ -477,6 +547,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
               onClick={handleDeleteModelImport}
               size="sm"
               colorScheme="error"
+              isDisabled={isActionInFlight}
             />
           )}
 
