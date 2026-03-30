@@ -22,14 +22,14 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "qwen_image_i2l",
-    title="Image to Latents - Qwen Image Edit",
+    title="Image to Latents - Qwen Image",
     tags=["image", "latents", "vae", "i2l", "qwen_image"],
     category="image",
     version="1.0.0",
     classification=Classification.Prototype,
 )
 class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
-    """Generates latents from an image using the Qwen Image Edit VAE."""
+    """Generates latents from an image using the Qwen Image VAE."""
 
     image: ImageField = InputField(description="The image to encode.")
     vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection)
@@ -51,7 +51,7 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
 
             image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
             with torch.inference_mode():
-                # The Qwen Image Edit VAE expects 5D input: (B, C, num_frames, H, W)
+                # The Qwen Image VAE expects 5D input: (B, C, num_frames, H, W)
                 if image_tensor.dim() == 4:
                     image_tensor = image_tensor.unsqueeze(2)
 

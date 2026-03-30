@@ -36,14 +36,14 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "qwen_image_denoise",
-    title="Denoise - Qwen Image Edit",
+    title="Denoise - Qwen Image",
     tags=["image", "qwen_image"],
     category="image",
     version="1.0.0",
     classification=Classification.Prototype,
 )
 class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
-    """Run the denoising process with a Qwen Image Edit model."""
+    """Run the denoising process with a Qwen Image model."""
 
     # If latents is provided, this means we are doing image-to-image.
     latents: Optional[LatentsField] = InputField(
@@ -270,7 +270,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # Try to load the scheduler config from the model's directory (Diffusers models
         # have a scheduler/ subdir). For GGUF models this path doesn't exist, so fall
-        # back to instantiating the scheduler with the known Qwen Image Edit defaults.
+        # back to instantiating the scheduler with the known Qwen Image defaults.
         model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
         scheduler_path = model_path / "scheduler"
         if scheduler_path.is_dir() and (scheduler_path / "scheduler_config.json").exists():

@@ -263,12 +263,6 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
-  if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
-    if (!params.qwenImageComponentSource) {
-      reasons.push({ content: i18n.t('parameters.invoke.noQwenImageComponentSourceSelected') });
-    }
-  }
-
   if (model?.base === 'z-image') {
     // Check if VAE source is available (either separate VAE or Qwen3 Source)
     const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;

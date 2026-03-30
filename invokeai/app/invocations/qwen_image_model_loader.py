@@ -20,7 +20,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, 
 
 @invocation_output("qwen_image_model_loader_output")
 class QwenImageModelLoaderOutput(BaseInvocationOutput):
-    """Qwen Image Edit base model loader output."""
+    """Qwen Image model loader output."""
 
     transformer: TransformerField = OutputField(description=FieldDescriptions.transformer, title="Transformer")
     qwen_vl_encoder: QwenVLEncoderField = OutputField(
@@ -31,14 +31,14 @@ class QwenImageModelLoaderOutput(BaseInvocationOutput):
 
 @invocation(
     "qwen_image_model_loader",
-    title="Main Model - Qwen Image Edit",
+    title="Main Model - Qwen Image",
     tags=["model", "qwen_image"],
     category="model",
     version="1.1.0",
     classification=Classification.Prototype,
 )
 class QwenImageModelLoaderInvocation(BaseInvocation):
-    """Loads a Qwen Image Edit model, outputting its submodels.
+    """Loads a Qwen Image model, outputting its submodels.
 
     The transformer is always loaded from the main model (Diffusers or GGUF).
 
@@ -59,7 +59,7 @@ class QwenImageModelLoaderInvocation(BaseInvocation):
 
     component_source: Optional[ModelIdentifierField] = InputField(
         default=None,
-        description="Diffusers Qwen Image Edit model to extract the VAE and Qwen VL encoder from. "
+        description="Diffusers Qwen Image model to extract the VAE and Qwen VL encoder from. "
         "Required when using a GGUF quantized transformer. "
         "Ignored when the main model is already in Diffusers format.",
         input=Input.Direct,
@@ -96,7 +96,7 @@ class QwenImageModelLoaderInvocation(BaseInvocation):
             raise ValueError(
                 "No source for VAE and Qwen VL encoder. "
                 "GGUF quantized models only contain the transformer — "
-                "please set 'Component Source' to a Diffusers Qwen Image Edit model "
+                "please set 'Component Source' to a Diffusers Qwen Image model "
                 "to provide the VAE and text encoder."
             )
 

@@ -23,14 +23,14 @@ from invokeai.backend.util.devices import TorchDevice
 
 @invocation(
     "qwen_image_l2i",
-    title="Latents to Image - Qwen Image Edit",
+    title="Latents to Image - Qwen Image",
     tags=["latents", "image", "vae", "l2i", "qwen_image"],
     category="latents",
     version="1.0.0",
     classification=Classification.Prototype,
 )
 class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
-    """Generates an image from latents using the Qwen Image Edit VAE."""
+    """Generates an image from latents using the Qwen Image VAE."""
 
     latents: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection)
@@ -56,7 +56,7 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
             TorchDevice.empty_cache()
 
             with torch.inference_mode(), tiling_context:
-                # The Qwen Image Edit VAE uses per-channel latents_mean / latents_std
+                # The Qwen Image VAE uses per-channel latents_mean / latents_std
                 # instead of a single scaling_factor.
                 # Latents are 5D: (B, C, num_frames, H, W) — the unpack from the
                 # denoise step already produces this shape.
