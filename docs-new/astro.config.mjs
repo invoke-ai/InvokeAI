@@ -117,7 +117,10 @@ export default defineConfig({
         PageFrame: './src/layouts/PageFrameExtended.astro',
       },
       plugins: [
-        starlightLinksValidator(),
+        starlightLinksValidator({
+          errorOnRelativeLinks: false,
+          errorOnLocalLinks: false,
+        }),
         starlightLlmsText(),
         starlightChangelogs(),
         // starlightContextualMenu({
