@@ -15,7 +15,9 @@ def _make_model_id(**kwargs) -> ModelIdentifierField:
     return ModelIdentifierField(**defaults)
 
 
-def _make_mock_context(main_format: ModelFormat = ModelFormat.Diffusers, source_format: ModelFormat = ModelFormat.Diffusers):
+def _make_mock_context(
+    main_format: ModelFormat = ModelFormat.Diffusers, source_format: ModelFormat = ModelFormat.Diffusers
+):
     """Create a mock InvocationContext that returns configs with the given formats."""
     context = MagicMock()
 

@@ -1,6 +1,5 @@
 """Tests for the Qwen Image denoise invocation."""
 
-
 import pytest
 
 from invokeai.app.invocations.qwen_image_denoise import QwenImageDenoiseInvocation
@@ -46,7 +45,7 @@ class TestComputeSigmas:
         inv = QwenImageDenoiseInvocation.model_construct()
         sigmas = inv._compute_sigmas(image_seq_len=4096, num_steps=10, shift_override=None)
         for i in range(len(sigmas) - 1):
-            assert sigmas[i] > sigmas[i + 1], f"Sigma at {i} ({sigmas[i]}) not > sigma at {i+1} ({sigmas[i+1]})"
+            assert sigmas[i] > sigmas[i + 1], f"Sigma at {i} ({sigmas[i]}) not > sigma at {i + 1} ({sigmas[i + 1]})"
 
     def test_shift_override_changes_schedule(self):
         """A shift override should produce different sigma values than the default."""
@@ -59,9 +58,9 @@ class TestComputeSigmas:
         assert default_sigmas[0] == shifted_sigmas[0] == 1.0
         assert default_sigmas[-1] == shifted_sigmas[-1] == 0.0
         # At least one intermediate value should differ
-        assert any(
-            abs(d - s) > 1e-6 for d, s in zip(default_sigmas[1:-1], shifted_sigmas[1:-1], strict=False)
-        ), "Shift override should change intermediate sigma values"
+        assert any(abs(d - s) > 1e-6 for d, s in zip(default_sigmas[1:-1], shifted_sigmas[1:-1], strict=False)), (
+            "Shift override should change intermediate sigma values"
+        )
 
     def test_shift_override_uses_log(self):
         """With shift_override=3.0, mu should be log(3)."""
