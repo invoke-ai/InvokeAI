@@ -15,7 +15,7 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 @invocation_output("qwen_image_lora_loader_output")
 class QwenImageLoRALoaderOutput(BaseInvocationOutput):
-    """Qwen Image Edit LoRA Loader Output"""
+    """Qwen Image LoRA Loader Output"""
 
     transformer: Optional[TransformerField] = OutputField(
         default=None, description=FieldDescriptions.transformer, title="Transformer"
@@ -24,14 +24,14 @@ class QwenImageLoRALoaderOutput(BaseInvocationOutput):
 
 @invocation(
     "qwen_image_lora_loader",
-    title="Apply LoRA - Qwen Image Edit",
+    title="Apply LoRA - Qwen Image",
     tags=["lora", "model", "qwen_image"],
     category="model",
     version="1.0.0",
     classification=Classification.Prototype,
 )
 class QwenImageLoRALoaderInvocation(BaseInvocation):
-    """Apply a LoRA model to a Qwen Image Edit transformer."""
+    """Apply a LoRA model to a Qwen Image transformer."""
 
     lora: ModelIdentifierField = InputField(
         description=FieldDescriptions.lora_model,
@@ -72,14 +72,14 @@ class QwenImageLoRALoaderInvocation(BaseInvocation):
 
 @invocation(
     "qwen_image_lora_collection_loader",
-    title="Apply LoRA Collection - Qwen Image Edit",
+    title="Apply LoRA Collection - Qwen Image",
     tags=["lora", "model", "qwen_image"],
     category="model",
     version="1.0.0",
     classification=Classification.Prototype,
 )
 class QwenImageLoRACollectionLoader(BaseInvocation):
-    """Applies a collection of LoRAs to a Qwen Image Edit transformer."""
+    """Applies a collection of LoRAs to a Qwen Image transformer."""
 
     loras: Optional[LoRAField | list[LoRAField]] = InputField(
         default=None, description="LoRA models and weights. May be a single LoRA or collection.", title="LoRAs"

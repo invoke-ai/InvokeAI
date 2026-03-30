@@ -63,14 +63,14 @@ def _build_prompt(user_prompt: str, num_images: int) -> str:
 
 @invocation(
     "qwen_image_text_encoder",
-    title="Prompt - Qwen Image Edit",
+    title="Prompt - Qwen Image",
     tags=["prompt", "conditioning", "qwen_image"],
     category="conditioning",
     version="1.2.0",
     classification=Classification.Prototype,
 )
 class QwenImageTextEncoderInvocation(BaseInvocation):
-    """Encodes text and reference images for Qwen Image Edit using Qwen2.5-VL."""
+    """Encodes text and reference images for Qwen Image using Qwen2.5-VL."""
 
     prompt: str = InputField(description="Text prompt describing the desired edit.", ui_component=UIComponent.Textarea)
     reference_images: list[ImageField] = InputField(

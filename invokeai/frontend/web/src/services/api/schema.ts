@@ -22749,8 +22749,8 @@ export type components = {
             type: "qwen_image_conditioning_output";
         };
         /**
-         * Denoise - Qwen Image Edit
-         * @description Run the denoising process with a Qwen Image Edit model.
+         * Denoise - Qwen Image
+         * @description Run the denoising process with a Qwen Image model.
          */
         QwenImageDenoiseInvocation: {
             /**
@@ -22867,8 +22867,8 @@ export type components = {
             type: "qwen_image_denoise";
         };
         /**
-         * Image to Latents - Qwen Image Edit
-         * @description Generates latents from an image using the Qwen Image Edit VAE.
+         * Image to Latents - Qwen Image
+         * @description Generates latents from an image using the Qwen Image VAE.
          */
         QwenImageImageToLatentsInvocation: {
             /**
@@ -22928,8 +22928,8 @@ export type components = {
             type: "qwen_image_i2l";
         };
         /**
-         * Latents to Image - Qwen Image Edit
-         * @description Generates an image from latents using the Qwen Image Edit VAE.
+         * Latents to Image - Qwen Image
+         * @description Generates an image from latents using the Qwen Image VAE.
          */
         QwenImageLatentsToImageInvocation: {
             /**
@@ -22977,8 +22977,8 @@ export type components = {
             type: "qwen_image_l2i";
         };
         /**
-         * Apply LoRA Collection - Qwen Image Edit
-         * @description Applies a collection of LoRAs to a Qwen Image Edit transformer.
+         * Apply LoRA Collection - Qwen Image
+         * @description Applies a collection of LoRAs to a Qwen Image transformer.
          */
         QwenImageLoRACollectionLoader: {
             /**
@@ -23018,8 +23018,8 @@ export type components = {
             type: "qwen_image_lora_collection_loader";
         };
         /**
-         * Apply LoRA - Qwen Image Edit
-         * @description Apply a LoRA model to a Qwen Image Edit transformer.
+         * Apply LoRA - Qwen Image
+         * @description Apply a LoRA model to a Qwen Image transformer.
          */
         QwenImageLoRALoaderInvocation: {
             /**
@@ -23066,7 +23066,7 @@ export type components = {
         };
         /**
          * QwenImageLoRALoaderOutput
-         * @description Qwen Image Edit LoRA Loader Output
+         * @description Qwen Image LoRA Loader Output
          */
         QwenImageLoRALoaderOutput: {
             /**
@@ -23083,8 +23083,8 @@ export type components = {
             type: "qwen_image_lora_loader_output";
         };
         /**
-         * Main Model - Qwen Image Edit
-         * @description Loads a Qwen Image Edit model, outputting its submodels.
+         * Main Model - Qwen Image
+         * @description Loads a Qwen Image model, outputting its submodels.
          *
          *     The transformer is always loaded from the main model (Diffusers or GGUF).
          *
@@ -23119,7 +23119,7 @@ export type components = {
             model: components["schemas"]["ModelIdentifierField"];
             /**
              * Component Source (Diffusers)
-             * @description Diffusers Qwen Image Edit model to extract the VAE and Qwen VL encoder from. Required when using a GGUF quantized transformer. Ignored when the main model is already in Diffusers format.
+             * @description Diffusers Qwen Image model to extract the VAE and Qwen VL encoder from. Required when using a GGUF quantized transformer. Ignored when the main model is already in Diffusers format.
              * @default null
              */
             component_source?: components["schemas"]["ModelIdentifierField"] | null;
@@ -23132,7 +23132,7 @@ export type components = {
         };
         /**
          * QwenImageModelLoaderOutput
-         * @description Qwen Image Edit base model loader output.
+         * @description Qwen Image model loader output.
          */
         QwenImageModelLoaderOutput: {
             /**
@@ -23158,8 +23158,8 @@ export type components = {
             type: "qwen_image_model_loader_output";
         };
         /**
-         * Prompt - Qwen Image Edit
-         * @description Encodes text and reference images for Qwen Image Edit using Qwen2.5-VL.
+         * Prompt - Qwen Image
+         * @description Encodes text and reference images for Qwen Image using Qwen2.5-VL.
          */
         QwenImageTextEncoderInvocation: {
             /**
