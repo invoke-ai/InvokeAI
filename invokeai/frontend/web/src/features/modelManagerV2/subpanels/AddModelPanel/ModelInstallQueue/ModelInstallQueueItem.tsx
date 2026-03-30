@@ -394,9 +394,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
   const hasVisibleError = displayStatus === 'error' ? installJob.error : null;
   const isActionInFlight = actionInFlight !== null;
 
-  const showDisconnectedIndicator =
-    !isConnected &&
-    isActiveInstall;
+  const showDisconnectedIndicator = !isConnected && isActiveInstall;
 
   return (
     <Tr>
