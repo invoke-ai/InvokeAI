@@ -59,13 +59,16 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     quantization: params.qwenImageQuantization,
   });
 
-  // Negative conditioning with a blank prompt for CFG
-  const negCond = g.addNode({
-    type: 'qwen_image_text_encoder',
-    id: getPrefixedId('neg_prompt'),
-    prompt: prompts.negative || ' ',
-    quantization: params.qwenImageQuantization,
-  });
+  // Negative conditioning for CFG (only when cfg_scale > 1)
+  const useCfg = typeof cfg_scale === 'number' ? cfg_scale > 1 : true;
+  const negCond = useCfg
+    ? g.addNode({
+        type: 'qwen_image_text_encoder',
+        id: getPrefixedId('neg_prompt'),
+        prompt: prompts.negative || ' ',
+        quantization: params.qwenImageQuantization,
+      })
+    : null;
 
   const seed = g.addNode({
     id: getPrefixedId('seed'),
@@ -85,13 +88,15 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
 
   g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
   g.addEdge(modelLoader, 'qwen_vl_encoder', posCond, 'qwen_vl_encoder');
-  g.addEdge(modelLoader, 'qwen_vl_encoder', negCond, 'qwen_vl_encoder');
   g.addEdge(modelLoader, 'vae', l2i, 'vae');
 
   g.addEdge(positivePrompt, 'value', posCond, 'prompt');
   g.addEdge(posCond, 'conditioning', denoise, 'positive_conditioning');
 
-  g.addEdge(negCond, 'conditioning', denoise, 'negative_conditioning');
+  if (negCond) {
+    g.addEdge(modelLoader, 'qwen_vl_encoder', negCond, 'qwen_vl_encoder');
+    g.addEdge(negCond, 'conditioning', denoise, 'negative_conditioning');
+  }
 
   g.addEdge(seed, 'value', denoise, 'seed');
   g.addEdge(denoise, 'latents', l2i, 'latents');
