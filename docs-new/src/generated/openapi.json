@@ -4998,15 +4998,15 @@
         "properties": {
           "collection": {
             "default": [],
-            "description": "The collection, will be provided on execution",
+            "description": "An optional collection to append to",
             "field_kind": "input",
-            "input": "any",
+            "input": "connection",
             "items": {},
             "orig_default": [],
             "orig_required": false,
             "title": "Collection",
             "type": "array",
-            "ui_hidden": true
+            "ui_type": "CollectionField"
           },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
@@ -5062,7 +5062,7 @@
         ],
         "title": "CollectInvocation",
         "type": "object",
-        "version": "1.0.0"
+        "version": "1.1.0"
       },
       "CollectInvocationOutput": {
         "class": "output",
