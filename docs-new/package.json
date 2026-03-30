@@ -12,12 +12,12 @@
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/markdoc": "^1.0.0",
-    "@astrojs/starlight": "^0.38.1",
+    "@astrojs/markdoc": "^1.0.3",
+    "@astrojs/starlight": "^0.38.2",
     "@astrojs/starlight-markdoc": "^0.6.0",
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/roboto-mono": "^5.2.8",
-    "astro": "^6.0.4",
+    "astro": "^6.1.2",
     "mermaid": "^11.12.3",
     "rehype-external-links": "^3.0.0",
     "sharp": "^0.34.2",
