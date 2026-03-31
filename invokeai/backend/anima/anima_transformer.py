@@ -396,9 +396,9 @@ class FinalLayer(nn.Module):
     ) -> torch.Tensor:
         if self.use_adaln_lora:
             assert adaln_lora_B_T_3D is not None
-            shift, scale = (
-                self.adaln_modulation(emb_B_T_D) + adaln_lora_B_T_3D[:, :, : 2 * self.hidden_size]
-            ).chunk(2, dim=-1)
+            shift, scale = (self.adaln_modulation(emb_B_T_D) + adaln_lora_B_T_3D[:, :, : 2 * self.hidden_size]).chunk(
+                2, dim=-1
+            )
         else:
             shift, scale = self.adaln_modulation(emb_B_T_D).chunk(2, dim=-1)
 
@@ -441,13 +441,19 @@ class DiTBlock(nn.Module):
         # AdaLN modulation layers (shift, scale, gate for each of 3 components)
         if use_adaln_lora:
             self.adaln_modulation_self_attn = nn.Sequential(
-                nn.SiLU(), nn.Linear(x_dim, adaln_lora_dim, bias=False), nn.Linear(adaln_lora_dim, 3 * x_dim, bias=False)
+                nn.SiLU(),
+                nn.Linear(x_dim, adaln_lora_dim, bias=False),
+                nn.Linear(adaln_lora_dim, 3 * x_dim, bias=False),
             )
             self.adaln_modulation_cross_attn = nn.Sequential(
-                nn.SiLU(), nn.Linear(x_dim, adaln_lora_dim, bias=False), nn.Linear(adaln_lora_dim, 3 * x_dim, bias=False)
+                nn.SiLU(),
+                nn.Linear(x_dim, adaln_lora_dim, bias=False),
+                nn.Linear(adaln_lora_dim, 3 * x_dim, bias=False),
             )
             self.adaln_modulation_mlp = nn.Sequential(
-                nn.SiLU(), nn.Linear(x_dim, adaln_lora_dim, bias=False), nn.Linear(adaln_lora_dim, 3 * x_dim, bias=False)
+                nn.SiLU(),
+                nn.Linear(x_dim, adaln_lora_dim, bias=False),
+                nn.Linear(adaln_lora_dim, 3 * x_dim, bias=False),
             )
         else:
             self.adaln_modulation_self_attn = nn.Sequential(nn.SiLU(), nn.Linear(x_dim, 3 * x_dim, bias=False))
@@ -472,15 +478,13 @@ class DiTBlock(nn.Module):
         # Compute AdaLN modulations
         if self.use_adaln_lora:
             assert adaln_lora_B_T_3D is not None
-            shift_sa, scale_sa, gate_sa = (
-                self.adaln_modulation_self_attn(emb_B_T_D) + adaln_lora_B_T_3D
-            ).chunk(3, dim=-1)
-            shift_ca, scale_ca, gate_ca = (
-                self.adaln_modulation_cross_attn(emb_B_T_D) + adaln_lora_B_T_3D
-            ).chunk(3, dim=-1)
-            shift_mlp, scale_mlp, gate_mlp = (
-                self.adaln_modulation_mlp(emb_B_T_D) + adaln_lora_B_T_3D
-            ).chunk(3, dim=-1)
+            shift_sa, scale_sa, gate_sa = (self.adaln_modulation_self_attn(emb_B_T_D) + adaln_lora_B_T_3D).chunk(
+                3, dim=-1
+            )
+            shift_ca, scale_ca, gate_ca = (self.adaln_modulation_cross_attn(emb_B_T_D) + adaln_lora_B_T_3D).chunk(
+                3, dim=-1
+            )
+            shift_mlp, scale_mlp, gate_mlp = (self.adaln_modulation_mlp(emb_B_T_D) + adaln_lora_B_T_3D).chunk(3, dim=-1)
         else:
             shift_sa, scale_sa, gate_sa = self.adaln_modulation_self_attn(emb_B_T_D).chunk(3, dim=-1)
             shift_ca, scale_ca, gate_ca = self.adaln_modulation_cross_attn(emb_B_T_D).chunk(3, dim=-1)
@@ -499,16 +503,28 @@ class DiTBlock(nn.Module):
         # Self-attention
         normed = _adaln(x_B_T_H_W_D, self.layer_norm_self_attn, scale_sa, shift_sa)
         result = rearrange(
-            self.self_attn(rearrange(normed.to(compute_dtype), "b t h w d -> b (t h w) d"), None, rope_emb=rope_emb_L_1_1_D),
-            "b (t h w) d -> b t h w d", t=T, h=H, w=W,
+            self.self_attn(
+                rearrange(normed.to(compute_dtype), "b t h w d -> b (t h w) d"), None, rope_emb=rope_emb_L_1_1_D
+            ),
+            "b (t h w) d -> b t h w d",
+            t=T,
+            h=H,
+            w=W,
         )
         x_B_T_H_W_D = x_B_T_H_W_D + gate_sa.to(residual_dtype) * result.to(residual_dtype)
 
         # Cross-attention
         normed = _adaln(x_B_T_H_W_D, self.layer_norm_cross_attn, scale_ca, shift_ca)
         result = rearrange(
-            self.cross_attn(rearrange(normed.to(compute_dtype), "b t h w d -> b (t h w) d"), crossattn_emb, rope_emb=rope_emb_L_1_1_D),
-            "b (t h w) d -> b t h w d", t=T, h=H, w=W,
+            self.cross_attn(
+                rearrange(normed.to(compute_dtype), "b t h w d -> b (t h w) d"),
+                crossattn_emb,
+                rope_emb=rope_emb_L_1_1_D,
+            ),
+            "b (t h w) d -> b t h w d",
+            t=T,
+            h=H,
+            w=W,
         )
         x_B_T_H_W_D = result.to(residual_dtype) * gate_ca.to(residual_dtype) + x_B_T_H_W_D
 
@@ -635,17 +651,19 @@ class MiniTrainDIT(nn.Module):
         )
 
         # Transformer blocks
-        self.blocks = nn.ModuleList([
-            DiTBlock(
-                x_dim=model_channels,
-                context_dim=crossattn_emb_channels,
-                num_heads=num_heads,
-                mlp_ratio=mlp_ratio,
-                use_adaln_lora=use_adaln_lora,
-                adaln_lora_dim=adaln_lora_dim,
-            )
-            for _ in range(num_blocks)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                DiTBlock(
+                    x_dim=model_channels,
+                    context_dim=crossattn_emb_channels,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    use_adaln_lora=use_adaln_lora,
+                    adaln_lora_dim=adaln_lora_dim,
+                )
+                for _ in range(num_blocks)
+            ]
+        )
 
         # Final output layer
         self.final_layer = FinalLayer(
@@ -676,8 +694,12 @@ class MiniTrainDIT(nn.Module):
         if self.concat_padding_mask:
             if padding_mask is None:
                 padding_mask = torch.zeros(
-                    x_B_C_T_H_W.shape[0], 1, x_B_C_T_H_W.shape[3], x_B_C_T_H_W.shape[4],
-                    dtype=x_B_C_T_H_W.dtype, device=x_B_C_T_H_W.device,
+                    x_B_C_T_H_W.shape[0],
+                    1,
+                    x_B_C_T_H_W.shape[3],
+                    x_B_C_T_H_W.shape[4],
+                    dtype=x_B_C_T_H_W.dtype,
+                    device=x_B_C_T_H_W.device,
                 )
             x_B_C_T_H_W = torch.cat(
                 [x_B_C_T_H_W, padding_mask.unsqueeze(1).repeat(1, 1, x_B_C_T_H_W.shape[2], 1, 1)], dim=1
@@ -687,7 +709,9 @@ class MiniTrainDIT(nn.Module):
 
         extra_pos_emb = None
         if self.extra_per_block_abs_pos_emb:
-            extra_pos_emb = self.extra_pos_embedder(x_B_T_H_W_D, fps=fps, device=x_B_C_T_H_W.device, dtype=x_B_C_T_H_W.dtype)
+            extra_pos_emb = self.extra_pos_embedder(
+                x_B_T_H_W_D, fps=fps, device=x_B_C_T_H_W.device, dtype=x_B_C_T_H_W.dtype
+            )
 
         if "rope" in self.pos_emb_cls.lower():
             return x_B_T_H_W_D, self.pos_embedder(x_B_T_H_W_D, fps=fps, device=x_B_C_T_H_W.device), extra_pos_emb
@@ -715,7 +739,9 @@ class MiniTrainDIT(nn.Module):
         orig_shape = list(x.shape)
         x = self._pad_to_patch_size(x)
 
-        x_B_T_H_W_D, rope_emb_L_1_1_D, extra_pos_emb = self.prepare_embedded_sequence(x, fps=fps, padding_mask=padding_mask)
+        x_B_T_H_W_D, rope_emb_L_1_1_D, extra_pos_emb = self.prepare_embedded_sequence(
+            x, fps=fps, padding_mask=padding_mask
+        )
 
         if timesteps.ndim == 1:
             timesteps = timesteps.unsqueeze(1)
@@ -767,14 +793,10 @@ class LLMAdapterRotaryEmbedding(nn.Module):
         half_dim = head_dim // 2
         index = torch.arange(half_dim, dtype=torch.float32)
         exponent = (2.0 / float(head_dim)) * index
-        inv_freq = torch.reciprocal(
-            torch.pow(torch.tensor(theta, dtype=torch.float32), exponent)
-        )
+        inv_freq = torch.reciprocal(torch.pow(torch.tensor(theta, dtype=torch.float32), exponent))
         self.register_buffer("inv_freq", inv_freq, persistent=False)
 
-    def forward(
-        self, x: torch.Tensor, position_ids: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, position_ids: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         pos = position_ids.to(device=x.device, dtype=torch.float32)
         inv = self.inv_freq.to(device=x.device, dtype=torch.float32)
         freqs = torch.einsum("bl,d->bld", pos, inv)
@@ -809,21 +831,9 @@ class LLMAdapterAttention(nn.Module):
     ) -> torch.Tensor:
         context = x if context is None else context
 
-        q = (
-            self.q_proj(x)
-            .view(x.shape[0], x.shape[1], self.n_heads, self.head_dim)
-            .transpose(1, 2)
-        )
-        k = (
-            self.k_proj(context)
-            .view(context.shape[0], context.shape[1], self.n_heads, self.head_dim)
-            .transpose(1, 2)
-        )
-        v = (
-            self.v_proj(context)
-            .view(context.shape[0], context.shape[1], self.n_heads, self.head_dim)
-            .transpose(1, 2)
-        )
+        q = self.q_proj(x).view(x.shape[0], x.shape[1], self.n_heads, self.head_dim).transpose(1, 2)
+        k = self.k_proj(context).view(context.shape[0], context.shape[1], self.n_heads, self.head_dim).transpose(1, 2)
+        v = self.v_proj(context).view(context.shape[0], context.shape[1], self.n_heads, self.head_dim).transpose(1, 2)
 
         q = self.q_norm(q)
         k = self.k_norm(k)
@@ -915,10 +925,9 @@ class LLMAdapter(nn.Module):
     ):
         super().__init__()
         self.embed = nn.Embedding(vocab_size, dim)
-        self.blocks = nn.ModuleList([
-            LLMAdapterTransformerBlock(source_dim=dim, model_dim=dim, num_heads=num_heads)
-            for _ in range(num_layers)
-        ])
+        self.blocks = nn.ModuleList(
+            [LLMAdapterTransformerBlock(source_dim=dim, model_dim=dim, num_heads=num_heads) for _ in range(num_layers)]
+        )
         self.out_proj = nn.Linear(dim, dim)
         self.norm = nn.RMSNorm(dim, eps=1e-6)
         self.rotary_emb = LLMAdapterRotaryEmbedding(dim // num_heads)

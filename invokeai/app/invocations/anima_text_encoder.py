@@ -136,13 +136,9 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             )
 
             if not isinstance(text_encoder, PreTrainedModel):
-                raise TypeError(
-                    f"Expected PreTrainedModel for text encoder, got {type(text_encoder).__name__}."
-                )
+                raise TypeError(f"Expected PreTrainedModel for text encoder, got {type(text_encoder).__name__}.")
             if not isinstance(tokenizer, PreTrainedTokenizerBase):
-                raise TypeError(
-                    f"Expected PreTrainedTokenizerBase for tokenizer, got {type(tokenizer).__name__}."
-                )
+                raise TypeError(f"Expected PreTrainedTokenizerBase for tokenizer, got {type(tokenizer).__name__}.")
 
             context.util.signal_progress("Running Qwen3 0.6B text encoder")
 

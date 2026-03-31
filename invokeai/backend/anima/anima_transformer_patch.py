@@ -20,6 +20,7 @@ def _patched_cross_attn_forward(
         original_forward: The original CosmosAttention.forward method (bound to self).
         attn_mask: Cross-attention mask of shape (img_seq_len, context_seq_len).
     """
+
     def forward(x, context=None, rope_emb=None):
         # If the context sequence length doesn't match the mask (e.g. negative conditioning
         # has a different number of tokens than positive regional conditioning), skip masking
@@ -42,6 +43,7 @@ def _patched_cross_attn_forward(
 
         if self.is_selfattn and rope_emb is not None:
             from invokeai.backend.anima.anima_transformer import apply_rotary_pos_emb_cosmos
+
             q = apply_rotary_pos_emb_cosmos(q, rope_emb)
             k = apply_rotary_pos_emb_cosmos(k, rope_emb)
 
@@ -94,9 +96,7 @@ def patch_anima_for_regional_prompting(
 
         mask = regional_extension.get_cross_attn_mask(block_idx)
         if mask is not None:
-            block.cross_attn.forward = _patched_cross_attn_forward(
-                block.cross_attn.forward, mask
-            )
+            block.cross_attn.forward = _patched_cross_attn_forward(block.cross_attn.forward, mask)
 
     try:
         yield transformer

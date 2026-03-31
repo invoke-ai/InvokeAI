@@ -192,7 +192,7 @@ def test_qwen3_keys_include_model_prefix():
 
     for key in lora_model.layers.keys():
         if key.startswith(ANIMA_LORA_QWEN3_PREFIX):
-            inner_key = key[len(ANIMA_LORA_QWEN3_PREFIX):]
+            inner_key = key[len(ANIMA_LORA_QWEN3_PREFIX) :]
             assert inner_key.startswith("model."), (
                 f"Qwen3 key should start with 'model.' after prefix, got: {inner_key}"
             )
@@ -216,11 +216,9 @@ def test_peft_keys_get_transformer_prefix():
     lora_model = lora_model_from_anima_state_dict(state_dict)
 
     for key in lora_model.layers.keys():
-        assert key.startswith(ANIMA_LORA_TRANSFORMER_PREFIX), (
-            f"Expected transformer prefix, got key: {key}"
-        )
+        assert key.startswith(ANIMA_LORA_TRANSFORMER_PREFIX), f"Expected transformer prefix, got key: {key}"
         # Verify the diffusion_model. prefix is stripped
-        inner_key = key[len(ANIMA_LORA_TRANSFORMER_PREFIX):]
+        inner_key = key[len(ANIMA_LORA_TRANSFORMER_PREFIX) :]
         assert not inner_key.startswith("diffusion_model."), (
             f"diffusion_model. prefix should be stripped, got: {inner_key}"
         )
