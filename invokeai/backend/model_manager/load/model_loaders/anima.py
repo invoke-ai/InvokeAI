@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional
 
 import accelerate
-import torch
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig

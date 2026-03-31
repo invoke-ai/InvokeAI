@@ -60,8 +60,6 @@ class AnimaLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 f"Expected AutoencoderKLWan or FluxAutoEncoder for Anima VAE, got {type(vae_info.model).__name__}."
             )
 
-        is_flux_vae = isinstance(vae_info.model, FluxAutoEncoder)
-
         estimated_working_memory = estimate_vae_working_memory_flux(
             operation="decode",
             image_tensor=latents,

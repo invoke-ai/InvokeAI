@@ -594,7 +594,7 @@ class MiniTrainDIT(nn.Module):
         self.extra_per_block_abs_pos_emb = extra_per_block_abs_pos_emb
 
         # Positional embeddings
-        rope_kwargs = dict(
+        self.pos_embedder = VideoRopePosition3DEmb(
             head_dim=model_channels // num_heads,
             len_h=max_img_h // patch_spatial,
             len_w=max_img_w // patch_spatial,
@@ -606,7 +606,6 @@ class MiniTrainDIT(nn.Module):
             t_extrapolation_ratio=rope_t_extrapolation_ratio,
             enable_fps_modulation=rope_enable_fps_modulation,
         )
-        self.pos_embedder = VideoRopePosition3DEmb(**rope_kwargs)
 
         if extra_per_block_abs_pos_emb:
             self.extra_pos_embedder = LearnablePosEmbAxis(

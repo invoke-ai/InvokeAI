@@ -20,8 +20,7 @@ from typing import Optional
 import torch
 import torchvision
 
-from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Range
+from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.mask import to_standard_float_mask
 
