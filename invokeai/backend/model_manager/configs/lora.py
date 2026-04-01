@@ -778,8 +778,13 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         has_lora_suffix = state_dict_has_any_keys_ending_with(
             state_dict,
             {
-                "lora_A.weight", "lora_B.weight", "lora_down.weight", "lora_up.weight",
-                "dora_scale", "lokr_w1", "lokr_w2",  # LoKR format
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+                "dora_scale",
+                "lokr_w1",
+                "lokr_w2",  # LoKR format
             },
         )
         # Must NOT have diffusion_model.layers (Z-Image) or Flux-style keys.

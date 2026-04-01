@@ -95,9 +95,7 @@ def lora_model_from_qwen_image_state_dict(
         return _convert_diffusers_format(state_dict, alpha)
 
 
-def _convert_kohya_format(
-    state_dict: Dict[str, torch.Tensor], alpha: float | None
-) -> ModelPatchRaw:
+def _convert_kohya_format(state_dict: Dict[str, torch.Tensor], alpha: float | None) -> ModelPatchRaw:
     """Convert Kohya-format state dict. Keys are like lora_unet_transformer_blocks_0_attn_to_k.lokr_w1"""
     layers: dict[str, BaseLayerPatch] = {}
 
@@ -123,9 +121,7 @@ def _convert_kohya_format(
     return ModelPatchRaw(layers=layers)
 
 
-def _convert_diffusers_format(
-    state_dict: Dict[str, torch.Tensor], alpha: float | None
-) -> ModelPatchRaw:
+def _convert_diffusers_format(state_dict: Dict[str, torch.Tensor], alpha: float | None) -> ModelPatchRaw:
     """Convert Diffusers/PEFT format state dict."""
     layers: dict[str, BaseLayerPatch] = {}
 
