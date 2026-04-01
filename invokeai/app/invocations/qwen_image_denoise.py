@@ -132,7 +132,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         seed: int,
     ) -> torch.Tensor:
         rand_device = "cpu"
-        rand_dtype = torch.float16
+        rand_dtype = torch.float32
 
         return torch.randn(
             batch_size,
