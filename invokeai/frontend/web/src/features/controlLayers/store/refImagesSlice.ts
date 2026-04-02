@@ -37,8 +37,7 @@ type PayloadActionWithId<T = void> = T extends void
 /** Fingerprint used to match the same reference image entry after recall when ids are regenerated. */
 const getRefImageRecallMatchKey = (entity: RefImageState): string => {
   const { config } = entity;
-  const imageName =
-    config.image?.original.image.image_name ?? config.image?.crop?.image.image_name ?? '';
+  const imageName = config.image?.original.image.image_name ?? config.image?.crop?.image.image_name ?? '';
   const modelKey = 'model' in config && config.model ? config.model.key : '';
   return `${config.type}\0${modelKey}\0${imageName}`;
 };
