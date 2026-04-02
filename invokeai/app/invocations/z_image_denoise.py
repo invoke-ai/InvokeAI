@@ -234,34 +234,36 @@ class ZImageDenoiseInvocation(BaseInvocation):
         """Calculate timestep shift based on image sequence length.
 
         Based on diffusers ZImagePipeline.calculate_shift method.
-        """
-        m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
-        b = base_shift - m * base_image_seq_len
-        mu = image_seq_len * m + b
-        return mu
-
-    def _get_sigmas(self, mu: float, num_steps: int) -> list[float]:
-        """Generate sigma schedule with time shift.
-
-        Based on FlowMatchEulerDiscreteScheduler with shift.
-        Generates num_steps + 1 sigma values (including terminal 0.0).
+        Returns a linear shift value (exp(mu) from the original formula).
         """
         import math
 
-        def time_shift(mu: float, sigma: float, t: float) -> float:
-            """Apply time shift to a single timestep value."""
+        m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
+        b = base_shift - m * base_image_seq_len
+        mu = image_seq_len * m + b
+        # Convert from exponential mu to linear shift value
+        return math.exp(mu)
+
+    def _get_sigmas(self, shift: float, num_steps: int) -> list[float]:
+        """Generate sigma schedule with linear time shift.
+
+        Uses linear time shift: shift / (shift + (1/t - 1)).
+        The shift value is used directly as a multiplier.
+        Generates num_steps + 1 sigma values (including terminal 0.0).
+        """
+
+        def time_shift(shift: float, t: float) -> float:
+            """Apply linear time shift to a single timestep value."""
             if t <= 0:
                 return 0.0
             if t >= 1:
                 return 1.0
-            return math.exp(mu) / (math.exp(mu) + (1 / t - 1) ** sigma)
+            return shift / (shift + (1 / t - 1))
 
-        # Generate linearly spaced values from 1 to 0 (excluding endpoints for safety)
-        # then apply time shift
         sigmas = []
         for i in range(num_steps + 1):
             t = 1.0 - i / num_steps  # Goes from 1.0 to 0.0
-            sigma = time_shift(mu, 1.0, t)
+            sigma = time_shift(shift, t)
             sigmas.append(sigma)
 
         return sigmas
@@ -324,12 +326,12 @@ class ZImageDenoiseInvocation(BaseInvocation):
 
         # Calculate shift based on image sequence length, or use override
         if self.shift is not None:
-            mu = self.shift
+            shift = self.shift
         else:
-            mu = self._calculate_shift(img_seq_len)
+            shift = self._calculate_shift(img_seq_len)
 
         # Generate sigma schedule with time shift
-        sigmas = self._get_sigmas(mu, self.steps)
+        sigmas = self._get_sigmas(shift, self.steps)
 
         # Apply denoising_start and denoising_end clipping
         if self.denoising_start > 0 or self.denoising_end < 1:
