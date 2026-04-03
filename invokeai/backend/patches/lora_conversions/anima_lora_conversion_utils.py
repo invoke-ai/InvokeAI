@@ -16,9 +16,6 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
-from invokeai.backend.util.logging import InvokeAILogger
-
-logger = InvokeAILogger.get_logger(__name__)
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     ANIMA_LORA_QWEN3_PREFIX,
     ANIMA_LORA_TRANSFORMER_PREFIX,
@@ -26,6 +23,9 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.util.logging import InvokeAILogger
+
+logger = InvokeAILogger.get_logger(__name__)
 
 
 def is_state_dict_likely_anima_lora(state_dict: dict[str | int, torch.Tensor]) -> bool:
@@ -84,12 +84,12 @@ def _convert_kohya_unet_key(kohya_layer_name: str) -> str:
     """
     key = kohya_layer_name
     if key.startswith("lora_unet_"):
-        key = key[len("lora_unet_"):]
+        key = key[len("lora_unet_") :]
 
     # Handle llm_adapter prefix: strip it, run the standard block conversion, then re-add with dot
     llm_adapter_prefix = ""
     if key.startswith("llm_adapter_"):
-        key = key[len("llm_adapter_"):]
+        key = key[len("llm_adapter_") :]
         llm_adapter_prefix = "llm_adapter."
 
     # Convert blocks_N_ to blocks.N.
@@ -114,7 +114,7 @@ def _convert_kohya_te_key(kohya_layer_name: str) -> str:
     """
     key = kohya_layer_name
     if key.startswith("lora_te_"):
-        key = key[len("lora_te_"):]
+        key = key[len("lora_te_") :]
 
     # Convert layers_N_ to layers.N.
     key = re.sub(r"^layers_(\d+)_", r"layers.\1.", key)
@@ -147,9 +147,7 @@ def _make_layer_patch(layer_dict: dict[str, torch.Tensor]) -> BaseLayerPatch:
     return any_lora_layer_from_state_dict(layer_dict)
 
 
-def lora_model_from_anima_state_dict(
-    state_dict: Dict[str, torch.Tensor], alpha: float | None = None
-) -> ModelPatchRaw:
+def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha: float | None = None) -> ModelPatchRaw:
     """Convert an Anima LoRA state dict to a ModelPatchRaw.
 
     Supports both Kohya-style keys (lora_unet_blocks_0_...) and diffusers PEFT format.
@@ -196,7 +194,7 @@ def lora_model_from_anima_state_dict(
             is_text_encoder = False
             for prefix in text_encoder_prefixes:
                 if layer_key.startswith(prefix):
-                    clean_key = layer_key[len(prefix):]
+                    clean_key = layer_key[len(prefix) :]
                     is_text_encoder = True
                     break
 
@@ -208,7 +206,7 @@ def lora_model_from_anima_state_dict(
                     "diffusion_model.",
                 ]:
                     if layer_key.startswith(prefix):
-                        clean_key = layer_key[len(prefix):]
+                        clean_key = layer_key[len(prefix) :]
                         break
 
             if is_text_encoder:

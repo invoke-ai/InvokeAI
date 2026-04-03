@@ -21,9 +21,7 @@ ANIMA_LORA_QWEN3_PREFIX = "lora_qwen3-"
 _COSMOS_DIT_SUBCOMPONENTS_RE = r"(cross_attn|self_attn|mlp|adaln_modulation)"
 
 # Kohya format: lora_unet_[llm_adapter_]blocks_N_<cosmos_subcomponent>
-_KOHYA_ANIMA_RE = re.compile(
-    r"lora_unet_(llm_adapter_)?blocks_\d+_" + _COSMOS_DIT_SUBCOMPONENTS_RE
-)
+_KOHYA_ANIMA_RE = re.compile(r"lora_unet_(llm_adapter_)?blocks_\d+_" + _COSMOS_DIT_SUBCOMPONENTS_RE)
 
 # PEFT format: <prefix>.blocks.N.<cosmos_subcomponent>
 _PEFT_ANIMA_RE = re.compile(

@@ -1100,8 +1100,14 @@ def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
 
     # Cosmos DiT key prefixes — support both with and without `net.` prefix
     cosmos_prefixes = (
-        "blocks.", "t_embedder.", "x_embedder.", "final_layer.",
-        "net.blocks.", "net.t_embedder.", "net.x_embedder.", "net.final_layer.",
+        "blocks.",
+        "t_embedder.",
+        "x_embedder.",
+        "final_layer.",
+        "net.blocks.",
+        "net.t_embedder.",
+        "net.x_embedder.",
+        "net.final_layer.",
     )
 
     for key in state_dict.keys():

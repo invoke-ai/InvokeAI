@@ -51,8 +51,8 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
     RectifiedFlowInpaintExtension,
     assert_broadcastable,
 )
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, Range
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, Range
 from invokeai.backend.util.devices import TorchDevice
 
 # Anima uses 8x spatial compression (VAE downsamples by 2^3)
@@ -549,7 +549,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
                 pos_context = transformer.preprocess_text_embeds(
                     pos_qwen3_embeds.to(dtype=inference_dtype),
                     pos_t5xxl_ids,
-                    t5xxl_weights=pos_t5xxl_weights.to(dtype=inference_dtype) if pos_t5xxl_weights is not None else None,
+                    t5xxl_weights=pos_t5xxl_weights.to(dtype=inference_dtype)
+                    if pos_t5xxl_weights is not None
+                    else None,
                 )
 
                 neg_context = None
@@ -569,14 +571,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
                 regional_extension = None
 
             # Apply regional prompting patch if we have regional masks
-            exit_stack.enter_context(
-                patch_anima_for_regional_prompting(transformer, regional_extension)
-            )
+            exit_stack.enter_context(patch_anima_for_regional_prompting(transformer, regional_extension))
 
             # Helper to run transformer with pre-computed context (bypasses LLM Adapter)
             def _run_transformer(ctx: torch.Tensor) -> torch.Tensor:
                 return transformer(
-                    x=latents.to(transformer.dtype if hasattr(transformer, 'dtype') else inference_dtype),
+                    x=latents.to(transformer.dtype if hasattr(transformer, "dtype") else inference_dtype),
                     timesteps=timestep,
                     context=ctx,
                     # t5xxl_ids=None skips the LLM Adapter — context is already pre-computed
@@ -625,18 +625,28 @@ class AnimaDenoiseInvocation(BaseInvocation):
                             user_step += 1
                             if user_step <= total_steps:
                                 pbar.update(1)
-                                step_callback(PipelineIntermediateState(
-                                    step=user_step, order=2, total_steps=total_steps,
-                                    timestep=int(sigma_curr * 1000), latents=latents.squeeze(2),
-                                ))
+                                step_callback(
+                                    PipelineIntermediateState(
+                                        step=user_step,
+                                        order=2,
+                                        total_steps=total_steps,
+                                        timestep=int(sigma_curr * 1000),
+                                        latents=latents.squeeze(2),
+                                    )
+                                )
                     else:
                         user_step += 1
                         if user_step <= total_steps:
                             pbar.update(1)
-                            step_callback(PipelineIntermediateState(
-                                step=user_step, order=1, total_steps=total_steps,
-                                timestep=int(sigma_curr * 1000), latents=latents.squeeze(2),
-                            ))
+                            step_callback(
+                                PipelineIntermediateState(
+                                    step=user_step,
+                                    order=1,
+                                    total_steps=total_steps,
+                                    timestep=int(sigma_curr * 1000),
+                                    latents=latents.squeeze(2),
+                                )
+                            )
                 pbar.close()
             else:
                 # Built-in Euler implementation (default for Anima)

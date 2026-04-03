@@ -67,9 +67,7 @@ class AnimaImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             if not isinstance(vae, (AutoencoderKLWan, FluxAutoEncoder)):
-                raise TypeError(
-                    f"Expected AutoencoderKLWan or FluxAutoEncoder, got {type(vae).__name__}."
-                )
+                raise TypeError(f"Expected AutoencoderKLWan or FluxAutoEncoder, got {type(vae).__name__}.")
 
             vae_dtype = next(iter(vae.parameters())).dtype
             image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
