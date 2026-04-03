@@ -157,6 +157,9 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
 
+  // Add LoRAs before regions so regional nodes copy the LoRA-patched encoder edges
+  addAnimaLoRAs(state, g, denoise, modelLoader, posCond, negCond);
+
   // Add regional guidance if canvas manager is available
   const canvas = selectCanvasSlice(state);
   if (manager !== null) {
@@ -177,9 +180,6 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
 
   // IP Adapters are not supported for Anima, so delete the unused collector
   g.deleteNode(ipAdapterCollect.id);
-
-  // Add LoRAs
-  addAnimaLoRAs(state, g, denoise, modelLoader, posCond, negCond);
 
   let canvasOutput: Invocation<ImageOutputNodes> = l2i;
 
