@@ -16,20 +16,20 @@ help:
 	@echo "frontend-build           Build the frontend in order to run on localhost:9090"
 	@echo "frontend-dev             Run the frontend in developer mode on localhost:5173"
 	@echo "frontend-typegen         Generate types for the frontend from the OpenAPI schema"
-	@echo "wheel            				Build the wheel for the current version"
+	@echo "frontend-prettier        Format the frontend using lint:prettier"
+	@echo "wheel            	Build the wheel for the current version"
 	@echo "tag-release              Tag the GitHub repository with the current version (use at release time only!)"
 	@echo "openapi                  Generate the OpenAPI schema for the app, outputting to stdout"
 	@echo "docs                     Serve the mkdocs site with live reload"
 
 # Runs ruff, fixing any safely-fixable errors and formatting
 ruff:
-	ruff check . --fix
-	ruff format .
+	cd invokeai && uv tool run ruff@0.11.2 format
 
 # Runs ruff, fixing all errors it can fix and formatting
 ruff-unsafe:
 	ruff check . --fix --unsafe-fixes
-	ruff format .
+	ruff format
 
 # Runs mypy, using the config in pyproject.toml
 mypy:
@@ -63,6 +63,13 @@ frontend-dev:
 
 frontend-typegen:
 	cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
+
+frontend-lint:
+	cd invokeai/frontend/web/src && \
+	pnpm lint:tsc && \
+	pnpm lint:dpdm && \
+	pnpm lint:eslint --fix && \
+	pnpm lint:prettier --write 
 
 # Tag the release
 wheel:
