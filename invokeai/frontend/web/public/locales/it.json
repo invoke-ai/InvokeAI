@@ -2639,7 +2639,7 @@
             "desc": "Seleziona un singolo oggetto di destinazione. Una volta completata la selezione, fai clic su <Bold>Applica</Bold> per eliminare tutto ciò che si trova al di fuori dell'area selezionata, oppure salva la selezione come nuovo livello.",
             "visualModeDesc": "La modalità visiva utilizza input di tipo riquadro e punto per selezionare un oggetto.",
             "visualMode1": "Fai clic e trascina per disegnare un riquadro attorno all'oggetto che desideri selezionare. Puoi ottenere risultati migliori disegnando il riquadro un po' più grande o più piccolo dell'oggetto.",
-            "visualMode2": "Fare clic per aggiungere un punto di <Bold>iinclusione</Bold>i verde oppure fare clic tenendo premuto Maiusc per aggiungere un punto di <Bold>iesclusione</Bold>i rosso per indicare al modello cosa includere o escludere.",
+            "visualMode2": "Fai clic per aggiungere un punto verde <Bold>includi</Bold> oppure fai clic tenendo premuto il tasto Maiusc per aggiungere un punto rosso <Bold>escludi</Bold> per indicare al modello cosa includere o escludere.",
             "visualMode3": "I punti possono essere utilizzati per perfezionare una selezione di caselle oppure in modo indipendente.",
             "promptModeDesc": "La modalità Prompt utilizza l'input di testo per selezionare un oggetto.",
             "promptMode1": "Digitare una breve descrizione dell'oggetto che si desidera selezionare.",
@@ -3089,7 +3089,8 @@
             "passwordsDoNotMatch": "Le password non corrispondono",
             "createAccount": "Crea un account amministratore",
             "creatingAccount": "Impostazione in corso...",
-            "setupFailed": "Installazione non riuscita. Riprova."
+            "setupFailed": "Installazione non riuscita. Riprova.",
+            "passwordHelperRelaxed": "Inserisci una password qualsiasi (verrà visualizzata la sua robustezza)"
         },
         "userMenu": "Menu utente",
         "logout": "Esci",
@@ -3139,6 +3140,11 @@
             "back": "Indietro",
             "cannotDeleteSelf": "Non puoi eliminare il tuo account",
             "cannotDeactivateSelf": "Non puoi disattivare il tuo account"
+        },
+        "passwordStrength": {
+            "weak": "Password debole",
+            "moderate": "Password moderata",
+            "strong": "Password forte"
         }
     }
 }
