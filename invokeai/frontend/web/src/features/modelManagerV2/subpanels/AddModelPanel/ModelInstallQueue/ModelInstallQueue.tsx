@@ -209,16 +209,10 @@ export const ModelInstallQueue = memo(() => {
   }, [data]);
 
   const isPrunePriority = useMemo(() => {
-    if (!pruneAvailable) {
-      return false;
-    }
-
-    if (hasCancelableInstalls) {
-      return false;
-    }
-
-    return true;
-  }, [pruneAvailable, hasCancelableInstalls]);
+    // Show the Prune button prominently whenever there are terminal jobs,
+    // even if there are also active (cancelable) jobs in progress.
+    return !!pruneAvailable;
+  }, [pruneAvailable]);
 
   const pauseAll = useCallback(() => {
     void runBulkAction('pause', pauseableInstallIds);
