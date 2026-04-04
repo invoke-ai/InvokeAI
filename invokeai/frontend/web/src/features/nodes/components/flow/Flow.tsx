@@ -51,7 +51,7 @@ import { selectSelectionMode, selectShouldSnapToGrid } from 'features/nodes/stor
 import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import type { CSSProperties, MouseEvent } from 'react';
+import type { CSSProperties, MouseEvent, RefObject } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
@@ -61,6 +61,7 @@ import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
 import CurrentImageNode from './nodes/CurrentImage/CurrentImageNode';
 import InvocationNodeWrapper from './nodes/Invocation/InvocationNodeWrapper';
 import NotesNode from './nodes/Notes/NotesNode';
+import { shouldIgnoreWorkflowCopyHotkey } from './workflowHotkeys';
 
 const edgeTypes = {
   collapsed: InvocationCollapsedEdge,
@@ -248,14 +249,14 @@ export const Flow = memo(() => {
       >
         <Background gap={snapGrid} offset={snapGrid} />
       </ReactFlow>
-      <HotkeyIsolator />
+      <HotkeyIsolator flowWrapper={flowWrapper} />
     </>
   );
 });
 
 Flow.displayName = 'Flow';
 
-const HotkeyIsolator = memo(() => {
+const HotkeyIsolator = memo(({ flowWrapper }: { flowWrapper: RefObject<HTMLDivElement> }) => {
   const mayUndo = useAppSelector(selectMayUndo);
   const mayRedo = useAppSelector(selectMayRedo);
 
@@ -270,8 +271,12 @@ const HotkeyIsolator = memo(() => {
     id: 'copySelection',
     category: 'workflows',
     callback: copySelection,
-    options: { enabled: isWorkflowEditorFocused, preventDefault: true },
-    dependencies: [copySelection],
+    options: {
+      enabled: isWorkflowEditorFocused,
+      preventDefault: true,
+      ignoreEventWhen: () => shouldIgnoreWorkflowCopyHotkey(window.getSelection(), flowWrapper.current),
+    },
+    dependencies: [copySelection, isWorkflowEditorFocused],
   });
 
   const selectAll = useCallback(() => {
