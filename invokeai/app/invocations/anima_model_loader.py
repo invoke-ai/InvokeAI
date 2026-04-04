@@ -1,5 +1,3 @@
-from typing import Optional
-
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -38,7 +36,7 @@ class AnimaModelLoaderOutput(BaseInvocationOutput):
     title="Main Model - Anima",
     tags=["model", "anima"],
     category="model",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class AnimaModelLoaderInvocation(BaseInvocation):
@@ -59,8 +57,7 @@ class AnimaModelLoaderInvocation(BaseInvocation):
         title="Transformer",
     )
 
-    vae_model: Optional[ModelIdentifierField] = InputField(
-        default=None,
+    vae_model: ModelIdentifierField = InputField(
         description="Standalone VAE model. Anima uses a Wan 2.1 / QwenImage VAE (16-channel). "
         "If not provided, a FLUX VAE can be used as a fallback.",
         input=Input.Direct,
@@ -68,16 +65,14 @@ class AnimaModelLoaderInvocation(BaseInvocation):
         title="VAE",
     )
 
-    qwen3_encoder_model: Optional[ModelIdentifierField] = InputField(
-        default=None,
+    qwen3_encoder_model: ModelIdentifierField = InputField(
         description="Standalone Qwen3 0.6B Encoder model.",
         input=Input.Direct,
         ui_model_type=ModelType.Qwen3Encoder,
         title="Qwen3 Encoder",
     )
 
-    t5_encoder_model: Optional[ModelIdentifierField] = InputField(
-        default=None,
+    t5_encoder_model: ModelIdentifierField = InputField(
         description="T5-XXL encoder model. The tokenizer submodel is used for Anima text encoding.",
         input=Input.Direct,
         ui_model_type=ModelType.T5Encoder,
@@ -89,26 +84,15 @@ class AnimaModelLoaderInvocation(BaseInvocation):
         transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
 
         # VAE
-        if self.vae_model is not None:
-            vae = self.vae_model.model_copy(update={"submodel_type": SubModelType.VAE})
-        else:
-            raise ValueError(
-                "No VAE source provided. Set 'VAE' to a compatible VAE model (Wan 2.1 QwenImage VAE or FLUX VAE)."
-            )
+        vae = self.vae_model.model_copy(update={"submodel_type": SubModelType.VAE})
 
         # Qwen3 Encoder
-        if self.qwen3_encoder_model is not None:
-            qwen3_tokenizer = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
-            qwen3_encoder = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
-        else:
-            raise ValueError("No Qwen3 Encoder source provided. Set 'Qwen3 Encoder' to a Qwen3 0.6B model.")
+        qwen3_tokenizer = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+        qwen3_encoder = self.qwen3_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
 
         # T5 Encoder (only tokenizer submodel is used by Anima)
-        if self.t5_encoder_model is not None:
-            t5_tokenizer = preprocess_t5_tokenizer_model_identifier(self.t5_encoder_model)
-            t5_encoder = preprocess_t5_encoder_model_identifier(self.t5_encoder_model)
-        else:
-            raise ValueError("No T5 Encoder source provided. Set 'T5 Encoder' to a T5-XXL encoder model.")
+        t5_tokenizer = preprocess_t5_tokenizer_model_identifier(self.t5_encoder_model)
+        t5_encoder = preprocess_t5_encoder_model_identifier(self.t5_encoder_model)
 
         return AnimaModelLoaderOutput(
             transformer=TransformerField(transformer=transformer, loras=[]),
