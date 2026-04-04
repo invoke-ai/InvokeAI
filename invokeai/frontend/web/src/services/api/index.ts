@@ -84,12 +84,12 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
       (args.url.includes('/auth/login') || args.url.includes('/auth/setup'))) ||
     (typeof args === 'string' && (args.includes('/auth/login') || args.includes('/auth/setup')));
 
+  const token = localStorage.getItem('auth_token');
+
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
     baseUrl: getBaseUrl(),
     prepareHeaders: (headers) => {
       // Add auth token to all requests except setup and login
-      const token = localStorage.getItem('auth_token');
-
       if (token && !isAuthEndpoint) {
         headers.set('Authorization', `Bearer ${token}`);
       }
@@ -107,7 +107,7 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
   const result = await rawBaseQuery(args, api, extraOptions);
 
   // If we receive a 401 on a non-auth endpoint and we have a token, the session has expired.
-  if (result.error && result.error.status === 401 && !isAuthEndpoint && localStorage.getItem('auth_token')) {
+  if (result.error && result.error.status === 401 && !isAuthEndpoint && token) {
     api.dispatch(sessionExpiredLogout());
   }
 
