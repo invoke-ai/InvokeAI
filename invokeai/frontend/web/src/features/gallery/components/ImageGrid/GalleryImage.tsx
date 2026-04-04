@@ -26,8 +26,6 @@ import type { MouseEvent, MouseEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PiImageBold } from 'react-icons/pi';
 import { imagesApi } from 'services/api/endpoints/images';
-import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
-import { useSelectedBoard } from 'services/api/hooks/useSelectedBoard';
 import type { ImageDTO } from 'services/api/types';
 
 import { galleryItemContainerSX } from './galleryItemContainerSX';
@@ -104,8 +102,6 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     [imageDTO.image_name]
   );
   const isSelected = useAppSelector(selectIsSelected);
-  const selectedBoard = useSelectedBoard();
-  const { canWriteImages: canDragFromBoard } = useBoardAccess(selectedBoard);
 
   useEffect(() => {
     const element = ref.current;
@@ -130,10 +126,6 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
         setIsDragging(false);
       },
     });
-
-    if (!canDragFromBoard) {
-      return combine(firefoxDndFix(element), monitorBinding);
-    }
 
     return combine(
       firefoxDndFix(element),
@@ -182,7 +174,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
       }),
       monitorBinding
     );
-  }, [imageDTO, store, canDragFromBoard]);
+  }, [imageDTO, store]);
 
   const [isHovered, setIsHovered] = useState(false);
 
