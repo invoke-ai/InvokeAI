@@ -46,7 +46,8 @@
             "passwordsDoNotMatch": "Passwords do not match",
             "createAccount": "Create Administrator Account",
             "creatingAccount": "Setting up...",
-            "setupFailed": "Setup failed. Please try again."
+            "setupFailed": "Setup failed. Please try again.",
+            "passwordHelperRelaxed": "Enter any password (strength will be shown)"
         },
         "userMenu": "User Menu",
         "admin": "Admin",
@@ -102,6 +103,11 @@
             "back": "Back",
             "cannotDeleteSelf": "You cannot delete your own account",
             "cannotDeactivateSelf": "You cannot deactivate your own account"
+        },
+        "passwordStrength": {
+            "weak": "Weak password",
+            "moderate": "Moderate password",
+            "strong": "Strong password"
         }
     },
     "boards": {
@@ -1016,6 +1022,15 @@
         "reidentifySuccess": "Model reidentified successfully",
         "reidentifyUnknown": "Unable to identify model",
         "reidentifyError": "Error reidentifying model",
+        "reidentifyModels": "Reidentify Models",
+        "reidentifyModelsConfirm": "Are you sure you want to reidentify {{count}} model(s)? This will re-probe their weights files to determine the correct format and settings.",
+        "reidentifyWarning": "This will reset any custom settings you may have applied to these models.",
+        "modelsReidentified": "Successfully reidentified {{count}} model(s)",
+        "modelsReidentifyFailed": "Failed to reidentify models",
+        "someModelsFailedToReidentify": "{{count}} model(s) could not be reidentified",
+        "modelsReidentifiedPartial": "Partially completed",
+        "someModelsReidentified": "{{succeeded}} reidentified, {{failed}} failed",
+        "modelsReidentifyError": "Error reidentifying models",
         "updatePath": "Update Path",
         "updatePathTooltip": "Update the file path for this model if you have moved the model files to a new location.",
         "updatePathDescription": "Enter the new path to the model file or directory. Use this if you have manually moved the model files on disk.",
@@ -3119,9 +3134,9 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
-            "FLUX.2 Klein Support: InvokeAI now supports the new FLUX.2 Klein models (4B and 9B variants) with GGUF, FP8, and Diffusers formats. Features include txt2img, img2img, inpainting, and outpainting. See 'Starter Models' to get started.",
-            "DyPE support for FLUX models improves high-resolution  (>1536 px up to 4K) images. Go to the 'Advanced Options' section to activate.",
-            "Z-Image Turbo diversity: Active 'Seed Variance Enhancer' under 'Advanced Options' to add diversitiy to your ZiT gens."
+            "Multi-user mode supports multiple isolated users on the same server.",
+            "Enhanced support for Z-Image and FLUX.2 Models.",
+            "Multiple user interface enhancements and new canvas features."
         ],
         "takeUserSurvey": "📣 Let us know how you like InvokeAI. Take our User Experience Survey!",
         "readReleaseNotes": "Read Release Notes",

@@ -635,9 +635,7 @@ def test_non_owner_cannot_change_board_visibility(client: TestClient, user1_toke
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 
-def test_shared_board_image_names_visible_to_other_users(
-    client: TestClient, user1_token: str, user2_token: str
-):
+def test_shared_board_image_names_visible_to_other_users(client: TestClient, user1_token: str, user2_token: str):
     """Test that image names for shared boards are accessible to other users."""
     create = client.post(
         "/api/v1/boards/?board_name=User1+Shared+Images+Board",

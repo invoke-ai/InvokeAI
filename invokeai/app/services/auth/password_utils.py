@@ -1,6 +1,6 @@
 """Password hashing and validation utilities."""
 
-from typing import cast
+from typing import Literal, cast
 
 from passlib.context import CryptContext
 
@@ -84,3 +84,30 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
         return False, "Password must contain uppercase, lowercase, and numbers"
 
     return True, ""
+
+
+def get_password_strength(password: str) -> Literal["weak", "moderate", "strong"]:
+    """Determine the strength of a password.
+
+    Strength levels:
+    - weak: less than 8 characters
+    - moderate: 8+ characters but missing at least one of uppercase, lowercase, or digit
+    - strong: 8+ characters with uppercase, lowercase, and digit
+
+    Args:
+        password: The password to evaluate
+
+    Returns:
+        One of "weak", "moderate", or "strong"
+    """
+    if len(password) < 8:
+        return "weak"
+
+    has_upper = any(c.isupper() for c in password)
+    has_lower = any(c.islower() for c in password)
+    has_digit = any(c.isdigit() for c in password)
+
+    if not (has_upper and has_lower and has_digit):
+        return "moderate"
+
+    return "strong"

@@ -9,7 +9,6 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordNotFoundException,
     BoardRecordOrderBy,
     BoardRecordSaveException,
-    BoardVisibility,
     deserialize_board_record,
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
