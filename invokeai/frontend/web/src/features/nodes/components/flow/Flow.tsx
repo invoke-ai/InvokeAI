@@ -92,7 +92,7 @@ export const Flow = memo(() => {
   const isValidConnection = useIsValidConnection();
   const updateNodeInternals = useUpdateNodeInternals();
 
-  useFocusRegion('workflows', flowWrapper);
+  useFocusRegion('workflowEditor', flowWrapper);
 
   const [borderRadius] = useToken('radii', ['base']);
   const flowStyles = useMemo<CSSProperties>(() => ({ borderRadius }), [borderRadius]);
@@ -262,7 +262,7 @@ const HotkeyIsolator = memo(() => {
   const cancelConnection = useReactFlowStore(selectCancelConnection);
 
   const store = useAppStore();
-  const isWorkflowsFocused = useIsRegionFocused('workflows');
+  const isWorkflowEditorFocused = useIsRegionFocused('workflowEditor');
 
   const { copySelection, pasteSelection, pasteSelectionWithEdges } = useNodeCopyPaste();
 
@@ -270,7 +270,7 @@ const HotkeyIsolator = memo(() => {
     id: 'copySelection',
     category: 'workflows',
     callback: copySelection,
-    options: { enabled: isWorkflowsFocused, preventDefault: true },
+    options: { enabled: isWorkflowEditorFocused, preventDefault: true },
     dependencies: [copySelection],
   });
 
@@ -299,24 +299,24 @@ const HotkeyIsolator = memo(() => {
     id: 'selectAll',
     category: 'workflows',
     callback: selectAll,
-    options: { enabled: isWorkflowsFocused, preventDefault: true },
-    dependencies: [selectAll, isWorkflowsFocused],
+    options: { enabled: isWorkflowEditorFocused, preventDefault: true },
+    dependencies: [selectAll, isWorkflowEditorFocused],
   });
 
   useRegisteredHotkeys({
     id: 'pasteSelection',
     category: 'workflows',
     callback: pasteSelection,
-    options: { enabled: isWorkflowsFocused, preventDefault: true },
-    dependencies: [pasteSelection, isWorkflowsFocused],
+    options: { enabled: isWorkflowEditorFocused, preventDefault: true },
+    dependencies: [pasteSelection, isWorkflowEditorFocused],
   });
 
   useRegisteredHotkeys({
     id: 'pasteSelectionWithEdges',
     category: 'workflows',
     callback: pasteSelectionWithEdges,
-    options: { enabled: isWorkflowsFocused, preventDefault: true },
-    dependencies: [pasteSelectionWithEdges, isWorkflowsFocused],
+    options: { enabled: isWorkflowEditorFocused, preventDefault: true },
+    dependencies: [pasteSelectionWithEdges, isWorkflowEditorFocused],
   });
 
   useRegisteredHotkeys({
@@ -325,8 +325,8 @@ const HotkeyIsolator = memo(() => {
     callback: () => {
       store.dispatch(undo());
     },
-    options: { enabled: isWorkflowsFocused && mayUndo, preventDefault: true },
-    dependencies: [store, mayUndo, isWorkflowsFocused],
+    options: { enabled: isWorkflowEditorFocused && mayUndo, preventDefault: true },
+    dependencies: [store, mayUndo, isWorkflowEditorFocused],
   });
 
   useRegisteredHotkeys({
@@ -335,8 +335,8 @@ const HotkeyIsolator = memo(() => {
     callback: () => {
       store.dispatch(redo());
     },
-    options: { enabled: isWorkflowsFocused && mayRedo, preventDefault: true },
-    dependencies: [store, mayRedo, isWorkflowsFocused],
+    options: { enabled: isWorkflowEditorFocused && mayRedo, preventDefault: true },
+    dependencies: [store, mayRedo, isWorkflowEditorFocused],
   });
 
   const onEscapeHotkey = useCallback(() => {
@@ -373,8 +373,8 @@ const HotkeyIsolator = memo(() => {
     id: 'deleteSelection',
     category: 'workflows',
     callback: deleteSelection,
-    options: { preventDefault: true, enabled: isWorkflowsFocused },
-    dependencies: [deleteSelection, isWorkflowsFocused],
+    options: { preventDefault: true, enabled: isWorkflowEditorFocused },
+    dependencies: [deleteSelection, isWorkflowEditorFocused],
   });
 
   return null;

@@ -13,6 +13,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { IAINoContentFallback, IAINoContentFallbackWithSpinner } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { setFocusedRegion } from 'common/hooks/focus';
 import ImageMetadataGraphTabContent from 'features/gallery/components/ImageMetadataViewer/ImageMetadataGraphTabContent';
 import { ImageMetadataHandlers } from 'features/metadata/parsing';
 import type { ChangeEvent } from 'react';
@@ -39,6 +40,10 @@ const TAB_INDEX = {
   graph: 4,
 } as const;
 const TAB_COUNT = Object.keys(TAB_INDEX).length;
+
+export const handleImageMetadataViewerPointerDown = () => {
+  setFocusedRegion('viewer');
+};
 
 const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
   // TODO: fix hotkeys
@@ -80,6 +85,7 @@ const ImageMetadataViewer = ({ image }: ImageMetadataViewerProps) => {
 
   return (
     <Flex
+      onPointerDown={handleImageMetadataViewerPointerDown}
       layerStyle="first"
       padding={4}
       paddingInline={16}
