@@ -399,8 +399,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         if self.denoising_start >= self.denoising_end:
             raise ValueError(
-                f"denoising_start ({self.denoising_start}) must be less than "
-                f"denoising_end ({self.denoising_end})."
+                f"denoising_start ({self.denoising_start}) must be less than denoising_end ({self.denoising_end})."
             )
 
         transformer_info = context.models.load(self.transformer.transformer)
