@@ -21,12 +21,15 @@ class UserService(UserServiceBase):
         """
         self._db = db
 
-    def create(self, user_data: UserCreateRequest) -> UserDTO:
+    def create(self, user_data: UserCreateRequest, strict_password_checking: bool = True) -> UserDTO:
         """Create a new user."""
         # Validate password strength
-        is_valid, error_msg = validate_password_strength(user_data.password)
-        if not is_valid:
-            raise ValueError(error_msg)
+        if strict_password_checking:
+            is_valid, error_msg = validate_password_strength(user_data.password)
+            if not is_valid:
+                raise ValueError(error_msg)
+        elif not user_data.password:
+            raise ValueError("Password cannot be empty")
 
         # Check if email already exists
         if self.get_by_email(user_data.email) is not None:
@@ -106,7 +109,7 @@ class UserService(UserServiceBase):
             last_login_at=datetime.fromisoformat(row[7]) if row[7] else None,
         )
 
-    def update(self, user_id: str, changes: UserUpdateRequest) -> UserDTO:
+    def update(self, user_id: str, changes: UserUpdateRequest, strict_password_checking: bool = True) -> UserDTO:
         """Update user."""
         # Check if user exists
         user = self.get(user_id)
@@ -115,9 +118,12 @@ class UserService(UserServiceBase):
 
         # Validate password if provided
         if changes.password is not None:
-            is_valid, error_msg = validate_password_strength(changes.password)
-            if not is_valid:
-                raise ValueError(error_msg)
+            if strict_password_checking:
+                is_valid, error_msg = validate_password_strength(changes.password)
+                if not is_valid:
+                    raise ValueError(error_msg)
+            elif not changes.password:
+                raise ValueError("Password cannot be empty")
 
         # Build update query dynamically based on provided fields
         updates: list[str] = []
@@ -208,7 +214,7 @@ class UserService(UserServiceBase):
         count = row[0] if row else 0
         return bool(count > 0)
 
-    def create_admin(self, user_data: UserCreateRequest) -> UserDTO:
+    def create_admin(self, user_data: UserCreateRequest, strict_password_checking: bool = True) -> UserDTO:
         """Create an admin user (for initial setup)."""
         if self.has_admin():
             raise ValueError("Admin user already exists")
@@ -220,7 +226,7 @@ class UserService(UserServiceBase):
             password=user_data.password,
             is_admin=True,
         )
-        return self.create(admin_data)
+        return self.create(admin_data, strict_password_checking=strict_password_checking)
 
     def list_users(self, limit: int = 100, offset: int = 0) -> list[UserDTO]:
         """List all users."""

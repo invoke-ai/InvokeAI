@@ -52,6 +52,14 @@ type BulkDeleteModelsResponse = {
   failed: string[];
 };
 
+type BulkReidentifyModelsArg = {
+  keys: string[];
+};
+type BulkReidentifyModelsResponse = {
+  succeeded: string[];
+  failed: string[];
+};
+
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
@@ -239,6 +247,18 @@ export const modelsApi = api.injectEndpoints({
       },
       serializeQueryArgs: ({ queryArgs }) => `${queryArgs.name}.${queryArgs.base}.${queryArgs.type}`,
     }),
+    getModelConfigByHash: build.query<AnyModelConfig, string>({
+      query: (hash) => buildModelsUrl(`get_by_hash?${queryString.stringify({ hash })}`),
+      providesTags: (result) => {
+        const tags: ApiTagDescription[] = [];
+
+        if (result) {
+          tags.push({ type: 'ModelConfig', id: result.key });
+        }
+
+        return tags;
+      },
+    }),
     scanFolder: build.query<ScanFolderResponse, ScanFolderArg>({
       query: (arg) => {
         const folderQueryStr = arg ? queryString.stringify(arg, {}) : '';
@@ -419,6 +439,16 @@ export const modelsApi = api.injectEndpoints({
         }
       },
     }),
+    bulkReidentifyModels: build.mutation<BulkReidentifyModelsResponse, BulkReidentifyModelsArg>({
+      query: ({ keys }) => {
+        return {
+          url: buildModelsUrl('i/bulk_reidentify'),
+          method: 'POST',
+          body: { keys },
+        };
+      },
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
+    }),
     getOrphanedModels: build.query<GetOrphanedModelsResponse, void>({
       query: () => ({
         url: buildModelsUrl('sync/orphaned'),
@@ -463,6 +493,7 @@ export const {
   useResetHFTokenMutation,
   useEmptyModelCacheMutation,
   useReidentifyModelMutation,
+  useBulkReidentifyModelsMutation,
   useGetOrphanedModelsQuery,
   useDeleteOrphanedModelsMutation,
 } = modelsApi;
