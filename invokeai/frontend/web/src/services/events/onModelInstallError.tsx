@@ -195,9 +195,23 @@ const HFUnauthorizedToastDescription = () => {
 
 export const DiscordLink = () => {
   const { t: tFunc } = useTranslation();
-  return <ExternalLink fontWeight="semibold" href={discordLink} display="inline-flex" label={tFunc('supportVideos.discord')} />;
+  return (
+    <ExternalLink
+      fontWeight="semibold"
+      href={discordLink}
+      display="inline-flex"
+      label={tFunc('supportVideos.discord')}
+    />
+  );
 };
 export const GitHubIssuesLink = () => {
   const { t: tFunc } = useTranslation();
-  return <ExternalLink fontWeight="semibold" href={githubIssuesLink} display="inline-flex" label={tFunc('supportVideos.github')} />;
+  return (
+    <ExternalLink
+      fontWeight="semibold"
+      href={githubIssuesLink}
+      display="inline-flex"
+      label={tFunc('supportVideos.github')}
+    />
+  );
 };

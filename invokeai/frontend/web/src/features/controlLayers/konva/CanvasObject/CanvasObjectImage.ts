@@ -129,10 +129,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
     const imageElementResult = await withResultAsync(() => loadImage(imageDTO.image_url));
     if (imageElementResult.isErr()) {
       // Image loading failed (e.g. the URL to the "physical" image is invalid)
-      this.onFailedToLoadImage(
-        t('controlLayers.errors.unableToLoadImage'),
-        parseify(imageElementResult.error)
-      );
+      this.onFailedToLoadImage(t('controlLayers.errors.unableToLoadImage'), parseify(imageElementResult.error));
       return;
     }
 
@@ -155,10 +152,7 @@ export class CanvasObjectImage extends CanvasModuleBase {
     const imageElementResult = await withResultAsync(() => loadImage(dataURL));
     if (imageElementResult.isErr()) {
       // Image loading failed (e.g. the URL to the "physical" image is invalid)
-      this.onFailedToLoadImage(
-        t('controlLayers.errors.unableToLoadImage'),
-        parseify(imageElementResult.error)
-      );
+      this.onFailedToLoadImage(t('controlLayers.errors.unableToLoadImage'), parseify(imageElementResult.error));
       return;
     }
 

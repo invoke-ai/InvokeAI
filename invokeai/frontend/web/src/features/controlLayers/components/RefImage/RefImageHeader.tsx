@@ -72,11 +72,15 @@ export const RefImageHeader = memo(() => {
           </Text>
         )}
         <IconButton
-          tooltip={entity.isEnabled ? t('controlLayers.disableReferenceImage') : t('controlLayers.enableReferenceImage')}
+          tooltip={
+            entity.isEnabled ? t('controlLayers.disableReferenceImage') : t('controlLayers.enableReferenceImage')
+          }
           size="xs"
           variant="link"
           alignSelf="stretch"
-          aria-label={entity.isEnabled ? t('controlLayers.disableReferenceImage') : t('controlLayers.enableReferenceImage')}
+          aria-label={
+            entity.isEnabled ? t('controlLayers.disableReferenceImage') : t('controlLayers.enableReferenceImage')
+          }
           onClick={toggleIsEnabled}
           icon={entity.isEnabled ? <PiCircleFill /> : <PiCircleBold />}
         />

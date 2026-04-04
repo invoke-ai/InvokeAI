@@ -838,13 +838,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       id: bulk_download_item_name,
       title: t('gallery.bulkDownloadReady'),
       status: 'success',
-      description: (
-        <ExternalLink
-          label={t('gallery.clickToDownload')}
-          href={url}
-          download={bulk_download_item_name}
-        />
-      ),
+      description: <ExternalLink label={t('gallery.clickToDownload')} href={url} download={bulk_download_item_name} />,
       duration: null,
     });
   });

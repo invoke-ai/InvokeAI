@@ -50,7 +50,9 @@ const StudioSessionsPlaylistLink = () => {
 
 const DiscordLink = () => {
   const { t } = useTranslation();
-  return <ExternalLink fontWeight="semibold" href={discordLink} display="inline-flex" label={t('supportVideos.discord')} />;
+  return (
+    <ExternalLink fontWeight="semibold" href={discordLink} display="inline-flex" label={t('supportVideos.discord')} />
+  );
 };
 
 const components = {
