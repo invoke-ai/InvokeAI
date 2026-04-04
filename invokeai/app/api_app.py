@@ -100,25 +100,17 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
             if auth_header.startswith("Bearer "):
                 token = auth_header[7:]
                 try:
+                    from datetime import timedelta
+
+                    from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_NORMAL, TOKEN_EXPIRATION_REMEMBER_ME
                     from invokeai.app.services.auth.token_service import create_access_token, verify_token
 
                     token_data = verify_token(token)
                     if token_data is not None:
-                        # Determine expiry from the original token's remaining lifetime category.
-                        # Tokens with > 1 day remaining were "remember me" tokens; refresh with 7 days.
-                        # Others refresh with 1 day.
-                        from datetime import datetime, timedelta, timezone
-
-                        from jose import jwt
-
-                        from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_NORMAL, TOKEN_EXPIRATION_REMEMBER_ME
-                        from invokeai.app.services.auth.token_service import ALGORITHM, get_jwt_secret
-
-                        payload = jwt.decode(token, get_jwt_secret(), algorithms=[ALGORITHM])
-                        exp = payload.get("exp", 0)
-                        remaining = exp - datetime.now(timezone.utc).timestamp()
-                        # If more than 1 day remaining, this was a "remember me" token
-                        if remaining > 86400:
+                        # Use the remember_me claim from the token to determine the
+                        # correct refresh duration. This avoids the bug where a 7-day
+                        # token with <24h remaining would be silently downgraded to 1 day.
+                        if token_data.remember_me:
                             expires_delta = timedelta(days=TOKEN_EXPIRATION_REMEMBER_ME)
                         else:
                             expires_delta = timedelta(days=TOKEN_EXPIRATION_NORMAL)

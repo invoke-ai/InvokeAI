@@ -33,8 +33,10 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
   });
 
   useEffect(() => {
-    // If we have a token but fetching user failed, token is invalid/expired - logout
-    if (userError && isAuthenticated) {
+    // Only treat 401 as session expiry. Other errors (500, network, etc.) are
+    // transient and should not force logout — the 401 handler in dynamicBaseQuery
+    // already covers the actual expiry case.
+    if (userError && isAuthenticated && 'status' in userError && userError.status === 401) {
       dispatch(sessionExpiredLogout());
       navigate('/login', { replace: true });
     }
