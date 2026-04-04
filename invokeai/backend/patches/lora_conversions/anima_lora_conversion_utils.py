@@ -98,7 +98,7 @@ def _convert_kohya_unet_key(kohya_layer_name: str) -> str:
     # Apply known replacements for subcomponent names
     for old, new in _KOHYA_UNET_KEY_REPLACEMENTS:
         if old in key:
-            key = key.replace(old, new)
+            key = key.replace(old, new, 1)
             break
 
     return llm_adapter_prefix + key
@@ -122,7 +122,7 @@ def _convert_kohya_te_key(kohya_layer_name: str) -> str:
     # Apply known replacements
     for old, new in _KOHYA_TE_KEY_REPLACEMENTS:
         if old in key:
-            key = key.replace(old, new)
+            key = key.replace(old, new, 1)
             break
 
     # Qwen3ForCausalLM wraps the base Qwen3Model under `model.`
@@ -143,100 +143,49 @@ def _make_layer_patch(layer_dict: dict[str, torch.Tensor]) -> BaseLayerPatch:
     has_dora = "dora_scale" in layer_dict
     if has_lokr and has_dora:
         layer_dict = {k: v for k, v in layer_dict.items() if k != "dora_scale"}
-        logger.debug("Stripped dora_scale from LoKR layer (DoRA+LoKR combination not supported, using LoKR only)")
+        logger.warning("Stripped dora_scale from LoKR layer (DoRA+LoKR combination not supported, using LoKR only)")
     return any_lora_layer_from_state_dict(layer_dict)
 
 
-def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha: float | None = None) -> ModelPatchRaw:
-    """Convert an Anima LoRA state dict to a ModelPatchRaw.
+# Known suffixes for Kohya format
+_KOHYA_KNOWN_SUFFIXES = [
+    ".lora_A.weight",
+    ".lora_B.weight",
+    ".lora_down.weight",
+    ".lora_up.weight",
+    ".dora_scale",
+    ".alpha",
+]
 
-    Supports both Kohya-style keys (lora_unet_blocks_0_...) and diffusers PEFT format.
-    Also supports text encoder LoRA keys (lora_te_layers_0_...) targeting the Qwen3 encoder.
+# Additional suffixes for PEFT/LoKR format
+_PEFT_EXTRA_SUFFIXES = [
+    ".lokr_w1",
+    ".lokr_w2",
+    ".lokr_w1_a",
+    ".lokr_w1_b",
+    ".lokr_w2_a",
+    ".lokr_w2_b",
+]
+
+
+def _group_keys_by_layer(
+    state_dict: Dict[str, torch.Tensor],
+    extra_suffixes: list[str] | None = None,
+) -> dict[str, dict[str, torch.Tensor]]:
+    """Group state dict keys by layer name based on known suffixes.
 
     Args:
-        state_dict: The LoRA state dict
-        alpha: The alpha value for LoRA scaling. If None, uses rank as alpha.
+        state_dict: The LoRA state dict to group.
+        extra_suffixes: Additional suffixes to recognize beyond the base Kohya set.
 
     Returns:
-        A ModelPatchRaw containing the LoRA layers
-    """
-    layers: dict[str, BaseLayerPatch] = {}
-
-    # Detect format
-    str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
-    is_kohya = any(k.startswith(("lora_unet_", "lora_te_")) for k in str_keys)
-
-    if is_kohya:
-        # Kohya format: group by layer name (everything before .lora_down/.lora_up/.alpha)
-        grouped = _group_kohya_keys(state_dict)
-        for kohya_layer_name, layer_dict in grouped.items():
-            if kohya_layer_name.startswith("lora_te_"):
-                model_key = _convert_kohya_te_key(kohya_layer_name)
-                final_key = f"{ANIMA_LORA_QWEN3_PREFIX}{model_key}"
-            else:
-                model_key = _convert_kohya_unet_key(kohya_layer_name)
-                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{model_key}"
-            layer = _make_layer_patch(layer_dict)
-            layers[final_key] = layer
-    else:
-        # Diffusers PEFT format
-        grouped = _group_by_layer(state_dict)
-        for layer_key, layer_dict in grouped.items():
-            values = _get_lora_layer_values(layer_dict, alpha)
-            clean_key = layer_key
-
-            # Check for text encoder prefixes
-            text_encoder_prefixes = [
-                "base_model.model.text_encoder.",
-                "text_encoder.",
-            ]
-
-            is_text_encoder = False
-            for prefix in text_encoder_prefixes:
-                if layer_key.startswith(prefix):
-                    clean_key = layer_key[len(prefix) :]
-                    is_text_encoder = True
-                    break
-
-            # If not text encoder, check transformer prefixes
-            if not is_text_encoder:
-                for prefix in [
-                    "base_model.model.transformer.",
-                    "transformer.",
-                    "diffusion_model.",
-                ]:
-                    if layer_key.startswith(prefix):
-                        clean_key = layer_key[len(prefix) :]
-                        break
-
-            if is_text_encoder:
-                final_key = f"{ANIMA_LORA_QWEN3_PREFIX}{clean_key}"
-            else:
-                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{clean_key}"
-
-            layer = _make_layer_patch(values)
-            layers[final_key] = layer
-
-    return ModelPatchRaw(layers=layers)
-
-
-def _group_kohya_keys(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:
-    """Group Kohya-style LoRA keys by layer name.
-
-    Kohya keys look like: lora_unet_blocks_0_cross_attn_k_proj.lora_down.weight
-    Layer name: lora_unet_blocks_0_cross_attn_k_proj
-    Key suffix: lora_down.weight
+        Dict mapping layer names to their component tensors.
     """
     layer_dict: dict[str, dict[str, torch.Tensor]] = {}
 
-    known_suffixes = [
-        ".lora_A.weight",
-        ".lora_B.weight",
-        ".lora_down.weight",
-        ".lora_up.weight",
-        ".dora_scale",
-        ".alpha",
-    ]
+    known_suffixes = list(_KOHYA_KNOWN_SUFFIXES)
+    if extra_suffixes:
+        known_suffixes.extend(extra_suffixes)
 
     for key in state_dict:
         if not isinstance(key, str):
@@ -278,45 +227,74 @@ def _get_lora_layer_values(layer_dict: dict[str, torch.Tensor], alpha: float | N
         return layer_dict
 
 
-def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:
-    """Groups keys in the state dict by layer (for diffusers PEFT format)."""
-    layer_dict: dict[str, dict[str, torch.Tensor]] = {}
+def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha: float | None = None) -> ModelPatchRaw:
+    """Convert an Anima LoRA state dict to a ModelPatchRaw.
 
-    known_suffixes = [
-        ".lora_A.weight",
-        ".lora_B.weight",
-        ".lora_down.weight",
-        ".lora_up.weight",
-        ".dora_scale",
-        ".alpha",
-        # LoKR suffixes
-        ".lokr_w1",
-        ".lokr_w2",
-        ".lokr_w1_a",
-        ".lokr_w1_b",
-        ".lokr_w2_a",
-        ".lokr_w2_b",
-    ]
+    Supports both Kohya-style keys (lora_unet_blocks_0_...) and diffusers PEFT format.
+    Also supports text encoder LoRA keys (lora_te_layers_0_...) targeting the Qwen3 encoder.
 
-    for key in state_dict:
-        if not isinstance(key, str):
-            continue
+    Args:
+        state_dict: The LoRA state dict
+        alpha: The alpha value for LoRA scaling. If None, uses rank as alpha.
 
-        layer_name = None
-        key_name = None
-        for suffix in known_suffixes:
-            if key.endswith(suffix):
-                layer_name = key[: -len(suffix)]
-                key_name = suffix[1:]
-                break
+    Returns:
+        A ModelPatchRaw containing the LoRA layers
+    """
+    layers: dict[str, BaseLayerPatch] = {}
 
-        if layer_name is None:
-            parts = key.rsplit(".", maxsplit=2)
-            layer_name = parts[0]
-            key_name = ".".join(parts[1:])
+    # Detect format
+    str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+    is_kohya = any(k.startswith(("lora_unet_", "lora_te_")) for k in str_keys)
 
-        if layer_name not in layer_dict:
-            layer_dict[layer_name] = {}
-        layer_dict[layer_name][key_name] = state_dict[key]
+    if is_kohya:
+        # Kohya format: group by layer name (everything before .lora_down/.lora_up/.alpha)
+        grouped = _group_keys_by_layer(state_dict)
+        for kohya_layer_name, layer_dict in grouped.items():
+            if kohya_layer_name.startswith("lora_te_"):
+                model_key = _convert_kohya_te_key(kohya_layer_name)
+                final_key = f"{ANIMA_LORA_QWEN3_PREFIX}{model_key}"
+            else:
+                model_key = _convert_kohya_unet_key(kohya_layer_name)
+                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{model_key}"
+            layer = _make_layer_patch(layer_dict)
+            layers[final_key] = layer
+    else:
+        # Diffusers PEFT format
+        grouped = _group_keys_by_layer(state_dict, extra_suffixes=_PEFT_EXTRA_SUFFIXES)
+        for layer_key, layer_dict in grouped.items():
+            values = _get_lora_layer_values(layer_dict, alpha)
+            clean_key = layer_key
 
-    return layer_dict
+            # Check for text encoder prefixes
+            text_encoder_prefixes = [
+                "base_model.model.text_encoder.",
+                "text_encoder.",
+            ]
+
+            is_text_encoder = False
+            for prefix in text_encoder_prefixes:
+                if layer_key.startswith(prefix):
+                    clean_key = layer_key[len(prefix) :]
+                    is_text_encoder = True
+                    break
+
+            # If not text encoder, check transformer prefixes
+            if not is_text_encoder:
+                for prefix in [
+                    "base_model.model.transformer.",
+                    "transformer.",
+                    "diffusion_model.",
+                ]:
+                    if layer_key.startswith(prefix):
+                        clean_key = layer_key[len(prefix) :]
+                        break
+
+            if is_text_encoder:
+                final_key = f"{ANIMA_LORA_QWEN3_PREFIX}{clean_key}"
+            else:
+                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{clean_key}"
+
+            layer = _make_layer_patch(values)
+            layers[final_key] = layer
+
+    return ModelPatchRaw(layers=layers)

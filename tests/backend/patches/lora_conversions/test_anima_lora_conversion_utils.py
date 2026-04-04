@@ -222,3 +222,9 @@ def test_peft_keys_get_transformer_prefix():
         assert not inner_key.startswith("diffusion_model."), (
             f"diffusion_model. prefix should be stripped, got: {inner_key}"
         )
+
+
+def test_empty_state_dict_returns_empty_model():
+    """An empty state dict should produce a ModelPatchRaw with no layers."""
+    lora_model = lora_model_from_anima_state_dict({})
+    assert len(lora_model.layers) == 0
