@@ -107,12 +107,12 @@ class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
                         # Determine expiry from the original token's remaining lifetime category.
                         # Tokens with > 1 day remaining were "remember me" tokens; refresh with 7 days.
                         # Others refresh with 1 day.
-                        from datetime import timedelta
+                        from datetime import datetime, timedelta, timezone
+
+                        from jose import jwt
 
                         from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_NORMAL, TOKEN_EXPIRATION_REMEMBER_ME
-                        from jose import jwt
                         from invokeai.app.services.auth.token_service import ALGORITHM, get_jwt_secret
-                        from datetime import datetime, timezone
 
                         payload = jwt.decode(token, get_jwt_secret(), algorithms=[ALGORITHM])
                         exp = payload.get("exp", 0)
