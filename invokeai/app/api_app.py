@@ -79,6 +79,58 @@ app = FastAPI(
 )
 
 
+class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
+    """Refresh the JWT token on each authenticated response.
+
+    When a request includes a valid Bearer token, the response includes a
+    X-Refreshed-Token header with a new token that has a fresh expiry.
+    This implements sliding-window session expiry: the session only expires
+    after a period of *inactivity*, not a fixed time after login.
+    """
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
+        response = await call_next(request)
+
+        # Only refresh on mutating requests (POST/PUT/PATCH/DELETE) — these indicate
+        # genuine user activity. GET requests are often background fetches (RTK Query
+        # cache revalidation, refetch-on-focus, etc.) and should not reset the
+        # inactivity timer.
+        if response.status_code < 400 and request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            auth_header = request.headers.get("authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+                try:
+                    from invokeai.app.services.auth.token_service import create_access_token, verify_token
+
+                    token_data = verify_token(token)
+                    if token_data is not None:
+                        # Determine expiry from the original token's remaining lifetime category.
+                        # Tokens with > 1 day remaining were "remember me" tokens; refresh with 7 days.
+                        # Others refresh with 1 day.
+                        from datetime import timedelta
+
+                        from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_NORMAL, TOKEN_EXPIRATION_REMEMBER_ME
+                        from jose import jwt
+                        from invokeai.app.services.auth.token_service import ALGORITHM, get_jwt_secret
+                        from datetime import datetime, timezone
+
+                        payload = jwt.decode(token, get_jwt_secret(), algorithms=[ALGORITHM])
+                        exp = payload.get("exp", 0)
+                        remaining = exp - datetime.now(timezone.utc).timestamp()
+                        # If more than 1 day remaining, this was a "remember me" token
+                        if remaining > 86400:
+                            expires_delta = timedelta(days=TOKEN_EXPIRATION_REMEMBER_ME)
+                        else:
+                            expires_delta = timedelta(days=TOKEN_EXPIRATION_NORMAL)
+
+                        new_token = create_access_token(token_data, expires_delta)
+                        response.headers["X-Refreshed-Token"] = new_token
+                except Exception:
+                    pass  # Don't fail the request if token refresh fails
+
+        return response
+
+
 class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
     """When a request is made to the root path with a query string, redirect to the root path without the query string.
 
@@ -99,6 +151,7 @@ class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
 
 # Add the middleware
 app.add_middleware(RedirectRootWithQueryStringMiddleware)
+app.add_middleware(SlidingWindowTokenMiddleware)
 
 
 # Add event handler
@@ -117,6 +170,7 @@ app.add_middleware(
     allow_credentials=app_config.allow_credentials,
     allow_methods=app_config.allow_methods,
     allow_headers=app_config.allow_headers,
+    expose_headers=["X-Refreshed-Token"],
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)

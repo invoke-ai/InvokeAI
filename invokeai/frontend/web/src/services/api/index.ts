@@ -113,6 +113,15 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
     api.dispatch(sessionExpiredLogout());
   }
 
+  // Sliding window token refresh: if the server returned a refreshed token,
+  // update localStorage so subsequent requests use the new expiry.
+  if (!result.error && result.meta?.response) {
+    const refreshedToken = result.meta.response.headers.get('X-Refreshed-Token');
+    if (refreshedToken) {
+      localStorage.setItem('auth_token', refreshedToken);
+    }
+  }
+
   return result;
 };
 
