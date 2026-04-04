@@ -59,7 +59,7 @@ class AnimaModelLoaderInvocation(BaseInvocation):
 
     vae_model: ModelIdentifierField = InputField(
         description="Standalone VAE model. Anima uses a Wan 2.1 / QwenImage VAE (16-channel). "
-        "If not provided, a FLUX VAE can be used as a fallback.",
+        "A FLUX VAE can also be used as a compatible fallback.",
         input=Input.Direct,
         ui_model_type=ModelType.VAE,
         title="VAE",
