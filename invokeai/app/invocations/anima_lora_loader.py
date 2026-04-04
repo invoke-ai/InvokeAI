@@ -3,6 +3,7 @@ from typing import Optional
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
+    Classification,
     invocation,
     invocation_output,
 )
@@ -30,6 +31,7 @@ class AnimaLoRALoaderOutput(BaseInvocationOutput):
     tags=["lora", "model", "anima"],
     category="model",
     version="1.0.0",
+    classification=Classification.Prototype,
 )
 class AnimaLoRALoaderInvocation(BaseInvocation):
     """Apply a LoRA model to an Anima transformer and/or Qwen3 text encoder."""
@@ -93,6 +95,7 @@ class AnimaLoRALoaderInvocation(BaseInvocation):
     tags=["lora", "model", "anima"],
     category="model",
     version="1.0.0",
+    classification=Classification.Prototype,
 )
 class AnimaLoRACollectionLoader(BaseInvocation):
     """Applies a collection of LoRAs to an Anima transformer."""
@@ -116,6 +119,14 @@ class AnimaLoRACollectionLoader(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> AnimaLoRALoaderOutput:
         output = AnimaLoRALoaderOutput()
+
+        if self.loras is None:
+            if self.transformer is not None:
+                output.transformer = self.transformer.model_copy(deep=True)
+            if self.qwen3_encoder is not None:
+                output.qwen3_encoder = self.qwen3_encoder.model_copy(deep=True)
+            return output
+
         loras = self.loras if isinstance(self.loras, list) else [self.loras]
         added_loras: list[str] = []
 
@@ -132,7 +143,7 @@ class AnimaLoRACollectionLoader(BaseInvocation):
                 continue
 
             if not context.models.exists(lora.lora.key):
-                raise Exception(f"Unknown lora: {lora.lora.key}!")
+                raise ValueError(f"Unknown lora: {lora.lora.key}!")
 
             if lora.lora.base is not BaseModelType.Anima:
                 raise ValueError(
