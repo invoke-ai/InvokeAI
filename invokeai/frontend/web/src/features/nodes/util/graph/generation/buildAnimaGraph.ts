@@ -63,9 +63,9 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     type: 'anima_model_loader',
     id: getPrefixedId('anima_model_loader'),
     model,
-    vae_model: animaVaeModel ?? undefined,
-    qwen3_encoder_model: animaQwen3EncoderModel ?? undefined,
-    t5_encoder_model: animaT5EncoderModel ?? undefined,
+    vae_model: animaVaeModel,
+    qwen3_encoder_model: animaQwen3EncoderModel,
+    t5_encoder_model: animaT5EncoderModel,
   });
 
   const positivePrompt = g.addNode({
@@ -153,6 +153,7 @@ export const buildAnimaGraph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     scheduler: animaScheduler,
     vae: animaVaeModel ?? undefined,
     qwen3_encoder: animaQwen3EncoderModel ?? undefined,
+    t5_encoder: animaT5EncoderModel ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');

@@ -41,7 +41,7 @@ export const addAnimaLoRAs = (
   g.deleteEdgesTo(posCond, ['qwen3_encoder']);
   g.addEdge(loraCollectionLoader, 'transformer', denoise, 'transformer');
   g.addEdge(loraCollectionLoader, 'qwen3_encoder', posCond, 'qwen3_encoder');
-  // Only reroute negCond if it exists (guidance_scale > 0)
+  // Only reroute negCond if it exists (guidance_scale > 1)
   if (negCond !== null) {
     g.deleteEdgesTo(negCond, ['qwen3_encoder']);
     g.addEdge(loraCollectionLoader, 'qwen3_encoder', negCond, 'qwen3_encoder');

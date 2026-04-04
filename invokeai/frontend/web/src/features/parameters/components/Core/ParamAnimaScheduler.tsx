@@ -3,7 +3,7 @@ import { Combobox, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { selectAnimaScheduler, setAnimaScheduler } from 'features/controlLayers/store/paramsSlice';
-import { isParameterZImageScheduler } from 'features/parameters/types/parameterSchemas';
+import { isParameterAnimaScheduler } from 'features/parameters/types/parameterSchemas';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -21,8 +21,8 @@ const ParamAnimaScheduler = () => {
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
-      // Reuse Z-Image scheduler type guard since the values are identical
-      if (!isParameterZImageScheduler(v?.value)) {
+      // Validate against Anima scheduler values
+      if (!isParameterAnimaScheduler(v?.value)) {
         return;
       }
       dispatch(setAnimaScheduler(v.value));

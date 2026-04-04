@@ -71,6 +71,8 @@ export const zFluxSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Z-Image scheduler options (Flow Matching schedulers)
 // Note: LCM is only supported for Z-Image Turbo, not for Z-Image Base (undistilled)
 export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
+// Anima scheduler options (same flow-matching schedulers, defined separately to avoid coupling)
+export const zAnimaSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 
 // Flux DyPE (Dynamic Position Extrapolation) preset options for high-resolution generation
 export const zFluxDypePresetField = z.enum(['off', 'manual', 'auto', 'area', '4k']);
