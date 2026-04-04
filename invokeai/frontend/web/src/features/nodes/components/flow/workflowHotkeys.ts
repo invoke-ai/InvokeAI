@@ -5,6 +5,10 @@ export const isEventTargetWithinElement = (
   return Boolean(target && element?.contains(target as Node));
 };
 
+export const isWorkflowHotkeyEnabled = (isWorkflowsFocused: boolean) => {
+  return isWorkflowsFocused;
+};
+
 type SelectionLike = {
   isCollapsed: boolean;
   toString(): string;

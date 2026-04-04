@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isEventTargetWithinElement, shouldIgnoreWorkflowCopyHotkey } from './workflowHotkeys';
+import { isEventTargetWithinElement, isWorkflowHotkeyEnabled, shouldIgnoreWorkflowCopyHotkey } from './workflowHotkeys';
 
 describe('isEventTargetWithinElement', () => {
   it('returns true when the element contains the event target', () => {
@@ -23,6 +23,16 @@ describe('isEventTargetWithinElement', () => {
 
   it('returns false when the element is missing', () => {
     expect(isEventTargetWithinElement(new EventTarget(), null)).toBe(false);
+  });
+});
+
+describe('isWorkflowHotkeyEnabled', () => {
+  it('enables workflow hotkeys whenever the workflows pane is focused', () => {
+    expect(isWorkflowHotkeyEnabled(true)).toBe(true);
+  });
+
+  it('disables workflow hotkeys when the workflows pane is not focused', () => {
+    expect(isWorkflowHotkeyEnabled(false)).toBe(false);
   });
 });
 

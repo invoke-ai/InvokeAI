@@ -35,7 +35,6 @@ const REGION_NAMES = [
   'layers',
   'canvas',
   'workflows',
-  'workflowEditor',
   'progress',
   'settings',
 ] as const;
