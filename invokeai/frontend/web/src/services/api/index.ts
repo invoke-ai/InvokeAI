@@ -106,7 +106,9 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
 
   const result = await rawBaseQuery(args, api, extraOptions);
 
-  // If we receive a 401 on a non-auth endpoint and we have a token, the session has expired.
+  // If we sent an auth token but got 401, the token is invalid/expired.
+  // Only trigger session expiry when we actually sent a token — unauthenticated
+  // requests (e.g. client_state queries during page load) should not cause logout.
   if (result.error && result.error.status === 401 && !isAuthEndpoint && token) {
     api.dispatch(sessionExpiredLogout());
   }

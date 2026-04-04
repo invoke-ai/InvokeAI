@@ -40,6 +40,33 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
     }
   }, [userError, isAuthenticated, dispatch, navigate]);
 
+  // Detect when auth_token is removed from localStorage (e.g. by another tab,
+  // browser devtools, or token expiry cleanup). The 'storage' event fires when
+  // localStorage is modified by another context; we also poll periodically to
+  // catch same-tab deletions (which don't trigger the storage event).
+  useEffect(() => {
+    if (!multiuserEnabled || !isAuthenticated) {
+      return;
+    }
+
+    const checkToken = () => {
+      if (!localStorage.getItem('auth_token') && isAuthenticated) {
+        dispatch(sessionExpiredLogout());
+        navigate('/login', { replace: true });
+      }
+    };
+
+    // Listen for cross-tab localStorage changes
+    window.addEventListener('storage', checkToken);
+    // Poll for same-tab deletions (e.g. browser console)
+    const interval = setInterval(checkToken, 5000);
+
+    return () => {
+      window.removeEventListener('storage', checkToken);
+      clearInterval(interval);
+    };
+  }, [multiuserEnabled, isAuthenticated, dispatch, navigate]);
+
   useEffect(() => {
     // If we successfully fetched user data, update auth state
     if (currentUser && token && !user) {
