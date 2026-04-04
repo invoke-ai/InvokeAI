@@ -1,7 +1,7 @@
 import { Center, Spinner } from '@invoke-ai/ui-library';
 import type { RootState } from 'app/store/store';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { logout, setCredentials } from 'features/auth/store/authSlice';
+import { logout, sessionExpiredLogout, setCredentials } from 'features/auth/store/authSlice';
 import type { PropsWithChildren } from 'react';
 import { memo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -33,9 +33,9 @@ export const ProtectedRoute = memo(({ children, requireAdmin = false }: PropsWit
   });
 
   useEffect(() => {
-    // If we have a token but fetching user failed, token is invalid - logout
+    // If we have a token but fetching user failed, token is invalid/expired - logout
     if (userError && isAuthenticated) {
-      dispatch(logout());
+      dispatch(sessionExpiredLogout());
       navigate('/login', { replace: true });
     }
   }, [userError, isAuthenticated, dispatch, navigate]);
