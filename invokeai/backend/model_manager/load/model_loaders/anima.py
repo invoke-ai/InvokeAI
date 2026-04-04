@@ -19,6 +19,9 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.logging import InvokeAILogger
+
+logger = InvokeAILogger.get_logger(__name__)
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.Main, format=ModelFormat.Checkpoint)
@@ -122,5 +125,16 @@ class AnimaCheckpointModel(ModelLoader):
         for k in keys_to_remove:
             del sd[k]
 
-        model.load_state_dict(sd, assign=True, strict=False)
+        load_result = model.load_state_dict(sd, assign=True, strict=False)
+        if load_result.unexpected_keys:
+            raise RuntimeError(
+                f"Checkpoint contains {len(load_result.unexpected_keys)} unexpected keys. "
+                f"This may indicate a corrupted or incompatible checkpoint. "
+                f"First 5 unexpected keys: {load_result.unexpected_keys[:5]}"
+            )
+        if load_result.missing_keys:
+            logger.warning(
+                f"Checkpoint is missing {len(load_result.missing_keys)} keys "
+                f"(expected for inv_freq buffers). First 5: {load_result.missing_keys[:5]}"
+            )
         return model
