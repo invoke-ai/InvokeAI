@@ -39,9 +39,16 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.logging import InvokeAILogger
+
+logger = InvokeAILogger.get_logger(__name__)
 
 # T5-XXL max sequence length for token IDs
 T5_MAX_SEQ_LEN = 512
+
+# Safety cap for Qwen3 sequence length to prevent GPU OOM on extremely long prompts.
+# Qwen3 0.6B supports 32K context but the LLM Adapter doesn't need that much.
+QWEN3_MAX_SEQ_LEN = 8192
 
 
 @invocation(
@@ -143,12 +150,12 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             context.util.signal_progress("Running Qwen3 0.6B text encoder")
 
             # Anima uses base Qwen3 (not instruct) — tokenize directly, no chat template.
-            # No padding or truncation: the LLM Adapter uses rotary position embeddings
-            # with no fixed positional limit, so the Qwen3 source sequence can be any length.
+            # A safety cap is applied to prevent GPU OOM on extremely long prompts.
             text_inputs = tokenizer(
                 prompt,
                 padding=False,
-                truncation=False,
+                truncation=True,
+                max_length=QWEN3_MAX_SEQ_LEN,
                 return_attention_mask=True,
                 return_tensors="pt",
             )
@@ -157,6 +164,12 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             attention_mask = text_inputs.attention_mask
             if not isinstance(text_input_ids, torch.Tensor) or not isinstance(attention_mask, torch.Tensor):
                 raise TypeError("Tokenizer returned unexpected types.")
+
+            if text_input_ids.shape[-1] == QWEN3_MAX_SEQ_LEN:
+                logger.warning(
+                    f"Prompt was truncated to {QWEN3_MAX_SEQ_LEN} tokens. "
+                    "Consider shortening the prompt for best results."
+                )
 
             # Ensure at least 1 token (empty prompts produce 0 tokens with padding=False)
             if text_input_ids.shape[-1] == 0:
