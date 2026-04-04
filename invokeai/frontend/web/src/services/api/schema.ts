@@ -521,6 +521,28 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/i/bulk_reidentify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Reidentify Models
+         * @description Reidentify multiple models by re-probing their weights files.
+         *
+         *     Returns a list of successfully reidentified keys and failed reidentifications with error messages.
+         */
+        post: operations["bulk_reidentify_models"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/install": {
         parameters: {
             query?: never;
@@ -3727,6 +3749,35 @@ export type components = {
              * @description The name of the bulk image download item
              */
             bulk_download_item_name: string;
+        };
+        /**
+         * BulkReidentifyModelsRequest
+         * @description Request body for bulk model reidentification.
+         */
+        BulkReidentifyModelsRequest: {
+            /**
+             * Keys
+             * @description List of model keys to reidentify
+             */
+            keys: string[];
+        };
+        /**
+         * BulkReidentifyModelsResponse
+         * @description Response body for bulk model reidentification.
+         */
+        BulkReidentifyModelsResponse: {
+            /**
+             * Succeeded
+             * @description List of successfully reidentified model keys
+             */
+            succeeded: string[];
+            /**
+             * Failed
+             * @description List of failed reidentifications with error messages
+             */
+            failed: {
+                [key: string]: unknown;
+            }[];
         };
         /** CLIPEmbed_Diffusers_G_Config */
         CLIPEmbed_Diffusers_G_Config: {
@@ -29675,6 +29726,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkDeleteModelsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_reidentify_models: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkReidentifyModelsRequest"];
+            };
+        };
+        responses: {
+            /** @description Models reidentified (possibly with some failures) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkReidentifyModelsResponse"];
                 };
             };
             /** @description Validation Error */
