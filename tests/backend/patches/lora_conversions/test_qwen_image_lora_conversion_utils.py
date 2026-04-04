@@ -18,7 +18,6 @@ from tests.backend.patches.lora_conversions.lora_state_dicts.qwen_image_lora_koh
 )
 from tests.backend.patches.lora_conversions.lora_state_dicts.utils import keys_to_mock_state_dict
 
-
 # ---- Format detection tests ----
 
 
@@ -59,9 +58,7 @@ def test_convert_kohya_key_mlp():
         _convert_kohya_key("lora_unet_transformer_blocks_0_img_mlp_net_0_proj")
         == "transformer_blocks.0.img_mlp.net.0.proj"
     )
-    assert (
-        _convert_kohya_key("lora_unet_transformer_blocks_0_txt_mlp_net_2") == "transformer_blocks.0.txt_mlp.net.2"
-    )
+    assert _convert_kohya_key("lora_unet_transformer_blocks_0_txt_mlp_net_2") == "transformer_blocks.0.txt_mlp.net.2"
 
 
 def test_convert_kohya_key_unknown_returns_none():
