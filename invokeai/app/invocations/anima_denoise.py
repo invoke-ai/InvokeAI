@@ -397,6 +397,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
         device = TorchDevice.choose_torch_device()
         inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
 
+        if self.denoising_start >= self.denoising_end:
+            raise ValueError(
+                f"denoising_start ({self.denoising_start}) must be less than "
+                f"denoising_end ({self.denoising_end})."
+            )
+
         transformer_info = context.models.load(self.transformer.transformer)
 
         # Compute image token grid dimensions for regional prompting
@@ -574,10 +580,10 @@ class AnimaDenoiseInvocation(BaseInvocation):
             exit_stack.enter_context(patch_anima_for_regional_prompting(transformer, regional_extension))
 
             # Helper to run transformer with pre-computed context (bypasses LLM Adapter)
-            def _run_transformer(ctx: torch.Tensor) -> torch.Tensor:
+            def _run_transformer(ctx: torch.Tensor, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
                 return transformer(
-                    x=latents.to(transformer.dtype if hasattr(transformer, "dtype") else inference_dtype),
-                    timesteps=timestep,
+                    x=x.to(transformer.dtype if hasattr(transformer, "dtype") else inference_dtype),
+                    timesteps=t,
                     context=ctx,
                     # t5xxl_ids=None skips the LLM Adapter — context is already pre-computed
                 )
@@ -597,10 +603,10 @@ class AnimaDenoiseInvocation(BaseInvocation):
                         [sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
                     ).expand(latents.shape[0])
 
-                    noise_pred_cond = _run_transformer(pos_context).float()
+                    noise_pred_cond = _run_transformer(pos_context, latents, timestep).float()
 
                     if do_cfg and neg_context is not None:
-                        noise_pred_uncond = _run_transformer(neg_context).float()
+                        noise_pred_uncond = _run_transformer(neg_context, latents, timestep).float()
                         noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
                     else:
                         noise_pred = noise_pred_cond
@@ -658,10 +664,10 @@ class AnimaDenoiseInvocation(BaseInvocation):
                         [sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
                     ).expand(latents.shape[0])
 
-                    noise_pred_cond = _run_transformer(pos_context).float()
+                    noise_pred_cond = _run_transformer(pos_context, latents, timestep).float()
 
                     if do_cfg and neg_context is not None:
-                        noise_pred_uncond = _run_transformer(neg_context).float()
+                        noise_pred_uncond = _run_transformer(neg_context, latents, timestep).float()
                         noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
                     else:
                         noise_pred = noise_pred_cond

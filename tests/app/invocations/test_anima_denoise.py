@@ -107,3 +107,38 @@ class TestGetSigmas:
         sigmas = inv._get_sigmas(10)
         # At step 5/10, linear t = 0.5, shifted sigma should be 0.75
         assert sigmas[5] == pytest.approx(loglinear_timestep_shift(3.0, 0.5))
+
+
+class TestGetSigmasEdgeCases:
+    """Test edge cases for sigma schedule generation."""
+
+    def test_single_step_produces_valid_schedule(self):
+        """_get_sigmas(num_steps=1) should produce a valid 2-element schedule."""
+        inv = AnimaDenoiseInvocation(
+            positive_conditioning=None,  # type: ignore
+            transformer=None,  # type: ignore
+        )
+        sigmas = inv._get_sigmas(1)
+        assert len(sigmas) == 2
+        assert sigmas[0] > sigmas[1]
+        assert sigmas[0] == pytest.approx(loglinear_timestep_shift(ANIMA_SHIFT, 1.0))
+        assert sigmas[-1] == pytest.approx(0.0)
+
+
+class TestInverseLoglinearEdgeCases:
+    """Test edge cases for inverse_loglinear_timestep_shift."""
+
+    def test_alpha_zero_does_not_divide_by_zero(self):
+        """inverse_loglinear_timestep_shift with alpha=0 should not raise ZeroDivisionError.
+
+        With alpha=0: denominator = 0 - (0-1)*sigma = sigma.
+        At sigma=0, denominator=0 which hits the epsilon guard and returns 1.0.
+        At sigma>0, denominator=sigma, result = sigma/sigma = 1.0.
+        """
+        # Should not raise
+        result = inverse_loglinear_timestep_shift(0.0, 0.5)
+        assert isinstance(result, float)
+
+        # At sigma=0, denominator would be 0 — should hit the epsilon guard
+        result_zero = inverse_loglinear_timestep_shift(0.0, 0.0)
+        assert isinstance(result_zero, float)
