@@ -3,10 +3,8 @@
 from datetime import timedelta
 
 import pytest
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret
 
@@ -89,10 +87,10 @@ class TestSlidingWindowTokenMiddleware:
 
     def test_remember_me_token_refreshes_to_remember_me_duration(self):
         """A remember_me=True token refreshes with the remember-me duration, not the normal duration."""
-        from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_REMEMBER_ME
-        from invokeai.app.services.auth.token_service import ALGORITHM, get_jwt_secret, verify_token
-
         from jose import jwt
+
+        from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_REMEMBER_ME
+        from invokeai.app.services.auth.token_service import ALGORITHM, get_jwt_secret
 
         app = _create_test_app()
         client = TestClient(app)
@@ -121,10 +119,10 @@ class TestSlidingWindowTokenMiddleware:
 
     def test_normal_token_refreshes_to_normal_duration(self):
         """A remember_me=False token refreshes with the normal duration."""
+        from jose import jwt
+
         from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_NORMAL
         from invokeai.app.services.auth.token_service import ALGORITHM, get_jwt_secret
-
-        from jose import jwt
 
         app = _create_test_app()
         client = TestClient(app)
