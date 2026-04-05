@@ -25,6 +25,19 @@ import { assert } from 'tsafe';
 
 const log = logger('system');
 
+/**
+ * Determine whether the given model config represents a Qwen Image Edit model.
+ * Only edit-variant models should use reference images for conditioning.
+ * Generate (txt2img) models should never receive reference images, even if
+ * they exist in state from a previous edit session.
+ */
+export const isQwenImageEditModel = (model: { variant?: string | null } | null): boolean => {
+  if (!model) {
+    return false;
+  }
+  return 'variant' in model && model.variant === 'edit';
+};
+
 export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
   const { generationMode, state, manager } = arg;
 
@@ -106,7 +119,7 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
 
   // Only collect reference images for edit-variant models.
   // For txt2img (generate) models, reference images are not used even if they exist in state.
-  const isEditModel = 'variant' in model && model.variant === 'edit';
+  const isEditModel = isQwenImageEditModel(model);
   const validRefImageConfigs = isEditModel
     ? selectRefImagesSlice(state).entities.filter(
         (entity) =>
