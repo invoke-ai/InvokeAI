@@ -1285,4 +1285,12 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         if not _has_ggml_tensors(sd):
             raise NotAMatchError("state dict does not look like GGUF quantized")
 
+        # Infer variant from filename if not explicitly provided.
+        # GGUF files have no metadata to distinguish edit from generate models,
+        # but filenames containing "edit" (case-insensitive) are a strong heuristic.
+        if "variant" not in override_fields or override_fields.get("variant") is None:
+            filename = mod.path.stem.lower()
+            if "edit" in filename:
+                override_fields = {**override_fields, "variant": QwenImageVariantType.Edit}
+
         return cls(**override_fields)
