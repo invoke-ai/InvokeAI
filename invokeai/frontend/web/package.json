@@ -141,6 +141,7 @@
     "eslint-plugin-storybook": "^9.0.17",
     "eslint-plugin-unused-imports": "^4.1.4",
     "globals": "^16.3.0",
+    "jsdom": "^29.0.1",
     "knip": "^5.61.3",
     "magic-string": "^0.30.17",
     "openapi-types": "^12.1.3",

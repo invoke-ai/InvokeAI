@@ -39,6 +39,8 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
     },
     test: {
+      environment: 'jsdom',
+      setupFiles: ['src/tests/setup.ts'],
       typecheck: {
         enabled: true,
         ignoreSourceErrors: true,
