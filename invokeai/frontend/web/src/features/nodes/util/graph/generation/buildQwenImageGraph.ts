@@ -38,6 +38,19 @@ export const isQwenImageEditModel = (model: { variant?: string | null } | null):
   return 'variant' in model && model.variant === 'edit';
 };
 
+/**
+ * Determine whether classifier-free guidance (negative conditioning) should be used.
+ * CFG is only enabled when cfg_scale > 1. With cfg_scale <= 1, the negative prompt
+ * is mathematically unused and the model runs once per step instead of twice.
+ */
+export const shouldUseCfg = (cfgScale: number | number[]): boolean => {
+  if (typeof cfgScale === 'number') {
+    return cfgScale > 1;
+  }
+  // For per-step CFG arrays, enable CFG if any value exceeds 1
+  return cfgScale.some((value) => value > 1);
+};
+
 export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
   const { generationMode, state, manager } = arg;
 
@@ -73,7 +86,7 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
   });
 
   // Negative conditioning for CFG (only when cfg_scale > 1)
-  const useCfg = typeof cfg_scale === 'number' ? cfg_scale > 1 : true;
+  const useCfg = shouldUseCfg(cfg_scale);
   const negCond = useCfg
     ? g.addNode({
         type: 'qwen_image_text_encoder',
