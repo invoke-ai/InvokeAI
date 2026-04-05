@@ -2595,6 +2595,216 @@ export type components = {
             is_active?: boolean | null;
         };
         /**
+         * Adv AutoStereogram
+         * @description create an advanced autostereogram from a depth map
+         */
+        AdvAutostereogramInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The depth map to create the image from
+             * @default null
+             */
+            depth_map?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The pattern image to use as the background, if not provided then random dots will be used
+             * @default null
+             */
+            pattern?: components["schemas"]["ImageField"] | null;
+            /**
+             * Pattern Width
+             * @description The pattern width pixels
+             * @default 100
+             */
+            pattern_width?: number;
+            /**
+             * Depth Steps
+             * @description The number of depth steps, 30-127 is a good range but should be less than the pattern width
+             * @default 50
+             */
+            depth_steps?: number;
+            /**
+             * Invert Depth Map
+             * @description Invert the depth map (difference between crossing and uncrossing eyes)
+             * @default false
+             */
+            invert_depth_map?: boolean;
+            /**
+             * Grayscale
+             * @description Color or Grayscale output
+             * @default false
+             */
+            grayscale?: boolean;
+            /**
+             * type
+             * @default adv_autostereogram
+             * @constant
+             */
+            type: "adv_autostereogram";
+        };
+        /**
+         * Advanced Text Font to Image
+         * @description Overlay Text onto an image or blank canvas.
+         */
+        AdvancedTextFontImageInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Text Input
+             * @description The text from which to generate an image
+             * @default Invoke AI
+             */
+            text_input?: string;
+            /**
+             * Text Input Second Row
+             * @description The second row of text to add below the first text
+             * @default null
+             */
+            text_input_second_row?: string | null;
+            /**
+             * Font Url
+             * @description URL address of the font file to download
+             * @default https://www.1001fonts.com/download/font/caliban.medium.ttf
+             */
+            font_url?: string | null;
+            /**
+             * Local Font Path
+             * @description Local font file path (overrides font_url)
+             * @default null
+             */
+            local_font_path?: string | null;
+            /**
+             * Local Font
+             * @description Name of the local font file to use from the font_cache folder
+             * @default None
+             * @constant
+             */
+            local_font?: "None";
+            /**
+             * Image Width
+             * @description Width of the output image
+             * @default 1024
+             */
+            image_width?: number;
+            /**
+             * Image Height
+             * @description Height of the output image
+             * @default 512
+             */
+            image_height?: number;
+            /**
+             * Font Color First
+             * @description Font color for the first row of text in HEX format (e.g., '#FFFFFF')
+             * @default #FFFFFF
+             */
+            font_color_first?: string;
+            /**
+             * X Position First
+             * @description X position of the first row of text
+             * @default 0
+             */
+            x_position_first?: number;
+            /**
+             * Y Position First
+             * @description Y position of the first row of text
+             * @default 0
+             */
+            y_position_first?: number;
+            /**
+             * Rotation First
+             * @description Rotation angle of the first row of text (in degrees)
+             * @default 0
+             */
+            rotation_first?: number;
+            /**
+             * Font Size First
+             * @description Font size for the first row of text
+             * @default 35
+             */
+            font_size_first?: number | null;
+            /**
+             * Font Color Second
+             * @description Font color for the second row of text in HEX format (e.g., '#FFFFFF')
+             * @default #FFFFFF
+             */
+            font_color_second?: string;
+            /**
+             * X Position Second
+             * @description X position of the second row of text
+             * @default 0
+             */
+            x_position_second?: number;
+            /**
+             * Y Position Second
+             * @description Y position of the second row of text
+             * @default 0
+             */
+            y_position_second?: number;
+            /**
+             * Rotation Second
+             * @description Rotation angle of the second row of text (in degrees)
+             * @default 0
+             */
+            rotation_second?: number;
+            /**
+             * Font Size Second
+             * @description Font size for the second row of text
+             * @default 35
+             */
+            font_size_second?: number | null;
+            /**
+             * @description An image to place the text onto
+             * @default null
+             */
+            input_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * type
+             * @default Advanced_Text_Font_to_Image
+             * @constant
+             */
+            type: "Advanced_Text_Font_to_Image";
+        };
+        /**
          * Alpha Mask to Tensor
          * @description Convert a mask image to a tensor. Opaque regions are 1 and transparent regions are 0.
          */
@@ -2633,6 +2843,102 @@ export type components = {
              * @constant
              */
             type: "alpha_mask_to_tensor";
+        };
+        /**
+         * Anamorphic Streaks
+         * @description Adds anamorphic streaks to the input image
+         */
+        AnamorphicStreaksInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to streak
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The color to use for streaks
+             * @default {
+             *       "r": 0,
+             *       "g": 100,
+             *       "b": 255,
+             *       "a": 255
+             *     }
+             */
+            streak_color?: components["schemas"]["ColorField"];
+            /**
+             * Gamma
+             * @description Gamma to use for finding highlights
+             * @default 30
+             */
+            gamma?: number;
+            /**
+             * Blur Radius
+             * @description Radius to blur highlights
+             * @default 5
+             */
+            blur_radius?: number;
+            /**
+             * Erosion Kernel Size
+             * @description Amount to erode blurred highlights
+             * @default 5
+             */
+            erosion_kernel_size?: number;
+            /**
+             * Erosion Iterations
+             * @description Number of erosion iterations
+             * @default 2
+             */
+            erosion_iterations?: number;
+            /**
+             * Streak Intensity
+             * @description Streak Intensity
+             * @default 10
+             */
+            streak_intensity?: number;
+            /**
+             * Internal Reflection Strength
+             * @description Internal reflection strength
+             * @default 0.3
+             */
+            internal_reflection_strength?: number;
+            /**
+             * Streak Width
+             * @description Streak width (recommended image width)
+             * @default 512
+             */
+            streak_width?: number;
+            /**
+             * type
+             * @default anamorphic_streaks
+             * @constant
+             */
+            type: "anamorphic_streaks";
         };
         AnyModelConfig: components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Unknown_Config"];
         /**
@@ -2758,6 +3064,124 @@ export type components = {
              * @constant
              */
             type: "apply_mask_to_image";
+        };
+        /**
+         * AutoStereogram
+         * @description create an autostereogram from a depth map
+         */
+        AutostereogramInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The depth map to create the autostereogram from
+             * @default null
+             */
+            depth_map?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The pattern image, if not provided then random dots will be used
+             * @default null
+             */
+            pattern?: components["schemas"]["ImageField"] | null;
+            /**
+             * Pattern Divisions
+             * @description How many pattern repeats in output 5-10 is in general a good range. lower = more depth but harder to see
+             * @default 8
+             */
+            pattern_divisions?: number;
+            /**
+             * Invert Depth Map
+             * @description Invert the depth map (difference between crossing and uncrossing eyes)
+             * @default false
+             */
+            invert_depth_map?: boolean;
+            /**
+             * Grayscale
+             * @description Color or Grayscale output
+             * @default false
+             */
+            grayscale?: boolean;
+            /**
+             * type
+             * @default autostereogram
+             * @constant
+             */
+            type: "autostereogram";
+        };
+        /**
+         * Average Images
+         * @description Average images
+         */
+        AverageImagesInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Images
+             * @description The collection of images to average
+             * @default null
+             */
+            images?: components["schemas"]["ImageField"][] | null;
+            /**
+             * Gamma
+             * @description Gamma for color correcting before/after blending
+             * @default 2.2
+             */
+            gamma?: number;
+            /**
+             * type
+             * @default average_images
+             * @constant
+             */
+            type: "average_images";
         };
         /**
          * BaseMetadata
@@ -3419,6 +3843,147 @@ export type components = {
             metadata?: string | null;
         };
         /**
+         * Bool Collection Index
+         * @description CollectionIndex Picks an index out of a collection with a random option
+         */
+        BoolCollectionIndexInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Random
+             * @description Random Index?
+             * @default true
+             */
+            random?: boolean;
+            /**
+             * Index
+             * @description zero based index into collection (note index will wrap around if out of bounds)
+             * @default 0
+             */
+            index?: number;
+            /**
+             * Collection
+             * @description bool collection
+             * @default null
+             */
+            collection?: boolean[] | null;
+            /**
+             * type
+             * @default bool_collection_index
+             * @constant
+             */
+            type: "bool_collection_index";
+        };
+        /**
+         * Bool Collection Toggle
+         * @description Allows boolean selection between two separate boolean collection inputs
+         */
+        BoolCollectionToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Col1
+             * @description First Bool Collection Input
+             * @default null
+             */
+            col1?: boolean[] | null;
+            /**
+             * Col2
+             * @description Second Bool Collection Input
+             * @default null
+             */
+            col2?: boolean[] | null;
+            /**
+             * type
+             * @default bool_collection_toggle
+             * @constant
+             */
+            type: "bool_collection_toggle";
+        };
+        /**
+         * Bool Toggle
+         * @description Allows boolean selection between two separate boolean inputs
+         */
+        BoolToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Bool1
+             * @description First Bool Input
+             * @default false
+             */
+            bool1?: boolean;
+            /**
+             * Bool2
+             * @description Second Bool Input
+             * @default false
+             */
+            bool2?: boolean;
+            /**
+             * type
+             * @default bool_toggle
+             * @constant
+             */
+            type: "bool_toggle";
+        };
+        /**
          * Boolean Collection Primitive
          * @description A collection of boolean primitive values
          */
@@ -3452,6 +4017,47 @@ export type components = {
              * @constant
              */
             type: "boolean_collection";
+        };
+        /**
+         * Boolean Collection Primitive Linked
+         * @description A collection of boolean primitive values
+         */
+        BooleanCollectionLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description The collection of boolean values
+             * @default []
+             */
+            collection?: boolean[];
+            /**
+             * type
+             * @default boolean_collection_linked
+             * @constant
+             */
+            type: "boolean_collection_linked";
+            /**
+             * Value
+             * @description The boolean value
+             * @default false
+             */
+            value?: boolean;
         };
         /**
          * BooleanCollectionOutput
@@ -4113,6 +4719,510 @@ export type components = {
             cpu_only: boolean | null;
         };
         /**
+         * CMYK Color Separation
+         * @description Get color images from a base color and two others that subtractively mix to obtain it
+         */
+        CMYKColorSeparationInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Width
+             * @description Desired image width
+             * @default 512
+             */
+            width?: number;
+            /**
+             * Height
+             * @description Desired image height
+             * @default 512
+             */
+            height?: number;
+            /**
+             * C Value
+             * @description Desired final cyan value
+             * @default 0
+             */
+            c_value?: number;
+            /**
+             * M Value
+             * @description Desired final magenta value
+             * @default 25
+             */
+            m_value?: number;
+            /**
+             * Y Value
+             * @description Desired final yellow value
+             * @default 28
+             */
+            y_value?: number;
+            /**
+             * K Value
+             * @description Desired final black value
+             * @default 76
+             */
+            k_value?: number;
+            /**
+             * C Split
+             * @description Desired cyan split point % [0..1.0]
+             * @default 0.5
+             */
+            c_split?: number;
+            /**
+             * M Split
+             * @description Desired magenta split point % [0..1.0]
+             * @default 1
+             */
+            m_split?: number;
+            /**
+             * Y Split
+             * @description Desired yellow split point % [0..1.0]
+             * @default 0
+             */
+            y_split?: number;
+            /**
+             * K Split
+             * @description Desired black split point % [0..1.0]
+             * @default 0.5
+             */
+            k_split?: number;
+            /**
+             * Profile
+             * @description CMYK Color Profile
+             * @default Default
+             * @enum {string}
+             */
+            profile?: "Default" | "PIL";
+            /**
+             * type
+             * @default cmyk_separation
+             * @constant
+             */
+            type: "cmyk_separation";
+        };
+        /**
+         * CMYK Halftone
+         * @description Halftones an image in the style of a CMYK print
+         */
+        CMYKHalftoneInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to halftone
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Spacing
+             * @description Halftone dot spacing
+             * @default 8
+             */
+            spacing?: number;
+            /**
+             * C Angle
+             * @description C halftone angle
+             * @default 15
+             */
+            c_angle?: number;
+            /**
+             * M Angle
+             * @description M halftone angle
+             * @default 75
+             */
+            m_angle?: number;
+            /**
+             * Y Angle
+             * @description Y halftone angle
+             * @default 90
+             */
+            y_angle?: number;
+            /**
+             * K Angle
+             * @description K halftone angle
+             * @default 45
+             */
+            k_angle?: number;
+            /**
+             * Oversampling
+             * @description Oversampling factor
+             * @default 1
+             */
+            oversampling?: number;
+            /**
+             * Offset C
+             * @description Offset Cyan halfway between dots
+             * @default false
+             */
+            offset_c?: boolean;
+            /**
+             * Offset M
+             * @description Offset Magenta halfway between dots
+             * @default false
+             */
+            offset_m?: boolean;
+            /**
+             * Offset Y
+             * @description Offset Yellow halfway between dots
+             * @default false
+             */
+            offset_y?: boolean;
+            /**
+             * Offset K
+             * @description Offset K halfway between dots
+             * @default false
+             */
+            offset_k?: boolean;
+            /**
+             * type
+             * @default cmyk_halftone
+             * @constant
+             */
+            type: "cmyk_halftone";
+        };
+        /**
+         * CMYK Merge
+         * @description Merge subtractive color channels (CMYK+alpha)
+         */
+        CMYKMergeInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The c channel
+             * @default null
+             */
+            c_channel?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The m channel
+             * @default null
+             */
+            m_channel?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The y channel
+             * @default null
+             */
+            y_channel?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The k channel
+             * @default null
+             */
+            k_channel?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The alpha channel
+             * @default null
+             */
+            alpha_channel?: components["schemas"]["ImageField"] | null;
+            /**
+             * Profile
+             * @description CMYK Color Profile
+             * @default Default
+             * @enum {string}
+             */
+            profile?: "Default" | "PIL";
+            /**
+             * type
+             * @default cmyk_merge
+             * @constant
+             */
+            type: "cmyk_merge";
+        };
+        /**
+         * CMYKSeparationOutput
+         * @description Base class for invocations that output four L-mode images (C, M, Y, K)
+         */
+        CMYKSeparationOutput: {
+            /** @description Blank image of the specified color */
+            color_image: components["schemas"]["ImageField"];
+            /**
+             * Width
+             * @description The width of the image in pixels
+             */
+            width: number;
+            /**
+             * Height
+             * @description The height of the image in pixels
+             */
+            height: number;
+            /** @description Blank image of the first separated color */
+            part_a: components["schemas"]["ImageField"];
+            /**
+             * Rgb Red A
+             * @description R value of color part A
+             */
+            rgb_red_a: number;
+            /**
+             * Rgb Green A
+             * @description G value of color part A
+             */
+            rgb_green_a: number;
+            /**
+             * Rgb Blue A
+             * @description B value of color part A
+             */
+            rgb_blue_a: number;
+            /** @description Blank image of the second separated color */
+            part_b: components["schemas"]["ImageField"];
+            /**
+             * Rgb Red B
+             * @description R value of color part B
+             */
+            rgb_red_b: number;
+            /**
+             * Rgb Green B
+             * @description G value of color part B
+             */
+            rgb_green_b: number;
+            /**
+             * Rgb Blue B
+             * @description B value of color part B
+             */
+            rgb_blue_b: number;
+            /**
+             * type
+             * @default cmyk_separation_output
+             * @constant
+             */
+            type: "cmyk_separation_output";
+        };
+        /**
+         * CMYK Split
+         * @description Split an image into subtractive color channels (CMYK+alpha)
+         */
+        CMYKSplitInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to split into additive channels
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Profile
+             * @description CMYK Color Profile
+             * @default Default
+             * @enum {string}
+             */
+            profile?: "Default" | "PIL";
+            /**
+             * type
+             * @default cmyk_split
+             * @constant
+             */
+            type: "cmyk_split";
+        };
+        /**
+         * CMYKSplitOutput
+         * @description Base class for invocations that output four L-mode images (C, M, Y, K)
+         */
+        CMYKSplitOutput: {
+            /** @description Grayscale image of the cyan channel */
+            c_channel: components["schemas"]["ImageField"];
+            /** @description Grayscale image of the magenta channel */
+            m_channel: components["schemas"]["ImageField"];
+            /** @description Grayscale image of the yellow channel */
+            y_channel: components["schemas"]["ImageField"];
+            /** @description Grayscale image of the k channel */
+            k_channel: components["schemas"]["ImageField"];
+            /** @description Grayscale image of the alpha channel */
+            alpha_channel: components["schemas"]["ImageField"];
+            /**
+             * Width
+             * @description The width of the image in pixels
+             */
+            width: number;
+            /**
+             * Height
+             * @description The height of the image in pixels
+             */
+            height: number;
+            /**
+             * type
+             * @default cmyk_split_output
+             * @constant
+             */
+            type: "cmyk_split_output";
+        };
+        /**
+         * CSV To Index String
+         * @description CSVToIndexString converts a CSV to a String at index with a random option
+         */
+        CSVToIndexStringInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Csv String
+             * @description csv string
+             * @default
+             */
+            csv_string?: string;
+            /**
+             * Random
+             * @description Random Index?
+             * @default true
+             */
+            random?: boolean;
+            /**
+             * Index
+             * @description zero based index into CSV array (note index will wrap around if out of bounds)
+             * @default 0
+             */
+            index?: number;
+            /**
+             * type
+             * @default csv_to_index_string
+             * @constant
+             */
+            type: "csv_to_index_string";
+        };
+        /**
+         * CSV To Strings
+         * @description Converts a CSV string to a collection of strings
+         */
+        CSVToStringsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Csv String
+             * @description csv string
+             * @default null
+             */
+            csv_string?: string | null;
+            /**
+             * type
+             * @default csv_to_strings
+             * @constant
+             */
+            type: "csv_to_strings";
+        };
+        /**
          * CV2 Infill
          * @description Infills transparent areas of an image using OpenCV Inpainting
          */
@@ -4652,6 +5762,148 @@ export type components = {
             type: "img_pad_crop";
         };
         /**
+         * ChromaNoise
+         * @description Adds chroma-only noise (in OKLab space) to an image.
+         */
+        ChromaNoiseInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to add chroma noise to
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Amount 1
+             * @description Amount of the first chroma noise layer
+             * @default 100
+             */
+            amount_1?: number;
+            /**
+             * Amount 2
+             * @description Amount of the second chroma noise layer
+             * @default 50
+             */
+            amount_2?: number;
+            /**
+             * Seed 1
+             * @description The first seed to use (omit for random)
+             * @default null
+             */
+            seed_1?: number | null;
+            /**
+             * Seed 2
+             * @description The second seed to use (omit for random)
+             * @default null
+             */
+            seed_2?: number | null;
+            /**
+             * Blur 1
+             * @description The strength of the first noise blur
+             * @default 0.5
+             */
+            blur_1?: number;
+            /**
+             * Blur 2
+             * @description The strength of the second noise blur
+             * @default 0.5
+             */
+            blur_2?: number;
+            /**
+             * type
+             * @default chroma_noise
+             * @constant
+             */
+            type: "chroma_noise";
+        };
+        /**
+         * Chromatic Aberration
+         * @description Simulate realistic chromatic aberration in an image with controllable strength and center point.
+         */
+        ChromaticAberrationInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to apply chromatic aberration to
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Strength
+             * @description Strength of the chromatic shift (0–10)
+             * @default 1
+             */
+            strength?: number;
+            /**
+             * Center X
+             * @description X coordinate of center (0–1)
+             * @default 0.5
+             */
+            center_x?: number;
+            /**
+             * Center Y
+             * @description Y coordinate of center (0–1)
+             * @default 0.5
+             */
+            center_y?: number;
+            /**
+             * type
+             * @default chromatic_aberration
+             * @constant
+             */
+            type: "chromatic_aberration";
+        };
+        /**
          * Classification
          * @description The classification of an Invocation.
          *     - `Stable`: The invocation, including its inputs/outputs and internal logic, is stable. You may build workflows with it, having confidence that they will not break because of a change in this invocation.
@@ -4680,6 +5932,176 @@ export type components = {
          * @enum {string}
          */
         ClipVariantType: "large" | "gigantic";
+        /**
+         * Clipseg Mask Hierarchy
+         * @description Creates a segmentation hierarchy of mutually exclusive masks from clipseg text prompts.
+         *
+         *     This node takes up to seven pairs of prompts/threshold values, then descends through them hierarchically creating mutually exclusive masks out of whatever it can match from the input image. This means whatever is matched in prompt 1 will be subtracted from the match area for prompt 2; both areas will be omitted from the match area of prompt 3; etc. The idea is that by starting with foreground objects and working your way back through a scene, you can create a more-or-less complete segmentation map for the image whose constituent segments can be passed off to different masks for regional conditioning or other processing.
+         */
+        ClipsegMaskHierarchyInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image from which to create masks
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Invert Output
+             * @description Off: white on black / On: black on white
+             * @default true
+             */
+            invert_output?: boolean;
+            /**
+             * Smoothing
+             * @description Radius of blur to apply before thresholding
+             * @default 4
+             */
+            smoothing?: number;
+            /**
+             * Prompt 1
+             * @description Text to mask prompt with highest segmentation priority
+             * @default null
+             */
+            prompt_1?: string | null;
+            /**
+             * Threshold 1
+             * @description Detection confidence threshold for prompt 1
+             * @default 0.4
+             */
+            threshold_1?: number;
+            /**
+             * Prompt 2
+             * @description Text to mask prompt, behind prompt 1
+             * @default null
+             */
+            prompt_2?: string | null;
+            /**
+             * Threshold 2
+             * @description Detection confidence threshold for prompt 2
+             * @default 0.4
+             */
+            threshold_2?: number;
+            /**
+             * Prompt 3
+             * @description Text to mask prompt, behind prompts 1 & 2
+             * @default null
+             */
+            prompt_3?: string | null;
+            /**
+             * Threshold 3
+             * @description Detection confidence threshold for prompt 3
+             * @default 0.4
+             */
+            threshold_3?: number;
+            /**
+             * Prompt 4
+             * @description Text to mask prompt, behind prompts 1, 2, & 3
+             * @default null
+             */
+            prompt_4?: string | null;
+            /**
+             * Threshold 4
+             * @description Detection confidence threshold for prompt 4
+             * @default 0.4
+             */
+            threshold_4?: number;
+            /**
+             * Prompt 5
+             * @description Text to mask prompt, behind prompts 1 thru 4
+             * @default null
+             */
+            prompt_5?: string | null;
+            /**
+             * Threshold 5
+             * @description Detection confidence threshold for prompt 5
+             * @default 0.4
+             */
+            threshold_5?: number;
+            /**
+             * Prompt 6
+             * @description Text to mask prompt, behind prompts 1 thru 5
+             * @default null
+             */
+            prompt_6?: string | null;
+            /**
+             * Threshold 6
+             * @description Detection confidence threshold for prompt 6
+             * @default 0.4
+             */
+            threshold_6?: number;
+            /**
+             * Prompt 7
+             * @description Text to mask prompt, lowest priority behind all others
+             * @default null
+             */
+            prompt_7?: string | null;
+            /**
+             * Threshold 7
+             * @description Detection confidence threshold for prompt 7
+             * @default 0.4
+             */
+            threshold_7?: number;
+            /**
+             * type
+             * @default clipseg_mask_hierarchy
+             * @constant
+             */
+            type: "clipseg_mask_hierarchy";
+        };
+        /**
+         * ClipsegMaskHierarchyOutput
+         * @description Class for invocations that output a hierarchy of masks
+         */
+        ClipsegMaskHierarchyOutput: {
+            /** @description Mask corresponding to prompt 1 (full coverage) */
+            mask_1: components["schemas"]["ImageField"];
+            /** @description Mask corresponding to prompt 2 (minus mask 1) */
+            mask_2: components["schemas"]["ImageField"];
+            /** @description Mask corresponding to prompt 3 (minus masks 1 & 2) */
+            mask_3: components["schemas"]["ImageField"];
+            /** @description Mask corresponding to prompt 4 (minus masks 1, 2, & 3) */
+            mask_4: components["schemas"]["ImageField"];
+            /** @description Mask corresponding to prompt 5 (minus masks 1 thru 4) */
+            mask_5: components["schemas"]["ImageField"];
+            /** @description Mask corresponding to prompt 6 (minus masks 1 thru 5) */
+            mask_6: components["schemas"]["ImageField"];
+            /** @description Mask corresponding to prompt 7 (minus masks 1 thru 6) */
+            mask_7: components["schemas"]["ImageField"];
+            /** @description Mask coresponding to remaining unmatched image areas. */
+            ground_mask: components["schemas"]["ImageField"];
+            /**
+             * type
+             * @default clipseg_mask_hierarchy_output
+             * @constant
+             */
+            type: "clipseg_mask_hierarchy_output";
+        };
         /**
          * CogView4ConditioningField
          * @description A conditioning tensor primitive value
@@ -5065,6 +6487,476 @@ export type components = {
             type: "collect_output";
         };
         /**
+         * Collection Count
+         * @description Counts the number of items in a collection.
+         */
+        CollectionCountInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description The collection to count
+             * @default []
+             */
+            collection?: unknown[];
+            /**
+             * type
+             * @default collection_count
+             * @constant
+             */
+            type: "collection_count";
+        };
+        /**
+         * CollectionCountOutput
+         * @description The output of the collection count node.
+         */
+        CollectionCountOutput: {
+            /**
+             * Count
+             * @description The number of items in the collection
+             */
+            count: number;
+            /**
+             * type
+             * @default collection_count_output
+             * @constant
+             */
+            type: "collection_count_output";
+        };
+        /**
+         * Collection Index
+         * @description CollectionIndex Picks an index out of a collection with a random option
+         */
+        CollectionIndexInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Random
+             * @description Random Index?
+             * @default true
+             */
+            random?: boolean;
+            /**
+             * Index
+             * @description zero based index into collection (note index will wrap around if out of bounds)
+             * @default 0
+             */
+            index?: number;
+            /**
+             * Collection
+             * @description collection
+             * @default null
+             */
+            collection?: unknown[] | null;
+            /**
+             * type
+             * @default collection_index
+             * @constant
+             */
+            type: "collection_index";
+        };
+        /**
+         * CollectionIndexOutput
+         * @description Used to connect iteration outputs. Will be expanded to a specific output.
+         */
+        CollectionIndexOutput: {
+            /**
+             * Collection Item
+             * @description The item being iterated over
+             */
+            item: unknown;
+            /**
+             * Index
+             * @description The index of the selected item
+             */
+            index: number;
+            /**
+             * Total
+             * @description The total number of items in the collection
+             */
+            total: number;
+            /**
+             * type
+             * @default collection_index_output
+             * @constant
+             */
+            type: "collection_index_output";
+        };
+        /**
+         * Collection Join
+         * @description CollectionJoin Joins two collections into a single collection
+         */
+        CollectionJoinInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Collection A
+             * @description collection
+             * @default []
+             */
+            collection_a?: unknown[];
+            /**
+             * Collection B
+             * @description collection
+             * @default []
+             */
+            collection_b?: unknown[];
+            /**
+             * type
+             * @default collection_join
+             * @constant
+             */
+            type: "collection_join";
+        };
+        /** CollectionJoinOutput */
+        CollectionJoinOutput: {
+            /**
+             * Collection
+             * @description The collection of output items
+             */
+            collection: unknown[];
+            /**
+             * type
+             * @default collection_join_output
+             * @constant
+             */
+            type: "collection_join_output";
+        };
+        /**
+         * Collection Reverse
+         * @description Reverses a collection.
+         */
+        CollectionReverseInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description The collection to reverse
+             * @default []
+             */
+            collection?: unknown[];
+            /**
+             * type
+             * @default collection_reverse
+             * @constant
+             */
+            type: "collection_reverse";
+        };
+        /**
+         * CollectionReverseOutput
+         * @description The output of the collection reverse node.
+         */
+        CollectionReverseOutput: {
+            /**
+             * Collection
+             * @description The reversed collection
+             */
+            collection: unknown[];
+            /**
+             * type
+             * @default collection_reverse_output
+             * @constant
+             */
+            type: "collection_reverse_output";
+        };
+        /**
+         * Collection Slice
+         * @description Slices a collection.
+         */
+        CollectionSliceInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description The collection to slice
+             * @default []
+             */
+            collection?: unknown[];
+            /**
+             * Start
+             * @description The start index of the slice
+             * @default 0
+             */
+            start?: number;
+            /**
+             * Stop
+             * @description The stop index of the slice (exclusive)
+             * @default null
+             */
+            stop?: number | null;
+            /**
+             * Step
+             * @description The step of the slice
+             * @default 1
+             */
+            step?: number;
+            /**
+             * type
+             * @default collection_slice
+             * @constant
+             */
+            type: "collection_slice";
+        };
+        /**
+         * CollectionSliceOutput
+         * @description The output of the collection slice node.
+         */
+        CollectionSliceOutput: {
+            /**
+             * Collection
+             * @description The sliced collection
+             */
+            collection: unknown[];
+            /**
+             * type
+             * @default collection_slice_output
+             * @constant
+             */
+            type: "collection_slice_output";
+        };
+        /**
+         * Collection Sort
+         * @description CollectionSort Sorts a collection
+         */
+        CollectionSortInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description collection
+             * @default []
+             */
+            collection?: unknown[];
+            /**
+             * Reverse
+             * @description Reverse Sort
+             * @default false
+             */
+            reverse?: boolean;
+            /**
+             * type
+             * @default collection_sort
+             * @constant
+             */
+            type: "collection_sort";
+        };
+        /** CollectionSortOutput */
+        CollectionSortOutput: {
+            /**
+             * Collection
+             * @description The collection of output items
+             */
+            collection: unknown[];
+            /**
+             * type
+             * @default collection_sort_output
+             * @constant
+             */
+            type: "collection_sort_output";
+        };
+        /**
+         * Collection Unique
+         * @description Removes duplicate items from a collection.
+         */
+        CollectionUniqueInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description The collection to deduplicate
+             * @default []
+             */
+            collection?: unknown[];
+            /**
+             * type
+             * @default collection_unique
+             * @constant
+             */
+            type: "collection_unique";
+        };
+        /**
+         * CollectionUniqueOutput
+         * @description The output of the collection unique node.
+         */
+        CollectionUniqueOutput: {
+            /**
+             * Collection
+             * @description The collection with unique items
+             */
+            collection: unknown[];
+            /**
+             * type
+             * @default collection_unique_output
+             * @constant
+             */
+            type: "collection_unique_output";
+        };
+        /**
+         * Color Cast Correction
+         * @description Correct color cast while preserving perceptual brightness
+         */
+        ColorCastCorrectionInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Image to correct
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Strength
+             * @description Strength of correction adjustment
+             * @default 0.75
+             */
+            strength?: number;
+            /**
+             * @description The target color for correction
+             * @default {
+             *       "r": 127,
+             *       "g": 127,
+             *       "b": 127,
+             *       "a": 255
+             *     }
+             */
+            target_color?: components["schemas"]["ColorField"];
+            /**
+             * type
+             * @default color_cast_correction
+             * @constant
+             */
+            type: "color_cast_correction";
+        };
+        /**
          * ColorCollectionOutput
          * @description Base class for nodes that output a collection of colors
          */
@@ -5273,6 +7165,153 @@ export type components = {
             type: "color_output";
         };
         /**
+         * Compare Floats
+         * @description Compares two floats based on input criteria and ouputs a boolean.
+         */
+        CompareFloatsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Comparison Method
+             * @description The comparision method to use
+             * @default null
+             */
+            comparison_method?: ("<" | "<=" | ">" | ">=" | "==" | "!=") | null;
+            /**
+             * Float 1
+             * @description The first float
+             * @default null
+             */
+            float1?: number | null;
+            /**
+             * Float 2
+             * @description The second float
+             * @default null
+             */
+            float2?: number | null;
+            /**
+             * type
+             * @default compare_floats_invocation
+             * @constant
+             */
+            type: "compare_floats_invocation";
+        };
+        /**
+         * Compare Ints
+         * @description Compares two integers based on input criteria and ouputs a boolean.
+         */
+        CompareIntsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Comparison Method
+             * @description The comparision method to use
+             * @default null
+             */
+            comparison_method?: ("<" | "<=" | ">" | ">=" | "==" | "!=") | null;
+            /**
+             * Int 1
+             * @description The first integer.
+             * @default null
+             */
+            int1?: number | null;
+            /**
+             * Int 2
+             * @description The second integer.
+             * @default null
+             */
+            int2?: number | null;
+            /**
+             * type
+             * @default compare_ints_invocation
+             * @constant
+             */
+            type: "compare_ints_invocation";
+        };
+        /**
+         * Compare Strings
+         * @description Compares two strings based on input criteria and ouputs a boolean.
+         */
+        CompareStringsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Comparison Method
+             * @description The comparision method to use
+             * @default null
+             */
+            comparison_method?: ("equals" | "contains" | "starts with" | "ends with") | null;
+            /**
+             * Ignore Case
+             * @description If true the node will ignore the case of the strings in all comparison methods
+             * @default null
+             */
+            ignore_case?: boolean | null;
+            /**
+             * String 1
+             * @description The first float
+             * @default null
+             */
+            str1?: string | null;
+            /**
+             * String 2
+             * @description The second float
+             * @default null
+             */
+            str2?: string | null;
+            /**
+             * type
+             * @default compare_strings_invocation
+             * @constant
+             */
+            type: "compare_strings_invocation";
+        };
+        /**
          * Prompt - SD1.5
          * @description Parse prompt using compel package to conditioning.
          */
@@ -5319,6 +7358,109 @@ export type components = {
             type: "compel";
         };
         /**
+         * Concatenate Flux Conditionings
+         * @description Concatenates the T5 embedding tensors of up to six input Flux Conditioning objects.
+         *     Provides flexible control over the CLIP embedding: select by 1-indexed input number,
+         *     or generate a zeros tensor.
+         */
+        ConcatenateFluxConditioningInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description First optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_1?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * Strength 1
+             * @description Strength for the first conditioning input (multiplies its embedding tensors).
+             * @default 1
+             */
+            strength_1?: number;
+            /**
+             * @description Second optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_2?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * Strength 2
+             * @description Strength for the second conditioning input (multiplies its embedding tensors).
+             * @default 1
+             */
+            strength_2?: number;
+            /**
+             * @description Third optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_3?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * Strength 3
+             * @description Strength for the third conditioning input (multiplies its embedding tensors).
+             * @default 1
+             */
+            strength_3?: number;
+            /**
+             * @description Fourth optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_4?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * Strength 4
+             * @description Strength for the fourth conditioning input (multiplies its embedding tensors).
+             * @default 1
+             */
+            strength_4?: number;
+            /**
+             * @description Fifth optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_5?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * Strength 5
+             * @description Strength for the fifth conditioning input (multiplies its embedding tensors).
+             * @default 1
+             */
+            strength_5?: number;
+            /**
+             * @description Sixth optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_6?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * Strength 6
+             * @description Strength for the sixth conditioning input (multiplies its embedding tensors).
+             * @default 1
+             */
+            strength_6?: number;
+            /**
+             * Select Clip
+             * @description CLIP embedding selection: 0 for a zeros tensor; 1-6 to select a specific input (1-indexed). If a selected input is missing, it falls back to the next subsequent, then preceding, available CLIP embedding.
+             * @default 1
+             */
+            select_clip?: number;
+            /**
+             * type
+             * @default flux_conditioning_concatenate
+             * @constant
+             */
+            type: "flux_conditioning_concatenate";
+        };
+        /**
          * Conditioning Collection Primitive
          * @description A collection of conditioning tensor primitive values
          */
@@ -5354,6 +7496,46 @@ export type components = {
             type: "conditioning_collection";
         };
         /**
+         * Conditioning Collection Primitive Linked
+         * @description A collection of conditioning tensor primitive values
+         */
+        ConditioningCollectionLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description The collection of conditioning tensors
+             * @default []
+             */
+            collection?: components["schemas"]["ConditioningField"][];
+            /**
+             * type
+             * @default conditioning_collection_linked
+             * @constant
+             */
+            type: "conditioning_collection_linked";
+            /**
+             * @description Conditioning tensor
+             * @default null
+             */
+            conditioning?: components["schemas"]["ConditioningField"] | null;
+        };
+        /**
          * ConditioningCollectionOutput
          * @description Base class for nodes that output a collection of conditioning tensors
          */
@@ -5369,6 +7551,53 @@ export type components = {
              * @constant
              */
             type: "conditioning_collection_output";
+        };
+        /**
+         * Conditioning Collection Toggle
+         * @description Allows boolean selection between two separate conditioning collection inputs
+         */
+        ConditioningCollectionToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Col1
+             * @description First Conditioning Collection Input
+             * @default null
+             */
+            col1?: components["schemas"]["ConditioningField"][] | null;
+            /**
+             * Col2
+             * @description Second Conditioning Collection Input
+             * @default null
+             */
+            col2?: components["schemas"]["ConditioningField"][] | null;
+            /**
+             * type
+             * @default conditioning_collection_toggle
+             * @constant
+             */
+            type: "conditioning_collection_toggle";
         };
         /**
          * ConditioningField
@@ -5433,6 +7662,51 @@ export type components = {
              * @constant
              */
             type: "conditioning_output";
+        };
+        /**
+         * Conditioning Toggle
+         * @description Allows boolean selection between two separate conditioning inputs
+         */
+        ConditioningToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * @description First Conditioning Input
+             * @default null
+             */
+            cond1?: components["schemas"]["ConditioningField"] | null;
+            /**
+             * @description Second Conditioning Input
+             * @default null
+             */
+            cond2?: components["schemas"]["ConditioningField"] | null;
+            /**
+             * type
+             * @default conditioning_toggle
+             * @constant
+             */
+            type: "conditioning_toggle";
         };
         /**
          * Content Shuffle
@@ -5527,6 +7801,20 @@ export type components = {
              * @enum {string}
              */
             resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+        };
+        /** ControlListOutput */
+        ControlListOutput: {
+            /**
+             * ControlNet List
+             * @description ControlNet(s) to apply
+             */
+            control_list: components["schemas"]["ControlField"][];
+            /**
+             * type
+             * @default control_list_output
+             * @constant
+             */
+            type: "control_list_output";
         };
         /** ControlLoRAField */
         ControlLoRAField: {
@@ -5684,6 +7972,83 @@ export type components = {
              * @constant
              */
             type: "controlnet";
+        };
+        /**
+         * ControlNet-Linked
+         * @description Collects ControlNet info to pass to other nodes.
+         */
+        ControlNetLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The control image
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description ControlNet model to load
+             * @default null
+             */
+            control_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Control Weight
+             * @description The weight given to the ControlNet
+             * @default 1
+             */
+            control_weight?: number | number[];
+            /**
+             * Begin Step Percent
+             * @description When the ControlNet is first applied (% of total steps)
+             * @default 0
+             */
+            begin_step_percent?: number;
+            /**
+             * End Step Percent
+             * @description When the ControlNet is last applied (% of total steps)
+             * @default 1
+             */
+            end_step_percent?: number;
+            /**
+             * Control Mode
+             * @description The control mode used
+             * @default balanced
+             * @enum {string}
+             */
+            control_mode?: "balanced" | "more_prompt" | "more_control" | "unbalanced";
+            /**
+             * Resize Mode
+             * @description The resize mode used
+             * @default just_resize
+             * @enum {string}
+             */
+            resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+            /**
+             * type
+             * @default controlnet-linked
+             * @constant
+             */
+            type: "controlnet-linked";
+            /**
+             * ControlNet-List
+             * @description ControlNet(s) to apply
+             * @default null
+             */
+            control_list?: components["schemas"]["ControlField"] | components["schemas"]["ControlField"][] | null;
         };
         /** ControlNetMetadataField */
         ControlNetMetadataField: {
@@ -6445,6 +8810,162 @@ export type components = {
             type: "control_output";
         };
         /**
+         * Coordinated Noise (Flux)
+         * @description Generates latent noise that is stable for the given coordinates.
+         *
+         *     That is, the noise at channel=1 x=3 y=4 for seed=42 will always be the same, regardless of the
+         *     total size (width and height) of the region.
+         *
+         *     It makes reproducible noise that you're able to crop or scroll.
+         *
+         *     This variant has 16 channels for Flux.
+         */
+        CoordinatedFluxNoiseInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Seed
+             * @description Seed for random number generation
+             * @default null
+             */
+            seed?: number | null;
+            /**
+             * Width
+             * @description Width of output (px)
+             * @default 512
+             */
+            width?: number;
+            /**
+             * Height
+             * @description Height of output (px)
+             * @default 512
+             */
+            height?: number;
+            /**
+             * X Offset
+             * @description x-coordinate of the lower edge
+             * @default 0
+             */
+            x_offset?: number;
+            /**
+             * Y Offset
+             * @description y-coordinate of the lower edge
+             * @default 0
+             */
+            y_offset?: number;
+            /**
+             * Channel Offset
+             * @description coordinate of the first channel
+             * @default 0
+             */
+            channel_offset?: number;
+            /**
+             * Algorithm
+             * @description psuedo-random generation algorithm
+             * @default pcg64
+             * @enum {string}
+             */
+            algorithm?: "pcg64" | "morton+farmhash";
+            /**
+             * type
+             * @default noise_coordinated_flux
+             * @constant
+             */
+            type: "noise_coordinated_flux";
+        };
+        /**
+         * Coordinated Noise
+         * @description Generates latent noise that is stable for the given coordinates.
+         *
+         *     That is, the noise at channel=1 x=3 y=4 for seed=42 will always be the same, regardless of the
+         *     total size (width and height) of the region.
+         *
+         *     It makes reproducible noise that you're able to crop or scroll.
+         */
+        CoordinatedNoiseInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Seed
+             * @description Seed for random number generation
+             * @default null
+             */
+            seed?: number | null;
+            /**
+             * Width
+             * @description Width of output (px)
+             * @default 512
+             */
+            width?: number;
+            /**
+             * Height
+             * @description Height of output (px)
+             * @default 512
+             */
+            height?: number;
+            /**
+             * X Offset
+             * @description x-coordinate of the lower edge
+             * @default 0
+             */
+            x_offset?: number;
+            /**
+             * Y Offset
+             * @description y-coordinate of the lower edge
+             * @default 0
+             */
+            y_offset?: number;
+            /**
+             * Channel Offset
+             * @description coordinate of the first channel
+             * @default 0
+             */
+            channel_offset?: number;
+            /**
+             * Algorithm
+             * @description psuedo-random generation algorithm
+             * @default pcg64
+             * @enum {string}
+             */
+            algorithm?: "pcg64" | "morton+farmhash";
+            /**
+             * type
+             * @default noise_coordinated
+             * @constant
+             */
+            type: "noise_coordinated";
+        };
+        /**
          * Core Metadata
          * @description Used internally by Invoke to collect metadata for generations.
          */
@@ -6928,6 +9449,149 @@ export type components = {
             type: "crop_latents";
         };
         /**
+         * Crop Latents
+         * @description Crops latents
+         */
+        CropLatentsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latents?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Width
+             * @description Width of output (px)
+             * @default null
+             */
+            width?: number | null;
+            /**
+             * Height
+             * @description Width of output (px)
+             * @default null
+             */
+            height?: number | null;
+            /**
+             * X Offset
+             * @description x-coordinate
+             * @default null
+             */
+            x_offset?: number | null;
+            /**
+             * Y Offset
+             * @description y-coordinate
+             * @default null
+             */
+            y_offset?: number | null;
+            /**
+             * type
+             * @default lcrop
+             * @constant
+             */
+            type: "lcrop";
+        };
+        /**
+         * Crossover Prompt
+         * @description Performs a crossover operation on two parent seed vectors to generate a new prompt.
+         */
+        CrossoverPromptInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Resolutions Dict
+             * @description Private field for id substitutions dict cache
+             * @default {}
+             */
+            resolutions_dict?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Lookups
+             * @description Lookup table(s) containing template(s) (JSON)
+             * @default []
+             */
+            lookups?: string | string[];
+            /**
+             * Remove Negatives
+             * @description Whether to strip out text between []
+             * @default false
+             */
+            remove_negatives?: boolean;
+            /**
+             * Strip Parens Probability
+             * @description Probability of removing attention group weightings
+             * @default 0
+             */
+            strip_parens_probability?: number;
+            /**
+             * Resolutions
+             * @description JSON structure of substitutions by id by tag
+             * @default []
+             */
+            resolutions?: string | string[];
+            /**
+             * Parent A Seed Vector In
+             * @description JSON array of seeds for Parent A's generation
+             * @default null
+             */
+            parent_a_seed_vector_in?: string | null;
+            /**
+             * Parent B Seed Vector In
+             * @description JSON array of seeds for Parent B's generation
+             * @default null
+             */
+            parent_b_seed_vector_in?: string | null;
+            /**
+             * Child A Or B
+             * @description True for Child A (Parent A + B's branch), False for Child B (Parent B + A's branch)
+             * @default true
+             */
+            child_a_or_b?: boolean;
+            /**
+             * Crossover Non Terminal
+             * @description Optional: The non-terminal (key in lookups) to target for the crossover branch. If None, a random one will be chosen from available non-terminals.
+             * @default null
+             */
+            crossover_non_terminal?: string | null;
+            /**
+             * type
+             * @default crossover_prompt
+             * @constant
+             */
+            type: "crossover_prompt";
+        };
+        /**
          * OpenCV Inpaint
          * @description Simple inpaint using opencv.
          */
@@ -7074,6 +9738,64 @@ export type components = {
              * @constant
              */
             type: "decode_watermark";
+        };
+        /**
+         * Default XYImage Tile Generator
+         * @description Cuts up an image into overlapping tiles and outputs a string representation of the tiles to use
+         */
+        DefaultXYTileGenerator: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The input image
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Tile Width
+             * @description x resolution of generation tile (must be a multiple of 8)
+             * @default 576
+             */
+            tile_width?: number;
+            /**
+             * Tile Height
+             * @description y resolution of generation tile (must be a multiple of 8)
+             * @default 576
+             */
+            tile_height?: number;
+            /**
+             * Overlap
+             * @description tile overlap size (must be a multiple of 8)
+             * @default 128
+             */
+            overlap?: number;
+            /**
+             * Adjust Tile Size
+             * @description adjust tile size to account for overlap
+             * @default true
+             */
+            adjust_tile_size?: boolean;
+            /**
+             * type
+             * @default default_xy_tile_generator
+             * @constant
+             */
+            type: "default_xy_tile_generator";
         };
         /**
          * DeleteAllExceptCurrentResult
@@ -7917,6 +10639,74 @@ export type components = {
              */
             field: string;
         };
+        /**
+         * Enhance Detail
+         * @description Enhance Detail using guided filter
+         */
+        EnhanceDetailInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to detail enhance
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Filter Radius
+             * @description radius of filter
+             * @default 2
+             */
+            filter_radius?: number;
+            /**
+             * Sigma
+             * @description sigma
+             * @default 0.1
+             */
+            sigma?: number;
+            /**
+             * Denoise
+             * @description denoise
+             * @default 0.1
+             */
+            denoise?: number;
+            /**
+             * Detail Multiplier
+             * @description detail multiplier
+             * @default 2
+             */
+            detail_multiplier?: number;
+            /**
+             * type
+             * @default enhance_detail
+             * @constant
+             */
+            type: "enhance_detail";
+        };
         /** EnqueueBatchResult */
         EnqueueBatchResult: {
             /**
@@ -7946,6 +10736,132 @@ export type components = {
              * @description The IDs of the queue items that were enqueued
              */
             item_ids: number[];
+        };
+        /**
+         * EscapedOutput
+         * @description The input str with double quotes escaped
+         */
+        EscapedOutput: {
+            /**
+             * Prompt
+             * @description The input str with double quotes escaped
+             */
+            prompt: string;
+            /**
+             * type
+             * @default escaped_quotes_output
+             * @constant
+             */
+            type: "escaped_quotes_output";
+        };
+        /**
+         * Quote Escaper
+         * @description Escapes double quotes from input strings
+         */
+        EscaperInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Prompt
+             * @description the string to escape quotes from
+             * @default
+             */
+            prompt?: string;
+            /**
+             * type
+             * @default quote_escaper
+             * @constant
+             */
+            type: "quote_escaper";
+        };
+        /**
+         * Even Split XYImage Tile Generator
+         * @description Cuts up an image into a number of even sized tiles with the overlap been a percentage of the tile size and outputs a string representation of the tiles to use
+         */
+        EvenSplitXYTileGenerator: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The input image
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Num X Tiles
+             * @description Number of tiles to divide image into on the x axis
+             * @default 2
+             */
+            num_x_tiles?: number;
+            /**
+             * Num Y Tiles
+             * @description Number of tiles to divide image into on the y axis
+             * @default 2
+             */
+            num_y_tiles?: number;
+            /**
+             * Overlap
+             * @description Overlap amount of tile size (0-1)
+             * @default 0.25
+             */
+            overlap?: number;
+            /**
+             * type
+             * @default even_split_xy_tile_generator
+             * @constant
+             */
+            type: "even_split_xy_tile_generator";
+        };
+        /**
+         * EvolutionaryPromptListOutput
+         * @description Output for a list of generated prompts and their seed vectors.
+         */
+        EvolutionaryPromptListOutput: {
+            /**
+             * Prompt Seed Pairs
+             * @description List of JSON strings, each containing [prompt, seed_vector_json]
+             */
+            prompt_seed_pairs: string[];
+            /**
+             * Selected Pair
+             * @description The index-selected prompt from the output population
+             */
+            selected_pair: string;
+            /**
+             * type
+             * @default evolutionary_prompt_list_output
+             * @constant
+             */
+            type: "evolutionary_prompt_list_output";
         };
         /**
          * Expand Mask with Fade
@@ -8012,6 +10928,347 @@ export type components = {
             nodeId: string;
             /** Fieldname */
             fieldName: string;
+        };
+        /**
+         * Extract Image Collection Metadata (Bool)
+         * @description This node extracts specified metadata values as booleans from a collection of input images.
+         *     Values are converted to boolean: truthy values become True, falsy values (including None, empty string, 0) become False.
+         */
+        ExtractImageCollectionMetadataBooleanInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Image Collection
+             * @description A collection of images from which to extract metadata.
+             * @default null
+             */
+            images?: components["schemas"]["ImageField"][] | null;
+            /**
+             * Metadata Key
+             * @description Metadata key to extract values for Output. Leave empty to ignore.
+             * @default
+             */
+            key?: string;
+            /**
+             * type
+             * @default extract_image_collection_metadata_boolean
+             * @constant
+             */
+            type: "extract_image_collection_metadata_boolean";
+        };
+        /**
+         * Extract Image Collection Metadata (Float)
+         * @description This node extracts specified metadata values as floats from a collection of input images.
+         *     Non-float values will attempt to be converted. If conversion fails, 0.0 is used.
+         */
+        ExtractImageCollectionMetadataFloatInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Image Collection
+             * @description A collection of images from which to extract metadata.
+             * @default null
+             */
+            images?: components["schemas"]["ImageField"][] | null;
+            /**
+             * Metadata Key
+             * @description Metadata key to extract values for Output. Leave empty to ignore.
+             * @default
+             */
+            key?: string;
+            /**
+             * type
+             * @default extract_image_collection_metadata_float
+             * @constant
+             */
+            type: "extract_image_collection_metadata_float";
+        };
+        /**
+         * Extract Image Collection Metadata (Int)
+         * @description This node extracts specified metadata values as integers from a collection of input images.
+         *     Non-integer values will attempt to be converted. If conversion fails, 0 is used.
+         */
+        ExtractImageCollectionMetadataIntegerInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Image Collection
+             * @description A collection of images from which to extract metadata.
+             * @default null
+             */
+            images?: components["schemas"]["ImageField"][] | null;
+            /**
+             * Metadata Key
+             * @description Metadata key to extract values for Output. Leave empty to ignore.
+             * @default
+             */
+            key?: string;
+            /**
+             * type
+             * @default extract_image_collection_metadata_integer
+             * @constant
+             */
+            type: "extract_image_collection_metadata_integer";
+        };
+        /**
+         * Extract Image Collection Metadata (String)
+         * @description This node extracts specified metadata values as strings from a collection of input images.
+         */
+        ExtractImageCollectionMetadataStringInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Image Collection
+             * @description A collection of images from which to extract metadata.
+             * @default null
+             */
+            images?: components["schemas"]["ImageField"][] | null;
+            /**
+             * Metadata Key
+             * @description Metadata key to extract values for Output. Leave empty to ignore.
+             * @default
+             */
+            key?: string;
+            /**
+             * type
+             * @default extract_image_collection_metadata_string
+             * @constant
+             */
+            type: "extract_image_collection_metadata_string";
+        };
+        /**
+         * Extrude Depth from Mask
+         * @description Node for creating fake depth by "extruding" a mask using OpenCV.
+         */
+        ExtrudeDepthInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * @description The mask from which to extrude
+             * @default null
+             */
+            mask?: components["schemas"]["ImageField"] | null;
+            /**
+             * Direction
+             * @description Extrude direction in degrees
+             * @default 45
+             */
+            direction?: number;
+            /**
+             * Shift
+             * @description Number of pixels to shift bottom from top
+             * @default 40
+             */
+            shift?: number;
+            /**
+             * Close Point
+             * @description Closest extrusion depth
+             * @default 180
+             */
+            close_point?: number;
+            /**
+             * Far Point
+             * @description Farthest extrusion depth
+             * @default 80
+             */
+            far_point?: number;
+            /**
+             * Bg Threshold
+             * @description Background threshold
+             * @default 10
+             */
+            bg_threshold?: number;
+            /**
+             * Bg Depth
+             * @description Target background depth
+             * @default 0
+             */
+            bg_depth?: number;
+            /**
+             * Steps
+             * @description Number of steps in extrusion gradient
+             * @default 100
+             */
+            steps?: number;
+            /**
+             * Invert
+             * @description Inverts mask image before extruding
+             * @default false
+             */
+            invert?: boolean;
+            /**
+             * type
+             * @default cv_extrude_depth
+             * @constant
+             */
+            type: "cv_extrude_depth";
+        };
+        /**
+         * FLUX Conditioning Collection Toggle
+         * @description Allows boolean selection between two separate FLUX conditioning collection inputs
+         */
+        FLUXConditioningCollectionToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Col1
+             * @description First FLUX Conditioning Collection Input
+             * @default null
+             */
+            col1?: components["schemas"]["FluxConditioningField"][] | null;
+            /**
+             * Col2
+             * @description Second FLUX Conditioning Collection Input
+             * @default null
+             */
+            col2?: components["schemas"]["FluxConditioningField"][] | null;
+            /**
+             * type
+             * @default flux_conditioning_collection_toggle
+             * @constant
+             */
+            type: "flux_conditioning_collection_toggle";
+        };
+        /**
+         * FLUX Conditioning Toggle
+         * @description Allows boolean selection between two separate FLUX conditioning inputs
+         */
+        FLUXConditioningToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * @description First FLUX Conditioning Input
+             * @default null
+             */
+            cond1?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * @description Second FLUX Conditioning Input
+             * @default null
+             */
+            cond2?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * type
+             * @default flux_conditioning_toggle
+             * @constant
+             */
+            type: "flux_conditioning_toggle";
         };
         /**
          * Apply LoRA Collection - FLUX
@@ -8424,6 +11681,130 @@ export type components = {
          */
         FieldKind: "input" | "output" | "internal" | "node_attribute";
         /**
+         * FilmGrain
+         * @description Adds film grain to an image
+         */
+        FilmGrainInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to add film grain to
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Amount 1
+             * @description Amount of the first noise layer
+             * @default 100
+             */
+            amount_1?: number;
+            /**
+             * Amount 2
+             * @description Amount of the second noise layer
+             * @default 50
+             */
+            amount_2?: number;
+            /**
+             * Seed 1
+             * @description The first seed to use (omit for random)
+             * @default null
+             */
+            seed_1?: number | null;
+            /**
+             * Seed 2
+             * @description The second seed to use (omit for random)
+             * @default null
+             */
+            seed_2?: number | null;
+            /**
+             * Blur 1
+             * @description The strength of the first noise blur
+             * @default 0.5
+             */
+            blur_1?: number;
+            /**
+             * Blur 2
+             * @description The strength of the second noise blur
+             * @default 0.5
+             */
+            blur_2?: number;
+            /**
+             * type
+             * @default film_grain
+             * @constant
+             */
+            type: "film_grain";
+        };
+        /**
+         * Flatten Histogram (Grayscale)
+         * @description Scales the values of an L-mode image by scaling them to the full range 0..255 in equal proportions
+         */
+        FlattenHistogramMono: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Single-channel image for which to flatten the histogram
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * type
+             * @default flatten_histogram_mono
+             * @constant
+             */
+            type: "flatten_histogram_mono";
+        };
+        /**
          * Float Batch
          * @description Create a batched generation, where the workflow is executed once for each float in the batch.
          */
@@ -8466,6 +11847,53 @@ export type components = {
             type: "float_batch";
         };
         /**
+         * Float Collection Index
+         * @description CollectionIndex Picks an index out of a collection with a random option
+         */
+        FloatCollectionIndexInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Random
+             * @description Random Index?
+             * @default true
+             */
+            random?: boolean;
+            /**
+             * Index
+             * @description zero based index into collection (note index will wrap around if out of bounds)
+             * @default 0
+             */
+            index?: number;
+            /**
+             * Collection
+             * @description float collection
+             * @default null
+             */
+            collection?: number[] | null;
+            /**
+             * type
+             * @default float_collection_index
+             * @constant
+             */
+            type: "float_collection_index";
+        };
+        /**
          * Float Collection Primitive
          * @description A collection of float primitive values
          */
@@ -8501,6 +11929,47 @@ export type components = {
             type: "float_collection";
         };
         /**
+         * Float Collection Primitive linked
+         * @description A collection of float primitive values
+         */
+        FloatCollectionLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description The collection of float values
+             * @default []
+             */
+            collection?: number[];
+            /**
+             * type
+             * @default float_collection_linked
+             * @constant
+             */
+            type: "float_collection_linked";
+            /**
+             * Value
+             * @description The float value
+             * @default 0
+             */
+            value?: number;
+        };
+        /**
          * FloatCollectionOutput
          * @description Base class for nodes that output a collection of floats
          */
@@ -8516,6 +11985,53 @@ export type components = {
              * @constant
              */
             type: "float_collection_output";
+        };
+        /**
+         * Float Collection Toggle
+         * @description Allows boolean selection between two separate float collection inputs
+         */
+        FloatCollectionToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Col1
+             * @description First Float Collection Input
+             * @default null
+             */
+            col1?: number[] | null;
+            /**
+             * Col2
+             * @description Second Float Collection Input
+             * @default null
+             */
+            col2?: number[] | null;
+            /**
+             * type
+             * @default float_collection_toggle
+             * @constant
+             */
+            type: "float_collection_toggle";
         };
         /**
          * Float Generator
@@ -8764,6 +12280,88 @@ export type components = {
              * @constant
              */
             type: "float_to_int";
+        };
+        /**
+         * Float Toggle
+         * @description Allows boolean selection between two separate float inputs
+         */
+        FloatToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Float1
+             * @description First Float Input
+             * @default 0
+             */
+            float1?: number;
+            /**
+             * Float2
+             * @description Second Float Input
+             * @default 0
+             */
+            float2?: number;
+            /**
+             * type
+             * @default float_toggle
+             * @constant
+             */
+            type: "float_toggle";
+        };
+        /**
+         * Floats To Strings
+         * @description Converts a float or collections of floats to a collection of strings
+         */
+        FloatsToStringsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Floats
+             * @description float or collection of floats
+             * @default []
+             */
+            floats?: number | number[];
+            /**
+             * type
+             * @default floats_to_strings
+             * @constant
+             */
+            type: "floats_to_strings";
         };
         /**
          * FLUX2 Denoise
@@ -9266,6 +12864,195 @@ export type components = {
          */
         Flux2VariantType: "klein_4b" | "klein_9b" | "klein_9b_base";
         /**
+         * Flux Conditioning Blend
+         * @description Performs a blend between two FLUX Conditioning objects using either direct SLERP
+         *     or an advanced method that separates magnitude and direction.
+         */
+        FluxConditioningBlendInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The first FLUX Conditioning object.
+             * @default null
+             */
+            conditioning_1?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * @description The second FLUX Conditioning object.
+             * @default null
+             */
+            conditioning_2?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * Alpha
+             * @description Interpolation factor (0.0 for conditioning_1, 1.0 for conditioning_2).
+             * @default 0.5
+             */
+            alpha?: number;
+            /**
+             * Use Magnitude Separation
+             * @description If True, uses magnitude separation (SLERP for direction, LERP for magnitude); otherwise, uses direct SLERP.
+             * @default false
+             */
+            use_magnitude_separation?: boolean;
+            /**
+             * type
+             * @default flux_conditioning_blend
+             * @constant
+             */
+            type: "flux_conditioning_blend";
+        };
+        /**
+         * FluxConditioningBlendOutput
+         * @description Output for the blended Flux Conditionings.
+         */
+        FluxConditioningBlendOutput: {
+            /** @description The interpolated Flux Conditioning */
+            conditioning: components["schemas"]["FluxConditioningField"];
+            /**
+             * type
+             * @default flux_conditioning_blend_output
+             * @constant
+             */
+            type: "flux_conditioning_blend_output";
+        };
+        /**
+         * Flux Conditioning Collection Index
+         * @description CollectionIndex Picks an index out of a collection with a random option
+         */
+        FluxConditioningCollectionIndexInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Random
+             * @description Random Index?
+             * @default true
+             */
+            random?: boolean;
+            /**
+             * Index
+             * @description zero based index into collection (note index will wrap around if out of bounds)
+             * @default 0
+             */
+            index?: number;
+            /**
+             * FLUX Conditionings
+             * @description Conditioning tensor
+             * @default []
+             */
+            collection?: components["schemas"]["FluxConditioningField"][];
+            /**
+             * type
+             * @default flux_conditioning_index
+             * @constant
+             */
+            type: "flux_conditioning_index";
+        };
+        /**
+         * Flux Conditioning Collection Primitive
+         * @description A collection of flux conditioning tensor primitive values
+         */
+        FluxConditioningCollectionInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * FLUX Conditionings
+             * @description Conditioning tensor
+             * @default []
+             */
+            conditioning?: components["schemas"]["FluxConditioningField"][];
+            /**
+             * type
+             * @default flux_conditioning_collection
+             * @constant
+             */
+            type: "flux_conditioning_collection";
+        };
+        /**
+         * Flux Conditioning Collection join
+         * @description Join a flux conditioning tensor or collections into a single collection of flux conditioning tensors
+         */
+        FluxConditioningCollectionJoinInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * FLUX Text Encoder Conditioning or Collection
+             * @description Conditioning tensor
+             * @default null
+             */
+            conditionings_a?: components["schemas"]["FluxConditioningField"] | components["schemas"]["FluxConditioningField"][] | null;
+            /**
+             * FLUX Text Encoder Conditioning or Collection
+             * @description Conditioning tensor
+             * @default null
+             */
+            conditionings_b?: components["schemas"]["FluxConditioningField"] | components["schemas"]["FluxConditioningField"][] | null;
+            /**
+             * type
+             * @default flux_conditioning_collection_join
+             * @constant
+             */
+            type: "flux_conditioning_collection_join";
+        };
+        /**
          * FluxConditioningCollectionOutput
          * @description Base class for nodes that output a collection of conditioning tensors
          */
@@ -9281,6 +13068,88 @@ export type components = {
              * @constant
              */
             type: "flux_conditioning_collection_output";
+        };
+        /**
+         * FluxConditioningDeltaAndAugmentedOutput
+         * @description Output for the Conditioning Delta and Augmented Conditioning.
+         */
+        FluxConditioningDeltaAndAugmentedOutput: {
+            /** @description The augmented conditioning (base + delta, or just delta) */
+            augmented_conditioning: components["schemas"]["FluxConditioningField"];
+            /** @description The resulting conditioning delta (feature - reference) */
+            delta_conditioning: components["schemas"]["FluxConditioningField"];
+            /**
+             * type
+             * @default conditioning_delta_and_augmented_output
+             * @constant
+             */
+            type: "conditioning_delta_and_augmented_output";
+        };
+        /**
+         * Flux Conditioning Delta
+         * @description Calculates the delta between feature and reference conditionings,
+         *     and optionally augments a base conditioning with this delta.
+         *     If reference conditioning is omitted, it will be treated as zero tensors.
+         */
+        FluxConditioningDeltaAugmentationInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Feature Conditioning
+             * @description Feature Conditioning (single or list) for delta calculation. If a list, it will be averaged.
+             * @default null
+             */
+            feature_conditioning?: components["schemas"]["FluxConditioningField"] | components["schemas"]["FluxConditioningField"][] | null;
+            /**
+             * Reference Conditioning
+             * @description Reference Conditioning (single or list) for delta calculation. If a list, it will be averaged. If omitted, zero tensors will be used as reference.
+             * @default null
+             */
+            reference_conditioning?: components["schemas"]["FluxConditioningField"] | components["schemas"]["FluxConditioningField"][] | null;
+            /**
+             * @description Optional Base Conditioning to which the delta will be added. If not provided, Augmented Conditioning will be the Delta.
+             * @default null
+             */
+            base_conditioning?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * Base Scale
+             * @description Scalar to multiply the base conditioning when augmenting.
+             * @default 1
+             */
+            base_scale?: number;
+            /**
+             * Delta Scale
+             * @description Scalar to multiply the delta when augmenting the base conditioning.
+             * @default 1
+             */
+            delta_scale?: number;
+            /**
+             * Scale Delta Output
+             * @description If true, the delta output will also be scaled by the delta_scale.
+             * @default false
+             */
+            scale_delta_output?: boolean;
+            /**
+             * type
+             * @default flux_conditioning_delta_augmentation
+             * @constant
+             */
+            type: "flux_conditioning_delta_augmentation";
         };
         /**
          * FluxConditioningField
@@ -9299,6 +13168,142 @@ export type components = {
             mask?: components["schemas"]["TensorField"] | null;
         };
         /**
+         * Flux Conditioning List
+         * @description Takes multiple optional Flux Conditioning inputs and outputs them as a single
+         *     ordered list. Missing (None) inputs are gracefully handled.
+         */
+        FluxConditioningListInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description First optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_1?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * @description Second optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_2?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * @description Third optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_3?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * @description Fourth optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_4?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * @description Fifth optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_5?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * @description Sixth optional Flux Conditioning input.
+             * @default null
+             */
+            conditioning_6?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * type
+             * @default flux_conditioning_list
+             * @constant
+             */
+            type: "flux_conditioning_list";
+        };
+        /**
+         * FluxConditioningListOutput
+         * @description Output for the Flux Conditioning List node, providing an ordered list
+         *     of Flux Conditioning objects.
+         */
+        FluxConditioningListOutput: {
+            /**
+             * Conditioning List
+             * @description An ordered list of provided Flux Conditioning objects.
+             */
+            conditioning_list: components["schemas"]["FluxConditioningField"][];
+            /**
+             * type
+             * @default flux_conditioning_list_output
+             * @constant
+             */
+            type: "flux_conditioning_list_output";
+        };
+        /**
+         * FLUX Conditioning Math
+         * @description Performs a Math operation on two FLUX conditionings.
+         */
+        FluxConditioningMathOperationInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description First FLUX Conditioning (A)
+             * @default null
+             */
+            cond_a?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * @description Second FLUX Conditioning (B)
+             * @default null
+             */
+            cond_b?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * Operation
+             * @description Operation to perform (A op B)
+             * @default ADD
+             * @enum {string}
+             */
+            operation?: "ADD" | "SUB" | "MUL" | "DIV" | "APPEND" | "SPV" | "NSPV" | "LERP" | "SLERP";
+            /**
+             * Scale
+             * @description Scaling factor
+             * @default 1
+             */
+            scale?: number;
+            /**
+             * Rescale Target Norm
+             * @description If > 0, rescales the output embeddings to the target max norm. Set to 0 to disable.
+             * @default 0
+             */
+            rescale_target_norm?: number;
+            /**
+             * type
+             * @default flux_conditioning_math
+             * @constant
+             */
+            type: "flux_conditioning_math";
+        };
+        /**
          * FluxConditioningOutput
          * @description Base class for nodes that output a single conditioning tensor
          */
@@ -9311,6 +13316,23 @@ export type components = {
              * @constant
              */
             type: "flux_conditioning_output";
+        };
+        /**
+         * FluxConditioningStoreOutput
+         * @description Output for the Store Flux Conditioning node.
+         */
+        FluxConditioningStoreOutput: {
+            /**
+             * Conditioning Id
+             * @description Unique identifier for the stored Flux Conditioning
+             */
+            conditioning_id: string;
+            /**
+             * type
+             * @default flux_conditioning_store_output
+             * @constant
+             */
+            type: "flux_conditioning_store_output";
         };
         /**
          * Control LoRA - FLUX
@@ -9375,6 +13397,143 @@ export type components = {
              * @constant
              */
             type: "flux_control_lora_loader_output";
+        };
+        /**
+         * Flux ControlNet Collection Index
+         * @description CollectionIndex Picks an index out of a collection with a random option
+         */
+        FluxControlNetCollectionIndexInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Random
+             * @description Random Index?
+             * @default true
+             */
+            random?: boolean;
+            /**
+             * Index
+             * @description zero based index into collection (note index will wrap around if out of bounds)
+             * @default 0
+             */
+            index?: number;
+            /**
+             * FLUX ControlNets
+             * @description FLUX ControlNet Collection
+             * @default []
+             */
+            collection?: components["schemas"]["FluxControlNetField"][];
+            /**
+             * type
+             * @default flux_controlnet_index
+             * @constant
+             */
+            type: "flux_controlnet_index";
+        };
+        /**
+         * FLUX ControlNet Collection Primitive
+         * @description A collection of flux controlnet primitive values
+         */
+        FluxControlNetCollectionInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * FLUX ControlNet Collection
+             * @description FLUX ControlNets
+             * @default null
+             */
+            collection?: components["schemas"]["FluxControlNetField"][] | null;
+            /**
+             * type
+             * @default flux_controlnet_collection
+             * @constant
+             */
+            type: "flux_controlnet_collection";
+        };
+        /**
+         * FLUX ControlNet Collection join
+         * @description Join a flux controlnet tensors or collections into a single collection of flux controlnet tensors
+         */
+        FluxControlNetCollectionJoinInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * FLUX ControlNet or Collection
+             * @description FLUX ControlNets
+             * @default null
+             */
+            controlnets_a?: components["schemas"]["FluxControlNetField"] | components["schemas"]["FluxControlNetField"][] | null;
+            /**
+             * FLUX ControlNet or Collection
+             * @description FLUX ControlNets
+             * @default null
+             */
+            controlnets_b?: components["schemas"]["FluxControlNetField"] | components["schemas"]["FluxControlNetField"][] | null;
+            /**
+             * type
+             * @default flux_controlnet_collection_join
+             * @constant
+             */
+            type: "flux_controlnet_collection_join";
+        };
+        /** FluxControlNetCollectionOutput */
+        FluxControlNetCollectionOutput: {
+            /**
+             * FLUX ControlNet List
+             * @description ControlNet(s) to apply
+             */
+            collection: components["schemas"]["FluxControlNetField"][];
+            /**
+             * type
+             * @default flux_controlnet_collection_output
+             * @constant
+             */
+            type: "flux_controlnet_collection_output";
         };
         /** FluxControlNetField */
         FluxControlNetField: {
@@ -9483,6 +13642,96 @@ export type components = {
              * @constant
              */
             type: "flux_controlnet";
+        };
+        /**
+         * FLUX ControlNet-Linked
+         * @description Collects FLUX ControlNet info to pass to other nodes.
+         */
+        FluxControlNetLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The control image
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description ControlNet model to load
+             * @default null
+             */
+            control_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Control Weight
+             * @description The weight given to the ControlNet
+             * @default 1
+             */
+            control_weight?: number | number[];
+            /**
+             * Begin Step Percent
+             * @description When the ControlNet is first applied (% of total steps)
+             * @default 0
+             */
+            begin_step_percent?: number;
+            /**
+             * End Step Percent
+             * @description When the ControlNet is last applied (% of total steps)
+             * @default 1
+             */
+            end_step_percent?: number;
+            /**
+             * Resize Mode
+             * @description The resize mode used
+             * @default just_resize
+             * @enum {string}
+             */
+            resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+            /**
+             * Instantx Control Mode
+             * @description The control mode for InstantX ControlNet union models. Ignored for other ControlNet models. The standard mapping is: canny (0), tile (1), depth (2), blur (3), pose (4), gray (5), low quality (6). Negative values will be treated as 'None'.
+             * @default -1
+             */
+            instantx_control_mode?: number | null;
+            /**
+             * type
+             * @default flux_controlnet_linked
+             * @constant
+             */
+            type: "flux_controlnet_linked";
+            /**
+             * FLUX ControlNet List
+             * @description FLUX ControlNet List
+             * @default null
+             */
+            controlnet_list?: components["schemas"]["FluxControlNetField"] | components["schemas"]["FluxControlNetField"][] | null;
+        };
+        /** FluxControlNetListOutput */
+        FluxControlNetListOutput: {
+            /**
+             * FLUX ControlNet List
+             * @description ControlNet(s) to apply
+             */
+            controlnet_list: components["schemas"]["FluxControlNetField"][];
+            /**
+             * type
+             * @default flux_controlnet_list_output
+             * @constant
+             */
+            type: "flux_controlnet_list_output";
         };
         /**
          * FluxControlNetOutput
@@ -10013,6 +14262,75 @@ export type components = {
             type: "flux_ip_adapter";
         };
         /**
+         * Flux Ideal Size
+         * @description Calculates the ideal size for generation to avoid duplication
+         */
+        FluxIdealSizeInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Width
+             * @description Target width
+             * @default 1024
+             */
+            width?: number;
+            /**
+             * Height
+             * @description Target height
+             * @default 576
+             */
+            height?: number;
+            /**
+             * Multiplier
+             * @description Dimensional multiplier
+             * @default 1
+             */
+            multiplier?: number;
+            /**
+             * type
+             * @default flux_ideal_size
+             * @constant
+             */
+            type: "flux_ideal_size";
+        };
+        /**
+         * FluxIdealSizeOutput
+         * @description Base class for invocations that output an image
+         */
+        FluxIdealSizeOutput: {
+            /**
+             * Width
+             * @description The ideal width of the image in pixels
+             */
+            width: number;
+            /**
+             * Height
+             * @description The ideal height of the image in pixels
+             */
+            height: number;
+            /**
+             * type
+             * @default flux_ideal_size_output
+             * @constant
+             */
+            type: "flux_ideal_size_output";
+        };
+        /**
          * FLUX Kontext Image Prep
          * @description Prepares an image or images for use with FLUX Kontext. The first/single image is resized to the nearest
          *     preferred Kontext resolution. All other images are concatenated horizontally, maintaining their aspect ratio.
@@ -10071,6 +14389,47 @@ export type components = {
         FluxKontextConditioningField: {
             /** @description The Kontext reference image. */
             image: components["schemas"]["ImageField"];
+        };
+        /**
+         * Flux Kontext Ideal Size
+         * @description Calculates the ideal size for generation using Flux Kontext
+         */
+        FluxKontextIdealSizeInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Width
+             * @description Target width
+             * @default 1024
+             */
+            width?: number;
+            /**
+             * Height
+             * @description Target height
+             * @default 576
+             */
+            height?: number;
+            /**
+             * type
+             * @default flux_kontext_ideal_size
+             * @constant
+             */
+            type: "flux_kontext_ideal_size";
         };
         /**
          * Kontext Conditioning - FLUX
@@ -10213,6 +14572,58 @@ export type components = {
             type: "flux_lora_loader_output";
         };
         /**
+         * FLUX Main Model Input
+         * @description Loads a flux model from an input, outputting its submodels.
+         */
+        FluxModelLoaderInputInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Flux model (Transformer) to load
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * T5 Encoder
+             * @description T5 tokenizer and text encoder
+             * @default null
+             */
+            t5_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * CLIP Embed
+             * @description CLIP Embed loader
+             * @default null
+             */
+            clip_embed_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * VAE
+             * @description VAE model to load
+             * @default null
+             */
+            vae_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default flux_model_loader_input
+             * @constant
+             */
+            type: "flux_model_loader_input";
+        };
+        /**
          * Main Model - FLUX
          * @description Loads a flux base model, outputting its submodels.
          */
@@ -10303,6 +14714,177 @@ export type components = {
             type: "flux_model_loader_output";
         };
         /**
+         * Flux Model To String
+         * @description Converts an Flux Model to a JSONString
+         */
+        FluxModelToStringInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Flux model (Transformer) to load
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default flux_model_to_string
+             * @constant
+             */
+            type: "flux_model_to_string";
+        };
+        /**
+         * Flux Redux Collection Index
+         * @description CollectionIndex Picks an index out of a collection with a random option
+         */
+        FluxReduxCollectionIndexInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Random
+             * @description Random Index?
+             * @default true
+             */
+            random?: boolean;
+            /**
+             * Index
+             * @description zero based index into collection (note index will wrap around if out of bounds)
+             * @default 0
+             */
+            index?: number;
+            /**
+             * FLUX Redux Collection
+             * @description Conditioning tensor
+             * @default []
+             */
+            collection?: components["schemas"]["FluxReduxConditioningField"][];
+            /**
+             * type
+             * @default flux_redux_index
+             * @constant
+             */
+            type: "flux_redux_index";
+        };
+        /**
+         * FLUX Redux Collection Primitive
+         * @description A collection of flux redux primitive values
+         */
+        FluxReduxCollectionInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * FLUX Redux Collection
+             * @description FLUX Redux Collection
+             * @default null
+             */
+            collection?: components["schemas"]["FluxReduxConditioningField"][] | null;
+            /**
+             * type
+             * @default flux_redux_collection
+             * @constant
+             */
+            type: "flux_redux_collection";
+        };
+        /**
+         * FLUX Redux Collection join
+         * @description Join a flux redux tensor or collections into a single collection of flux redux tensors
+         */
+        FluxReduxCollectionJoinInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * FLUX Redux or Collection
+             * @description FLUX Reduxs
+             * @default null
+             */
+            conditionings_a?: components["schemas"]["FluxReduxConditioningField"] | components["schemas"]["FluxReduxConditioningField"][] | null;
+            /**
+             * FLUX Redux or Collection
+             * @description FLUX Reduxs
+             * @default null
+             */
+            conditionings_b?: components["schemas"]["FluxReduxConditioningField"] | components["schemas"]["FluxReduxConditioningField"][] | null;
+            /**
+             * type
+             * @default flux_redux_collection_join
+             * @constant
+             */
+            type: "flux_redux_collection_join";
+        };
+        /** FluxReduxCollectionOutput */
+        FluxReduxCollectionOutput: {
+            /**
+             * FLUX Redux Collection
+             * @description ControlNet(s) to apply
+             */
+            collection: components["schemas"]["FluxReduxConditioningField"][];
+            /**
+             * type
+             * @default flux_redux_collection_output
+             * @constant
+             */
+            type: "flux_redux_collection_output";
+        };
+        /**
          * FluxReduxConditioningField
          * @description A FLUX Redux conditioning tensor primitive value
          */
@@ -10314,6 +14896,117 @@ export type components = {
              * @default null
              */
             mask?: components["schemas"]["TensorField"] | null;
+        };
+        /**
+         * FLUX Redux Conditioning Math
+         * @description Performs a Math operation on two FLUX Redux conditionings.
+         */
+        FluxReduxConditioningMathOperationInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description First FLUX Redux Conditioning (A)
+             * @default null
+             */
+            cond_a?: components["schemas"]["FluxReduxConditioningField"] | null;
+            /**
+             * @description Second FLUX Redux Conditioning (B)
+             * @default null
+             */
+            cond_b?: components["schemas"]["FluxReduxConditioningField"] | null;
+            /**
+             * Operation
+             * @description Operation to perform (A op B)
+             * @default ADD
+             * @enum {string}
+             */
+            operation?: "ADD" | "SUB" | "MUL" | "DIV" | "APPEND" | "SPV" | "NSPV" | "LERP" | "SLERP";
+            /**
+             * Scale
+             * @description Scaling factor
+             * @default 1
+             */
+            scale?: number;
+            /**
+             * Rescale Target Norm
+             * @description If > 0, rescales the output embeddings to the target max norm. Set to 0 to disable.
+             * @default 0
+             */
+            rescale_target_norm?: number;
+            /**
+             * type
+             * @default flux_redux_conditioning_math
+             * @constant
+             */
+            type: "flux_redux_conditioning_math";
+        };
+        /**
+         * FLUX Redux Downsampling
+         * @description Downsampling Flux Redux conditioning
+         */
+        FluxReduxDownsamplingInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description FLUX Redux conditioning tensor.
+             * @default null
+             */
+            redux_conditioning?: components["schemas"]["FluxReduxConditioningField"] | null;
+            /**
+             * Downsampling Factor
+             * @description Redux Downsampling Factor (1-9)
+             * @default 3
+             */
+            downsampling_factor?: number;
+            /**
+             * Downsampling Function
+             * @description Redux Downsampling Function
+             * @default area
+             * @enum {string}
+             */
+            downsampling_function?: "nearest" | "bilinear" | "bicubic" | "area" | "nearest-exact";
+            /**
+             * Weight
+             * @description Redux weight (0.0-3.0)
+             * @default 1
+             */
+            weight?: number;
+            /**
+             * type
+             * @default flux_redux_downsampling
+             * @constant
+             */
+            type: "flux_redux_downsampling";
         };
         /**
          * FLUX Redux
@@ -10380,6 +15073,90 @@ export type components = {
             type: "flux_redux";
         };
         /**
+         * FLUX Redux-Linked
+         * @description Collects FLUX Redux conditioning info to pass to other nodes.
+         */
+        FluxReduxLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The FLUX Redux image prompt.
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The bool mask associated with this FLUX Redux image prompt. Excluded regions should be set to False, included regions should be set to True.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
+            /**
+             * FLUX Redux Model
+             * @description The FLUX Redux model to use.
+             * @default null
+             */
+            redux_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Downsampling Factor
+             * @description Redux Downsampling Factor (1-9)
+             * @default 1
+             */
+            downsampling_factor?: number;
+            /**
+             * Downsampling Function
+             * @description Redux Downsampling Function
+             * @default area
+             * @enum {string}
+             */
+            downsampling_function?: "nearest" | "bilinear" | "bicubic" | "area" | "nearest-exact";
+            /**
+             * Weight
+             * @description Redux weight (0.0-1.0)
+             * @default 1
+             */
+            weight?: number;
+            /**
+             * type
+             * @default flux_redux_linked
+             * @constant
+             */
+            type: "flux_redux_linked";
+            /**
+             * FLUX Redux Conditioning List
+             * @description FLUX Redux conditioning list
+             * @default null
+             */
+            redux_conditioning_list?: components["schemas"]["FluxReduxConditioningField"] | components["schemas"]["FluxReduxConditioningField"][] | null;
+        };
+        /** FluxReduxListOutput */
+        FluxReduxListOutput: {
+            /**
+             * FLUX Redux Conditioning List
+             * @description FLUX Redux conditioning tensor
+             */
+            redux_conditioning_list: components["schemas"]["FluxReduxConditioningField"][];
+            /**
+             * type
+             * @default flux_redux_list_output
+             * @constant
+             */
+            type: "flux_redux_list_output";
+        };
+        /**
          * FluxReduxOutput
          * @description The conditioning output of a FLUX Redux invocation.
          */
@@ -10395,6 +15172,266 @@ export type components = {
              * @constant
              */
             type: "flux_redux_output";
+        };
+        /**
+         * Rescale FLUX Redux Conditioning
+         * @description Rescales a FLUX Redux conditioning field to a target max norm.
+         */
+        FluxReduxRescaleConditioningInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description FLUX Redux Conditioning to rescale
+             * @default null
+             */
+            redux_conditioning?: components["schemas"]["FluxReduxConditioningField"] | null;
+            /**
+             * Target Norm
+             * @description The target max norm for the conditioning.
+             * @default 1
+             */
+            target_norm?: number;
+            /**
+             * type
+             * @default flux_redux_rescale_conditioning
+             * @constant
+             */
+            type: "flux_redux_rescale_conditioning";
+        };
+        /**
+         * Rescale FLUX Conditioning
+         * @description Rescales a FLUX conditioning field to a target max norm.
+         */
+        FluxRescaleConditioningInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description FLUX Conditioning to rescale
+             * @default null
+             */
+            conditioning?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * Clip Rescale
+             * @description Whether to rescale the CLIP embeddings.
+             * @default true
+             */
+            clip_rescale?: boolean;
+            /**
+             * Clip Target Norm
+             * @description The target max norm for the CLIP embeddings.
+             * @default 30
+             */
+            clip_target_norm?: number;
+            /**
+             * T5 Rescale
+             * @description Whether to rescale the T5 embeddings.
+             * @default true
+             */
+            t5_rescale?: boolean;
+            /**
+             * T5 Target Norm
+             * @description The target max norm for the T5 embeddings.
+             * @default 10
+             */
+            t5_target_norm?: number;
+            /**
+             * type
+             * @default flux_rescale_conditioning
+             * @constant
+             */
+            type: "flux_rescale_conditioning";
+        };
+        /**
+         * Scale FLUX Conditioning
+         * @description Scales a FLUX conditioning field by a factor.
+         */
+        FluxScaleConditioningInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description FLUX Conditioning to scale
+             * @default null
+             */
+            conditioning?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * Scale
+             * @description Scaling factor
+             * @default 1
+             */
+            scale?: number;
+            /**
+             * Negative
+             * @description Scale negative conditioning
+             * @default false
+             */
+            negative?: boolean;
+            /**
+             * type
+             * @default flux_scale_conditioning
+             * @constant
+             */
+            type: "flux_scale_conditioning";
+        };
+        /**
+         * Scale FLUX Prompt Section(s)
+         * @description Scales one or more sections of a FLUX prompt conditioning.
+         */
+        FluxScalePromptSectionInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description FLUX Conditioning to modify
+             * @default null
+             */
+            conditioning?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * T5Encoder
+             * @description T5 Encoder model and tokenizer used for the original conditioning.
+             * @default null
+             */
+            t5_encoder?: components["schemas"]["T5EncoderField"] | null;
+            /**
+             * Prompt
+             * @description The full prompt text used for the original conditioning.
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * Prompt Section
+             * @description The section or sections of the prompt to scale.
+             * @default null
+             */
+            prompt_section?: string | string[] | null;
+            /**
+             * Scale
+             * @description The scaling factor or factors for the prompt section(s).
+             * @default 1
+             */
+            scale?: number | number[];
+            /**
+             * Positions
+             * @description The start character position(s) of the section(s) to scale. If provided, this is used to locate the section(s) instead of searching.
+             * @default null
+             */
+            positions?: number | number[] | null;
+            /**
+             * Rescale Output
+             * @description Rescales the output T5 embeddings to have the same max vector norm as the original conditioning.
+             * @default false
+             */
+            rescale_output?: boolean;
+            /**
+             * type
+             * @default flux_scale_prompt_section
+             * @constant
+             */
+            type: "flux_scale_prompt_section";
+        };
+        /**
+         * Scale FLUX Redux Conditioning
+         * @description Scales a FLUX Redux conditioning field by a factor.
+         */
+        FluxScaleReduxConditioningInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description FLUX Redux Conditioning to scale
+             * @default null
+             */
+            redux_conditioning?: components["schemas"]["FluxReduxConditioningField"] | null;
+            /**
+             * Scale
+             * @description Scaling factor
+             * @default 1
+             */
+            scale?: number;
+            /**
+             * Negative
+             * @description Scale negative conditioning
+             * @default false
+             */
+            negative?: boolean;
+            /**
+             * type
+             * @default flux_scale_redux_conditioning
+             * @constant
+             */
+            type: "flux_scale_redux_conditioning";
         };
         /**
          * Prompt - FLUX
@@ -10453,6 +15490,87 @@ export type components = {
              * @constant
              */
             type: "flux_text_encoder";
+        };
+        /**
+         * Prompt - FLUX Linked
+         * @description Collects FLUX prompt conditionings to pass to other nodes.
+         */
+        FluxTextEncoderLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * CLIP
+             * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+             * @default null
+             */
+            clip?: components["schemas"]["CLIPField"] | null;
+            /**
+             * T5Encoder
+             * @description T5 tokenizer and text encoder
+             * @default null
+             */
+            t5_encoder?: components["schemas"]["T5EncoderField"] | null;
+            /**
+             * T5 Max Seq Len
+             * @description Max sequence length for the T5 encoder. Expected to be 256 for FLUX schnell models and 512 for FLUX dev models.
+             * @default null
+             */
+            t5_max_seq_len?: (256 | 512) | null;
+            /**
+             * Prompt
+             * @description Text prompt to encode.
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description A mask defining the region that this conditioning prompt applies to.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
+            /**
+             * type
+             * @default flux_text_encoder_linked
+             * @constant
+             */
+            type: "flux_text_encoder_linked";
+            /**
+             * FLUX Text Encoder Conditioning List
+             * @description Conditioning tensor
+             * @default null
+             */
+            flux_text_encoder_list?: components["schemas"]["FluxConditioningField"] | components["schemas"]["FluxConditioningField"][] | null;
+        };
+        /**
+         * FluxTextEncoderListOutput
+         * @description Output for a list of FLUX text encoder conditioning.
+         */
+        FluxTextEncoderListOutput: {
+            /**
+             * FLUX Text Encoder Conditioning List
+             * @description Conditioning tensor
+             */
+            flux_text_encoder_list: components["schemas"]["FluxConditioningField"][];
+            /**
+             * type
+             * @default flux_text_encoder_list_output
+             * @constant
+             */
+            type: "flux_text_encoder_list_output";
         };
         /**
          * Latents to Image - FLUX
@@ -10548,6 +15666,89 @@ export type components = {
          * @enum {string}
          */
         FluxVariantType: "schnell" | "dev" | "dev_fill";
+        /**
+         * FLUX Weighted Prompt
+         * @description Parses a weighted prompt, then encodes it for FLUX.
+         */
+        FluxWeightedPromptInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Prompt
+             * @description Text prompt to encode.
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * CLIP
+             * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+             * @default null
+             */
+            clip?: components["schemas"]["CLIPField"] | null;
+            /**
+             * T5Encoder
+             * @description T5 tokenizer and text encoder
+             * @default null
+             */
+            t5_encoder?: components["schemas"]["T5EncoderField"] | null;
+            /**
+             * T5 Max Seq Len
+             * @description Max sequence length for the T5 encoder. Expected to be 256 for FLUX schnell models and 512 for FLUX dev models.
+             * @default null
+             */
+            t5_max_seq_len?: (256 | 512) | null;
+            /**
+             * @description A mask defining the region that this conditioning prompt applies to.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
+            /**
+             * Rescale Output
+             * @description Rescales the output T5 embeddings to have the same max vector norm as the original conditioning.
+             * @default false
+             */
+            rescale_output?: boolean;
+            /**
+             * type
+             * @default flux_weighted_prompt
+             * @constant
+             */
+            type: "flux_weighted_prompt";
+        };
+        /**
+         * FluxWeightedPromptOutput
+         * @description Outputs a FLUX conditioning and a cleaned prompt
+         */
+        FluxWeightedPromptOutput: {
+            /** @description The FLUX conditioning */
+            conditioning: components["schemas"]["FluxConditioningField"];
+            /**
+             * Cleaned Prompt
+             * @description The prompt with all weighting syntax removed
+             */
+            cleaned_prompt: string;
+            /**
+             * type
+             * @default flux_weighted_prompt_output
+             * @constant
+             */
+            type: "flux_weighted_prompt_output";
+        };
         /** FoundModel */
         FoundModel: {
             /**
@@ -10652,6 +15853,219 @@ export type components = {
              */
             type: "freeu";
         };
+        /** Frequency Blend Latents */
+        FrequencyBlendLatents: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Image from which to take high frequencies.
+             * @default null
+             */
+            high_input?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description Image from which to take low frequencies.
+             * @default null
+             */
+            low_input?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Threshold
+             * @description How much of the high-frequency to use. Negative values swap the inputs.
+             * @default 0.05
+             */
+            threshold?: number;
+            /**
+             * Weighted Blend
+             * @description Weighted blend?
+             * @default true
+             */
+            weighted_blend?: boolean;
+            /**
+             * type
+             * @default frequency_blend_latents
+             * @constant
+             */
+            type: "frequency_blend_latents";
+        };
+        /**
+         * Frequency Spectrum Match Latents
+         * @description Generates latent noise with the frequency spectrum of target latents, masked by a provided mask image.
+         *     Takes both target latents and white noise latents as inputs.
+         */
+        FrequencySpectrumMatchLatentsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Target latents to match frequency spectrum (A)
+             * @default null
+             */
+            target_latents_a?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description Target latents to match frequency spectrum (B) (optional)
+             * @default null
+             */
+            target_latents_b?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Frequency Blend Alpha
+             * @description Blend ratio for the frequency spectra
+             * @default 0
+             */
+            frequency_blend_alpha?: number;
+            /**
+             * @description White noise latents for phase information (A)
+             * @default null
+             */
+            phase_latents_a?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description White noise latents for phase information (B) (optional)
+             * @default null
+             */
+            phase_latents_b?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Phase Blend Alpha
+             * @description Blend ratio for the phases
+             * @default 0
+             */
+            phase_blend_alpha?: number;
+            /**
+             * @description Mask for blending (optional)
+             * @default null
+             */
+            mask?: components["schemas"]["ImageField"] | null;
+            /**
+             * Blur Sigma
+             * @description Amount of Gaussian blur to apply to the mask
+             * @default 0
+             */
+            blur_sigma?: number;
+            /**
+             * type
+             * @default frequency_match_latents
+             * @constant
+             */
+            type: "frequency_match_latents";
+        };
+        /**
+         * Generate Evolutionary Prompts
+         * @description Generates a new population of prompts by performing crossover operations
+         *     on an input list of parent seed vectors.
+         */
+        GenerateEvolutionaryPromptsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Resolutions Dict
+             * @description Private field for id substitutions dict cache
+             * @default {}
+             */
+            resolutions_dict?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Lookups
+             * @description Lookup table(s) containing template(s) (JSON)
+             * @default []
+             */
+            lookups?: string | string[];
+            /**
+             * Remove Negatives
+             * @description Whether to strip out text between []
+             * @default false
+             */
+            remove_negatives?: boolean;
+            /**
+             * Strip Parens Probability
+             * @description Probability of removing attention group weightings
+             * @default 0
+             */
+            strip_parens_probability?: number;
+            /**
+             * Resolutions
+             * @description JSON structure of substitutions by id by tag
+             * @default []
+             */
+            resolutions?: string | string[];
+            /**
+             * Seed Vectors In
+             * @description List of JSON array strings, each representing a parent's seed vector.
+             * @default []
+             */
+            seed_vectors_in?: string[];
+            /**
+             * Target Population Size
+             * @description The desired size of the new population to generate.
+             * @default 10
+             */
+            target_population_size?: number;
+            /**
+             * Selected Pair
+             * @description The selected population member to output specifically.
+             * @default 0
+             */
+            selected_pair?: number;
+            /**
+             * Ga Seed
+             * @description Seed for the random number generator to ensure deterministic GA operations
+             * @default 0
+             */
+            ga_seed?: number;
+            /**
+             * Crossover Non Terminal
+             * @description Optional: The non-terminal (key in lookups) to target for the crossover branch. If None, a random one will be chosen from available common non-terminals for each crossover.
+             * @default null
+             */
+            crossover_non_terminal?: string | null;
+            /**
+             * type
+             * @default generate_evolutionary_prompts
+             * @constant
+             */
+            type: "generate_evolutionary_prompts";
+        };
         /**
          * GeneratePasswordResponse
          * @description Response containing a generated password.
@@ -10713,6 +16127,76 @@ export type components = {
              */
             type: "get_image_mask_bounding_box";
         };
+        /**
+         * Get Source Frame Rate
+         * @description Get the source framerate of an MP4 video and provide it as output.
+         */
+        GetSourceFrameRateInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Video Path
+             * @description The path to the MP4 video file
+             * @default null
+             */
+            video_path?: string | null;
+            /**
+             * type
+             * @default get_source_framerate
+             * @constant
+             */
+            type: "get_source_framerate";
+        };
+        /**
+         * Get Total Frames
+         * @description Get the total number of frames in an MP4 video and provide it as output.
+         */
+        GetTotalFramesInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Video Path
+             * @description The path to the MP4 video file
+             * @default null
+             */
+            video_path?: string | null;
+            /**
+             * type
+             * @default get_total_frames
+             * @constant
+             */
+            type: "get_total_frames";
+        };
         /** GlmEncoderField */
         GlmEncoderField: {
             /** @description Info to load tokenizer submodel */
@@ -10748,7 +16232,7 @@ export type components = {
              * @description The nodes in this graph
              */
             nodes?: {
-                [key: string]: components["schemas"]["AddInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
+                [key: string]: components["schemas"]["AddInvocation"] | components["schemas"]["AdvAutostereogramInvocation"] | components["schemas"]["AdvancedTextFontImageInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnamorphicStreaksInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AutostereogramInvocation"] | components["schemas"]["AverageImagesInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BoolCollectionIndexInvocation"] | components["schemas"]["BoolCollectionToggleInvocation"] | components["schemas"]["BoolToggleInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanCollectionLinkedInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CMYKColorSeparationInvocation"] | components["schemas"]["CMYKHalftoneInvocation"] | components["schemas"]["CMYKMergeInvocation"] | components["schemas"]["CMYKSplitInvocation"] | components["schemas"]["CSVToIndexStringInvocation"] | components["schemas"]["CSVToStringsInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ChromaNoiseInvocation"] | components["schemas"]["ChromaticAberrationInvocation"] | components["schemas"]["ClipsegMaskHierarchyInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCountInvocation"] | components["schemas"]["CollectionIndexInvocation"] | components["schemas"]["CollectionJoinInvocation"] | components["schemas"]["CollectionReverseInvocation"] | components["schemas"]["CollectionSliceInvocation"] | components["schemas"]["CollectionSortInvocation"] | components["schemas"]["CollectionUniqueInvocation"] | components["schemas"]["ColorCastCorrectionInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompareFloatsInvocation"] | components["schemas"]["CompareIntsInvocation"] | components["schemas"]["CompareStringsInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConcatenateFluxConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningCollectionLinkedInvocation"] | components["schemas"]["ConditioningCollectionToggleInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningToggleInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ControlNetLinkedInvocation"] | components["schemas"]["CoordinatedFluxNoiseInvocation"] | components["schemas"]["CoordinatedNoiseInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CropLatentsInvocation"] | components["schemas"]["CrossoverPromptInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DefaultXYTileGenerator"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["EnhanceDetailInvocation"] | components["schemas"]["EscaperInvocation"] | components["schemas"]["EvenSplitXYTileGenerator"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractImageCollectionMetadataBooleanInvocation"] | components["schemas"]["ExtractImageCollectionMetadataFloatInvocation"] | components["schemas"]["ExtractImageCollectionMetadataIntegerInvocation"] | components["schemas"]["ExtractImageCollectionMetadataStringInvocation"] | components["schemas"]["ExtrudeDepthInvocation"] | components["schemas"]["FLUXConditioningCollectionToggleInvocation"] | components["schemas"]["FLUXConditioningToggleInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FilmGrainInvocation"] | components["schemas"]["FlattenHistogramMono"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionIndexInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatCollectionLinkedInvocation"] | components["schemas"]["FloatCollectionToggleInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FloatToggleInvocation"] | components["schemas"]["FloatsToStringsInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["FluxConditioningBlendInvocation"] | components["schemas"]["FluxConditioningCollectionIndexInvocation"] | components["schemas"]["FluxConditioningCollectionInvocation"] | components["schemas"]["FluxConditioningCollectionJoinInvocation"] | components["schemas"]["FluxConditioningDeltaAugmentationInvocation"] | components["schemas"]["FluxConditioningListInvocation"] | components["schemas"]["FluxConditioningMathOperationInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetCollectionIndexInvocation"] | components["schemas"]["FluxControlNetCollectionInvocation"] | components["schemas"]["FluxControlNetCollectionJoinInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxControlNetLinkedInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxIdealSizeInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextIdealSizeInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInputInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxModelToStringInvocation"] | components["schemas"]["FluxReduxCollectionIndexInvocation"] | components["schemas"]["FluxReduxCollectionInvocation"] | components["schemas"]["FluxReduxCollectionJoinInvocation"] | components["schemas"]["FluxReduxConditioningMathOperationInvocation"] | components["schemas"]["FluxReduxDownsamplingInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxReduxLinkedInvocation"] | components["schemas"]["FluxReduxRescaleConditioningInvocation"] | components["schemas"]["FluxRescaleConditioningInvocation"] | components["schemas"]["FluxScaleConditioningInvocation"] | components["schemas"]["FluxScalePromptSectionInvocation"] | components["schemas"]["FluxScaleReduxConditioningInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxTextEncoderLinkedInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["FluxWeightedPromptInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["FrequencyBlendLatents"] | components["schemas"]["FrequencySpectrumMatchLatentsInvocation"] | components["schemas"]["GenerateEvolutionaryPromptsInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GetSourceFrameRateInvocation"] | components["schemas"]["GetTotalFramesInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HalftoneInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IPAdapterLinkedInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionIndexInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageCollectionLinkedInvocation"] | components["schemas"]["ImageCollectionToggleInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageIndexCollectInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImageOffsetInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageRotateInvocation"] | components["schemas"]["ImageSOMInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageSearchToMaskClipsegInvocation"] | components["schemas"]["ImageToAAInvocation"] | components["schemas"]["ImageToDetailedASCIIArtInvocation"] | components["schemas"]["ImageToImageNameInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageToUnicodeArtInvocation"] | components["schemas"]["ImageToXYImageCollectionInvocation"] | components["schemas"]["ImageToXYImageTilesInvocation"] | components["schemas"]["ImageToggleInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["ImagesIndexToVideoInvocation"] | components["schemas"]["ImagesToGridsInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfoGrabberUNetInvocation"] | components["schemas"]["IntCollectionToggleInvocation"] | components["schemas"]["IntToggleInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionIndexInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerCollectionLinkedInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["IntsToStringsInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentAverageInvocation"] | components["schemas"]["LatentBandPassFilterInvocation"] | components["schemas"]["LatentBlendLinearInvocation"] | components["schemas"]["LatentChannelsToGridInvocation"] | components["schemas"]["LatentCombineInvocation"] | components["schemas"]["LatentDtypeConvertInvocation"] | components["schemas"]["LatentHighPassFilterInvocation"] | components["schemas"]["LatentLowPassFilterInvocation"] | components["schemas"]["LatentMatchInvocation"] | components["schemas"]["LatentModifyChannelsInvocation"] | components["schemas"]["LatentNormalizeRangeInvocation"] | components["schemas"]["LatentNormalizeStdDevInvocation"] | components["schemas"]["LatentNormalizeStdRangeInvocation"] | components["schemas"]["LatentPlotInvocation"] | components["schemas"]["LatentSOMInvocation"] | components["schemas"]["LatentWhiteNoiseInvocation"] | components["schemas"]["LatentsCollectionIndexInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsCollectionLinkedInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LensApertureGeneratorInvocation"] | components["schemas"]["LensBlurInvocation"] | components["schemas"]["LensVignetteInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionFromPathInvocation"] | components["schemas"]["LoRACollectionInvocation"] | components["schemas"]["LoRACollectionLinkedInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRACollectionToggleInvocation"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRANameGrabberInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["LoRAToggleInvocation"] | components["schemas"]["LoadAllTextFilesInFolderInvocation"] | components["schemas"]["LoadApertureImageInvocation"] | components["schemas"]["LoadTextFileToStringInvocation"] | components["schemas"]["LoadVideoFrameInvocation"] | components["schemas"]["LookupLoRACollectionTriggersInvocation"] | components["schemas"]["LookupLoRATriggersInvocation"] | components["schemas"]["LookupTableFromFileInvocation"] | components["schemas"]["LookupsEntryFromPromptInvocation"] | components["schemas"]["LoraToStringInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInputInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MainModelToStringInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MatchHistogramInvocation"] | components["schemas"]["MatchHistogramLabInvocation"] | components["schemas"]["MathEvalInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeLoRACollectionsInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeStringCollectionsInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MinimumOverlapXYTileGenerator"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["ModelNameGrabberInvocation"] | components["schemas"]["ModelNameToModelInvocation"] | components["schemas"]["ModelToStringInvocation"] | components["schemas"]["ModelToggleInvocation"] | components["schemas"]["MonochromeFilmGrainInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NightmareInvocation"] | components["schemas"]["NoiseAddFluxInvocation"] | components["schemas"]["NoiseImage2DInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NoiseSpectralInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OctreeQuantizerInvocation"] | components["schemas"]["OffsetLatentsInvocation"] | components["schemas"]["OptimizedTileSizeFromAreaInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PTFieldsCollectInvocation"] | components["schemas"]["PTFieldsExpandInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["ParseWeightedStringInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PercentToFloatInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PixelArtInvocation"] | components["schemas"]["PixelizeImageInvocation"] | components["schemas"]["PixelizeInvocation"] | components["schemas"]["PrintStringToConsoleInvocation"] | components["schemas"]["PromptAutoAndInvocation"] | components["schemas"]["PromptFromLookupTableInvocation"] | components["schemas"]["PromptStrengthInvocation"] | components["schemas"]["PromptStrengthsCombineInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["PromptsToFileInvocation"] | components["schemas"]["PruneTextInvocation"] | components["schemas"]["Qwen3PromptProInvocation"] | components["schemas"]["RGBMergeInvocation"] | components["schemas"]["RGBSplitInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomImageSizeInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomLoRAMixerInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ReapplyLoRAWeightInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RetrieveBoardImagesInvocation"] | components["schemas"]["RetrieveFluxConditioningInvocation"] | components["schemas"]["RetroBitizeInvocation"] | components["schemas"]["RetroCRTCurvatureInvocation"] | components["schemas"]["RetroGetPaletteAdvInvocation"] | components["schemas"]["RetroGetPaletteInvocation"] | components["schemas"]["RetroPalettizeAdvInvocation"] | components["schemas"]["RetroPalettizeInvocation"] | components["schemas"]["RetroQuantizeInvocation"] | components["schemas"]["RetroScanlinesSimpleInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3ModelLoaderInputInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLMainModelToggleInvocation"] | components["schemas"]["SDXLModelLoaderInputInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLModelToStringInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SchedulerToStringInvocation"] | components["schemas"]["SchedulerToggleInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3ModelToStringInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["SeparatePromptAndSeedVectorInvocation"] | components["schemas"]["ShadowsHighlightsMidtonesMaskInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["SphericalDistortionInvocation"] | components["schemas"]["StoreFluxConditioningInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionIndexInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringCollectionJoinerInvocation"] | components["schemas"]["StringCollectionLinkedInvocation"] | components["schemas"]["StringCollectionToggleInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringToCollectionSplitterInvocation"] | components["schemas"]["StringToFloatInvocation"] | components["schemas"]["StringToIntInvocation"] | components["schemas"]["StringToLoraInvocation"] | components["schemas"]["StringToMainModelInvocation"] | components["schemas"]["StringToModelInvocation"] | components["schemas"]["StringToSDXLModelInvocation"] | components["schemas"]["StringToSchedulerInvocation"] | components["schemas"]["StringToggleInvocation"] | components["schemas"]["StringsToCSVInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["T2IAdapterLinkedInvocation"] | components["schemas"]["TextMaskInvocation"] | components["schemas"]["TextToMaskClipsegAdvancedInvocation"] | components["schemas"]["TextToMaskClipsegInvocation"] | components["schemas"]["TextfontimageInvocation"] | components["schemas"]["ThresholdingInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["TraceryInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["XYExpandInvocation"] | components["schemas"]["XYImageCollectInvocation"] | components["schemas"]["XYImageExpandInvocation"] | components["schemas"]["XYImageTilesToImageInvocation"] | components["schemas"]["XYImagesToGridInvocation"] | components["schemas"]["XYProductCSVInvocation"] | components["schemas"]["XYProductInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
             };
             /**
              * Edges
@@ -10785,7 +16269,7 @@ export type components = {
              * @description The results of node executions
              */
             results: {
-                [key: string]: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
+                [key: string]: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CMYKSeparationOutput"] | components["schemas"]["CMYKSplitOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["ClipsegMaskHierarchyOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["CollectionCountOutput"] | components["schemas"]["CollectionIndexOutput"] | components["schemas"]["CollectionJoinOutput"] | components["schemas"]["CollectionReverseOutput"] | components["schemas"]["CollectionSliceOutput"] | components["schemas"]["CollectionSortOutput"] | components["schemas"]["CollectionUniqueOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlListOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["EscapedOutput"] | components["schemas"]["EvolutionaryPromptListOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["FluxConditioningBlendOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningDeltaAndAugmentedOutput"] | components["schemas"]["FluxConditioningListOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxConditioningStoreOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetCollectionOutput"] | components["schemas"]["FluxControlNetListOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxIdealSizeOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxCollectionOutput"] | components["schemas"]["FluxReduxListOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["FluxTextEncoderListOutput"] | components["schemas"]["FluxWeightedPromptOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["HalvedPromptOutput"] | components["schemas"]["IPAdapterListOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageIndexCollectOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["ImageSOMOutput"] | components["schemas"]["ImageToImageNameOutput"] | components["schemas"]["ImageToXYImageTilesOutput"] | components["schemas"]["ImagesIndexToVideoOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["JsonListStringsOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRACollectionFromPathOutput"] | components["schemas"]["LoRACollectionOutput"] | components["schemas"]["LoRACollectionToggleOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRANameGrabberOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["LoRAToggleOutput"] | components["schemas"]["LoadAllTextFilesInFolderOutput"] | components["schemas"]["LoadTextFileToStringOutput"] | components["schemas"]["LookupLoRACollectionTriggersOutput"] | components["schemas"]["LookupLoRATriggersOutput"] | components["schemas"]["LookupTableOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MathEvalOutput"] | components["schemas"]["MergeLoRACollectionsOutput"] | components["schemas"]["MergeStringCollectionsOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["ModelNameGrabberOutput"] | components["schemas"]["ModelToggleOutput"] | components["schemas"]["NightmareOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PTFieldsCollectOutput"] | components["schemas"]["PTFieldsExpandOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PaletteOutput"] | components["schemas"]["PrintStringToConsoleOutput"] | components["schemas"]["PromptStrengthOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["PromptsToFileInvocationOutput"] | components["schemas"]["PrunedPromptOutput"] | components["schemas"]["Qwen3PromptProOutput"] | components["schemas"]["RGBSplitOutput"] | components["schemas"]["RandomImageSizeOutput"] | components["schemas"]["RandomLoRAMixerOutput"] | components["schemas"]["ReapplyLoRAWeightOutput"] | components["schemas"]["RetrieveFluxConditioningMultiOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["ShadowsHighlightsMidtonesMasksOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionJoinerOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["StringToLoraOutput"] | components["schemas"]["StringToMainModelOutput"] | components["schemas"]["StringToModelOutput"] | components["schemas"]["StringToSDXLModelOutput"] | components["schemas"]["T2IAdapterListOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["ThresholdingOutput"] | components["schemas"]["TileSizeOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["TilesOutput"] | components["schemas"]["TraceryOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["WeightedStringOutput"] | components["schemas"]["XYExpandOutput"] | components["schemas"]["XYImageExpandOutput"] | components["schemas"]["XYProductOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
             };
             /**
              * Errors
@@ -10953,6 +16437,110 @@ export type components = {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * Halftone
+         * @description Halftones an image
+         */
+        HalftoneInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to halftone
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Spacing
+             * @description Halftone dot spacing
+             * @default 8
+             */
+            spacing?: number;
+            /**
+             * Angle
+             * @description Halftone angle
+             * @default 45
+             */
+            angle?: number;
+            /**
+             * Oversampling
+             * @description Oversampling factor
+             * @default 1
+             */
+            oversampling?: number;
+            /**
+             * type
+             * @default halftone
+             * @constant
+             */
+            type: "halftone";
+        };
+        /**
+         * HalvedPromptOutput
+         * @description Output for a halved prompt.
+         */
+        HalvedPromptOutput: {
+            /**
+             * Prompt
+             * @description The entire output prompt
+             * @default
+             */
+            prompt: string;
+            /**
+             * Part A
+             * @description The first part of the output prompt
+             * @default
+             */
+            part_a: string;
+            /**
+             * Part B
+             * @description The second part of the output prompt
+             * @default
+             */
+            part_b: string;
+            /**
+             * Resolutions
+             * @description JSON dict of [tagname,id] resolutions
+             * @default
+             */
+            resolutions: string;
+            /**
+             * Seed Vector
+             * @description JSON string of the seed vector used for generation
+             * @default
+             */
+            seed_vector: string;
+            /**
+             * type
+             * @default halved_prompt_output
+             * @constant
+             */
+            type: "halved_prompt_output";
         };
         /**
          * Heuristic Resize
@@ -11179,6 +16767,104 @@ export type components = {
              * @constant
              */
             type: "ip_adapter";
+        };
+        /**
+         * IP-Adapter-Linked
+         * @description Collects IP-Adapter info to pass to other nodes.
+         */
+        IPAdapterLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Image
+             * @description The IP-Adapter image prompt(s).
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | components["schemas"]["ImageField"][] | null;
+            /**
+             * IP-Adapter Model
+             * @description The IP-Adapter model.
+             * @default null
+             */
+            ip_adapter_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Clip Vision Model
+             * @description CLIP Vision model to use. Overrides model settings. Mandatory for checkpoint models.
+             * @default ViT-H
+             * @enum {string}
+             */
+            clip_vision_model?: "ViT-H" | "ViT-G" | "ViT-L";
+            /**
+             * Weight
+             * @description The weight given to the IP-Adapter
+             * @default 1
+             */
+            weight?: number | number[];
+            /**
+             * Method
+             * @description The method to apply the IP-Adapter
+             * @default full
+             * @enum {string}
+             */
+            method?: "full" | "style" | "composition" | "style_strong" | "style_precise";
+            /**
+             * Begin Step Percent
+             * @description When the IP-Adapter is first applied (% of total steps)
+             * @default 0
+             */
+            begin_step_percent?: number;
+            /**
+             * End Step Percent
+             * @description When the IP-Adapter is last applied (% of total steps)
+             * @default 1
+             */
+            end_step_percent?: number;
+            /**
+             * @description A mask defining the region that this IP-Adapter applies to.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
+            /**
+             * type
+             * @default ip_adapter_linked
+             * @constant
+             */
+            type: "ip_adapter_linked";
+            /**
+             * IP-Adapter List
+             * @description IP-Adapter to apply
+             * @default null
+             */
+            ip_adapter_list?: components["schemas"]["IPAdapterField"] | components["schemas"]["IPAdapterField"][] | null;
+        };
+        /** IPAdapterListOutput */
+        IPAdapterListOutput: {
+            /**
+             * IP-Adapter List
+             * @description IP-Adapter to apply
+             */
+            ip_adapter_list: components["schemas"]["IPAdapterField"][];
+            /**
+             * type
+             * @default ip_adapter_list_output
+             * @constant
+             */
+            type: "ip_adapter_list_output";
         };
         /**
          * IPAdapterMetadataField
@@ -12110,6 +17796,53 @@ export type components = {
             type: "img_channel_offset";
         };
         /**
+         * Image Collection Index
+         * @description CollectionIndex Picks an index out of a collection with a random option
+         */
+        ImageCollectionIndexInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Random
+             * @description Random Index?
+             * @default true
+             */
+            random?: boolean;
+            /**
+             * Index
+             * @description zero based index into collection (note index will wrap around if out of bounds)
+             * @default 0
+             */
+            index?: number;
+            /**
+             * Collection
+             * @description image collection
+             * @default null
+             */
+            collection?: components["schemas"]["ImageField"][] | null;
+            /**
+             * type
+             * @default image_collection_index
+             * @constant
+             */
+            type: "image_collection_index";
+        };
+        /**
          * Image Collection Primitive
          * @description A collection of image primitive values
          */
@@ -12145,6 +17878,46 @@ export type components = {
             type: "image_collection";
         };
         /**
+         * Image Collection Primitive linked
+         * @description A collection of image primitive values
+         */
+        ImageCollectionLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description The collection of image values
+             * @default null
+             */
+            collection?: components["schemas"]["ImageField"][] | null;
+            /**
+             * type
+             * @default image_collection_linked
+             * @constant
+             */
+            type: "image_collection_linked";
+            /**
+             * @description The image to load
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+        };
+        /**
          * ImageCollectionOutput
          * @description Base class for nodes that output a collection of images
          */
@@ -12160,6 +17933,53 @@ export type components = {
              * @constant
              */
             type: "image_collection_output";
+        };
+        /**
+         * Image Collection Toggle
+         * @description Allows boolean selection between two separate Image collection inputs
+         */
+        ImageCollectionToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Col1
+             * @description First Image Collection Input
+             * @default null
+             */
+            col1?: components["schemas"]["ImageField"][] | null;
+            /**
+             * Col2
+             * @description Second Image Collection Input
+             * @default null
+             */
+            col2?: components["schemas"]["ImageField"][] | null;
+            /**
+             * type
+             * @default image_collection_toggle
+             * @constant
+             */
+            type: "image_collection_toggle";
         };
         /**
          * Convert Image Mode
@@ -12473,6 +18293,63 @@ export type components = {
              * @constant
              */
             type: "img_hue_adjust";
+        };
+        /**
+         * Image Index Collect
+         * @description ImageIndexCollect takes Image and Index then outputs it as an (index,image_name)array converted to json
+         */
+        ImageIndexCollectInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Index
+             * @description The index
+             * @default 0
+             */
+            index?: number;
+            /**
+             * @description The image associated with the index
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * type
+             * @default image_index_collect
+             * @constant
+             */
+            type: "image_index_collect";
+        };
+        /**
+         * ImageIndexCollectOutput
+         * @description XImageCollectOutput string containing an array of xItem, Image_name converted to json
+         */
+        ImageIndexCollectOutput: {
+            /**
+             * Image Index Collection
+             * @description The Image Index Collection
+             */
+            image_index_collection: string;
+            /**
+             * type
+             * @default image_index_collect_output
+             * @constant
+             */
+            type: "image_index_collect_output";
         };
         /**
          * Inverse Lerp Image
@@ -12866,6 +18743,70 @@ export type components = {
             type: "img_noise";
         };
         /**
+         * Offset Image
+         * @description Offsets an image by a given percentage (or pixel amount).
+         *
+         *     This works like Offset Latents, but in image space, with the additional capability of taking exact pixel offsets instead of just percentages (toggled with a switch/boolean input).
+         */
+        ImageOffsetInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * As Pixels
+             * @description Interpret offsets as pixels rather than percentages
+             * @default false
+             */
+            as_pixels?: boolean;
+            /**
+             * @description Image to be offset
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * X Offset
+             * @description x-offset for the subject
+             * @default 0.5
+             */
+            x_offset?: number;
+            /**
+             * Y Offset
+             * @description y-offset for the subject
+             * @default 0.5
+             */
+            y_offset?: number;
+            /**
+             * type
+             * @default offset_image
+             * @constant
+             */
+            type: "offset_image";
+        };
+        /**
          * ImageOutput
          * @description Base class for nodes that output a single image
          */
@@ -13151,6 +19092,203 @@ export type components = {
             type: "img_resize";
         };
         /**
+         * Rotate/Flip Image
+         * @description Rotates an image by a given angle (in degrees clockwise).
+         *
+         *     Rotate an image in degrees about its center, clockwise (positive entries) or counterclockwise (negative entries). Optionally expand the image boundary to fit the rotated image, or flip it horizontally or vertically.
+         */
+        ImageRotateInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Image to be rotated clockwise
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Degrees
+             * @description Angle (in degrees clockwise) by which to rotate
+             * @default 90
+             */
+            degrees?: number;
+            /**
+             * Expand To Fit
+             * @description If true, extends the image boundary to fit the rotated content
+             * @default true
+             */
+            expand_to_fit?: boolean;
+            /**
+             * Flip Horizontal
+             * @description If true, flips the image horizontally
+             * @default false
+             */
+            flip_horizontal?: boolean;
+            /**
+             * Flip Vertical
+             * @description If true, flips the image vertically
+             * @default false
+             */
+            flip_vertical?: boolean;
+            /**
+             * type
+             * @default rotate_image
+             * @constant
+             */
+            type: "rotate_image";
+        };
+        /**
+         * Image Quantize (Kohonen map)
+         * @description Use a Kohonen self-organizing map to quantize the pixel values of an image.
+         *
+         *     It's possible to pass in an existing map, which will be used instead of training a new one. It's also possible to pass in a "swap map", which will be used in place of the standard map's assigned pixel values in quantizing the target image - these values can be correlated either one by one by a linear assignment minimizing the distances\* between each of them, or by swapping their coordinates on the maps themselves, which can be oriented first such that their corner distances\* are minimized achieving a closest-fit while attempting to preserve mappings of adjacent colors.
+         *
+         *     \*Here, "distances" refers to the euclidean distances between (L, a, b) tuples in Oklab color space.
+         */
+        ImageSOMInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to quantize
+             * @default null
+             */
+            image_in?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description Use an existing SOM instead of training one (skips all training)
+             * @default null
+             */
+            map_in?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description Take another map and swap in its colors after obtaining best-match indices but prior to mapping
+             * @default null
+             */
+            swap_map?: components["schemas"]["ImageField"] | null;
+            /**
+             * Swap Mode
+             * @description How to employ the swap map - directly, reoriented or rearranged
+             * @default Minimize distances
+             * @enum {string}
+             */
+            swap_mode?: "Direct" | "Reorient corners" | "Minimize distances";
+            /**
+             * Map Width
+             * @description Width (in cells) of the self-organizing map to train
+             * @default 16
+             */
+            map_width?: number;
+            /**
+             * Map Height
+             * @description Height (in cells) of the self-organizing map to train
+             * @default 16
+             */
+            map_height?: number;
+            /**
+             * Steps
+             * @description Training step count for the self-organizing map
+             * @default 64
+             */
+            steps?: number;
+            /**
+             * Training Scale
+             * @description Nearest-neighbor scale image size prior to sampling - size close to sample size is recommended
+             * @default 0.25
+             */
+            training_scale?: number;
+            /**
+             * Sample Width
+             * @description Width of assorted pixel sample per step - for performance, keep this number low
+             * @default 64
+             */
+            sample_width?: number;
+            /**
+             * Sample Height
+             * @description Height of assorted pixel sample per step - for performance, keep this number low
+             * @default 64
+             */
+            sample_height?: number;
+            /**
+             * type
+             * @default image_som
+             * @constant
+             */
+            type: "image_som";
+        };
+        /**
+         * ImageSOMOutput
+         * @description Outputs an image and the SOM used to quantize that image
+         */
+        ImageSOMOutput: {
+            /** @description Quantized image */
+            image_out: components["schemas"]["ImageField"];
+            /** @description The pixels of the self-organizing map */
+            map_out: components["schemas"]["ImageField"];
+            /**
+             * Image Width
+             * @description Width of the quantized image
+             */
+            image_width: number;
+            /**
+             * Image Height
+             * @description Height of the quantized image
+             */
+            image_height: number;
+            /**
+             * Map Width
+             * @description Width of the SOM image
+             */
+            map_width: number;
+            /**
+             * Map Height
+             * @description Height of the SOM image
+             */
+            map_height: number;
+            /**
+             * type
+             * @default image_som_output
+             * @constant
+             */
+            type: "image_som_output";
+        };
+        /**
          * Scale Image
          * @description Scales an image by a factor
          */
@@ -13206,6 +19344,307 @@ export type components = {
              * @constant
              */
             type: "img_scale";
+        };
+        /**
+         * Image Search to Mask (Clipseg)
+         * @description Uses the Clipseg model to generate an image mask from an image prompt.
+         *
+         *     Input a base image and a prompt image to generate a mask representing areas of the base image matched by the prompt image contents.
+         */
+        ImageSearchToMaskClipsegInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image from which to create a mask
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description Image prompt for which to search
+             * @default null
+             */
+            search_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Invert Output
+             * @description Off: white on black / On: black on white
+             * @default true
+             */
+            invert_output?: boolean;
+            /**
+             * Smoothing
+             * @description Radius of blur to apply before thresholding
+             * @default 4
+             */
+            smoothing?: number;
+            /**
+             * Subject Threshold
+             * @description Threshold above which is considered the subject
+             * @default 0.4
+             */
+            subject_threshold?: number;
+            /**
+             * Background Threshold
+             * @description Threshold below which is considered the background
+             * @default 0.4
+             */
+            background_threshold?: number;
+            /**
+             * Mask Expand Or Contract
+             * @description Pixels by which to grow (or shrink) mask after thresholding
+             * @default 0
+             */
+            mask_expand_or_contract?: number;
+            /**
+             * Mask Blur
+             * @description Radius of blur to apply after thresholding
+             * @default 0
+             */
+            mask_blur?: number;
+            /**
+             * type
+             * @default imgs2mask_clipseg
+             * @constant
+             */
+            type: "imgs2mask_clipseg";
+        };
+        /**
+         * Image to ASCII Art AnyFont
+         * @description Convert an Image to Ascii Art Image using any font or size
+         *     https://github.com/dernyn/256/tree/master this is a great font to use
+         */
+        ImageToAAInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * @description Image to convert to ASCII art
+             * @default null
+             */
+            input_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Font Url
+             * @description URL address of the font file to download
+             * @default https://github.com/dernyn/256/raw/master/Dernyn's-256(baseline).ttf
+             */
+            font_url?: string | null;
+            /**
+             * Local Font Path
+             * @description Local font file path (overrides font_url)
+             * @default null
+             */
+            local_font_path?: string | null;
+            /**
+             * Local Font
+             * @description Name of the local font file to use from the font_cache folder
+             * @default None
+             * @constant
+             */
+            local_font?: "None";
+            /**
+             * Font Size
+             * @description Font size for the ASCII art characters
+             * @default 6
+             */
+            font_size?: number;
+            /**
+             * Character Range
+             * @description The character range to use
+             * @default Ascii
+             * @enum {string}
+             */
+            character_range?: "All" | "Low" | "High" | "Ascii" | "Numbers" | "Letters" | "Lowercase" | "Uppercase" | "Hex" | "Punctuation" | "Printable" | "AH" | "AM" | "AL" | "Blocks" | "Binary" | "Custom";
+            /**
+             * Custom Characters
+             * @description Custom characters. Used if Custom is selected from character range
+             * @default ▁▂▃▄▅▆▇█
+             */
+            custom_characters?: string;
+            /**
+             * Comparison Type
+             * @description Choose the comparison type (Sum of Absolute Differences, Mean Squared Error, Structural Similarity Index, Normalized Average Luminance)
+             * @default NAL
+             * @enum {string}
+             */
+            comparison_type?: "SAD" | "MSE" | "SSIM" | "NAL";
+            /**
+             * Mono Comparison
+             * @description Convert input image to mono for comparison
+             * @default false
+             */
+            mono_comparison?: boolean;
+            /**
+             * Color Mode
+             * @description Enable color mode (default: grayscale)
+             * @default false
+             */
+            color_mode?: boolean;
+            /**
+             * type
+             * @default I2AA_AnyFont
+             * @constant
+             */
+            type: "I2AA_AnyFont";
+        };
+        /**
+         * Image to ASCII Art Image
+         * @description Convert an Image to ASCII Art Image
+         */
+        ImageToDetailedASCIIArtInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input image to convert to ASCII art
+             * @default null
+             */
+            input_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Font Spacing
+             * @description Font spacing for the ASCII art characters
+             * @default 6
+             */
+            font_spacing?: number;
+            /**
+             * Ascii Set
+             * @description Choose the desired ASCII character set
+             * @default Medium Detail
+             * @enum {string}
+             */
+            ascii_set?: "High Detail" | "Medium Detail" | "Low Detail" | "Numbers" | "Blocks" | "Binary";
+            /**
+             * Color Mode
+             * @description Enable color mode (default: grayscale)
+             * @default false
+             */
+            color_mode?: boolean;
+            /**
+             * Invert Colors
+             * @description Invert background color and ASCII character order
+             * @default true
+             */
+            invert_colors?: boolean;
+            /**
+             * Output To File
+             * @description Output ASCII art to a text file
+             * @default false
+             */
+            output_to_file?: boolean;
+            /**
+             * Gamma
+             * @description Gamma correction value for the output image
+             * @default 1
+             */
+            gamma?: number;
+            /**
+             * type
+             * @default Image_to_ASCII_Art_Image
+             * @constant
+             */
+            type: "Image_to_ASCII_Art_Image";
+        };
+        /**
+         * Image to Image Name
+         * @description Invocation to extract the image name from an ImageField.
+         */
+        ImageToImageNameInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The ImageField to extract the name from
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * type
+             * @default image_to_image_name
+             * @constant
+             */
+            type: "image_to_image_name";
+        };
+        /**
+         * ImageToImageNameOutput
+         * @description Output class for Image to Image Name Invocation
+         */
+        ImageToImageNameOutput: {
+            /**
+             * Image Name
+             * @description The name of the image
+             */
+            image_name: string;
+            /**
+             * type
+             * @default image_to_image_name_output
+             * @constant
+             */
+            type: "image_to_image_name_output";
         };
         /**
          * Image to Latents - SD1.5, SDXL
@@ -13270,6 +19709,219 @@ export type components = {
              * @constant
              */
             type: "i2l";
+        };
+        /**
+         * Image to Unicode Art
+         * @description Convert an Image to Unicode Art using Extended Characters
+         */
+        ImageToUnicodeArtInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input image to convert to Unicode art
+             * @default null
+             */
+            input_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Font Size
+             * @description Font size for the Unicode art characters
+             * @default 8
+             */
+            font_size?: number;
+            /**
+             * Gamma
+             * @description Gamma correction value for the output image
+             * @default 1
+             */
+            gamma?: number;
+            /**
+             * Unicode Set
+             * @description Use shaded Unicode characters for artwork
+             * @default Shaded
+             * @enum {string}
+             */
+            unicode_set?: "Shaded" | "Extended Shading" | "Intermediate Detail" | "Checkerboard Patterns" | "Vertical Lines" | "Horizontal Lines" | "Diagonal Lines" | "Arrows" | "Circles" | "Blocks" | "Triangles" | "Math Symbols" | "Stars";
+            /**
+             * Color Mode
+             * @description Enable color mode (default: grayscale)
+             * @default true
+             */
+            color_mode?: boolean;
+            /**
+             * Invert Colors
+             * @description Invert background color and ASCII character order
+             * @default true
+             */
+            invert_colors?: boolean;
+            /**
+             * type
+             * @default Image_to_Unicode_Art
+             * @constant
+             */
+            type: "Image_to_Unicode_Art";
+        };
+        /**
+         * Image To XYImage Collection
+         * @description Cuts an image up into columns and rows and outputs XYImage Collection
+         */
+        ImageToXYImageCollectionInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The input image
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Columns
+             * @description The number of columns
+             * @default 2
+             */
+            columns?: number;
+            /**
+             * Rows
+             * @description The number of rows
+             * @default 2
+             */
+            rows?: number;
+            /**
+             * type
+             * @default image_to_xy_image_collection
+             * @constant
+             */
+            type: "image_to_xy_image_collection";
+        };
+        /**
+         * Image To XYImage Tiles
+         * @description Cuts an image up into overlapping tiles and outputs as an XYImage Collection (x,y is the final position of the tile)
+         */
+        ImageToXYImageTilesInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Tiles
+             * @description The list of tiles
+             * @default []
+             */
+            tiles?: string[];
+            /**
+             * type
+             * @default image_to_xy_image_tiles
+             * @constant
+             */
+            type: "image_to_xy_image_tiles";
+        };
+        /**
+         * ImageToXYImageTilesOutput
+         * @description Image To XYImage Tiles Output
+         */
+        ImageToXYImageTilesOutput: {
+            /**
+             * Xyimages
+             * @description The XYImage Collection
+             */
+            xyImages: string[];
+            /**
+             * type
+             * @default image_to_xy_image_output
+             * @constant
+             */
+            type: "image_to_xy_image_output";
+        };
+        /**
+         * Image Toggle
+         * @description Allows boolean selection between two separate image inputs
+         */
+        ImageToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * @description First Image Input
+             * @default null
+             */
+            img1?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description Second Image Input
+             * @default null
+             */
+            img2?: components["schemas"]["ImageField"] | null;
+            /**
+             * type
+             * @default image_toggle
+             * @constant
+             */
+            type: "image_toggle";
         };
         /** ImageUploadEntry */
         ImageUploadEntry: {
@@ -13364,6 +20016,157 @@ export type components = {
              * @description The name of the bulk download item for which events will be emitted
              */
             bulk_download_item_name?: string | null;
+        };
+        /**
+         * Images Index To Video Output
+         * @description Load a collection of ImageIndex types (json of (idex,image_name)array) and create a video of them
+         */
+        ImagesIndexToVideoInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Image Index Collection
+             * @description The Image Index Collection
+             * @default null
+             */
+            image_index_collection?: string[] | null;
+            /**
+             * Video Out Path
+             * @description Path and filename of output mp4
+             * @default
+             */
+            video_out_path?: string;
+            /**
+             * Fps
+             * @description FPS
+             * @default 30
+             */
+            fps?: number;
+            /**
+             * Codec
+             * @description Video codec FourCC (e.g., mp4v, avc1, h264, x264, hev1, vp09, av01)
+             * @default x264
+             */
+            codec?: string;
+            /**
+             * type
+             * @default images_index_to_video
+             * @constant
+             */
+            type: "images_index_to_video";
+        };
+        /**
+         * ImagesIndexToVideoOutput
+         * @description ImagesIndexToVideoOutput returns nothing
+         */
+        ImagesIndexToVideoOutput: {
+            /**
+             * type
+             * @default ImagesIndexToVideoOutput
+             * @constant
+             */
+            type: "ImagesIndexToVideoOutput";
+        };
+        /**
+         * Images To Grids
+         * @description Takes a collection of images and outputs a collection of generated grid images
+         */
+        ImagesToGridsInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Images
+             * @description The image collection to turn into grids
+             * @default []
+             */
+            images?: components["schemas"]["ImageField"][];
+            /**
+             * Columns
+             * @description The number of columns in each grid
+             * @default 1
+             */
+            columns?: number;
+            /**
+             * Rows
+             * @description The number of rows to have in each grid
+             * @default 1
+             */
+            rows?: number;
+            /**
+             * Space
+             * @description The space to be added between images
+             * @default 1
+             */
+            space?: number;
+            /**
+             * Scale Factor
+             * @description The factor by which to scale the images
+             * @default 1
+             */
+            scale_factor?: number;
+            /**
+             * Resample Mode
+             * @description The resampling mode
+             * @default bicubic
+             * @enum {string}
+             */
+            resample_mode?: "nearest" | "box" | "bilinear" | "hamming" | "bicubic" | "lanczos";
+            /**
+             * @description The color to use as the background
+             * @default {
+             *       "r": 0,
+             *       "g": 0,
+             *       "b": 0,
+             *       "a": 255
+             *     }
+             */
+            background_color?: components["schemas"]["ColorField"];
+            /**
+             * type
+             * @default images_to_grids
+             * @constant
+             */
+            type: "images_to_grids";
         };
         /**
          * Solid Color Infill
@@ -13533,6 +20336,46 @@ export type components = {
             type: "infill_tile";
         };
         /**
+         * UNet Info Grabber
+         * @description Outputs different info from a UNet
+         */
+        InfoGrabberUNetInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * UNet
+             * @default null
+             */
+            unet?: components["schemas"]["UNetField"] | null;
+            /**
+             * Info Type
+             * @description The kind of info to retrieve
+             * @default null
+             */
+            info_type?: ("name" | "path") | null;
+            /**
+             * type
+             * @default info_grabber_unet_invocation
+             * @constant
+             */
+            type: "info_grabber_unet_invocation";
+        };
+        /**
          * Input
          * @description The type of input a field accepts.
          *     - `Input.Direct`: The field must have its value provided directly, when the invocation and field       are instantiated.
@@ -13613,6 +20456,100 @@ export type components = {
          */
         InstallStatus: "waiting" | "downloading" | "downloads_done" | "running" | "paused" | "completed" | "error" | "cancelled";
         /**
+         * Integer Collection Toggle
+         * @description Allows boolean selection between two separate integer collection inputs
+         */
+        IntCollectionToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Col1
+             * @description First Int Collection Input
+             * @default null
+             */
+            col1?: number[] | null;
+            /**
+             * Col2
+             * @description Second Int Collection Input
+             * @default null
+             */
+            col2?: number[] | null;
+            /**
+             * type
+             * @default int_collection_toggle
+             * @constant
+             */
+            type: "int_collection_toggle";
+        };
+        /**
+         * Integer Toggle
+         * @description Allows boolean selection between two separate integer inputs
+         */
+        IntToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Int1
+             * @description First Integer Input
+             * @default 0
+             */
+            int1?: number;
+            /**
+             * Int2
+             * @description Second Integer Input
+             * @default 0
+             */
+            int2?: number;
+            /**
+             * type
+             * @default int_toggle
+             * @constant
+             */
+            type: "int_toggle";
+        };
+        /**
          * Integer Batch
          * @description Create a batched generation, where the workflow is executed once for each integer in the batch.
          */
@@ -13655,6 +20592,53 @@ export type components = {
             type: "integer_batch";
         };
         /**
+         * Integer Collection Index
+         * @description CollectionIndex Picks an index out of a collection with a random option
+         */
+        IntegerCollectionIndexInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Random
+             * @description Random Index?
+             * @default true
+             */
+            random?: boolean;
+            /**
+             * Index
+             * @description zero based index into collection (note index will wrap around if out of bounds)
+             * @default 0
+             */
+            index?: number;
+            /**
+             * Collection
+             * @description integer collection
+             * @default null
+             */
+            collection?: number[] | null;
+            /**
+             * type
+             * @default integer_collection_index
+             * @constant
+             */
+            type: "integer_collection_index";
+        };
+        /**
          * Integer Collection Primitive
          * @description A collection of integer primitive values
          */
@@ -13688,6 +20672,47 @@ export type components = {
              * @constant
              */
             type: "integer_collection";
+        };
+        /**
+         * Integer Collection Primitive Linked
+         * @description A collection of integer primitive values
+         */
+        IntegerCollectionLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description The collection of integer values
+             * @default []
+             */
+            collection?: number[];
+            /**
+             * type
+             * @default integer_collection_linked
+             * @constant
+             */
+            type: "integer_collection_linked";
+            /**
+             * Value
+             * @description The integer value
+             * @default 0
+             */
+            value?: number;
         };
         /**
          * IntegerCollectionOutput
@@ -13857,6 +20882,41 @@ export type components = {
             type: "integer_output";
         };
         /**
+         * Ints To Strings
+         * @description Converts an integer or collection of integers to a collection of strings
+         */
+        IntsToStringsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Ints
+             * @description int or collection of ints
+             * @default []
+             */
+            ints?: number | number[];
+            /**
+             * type
+             * @default ints_to_strings
+             * @constant
+             */
+            type: "ints_to_strings";
+        };
+        /**
          * Invert Tensor Mask
          * @description Inverts a tensor mask.
          */
@@ -13970,7 +21030,7 @@ export type components = {
              * Invocation
              * @description The ID of the invocation
              */
-            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
+            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AdvAutostereogramInvocation"] | components["schemas"]["AdvancedTextFontImageInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnamorphicStreaksInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AutostereogramInvocation"] | components["schemas"]["AverageImagesInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BoolCollectionIndexInvocation"] | components["schemas"]["BoolCollectionToggleInvocation"] | components["schemas"]["BoolToggleInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanCollectionLinkedInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CMYKColorSeparationInvocation"] | components["schemas"]["CMYKHalftoneInvocation"] | components["schemas"]["CMYKMergeInvocation"] | components["schemas"]["CMYKSplitInvocation"] | components["schemas"]["CSVToIndexStringInvocation"] | components["schemas"]["CSVToStringsInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ChromaNoiseInvocation"] | components["schemas"]["ChromaticAberrationInvocation"] | components["schemas"]["ClipsegMaskHierarchyInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCountInvocation"] | components["schemas"]["CollectionIndexInvocation"] | components["schemas"]["CollectionJoinInvocation"] | components["schemas"]["CollectionReverseInvocation"] | components["schemas"]["CollectionSliceInvocation"] | components["schemas"]["CollectionSortInvocation"] | components["schemas"]["CollectionUniqueInvocation"] | components["schemas"]["ColorCastCorrectionInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompareFloatsInvocation"] | components["schemas"]["CompareIntsInvocation"] | components["schemas"]["CompareStringsInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConcatenateFluxConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningCollectionLinkedInvocation"] | components["schemas"]["ConditioningCollectionToggleInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningToggleInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ControlNetLinkedInvocation"] | components["schemas"]["CoordinatedFluxNoiseInvocation"] | components["schemas"]["CoordinatedNoiseInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CropLatentsInvocation"] | components["schemas"]["CrossoverPromptInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DefaultXYTileGenerator"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["EnhanceDetailInvocation"] | components["schemas"]["EscaperInvocation"] | components["schemas"]["EvenSplitXYTileGenerator"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractImageCollectionMetadataBooleanInvocation"] | components["schemas"]["ExtractImageCollectionMetadataFloatInvocation"] | components["schemas"]["ExtractImageCollectionMetadataIntegerInvocation"] | components["schemas"]["ExtractImageCollectionMetadataStringInvocation"] | components["schemas"]["ExtrudeDepthInvocation"] | components["schemas"]["FLUXConditioningCollectionToggleInvocation"] | components["schemas"]["FLUXConditioningToggleInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FilmGrainInvocation"] | components["schemas"]["FlattenHistogramMono"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionIndexInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatCollectionLinkedInvocation"] | components["schemas"]["FloatCollectionToggleInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FloatToggleInvocation"] | components["schemas"]["FloatsToStringsInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["FluxConditioningBlendInvocation"] | components["schemas"]["FluxConditioningCollectionIndexInvocation"] | components["schemas"]["FluxConditioningCollectionInvocation"] | components["schemas"]["FluxConditioningCollectionJoinInvocation"] | components["schemas"]["FluxConditioningDeltaAugmentationInvocation"] | components["schemas"]["FluxConditioningListInvocation"] | components["schemas"]["FluxConditioningMathOperationInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetCollectionIndexInvocation"] | components["schemas"]["FluxControlNetCollectionInvocation"] | components["schemas"]["FluxControlNetCollectionJoinInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxControlNetLinkedInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxIdealSizeInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextIdealSizeInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInputInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxModelToStringInvocation"] | components["schemas"]["FluxReduxCollectionIndexInvocation"] | components["schemas"]["FluxReduxCollectionInvocation"] | components["schemas"]["FluxReduxCollectionJoinInvocation"] | components["schemas"]["FluxReduxConditioningMathOperationInvocation"] | components["schemas"]["FluxReduxDownsamplingInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxReduxLinkedInvocation"] | components["schemas"]["FluxReduxRescaleConditioningInvocation"] | components["schemas"]["FluxRescaleConditioningInvocation"] | components["schemas"]["FluxScaleConditioningInvocation"] | components["schemas"]["FluxScalePromptSectionInvocation"] | components["schemas"]["FluxScaleReduxConditioningInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxTextEncoderLinkedInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["FluxWeightedPromptInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["FrequencyBlendLatents"] | components["schemas"]["FrequencySpectrumMatchLatentsInvocation"] | components["schemas"]["GenerateEvolutionaryPromptsInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GetSourceFrameRateInvocation"] | components["schemas"]["GetTotalFramesInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HalftoneInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IPAdapterLinkedInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionIndexInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageCollectionLinkedInvocation"] | components["schemas"]["ImageCollectionToggleInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageIndexCollectInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImageOffsetInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageRotateInvocation"] | components["schemas"]["ImageSOMInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageSearchToMaskClipsegInvocation"] | components["schemas"]["ImageToAAInvocation"] | components["schemas"]["ImageToDetailedASCIIArtInvocation"] | components["schemas"]["ImageToImageNameInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageToUnicodeArtInvocation"] | components["schemas"]["ImageToXYImageCollectionInvocation"] | components["schemas"]["ImageToXYImageTilesInvocation"] | components["schemas"]["ImageToggleInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["ImagesIndexToVideoInvocation"] | components["schemas"]["ImagesToGridsInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfoGrabberUNetInvocation"] | components["schemas"]["IntCollectionToggleInvocation"] | components["schemas"]["IntToggleInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionIndexInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerCollectionLinkedInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["IntsToStringsInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentAverageInvocation"] | components["schemas"]["LatentBandPassFilterInvocation"] | components["schemas"]["LatentBlendLinearInvocation"] | components["schemas"]["LatentChannelsToGridInvocation"] | components["schemas"]["LatentCombineInvocation"] | components["schemas"]["LatentDtypeConvertInvocation"] | components["schemas"]["LatentHighPassFilterInvocation"] | components["schemas"]["LatentLowPassFilterInvocation"] | components["schemas"]["LatentMatchInvocation"] | components["schemas"]["LatentModifyChannelsInvocation"] | components["schemas"]["LatentNormalizeRangeInvocation"] | components["schemas"]["LatentNormalizeStdDevInvocation"] | components["schemas"]["LatentNormalizeStdRangeInvocation"] | components["schemas"]["LatentPlotInvocation"] | components["schemas"]["LatentSOMInvocation"] | components["schemas"]["LatentWhiteNoiseInvocation"] | components["schemas"]["LatentsCollectionIndexInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsCollectionLinkedInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LensApertureGeneratorInvocation"] | components["schemas"]["LensBlurInvocation"] | components["schemas"]["LensVignetteInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionFromPathInvocation"] | components["schemas"]["LoRACollectionInvocation"] | components["schemas"]["LoRACollectionLinkedInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRACollectionToggleInvocation"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRANameGrabberInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["LoRAToggleInvocation"] | components["schemas"]["LoadAllTextFilesInFolderInvocation"] | components["schemas"]["LoadApertureImageInvocation"] | components["schemas"]["LoadTextFileToStringInvocation"] | components["schemas"]["LoadVideoFrameInvocation"] | components["schemas"]["LookupLoRACollectionTriggersInvocation"] | components["schemas"]["LookupLoRATriggersInvocation"] | components["schemas"]["LookupTableFromFileInvocation"] | components["schemas"]["LookupsEntryFromPromptInvocation"] | components["schemas"]["LoraToStringInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInputInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MainModelToStringInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MatchHistogramInvocation"] | components["schemas"]["MatchHistogramLabInvocation"] | components["schemas"]["MathEvalInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeLoRACollectionsInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeStringCollectionsInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MinimumOverlapXYTileGenerator"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["ModelNameGrabberInvocation"] | components["schemas"]["ModelNameToModelInvocation"] | components["schemas"]["ModelToStringInvocation"] | components["schemas"]["ModelToggleInvocation"] | components["schemas"]["MonochromeFilmGrainInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NightmareInvocation"] | components["schemas"]["NoiseAddFluxInvocation"] | components["schemas"]["NoiseImage2DInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NoiseSpectralInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OctreeQuantizerInvocation"] | components["schemas"]["OffsetLatentsInvocation"] | components["schemas"]["OptimizedTileSizeFromAreaInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PTFieldsCollectInvocation"] | components["schemas"]["PTFieldsExpandInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["ParseWeightedStringInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PercentToFloatInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PixelArtInvocation"] | components["schemas"]["PixelizeImageInvocation"] | components["schemas"]["PixelizeInvocation"] | components["schemas"]["PrintStringToConsoleInvocation"] | components["schemas"]["PromptAutoAndInvocation"] | components["schemas"]["PromptFromLookupTableInvocation"] | components["schemas"]["PromptStrengthInvocation"] | components["schemas"]["PromptStrengthsCombineInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["PromptsToFileInvocation"] | components["schemas"]["PruneTextInvocation"] | components["schemas"]["Qwen3PromptProInvocation"] | components["schemas"]["RGBMergeInvocation"] | components["schemas"]["RGBSplitInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomImageSizeInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomLoRAMixerInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ReapplyLoRAWeightInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RetrieveBoardImagesInvocation"] | components["schemas"]["RetrieveFluxConditioningInvocation"] | components["schemas"]["RetroBitizeInvocation"] | components["schemas"]["RetroCRTCurvatureInvocation"] | components["schemas"]["RetroGetPaletteAdvInvocation"] | components["schemas"]["RetroGetPaletteInvocation"] | components["schemas"]["RetroPalettizeAdvInvocation"] | components["schemas"]["RetroPalettizeInvocation"] | components["schemas"]["RetroQuantizeInvocation"] | components["schemas"]["RetroScanlinesSimpleInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3ModelLoaderInputInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLMainModelToggleInvocation"] | components["schemas"]["SDXLModelLoaderInputInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLModelToStringInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SchedulerToStringInvocation"] | components["schemas"]["SchedulerToggleInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3ModelToStringInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["SeparatePromptAndSeedVectorInvocation"] | components["schemas"]["ShadowsHighlightsMidtonesMaskInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["SphericalDistortionInvocation"] | components["schemas"]["StoreFluxConditioningInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionIndexInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringCollectionJoinerInvocation"] | components["schemas"]["StringCollectionLinkedInvocation"] | components["schemas"]["StringCollectionToggleInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringToCollectionSplitterInvocation"] | components["schemas"]["StringToFloatInvocation"] | components["schemas"]["StringToIntInvocation"] | components["schemas"]["StringToLoraInvocation"] | components["schemas"]["StringToMainModelInvocation"] | components["schemas"]["StringToModelInvocation"] | components["schemas"]["StringToSDXLModelInvocation"] | components["schemas"]["StringToSchedulerInvocation"] | components["schemas"]["StringToggleInvocation"] | components["schemas"]["StringsToCSVInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["T2IAdapterLinkedInvocation"] | components["schemas"]["TextMaskInvocation"] | components["schemas"]["TextToMaskClipsegAdvancedInvocation"] | components["schemas"]["TextToMaskClipsegInvocation"] | components["schemas"]["TextfontimageInvocation"] | components["schemas"]["ThresholdingInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["TraceryInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["XYExpandInvocation"] | components["schemas"]["XYImageCollectInvocation"] | components["schemas"]["XYImageExpandInvocation"] | components["schemas"]["XYImageTilesToImageInvocation"] | components["schemas"]["XYImagesToGridInvocation"] | components["schemas"]["XYProductCSVInvocation"] | components["schemas"]["XYProductInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
             /**
              * Invocation Source Id
              * @description The ID of the prepared invocation's source node
@@ -13980,7 +21040,7 @@ export type components = {
              * Result
              * @description The result of the invocation
              */
-            result: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
+            result: components["schemas"]["BooleanCollectionOutput"] | components["schemas"]["BooleanOutput"] | components["schemas"]["BoundingBoxCollectionOutput"] | components["schemas"]["BoundingBoxOutput"] | components["schemas"]["CLIPOutput"] | components["schemas"]["CLIPSkipInvocationOutput"] | components["schemas"]["CMYKSeparationOutput"] | components["schemas"]["CMYKSplitOutput"] | components["schemas"]["CalculateImageTilesOutput"] | components["schemas"]["ClipsegMaskHierarchyOutput"] | components["schemas"]["CogView4ConditioningOutput"] | components["schemas"]["CogView4ModelLoaderOutput"] | components["schemas"]["CollectInvocationOutput"] | components["schemas"]["CollectionCountOutput"] | components["schemas"]["CollectionIndexOutput"] | components["schemas"]["CollectionJoinOutput"] | components["schemas"]["CollectionReverseOutput"] | components["schemas"]["CollectionSliceOutput"] | components["schemas"]["CollectionSortOutput"] | components["schemas"]["CollectionUniqueOutput"] | components["schemas"]["ColorCollectionOutput"] | components["schemas"]["ColorOutput"] | components["schemas"]["ConditioningCollectionOutput"] | components["schemas"]["ConditioningOutput"] | components["schemas"]["ControlListOutput"] | components["schemas"]["ControlOutput"] | components["schemas"]["DenoiseMaskOutput"] | components["schemas"]["EscapedOutput"] | components["schemas"]["EvolutionaryPromptListOutput"] | components["schemas"]["FaceMaskOutput"] | components["schemas"]["FaceOffOutput"] | components["schemas"]["FloatCollectionOutput"] | components["schemas"]["FloatGeneratorOutput"] | components["schemas"]["FloatOutput"] | components["schemas"]["Flux2KleinLoRALoaderOutput"] | components["schemas"]["Flux2KleinModelLoaderOutput"] | components["schemas"]["FluxConditioningBlendOutput"] | components["schemas"]["FluxConditioningCollectionOutput"] | components["schemas"]["FluxConditioningDeltaAndAugmentedOutput"] | components["schemas"]["FluxConditioningListOutput"] | components["schemas"]["FluxConditioningOutput"] | components["schemas"]["FluxConditioningStoreOutput"] | components["schemas"]["FluxControlLoRALoaderOutput"] | components["schemas"]["FluxControlNetCollectionOutput"] | components["schemas"]["FluxControlNetListOutput"] | components["schemas"]["FluxControlNetOutput"] | components["schemas"]["FluxFillOutput"] | components["schemas"]["FluxIdealSizeOutput"] | components["schemas"]["FluxKontextOutput"] | components["schemas"]["FluxLoRALoaderOutput"] | components["schemas"]["FluxModelLoaderOutput"] | components["schemas"]["FluxReduxCollectionOutput"] | components["schemas"]["FluxReduxListOutput"] | components["schemas"]["FluxReduxOutput"] | components["schemas"]["FluxTextEncoderListOutput"] | components["schemas"]["FluxWeightedPromptOutput"] | components["schemas"]["GradientMaskOutput"] | components["schemas"]["HalvedPromptOutput"] | components["schemas"]["IPAdapterListOutput"] | components["schemas"]["IPAdapterOutput"] | components["schemas"]["IdealSizeOutput"] | components["schemas"]["ImageCollectionOutput"] | components["schemas"]["ImageGeneratorOutput"] | components["schemas"]["ImageIndexCollectOutput"] | components["schemas"]["ImageOutput"] | components["schemas"]["ImagePanelCoordinateOutput"] | components["schemas"]["ImageSOMOutput"] | components["schemas"]["ImageToImageNameOutput"] | components["schemas"]["ImageToXYImageTilesOutput"] | components["schemas"]["ImagesIndexToVideoOutput"] | components["schemas"]["IntegerCollectionOutput"] | components["schemas"]["IntegerGeneratorOutput"] | components["schemas"]["IntegerOutput"] | components["schemas"]["IterateInvocationOutput"] | components["schemas"]["JsonListStringsOutput"] | components["schemas"]["LatentsCollectionOutput"] | components["schemas"]["LatentsMetaOutput"] | components["schemas"]["LatentsOutput"] | components["schemas"]["LoRACollectionFromPathOutput"] | components["schemas"]["LoRACollectionOutput"] | components["schemas"]["LoRACollectionToggleOutput"] | components["schemas"]["LoRALoaderOutput"] | components["schemas"]["LoRANameGrabberOutput"] | components["schemas"]["LoRASelectorOutput"] | components["schemas"]["LoRAToggleOutput"] | components["schemas"]["LoadAllTextFilesInFolderOutput"] | components["schemas"]["LoadTextFileToStringOutput"] | components["schemas"]["LookupLoRACollectionTriggersOutput"] | components["schemas"]["LookupLoRATriggersOutput"] | components["schemas"]["LookupTableOutput"] | components["schemas"]["MDControlListOutput"] | components["schemas"]["MDIPAdapterListOutput"] | components["schemas"]["MDT2IAdapterListOutput"] | components["schemas"]["MaskOutput"] | components["schemas"]["MathEvalOutput"] | components["schemas"]["MergeLoRACollectionsOutput"] | components["schemas"]["MergeStringCollectionsOutput"] | components["schemas"]["MetadataItemOutput"] | components["schemas"]["MetadataOutput"] | components["schemas"]["MetadataToLorasCollectionOutput"] | components["schemas"]["MetadataToModelOutput"] | components["schemas"]["MetadataToSDXLModelOutput"] | components["schemas"]["ModelIdentifierOutput"] | components["schemas"]["ModelLoaderOutput"] | components["schemas"]["ModelNameGrabberOutput"] | components["schemas"]["ModelToggleOutput"] | components["schemas"]["NightmareOutput"] | components["schemas"]["NoiseOutput"] | components["schemas"]["PBRMapsOutput"] | components["schemas"]["PTFieldsCollectOutput"] | components["schemas"]["PTFieldsExpandOutput"] | components["schemas"]["PairTileImageOutput"] | components["schemas"]["PaletteOutput"] | components["schemas"]["PrintStringToConsoleOutput"] | components["schemas"]["PromptStrengthOutput"] | components["schemas"]["PromptTemplateOutput"] | components["schemas"]["PromptsToFileInvocationOutput"] | components["schemas"]["PrunedPromptOutput"] | components["schemas"]["Qwen3PromptProOutput"] | components["schemas"]["RGBSplitOutput"] | components["schemas"]["RandomImageSizeOutput"] | components["schemas"]["RandomLoRAMixerOutput"] | components["schemas"]["ReapplyLoRAWeightOutput"] | components["schemas"]["RetrieveFluxConditioningMultiOutput"] | components["schemas"]["SD3ConditioningOutput"] | components["schemas"]["SDXLLoRALoaderOutput"] | components["schemas"]["SDXLModelLoaderOutput"] | components["schemas"]["SDXLRefinerModelLoaderOutput"] | components["schemas"]["SchedulerOutput"] | components["schemas"]["Sd3ModelLoaderOutput"] | components["schemas"]["SeamlessModeOutput"] | components["schemas"]["ShadowsHighlightsMidtonesMasksOutput"] | components["schemas"]["String2Output"] | components["schemas"]["StringCollectionJoinerOutput"] | components["schemas"]["StringCollectionOutput"] | components["schemas"]["StringGeneratorOutput"] | components["schemas"]["StringOutput"] | components["schemas"]["StringPosNegOutput"] | components["schemas"]["StringToLoraOutput"] | components["schemas"]["StringToMainModelOutput"] | components["schemas"]["StringToModelOutput"] | components["schemas"]["StringToSDXLModelOutput"] | components["schemas"]["T2IAdapterListOutput"] | components["schemas"]["T2IAdapterOutput"] | components["schemas"]["ThresholdingOutput"] | components["schemas"]["TileSizeOutput"] | components["schemas"]["TileToPropertiesOutput"] | components["schemas"]["TilesOutput"] | components["schemas"]["TraceryOutput"] | components["schemas"]["UNetOutput"] | components["schemas"]["VAEOutput"] | components["schemas"]["WeightedStringOutput"] | components["schemas"]["XYExpandOutput"] | components["schemas"]["XYImageExpandOutput"] | components["schemas"]["XYProductOutput"] | components["schemas"]["ZImageConditioningOutput"] | components["schemas"]["ZImageControlOutput"] | components["schemas"]["ZImageLoRALoaderOutput"] | components["schemas"]["ZImageModelLoaderOutput"];
         };
         /**
          * InvocationErrorEvent
@@ -14034,7 +21094,7 @@ export type components = {
              * Invocation
              * @description The ID of the invocation
              */
-            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
+            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AdvAutostereogramInvocation"] | components["schemas"]["AdvancedTextFontImageInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnamorphicStreaksInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AutostereogramInvocation"] | components["schemas"]["AverageImagesInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BoolCollectionIndexInvocation"] | components["schemas"]["BoolCollectionToggleInvocation"] | components["schemas"]["BoolToggleInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanCollectionLinkedInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CMYKColorSeparationInvocation"] | components["schemas"]["CMYKHalftoneInvocation"] | components["schemas"]["CMYKMergeInvocation"] | components["schemas"]["CMYKSplitInvocation"] | components["schemas"]["CSVToIndexStringInvocation"] | components["schemas"]["CSVToStringsInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ChromaNoiseInvocation"] | components["schemas"]["ChromaticAberrationInvocation"] | components["schemas"]["ClipsegMaskHierarchyInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCountInvocation"] | components["schemas"]["CollectionIndexInvocation"] | components["schemas"]["CollectionJoinInvocation"] | components["schemas"]["CollectionReverseInvocation"] | components["schemas"]["CollectionSliceInvocation"] | components["schemas"]["CollectionSortInvocation"] | components["schemas"]["CollectionUniqueInvocation"] | components["schemas"]["ColorCastCorrectionInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompareFloatsInvocation"] | components["schemas"]["CompareIntsInvocation"] | components["schemas"]["CompareStringsInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConcatenateFluxConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningCollectionLinkedInvocation"] | components["schemas"]["ConditioningCollectionToggleInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningToggleInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ControlNetLinkedInvocation"] | components["schemas"]["CoordinatedFluxNoiseInvocation"] | components["schemas"]["CoordinatedNoiseInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CropLatentsInvocation"] | components["schemas"]["CrossoverPromptInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DefaultXYTileGenerator"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["EnhanceDetailInvocation"] | components["schemas"]["EscaperInvocation"] | components["schemas"]["EvenSplitXYTileGenerator"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractImageCollectionMetadataBooleanInvocation"] | components["schemas"]["ExtractImageCollectionMetadataFloatInvocation"] | components["schemas"]["ExtractImageCollectionMetadataIntegerInvocation"] | components["schemas"]["ExtractImageCollectionMetadataStringInvocation"] | components["schemas"]["ExtrudeDepthInvocation"] | components["schemas"]["FLUXConditioningCollectionToggleInvocation"] | components["schemas"]["FLUXConditioningToggleInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FilmGrainInvocation"] | components["schemas"]["FlattenHistogramMono"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionIndexInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatCollectionLinkedInvocation"] | components["schemas"]["FloatCollectionToggleInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FloatToggleInvocation"] | components["schemas"]["FloatsToStringsInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["FluxConditioningBlendInvocation"] | components["schemas"]["FluxConditioningCollectionIndexInvocation"] | components["schemas"]["FluxConditioningCollectionInvocation"] | components["schemas"]["FluxConditioningCollectionJoinInvocation"] | components["schemas"]["FluxConditioningDeltaAugmentationInvocation"] | components["schemas"]["FluxConditioningListInvocation"] | components["schemas"]["FluxConditioningMathOperationInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetCollectionIndexInvocation"] | components["schemas"]["FluxControlNetCollectionInvocation"] | components["schemas"]["FluxControlNetCollectionJoinInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxControlNetLinkedInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxIdealSizeInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextIdealSizeInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInputInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxModelToStringInvocation"] | components["schemas"]["FluxReduxCollectionIndexInvocation"] | components["schemas"]["FluxReduxCollectionInvocation"] | components["schemas"]["FluxReduxCollectionJoinInvocation"] | components["schemas"]["FluxReduxConditioningMathOperationInvocation"] | components["schemas"]["FluxReduxDownsamplingInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxReduxLinkedInvocation"] | components["schemas"]["FluxReduxRescaleConditioningInvocation"] | components["schemas"]["FluxRescaleConditioningInvocation"] | components["schemas"]["FluxScaleConditioningInvocation"] | components["schemas"]["FluxScalePromptSectionInvocation"] | components["schemas"]["FluxScaleReduxConditioningInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxTextEncoderLinkedInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["FluxWeightedPromptInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["FrequencyBlendLatents"] | components["schemas"]["FrequencySpectrumMatchLatentsInvocation"] | components["schemas"]["GenerateEvolutionaryPromptsInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GetSourceFrameRateInvocation"] | components["schemas"]["GetTotalFramesInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HalftoneInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IPAdapterLinkedInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionIndexInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageCollectionLinkedInvocation"] | components["schemas"]["ImageCollectionToggleInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageIndexCollectInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImageOffsetInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageRotateInvocation"] | components["schemas"]["ImageSOMInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageSearchToMaskClipsegInvocation"] | components["schemas"]["ImageToAAInvocation"] | components["schemas"]["ImageToDetailedASCIIArtInvocation"] | components["schemas"]["ImageToImageNameInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageToUnicodeArtInvocation"] | components["schemas"]["ImageToXYImageCollectionInvocation"] | components["schemas"]["ImageToXYImageTilesInvocation"] | components["schemas"]["ImageToggleInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["ImagesIndexToVideoInvocation"] | components["schemas"]["ImagesToGridsInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfoGrabberUNetInvocation"] | components["schemas"]["IntCollectionToggleInvocation"] | components["schemas"]["IntToggleInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionIndexInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerCollectionLinkedInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["IntsToStringsInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentAverageInvocation"] | components["schemas"]["LatentBandPassFilterInvocation"] | components["schemas"]["LatentBlendLinearInvocation"] | components["schemas"]["LatentChannelsToGridInvocation"] | components["schemas"]["LatentCombineInvocation"] | components["schemas"]["LatentDtypeConvertInvocation"] | components["schemas"]["LatentHighPassFilterInvocation"] | components["schemas"]["LatentLowPassFilterInvocation"] | components["schemas"]["LatentMatchInvocation"] | components["schemas"]["LatentModifyChannelsInvocation"] | components["schemas"]["LatentNormalizeRangeInvocation"] | components["schemas"]["LatentNormalizeStdDevInvocation"] | components["schemas"]["LatentNormalizeStdRangeInvocation"] | components["schemas"]["LatentPlotInvocation"] | components["schemas"]["LatentSOMInvocation"] | components["schemas"]["LatentWhiteNoiseInvocation"] | components["schemas"]["LatentsCollectionIndexInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsCollectionLinkedInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LensApertureGeneratorInvocation"] | components["schemas"]["LensBlurInvocation"] | components["schemas"]["LensVignetteInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionFromPathInvocation"] | components["schemas"]["LoRACollectionInvocation"] | components["schemas"]["LoRACollectionLinkedInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRACollectionToggleInvocation"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRANameGrabberInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["LoRAToggleInvocation"] | components["schemas"]["LoadAllTextFilesInFolderInvocation"] | components["schemas"]["LoadApertureImageInvocation"] | components["schemas"]["LoadTextFileToStringInvocation"] | components["schemas"]["LoadVideoFrameInvocation"] | components["schemas"]["LookupLoRACollectionTriggersInvocation"] | components["schemas"]["LookupLoRATriggersInvocation"] | components["schemas"]["LookupTableFromFileInvocation"] | components["schemas"]["LookupsEntryFromPromptInvocation"] | components["schemas"]["LoraToStringInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInputInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MainModelToStringInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MatchHistogramInvocation"] | components["schemas"]["MatchHistogramLabInvocation"] | components["schemas"]["MathEvalInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeLoRACollectionsInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeStringCollectionsInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MinimumOverlapXYTileGenerator"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["ModelNameGrabberInvocation"] | components["schemas"]["ModelNameToModelInvocation"] | components["schemas"]["ModelToStringInvocation"] | components["schemas"]["ModelToggleInvocation"] | components["schemas"]["MonochromeFilmGrainInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NightmareInvocation"] | components["schemas"]["NoiseAddFluxInvocation"] | components["schemas"]["NoiseImage2DInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NoiseSpectralInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OctreeQuantizerInvocation"] | components["schemas"]["OffsetLatentsInvocation"] | components["schemas"]["OptimizedTileSizeFromAreaInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PTFieldsCollectInvocation"] | components["schemas"]["PTFieldsExpandInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["ParseWeightedStringInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PercentToFloatInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PixelArtInvocation"] | components["schemas"]["PixelizeImageInvocation"] | components["schemas"]["PixelizeInvocation"] | components["schemas"]["PrintStringToConsoleInvocation"] | components["schemas"]["PromptAutoAndInvocation"] | components["schemas"]["PromptFromLookupTableInvocation"] | components["schemas"]["PromptStrengthInvocation"] | components["schemas"]["PromptStrengthsCombineInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["PromptsToFileInvocation"] | components["schemas"]["PruneTextInvocation"] | components["schemas"]["Qwen3PromptProInvocation"] | components["schemas"]["RGBMergeInvocation"] | components["schemas"]["RGBSplitInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomImageSizeInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomLoRAMixerInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ReapplyLoRAWeightInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RetrieveBoardImagesInvocation"] | components["schemas"]["RetrieveFluxConditioningInvocation"] | components["schemas"]["RetroBitizeInvocation"] | components["schemas"]["RetroCRTCurvatureInvocation"] | components["schemas"]["RetroGetPaletteAdvInvocation"] | components["schemas"]["RetroGetPaletteInvocation"] | components["schemas"]["RetroPalettizeAdvInvocation"] | components["schemas"]["RetroPalettizeInvocation"] | components["schemas"]["RetroQuantizeInvocation"] | components["schemas"]["RetroScanlinesSimpleInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3ModelLoaderInputInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLMainModelToggleInvocation"] | components["schemas"]["SDXLModelLoaderInputInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLModelToStringInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SchedulerToStringInvocation"] | components["schemas"]["SchedulerToggleInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3ModelToStringInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["SeparatePromptAndSeedVectorInvocation"] | components["schemas"]["ShadowsHighlightsMidtonesMaskInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["SphericalDistortionInvocation"] | components["schemas"]["StoreFluxConditioningInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionIndexInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringCollectionJoinerInvocation"] | components["schemas"]["StringCollectionLinkedInvocation"] | components["schemas"]["StringCollectionToggleInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringToCollectionSplitterInvocation"] | components["schemas"]["StringToFloatInvocation"] | components["schemas"]["StringToIntInvocation"] | components["schemas"]["StringToLoraInvocation"] | components["schemas"]["StringToMainModelInvocation"] | components["schemas"]["StringToModelInvocation"] | components["schemas"]["StringToSDXLModelInvocation"] | components["schemas"]["StringToSchedulerInvocation"] | components["schemas"]["StringToggleInvocation"] | components["schemas"]["StringsToCSVInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["T2IAdapterLinkedInvocation"] | components["schemas"]["TextMaskInvocation"] | components["schemas"]["TextToMaskClipsegAdvancedInvocation"] | components["schemas"]["TextToMaskClipsegInvocation"] | components["schemas"]["TextfontimageInvocation"] | components["schemas"]["ThresholdingInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["TraceryInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["XYExpandInvocation"] | components["schemas"]["XYImageCollectInvocation"] | components["schemas"]["XYImageExpandInvocation"] | components["schemas"]["XYImageTilesToImageInvocation"] | components["schemas"]["XYImagesToGridInvocation"] | components["schemas"]["XYProductCSVInvocation"] | components["schemas"]["XYProductInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
             /**
              * Invocation Source Id
              * @description The ID of the prepared invocation's source node
@@ -14057,13 +21117,27 @@ export type components = {
             error_traceback: string;
         };
         InvocationOutputMap: {
+            Advanced_Text_Font_to_Image: components["schemas"]["ImageOutput"];
+            I2AA_AnyFont: components["schemas"]["ImageOutput"];
+            Image_to_ASCII_Art_Image: components["schemas"]["ImageOutput"];
+            Image_to_Unicode_Art: components["schemas"]["ImageOutput"];
+            Retrieve_Board_Images: components["schemas"]["ImageCollectionOutput"];
+            Text_Font_to_Image: components["schemas"]["ImageOutput"];
             add: components["schemas"]["IntegerOutput"];
+            adv_autostereogram: components["schemas"]["ImageOutput"];
             alpha_mask_to_tensor: components["schemas"]["MaskOutput"];
+            anamorphic_streaks: components["schemas"]["ImageOutput"];
             apply_mask_to_image: components["schemas"]["ImageOutput"];
             apply_tensor_mask_to_image: components["schemas"]["ImageOutput"];
+            autostereogram: components["schemas"]["ImageOutput"];
+            average_images: components["schemas"]["ImageOutput"];
             blank_image: components["schemas"]["ImageOutput"];
+            bool_collection_index: components["schemas"]["BooleanOutput"];
+            bool_collection_toggle: components["schemas"]["BooleanCollectionOutput"];
+            bool_toggle: components["schemas"]["BooleanOutput"];
             boolean: components["schemas"]["BooleanOutput"];
             boolean_collection: components["schemas"]["BooleanCollectionOutput"];
+            boolean_collection_linked: components["schemas"]["BooleanCollectionOutput"];
             bounding_box: components["schemas"]["BoundingBoxOutput"];
             calculate_image_tiles: components["schemas"]["CalculateImageTilesOutput"];
             calculate_image_tiles_even_split: components["schemas"]["CalculateImageTilesOutput"];
@@ -14071,46 +21145,86 @@ export type components = {
             canny_edge_detection: components["schemas"]["ImageOutput"];
             canvas_paste_back: components["schemas"]["ImageOutput"];
             canvas_v2_mask_and_crop: components["schemas"]["ImageOutput"];
+            chroma_noise: components["schemas"]["ImageOutput"];
+            chromatic_aberration: components["schemas"]["ImageOutput"];
             clip_skip: components["schemas"]["CLIPSkipInvocationOutput"];
+            clipseg_mask_hierarchy: components["schemas"]["ClipsegMaskHierarchyOutput"];
+            cmyk_halftone: components["schemas"]["ImageOutput"];
+            cmyk_merge: components["schemas"]["ImageOutput"];
+            cmyk_separation: components["schemas"]["CMYKSeparationOutput"];
+            cmyk_split: components["schemas"]["CMYKSplitOutput"];
             cogview4_denoise: components["schemas"]["LatentsOutput"];
             cogview4_i2l: components["schemas"]["LatentsOutput"];
             cogview4_l2i: components["schemas"]["ImageOutput"];
             cogview4_model_loader: components["schemas"]["CogView4ModelLoaderOutput"];
             cogview4_text_encoder: components["schemas"]["CogView4ConditioningOutput"];
             collect: components["schemas"]["CollectInvocationOutput"];
+            collection_count: components["schemas"]["CollectionCountOutput"];
+            collection_index: components["schemas"]["CollectionIndexOutput"];
+            collection_join: components["schemas"]["CollectionJoinOutput"];
+            collection_reverse: components["schemas"]["CollectionReverseOutput"];
+            collection_slice: components["schemas"]["CollectionSliceOutput"];
+            collection_sort: components["schemas"]["CollectionSortOutput"];
+            collection_unique: components["schemas"]["CollectionUniqueOutput"];
             color: components["schemas"]["ColorOutput"];
+            color_cast_correction: components["schemas"]["ImageOutput"];
             color_correct: components["schemas"]["ImageOutput"];
             color_map: components["schemas"]["ImageOutput"];
+            compare_floats_invocation: components["schemas"]["BooleanOutput"];
+            compare_ints_invocation: components["schemas"]["BooleanOutput"];
+            compare_strings_invocation: components["schemas"]["BooleanOutput"];
             compel: components["schemas"]["ConditioningOutput"];
             conditioning: components["schemas"]["ConditioningOutput"];
             conditioning_collection: components["schemas"]["ConditioningCollectionOutput"];
+            conditioning_collection_linked: components["schemas"]["ConditioningCollectionOutput"];
+            conditioning_collection_toggle: components["schemas"]["ConditioningCollectionOutput"];
+            conditioning_toggle: components["schemas"]["ConditioningOutput"];
             content_shuffle: components["schemas"]["ImageOutput"];
             controlnet: components["schemas"]["ControlOutput"];
+            "controlnet-linked": components["schemas"]["ControlListOutput"];
             core_metadata: components["schemas"]["MetadataOutput"];
             create_denoise_mask: components["schemas"]["DenoiseMaskOutput"];
             create_gradient_mask: components["schemas"]["GradientMaskOutput"];
             crop_image_to_bounding_box: components["schemas"]["ImageOutput"];
             crop_latents: components["schemas"]["LatentsOutput"];
+            crossover_prompt: components["schemas"]["HalvedPromptOutput"];
+            csv_to_index_string: components["schemas"]["StringOutput"];
+            csv_to_strings: components["schemas"]["StringCollectionOutput"];
+            cv_extrude_depth: components["schemas"]["ImageOutput"];
             cv_inpaint: components["schemas"]["ImageOutput"];
             decode_watermark: components["schemas"]["StringOutput"];
+            default_xy_tile_generator: components["schemas"]["TilesOutput"];
             denoise_latents: components["schemas"]["LatentsOutput"];
             denoise_latents_meta: components["schemas"]["LatentsMetaOutput"];
             depth_anything_depth_estimation: components["schemas"]["ImageOutput"];
             div: components["schemas"]["IntegerOutput"];
             dw_openpose_detection: components["schemas"]["ImageOutput"];
             dynamic_prompt: components["schemas"]["StringCollectionOutput"];
+            enhance_detail: components["schemas"]["ImageOutput"];
             esrgan: components["schemas"]["ImageOutput"];
+            even_split_xy_tile_generator: components["schemas"]["TilesOutput"];
             expand_mask_with_fade: components["schemas"]["ImageOutput"];
+            extract_image_collection_metadata_boolean: components["schemas"]["BooleanCollectionOutput"];
+            extract_image_collection_metadata_float: components["schemas"]["FloatCollectionOutput"];
+            extract_image_collection_metadata_integer: components["schemas"]["IntegerCollectionOutput"];
+            extract_image_collection_metadata_string: components["schemas"]["StringCollectionOutput"];
             face_identifier: components["schemas"]["ImageOutput"];
             face_mask_detection: components["schemas"]["FaceMaskOutput"];
             face_off: components["schemas"]["FaceOffOutput"];
+            film_grain: components["schemas"]["ImageOutput"];
+            flatten_histogram_mono: components["schemas"]["ImageOutput"];
             float: components["schemas"]["FloatOutput"];
             float_batch: components["schemas"]["FloatOutput"];
             float_collection: components["schemas"]["FloatCollectionOutput"];
+            float_collection_index: components["schemas"]["FloatOutput"];
+            float_collection_linked: components["schemas"]["FloatCollectionOutput"];
+            float_collection_toggle: components["schemas"]["FloatCollectionOutput"];
             float_generator: components["schemas"]["FloatGeneratorOutput"];
             float_math: components["schemas"]["FloatOutput"];
             float_range: components["schemas"]["FloatCollectionOutput"];
             float_to_int: components["schemas"]["IntegerOutput"];
+            float_toggle: components["schemas"]["FloatOutput"];
+            floats_to_strings: components["schemas"]["StringCollectionOutput"];
             flux2_denoise: components["schemas"]["LatentsOutput"];
             flux2_klein_lora_collection_loader: components["schemas"]["Flux2KleinLoRALoaderOutput"];
             flux2_klein_lora_loader: components["schemas"]["Flux2KleinLoRALoaderOutput"];
@@ -14118,24 +21232,63 @@ export type components = {
             flux2_klein_text_encoder: components["schemas"]["FluxConditioningOutput"];
             flux2_vae_decode: components["schemas"]["ImageOutput"];
             flux2_vae_encode: components["schemas"]["LatentsOutput"];
+            flux_conditioning_blend: components["schemas"]["FluxConditioningBlendOutput"];
+            flux_conditioning_collection: components["schemas"]["FluxConditioningCollectionOutput"];
+            flux_conditioning_collection_join: components["schemas"]["FluxConditioningCollectionOutput"];
+            flux_conditioning_collection_toggle: components["schemas"]["FluxConditioningCollectionOutput"];
+            flux_conditioning_concatenate: components["schemas"]["FluxConditioningOutput"];
+            flux_conditioning_delta_augmentation: components["schemas"]["FluxConditioningDeltaAndAugmentedOutput"];
+            flux_conditioning_index: components["schemas"]["FluxConditioningOutput"];
+            flux_conditioning_list: components["schemas"]["FluxConditioningListOutput"];
+            flux_conditioning_math: components["schemas"]["FluxConditioningOutput"];
+            flux_conditioning_toggle: components["schemas"]["FluxConditioningOutput"];
             flux_control_lora_loader: components["schemas"]["FluxControlLoRALoaderOutput"];
             flux_controlnet: components["schemas"]["FluxControlNetOutput"];
+            flux_controlnet_collection: components["schemas"]["FluxControlNetCollectionOutput"];
+            flux_controlnet_collection_join: components["schemas"]["FluxControlNetCollectionOutput"];
+            flux_controlnet_index: components["schemas"]["FluxControlNetOutput"];
+            flux_controlnet_linked: components["schemas"]["FluxControlNetListOutput"];
             flux_denoise: components["schemas"]["LatentsOutput"];
             flux_denoise_meta: components["schemas"]["LatentsMetaOutput"];
             flux_fill: components["schemas"]["FluxFillOutput"];
+            flux_ideal_size: components["schemas"]["FluxIdealSizeOutput"];
             flux_ip_adapter: components["schemas"]["IPAdapterOutput"];
             flux_kontext: components["schemas"]["FluxKontextOutput"];
+            flux_kontext_ideal_size: components["schemas"]["FluxIdealSizeOutput"];
             flux_kontext_image_prep: components["schemas"]["ImageOutput"];
             flux_lora_collection_loader: components["schemas"]["FluxLoRALoaderOutput"];
             flux_lora_loader: components["schemas"]["FluxLoRALoaderOutput"];
             flux_model_loader: components["schemas"]["FluxModelLoaderOutput"];
+            flux_model_loader_input: components["schemas"]["FluxModelLoaderOutput"];
+            flux_model_to_string: components["schemas"]["StringOutput"];
             flux_redux: components["schemas"]["FluxReduxOutput"];
+            flux_redux_collection: components["schemas"]["FluxReduxCollectionOutput"];
+            flux_redux_collection_join: components["schemas"]["FluxReduxCollectionOutput"];
+            flux_redux_conditioning_math: components["schemas"]["FluxReduxOutput"];
+            flux_redux_downsampling: components["schemas"]["FluxReduxOutput"];
+            flux_redux_index: components["schemas"]["FluxReduxOutput"];
+            flux_redux_linked: components["schemas"]["FluxReduxListOutput"];
+            flux_redux_rescale_conditioning: components["schemas"]["FluxReduxOutput"];
+            flux_rescale_conditioning: components["schemas"]["FluxConditioningOutput"];
+            flux_scale_conditioning: components["schemas"]["FluxConditioningOutput"];
+            flux_scale_prompt_section: components["schemas"]["FluxConditioningOutput"];
+            flux_scale_redux_conditioning: components["schemas"]["FluxReduxOutput"];
             flux_text_encoder: components["schemas"]["FluxConditioningOutput"];
+            flux_text_encoder_linked: components["schemas"]["FluxTextEncoderListOutput"];
             flux_vae_decode: components["schemas"]["ImageOutput"];
             flux_vae_encode: components["schemas"]["LatentsOutput"];
+            flux_weighted_prompt: components["schemas"]["FluxWeightedPromptOutput"];
             freeu: components["schemas"]["UNetOutput"];
+            frequency_blend_latents: components["schemas"]["LatentsOutput"];
+            frequency_match_latents: components["schemas"]["LatentsOutput"];
+            generate_evolutionary_prompts: components["schemas"]["EvolutionaryPromptListOutput"];
             get_image_mask_bounding_box: components["schemas"]["BoundingBoxOutput"];
+            get_palette: components["schemas"]["ImageOutput"];
+            get_palette_adv: components["schemas"]["ImageOutput"];
+            get_source_framerate: components["schemas"]["FloatOutput"];
+            get_total_frames: components["schemas"]["IntegerOutput"];
             grounding_dino: components["schemas"]["BoundingBoxCollectionOutput"];
+            halftone: components["schemas"]["ImageOutput"];
             hed_edge_detection: components["schemas"]["ImageOutput"];
             heuristic_resize: components["schemas"]["ImageOutput"];
             i2l: components["schemas"]["LatentsOutput"];
@@ -14143,9 +21296,20 @@ export type components = {
             image: components["schemas"]["ImageOutput"];
             image_batch: components["schemas"]["ImageOutput"];
             image_collection: components["schemas"]["ImageCollectionOutput"];
+            image_collection_index: components["schemas"]["ImageOutput"];
+            image_collection_linked: components["schemas"]["ImageCollectionOutput"];
+            image_collection_toggle: components["schemas"]["ImageCollectionOutput"];
             image_generator: components["schemas"]["ImageGeneratorOutput"];
+            image_index_collect: components["schemas"]["ImageIndexCollectOutput"];
             image_mask_to_tensor: components["schemas"]["MaskOutput"];
             image_panel_layout: components["schemas"]["ImagePanelCoordinateOutput"];
+            image_som: components["schemas"]["ImageSOMOutput"];
+            image_to_image_name: components["schemas"]["ImageToImageNameOutput"];
+            image_to_xy_image_collection: components["schemas"]["StringCollectionOutput"];
+            image_to_xy_image_tiles: components["schemas"]["ImageToXYImageTilesOutput"];
+            image_toggle: components["schemas"]["ImageOutput"];
+            images_index_to_video: components["schemas"]["ImagesIndexToVideoOutput"];
+            images_to_grids: components["schemas"]["ImageCollectionOutput"];
             img_blur: components["schemas"]["ImageOutput"];
             img_chan: components["schemas"]["ImageOutput"];
             img_channel_multiply: components["schemas"]["ImageOutput"];
@@ -14163,16 +21327,23 @@ export type components = {
             img_resize: components["schemas"]["ImageOutput"];
             img_scale: components["schemas"]["ImageOutput"];
             img_watermark: components["schemas"]["ImageOutput"];
+            imgs2mask_clipseg: components["schemas"]["ImageOutput"];
             infill_cv2: components["schemas"]["ImageOutput"];
             infill_lama: components["schemas"]["ImageOutput"];
             infill_patchmatch: components["schemas"]["ImageOutput"];
             infill_rgba: components["schemas"]["ImageOutput"];
             infill_tile: components["schemas"]["ImageOutput"];
+            info_grabber_unet_invocation: components["schemas"]["StringOutput"];
+            int_collection_toggle: components["schemas"]["IntegerCollectionOutput"];
+            int_toggle: components["schemas"]["IntegerOutput"];
             integer: components["schemas"]["IntegerOutput"];
             integer_batch: components["schemas"]["IntegerOutput"];
             integer_collection: components["schemas"]["IntegerCollectionOutput"];
+            integer_collection_index: components["schemas"]["IntegerOutput"];
+            integer_collection_linked: components["schemas"]["IntegerCollectionOutput"];
             integer_generator: components["schemas"]["IntegerGeneratorOutput"];
             integer_math: components["schemas"]["IntegerOutput"];
+            ints_to_strings: components["schemas"]["StringCollectionOutput"];
             invert_tensor_mask: components["schemas"]["MaskOutput"];
             invokeai_ealightness: components["schemas"]["ImageOutput"];
             invokeai_img_blend: components["schemas"]["ImageOutput"];
@@ -14182,25 +21353,70 @@ export type components = {
             invokeai_img_hue_adjust_plus: components["schemas"]["ImageOutput"];
             invokeai_img_val_thresholds: components["schemas"]["ImageOutput"];
             ip_adapter: components["schemas"]["IPAdapterOutput"];
+            ip_adapter_linked: components["schemas"]["IPAdapterListOutput"];
             iterate: components["schemas"]["IterateInvocationOutput"];
             l2i: components["schemas"]["ImageOutput"];
+            latent_average: components["schemas"]["LatentsOutput"];
+            latent_band_pass_filter: components["schemas"]["LatentsOutput"];
+            latent_blend_linear: components["schemas"]["LatentsOutput"];
+            latent_channels_to_grid: components["schemas"]["ImageCollectionOutput"];
+            latent_combine: components["schemas"]["LatentsOutput"];
+            latent_dtype_convert: components["schemas"]["LatentsOutput"];
+            latent_high_pass_filter: components["schemas"]["LatentsOutput"];
+            latent_low_pass_filter: components["schemas"]["LatentsOutput"];
+            latent_match: components["schemas"]["LatentsOutput"];
+            latent_modify_channels: components["schemas"]["LatentsOutput"];
+            latent_normalize_range: components["schemas"]["LatentsOutput"];
+            latent_normalize_std_dev: components["schemas"]["LatentsOutput"];
+            latent_normalize_std_dev_range: components["schemas"]["LatentsOutput"];
+            latent_plot: components["schemas"]["ImageCollectionOutput"];
+            latent_som: components["schemas"]["LatentsOutput"];
+            latent_white_noise: components["schemas"]["LatentsOutput"];
             latents: components["schemas"]["LatentsOutput"];
             latents_collection: components["schemas"]["LatentsCollectionOutput"];
+            latents_collection_index: components["schemas"]["LatentsOutput"];
+            latents_collection_linked: components["schemas"]["LatentsCollectionOutput"];
             lblend: components["schemas"]["LatentsOutput"];
+            lcrop: components["schemas"]["LatentsOutput"];
+            lens_aperture_generator: components["schemas"]["ImageOutput"];
+            lens_blur: components["schemas"]["ImageOutput"];
+            lens_vignette: components["schemas"]["ImageOutput"];
             lineart_anime_edge_detection: components["schemas"]["ImageOutput"];
             lineart_edge_detection: components["schemas"]["ImageOutput"];
             llava_onevision_vllm: components["schemas"]["StringOutput"];
+            load_all_text_files_in_folder_output: components["schemas"]["LoadAllTextFilesInFolderOutput"];
+            load_aperture_image: components["schemas"]["ImageOutput"];
+            load_text_file_to_string_invocation: components["schemas"]["LoadTextFileToStringOutput"];
+            load_video_frame: components["schemas"]["ImageOutput"];
+            lookup_from_prompt: components["schemas"]["LookupTableOutput"];
+            lookup_lora_collection_triggers_invocation: components["schemas"]["LookupLoRATriggersOutput"];
+            lookup_lora_triggers_invocation: components["schemas"]["LookupLoRATriggersOutput"];
+            lookup_table_from_file: components["schemas"]["LookupTableOutput"];
+            lora_collection: components["schemas"]["LoRACollectionOutput"];
+            lora_collection_from_path_invocation: components["schemas"]["LoRACollectionFromPathOutput"];
+            lora_collection_linked: components["schemas"]["LoRACollectionOutput"];
             lora_collection_loader: components["schemas"]["LoRALoaderOutput"];
+            lora_collection_toggle: components["schemas"]["LoRACollectionToggleOutput"];
             lora_loader: components["schemas"]["LoRALoaderOutput"];
+            lora_name_grabber_invocation: components["schemas"]["LoRANameGrabberOutput"];
             lora_selector: components["schemas"]["LoRASelectorOutput"];
+            lora_to_string: components["schemas"]["StringOutput"];
+            lora_toggle: components["schemas"]["LoRAToggleOutput"];
             lresize: components["schemas"]["LatentsOutput"];
             lscale: components["schemas"]["LatentsOutput"];
             main_model_loader: components["schemas"]["ModelLoaderOutput"];
+            main_model_loader_input: components["schemas"]["ModelLoaderOutput"];
+            main_model_to_string: components["schemas"]["StringOutput"];
             mask_combine: components["schemas"]["ImageOutput"];
             mask_edge: components["schemas"]["ImageOutput"];
             mask_from_id: components["schemas"]["ImageOutput"];
+            match_histogram: components["schemas"]["ImageOutput"];
+            match_histogram_lab: components["schemas"]["ImageOutput"];
+            math_eval: components["schemas"]["MathEvalOutput"];
             mediapipe_face_detection: components["schemas"]["ImageOutput"];
+            merge_lora_collections_invocation: components["schemas"]["MergeLoRACollectionsOutput"];
             merge_metadata: components["schemas"]["MetadataOutput"];
+            merge_string_collections_invocation: components["schemas"]["MergeStringCollectionsOutput"];
             merge_tiles_to_image: components["schemas"]["ImageOutput"];
             metadata: components["schemas"]["MetadataOutput"];
             metadata_field_extractor: components["schemas"]["StringOutput"];
@@ -14225,59 +21441,142 @@ export type components = {
             metadata_to_string_collection: components["schemas"]["StringCollectionOutput"];
             metadata_to_t2i_adapters: components["schemas"]["MDT2IAdapterListOutput"];
             metadata_to_vae: components["schemas"]["VAEOutput"];
+            minimum_overlap_xy_tile_generator: components["schemas"]["TilesOutput"];
             mlsd_detection: components["schemas"]["ImageOutput"];
             model_identifier: components["schemas"]["ModelIdentifierOutput"];
+            model_name_grabber_invocation: components["schemas"]["ModelNameGrabberOutput"];
+            model_name_to_model: components["schemas"]["StringToModelOutput"];
+            model_to_string: components["schemas"]["StringOutput"];
+            model_toggle: components["schemas"]["ModelToggleOutput"];
+            monochrome_film_grain: components["schemas"]["ImageOutput"];
             mul: components["schemas"]["IntegerOutput"];
+            nightmare_promptgen: components["schemas"]["NightmareOutput"];
             noise: components["schemas"]["NoiseOutput"];
+            noise_add_flux: components["schemas"]["LatentsOutput"];
+            noise_coordinated: components["schemas"]["NoiseOutput"];
+            noise_coordinated_flux: components["schemas"]["LatentsOutput"];
+            noise_spectral: components["schemas"]["NoiseOutput"];
+            noiseimg_2d: components["schemas"]["ImageOutput"];
             normal_map: components["schemas"]["ImageOutput"];
+            octree_quantizer: components["schemas"]["ImageOutput"];
+            offset_image: components["schemas"]["ImageOutput"];
+            offset_latents: components["schemas"]["LatentsOutput"];
+            optimized_tile_size_from_area: components["schemas"]["TileSizeOutput"];
             pair_tile_image: components["schemas"]["PairTileImageOutput"];
+            parse_weighted_string: components["schemas"]["WeightedStringOutput"];
             paste_image_into_bounding_box: components["schemas"]["ImageOutput"];
             pbr_maps: components["schemas"]["PBRMapsOutput"];
+            percent_to_float: components["schemas"]["FloatOutput"];
             pidi_edge_detection: components["schemas"]["ImageOutput"];
+            "pixel-art": components["schemas"]["ImageOutput"];
+            pixelize: components["schemas"]["ImageOutput"];
+            print_string_to_console_invocation: components["schemas"]["PrintStringToConsoleOutput"];
+            prompt_auto_and: components["schemas"]["StringOutput"];
             prompt_from_file: components["schemas"]["StringCollectionOutput"];
+            prompt_from_lookup_table: components["schemas"]["HalvedPromptOutput"];
+            prompt_strength: components["schemas"]["PromptStrengthOutput"];
+            prompt_strengths_combine: components["schemas"]["StringOutput"];
             prompt_template: components["schemas"]["PromptTemplateOutput"];
+            prompt_to_file: components["schemas"]["PromptsToFileInvocationOutput"];
+            prune_prompt: components["schemas"]["PrunedPromptOutput"];
+            pt_fields_collect: components["schemas"]["PTFieldsCollectOutput"];
+            pt_fields_expand: components["schemas"]["PTFieldsExpandOutput"];
+            quote_escaper: components["schemas"]["EscapedOutput"];
+            qwen3_prompt_pro: components["schemas"]["Qwen3PromptProOutput"];
             rand_float: components["schemas"]["FloatOutput"];
             rand_int: components["schemas"]["IntegerOutput"];
+            random_image_size_invocation: components["schemas"]["RandomImageSizeOutput"];
+            random_lora_mixer_invocation: components["schemas"]["RandomLoRAMixerOutput"];
             random_range: components["schemas"]["IntegerCollectionOutput"];
             range: components["schemas"]["IntegerCollectionOutput"];
             range_of_size: components["schemas"]["IntegerCollectionOutput"];
+            reapply_lora_weight_invocation: components["schemas"]["ReapplyLoRAWeightOutput"];
             rectangle_mask: components["schemas"]["MaskOutput"];
+            retrieve_flux_conditioning: components["schemas"]["RetrieveFluxConditioningMultiOutput"];
+            retro_bitize: components["schemas"]["ImageOutput"];
+            retro_crt_curvature: components["schemas"]["ImageOutput"];
+            retro_palettize: components["schemas"]["ImageOutput"];
+            retro_palettize_adv: components["schemas"]["ImageOutput"];
+            retro_pixelize: components["schemas"]["ImageOutput"];
+            retro_quantize: components["schemas"]["ImageOutput"];
+            retro_scanlines_simple: components["schemas"]["ImageOutput"];
+            rgb_merge: components["schemas"]["ImageOutput"];
+            rgb_split: components["schemas"]["RGBSplitOutput"];
+            rotate_image: components["schemas"]["ImageOutput"];
             round_float: components["schemas"]["FloatOutput"];
             save_image: components["schemas"]["ImageOutput"];
             scheduler: components["schemas"]["SchedulerOutput"];
+            scheduler_to_string: components["schemas"]["StringOutput"];
+            scheduler_toggle: components["schemas"]["SchedulerOutput"];
             sd3_denoise: components["schemas"]["LatentsOutput"];
             sd3_i2l: components["schemas"]["LatentsOutput"];
             sd3_l2i: components["schemas"]["ImageOutput"];
             sd3_model_loader: components["schemas"]["Sd3ModelLoaderOutput"];
+            sd3_model_loader_input: components["schemas"]["Sd3ModelLoaderOutput"];
+            sd3_model_to_string: components["schemas"]["StringOutput"];
             sd3_text_encoder: components["schemas"]["SD3ConditioningOutput"];
             sdxl_compel_prompt: components["schemas"]["ConditioningOutput"];
             sdxl_lora_collection_loader: components["schemas"]["SDXLLoRALoaderOutput"];
             sdxl_lora_loader: components["schemas"]["SDXLLoRALoaderOutput"];
+            sdxl_main_model_toggle: components["schemas"]["SDXLModelLoaderOutput"];
             sdxl_model_loader: components["schemas"]["SDXLModelLoaderOutput"];
+            sdxl_model_loader_input: components["schemas"]["SDXLModelLoaderOutput"];
+            sdxl_model_to_string: components["schemas"]["StringOutput"];
             sdxl_refiner_compel_prompt: components["schemas"]["ConditioningOutput"];
             sdxl_refiner_model_loader: components["schemas"]["SDXLRefinerModelLoaderOutput"];
             seamless: components["schemas"]["SeamlessModeOutput"];
             segment_anything: components["schemas"]["MaskOutput"];
+            separate_prompt_and_seed_vector: components["schemas"]["JsonListStringsOutput"];
+            shmmask: components["schemas"]["ShadowsHighlightsMidtonesMasksOutput"];
             show_image: components["schemas"]["ImageOutput"];
             spandrel_image_to_image: components["schemas"]["ImageOutput"];
             spandrel_image_to_image_autoscale: components["schemas"]["ImageOutput"];
+            spherical_distortion: components["schemas"]["ImageOutput"];
+            store_flux_conditioning: components["schemas"]["FluxConditioningStoreOutput"];
             string: components["schemas"]["StringOutput"];
             string_batch: components["schemas"]["StringOutput"];
             string_collection: components["schemas"]["StringCollectionOutput"];
+            string_collection_index: components["schemas"]["StringOutput"];
+            string_collection_joiner_invocation: components["schemas"]["StringCollectionJoinerOutput"];
+            string_collection_linked: components["schemas"]["StringCollectionOutput"];
+            string_collection_toggle: components["schemas"]["StringCollectionOutput"];
             string_generator: components["schemas"]["StringGeneratorOutput"];
             string_join: components["schemas"]["StringOutput"];
             string_join_three: components["schemas"]["StringOutput"];
             string_replace: components["schemas"]["StringOutput"];
             string_split: components["schemas"]["String2Output"];
             string_split_neg: components["schemas"]["StringPosNegOutput"];
+            string_to_collection_splitter_invocation: components["schemas"]["StringCollectionOutput"];
+            string_to_float: components["schemas"]["FloatOutput"];
+            string_to_int: components["schemas"]["IntegerOutput"];
+            string_to_lora: components["schemas"]["StringToLoraOutput"];
+            string_to_main_model: components["schemas"]["StringToMainModelOutput"];
+            string_to_model: components["schemas"]["StringToModelOutput"];
+            string_to_scheduler: components["schemas"]["SchedulerOutput"];
+            string_to_sdxl_model: components["schemas"]["StringToSDXLModelOutput"];
+            string_toggle: components["schemas"]["StringOutput"];
+            strings_to_csv: components["schemas"]["StringOutput"];
             sub: components["schemas"]["IntegerOutput"];
             t2i_adapter: components["schemas"]["T2IAdapterOutput"];
+            t2i_adapter_linked: components["schemas"]["T2IAdapterListOutput"];
             tensor_mask_to_image: components["schemas"]["ImageOutput"];
+            text_mask: components["schemas"]["ImageOutput"];
+            thresholding: components["schemas"]["ThresholdingOutput"];
             tile_to_properties: components["schemas"]["TileToPropertiesOutput"];
             tiled_multi_diffusion_denoise_latents: components["schemas"]["LatentsOutput"];
             tomask: components["schemas"]["ImageOutput"];
+            tracery_invocation: components["schemas"]["TraceryOutput"];
+            txt2mask_clipseg: components["schemas"]["ImageOutput"];
+            txt2mask_clipseg_adv: components["schemas"]["ImageOutput"];
             unsharp_mask: components["schemas"]["ImageOutput"];
             vae_loader: components["schemas"]["VAEOutput"];
+            xy_expand: components["schemas"]["XYExpandOutput"];
+            xy_image_collect: components["schemas"]["StringOutput"];
+            xy_image_expand: components["schemas"]["XYImageExpandOutput"];
+            xy_image_tiles_to_image: components["schemas"]["ImageOutput"];
+            xy_images_to_grid: components["schemas"]["ImageOutput"];
+            xy_product: components["schemas"]["XYProductOutput"];
+            xy_product_csv: components["schemas"]["XYProductOutput"];
             z_image_control: components["schemas"]["ZImageControlOutput"];
             z_image_denoise: components["schemas"]["LatentsOutput"];
             z_image_denoise_meta: components["schemas"]["LatentsMetaOutput"];
@@ -14341,7 +21640,7 @@ export type components = {
              * Invocation
              * @description The ID of the invocation
              */
-            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
+            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AdvAutostereogramInvocation"] | components["schemas"]["AdvancedTextFontImageInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnamorphicStreaksInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AutostereogramInvocation"] | components["schemas"]["AverageImagesInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BoolCollectionIndexInvocation"] | components["schemas"]["BoolCollectionToggleInvocation"] | components["schemas"]["BoolToggleInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanCollectionLinkedInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CMYKColorSeparationInvocation"] | components["schemas"]["CMYKHalftoneInvocation"] | components["schemas"]["CMYKMergeInvocation"] | components["schemas"]["CMYKSplitInvocation"] | components["schemas"]["CSVToIndexStringInvocation"] | components["schemas"]["CSVToStringsInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ChromaNoiseInvocation"] | components["schemas"]["ChromaticAberrationInvocation"] | components["schemas"]["ClipsegMaskHierarchyInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCountInvocation"] | components["schemas"]["CollectionIndexInvocation"] | components["schemas"]["CollectionJoinInvocation"] | components["schemas"]["CollectionReverseInvocation"] | components["schemas"]["CollectionSliceInvocation"] | components["schemas"]["CollectionSortInvocation"] | components["schemas"]["CollectionUniqueInvocation"] | components["schemas"]["ColorCastCorrectionInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompareFloatsInvocation"] | components["schemas"]["CompareIntsInvocation"] | components["schemas"]["CompareStringsInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConcatenateFluxConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningCollectionLinkedInvocation"] | components["schemas"]["ConditioningCollectionToggleInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningToggleInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ControlNetLinkedInvocation"] | components["schemas"]["CoordinatedFluxNoiseInvocation"] | components["schemas"]["CoordinatedNoiseInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CropLatentsInvocation"] | components["schemas"]["CrossoverPromptInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DefaultXYTileGenerator"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["EnhanceDetailInvocation"] | components["schemas"]["EscaperInvocation"] | components["schemas"]["EvenSplitXYTileGenerator"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractImageCollectionMetadataBooleanInvocation"] | components["schemas"]["ExtractImageCollectionMetadataFloatInvocation"] | components["schemas"]["ExtractImageCollectionMetadataIntegerInvocation"] | components["schemas"]["ExtractImageCollectionMetadataStringInvocation"] | components["schemas"]["ExtrudeDepthInvocation"] | components["schemas"]["FLUXConditioningCollectionToggleInvocation"] | components["schemas"]["FLUXConditioningToggleInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FilmGrainInvocation"] | components["schemas"]["FlattenHistogramMono"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionIndexInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatCollectionLinkedInvocation"] | components["schemas"]["FloatCollectionToggleInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FloatToggleInvocation"] | components["schemas"]["FloatsToStringsInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["FluxConditioningBlendInvocation"] | components["schemas"]["FluxConditioningCollectionIndexInvocation"] | components["schemas"]["FluxConditioningCollectionInvocation"] | components["schemas"]["FluxConditioningCollectionJoinInvocation"] | components["schemas"]["FluxConditioningDeltaAugmentationInvocation"] | components["schemas"]["FluxConditioningListInvocation"] | components["schemas"]["FluxConditioningMathOperationInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetCollectionIndexInvocation"] | components["schemas"]["FluxControlNetCollectionInvocation"] | components["schemas"]["FluxControlNetCollectionJoinInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxControlNetLinkedInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxIdealSizeInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextIdealSizeInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInputInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxModelToStringInvocation"] | components["schemas"]["FluxReduxCollectionIndexInvocation"] | components["schemas"]["FluxReduxCollectionInvocation"] | components["schemas"]["FluxReduxCollectionJoinInvocation"] | components["schemas"]["FluxReduxConditioningMathOperationInvocation"] | components["schemas"]["FluxReduxDownsamplingInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxReduxLinkedInvocation"] | components["schemas"]["FluxReduxRescaleConditioningInvocation"] | components["schemas"]["FluxRescaleConditioningInvocation"] | components["schemas"]["FluxScaleConditioningInvocation"] | components["schemas"]["FluxScalePromptSectionInvocation"] | components["schemas"]["FluxScaleReduxConditioningInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxTextEncoderLinkedInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["FluxWeightedPromptInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["FrequencyBlendLatents"] | components["schemas"]["FrequencySpectrumMatchLatentsInvocation"] | components["schemas"]["GenerateEvolutionaryPromptsInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GetSourceFrameRateInvocation"] | components["schemas"]["GetTotalFramesInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HalftoneInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IPAdapterLinkedInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionIndexInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageCollectionLinkedInvocation"] | components["schemas"]["ImageCollectionToggleInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageIndexCollectInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImageOffsetInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageRotateInvocation"] | components["schemas"]["ImageSOMInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageSearchToMaskClipsegInvocation"] | components["schemas"]["ImageToAAInvocation"] | components["schemas"]["ImageToDetailedASCIIArtInvocation"] | components["schemas"]["ImageToImageNameInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageToUnicodeArtInvocation"] | components["schemas"]["ImageToXYImageCollectionInvocation"] | components["schemas"]["ImageToXYImageTilesInvocation"] | components["schemas"]["ImageToggleInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["ImagesIndexToVideoInvocation"] | components["schemas"]["ImagesToGridsInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfoGrabberUNetInvocation"] | components["schemas"]["IntCollectionToggleInvocation"] | components["schemas"]["IntToggleInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionIndexInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerCollectionLinkedInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["IntsToStringsInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentAverageInvocation"] | components["schemas"]["LatentBandPassFilterInvocation"] | components["schemas"]["LatentBlendLinearInvocation"] | components["schemas"]["LatentChannelsToGridInvocation"] | components["schemas"]["LatentCombineInvocation"] | components["schemas"]["LatentDtypeConvertInvocation"] | components["schemas"]["LatentHighPassFilterInvocation"] | components["schemas"]["LatentLowPassFilterInvocation"] | components["schemas"]["LatentMatchInvocation"] | components["schemas"]["LatentModifyChannelsInvocation"] | components["schemas"]["LatentNormalizeRangeInvocation"] | components["schemas"]["LatentNormalizeStdDevInvocation"] | components["schemas"]["LatentNormalizeStdRangeInvocation"] | components["schemas"]["LatentPlotInvocation"] | components["schemas"]["LatentSOMInvocation"] | components["schemas"]["LatentWhiteNoiseInvocation"] | components["schemas"]["LatentsCollectionIndexInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsCollectionLinkedInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LensApertureGeneratorInvocation"] | components["schemas"]["LensBlurInvocation"] | components["schemas"]["LensVignetteInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionFromPathInvocation"] | components["schemas"]["LoRACollectionInvocation"] | components["schemas"]["LoRACollectionLinkedInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRACollectionToggleInvocation"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRANameGrabberInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["LoRAToggleInvocation"] | components["schemas"]["LoadAllTextFilesInFolderInvocation"] | components["schemas"]["LoadApertureImageInvocation"] | components["schemas"]["LoadTextFileToStringInvocation"] | components["schemas"]["LoadVideoFrameInvocation"] | components["schemas"]["LookupLoRACollectionTriggersInvocation"] | components["schemas"]["LookupLoRATriggersInvocation"] | components["schemas"]["LookupTableFromFileInvocation"] | components["schemas"]["LookupsEntryFromPromptInvocation"] | components["schemas"]["LoraToStringInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInputInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MainModelToStringInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MatchHistogramInvocation"] | components["schemas"]["MatchHistogramLabInvocation"] | components["schemas"]["MathEvalInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeLoRACollectionsInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeStringCollectionsInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MinimumOverlapXYTileGenerator"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["ModelNameGrabberInvocation"] | components["schemas"]["ModelNameToModelInvocation"] | components["schemas"]["ModelToStringInvocation"] | components["schemas"]["ModelToggleInvocation"] | components["schemas"]["MonochromeFilmGrainInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NightmareInvocation"] | components["schemas"]["NoiseAddFluxInvocation"] | components["schemas"]["NoiseImage2DInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NoiseSpectralInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OctreeQuantizerInvocation"] | components["schemas"]["OffsetLatentsInvocation"] | components["schemas"]["OptimizedTileSizeFromAreaInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PTFieldsCollectInvocation"] | components["schemas"]["PTFieldsExpandInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["ParseWeightedStringInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PercentToFloatInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PixelArtInvocation"] | components["schemas"]["PixelizeImageInvocation"] | components["schemas"]["PixelizeInvocation"] | components["schemas"]["PrintStringToConsoleInvocation"] | components["schemas"]["PromptAutoAndInvocation"] | components["schemas"]["PromptFromLookupTableInvocation"] | components["schemas"]["PromptStrengthInvocation"] | components["schemas"]["PromptStrengthsCombineInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["PromptsToFileInvocation"] | components["schemas"]["PruneTextInvocation"] | components["schemas"]["Qwen3PromptProInvocation"] | components["schemas"]["RGBMergeInvocation"] | components["schemas"]["RGBSplitInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomImageSizeInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomLoRAMixerInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ReapplyLoRAWeightInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RetrieveBoardImagesInvocation"] | components["schemas"]["RetrieveFluxConditioningInvocation"] | components["schemas"]["RetroBitizeInvocation"] | components["schemas"]["RetroCRTCurvatureInvocation"] | components["schemas"]["RetroGetPaletteAdvInvocation"] | components["schemas"]["RetroGetPaletteInvocation"] | components["schemas"]["RetroPalettizeAdvInvocation"] | components["schemas"]["RetroPalettizeInvocation"] | components["schemas"]["RetroQuantizeInvocation"] | components["schemas"]["RetroScanlinesSimpleInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3ModelLoaderInputInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLMainModelToggleInvocation"] | components["schemas"]["SDXLModelLoaderInputInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLModelToStringInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SchedulerToStringInvocation"] | components["schemas"]["SchedulerToggleInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3ModelToStringInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["SeparatePromptAndSeedVectorInvocation"] | components["schemas"]["ShadowsHighlightsMidtonesMaskInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["SphericalDistortionInvocation"] | components["schemas"]["StoreFluxConditioningInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionIndexInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringCollectionJoinerInvocation"] | components["schemas"]["StringCollectionLinkedInvocation"] | components["schemas"]["StringCollectionToggleInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringToCollectionSplitterInvocation"] | components["schemas"]["StringToFloatInvocation"] | components["schemas"]["StringToIntInvocation"] | components["schemas"]["StringToLoraInvocation"] | components["schemas"]["StringToMainModelInvocation"] | components["schemas"]["StringToModelInvocation"] | components["schemas"]["StringToSDXLModelInvocation"] | components["schemas"]["StringToSchedulerInvocation"] | components["schemas"]["StringToggleInvocation"] | components["schemas"]["StringsToCSVInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["T2IAdapterLinkedInvocation"] | components["schemas"]["TextMaskInvocation"] | components["schemas"]["TextToMaskClipsegAdvancedInvocation"] | components["schemas"]["TextToMaskClipsegInvocation"] | components["schemas"]["TextfontimageInvocation"] | components["schemas"]["ThresholdingInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["TraceryInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["XYExpandInvocation"] | components["schemas"]["XYImageCollectInvocation"] | components["schemas"]["XYImageExpandInvocation"] | components["schemas"]["XYImageTilesToImageInvocation"] | components["schemas"]["XYImagesToGridInvocation"] | components["schemas"]["XYProductCSVInvocation"] | components["schemas"]["XYProductInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
             /**
              * Invocation Source Id
              * @description The ID of the prepared invocation's source node
@@ -14416,7 +21715,7 @@ export type components = {
              * Invocation
              * @description The ID of the invocation
              */
-            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
+            invocation: components["schemas"]["AddInvocation"] | components["schemas"]["AdvAutostereogramInvocation"] | components["schemas"]["AdvancedTextFontImageInvocation"] | components["schemas"]["AlphaMaskToTensorInvocation"] | components["schemas"]["AnamorphicStreaksInvocation"] | components["schemas"]["ApplyMaskTensorToImageInvocation"] | components["schemas"]["ApplyMaskToImageInvocation"] | components["schemas"]["AutostereogramInvocation"] | components["schemas"]["AverageImagesInvocation"] | components["schemas"]["BlankImageInvocation"] | components["schemas"]["BlendLatentsInvocation"] | components["schemas"]["BoolCollectionIndexInvocation"] | components["schemas"]["BoolCollectionToggleInvocation"] | components["schemas"]["BoolToggleInvocation"] | components["schemas"]["BooleanCollectionInvocation"] | components["schemas"]["BooleanCollectionLinkedInvocation"] | components["schemas"]["BooleanInvocation"] | components["schemas"]["BoundingBoxInvocation"] | components["schemas"]["CLIPSkipInvocation"] | components["schemas"]["CMYKColorSeparationInvocation"] | components["schemas"]["CMYKHalftoneInvocation"] | components["schemas"]["CMYKMergeInvocation"] | components["schemas"]["CMYKSplitInvocation"] | components["schemas"]["CSVToIndexStringInvocation"] | components["schemas"]["CSVToStringsInvocation"] | components["schemas"]["CV2InfillInvocation"] | components["schemas"]["CalculateImageTilesEvenSplitInvocation"] | components["schemas"]["CalculateImageTilesInvocation"] | components["schemas"]["CalculateImageTilesMinimumOverlapInvocation"] | components["schemas"]["CannyEdgeDetectionInvocation"] | components["schemas"]["CanvasPasteBackInvocation"] | components["schemas"]["CanvasV2MaskAndCropInvocation"] | components["schemas"]["CenterPadCropInvocation"] | components["schemas"]["ChromaNoiseInvocation"] | components["schemas"]["ChromaticAberrationInvocation"] | components["schemas"]["ClipsegMaskHierarchyInvocation"] | components["schemas"]["CogView4DenoiseInvocation"] | components["schemas"]["CogView4ImageToLatentsInvocation"] | components["schemas"]["CogView4LatentsToImageInvocation"] | components["schemas"]["CogView4ModelLoaderInvocation"] | components["schemas"]["CogView4TextEncoderInvocation"] | components["schemas"]["CollectInvocation"] | components["schemas"]["CollectionCountInvocation"] | components["schemas"]["CollectionIndexInvocation"] | components["schemas"]["CollectionJoinInvocation"] | components["schemas"]["CollectionReverseInvocation"] | components["schemas"]["CollectionSliceInvocation"] | components["schemas"]["CollectionSortInvocation"] | components["schemas"]["CollectionUniqueInvocation"] | components["schemas"]["ColorCastCorrectionInvocation"] | components["schemas"]["ColorCorrectInvocation"] | components["schemas"]["ColorInvocation"] | components["schemas"]["ColorMapInvocation"] | components["schemas"]["CompareFloatsInvocation"] | components["schemas"]["CompareIntsInvocation"] | components["schemas"]["CompareStringsInvocation"] | components["schemas"]["CompelInvocation"] | components["schemas"]["ConcatenateFluxConditioningInvocation"] | components["schemas"]["ConditioningCollectionInvocation"] | components["schemas"]["ConditioningCollectionLinkedInvocation"] | components["schemas"]["ConditioningCollectionToggleInvocation"] | components["schemas"]["ConditioningInvocation"] | components["schemas"]["ConditioningToggleInvocation"] | components["schemas"]["ContentShuffleInvocation"] | components["schemas"]["ControlNetInvocation"] | components["schemas"]["ControlNetLinkedInvocation"] | components["schemas"]["CoordinatedFluxNoiseInvocation"] | components["schemas"]["CoordinatedNoiseInvocation"] | components["schemas"]["CoreMetadataInvocation"] | components["schemas"]["CreateDenoiseMaskInvocation"] | components["schemas"]["CreateGradientMaskInvocation"] | components["schemas"]["CropImageToBoundingBoxInvocation"] | components["schemas"]["CropLatentsCoreInvocation"] | components["schemas"]["CropLatentsInvocation"] | components["schemas"]["CrossoverPromptInvocation"] | components["schemas"]["CvInpaintInvocation"] | components["schemas"]["DWOpenposeDetectionInvocation"] | components["schemas"]["DecodeInvisibleWatermarkInvocation"] | components["schemas"]["DefaultXYTileGenerator"] | components["schemas"]["DenoiseLatentsInvocation"] | components["schemas"]["DenoiseLatentsMetaInvocation"] | components["schemas"]["DepthAnythingDepthEstimationInvocation"] | components["schemas"]["DivideInvocation"] | components["schemas"]["DynamicPromptInvocation"] | components["schemas"]["ESRGANInvocation"] | components["schemas"]["EnhanceDetailInvocation"] | components["schemas"]["EscaperInvocation"] | components["schemas"]["EvenSplitXYTileGenerator"] | components["schemas"]["ExpandMaskWithFadeInvocation"] | components["schemas"]["ExtractImageCollectionMetadataBooleanInvocation"] | components["schemas"]["ExtractImageCollectionMetadataFloatInvocation"] | components["schemas"]["ExtractImageCollectionMetadataIntegerInvocation"] | components["schemas"]["ExtractImageCollectionMetadataStringInvocation"] | components["schemas"]["ExtrudeDepthInvocation"] | components["schemas"]["FLUXConditioningCollectionToggleInvocation"] | components["schemas"]["FLUXConditioningToggleInvocation"] | components["schemas"]["FLUXLoRACollectionLoader"] | components["schemas"]["FaceIdentifierInvocation"] | components["schemas"]["FaceMaskInvocation"] | components["schemas"]["FaceOffInvocation"] | components["schemas"]["FilmGrainInvocation"] | components["schemas"]["FlattenHistogramMono"] | components["schemas"]["FloatBatchInvocation"] | components["schemas"]["FloatCollectionIndexInvocation"] | components["schemas"]["FloatCollectionInvocation"] | components["schemas"]["FloatCollectionLinkedInvocation"] | components["schemas"]["FloatCollectionToggleInvocation"] | components["schemas"]["FloatGenerator"] | components["schemas"]["FloatInvocation"] | components["schemas"]["FloatLinearRangeInvocation"] | components["schemas"]["FloatMathInvocation"] | components["schemas"]["FloatToIntegerInvocation"] | components["schemas"]["FloatToggleInvocation"] | components["schemas"]["FloatsToStringsInvocation"] | components["schemas"]["Flux2DenoiseInvocation"] | components["schemas"]["Flux2KleinLoRACollectionLoader"] | components["schemas"]["Flux2KleinLoRALoaderInvocation"] | components["schemas"]["Flux2KleinModelLoaderInvocation"] | components["schemas"]["Flux2KleinTextEncoderInvocation"] | components["schemas"]["Flux2VaeDecodeInvocation"] | components["schemas"]["Flux2VaeEncodeInvocation"] | components["schemas"]["FluxConditioningBlendInvocation"] | components["schemas"]["FluxConditioningCollectionIndexInvocation"] | components["schemas"]["FluxConditioningCollectionInvocation"] | components["schemas"]["FluxConditioningCollectionJoinInvocation"] | components["schemas"]["FluxConditioningDeltaAugmentationInvocation"] | components["schemas"]["FluxConditioningListInvocation"] | components["schemas"]["FluxConditioningMathOperationInvocation"] | components["schemas"]["FluxControlLoRALoaderInvocation"] | components["schemas"]["FluxControlNetCollectionIndexInvocation"] | components["schemas"]["FluxControlNetCollectionInvocation"] | components["schemas"]["FluxControlNetCollectionJoinInvocation"] | components["schemas"]["FluxControlNetInvocation"] | components["schemas"]["FluxControlNetLinkedInvocation"] | components["schemas"]["FluxDenoiseInvocation"] | components["schemas"]["FluxDenoiseLatentsMetaInvocation"] | components["schemas"]["FluxFillInvocation"] | components["schemas"]["FluxIPAdapterInvocation"] | components["schemas"]["FluxIdealSizeInvocation"] | components["schemas"]["FluxKontextConcatenateImagesInvocation"] | components["schemas"]["FluxKontextIdealSizeInvocation"] | components["schemas"]["FluxKontextInvocation"] | components["schemas"]["FluxLoRALoaderInvocation"] | components["schemas"]["FluxModelLoaderInputInvocation"] | components["schemas"]["FluxModelLoaderInvocation"] | components["schemas"]["FluxModelToStringInvocation"] | components["schemas"]["FluxReduxCollectionIndexInvocation"] | components["schemas"]["FluxReduxCollectionInvocation"] | components["schemas"]["FluxReduxCollectionJoinInvocation"] | components["schemas"]["FluxReduxConditioningMathOperationInvocation"] | components["schemas"]["FluxReduxDownsamplingInvocation"] | components["schemas"]["FluxReduxInvocation"] | components["schemas"]["FluxReduxLinkedInvocation"] | components["schemas"]["FluxReduxRescaleConditioningInvocation"] | components["schemas"]["FluxRescaleConditioningInvocation"] | components["schemas"]["FluxScaleConditioningInvocation"] | components["schemas"]["FluxScalePromptSectionInvocation"] | components["schemas"]["FluxScaleReduxConditioningInvocation"] | components["schemas"]["FluxTextEncoderInvocation"] | components["schemas"]["FluxTextEncoderLinkedInvocation"] | components["schemas"]["FluxVaeDecodeInvocation"] | components["schemas"]["FluxVaeEncodeInvocation"] | components["schemas"]["FluxWeightedPromptInvocation"] | components["schemas"]["FreeUInvocation"] | components["schemas"]["FrequencyBlendLatents"] | components["schemas"]["FrequencySpectrumMatchLatentsInvocation"] | components["schemas"]["GenerateEvolutionaryPromptsInvocation"] | components["schemas"]["GetMaskBoundingBoxInvocation"] | components["schemas"]["GetSourceFrameRateInvocation"] | components["schemas"]["GetTotalFramesInvocation"] | components["schemas"]["GroundingDinoInvocation"] | components["schemas"]["HEDEdgeDetectionInvocation"] | components["schemas"]["HalftoneInvocation"] | components["schemas"]["HeuristicResizeInvocation"] | components["schemas"]["IPAdapterInvocation"] | components["schemas"]["IPAdapterLinkedInvocation"] | components["schemas"]["IdealSizeInvocation"] | components["schemas"]["ImageBatchInvocation"] | components["schemas"]["ImageBlurInvocation"] | components["schemas"]["ImageChannelInvocation"] | components["schemas"]["ImageChannelMultiplyInvocation"] | components["schemas"]["ImageChannelOffsetInvocation"] | components["schemas"]["ImageCollectionIndexInvocation"] | components["schemas"]["ImageCollectionInvocation"] | components["schemas"]["ImageCollectionLinkedInvocation"] | components["schemas"]["ImageCollectionToggleInvocation"] | components["schemas"]["ImageConvertInvocation"] | components["schemas"]["ImageCropInvocation"] | components["schemas"]["ImageGenerator"] | components["schemas"]["ImageHueAdjustmentInvocation"] | components["schemas"]["ImageIndexCollectInvocation"] | components["schemas"]["ImageInverseLerpInvocation"] | components["schemas"]["ImageInvocation"] | components["schemas"]["ImageLerpInvocation"] | components["schemas"]["ImageMaskToTensorInvocation"] | components["schemas"]["ImageMultiplyInvocation"] | components["schemas"]["ImageNSFWBlurInvocation"] | components["schemas"]["ImageNoiseInvocation"] | components["schemas"]["ImageOffsetInvocation"] | components["schemas"]["ImagePanelLayoutInvocation"] | components["schemas"]["ImagePasteInvocation"] | components["schemas"]["ImageResizeInvocation"] | components["schemas"]["ImageRotateInvocation"] | components["schemas"]["ImageSOMInvocation"] | components["schemas"]["ImageScaleInvocation"] | components["schemas"]["ImageSearchToMaskClipsegInvocation"] | components["schemas"]["ImageToAAInvocation"] | components["schemas"]["ImageToDetailedASCIIArtInvocation"] | components["schemas"]["ImageToImageNameInvocation"] | components["schemas"]["ImageToLatentsInvocation"] | components["schemas"]["ImageToUnicodeArtInvocation"] | components["schemas"]["ImageToXYImageCollectionInvocation"] | components["schemas"]["ImageToXYImageTilesInvocation"] | components["schemas"]["ImageToggleInvocation"] | components["schemas"]["ImageWatermarkInvocation"] | components["schemas"]["ImagesIndexToVideoInvocation"] | components["schemas"]["ImagesToGridsInvocation"] | components["schemas"]["InfillColorInvocation"] | components["schemas"]["InfillPatchMatchInvocation"] | components["schemas"]["InfillTileInvocation"] | components["schemas"]["InfoGrabberUNetInvocation"] | components["schemas"]["IntCollectionToggleInvocation"] | components["schemas"]["IntToggleInvocation"] | components["schemas"]["IntegerBatchInvocation"] | components["schemas"]["IntegerCollectionIndexInvocation"] | components["schemas"]["IntegerCollectionInvocation"] | components["schemas"]["IntegerCollectionLinkedInvocation"] | components["schemas"]["IntegerGenerator"] | components["schemas"]["IntegerInvocation"] | components["schemas"]["IntegerMathInvocation"] | components["schemas"]["IntsToStringsInvocation"] | components["schemas"]["InvertTensorMaskInvocation"] | components["schemas"]["InvokeAdjustImageHuePlusInvocation"] | components["schemas"]["InvokeEquivalentAchromaticLightnessInvocation"] | components["schemas"]["InvokeImageBlendInvocation"] | components["schemas"]["InvokeImageCompositorInvocation"] | components["schemas"]["InvokeImageDilateOrErodeInvocation"] | components["schemas"]["InvokeImageEnhanceInvocation"] | components["schemas"]["InvokeImageValueThresholdsInvocation"] | components["schemas"]["IterateInvocation"] | components["schemas"]["LaMaInfillInvocation"] | components["schemas"]["LatentAverageInvocation"] | components["schemas"]["LatentBandPassFilterInvocation"] | components["schemas"]["LatentBlendLinearInvocation"] | components["schemas"]["LatentChannelsToGridInvocation"] | components["schemas"]["LatentCombineInvocation"] | components["schemas"]["LatentDtypeConvertInvocation"] | components["schemas"]["LatentHighPassFilterInvocation"] | components["schemas"]["LatentLowPassFilterInvocation"] | components["schemas"]["LatentMatchInvocation"] | components["schemas"]["LatentModifyChannelsInvocation"] | components["schemas"]["LatentNormalizeRangeInvocation"] | components["schemas"]["LatentNormalizeStdDevInvocation"] | components["schemas"]["LatentNormalizeStdRangeInvocation"] | components["schemas"]["LatentPlotInvocation"] | components["schemas"]["LatentSOMInvocation"] | components["schemas"]["LatentWhiteNoiseInvocation"] | components["schemas"]["LatentsCollectionIndexInvocation"] | components["schemas"]["LatentsCollectionInvocation"] | components["schemas"]["LatentsCollectionLinkedInvocation"] | components["schemas"]["LatentsInvocation"] | components["schemas"]["LatentsToImageInvocation"] | components["schemas"]["LensApertureGeneratorInvocation"] | components["schemas"]["LensBlurInvocation"] | components["schemas"]["LensVignetteInvocation"] | components["schemas"]["LineartAnimeEdgeDetectionInvocation"] | components["schemas"]["LineartEdgeDetectionInvocation"] | components["schemas"]["LlavaOnevisionVllmInvocation"] | components["schemas"]["LoRACollectionFromPathInvocation"] | components["schemas"]["LoRACollectionInvocation"] | components["schemas"]["LoRACollectionLinkedInvocation"] | components["schemas"]["LoRACollectionLoader"] | components["schemas"]["LoRACollectionToggleInvocation"] | components["schemas"]["LoRALoaderInvocation"] | components["schemas"]["LoRANameGrabberInvocation"] | components["schemas"]["LoRASelectorInvocation"] | components["schemas"]["LoRAToggleInvocation"] | components["schemas"]["LoadAllTextFilesInFolderInvocation"] | components["schemas"]["LoadApertureImageInvocation"] | components["schemas"]["LoadTextFileToStringInvocation"] | components["schemas"]["LoadVideoFrameInvocation"] | components["schemas"]["LookupLoRACollectionTriggersInvocation"] | components["schemas"]["LookupLoRATriggersInvocation"] | components["schemas"]["LookupTableFromFileInvocation"] | components["schemas"]["LookupsEntryFromPromptInvocation"] | components["schemas"]["LoraToStringInvocation"] | components["schemas"]["MLSDDetectionInvocation"] | components["schemas"]["MainModelLoaderInputInvocation"] | components["schemas"]["MainModelLoaderInvocation"] | components["schemas"]["MainModelToStringInvocation"] | components["schemas"]["MaskCombineInvocation"] | components["schemas"]["MaskEdgeInvocation"] | components["schemas"]["MaskFromAlphaInvocation"] | components["schemas"]["MaskFromIDInvocation"] | components["schemas"]["MaskTensorToImageInvocation"] | components["schemas"]["MatchHistogramInvocation"] | components["schemas"]["MatchHistogramLabInvocation"] | components["schemas"]["MathEvalInvocation"] | components["schemas"]["MediaPipeFaceDetectionInvocation"] | components["schemas"]["MergeLoRACollectionsInvocation"] | components["schemas"]["MergeMetadataInvocation"] | components["schemas"]["MergeStringCollectionsInvocation"] | components["schemas"]["MergeTilesToImageInvocation"] | components["schemas"]["MetadataFieldExtractorInvocation"] | components["schemas"]["MetadataFromImageInvocation"] | components["schemas"]["MetadataInvocation"] | components["schemas"]["MetadataItemInvocation"] | components["schemas"]["MetadataItemLinkedInvocation"] | components["schemas"]["MetadataToBoolCollectionInvocation"] | components["schemas"]["MetadataToBoolInvocation"] | components["schemas"]["MetadataToControlnetsInvocation"] | components["schemas"]["MetadataToFloatCollectionInvocation"] | components["schemas"]["MetadataToFloatInvocation"] | components["schemas"]["MetadataToIPAdaptersInvocation"] | components["schemas"]["MetadataToIntegerCollectionInvocation"] | components["schemas"]["MetadataToIntegerInvocation"] | components["schemas"]["MetadataToLorasCollectionInvocation"] | components["schemas"]["MetadataToLorasInvocation"] | components["schemas"]["MetadataToModelInvocation"] | components["schemas"]["MetadataToSDXLLorasInvocation"] | components["schemas"]["MetadataToSDXLModelInvocation"] | components["schemas"]["MetadataToSchedulerInvocation"] | components["schemas"]["MetadataToStringCollectionInvocation"] | components["schemas"]["MetadataToStringInvocation"] | components["schemas"]["MetadataToT2IAdaptersInvocation"] | components["schemas"]["MetadataToVAEInvocation"] | components["schemas"]["MinimumOverlapXYTileGenerator"] | components["schemas"]["ModelIdentifierInvocation"] | components["schemas"]["ModelNameGrabberInvocation"] | components["schemas"]["ModelNameToModelInvocation"] | components["schemas"]["ModelToStringInvocation"] | components["schemas"]["ModelToggleInvocation"] | components["schemas"]["MonochromeFilmGrainInvocation"] | components["schemas"]["MultiplyInvocation"] | components["schemas"]["NightmareInvocation"] | components["schemas"]["NoiseAddFluxInvocation"] | components["schemas"]["NoiseImage2DInvocation"] | components["schemas"]["NoiseInvocation"] | components["schemas"]["NoiseSpectralInvocation"] | components["schemas"]["NormalMapInvocation"] | components["schemas"]["OctreeQuantizerInvocation"] | components["schemas"]["OffsetLatentsInvocation"] | components["schemas"]["OptimizedTileSizeFromAreaInvocation"] | components["schemas"]["PBRMapsInvocation"] | components["schemas"]["PTFieldsCollectInvocation"] | components["schemas"]["PTFieldsExpandInvocation"] | components["schemas"]["PairTileImageInvocation"] | components["schemas"]["ParseWeightedStringInvocation"] | components["schemas"]["PasteImageIntoBoundingBoxInvocation"] | components["schemas"]["PercentToFloatInvocation"] | components["schemas"]["PiDiNetEdgeDetectionInvocation"] | components["schemas"]["PixelArtInvocation"] | components["schemas"]["PixelizeImageInvocation"] | components["schemas"]["PixelizeInvocation"] | components["schemas"]["PrintStringToConsoleInvocation"] | components["schemas"]["PromptAutoAndInvocation"] | components["schemas"]["PromptFromLookupTableInvocation"] | components["schemas"]["PromptStrengthInvocation"] | components["schemas"]["PromptStrengthsCombineInvocation"] | components["schemas"]["PromptTemplateInvocation"] | components["schemas"]["PromptsFromFileInvocation"] | components["schemas"]["PromptsToFileInvocation"] | components["schemas"]["PruneTextInvocation"] | components["schemas"]["Qwen3PromptProInvocation"] | components["schemas"]["RGBMergeInvocation"] | components["schemas"]["RGBSplitInvocation"] | components["schemas"]["RandomFloatInvocation"] | components["schemas"]["RandomImageSizeInvocation"] | components["schemas"]["RandomIntInvocation"] | components["schemas"]["RandomLoRAMixerInvocation"] | components["schemas"]["RandomRangeInvocation"] | components["schemas"]["RangeInvocation"] | components["schemas"]["RangeOfSizeInvocation"] | components["schemas"]["ReapplyLoRAWeightInvocation"] | components["schemas"]["RectangleMaskInvocation"] | components["schemas"]["ResizeLatentsInvocation"] | components["schemas"]["RetrieveBoardImagesInvocation"] | components["schemas"]["RetrieveFluxConditioningInvocation"] | components["schemas"]["RetroBitizeInvocation"] | components["schemas"]["RetroCRTCurvatureInvocation"] | components["schemas"]["RetroGetPaletteAdvInvocation"] | components["schemas"]["RetroGetPaletteInvocation"] | components["schemas"]["RetroPalettizeAdvInvocation"] | components["schemas"]["RetroPalettizeInvocation"] | components["schemas"]["RetroQuantizeInvocation"] | components["schemas"]["RetroScanlinesSimpleInvocation"] | components["schemas"]["RoundInvocation"] | components["schemas"]["SD3DenoiseInvocation"] | components["schemas"]["SD3ImageToLatentsInvocation"] | components["schemas"]["SD3LatentsToImageInvocation"] | components["schemas"]["SD3ModelLoaderInputInvocation"] | components["schemas"]["SDXLCompelPromptInvocation"] | components["schemas"]["SDXLLoRACollectionLoader"] | components["schemas"]["SDXLLoRALoaderInvocation"] | components["schemas"]["SDXLMainModelToggleInvocation"] | components["schemas"]["SDXLModelLoaderInputInvocation"] | components["schemas"]["SDXLModelLoaderInvocation"] | components["schemas"]["SDXLModelToStringInvocation"] | components["schemas"]["SDXLRefinerCompelPromptInvocation"] | components["schemas"]["SDXLRefinerModelLoaderInvocation"] | components["schemas"]["SaveImageInvocation"] | components["schemas"]["ScaleLatentsInvocation"] | components["schemas"]["SchedulerInvocation"] | components["schemas"]["SchedulerToStringInvocation"] | components["schemas"]["SchedulerToggleInvocation"] | components["schemas"]["Sd3ModelLoaderInvocation"] | components["schemas"]["Sd3ModelToStringInvocation"] | components["schemas"]["Sd3TextEncoderInvocation"] | components["schemas"]["SeamlessModeInvocation"] | components["schemas"]["SegmentAnythingInvocation"] | components["schemas"]["SeparatePromptAndSeedVectorInvocation"] | components["schemas"]["ShadowsHighlightsMidtonesMaskInvocation"] | components["schemas"]["ShowImageInvocation"] | components["schemas"]["SpandrelImageToImageAutoscaleInvocation"] | components["schemas"]["SpandrelImageToImageInvocation"] | components["schemas"]["SphericalDistortionInvocation"] | components["schemas"]["StoreFluxConditioningInvocation"] | components["schemas"]["StringBatchInvocation"] | components["schemas"]["StringCollectionIndexInvocation"] | components["schemas"]["StringCollectionInvocation"] | components["schemas"]["StringCollectionJoinerInvocation"] | components["schemas"]["StringCollectionLinkedInvocation"] | components["schemas"]["StringCollectionToggleInvocation"] | components["schemas"]["StringGenerator"] | components["schemas"]["StringInvocation"] | components["schemas"]["StringJoinInvocation"] | components["schemas"]["StringJoinThreeInvocation"] | components["schemas"]["StringReplaceInvocation"] | components["schemas"]["StringSplitInvocation"] | components["schemas"]["StringSplitNegInvocation"] | components["schemas"]["StringToCollectionSplitterInvocation"] | components["schemas"]["StringToFloatInvocation"] | components["schemas"]["StringToIntInvocation"] | components["schemas"]["StringToLoraInvocation"] | components["schemas"]["StringToMainModelInvocation"] | components["schemas"]["StringToModelInvocation"] | components["schemas"]["StringToSDXLModelInvocation"] | components["schemas"]["StringToSchedulerInvocation"] | components["schemas"]["StringToggleInvocation"] | components["schemas"]["StringsToCSVInvocation"] | components["schemas"]["SubtractInvocation"] | components["schemas"]["T2IAdapterInvocation"] | components["schemas"]["T2IAdapterLinkedInvocation"] | components["schemas"]["TextMaskInvocation"] | components["schemas"]["TextToMaskClipsegAdvancedInvocation"] | components["schemas"]["TextToMaskClipsegInvocation"] | components["schemas"]["TextfontimageInvocation"] | components["schemas"]["ThresholdingInvocation"] | components["schemas"]["TileToPropertiesInvocation"] | components["schemas"]["TiledMultiDiffusionDenoiseLatents"] | components["schemas"]["TraceryInvocation"] | components["schemas"]["UnsharpMaskInvocation"] | components["schemas"]["VAELoaderInvocation"] | components["schemas"]["XYExpandInvocation"] | components["schemas"]["XYImageCollectInvocation"] | components["schemas"]["XYImageExpandInvocation"] | components["schemas"]["XYImageTilesToImageInvocation"] | components["schemas"]["XYImagesToGridInvocation"] | components["schemas"]["XYProductCSVInvocation"] | components["schemas"]["XYProductInvocation"] | components["schemas"]["ZImageControlInvocation"] | components["schemas"]["ZImageDenoiseInvocation"] | components["schemas"]["ZImageDenoiseMetaInvocation"] | components["schemas"]["ZImageImageToLatentsInvocation"] | components["schemas"]["ZImageLatentsToImageInvocation"] | components["schemas"]["ZImageLoRACollectionLoader"] | components["schemas"]["ZImageLoRALoaderInvocation"] | components["schemas"]["ZImageModelLoaderInvocation"] | components["schemas"]["ZImageSeedVarianceEnhancerInvocation"] | components["schemas"]["ZImageTextEncoderInvocation"];
             /**
              * Invocation Source Id
              * @description The ID of the prepared invocation's source node
@@ -14575,14 +21874,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models/.convert_cache
+             * @default models\.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models/.download_cache
+             * @default models\.download_cache
              */
             download_cache_dir?: string;
             /**
@@ -15480,6 +22779,28 @@ export type components = {
              */
             type: "iterate_output";
         };
+        /**
+         * JsonListStringsOutput
+         * @description Output class for two strings extracted from a JSON list.
+         */
+        JsonListStringsOutput: {
+            /**
+             * Prompt
+             * @description The prompt string from the JSON list
+             */
+            prompt: string;
+            /**
+             * Seed Vector
+             * @description The seed vector string from the JSON list
+             */
+            seed_vector: string;
+            /**
+             * type
+             * @default json_list_strings_output
+             * @constant
+             */
+            type: "json_list_strings_output";
+        };
         JsonValue: unknown;
         /**
          * LaMa Infill
@@ -15526,6 +22847,1038 @@ export type components = {
             type: "infill_lama";
         };
         /**
+         * Latent Average
+         * @description Average two latents
+         */
+        LatentAverageInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latentA?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latentB?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Channels
+             * @description Comma-separated list of channel indices to average. Use 'all' for all channels.
+             * @default all
+             */
+            channels?: string;
+            /**
+             * type
+             * @default latent_average
+             * @constant
+             */
+            type: "latent_average";
+        };
+        /**
+         * Latent Band Pass Filter
+         * @description Latent Band Pass Filter
+         */
+        LatentBandPassFilterInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input latent
+             * @default null
+             */
+            input_latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Lower Freq
+             * @description lower frequency (0-0.5)
+             * @default 0.1
+             */
+            lower_freq?: number;
+            /**
+             * Upper Freq
+             * @description upper frequency (0-0.5)
+             * @default 0.2
+             */
+            upper_freq?: number;
+            /**
+             * Normalize Std Dev
+             * @description normalize std dev to 1.0
+             * @default false
+             */
+            normalize_std_dev?: boolean;
+            /**
+             * type
+             * @default latent_band_pass_filter
+             * @constant
+             */
+            type: "latent_band_pass_filter";
+        };
+        /**
+         * Latent Blend Linear
+         * @description Blend two latents Linearly
+         */
+        LatentBlendLinearInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latentA?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latentB?: components["schemas"]["LatentsField"] | null;
+            /**
+             * A B Ratio
+             * @description Ratio of latentA to latentB (1=All A, 0=All B)
+             * @default 0.5
+             */
+            a_b_ratio?: number;
+            /**
+             * Channels
+             * @description Comma-separated list of channel indices to average. Use 'all' for all channels.
+             * @default all
+             */
+            channels?: string;
+            /**
+             * type
+             * @default latent_blend_linear
+             * @constant
+             */
+            type: "latent_blend_linear";
+        };
+        /**
+         * Latent Channels to Grid
+         * @description Generates a scaled grid Images from latent channels
+         */
+        LatentChannelsToGridInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Disable
+             * @description Disable this node
+             * @default false
+             */
+            disable?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Scale
+             * @description Overall scale factor for the grid.
+             * @default 1
+             */
+            scale?: number;
+            /**
+             * Normalize Channels
+             * @description Normalize all channels using a common min/max range.
+             * @default false
+             */
+            normalize_channels?: boolean;
+            /**
+             * Output Bit Depth
+             * @description Output as 8-bit or 16-bit grayscale.
+             * @default 8
+             * @enum {string}
+             */
+            output_bit_depth?: "8" | "16";
+            /**
+             * Title
+             * @description Title to display on the image
+             * @default Latent Channel Grid
+             */
+            title?: string;
+            /**
+             * type
+             * @default latent_channels_to_grid
+             * @constant
+             */
+            type: "latent_channels_to_grid";
+        };
+        /**
+         * Latent Combine
+         * @description Combines two latent tensors using various methods
+         */
+        LatentCombineInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latentA?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latentB?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Method
+             * @description Combination method
+             * @default average
+             * @enum {string}
+             */
+            method?: "average" | "add" | "subtract" | "difference" | "maximum" | "minimum" | "multiply" | "frequency_blend" | "screen" | "dodge" | "burn" | "overlay" | "soft_light" | "hard_light" | "color_dodge" | "color_burn" | "linear_dodge" | "linear_burn";
+            /**
+             * Weighted Combine
+             * @description Alter input latents by the provided weights
+             * @default false
+             */
+            weighted_combine?: boolean;
+            /**
+             * Weight A
+             * @description Weight for latent A
+             * @default 0.5
+             */
+            weight_a?: number;
+            /**
+             * Weight B
+             * @description Weight for latent B
+             * @default 0.5
+             */
+            weight_b?: number;
+            /**
+             * Scale To Input Ranges
+             * @description Scale output to input ranges
+             * @default false
+             */
+            scale_to_input_ranges?: boolean;
+            /**
+             * Channels
+             * @description Comma-separated list of channel indices to combine. Use 'all' for all channels.
+             * @default all
+             */
+            channels?: string;
+            /**
+             * type
+             * @default latent_combine
+             * @constant
+             */
+            type: "latent_combine";
+        };
+        /**
+         * Latent Dtype Convert
+         * @description Converts the dtype of a latent tensor.
+         */
+        LatentDtypeConvertInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Dtype
+             * @description The target dtype for the latent tensor.
+             * @default bfloat16
+             * @enum {string}
+             */
+            dtype?: "float32" | "float16" | "bfloat16";
+            /**
+             * type
+             * @default latent_dtype_convert
+             * @constant
+             */
+            type: "latent_dtype_convert";
+        };
+        /**
+         * Latent High Pass Filter
+         * @description Latent High Pass Filter
+         */
+        LatentHighPassFilterInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input latent
+             * @default null
+             */
+            input_latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Lower Freq
+             * @description lower frequency (0-0.5)
+             * @default 0.15
+             */
+            lower_freq?: number;
+            /**
+             * Normalize Std Dev
+             * @description normalize std dev to 1.0
+             * @default false
+             */
+            normalize_std_dev?: boolean;
+            /**
+             * type
+             * @default latent_high_pass_filter
+             * @constant
+             */
+            type: "latent_high_pass_filter";
+        };
+        /**
+         * Latent Low Pass Filter
+         * @description Latent Low Pass Filter
+         */
+        LatentLowPassFilterInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input latent
+             * @default null
+             */
+            input_latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Upper Freq
+             * @description upper frequency (0-0.5)
+             * @default 0.05
+             */
+            upper_freq?: number;
+            /**
+             * Normalize Std Dev
+             * @description normalize std dev to 1.0
+             * @default false
+             */
+            normalize_std_dev?: boolean;
+            /**
+             * type
+             * @default latent_low_pass_filter
+             * @constant
+             */
+            type: "latent_low_pass_filter";
+        };
+        /**
+         * Latent Match
+         * @description Matches the distribution of one latent tensor to that of another,
+         *     using either histogram matching or standard deviation matching.
+         */
+        LatentMatchInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The input latent tensor to be matched.
+             * @default null
+             */
+            input_latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description The reference latent tensor to match against.
+             * @default null
+             */
+            reference_latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Method
+             * @description The matching method to use.
+             * @default histogram
+             * @enum {string}
+             */
+            method?: "histogram" | "std_dev" | "mean" | "std_dev+mean" | "cdf" | "moment" | "range" | "std_dev+mean+range";
+            /**
+             * Channels
+             * @description Comma-separated list of channel indices to match. Use 'all' for all channels.
+             * @default all
+             */
+            channels?: string;
+            /**
+             * type
+             * @default latent_match
+             * @constant
+             */
+            type: "latent_match";
+        };
+        /**
+         * Latent Modify
+         * @description Modifies selected channels of a latent tensor using scale and shift.
+         */
+        LatentModifyChannelsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Channels
+             * @description Comma-separated list of channel indices to modify. Use 'all' for all channels.
+             * @default all
+             */
+            channels?: string;
+            /**
+             * Scale
+             * @description Scale factor to apply to the selected channels.
+             * @default 1
+             */
+            scale?: number;
+            /**
+             * Shift
+             * @description Shift value to add to the selected channels.
+             * @default 0
+             */
+            shift?: number;
+            /**
+             * type
+             * @default latent_modify_channels
+             * @constant
+             */
+            type: "latent_modify_channels";
+        };
+        /**
+         * Latent Normalize Range
+         * @description Normalize a Latents Range
+         */
+        LatentNormalizeRangeInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Min
+             * @description Min for new range
+             * @default -1
+             */
+            min?: number;
+            /**
+             * Max
+             * @description Max for new range
+             * @default 1
+             */
+            max?: number;
+            /**
+             * Channels
+             * @description Comma-separated list of channel indices to average. Use 'all' for all channels.
+             * @default all
+             */
+            channels?: string;
+            /**
+             * type
+             * @default latent_normalize_range
+             * @constant
+             */
+            type: "latent_normalize_range";
+        };
+        /**
+         * Latent Normalize Std-Dev
+         * @description Normalize a Latents Std Dev
+         */
+        LatentNormalizeStdDevInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Std Dev
+             * @description Standard deviation to normalize to
+             * @default 1
+             */
+            std_dev?: number;
+            /**
+             * Channels
+             * @description Comma-separated list of channel indices to average. Use 'all' for all channels.
+             * @default all
+             */
+            channels?: string;
+            /**
+             * type
+             * @default latent_normalize_std_dev
+             * @constant
+             */
+            type: "latent_normalize_std_dev";
+        };
+        /**
+         * Latent Normalize STD Dev and Range
+         * @description Normalize a Latents Range and Std Dev
+         */
+        LatentNormalizeStdRangeInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Std Dev
+             * @description Standard deviation to normalize to
+             * @default 1
+             */
+            std_dev?: number;
+            /**
+             * Min
+             * @description Min for new range
+             * @default -1
+             */
+            min?: number;
+            /**
+             * Max
+             * @description Max for new range
+             * @default 1
+             */
+            max?: number;
+            /**
+             * Tolerance
+             * @description tolerance
+             * @default 0.001
+             */
+            tolerance?: number;
+            /**
+             * Max Iterations
+             * @description Max iterations
+             * @default 10
+             */
+            max_iterations?: number;
+            /**
+             * Channels
+             * @description Comma-separated list of channel indices to average. Use 'all' for all channels.
+             * @default all
+             */
+            channels?: string;
+            /**
+             * type
+             * @default latent_normalize_std_dev_range
+             * @constant
+             */
+            type: "latent_normalize_std_dev_range";
+        };
+        /**
+         * Latent Plot
+         * @description Generates plots from latent channels and display in a grid.
+         */
+        LatentPlotInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Disable
+             * @description Disable this node
+             * @default false
+             */
+            disable?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latent?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Cell X Multiplier
+             * @description x size multiplier for grid cells
+             * @default 4
+             */
+            cell_x_multiplier?: number;
+            /**
+             * Cell Y Multiplier
+             * @description y size multiplier for grid cells
+             * @default 3
+             */
+            cell_y_multiplier?: number;
+            /**
+             * Histogram Plot
+             * @description Plot histogram
+             * @default true
+             */
+            histogram_plot?: boolean;
+            /**
+             * Histogram Bins
+             * @description Number of bins for the histogram
+             * @default 256
+             */
+            histogram_bins?: number;
+            /**
+             * Histogram Log Scale
+             * @description Use log scale for histogram y-axis
+             * @default false
+             */
+            histogram_log_scale?: boolean;
+            /**
+             * Box Plot
+             * @description Plot box and whisker
+             * @default true
+             */
+            box_plot?: boolean;
+            /**
+             * Stats Plot
+             * @description Plot distribution data (mean, std, mode, min, max, dtype)
+             * @default true
+             */
+            stats_plot?: boolean;
+            /**
+             * Title
+             * @description Title to display on the image
+             * @default Latent Channel Plots
+             */
+            title?: string;
+            /**
+             * Channels
+             * @description Comma-separated list of channel indices to plot. Use 'all' for all channels.
+             * @default all
+             */
+            channels?: string;
+            /**
+             * Common Axis
+             * @description Use a common axis scales for all plots
+             * @default false
+             */
+            common_axis?: boolean;
+            /**
+             * type
+             * @default latent_plot
+             * @constant
+             */
+            type: "latent_plot";
+        };
+        /**
+         * Latent Quantize (Kohonen map)
+         * @description Use a self-organizing map to quantize the values of a latent tensor.
+         *
+         *     This is highly experimental and not really suitable for most use cases. It's very easy to use settings that will appear to hang, or tie up the PC for a very long time, so use of this node is somewhat discouraged.
+         */
+        LatentSOMInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The latents tensor to quantize
+             * @default null
+             */
+            latents_in?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description Optional alternate latents to use for training
+             * @default null
+             */
+            reference_in?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Width
+             * @description Width (in cells) of the self-organizing map
+             * @default 4
+             */
+            width?: number;
+            /**
+             * Height
+             * @description Height (in cells) of the self-organizing map
+             * @default 3
+             */
+            height?: number;
+            /**
+             * Steps
+             * @description Training step count for the self-organizing map
+             * @default 256
+             */
+            steps?: number;
+            /**
+             * type
+             * @default latent_som
+             * @constant
+             */
+            type: "latent_som";
+        };
+        /**
+         * Latent White Noise
+         * @description Creates White Noise latent.
+         */
+        LatentWhiteNoiseInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Width
+             * @description Desired image width
+             * @default 512
+             */
+            width?: number;
+            /**
+             * Height
+             * @description Desired image height
+             * @default 512
+             */
+            height?: number;
+            /**
+             * Latent Type
+             * @description Latent Type
+             * @default Flux
+             * @enum {string}
+             */
+            latent_type?: "Flux" | "SD3.5" | "SD/SDXL";
+            /**
+             * Noise Type
+             * @description Noise Type (Uniform=random, Gausian=Normal distribution)
+             * @default Gausian
+             * @enum {string}
+             */
+            noise_type?: "Uniform" | "Gausian";
+            /**
+             * Seed
+             * @description Seed for noise generation
+             * @default 0
+             */
+            seed?: number;
+            /**
+             * type
+             * @default latent_white_noise
+             * @constant
+             */
+            type: "latent_white_noise";
+        };
+        /**
+         * Latents Collection Index
+         * @description CollectionIndex Picks an index out of a collection with a random option
+         */
+        LatentsCollectionIndexInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Random
+             * @description Random Index?
+             * @default true
+             */
+            random?: boolean;
+            /**
+             * Index
+             * @description zero based index into collection (note index will wrap around if out of bounds)
+             * @default 0
+             */
+            index?: number;
+            /**
+             * Collection
+             * @description latents collection
+             * @default null
+             */
+            collection?: components["schemas"]["LatentsField"][] | null;
+            /**
+             * type
+             * @default latents_collection_index
+             * @constant
+             */
+            type: "latents_collection_index";
+        };
+        /**
          * Latents Collection Primitive
          * @description A collection of latents tensor primitive values
          */
@@ -15559,6 +23912,46 @@ export type components = {
              * @constant
              */
             type: "latents_collection";
+        };
+        /**
+         * Latents Collection Primitive Linked
+         * @description A collection of latents tensor primitive values
+         */
+        LatentsCollectionLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description The collection of latents tensors
+             * @default null
+             */
+            collection?: components["schemas"]["LatentsField"][] | null;
+            /**
+             * type
+             * @default latents_collection_linked
+             * @constant
+             */
+            type: "latents_collection_linked";
+            /**
+             * @description The latents tensor
+             * @default null
+             */
+            latents?: components["schemas"]["LatentsField"] | null;
         };
         /**
          * LatentsCollectionOutput
@@ -15744,6 +24137,257 @@ export type components = {
              * @constant
              */
             type: "l2i";
+        };
+        /**
+         * Lens Aperture Generator
+         * @description Generates a grayscale aperture shape with adjustable number of blades, curvature, rotation, and softness.
+         */
+        LensApertureGeneratorInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Number Of Blades
+             * @description Number of aperture blades (e.g., 5 for pentagon, 6 for hexagon)
+             * @default 6
+             */
+            number_of_blades?: number;
+            /**
+             * Rounded Blades
+             * @description Use curved edges between aperture blades
+             * @default true
+             */
+            rounded_blades?: boolean;
+            /**
+             * Curvature
+             * @description Aperture blade curvature (1.0 is circular)
+             * @default 0.5
+             */
+            curvature?: number;
+            /**
+             * Rotation
+             * @description Clockwise rotation of the aperture shape in degrees
+             * @default 0
+             */
+            rotation?: number;
+            /**
+             * Softness
+             * @description Softness of the aperture edge (0.0 = hard, 1.0 = feathered)
+             * @default 0.1
+             */
+            softness?: number;
+            /**
+             * type
+             * @default lens_aperture_generator
+             * @constant
+             */
+            type: "lens_aperture_generator";
+        };
+        /**
+         * Lens Blur
+         * @description Adds lens blur to the input image, first converting the input image to RGB
+         */
+        LensBlurInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to streak
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The depth map to use
+             * @default null
+             */
+            depth_map?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The aperture image to use for convolution
+             * @default null
+             */
+            aperture_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Focal Distance
+             * @description The distance at which focus is sharp: 0.0 (near) - 1.0 (far)
+             * @default 0.5
+             */
+            focal_distance?: number;
+            /**
+             * Distance Range
+             * @description The depth of field range around the focal distance
+             * @default 0.2
+             */
+            distance_range?: number;
+            /**
+             * Max Blur Radius
+             * @description Maximum blur radius
+             * @default 5
+             */
+            max_blur_radius?: number;
+            /**
+             * Max Blur Steps
+             * @description Number of blur maps to use internally
+             * @default 32
+             */
+            max_blur_steps?: number;
+            /**
+             * Anamorphic Factor
+             * @description Anamorphic squeeze factor
+             * @default 1.33
+             */
+            anamorphic_factor?: number;
+            /**
+             * Highlight Threshold
+             * @description The luminance threshold at which highlight enhancement begins
+             * @default 0.75
+             */
+            highlight_threshold?: number;
+            /**
+             * Highlight Factor
+             * @description Minimum multiplier for highlights at the threshold
+             * @default 1
+             */
+            highlight_factor?: number;
+            /**
+             * Highlight Factor High
+             * @description Maximum multiplier for highlights at full brightness
+             * @default 2
+             */
+            highlight_factor_high?: number;
+            /**
+             * Reduce Halos
+             * @description Reduce halos around areas of sharp depth distance (SLOW)
+             * @default true
+             */
+            reduce_halos?: boolean;
+            /**
+             * type
+             * @default lens_blur
+             * @constant
+             */
+            type: "lens_blur";
+        };
+        /**
+         * Lens Vignette
+         * @description Apply realistic lens vignetting to an image with configurable parameters.
+         */
+        LensVignetteInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to apply vignetting to
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Intensity
+             * @description Intensity of the vignette effect (0-4)
+             * @default 0.5
+             */
+            intensity?: number;
+            /**
+             * Aperture Factor
+             * @description Aperture falloff factor (>1.2 = strong, <0.5 = weak)
+             * @default 0.5
+             */
+            aperture_factor?: number;
+            /**
+             * Center X
+             * @description X coordinate of vignette center (0-1)
+             * @default 0.5
+             */
+            center_x?: number;
+            /**
+             * Center Y
+             * @description Y coordinate of vignette center (0-1)
+             * @default 0.5
+             */
+            center_y?: number;
+            /**
+             * Preserve Highlights
+             * @description Preserve highlights
+             * @default true
+             */
+            preserve_highlights?: boolean;
+            /**
+             * type
+             * @default lens_vignette
+             * @constant
+             */
+            type: "lens_vignette";
         };
         /**
          * Lineart Anime Edge Detection
@@ -15965,6 +24609,153 @@ export type components = {
             cpu_only: boolean | null;
         };
         /**
+         * LoRA Collection From Path
+         * @description Loads a collection of LoRAs filtered based on their path on disk.
+         */
+        LoRACollectionFromPathInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * LoRA Type
+             * @description The type of LoRAs that will be retrieved.
+             * @default sdxl
+             * @enum {string}
+             */
+            model_type?: "sd-1" | "sd-2" | "sdxl" | "sdxl-refiner";
+            /**
+             * Path Filter
+             * @description The path for the lora must contain the filter string
+             * @default null
+             */
+            path_filter?: string | null;
+            /**
+             * Default Weight
+             * @description The weight to apply to each lora. This can be changed after using a Reapply LoRA Weight node.
+             * @default 0.75
+             */
+            default_weight?: number;
+            /**
+             * type
+             * @default lora_collection_from_path_invocation
+             * @constant
+             */
+            type: "lora_collection_from_path_invocation";
+        };
+        /**
+         * LoRACollectionFromPathOutput
+         * @description Filtered LoRA Colleciton Output
+         */
+        LoRACollectionFromPathOutput: {
+            /**
+             * LoRAs
+             * @description A collection of LoRAs.
+             */
+            loras: components["schemas"]["LoRAField"][];
+            /**
+             * type
+             * @default lora_collection_from_path_output
+             * @constant
+             */
+            type: "lora_collection_from_path_output";
+        };
+        /**
+         * LoRA Collection Primitive
+         * @description A collection of LoRA primitive values
+         */
+        LoRACollectionInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * LoRAs
+             * @description The collection of LoRA values
+             * @default []
+             */
+            collection?: components["schemas"]["LoRAField"][];
+            /**
+             * type
+             * @default lora_collection
+             * @constant
+             */
+            type: "lora_collection";
+        };
+        /**
+         * LoRA Collection Primitive Linked
+         * @description Selects a LoRA model and weight.
+         */
+        LoRACollectionLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * LoRAs
+             * @description The collection of LoRA values
+             * @default []
+             */
+            collection?: components["schemas"]["LoRAField"][];
+            /**
+             * type
+             * @default lora_collection_linked
+             * @constant
+             */
+            type: "lora_collection_linked";
+            /**
+             * LoRA
+             * @description LoRA model to load
+             * @default null
+             */
+            lora?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Weight
+             * @description The weight at which the LoRA is applied to each model
+             * @default 0.75
+             */
+            weight?: number;
+        };
+        /**
          * Apply LoRA Collection - SD1.5
          * @description Applies a collection of LoRAs to the provided UNet and CLIP models.
          */
@@ -16010,6 +24801,81 @@ export type components = {
              * @constant
              */
             type: "lora_collection_loader";
+        };
+        /** LoRACollectionOutput */
+        LoRACollectionOutput: {
+            /**
+             * LoRAs
+             * @description The collection of input items
+             */
+            collection: components["schemas"]["LoRAField"][];
+            /**
+             * type
+             * @default lora_collection_output
+             * @constant
+             */
+            type: "lora_collection_output";
+        };
+        /**
+         * LoRA Collection Toggle
+         * @description Allows boolean selection between two separate LoRA collection inputs
+         */
+        LoRACollectionToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Col1
+             * @description First LoRA Collection Input
+             * @default null
+             */
+            col1?: components["schemas"]["LoRAField"][] | null;
+            /**
+             * Col2
+             * @description Second LoRA Collection Input
+             * @default null
+             */
+            col2?: components["schemas"]["LoRAField"][] | null;
+            /**
+             * type
+             * @default lora_collection_toggle
+             * @constant
+             */
+            type: "lora_collection_toggle";
+        };
+        /** LoRACollectionToggleOutput */
+        LoRACollectionToggleOutput: {
+            /**
+             * LoRA Collection
+             * @description Collection of LoRA models and weights
+             */
+            collection: components["schemas"]["LoRAField"][];
+            /**
+             * type
+             * @default lora_collection_toggle_output
+             * @constant
+             */
+            type: "lora_collection_toggle_output";
         };
         /** LoRAField */
         LoRAField: {
@@ -16112,6 +24978,58 @@ export type components = {
             weight: number;
         };
         /**
+         * LoRA Name Grabber
+         * @description Outputs the LoRA's name as a string. Use a Lora Selector node as input.
+         */
+        LoRANameGrabberInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * LoRA
+             * @description The LoRA whose name you wish to grab. Get this from a LoRA Selector node.
+             * @default null
+             */
+            lora?: components["schemas"]["LoRAField"] | null;
+            /**
+             * type
+             * @default lora_name_grabber_invocation
+             * @constant
+             */
+            type: "lora_name_grabber_invocation";
+        };
+        /**
+         * LoRANameGrabberOutput
+         * @description LoRA Name Grabber output
+         */
+        LoRANameGrabberOutput: {
+            /**
+             * Name
+             * @description Name of the LoRA
+             */
+            name: string;
+            /**
+             * type
+             * @default lora_name_grabber_output
+             * @constant
+             */
+            type: "lora_name_grabber_output";
+        };
+        /**
          * LoRARecallParameter
          * @description LoRA configuration for recall
          */
@@ -16191,6 +25109,65 @@ export type components = {
              * @constant
              */
             type: "lora_selector_output";
+        };
+        /**
+         * LoRA Toggle
+         * @description Allows boolean selection between two separate LoRA inputs
+         */
+        LoRAToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * @description First LoRA Input
+             * @default null
+             */
+            lora1?: components["schemas"]["LoRAField"] | null;
+            /**
+             * @description Second LoRA Input
+             * @default null
+             */
+            lora2?: components["schemas"]["LoRAField"] | null;
+            /**
+             * type
+             * @default lora_toggle
+             * @constant
+             */
+            type: "lora_toggle";
+        };
+        /** LoRAToggleOutput */
+        LoRAToggleOutput: {
+            /**
+             * LoRA
+             * @description LoRA model and weight
+             */
+            lora: components["schemas"]["LoRAField"];
+            /**
+             * type
+             * @default lora_toggle_output
+             * @constant
+             */
+            type: "lora_toggle_output";
         };
         /** LoRA_Diffusers_FLUX_Config */
         LoRA_Diffusers_FLUX_Config: {
@@ -17259,6 +26236,197 @@ export type components = {
             base: "sdxl";
         };
         /**
+         * Load All Text Files In Folder
+         * @description Loads all text files in a folder and its subfolders recursively, returning them as a Collection of strings
+         */
+        LoadAllTextFilesInFolderInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * File Extension
+             * @description Only files with the given extension will be loaded. For example: json
+             * @default null
+             */
+            extension_to_match?: string | null;
+            /**
+             * Folder Path
+             * @description The path to load files from.
+             * @default null
+             */
+            folder_path?: string | null;
+            /**
+             * type
+             * @default load_all_text_files_in_folder_output
+             * @constant
+             */
+            type: "load_all_text_files_in_folder_output";
+        };
+        /**
+         * LoadAllTextFilesInFolderOutput
+         * @description Load Text Files In Folder Output
+         */
+        LoadAllTextFilesInFolderOutput: {
+            /** Results */
+            result: string[];
+            /**
+             * type
+             * @default load_all_text_files_in_folder_output
+             * @constant
+             */
+            type: "load_all_text_files_in_folder_output";
+        };
+        /**
+         * Load Aperture Image
+         * @description Loads a grayscale aperture image from the presets directory.
+         */
+        LoadApertureImageInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Aperture Image
+             * @description The aperture image to load from the 'aperture_images' folder
+             * @default 5_point_star.png
+             * @enum {string}
+             */
+            aperture_image?: "5_point_star.png" | "cross.png" | "diag_arrow.png" | "diffraction.png" | "heart.png";
+            /**
+             * type
+             * @default load_aperture_image
+             * @constant
+             */
+            type: "load_aperture_image";
+        };
+        /**
+         * Load Text File to String
+         * @description Loads a text from a provided path and outputs it as a string
+         */
+        LoadTextFileToStringInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Path
+             * @description The full path to the text file.
+             * @default null
+             */
+            file_path?: string | null;
+            /**
+             * type
+             * @default load_text_file_to_string_invocation
+             * @constant
+             */
+            type: "load_text_file_to_string_invocation";
+        };
+        /**
+         * LoadTextFileToStringOutput
+         * @description Load Text File To String Output
+         */
+        LoadTextFileToStringOutput: {
+            /** Result */
+            result: string;
+            /**
+             * type
+             * @default load_text_file_to_string_output
+             * @constant
+             */
+            type: "load_text_file_to_string_output";
+        };
+        /**
+         * Load Video Frame
+         * @description Load a specific frame from an MP4 video and provide it as output.
+         */
+        LoadVideoFrameInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Video Path
+             * @description The path to the MP4 video file
+             * @default null
+             */
+            video_path?: string | null;
+            /**
+             * Frame Number
+             * @description The frame number to load
+             * @default 1
+             */
+            frame_number?: number;
+            /**
+             * type
+             * @default load_video_frame
+             * @constant
+             */
+            type: "load_video_frame";
+        };
+        /**
          * LocalModelSource
          * @description A local file or directory path.
          */
@@ -17332,6 +26500,203 @@ export type components = {
              */
             success: boolean;
         };
+        /**
+         * Lookup LoRA Collection Triggers
+         * @description Retrieves trigger words from the Model Manager for all LoRAs in the collection
+         */
+        LookupLoRACollectionTriggersInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * LoRA Collection
+             * @description The LoRAs to look up
+             * @default null
+             */
+            lora_collection?: components["schemas"]["LoRAField"][] | null;
+            /**
+             * type
+             * @default lookup_lora_collection_triggers_invocation
+             * @constant
+             */
+            type: "lookup_lora_collection_triggers_invocation";
+        };
+        /**
+         * LookupLoRACollectionTriggersOutput
+         * @description Lookup LoRA Collection Triggers Output
+         */
+        LookupLoRACollectionTriggersOutput: {
+            /**
+             * Trigger Words
+             * @description A collection of all the LoRAs trigger words
+             */
+            trigger_words: string[];
+            /**
+             * type
+             * @default lookup_lora_collection_triggers_output
+             * @constant
+             */
+            type: "lookup_lora_collection_triggers_output";
+        };
+        /**
+         * Lookup LoRA Triggers
+         * @description Retrieves a LoRA's trigger words from the Model Manager
+         */
+        LookupLoRATriggersInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * LoRA
+             * @description The LoRA to look up
+             * @default null
+             */
+            lora?: components["schemas"]["LoRAField"] | null;
+            /**
+             * type
+             * @default lookup_lora_triggers_invocation
+             * @constant
+             */
+            type: "lookup_lora_triggers_invocation";
+        };
+        /**
+         * LookupLoRATriggersOutput
+         * @description Lookup LoRA Triggers Output
+         */
+        LookupLoRATriggersOutput: {
+            /**
+             * Trigger Words
+             * @description A collection of the LoRAs trigger words
+             */
+            trigger_words: string[];
+            /**
+             * type
+             * @default lookup_lora_triggers_output
+             * @constant
+             */
+            type: "lookup_lora_triggers_output";
+        };
+        /**
+         * Lookup Table from File
+         * @description Loads a lookup table from a YAML file
+         */
+        LookupTableFromFileInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * File Path
+             * @description Path to lookup table YAML file
+             * @default null
+             */
+            file_path?: string | null;
+            /**
+             * type
+             * @default lookup_table_from_file
+             * @constant
+             */
+            type: "lookup_table_from_file";
+        };
+        /**
+         * LookupTableOutput
+         * @description Base class for invocations that output a JSON lookup table
+         */
+        LookupTableOutput: {
+            /**
+             * Lookups
+             * @description The output lookup table
+             */
+            lookups: string;
+            /**
+             * type
+             * @default lookups_output
+             * @constant
+             */
+            type: "lookups_output";
+        };
+        /**
+         * Lookups Entry from Prompt
+         * @description Creates a lookup table of a single heading->value
+         */
+        LookupsEntryFromPromptInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Heading
+             * @description Heading for the lookup table entry
+             * @default null
+             */
+            heading?: string | null;
+            /**
+             * Lookup
+             * @description The entry to place under Heading in the lookup table
+             * @default
+             */
+            lookup?: string;
+            /**
+             * type
+             * @default lookup_from_prompt
+             * @constant
+             */
+            type: "lookup_from_prompt";
+        };
         /** LoraModelDefaultSettings */
         LoraModelDefaultSettings: {
             /**
@@ -17339,6 +26704,40 @@ export type components = {
              * @description Default weight for this model
              */
             weight?: number | null;
+        };
+        /**
+         * LoRA To String
+         * @description Converts an lora Model to a JSONString
+         */
+        LoraToStringInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description LoRA model to load
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default lora_to_string
+             * @constant
+             */
+            type: "lora_to_string";
         };
         /** MDControlListOutput */
         MDControlListOutput: {
@@ -17492,6 +26891,40 @@ export type components = {
             cpu_only?: boolean | null;
         };
         /**
+         * Main Model Input
+         * @description Loads a main model from an input, outputting its submodels.
+         */
+        MainModelLoaderInputInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Main model (UNet, VAE, CLIP) to load
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default main_model_loader_input
+             * @constant
+             */
+            type: "main_model_loader_input";
+        };
+        /**
          * Main Model - SD1.5, SD2
          * @description Loads a main model, outputting its submodels.
          */
@@ -17524,6 +26957,40 @@ export type components = {
              * @constant
              */
             type: "main_model_loader";
+        };
+        /**
+         * Main Model To String
+         * @description Converts a Main Model to a JSONString
+         */
+        MainModelToStringInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Main model (UNet, VAE, CLIP) to load
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default main_model_to_string
+             * @constant
+             */
+            type: "main_model_to_string";
         };
         /**
          * Main_BnBNF4_FLUX_Config
@@ -19458,6 +28925,237 @@ export type components = {
             type: "tensor_mask_to_image";
         };
         /**
+         * Match Histogram (YCbCr)
+         * @description Match a histogram from one image to another using YCbCr color space
+         */
+        MatchHistogramInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to receive the histogram
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The reference image with the source histogram
+             * @default null
+             */
+            reference_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Match Luminance Only
+             * @description Only transfer the luminance
+             * @default false
+             */
+            match_luminance_only?: boolean;
+            /**
+             * Output Grayscale
+             * @description Convert output image to grayscale
+             * @default false
+             */
+            output_grayscale?: boolean;
+            /**
+             * type
+             * @default match_histogram
+             * @constant
+             */
+            type: "match_histogram";
+        };
+        /**
+         * Match Histogram LAB
+         * @description Match a histogram from one image to another using Lab color space
+         */
+        MatchHistogramLabInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to receive the histogram
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The reference image with the source histogram
+             * @default null
+             */
+            reference_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Match Luminance Only
+             * @description Only transfer the luminance/brightness channel
+             * @default false
+             */
+            match_luminance_only?: boolean;
+            /**
+             * Output Grayscale
+             * @description Convert output image to grayscale
+             * @default false
+             */
+            output_grayscale?: boolean;
+            /**
+             * type
+             * @default match_histogram_lab
+             * @constant
+             */
+            type: "match_histogram_lab";
+        };
+        /**
+         * MathEval
+         * @description Performs arbitrary user-defined calculations on x, y, z, and w variables
+         */
+        MathEvalInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * X
+             * @description Input x
+             * @default 0
+             */
+            x?: number;
+            /**
+             * Y
+             * @description Input y
+             * @default 0
+             */
+            y?: number;
+            /**
+             * Z
+             * @description Input z
+             * @default 0
+             */
+            z?: number;
+            /**
+             * W
+             * @description Input w
+             * @default 0
+             */
+            w?: number;
+            /**
+             * Equation A
+             * @description A basic mathematical equation for a involving x, y, z, and w
+             * @default math.sin(x)
+             */
+            equation_a?: string;
+            /**
+             * Equation B
+             * @description A basic mathematical equation for b involving x, y, z, and w
+             * @default 1+(x*y)
+             */
+            equation_b?: string;
+            /**
+             * Equation C
+             * @description A basic mathematical equation for c involving x, y, z, and w
+             * @default
+             */
+            equation_c?: string;
+            /**
+             * Equation D
+             * @description A basic mathematical equation for d involving x, y, z, and w
+             * @default
+             */
+            equation_d?: string;
+            /**
+             * type
+             * @default math_eval
+             * @constant
+             */
+            type: "math_eval";
+        };
+        /**
+         * MathEvalOutput
+         * @description Base class for math output
+         */
+        MathEvalOutput: {
+            /**
+             * A
+             * @description Output a
+             */
+            a: number;
+            /**
+             * B
+             * @description Output b
+             */
+            b: number;
+            /**
+             * C
+             * @description Output c
+             */
+            c: number;
+            /**
+             * D
+             * @description Output d
+             */
+            d: number;
+            /**
+             * type
+             * @default math_eval_output
+             * @constant
+             */
+            type: "math_eval_output";
+        };
+        /**
          * MediaPipe Face Detection
          * @description Detects faces using MediaPipe.
          */
@@ -19514,6 +29212,64 @@ export type components = {
             type: "mediapipe_face_detection";
         };
         /**
+         * Merge LoRA Collections
+         * @description Merges two Collections of LoRAs into a single Collection.
+         */
+        MergeLoRACollectionsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Collection 1
+             * @description A collection of LoRAs or a single LoRA from a LoRA Selector node.
+             * @default null
+             */
+            collection1?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][] | null;
+            /**
+             * Collection 2
+             * @description A collection of LoRAs or a single LoRA from a LoRA Selector node.
+             * @default null
+             */
+            collection2?: components["schemas"]["LoRAField"] | components["schemas"]["LoRAField"][] | null;
+            /**
+             * type
+             * @default merge_lora_collections_invocation
+             * @constant
+             */
+            type: "merge_lora_collections_invocation";
+        };
+        /**
+         * MergeLoRACollectionsOutput
+         * @description Join LoRA Collections output
+         */
+        MergeLoRACollectionsOutput: {
+            /**
+             * Collection
+             * @description The merged collection
+             */
+            collection: components["schemas"]["LoRAField"][];
+            /**
+             * type
+             * @default merge_lora_collections_output
+             * @constant
+             */
+            type: "merge_lora_collections_output";
+        };
+        /**
          * Metadata Merge
          * @description Merged a collection of MetadataDict into a single MetadataDict.
          */
@@ -19547,6 +29303,64 @@ export type components = {
              * @constant
              */
             type: "merge_metadata";
+        };
+        /**
+         * Merge String Collections
+         * @description Merges two Collections of LoRAs into a single Collection.
+         */
+        MergeStringCollectionsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Collection 1
+             * @description A collection of strings or a single string.
+             * @default null
+             */
+            collection1?: string | string[] | null;
+            /**
+             * Collection 2
+             * @description A collection of strings or a single string.
+             * @default null
+             */
+            collection2?: string | string[] | null;
+            /**
+             * type
+             * @default merge_string_collections_invocation
+             * @constant
+             */
+            type: "merge_string_collections_invocation";
+        };
+        /**
+         * MergeStringCollectionsOutput
+         * @description Merge String Collections output
+         */
+        MergeStringCollectionsOutput: {
+            /**
+             * Collection
+             * @description The merged collection
+             */
+            collection: string[];
+            /**
+             * type
+             * @default merge_string_collections_output
+             * @constant
+             */
+            type: "merge_string_collections_output";
         };
         /**
          * Merge Tiles to Image
@@ -20848,6 +30662,65 @@ export type components = {
             type: "metadata_to_vae";
         };
         /**
+         * Minimum Overlap XYImage Tile Generator
+         * @description Cuts up an image into overlapping tiles and outputs a string representation of the tiles to use, taking the
+         *     input overlap as a minimum
+         */
+        MinimumOverlapXYTileGenerator: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The input image
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Tile Width
+             * @description x resolution of generation tile (must be a multiple of 8)
+             * @default 576
+             */
+            tile_width?: number;
+            /**
+             * Tile Height
+             * @description y resolution of generation tile (must be a multiple of 8)
+             * @default 576
+             */
+            tile_height?: number;
+            /**
+             * Min Overlap
+             * @description minimum tile overlap size (must be a multiple of 8)
+             * @default 128
+             */
+            min_overlap?: number;
+            /**
+             * Round To 8
+             * @description Round outputs down to the nearest 8 (for pulling from a large noise field)
+             * @default false
+             */
+            round_to_8?: boolean;
+            /**
+             * type
+             * @default minimum_overlap_xy_tile_generator
+             * @constant
+             */
+            type: "minimum_overlap_xy_tile_generator";
+        };
+        /**
          * ModelFormat
          * @description Storage format of model.
          * @enum {string}
@@ -21297,6 +31170,93 @@ export type components = {
             unet: components["schemas"]["UNetField"];
         };
         /**
+         * Model Name Grabber
+         * @description Outputs the Model's name as a string. Use the Model Identifier node as input.
+         */
+        ModelNameGrabberInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Model
+             * @description Get this input from a Model Identifier node.
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default model_name_grabber_invocation
+             * @constant
+             */
+            type: "model_name_grabber_invocation";
+        };
+        /**
+         * ModelNameGrabberOutput
+         * @description Model Name Grabber output
+         */
+        ModelNameGrabberOutput: {
+            /**
+             * Name
+             * @description Name of the Model
+             */
+            name: string;
+            /**
+             * type
+             * @default model_name_grabber_output
+             * @constant
+             */
+            type: "model_name_grabber_output";
+        };
+        /**
+         * Model Name to Model
+         * @description Converts a model identified by its string name to a Model
+         */
+        ModelNameToModelInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Model Name
+             * @description Exact model name (must match exactly one model)
+             * @default null
+             */
+            model_name?: string | null;
+            /**
+             * type
+             * @default model_name_to_model
+             * @constant
+             */
+            type: "model_name_to_model";
+        };
+        /**
          * ModelRecordChanges
          * @description A set of changes to apply to a model.
          */
@@ -21385,6 +31345,12 @@ export type components = {
              */
             config_path?: string | null;
         };
+        /**
+         * ModelRecordOrderBy
+         * @description The order in which to return model summaries.
+         * @enum {string}
+         */
+        ModelRecordOrderBy: "default" | "type" | "base" | "name" | "format" | "size" | "created_at" | "updated_at" | "path";
         /** ModelRelationshipBatchRequest */
         ModelRelationshipBatchRequest: {
             /**
@@ -21419,6 +31385,103 @@ export type components = {
          */
         ModelSourceType: "path" | "url" | "hf_repo_id";
         /**
+         * Model To String
+         * @description Converts an Model to a JSONString
+         */
+        ModelToStringInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Model
+             * @description The model to select
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default model_to_string
+             * @constant
+             */
+            type: "model_to_string";
+        };
+        /**
+         * Model Toggle
+         * @description Allows boolean selection between two separate ModelIdentifier inputs
+         */
+        ModelToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default null
+             */
+            use_second?: boolean | null;
+            /**
+             * @description First Model Input
+             * @default null
+             */
+            model1?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description First Model Input
+             * @default null
+             */
+            model2?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default model_toggle
+             * @constant
+             */
+            type: "model_toggle";
+        };
+        /**
+         * ModelToggleOutput
+         * @description Model Toggle output
+         */
+        ModelToggleOutput: {
+            /**
+             * Model
+             * @description Model identifier
+             */
+            model: components["schemas"]["ModelIdentifierField"];
+            /**
+             * type
+             * @default model_toggle_output
+             * @constant
+             */
+            type: "model_toggle_output";
+        };
+        /**
          * ModelType
          * @description Model type.
          * @enum {string}
@@ -21437,6 +31500,86 @@ export type components = {
         ModelsList: {
             /** Models */
             models: (components["schemas"]["Main_Diffusers_SD1_Config"] | components["schemas"]["Main_Diffusers_SD2_Config"] | components["schemas"]["Main_Diffusers_SDXL_Config"] | components["schemas"]["Main_Diffusers_SDXLRefiner_Config"] | components["schemas"]["Main_Diffusers_SD3_Config"] | components["schemas"]["Main_Diffusers_FLUX_Config"] | components["schemas"]["Main_Diffusers_Flux2_Config"] | components["schemas"]["Main_Diffusers_CogView4_Config"] | components["schemas"]["Main_Diffusers_ZImage_Config"] | components["schemas"]["Main_Checkpoint_SD1_Config"] | components["schemas"]["Main_Checkpoint_SD2_Config"] | components["schemas"]["Main_Checkpoint_SDXL_Config"] | components["schemas"]["Main_Checkpoint_SDXLRefiner_Config"] | components["schemas"]["Main_Checkpoint_Flux2_Config"] | components["schemas"]["Main_Checkpoint_FLUX_Config"] | components["schemas"]["Main_Checkpoint_ZImage_Config"] | components["schemas"]["Main_BnBNF4_FLUX_Config"] | components["schemas"]["Main_GGUF_Flux2_Config"] | components["schemas"]["Main_GGUF_FLUX_Config"] | components["schemas"]["Main_GGUF_ZImage_Config"] | components["schemas"]["VAE_Checkpoint_SD1_Config"] | components["schemas"]["VAE_Checkpoint_SD2_Config"] | components["schemas"]["VAE_Checkpoint_SDXL_Config"] | components["schemas"]["VAE_Checkpoint_FLUX_Config"] | components["schemas"]["VAE_Checkpoint_Flux2_Config"] | components["schemas"]["VAE_Diffusers_SD1_Config"] | components["schemas"]["VAE_Diffusers_SDXL_Config"] | components["schemas"]["VAE_Diffusers_Flux2_Config"] | components["schemas"]["ControlNet_Checkpoint_SD1_Config"] | components["schemas"]["ControlNet_Checkpoint_SD2_Config"] | components["schemas"]["ControlNet_Checkpoint_SDXL_Config"] | components["schemas"]["ControlNet_Checkpoint_FLUX_Config"] | components["schemas"]["ControlNet_Checkpoint_ZImage_Config"] | components["schemas"]["ControlNet_Diffusers_SD1_Config"] | components["schemas"]["ControlNet_Diffusers_SD2_Config"] | components["schemas"]["ControlNet_Diffusers_SDXL_Config"] | components["schemas"]["ControlNet_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_SD1_Config"] | components["schemas"]["LoRA_LyCORIS_SD2_Config"] | components["schemas"]["LoRA_LyCORIS_SDXL_Config"] | components["schemas"]["LoRA_LyCORIS_Flux2_Config"] | components["schemas"]["LoRA_LyCORIS_FLUX_Config"] | components["schemas"]["LoRA_LyCORIS_ZImage_Config"] | components["schemas"]["LoRA_OMI_SDXL_Config"] | components["schemas"]["LoRA_OMI_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_SD1_Config"] | components["schemas"]["LoRA_Diffusers_SD2_Config"] | components["schemas"]["LoRA_Diffusers_SDXL_Config"] | components["schemas"]["LoRA_Diffusers_Flux2_Config"] | components["schemas"]["LoRA_Diffusers_FLUX_Config"] | components["schemas"]["LoRA_Diffusers_ZImage_Config"] | components["schemas"]["ControlLoRA_LyCORIS_FLUX_Config"] | components["schemas"]["T5Encoder_T5Encoder_Config"] | components["schemas"]["T5Encoder_BnBLLMint8_Config"] | components["schemas"]["Qwen3Encoder_Qwen3Encoder_Config"] | components["schemas"]["Qwen3Encoder_Checkpoint_Config"] | components["schemas"]["Qwen3Encoder_GGUF_Config"] | components["schemas"]["TI_File_SD1_Config"] | components["schemas"]["TI_File_SD2_Config"] | components["schemas"]["TI_File_SDXL_Config"] | components["schemas"]["TI_Folder_SD1_Config"] | components["schemas"]["TI_Folder_SD2_Config"] | components["schemas"]["TI_Folder_SDXL_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD1_Config"] | components["schemas"]["IPAdapter_InvokeAI_SD2_Config"] | components["schemas"]["IPAdapter_InvokeAI_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD1_Config"] | components["schemas"]["IPAdapter_Checkpoint_SD2_Config"] | components["schemas"]["IPAdapter_Checkpoint_SDXL_Config"] | components["schemas"]["IPAdapter_Checkpoint_FLUX_Config"] | components["schemas"]["T2IAdapter_Diffusers_SD1_Config"] | components["schemas"]["T2IAdapter_Diffusers_SDXL_Config"] | components["schemas"]["Spandrel_Checkpoint_Config"] | components["schemas"]["CLIPEmbed_Diffusers_G_Config"] | components["schemas"]["CLIPEmbed_Diffusers_L_Config"] | components["schemas"]["CLIPVision_Diffusers_Config"] | components["schemas"]["SigLIP_Diffusers_Config"] | components["schemas"]["FLUXRedux_Checkpoint_Config"] | components["schemas"]["LlavaOnevision_Diffusers_Config"] | components["schemas"]["Unknown_Config"])[];
+        };
+        /**
+         * MonochromeFilmGrain
+         * @description Adds monochrome film grain to an image
+         */
+        MonochromeFilmGrainInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to add film grain to
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Amount 1
+             * @description Amount of the first noise layer
+             * @default 100
+             */
+            amount_1?: number;
+            /**
+             * Amount 2
+             * @description Amount of the second noise layer
+             * @default 50
+             */
+            amount_2?: number;
+            /**
+             * Seed 1
+             * @description The first seed to use (omit for random)
+             * @default null
+             */
+            seed_1?: number | null;
+            /**
+             * Seed 2
+             * @description The second seed to use (omit for random)
+             * @default null
+             */
+            seed_2?: number | null;
+            /**
+             * Blur 1
+             * @description The strength of the first noise blur
+             * @default 0.5
+             */
+            blur_1?: number;
+            /**
+             * Blur 2
+             * @description The strength of the second noise blur
+             * @default 0.5
+             */
+            blur_2?: number;
+            /**
+             * type
+             * @default monochrome_film_grain
+             * @constant
+             */
+            type: "monochrome_film_grain";
         };
         /**
          * Multiply Integers
@@ -21479,6 +31622,118 @@ export type components = {
              */
             type: "mul";
         };
+        /**
+         * Nightmare Promptgen
+         * @description makes new friends
+         */
+        NightmareInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Prompt
+             * @description starting point for the generated prompt
+             * @default
+             */
+            prompt?: string;
+            /**
+             * Max New Tokens
+             * @description the maximum allowed amount of new tokens to generate
+             * @default 300
+             */
+            max_new_tokens?: number;
+            /**
+             * Min New Tokens
+             * @description the minimum new tokens - NOTE, this can increase generation time
+             * @default 30
+             */
+            min_new_tokens?: number;
+            /**
+             * Max Time
+             * @description Overrules min tokens; the max amount of time allowed to generate
+             * @default 10
+             */
+            max_time?: number;
+            /**
+             * Temp
+             * @description Temperature
+             * @default 1.8
+             */
+            temp?: number;
+            /**
+             * Typical P
+             * @description Lower than 1.0 seems crazier, higher is more consistent.
+             * @default 1
+             */
+            typical_p?: number;
+            /**
+             * Top P
+             * @description Top P sampling
+             * @default 0.9
+             */
+            top_p?: number;
+            /**
+             * Top K
+             * @description Top K sampling
+             * @default 20
+             */
+            top_k?: number;
+            /**
+             * Repetition Penalty
+             * @description Higher than 1.0 will try to prevent repetition.
+             * @default 1
+             */
+            repetition_penalty?: number;
+            /**
+             * Include Starter
+             * @description Include your prompt starter with the output or not.
+             * @default true
+             */
+            include_starter?: boolean;
+            /**
+             * Repo Id
+             * @default cactusfriend/nightmare-promptgen-3
+             * @enum {string}
+             */
+            repo_id?: "cactusfriend/nightmare-promptgen-3" | "cactusfriend/nightmare-promptgen-XL" | "cactusfriend/nightmare-invokeai-prompts";
+            /**
+             * type
+             * @default nightmare_promptgen
+             * @constant
+             */
+            type: "nightmare_promptgen";
+        };
+        /**
+         * NightmareOutput
+         * @description Nightmare prompt string output
+         */
+        NightmareOutput: {
+            /**
+             * Prompt
+             * @description The generated nightmare prompt string
+             */
+            prompt: string;
+            /**
+             * type
+             * @default nightmare_str_output
+             * @constant
+             */
+            type: "nightmare_str_output";
+        };
         /** NodeFieldValue */
         NodeFieldValue: {
             /**
@@ -21496,6 +31751,155 @@ export type components = {
              * @description The value to substitute into the node/field.
              */
             value: string | number | components["schemas"]["ImageField"];
+        };
+        /**
+         * Add Noise (Flux)
+         * @description Add noise to a flux latents tensor using the appropriate ratio given the denoising schedule timestep.
+         *
+         *     Calculates the correct initial timestep noising amount and applies it to the given latent tensor using simple addition according to the specified ratio.
+         */
+        NoiseAddFluxInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latents_in?: components["schemas"]["LatentsField"] | null;
+            /**
+             * @description The noise to be added
+             * @default null
+             */
+            noise_in?: components["schemas"]["LatentsField"] | null;
+            /**
+             * Num Steps
+             * @description Number of diffusion steps
+             * @default null
+             */
+            num_steps?: number | null;
+            /**
+             * Denoising Start
+             * @description Starting point for denoising (0.0 to 1.0)
+             * @default null
+             */
+            denoising_start?: number | null;
+            /**
+             * Is Schnell
+             * @description Boolean flag indicating if this is a FLUX Schnell model
+             * @default null
+             */
+            is_schnell?: boolean | null;
+            /**
+             * type
+             * @default noise_add_flux
+             * @constant
+             */
+            type: "noise_add_flux";
+        };
+        /**
+         * 2D Noise Image
+         * @description Creates an image of 2D Noise approximating the desired characteristics.
+         *
+         *     Creates an image of 2D Noise approximating the desired characteristics, using various combinations of gaussian blur and arithmetic operations to perform low pass and high pass filtering of 2-dimensional spatial frequencies of each channel to create Red, Blue, or Green "colored noise".
+         */
+        NoiseImage2DInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Noise Type
+             * @description Desired noise spectral characteristics
+             * @default White
+             * @enum {string}
+             */
+            noise_type?: "White" | "Red" | "Blue" | "Green";
+            /**
+             * Width
+             * @description Desired image width
+             * @default 512
+             */
+            width?: number;
+            /**
+             * Height
+             * @description Desired image height
+             * @default 512
+             */
+            height?: number;
+            /**
+             * Seed
+             * @description Seed for noise generation
+             * @default 0
+             */
+            seed?: number;
+            /**
+             * Iterations
+             * @description Noise approx. iterations
+             * @default 15
+             */
+            iterations?: number;
+            /**
+             * Blur Threshold
+             * @description Threshold used in computing noise (lower is better/slower)
+             * @default 0.2
+             */
+            blur_threshold?: number;
+            /**
+             * Sigma Red
+             * @description Sigma for strong gaussian blur LPF for red/green
+             * @default 3
+             */
+            sigma_red?: number;
+            /**
+             * Sigma Blue
+             * @description Sigma for weak gaussian blur HPF for blue/green
+             * @default 1
+             */
+            sigma_blue?: number;
+            /**
+             * type
+             * @default noiseimg_2d
+             * @constant
+             */
+            type: "noiseimg_2d";
         };
         /**
          * Create Latent Noise
@@ -21575,6 +31979,92 @@ export type components = {
             type: "noise_output";
         };
         /**
+         * Noise (Spectral characteristics)
+         * @description Creates a latents tensor of 2D noise channels approximating the desired characteristics.
+         *
+         *     This operates like 2D Noise Image but outputs latent tensors, 4-channel or 16-channel.
+         */
+        NoiseSpectralInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Noise Type
+             * @description Desired noise spectral characteristics
+             * @default White
+             * @enum {string}
+             */
+            noise_type?: "White" | "Red" | "Blue" | "Green";
+            /**
+             * Width
+             * @description Desired image width
+             * @default 512
+             */
+            width?: number;
+            /**
+             * Height
+             * @description Desired image height
+             * @default 512
+             */
+            height?: number;
+            /**
+             * Flux16
+             * @description If false, 4-channel (SD/SDXL); if true, 16-channel (Flux)
+             * @default false
+             */
+            flux16?: boolean;
+            /**
+             * Seed
+             * @description Seed for noise generation
+             * @default 0
+             */
+            seed?: number;
+            /**
+             * Iterations
+             * @description Noise approx. iterations
+             * @default 15
+             */
+            iterations?: number;
+            /**
+             * Blur Threshold
+             * @description Threshold used in computing noise (lower is better/slower)
+             * @default 0.2
+             */
+            blur_threshold?: number;
+            /**
+             * Sigma Red
+             * @description Sigma for strong gaussian blur LPF for red/green
+             * @default 3
+             */
+            sigma_red?: number;
+            /**
+             * Sigma Blue
+             * @description Sigma for weak gaussian blur HPF for blue/green
+             * @default 1
+             */
+            sigma_blue?: number;
+            /**
+             * type
+             * @default noise_spectral
+             * @constant
+             */
+            type: "noise_spectral";
+        };
+        /**
          * Normal Map
          * @description Generates a normal map.
          */
@@ -21617,6 +32107,104 @@ export type components = {
              * @constant
              */
             type: "normal_map";
+        };
+        /**
+         * Octree Quantizer
+         * @description Quantizes an image to the desired number of colors
+         */
+        OctreeQuantizerInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to quantize
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Final Colors
+             * @description The final number of colors in the palette
+             * @default 16
+             */
+            final_colors?: number;
+            /**
+             * type
+             * @default octree_quantizer
+             * @constant
+             */
+            type: "octree_quantizer";
+        };
+        /**
+         * Offset Latents
+         * @description Offsets a latents tensor by a given percentage of height/width.
+         *
+         *     This takes a Latents input as well as two numbers (between 0 and 1), which are used to offset the latents in the vertical and/or horizontal directions. 0.5/0.5 would offset the image 50% in both directions such that the corners will wrap around and become the center of the image.
+         */
+        OffsetLatentsInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Latents tensor
+             * @default null
+             */
+            latents?: components["schemas"]["LatentsField"] | null;
+            /**
+             * X Offset
+             * @description Approx percentage to offset (H)
+             * @default 0.5
+             */
+            x_offset?: number;
+            /**
+             * Y Offset
+             * @description Approx percentage to offset (V)
+             * @default 0.5
+             */
+            y_offset?: number;
+            /**
+             * type
+             * @default offset_latents
+             * @constant
+             */
+            type: "offset_latents";
         };
         /** OffsetPaginatedResults[BoardDTO] */
         OffsetPaginatedResults_BoardDTO_: {
@@ -21663,6 +32251,72 @@ export type components = {
              * @description Items
              */
             items: components["schemas"]["ImageDTO"][];
+        };
+        /**
+         * Optimized Tile Size From Area
+         * @description Cuts up an image into overlapping tiles, optimized for the constraints of min area, max area, overlap, and
+         *     maximum tile dimension (either width or height). Returns ideal width and height.
+         */
+        OptimizedTileSizeFromAreaInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Width
+             * @description Image width in pixels
+             * @default null
+             */
+            width?: number | null;
+            /**
+             * Height
+             * @description Image height in pixels
+             * @default null
+             */
+            height?: number | null;
+            /**
+             * Min Area
+             * @description Minimum tile area
+             * @default 262144
+             */
+            min_area?: number;
+            /**
+             * Max Area
+             * @description Maximum tile area
+             * @default 1048576
+             */
+            max_area?: number;
+            /**
+             * Overlap
+             * @description Minimum overlap in pixels (both directions)
+             * @default null
+             */
+            overlap?: number | null;
+            /**
+             * Max Tile Dim
+             * @description Maximum dimension of a tile (to limit artifacts)
+             * @default 2048
+             */
+            max_tile_dim?: number;
+            /**
+             * type
+             * @default optimized_tile_size_from_area
+             * @constant
+             */
+            type: "optimized_tile_size_from_area";
         };
         /**
          * OrphanedModelInfo
@@ -21791,6 +32445,232 @@ export type components = {
              */
             type: "pbr_maps-output";
         };
+        /**
+         * PTFields Collect
+         * @description Collect Prompt Tools Fields for an image generated in InvokeAI.
+         */
+        PTFieldsCollectInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Positive Prompt
+             * @description The positive prompt parameter
+             * @default null
+             */
+            positive_prompt?: string | null;
+            /**
+             * Positive Style Prompt
+             * @description The positive style prompt parameter
+             * @default null
+             */
+            positive_style_prompt?: string | null;
+            /**
+             * Negative Prompt
+             * @description The negative prompt parameter
+             * @default null
+             */
+            negative_prompt?: string | null;
+            /**
+             * Negative Style Prompt
+             * @description The negative prompt parameter
+             * @default null
+             */
+            negative_style_prompt?: string | null;
+            /**
+             * Seed
+             * @description Seed for random number generation
+             * @default null
+             */
+            seed?: number | null;
+            /**
+             * Width
+             * @description Width of output (px)
+             * @default null
+             */
+            width?: number | null;
+            /**
+             * Height
+             * @description Height of output (px)
+             * @default null
+             */
+            height?: number | null;
+            /**
+             * Steps
+             * @description Number of steps to run
+             * @default null
+             */
+            steps?: number | null;
+            /**
+             * Cfg Scale
+             * @description Classifier-Free Guidance scale
+             * @default null
+             */
+            cfg_scale?: number | null;
+            /**
+             * Denoising Start
+             * @description When to start denoising, expressed a percentage of total steps
+             * @default null
+             */
+            denoising_start?: number | null;
+            /**
+             * Denoising End
+             * @description When to stop denoising, expressed a percentage of total steps
+             * @default null
+             */
+            denoising_end?: number | null;
+            /**
+             * Scheduler
+             * @description Scheduler to use during inference
+             * @default null
+             */
+            scheduler?: ("ddim" | "ddpm" | "deis" | "deis_k" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_k" | "kdpm_2_a" | "kdpm_2_a_k" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_3m" | "dpmpp_3m_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "unipc_k" | "lcm" | "tcd") | null;
+            /**
+             * type
+             * @default pt_fields_collect
+             * @constant
+             */
+            type: "pt_fields_collect";
+        };
+        /**
+         * PTFieldsCollectOutput
+         * @description PTFieldsCollect Output
+         */
+        PTFieldsCollectOutput: {
+            /**
+             * Pt Fields
+             * @description PTFields in Json Format
+             */
+            pt_fields: string;
+            /**
+             * type
+             * @default pt_fields_collect_output
+             * @constant
+             */
+            type: "pt_fields_collect_output";
+        };
+        /**
+         * PTFields Expand
+         * @description Save Expand PTFields into individual items
+         */
+        PTFieldsExpandInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Pt Fields
+             * @description PTFields in json Format
+             * @default null
+             */
+            pt_fields?: string | null;
+            /**
+             * type
+             * @default pt_fields_expand
+             * @constant
+             */
+            type: "pt_fields_expand";
+        };
+        /**
+         * PTFieldsExpandOutput
+         * @description Expand Prompt Tools Fields for an image generated in InvokeAI.
+         */
+        PTFieldsExpandOutput: {
+            /**
+             * Positive Prompt
+             * @description The positive prompt
+             */
+            positive_prompt: string;
+            /**
+             * Positive Style Prompt
+             * @description The positive style prompt
+             */
+            positive_style_prompt: string;
+            /**
+             * Negative Prompt
+             * @description The negative prompt
+             */
+            negative_prompt: string;
+            /**
+             * Negative Style Prompt
+             * @description The negative prompt
+             */
+            negative_style_prompt: string;
+            /**
+             * Seed
+             * @description Seed for random number generation
+             */
+            seed: number;
+            /**
+             * Width
+             * @description Width of output (px)
+             */
+            width: number;
+            /**
+             * Height
+             * @description Height of output (px)
+             */
+            height: number;
+            /**
+             * Steps
+             * @description Number of steps to run
+             */
+            steps: number;
+            /**
+             * Cfg Scale
+             * @description Classifier-Free Guidance scale
+             */
+            cfg_scale: number;
+            /**
+             * Denoising Start
+             * @description When to start denoising, expressed a percentage of total steps
+             */
+            denoising_start: number;
+            /**
+             * Denoising End
+             * @description When to stop denoising, expressed a percentage of total steps
+             */
+            denoising_end: number;
+            /**
+             * Scheduler
+             * @description Scheduler to use during inference
+             * @enum {string}
+             */
+            scheduler: "ddim" | "ddpm" | "deis" | "deis_k" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_k" | "kdpm_2_a" | "kdpm_2_a_k" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_3m" | "dpmpp_3m_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "unipc_k" | "lcm" | "tcd";
+            /**
+             * type
+             * @default pt_fields_expand_output
+             * @constant
+             */
+            type: "pt_fields_expand_output";
+        };
         /** PaginatedResults[WorkflowRecordListItemWithThumbnailDTO] */
         PaginatedResults_WorkflowRecordListItemWithThumbnailDTO_: {
             /**
@@ -21870,6 +32750,58 @@ export type components = {
             type: "pair_tile_image_output";
         };
         /**
+         * PaletteOutput
+         * @description Base class for Cell Fracture output
+         */
+        PaletteOutput: {
+            /**
+             * @description The palette output
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"];
+            /**
+             * type
+             * @default get_palette_output
+             * @constant
+             */
+            type: "get_palette_output";
+        };
+        /**
+         * Parse Weighted String
+         * @description Parses a string containing weighted terms (e.g. `(word)++` or `word-`) and returns the cleaned string, list of terms, their weights, and positions.
+         */
+        ParseWeightedStringInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Text
+             * @description The input string containing weighted expressions
+             * @default null
+             */
+            text?: string | null;
+            /**
+             * type
+             * @default parse_weighted_string
+             * @constant
+             */
+            type: "parse_weighted_string";
+        };
+        /**
          * Paste Image into Bounding Box
          * @description Paste the source image into the target image at the given bounding box.
          *
@@ -21924,6 +32856,41 @@ export type components = {
              * @constant
              */
             type: "paste_image_into_bounding_box";
+        };
+        /**
+         * Percent To Float
+         * @description Converts a string to a float and divides it by 100.
+         */
+        PercentToFloatInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Text
+             * @description Input text
+             * @default null
+             */
+            text?: string | null;
+            /**
+             * type
+             * @default percent_to_float
+             * @constant
+             */
+            type: "percent_to_float";
         };
         /**
          * PiDiNet Edge Detection
@@ -21981,6 +32948,180 @@ export type components = {
              */
             type: "pidi_edge_detection";
         };
+        /**
+         * Pixel Art
+         * @description Convert an image to pixelart
+         */
+        PixelArtInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to convert to pixelart
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description Optional - Image with the palette to use
+             * @default null
+             */
+            palette_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Pixel Size
+             * @description Size of the large 'pixels' in the output
+             * @default 4
+             */
+            pixel_size?: number;
+            /**
+             * Palette Size
+             * @description No. of colours in Palette (used if palette_image is not provided or to extract from it)
+             * @default 16
+             */
+            palette_size?: number;
+            /**
+             * Dither
+             * @description Apply Floyd-Steinberg dithering
+             * @default false
+             */
+            dither?: boolean;
+            /**
+             * type
+             * @default pixel-art
+             * @constant
+             */
+            type: "pixel-art";
+        };
+        /**
+         * Pixelize Image
+         * @description Creates 'pixel' 'art' using trained models
+         */
+        PixelizeImageInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to pixelize
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Correct Colors
+             * @description Correct hue and saturation to match original image.
+             * @default true
+             */
+            correct_colors?: boolean;
+            /**
+             * Cell Size
+             * @description pixel/cell size (min 2 max WHATEVER BRO)
+             * @default 4
+             */
+            cell_size?: number;
+            /**
+             * type
+             * @default pixelize
+             * @constant
+             */
+            type: "pixelize";
+        };
+        /**
+         * Pixelize
+         * @description Pixelize an image. Downsample, upsample.
+         */
+        PixelizeInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input image for pixelization
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Downsample Factor
+             * @description Image resizing factor. Higher = smaller image.
+             * @default 4
+             */
+            downsample_factor?: number;
+            /**
+             * Upsample
+             * @description Upsample to original resolution
+             * @default true
+             */
+            upsample?: boolean;
+            /**
+             * type
+             * @default retro_pixelize
+             * @constant
+             */
+            type: "retro_pixelize";
+        };
         /** PresetData */
         PresetData: {
             /**
@@ -21999,6 +33140,65 @@ export type components = {
          * @enum {string}
          */
         PresetType: "user" | "default";
+        /**
+         * Print String to Console
+         * @description Prints a string to the console.
+         */
+        PrintStringToConsoleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Print Colour
+             * @description The colour to print the console output
+             * @default White on Black
+             * @enum {string}
+             */
+            print_colour?: "Black on White" | "White on Black" | "Black on Green" | "Red on White" | "Green on Red" | "Yellow on Blue" | "Blue on Yellow" | "Magenta on Cyan" | "Cyan on Magenta" | "Black on Red" | "Red on Black" | "Yellow on Black" | "Black on Yellow";
+            /**
+             * Input string
+             * @description The string to print to console.
+             * @default ,
+             */
+            input_str?: string;
+            /**
+             * type
+             * @default print_string_to_console_invocation
+             * @constant
+             */
+            type: "print_string_to_console_invocation";
+        };
+        /**
+         * PrintStringToConsoleOutput
+         * @description Debug Print String Output
+         */
+        PrintStringToConsoleOutput: {
+            /**
+             * Passthrough
+             * @description Passthrough
+             */
+            passthrough: string;
+            /**
+             * type
+             * @default print_string_to_console_output
+             * @constant
+             */
+            type: "print_string_to_console_output";
+        };
         /**
          * ProgressImage
          * @description The progress image sent intermittently during processing
@@ -22019,6 +33219,227 @@ export type components = {
              * @description The image data as a b64 data URL
              */
             dataURL: string;
+        };
+        /**
+         * Prompt Auto .and()
+         * @description Takes a prompt string then chunks it up into a .and() output if over the max length
+         */
+        PromptAutoAndInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Prompt
+             * @description Prompt to auto .and()
+             * @default
+             */
+            prompt?: string;
+            /**
+             * Max Length
+             * @description Maximum chunk length in characters
+             * @default 200
+             */
+            max_length?: number;
+            /**
+             * type
+             * @default prompt_auto_and
+             * @constant
+             */
+            type: "prompt_auto_and";
+        };
+        /**
+         * Prompt from Lookup Table
+         * @description Creates prompts using lookup table templates
+         */
+        PromptFromLookupTableInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Resolutions Dict
+             * @description Private field for id substitutions dict cache
+             * @default {}
+             */
+            resolutions_dict?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Lookups
+             * @description Lookup table(s) containing template(s) (JSON)
+             * @default []
+             */
+            lookups?: string | string[];
+            /**
+             * Remove Negatives
+             * @description Whether to strip out text between []
+             * @default false
+             */
+            remove_negatives?: boolean;
+            /**
+             * Strip Parens Probability
+             * @description Probability of removing attention group weightings
+             * @default 0
+             */
+            strip_parens_probability?: number;
+            /**
+             * Resolutions
+             * @description JSON structure of substitutions by id by tag
+             * @default []
+             */
+            resolutions?: string | string[];
+            /**
+             * Seed Vector In
+             * @description Optional JSON array of seeds for deterministic generation
+             * @default null
+             */
+            seed_vector_in?: string | null;
+            /**
+             * type
+             * @default prompt_from_lookup_table
+             * @constant
+             */
+            type: "prompt_from_lookup_table";
+        };
+        /**
+         * Prompt Strength
+         * @description Takes a prompt string and float strength and outputs a new string in the format of (prompt)strength
+         */
+        PromptStrengthInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description Collection of Prompt strengths
+             * @default []
+             */
+            collection?: string[];
+            /**
+             * Prompt
+             * @description Prompt to work on
+             * @default
+             */
+            prompt?: string;
+            /**
+             * Strength
+             * @description strength of the prompt
+             * @default 1
+             */
+            strength?: number;
+            /**
+             * type
+             * @default prompt_strength
+             * @constant
+             */
+            type: "prompt_strength";
+        };
+        /**
+         * PromptStrengthOutput
+         * @description Base class for nodes that output a collection of images
+         */
+        PromptStrengthOutput: {
+            /**
+             * Collection
+             * @description Prompt strength collection
+             */
+            collection: string[];
+            /**
+             * Value
+             * @description Prompt strength
+             */
+            value: string;
+            /**
+             * type
+             * @default prompt_strength_collection_output
+             * @constant
+             */
+            type: "prompt_strength_collection_output";
+        };
+        /**
+         * Prompt Strengths Combine
+         * @description Takes a collection of prompt strength strings and converts it into a combined .and() or .blend() structure. Blank prompts are ignored
+         */
+        PromptStrengthsCombineInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Prompt Strengths
+             * @description Prompt strengths to combine
+             * @default [
+             *       ""
+             *     ]
+             */
+            prompt_strengths?: string[];
+            /**
+             * Combine Type
+             * @description Combine type .and() or .blend()
+             * @default .and
+             * @enum {string}
+             */
+            combine_type?: ".and" | ".blend";
+            /**
+             * type
+             * @default prompt_strengths_combine
+             * @constant
+             */
+            type: "prompt_strengths_combine";
         };
         /**
          * Prompt Template
@@ -22151,6 +33572,65 @@ export type components = {
             type: "prompt_from_file";
         };
         /**
+         * Prompts To File
+         * @description Save prompts to a text file
+         */
+        PromptsToFileInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * File Path
+             * @description Path to prompt text file
+             * @default null
+             */
+            file_path?: string | null;
+            /**
+             * Prompts
+             * @description Prompt or collection of prompts to write
+             * @default null
+             */
+            prompts?: string | string[] | null;
+            /**
+             * Append
+             * @description Append or overwrite file
+             * @default true
+             */
+            append?: boolean;
+            /**
+             * type
+             * @default prompt_to_file
+             * @constant
+             */
+            type: "prompt_to_file";
+        };
+        /**
+         * PromptsToFileInvocationOutput
+         * @description Base class for invocation that writes to a file and returns nothing of use
+         */
+        PromptsToFileInvocationOutput: {
+            /**
+             * type
+             * @default prompt_to_file_output
+             * @constant
+             */
+            type: "prompt_to_file_output";
+        };
+        /**
          * PruneResult
          * @description Result of pruning the session queue
          */
@@ -22160,6 +33640,100 @@ export type components = {
              * @description Number of queue items deleted
              */
             deleted: number;
+        };
+        /**
+         * Prune/Clean Prompts
+         * @description Like home staging but for prompt text
+         */
+        PruneTextInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Content
+             * @description Text to prune/cleanup
+             * @default null
+             */
+            content?: string | null;
+            /**
+             * Blacklist File Path
+             * @description Path to .txt to prune with. No path will run without matched content removal.
+             * @default
+             */
+            blacklist_file_path?: string | null;
+            /**
+             * Remove Weight Syntax
+             * @description Remove basic Compel + A111-style attention weighting syntax. Special Compel syntax like .and() not supported
+             * @default false
+             */
+            remove_weight_syntax?: boolean;
+            /**
+             * Dedupe Tags
+             * @description Group text by commas, remove duplicates
+             * @default true
+             */
+            dedupe_tags?: boolean;
+            /**
+             * Remove Slashes
+             * @description Delete all backslashes instead of just extras
+             * @default true
+             */
+            remove_slashes?: boolean;
+            /**
+             * Remove Tis And Loras
+             * @description Delete Invoke TI syntax, A111 LoRAs, and Invoke 2.x LoRAs
+             * @default false
+             */
+            remove_tis_and_loras?: boolean;
+            /**
+             * Custom Regex Pattern
+             * @description Custom regex pattern to apply to the text
+             * @default
+             */
+            custom_regex_pattern?: string | null;
+            /**
+             * Custom Regex Substitution
+             * @description Substitution string for the custom regex pattern. Leave blank to simply delete captured text
+             * @default
+             */
+            custom_regex_substitution?: string | null;
+            /**
+             * type
+             * @default prune_prompt
+             * @constant
+             */
+            type: "prune_prompt";
+        };
+        /**
+         * PrunedPromptOutput
+         * @description Pruned and cleaned string output
+         */
+        PrunedPromptOutput: {
+            /**
+             * Prompt
+             * @description Processed prompt string
+             */
+            prompt: string;
+            /**
+             * type
+             * @default clean_prompt
+             * @constant
+             */
+            type: "clean_prompt";
         };
         /**
          * QueueClearedEvent
@@ -22560,11 +34134,260 @@ export type components = {
             variant: components["schemas"]["Qwen3VariantType"];
         };
         /**
+         * Qwen3 Prompt Pro
+         * @description Use a Qwen3 encoder as a causal LLM to enhance a prompt, then encode it for Z-Image and Flux Klein.
+         *
+         *     Accepts the same Qwen3 encoder model used by Z-Image and Flux2 Klein text encoder nodes.
+         *     Outputs the enhanced prompt as text plus ready-to-use conditioning for both pipelines.
+         */
+        Qwen3PromptProInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Prompt
+             * @description Input text prompt.
+             * @default
+             */
+            prompt?: string;
+            /**
+             * System Prompt
+             * @description System prompt that guides prompt enhancement (generation step).
+             * @default You are an expert prompt writer for AI image generation. Given a brief description, expand it into a detailed, vivid prompt suitable for generating high-quality images. Only output the expanded prompt, nothing else.
+             */
+            system_prompt?: string;
+            /**
+             * Conditioning System Prompt
+             * @description System prompt prepended when encoding the enhanced prompt into conditioning. Leave empty for default behavior.
+             * @default
+             */
+            conditioning_system_prompt?: string;
+            /**
+             * Qwen3 Encoder
+             * @description Qwen3 tokenizer and text encoder
+             * @default null
+             */
+            qwen3_encoder?: components["schemas"]["Qwen3EncoderField"] | null;
+            /**
+             * @description A mask defining the region that the conditioning applies to.
+             * @default null
+             */
+            mask?: components["schemas"]["TensorField"] | null;
+            /**
+             * Max Tokens
+             * @description Maximum number of tokens to generate.
+             * @default 300
+             */
+            max_tokens?: number;
+            /**
+             * Temperature
+             * @description Sampling temperature. Higher = more creative, lower = more focused.
+             * @default 0.7
+             */
+            temperature?: number;
+            /**
+             * Top P
+             * @description Nucleus sampling threshold.
+             * @default 0.9
+             */
+            top_p?: number;
+            /**
+             * Enable Thinking
+             * @description Enable Qwen3 thinking mode during generation. Slower but potentially higher quality.
+             * @default false
+             */
+            enable_thinking?: boolean;
+            /**
+             * type
+             * @default qwen3_prompt_pro
+             * @constant
+             */
+            type: "qwen3_prompt_pro";
+        };
+        /**
+         * Qwen3PromptProOutput
+         * @description Output containing the enhanced prompt text and conditioning for Z-Image and Flux Klein.
+         */
+        Qwen3PromptProOutput: {
+            /**
+             * Enhanced Prompt
+             * @description The enhanced prompt text
+             */
+            enhanced_prompt: string;
+            /** @description Z-Image conditioning embeddings */
+            z_image_conditioning: components["schemas"]["ZImageConditioningField"];
+            /**
+             * Z Image Prompt
+             * @description The prompt text encoded for Z-Image conditioning
+             */
+            z_image_prompt: string;
+            /** @description Flux Klein conditioning embeddings */
+            flux_conditioning: components["schemas"]["FluxConditioningField"];
+            /**
+             * Flux Prompt
+             * @description The prompt text encoded for Flux Klein conditioning
+             */
+            flux_prompt: string;
+            /**
+             * type
+             * @default qwen3_prompt_pro_output
+             * @constant
+             */
+            type: "qwen3_prompt_pro_output";
+        };
+        /**
          * Qwen3VariantType
          * @description Qwen3 text encoder variants based on model size.
          * @enum {string}
          */
         Qwen3VariantType: "qwen3_4b" | "qwen3_8b";
+        /**
+         * RGB Merge
+         * @description Merge RGB color channels and alpha
+         */
+        RGBMergeInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The red channel
+             * @default null
+             */
+            r_channel?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The green channel
+             * @default null
+             */
+            g_channel?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The blue channel
+             * @default null
+             */
+            b_channel?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description The alpha channel
+             * @default null
+             */
+            alpha_channel?: components["schemas"]["ImageField"] | null;
+            /**
+             * type
+             * @default rgb_merge
+             * @constant
+             */
+            type: "rgb_merge";
+        };
+        /**
+         * RGB Split
+         * @description Split an image into RGB color channels and alpha
+         */
+        RGBSplitInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to split into channels
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * type
+             * @default rgb_split
+             * @constant
+             */
+            type: "rgb_split";
+        };
+        /**
+         * RGBSplitOutput
+         * @description Base class for invocations that output three L-mode images (R, G, B)
+         */
+        RGBSplitOutput: {
+            /** @description Grayscale image of the red channel */
+            r_channel: components["schemas"]["ImageField"];
+            /** @description Grayscale image of the green channel */
+            g_channel: components["schemas"]["ImageField"];
+            /** @description Grayscale image of the blue channel */
+            b_channel: components["schemas"]["ImageField"];
+            /** @description Grayscale image of the alpha channel */
+            alpha_channel: components["schemas"]["ImageField"];
+            /**
+             * Width
+             * @description The width of the image in pixels
+             */
+            width: number;
+            /**
+             * Height
+             * @description The height of the image in pixels
+             */
+            height: number;
+            /**
+             * type
+             * @default rgb_split_output
+             * @constant
+             */
+            type: "rgb_split_output";
+        };
         /**
          * Random Float
          * @description Outputs a single random float
@@ -22613,6 +34436,67 @@ export type components = {
             type: "rand_float";
         };
         /**
+         * Random Image Size
+         * @description Outputs a random size from a list of sizes.
+         */
+        RandomImageSizeInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Seed
+             * @description A seed for the randomness. Use -1 for non-deterministic.
+             * @default -1
+             */
+            seed?: number;
+            /**
+             * Size List
+             * @default 1024x1024,888x1184,1184x888,840x1256,1256x840,768x1368,1368x768
+             */
+            size_list?: string;
+            /**
+             * Multiples of 32
+             * @default false
+             */
+            multiples_of_32?: boolean;
+            /**
+             * type
+             * @default random_image_size_invocation
+             * @constant
+             */
+            type: "random_image_size_invocation";
+        };
+        /**
+         * RandomImageSizeOutput
+         * @description Random Image Size Output
+         */
+        RandomImageSizeOutput: {
+            /** Width */
+            width: number;
+            /** Height */
+            height: number;
+            /**
+             * type
+             * @default random_image_size
+             * @constant
+             */
+            type: "random_image_size";
+        };
+        /**
          * Random Integer
          * @description Outputs a single random integer.
          */
@@ -22652,6 +34536,110 @@ export type components = {
              * @constant
              */
             type: "rand_int";
+        };
+        /**
+         * Random LoRA Mixer
+         * @description Returns a random Collection of LoRAs selected from an input Collection.
+         */
+        RandomLoRAMixerInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * LoRAs
+             * @description A random selection of the input LoRAs with random weights
+             * @default null
+             */
+            loras?: components["schemas"]["LoRAField"][] | null;
+            /**
+             * Seed
+             * @description A seed to use for the random number generator. This allows reproducability. Leave as -1 for non-deterministic
+             * @default -1
+             */
+            seed?: number;
+            /**
+             * Min LoRAs
+             * @description The mininum number of LoRAs to output
+             * @default 1
+             */
+            min_loras?: number;
+            /**
+             * Max LoRAs
+             * @description The maximum number of LoRAs to output
+             * @default 3
+             */
+            max_loras?: number;
+            /**
+             * Min Weight
+             * @description The mininum weight to apply to a LoRA
+             * @default 0.05
+             */
+            min_weight?: number;
+            /**
+             * Max Weight
+             * @description The maxinum weight to apply to a LoRA
+             * @default 1
+             */
+            max_weight?: number;
+            /**
+             * Trigger Word Delimiter
+             * @description A character sequence to place between each trigger word
+             * @default ,
+             */
+            trigger_word_delimiter?: string;
+            /**
+             * LoRA Names Delimiter
+             * @description A character sequence to place between each LoRA name
+             * @default ,
+             */
+            lora_names_delimiter?: string;
+            /**
+             * type
+             * @default random_lora_mixer_invocation
+             * @constant
+             */
+            type: "random_lora_mixer_invocation";
+        };
+        /**
+         * RandomLoRAMixerOutput
+         * @description Random LoRA Mixer Output
+         */
+        RandomLoRAMixerOutput: {
+            /**
+             * LoRAs
+             * @description A random selection of the input LoRAs with random weights
+             */
+            loras: components["schemas"]["LoRAField"][];
+            /**
+             * Trigger Words
+             * @description A string with delimited trigger words for the random LoRAs
+             */
+            trigger_words: string;
+            /**
+             * Lora Names
+             * @description A string with the names and weights of all applied LoRAs
+             */
+            lora_names: string;
+            /**
+             * type
+             * @default random_lora_mixer_output
+             * @constant
+             */
+            type: "random_lora_mixer_output";
         };
         /**
          * Random Range
@@ -22799,6 +34787,63 @@ export type components = {
              * @constant
              */
             type: "range_of_size";
+        };
+        /**
+         * Reapply LoRA Weight
+         * @description Allows specifying an alternate weight for a LoRA after it has been selected with a LoRA selector node
+         */
+        ReapplyLoRAWeightInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * LoRA
+             * @default null
+             */
+            lora?: components["schemas"]["LoRAField"] | null;
+            /**
+             * Weight
+             * @description The weight at which the LoRA is applied to each model
+             * @default 0.75
+             */
+            weight?: number;
+            /**
+             * type
+             * @default reapply_lora_weight_invocation
+             * @constant
+             */
+            type: "reapply_lora_weight_invocation";
+        };
+        /**
+         * ReapplyLoRAWeightOutput
+         * @description Reapply LoRA Weight Output
+         */
+        ReapplyLoRAWeightOutput: {
+            /**
+             * LoRA
+             * @description LoRA model from a LoRA Selector node
+             */
+            lora: components["schemas"]["LoRAField"];
+            /**
+             * type
+             * @default reapply_lora_weight_output
+             * @constant
+             */
+            type: "reapply_lora_weight_output";
         };
         /**
          * RecallParameter
@@ -23135,6 +35180,636 @@ export type components = {
          * @enum {string}
          */
         ResourceOrigin: "internal" | "external";
+        /** Retrieve Images from Board */
+        RetrieveBoardImagesInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input board containing images to be retrieved. If not provided or set to None, it will grab images from uncategorized.
+             * @default null
+             */
+            input_board?: components["schemas"]["BoardField"] | null;
+            /**
+             * Num Images
+             * @description Number of images to retrieve: specify 'all', a single index like '10', specific indices like '1,4,6', or a range like '30-50'.
+             * @default all
+             */
+            num_images?: string;
+            /**
+             * Category
+             * @description Category of images to retrieve; select either 'images' or 'assets'.
+             * @default images
+             * @enum {string}
+             */
+            category?: "images" | "assets";
+            /**
+             * Starred Only
+             * @description Retrieve only starred images if set to True.
+             * @default false
+             */
+            starred_only?: boolean;
+            /**
+             * Keyword
+             * @description Keyword to filter images by metadata. Only images with metadata containing this keyword will be retrieved.
+             * @default null
+             */
+            keyword?: string | null;
+            /**
+             * type
+             * @default Retrieve_Board_Images
+             * @constant
+             */
+            type: "Retrieve_Board_Images";
+        };
+        /**
+         * Retrieve Flux Conditioning
+         * @description Retrieves one or more FLUX Conditioning objects (CLIP and T5 embeddings)
+         *     from an SQLite database using unique identifiers.
+         *     Outputs a single selected conditioning and a list of all retrieved conditionings.
+         *     Includes an option to update the timestamp of retrieved entries.
+         *     The input conditioning IDs are sorted for deterministic retrieval.
+         */
+        RetrieveFluxConditioningInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Conditioning Id Or List
+             * @description The unique identifier(s) of the Flux Conditioning(s) to retrieve.
+             * @default null
+             */
+            conditioning_id_or_list?: string | string[] | null;
+            /**
+             * Select Index
+             * @description Index of the retrieved conditioning to output as the single 'conditioning' field. If out of bounds, uses modulus.
+             * @default 0
+             */
+            select_index?: number;
+            /**
+             * Touch Timestamp
+             * @description When true, updates the timestamp of retrieved entries to 'now', preventing early purge.
+             * @default false
+             */
+            touch_timestamp?: boolean;
+            /**
+             * type
+             * @default retrieve_flux_conditioning
+             * @constant
+             */
+            type: "retrieve_flux_conditioning";
+        };
+        /**
+         * RetrieveFluxConditioningMultiOutput
+         * @description Output for the Retrieve Flux Conditioning node, providing a single selected
+         *     conditioning and a list of all retrieved conditionings.
+         */
+        RetrieveFluxConditioningMultiOutput: {
+            /** @description A single selected Flux Conditioning (selected by index from the retrieved list) */
+            conditioning: components["schemas"]["FluxConditioningField"];
+            /**
+             * Conditioning List
+             * @description A list of all retrieved Flux Conditionings
+             */
+            conditioning_list: components["schemas"]["FluxConditioningField"][];
+            /**
+             * type
+             * @default retrieve_flux_conditioning_multi_output
+             * @constant
+             */
+            type: "retrieve_flux_conditioning_multi_output";
+        };
+        /**
+         * Bitize
+         * @description Crush an image to one-bit pixels
+         */
+        RetroBitizeInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input image for pixelization
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Dither
+             * @description Dither the Bitized image
+             * @default true
+             */
+            dither?: boolean;
+            /**
+             * type
+             * @default retro_bitize
+             * @constant
+             */
+            type: "retro_bitize";
+        };
+        /**
+         * CRT
+         * @description Distort the input image, simulating CRT display curvature
+         */
+        RetroCRTCurvatureInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input image for pixelization
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Crt Width
+             * @description Horizontal resolution of the CRT; smaller = more noticeable
+             * @default 240
+             */
+            crt_width?: number;
+            /**
+             * Crt Height
+             * @description Vertical resolution of the CRT; smaller = more noticeable
+             * @default 160
+             */
+            crt_height?: number;
+            /**
+             * Crt Curvature
+             * @description Curvature factor; smaller = stronger inward curve
+             * @default 3
+             */
+            crt_curvature?: number;
+            /**
+             * Scanlines Opacity
+             * @description Opacity of CRT scan lines
+             * @default 1
+             */
+            scanlines_opacity?: number;
+            /**
+             * Vignette Opacity
+             * @description Vignette opacity
+             * @default 0.5
+             */
+            vignette_opacity?: number;
+            /**
+             * Vignette Roundness
+             * @description Vignette opacity
+             * @default 5
+             */
+            vignette_roundness?: number;
+            /**
+             * Crt Brightness
+             * @description Factor by which to brighten the image if using scan lines
+             * @default 1.2
+             */
+            crt_brightness?: number;
+            /**
+             * type
+             * @default retro_crt_curvature
+             * @constant
+             */
+            type: "retro_crt_curvature";
+        };
+        /**
+         * Get Palette (Advanced)
+         * @description Get palette from an image, 256 colors max. Optionally export to a user-defined location.
+         */
+        RetroGetPaletteAdvInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input image to grab a palette from
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Export
+             * @description Save palette PNG to specified path with optional name
+             * @default true
+             */
+            export?: boolean;
+            /**
+             * Subfolder
+             * @description Subfolder for the palette in nodes/Retroize/palettes/ folder
+             * @default
+             */
+            subfolder?: string;
+            /**
+             * Name
+             * @description Name for the palette image
+             * @default
+             */
+            name?: string;
+            /**
+             * type
+             * @default get_palette_adv
+             * @constant
+             */
+            type: "get_palette_adv";
+        };
+        /**
+         * Get Palette
+         * @description Get palette from an image, 256 colors max.
+         */
+        RetroGetPaletteInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input image to grab a palette from
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * type
+             * @default get_palette
+             * @constant
+             */
+            type: "get_palette";
+        };
+        /**
+         * Palettize Advanced
+         * @description Palettize an image by applying a color palette
+         */
+        RetroPalettizeAdvInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input image for pixelization
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Palette Image
+             * @description Palette image
+             * @default null
+             */
+            palette_image?: ("None" | "aap-64.png" | "atari-8-bit.png" | "commodore64.png" | "endesga-32.png" | "fantasy-24.png" | "mg\\mg-16-01.png" | "microsoft-windows.png" | "NES.png" | "nintendo-gameboy.png" | "pico-8.png" | "slso8.png") | null;
+            /**
+             * Dither
+             * @description Apply dithering to image when palettizing
+             * @default false
+             */
+            dither?: boolean;
+            /**
+             * Prequantize
+             * @description Apply 256-color quantization with specified method prior to applying the color palette
+             * @default false
+             */
+            prequantize?: boolean;
+            /**
+             * Quantizer
+             * @description Palettizer quantization method
+             * @default Fast Octree
+             * @enum {string}
+             */
+            quantizer?: "Median Cut" | "Max Coverage" | "Fast Octree";
+            /**
+             * type
+             * @default retro_palettize_adv
+             * @constant
+             */
+            type: "retro_palettize_adv";
+        };
+        /**
+         * Palettize
+         * @description Palettize an image by applying a color palette
+         */
+        RetroPalettizeInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input image for pixelization
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * @description Palette image
+             * @default null
+             */
+            palette_image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Palette Path
+             * @description Palette image path, including ".png" extension
+             * @default
+             */
+            palette_path?: string;
+            /**
+             * Dither
+             * @description Apply dithering to image when palettizing
+             * @default false
+             */
+            dither?: boolean;
+            /**
+             * Prequantize
+             * @description Apply 256-color quantization with specified method prior to applying the color palette
+             * @default false
+             */
+            prequantize?: boolean;
+            /**
+             * Quantizer
+             * @description Palettizer quantization method
+             * @default Fast Octree
+             * @enum {string}
+             */
+            quantizer?: "Median Cut" | "Max Coverage" | "Fast Octree";
+            /**
+             * type
+             * @default retro_palettize
+             * @constant
+             */
+            type: "retro_palettize";
+        };
+        /**
+         * Quantize
+         * @description Quantize an image to 256 or less colors
+         */
+        RetroQuantizeInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input image for quantizing
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Colors
+             * @description Number of colors the image should be reduced to
+             * @default 64
+             */
+            colors?: number;
+            /**
+             * Method
+             * @description Quantization method
+             * @default Median Cut
+             * @enum {string}
+             */
+            method?: "Median Cut" | "Max Coverage" | "Fast Octree";
+            /**
+             * Kmeans
+             * @description k_means
+             * @default 0
+             */
+            kmeans?: number;
+            /**
+             * Dither
+             * @description Dither quantized image
+             * @default true
+             */
+            dither?: boolean;
+            /**
+             * type
+             * @default retro_quantize
+             * @constant
+             */
+            type: "retro_quantize";
+        };
+        /**
+         * Scan Lines
+         * @description Apply a simple scan lines effect to the input image
+         */
+        RetroScanlinesSimpleInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Input image to add scanlines to
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Line Size
+             * @description Thickness of scanlines in pixels
+             * @default 1
+             */
+            line_size?: number;
+            /**
+             * Line Spacing
+             * @description Space between lines in pixels
+             * @default 4
+             */
+            line_spacing?: number;
+            /**
+             * @description Darkness of scanlines, 1.0 being black
+             * @default {
+             *       "r": 0,
+             *       "g": 0,
+             *       "b": 0,
+             *       "a": 255
+             *     }
+             */
+            line_color?: components["schemas"]["ColorField"];
+            /**
+             * Size Jitter
+             * @description Random line position offset
+             * @default 0
+             */
+            size_jitter?: number;
+            /**
+             * Space Jitter
+             * @description Random line position offset
+             * @default 0
+             */
+            space_jitter?: number;
+            /**
+             * Vertical
+             * @description Switch scanlines to vertical
+             * @default false
+             */
+            vertical?: boolean;
+            /**
+             * type
+             * @default retro_scanlines_simple
+             * @constant
+             */
+            type: "retro_scanlines_simple";
+        };
         /** RetryItemsResult */
         RetryItemsResult: {
             /**
@@ -23448,6 +36123,64 @@ export type components = {
             type: "sd3_l2i";
         };
         /**
+         * SD3 Main Model Input
+         * @description Loads a sd3 model from an input, outputting its submodels.
+         */
+        SD3ModelLoaderInputInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description SD3 model (MMDiTX) to load
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * T5 Encoder
+             * @description T5 tokenizer and text encoder
+             * @default null
+             */
+            t5_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * CLIP L Encoder
+             * @description CLIP Embed loader
+             * @default null
+             */
+            clip_l_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * CLIP G Encoder
+             * @description CLIP-G Embed loader
+             * @default null
+             */
+            clip_g_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * VAE
+             * @description VAE model to load
+             * @default null
+             */
+            vae_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default sd3_model_loader_input
+             * @constant
+             */
+            type: "sd3_model_loader_input";
+        };
+        /**
          * Prompt - SDXL
          * @description Parse prompt using compel package to conditioning.
          */
@@ -23678,6 +36411,123 @@ export type components = {
             type: "sdxl_lora_loader_output";
         };
         /**
+         * SDXL Main Model Toggle
+         * @description Allows boolean selection between two separate SDXL Main Model inputs
+         */
+        SDXLMainModelToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * UNet 1
+             * @description UNet (scheduler, LoRAs)
+             * @default null
+             */
+            unet1?: components["schemas"]["UNetField"] | null;
+            /**
+             * CLIP 1 1
+             * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+             * @default null
+             */
+            clip1?: components["schemas"]["CLIPField"] | null;
+            /**
+             * CLIP 2 1
+             * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+             * @default null
+             */
+            clip21?: components["schemas"]["CLIPField"] | null;
+            /**
+             * VAE 1
+             * @description VAE
+             * @default null
+             */
+            vae1?: components["schemas"]["VAEField"] | null;
+            /**
+             * UNet 2
+             * @description UNet (scheduler, LoRAs)
+             * @default null
+             */
+            unet2?: components["schemas"]["UNetField"] | null;
+            /**
+             * CLIP 1 2
+             * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+             * @default null
+             */
+            clip2?: components["schemas"]["CLIPField"] | null;
+            /**
+             * CLIP 2 2
+             * @description CLIP (tokenizer, text encoder, LoRAs) and skipped layer count
+             * @default null
+             */
+            clip22?: components["schemas"]["CLIPField"] | null;
+            /**
+             * VAE 2
+             * @description VAE
+             * @default null
+             */
+            vae2?: components["schemas"]["VAEField"] | null;
+            /**
+             * type
+             * @default sdxl_main_model_toggle
+             * @constant
+             */
+            type: "sdxl_main_model_toggle";
+        };
+        /**
+         * SDXL Main Model Input
+         * @description Loads a sdxl model from an input, outputting its submodels.
+         */
+        SDXLModelLoaderInputInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default sdxl_model_loader_input
+             * @constant
+             */
+            type: "sdxl_model_loader_input";
+        };
+        /**
          * Main Model - SDXL
          * @description Loads an sdxl base model, outputting its submodels.
          */
@@ -23742,6 +36592,40 @@ export type components = {
              * @constant
              */
             type: "sdxl_model_loader_output";
+        };
+        /**
+         * SDXL Model To String
+         * @description Converts an SDXL Model to a JSONString
+         */
+        SDXLModelToStringInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default sdxl_model_to_string
+             * @constant
+             */
+            type: "sdxl_model_to_string";
         };
         /**
          * Prompt - SDXL Refiner
@@ -24030,6 +36914,89 @@ export type components = {
          */
         SchedulerPredictionType: "epsilon" | "v_prediction" | "sample";
         /**
+         * Scheduler To String
+         * @description Converts a Scheduler to a string
+         */
+        SchedulerToStringInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Scheduler
+             * @description Scheduler to use during inference
+             * @default euler
+             * @enum {string}
+             */
+            scheduler?: "ddim" | "ddpm" | "deis" | "deis_k" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_k" | "kdpm_2_a" | "kdpm_2_a_k" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_3m" | "dpmpp_3m_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "unipc_k" | "lcm" | "tcd";
+            /**
+             * type
+             * @default scheduler_to_string
+             * @constant
+             */
+            type: "scheduler_to_string";
+        };
+        /**
+         * Scheduler Toggle
+         * @description Allows boolean selection between two separate scheduler inputs
+         */
+        SchedulerToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Scheduler1
+             * @description First Scheduler Input
+             * @default null
+             */
+            scheduler1?: ("ddim" | "ddpm" | "deis" | "deis_k" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_k" | "kdpm_2_a" | "kdpm_2_a_k" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_3m" | "dpmpp_3m_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "unipc_k" | "lcm" | "tcd") | null;
+            /**
+             * Scheduler2
+             * @description Second Scheduler Input
+             * @default null
+             */
+            scheduler2?: ("ddim" | "ddpm" | "deis" | "deis_k" | "lms" | "lms_k" | "pndm" | "heun" | "heun_k" | "euler" | "euler_k" | "euler_a" | "kdpm_2" | "kdpm_2_k" | "kdpm_2_a" | "kdpm_2_a_k" | "dpmpp_2s" | "dpmpp_2s_k" | "dpmpp_2m" | "dpmpp_2m_k" | "dpmpp_2m_sde" | "dpmpp_2m_sde_k" | "dpmpp_3m" | "dpmpp_3m_k" | "dpmpp_sde" | "dpmpp_sde_k" | "unipc" | "unipc_k" | "lcm" | "tcd") | null;
+            /**
+             * type
+             * @default scheduler_toggle
+             * @constant
+             */
+            type: "scheduler_toggle";
+        };
+        /**
          * Main Model - SD3
          * @description Loads a SD3 base model, outputting its submodels.
          */
@@ -24120,6 +37087,40 @@ export type components = {
              * @constant
              */
             type: "sd3_model_loader_output";
+        };
+        /**
+         * SD3 Model To String
+         * @description Converts an SD3 Model to a JSONString
+         */
+        Sd3ModelToStringInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description SD3 model (MMDiTX) to load
+             * @default null
+             */
+            model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * type
+             * @default sd3_model_to_string
+             * @constant
+             */
+            type: "sd3_model_to_string";
         };
         /**
          * Prompt - SD3
@@ -24315,6 +37316,42 @@ export type components = {
              * @constant
              */
             type: "segment_anything";
+        };
+        /**
+         * Separate Prompt and Seed Vector
+         * @description Parses a JSON string representing a list of two strings,
+         *     outputting each string separately.
+         */
+        SeparatePromptAndSeedVectorInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Pair Input
+             * @description JSON string of a list containing exactly two strings, e.g., '["string one", "string two"]'
+             * @default ["", ""]
+             */
+            pair_input?: string;
+            /**
+             * type
+             * @default separate_prompt_and_seed_vector
+             * @constant
+             */
+            type: "separate_prompt_and_seed_vector";
         };
         /** SessionProcessorStatus */
         SessionProcessorStatus: {
@@ -24611,6 +37648,119 @@ export type components = {
              * @description Whether strict password requirements are enforced
              */
             strict_password_checking: boolean;
+        };
+        /**
+         * Shadows/Highlights/Midtones
+         * @description Extract a Shadows/Highlights/Midtones mask from an image.
+         *
+         *     Extract three masks (with adjustable hard or soft thresholds) representing shadows, midtones, and highlights regions of an image.
+         */
+        ShadowsHighlightsMidtonesMaskInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description Image from which to extract mask
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Invert Output
+             * @description Off: white on black / On: black on white
+             * @default true
+             */
+            invert_output?: boolean;
+            /**
+             * Highlight Threshold
+             * @description Threshold beyond which mask values will be at extremum
+             * @default 0.75
+             */
+            highlight_threshold?: number;
+            /**
+             * Upper Mid Threshold
+             * @description Threshold to which to extend mask border by 0..1 gradient
+             * @default 0.7
+             */
+            upper_mid_threshold?: number;
+            /**
+             * Lower Mid Threshold
+             * @description Threshold to which to extend mask border by 0..1 gradient
+             * @default 0.3
+             */
+            lower_mid_threshold?: number;
+            /**
+             * Shadow Threshold
+             * @description Threshold beyond which mask values will be at extremum
+             * @default 0.25
+             */
+            shadow_threshold?: number;
+            /**
+             * Mask Expand Or Contract
+             * @description Pixels to grow (or shrink) the mask areas
+             * @default 0
+             */
+            mask_expand_or_contract?: number;
+            /**
+             * Mask Blur
+             * @description Gaussian blur radius to apply to the masks
+             * @default 0
+             */
+            mask_blur?: number;
+            /**
+             * type
+             * @default shmmask
+             * @constant
+             */
+            type: "shmmask";
+        };
+        /** ShadowsHighlightsMidtonesMasksOutput */
+        ShadowsHighlightsMidtonesMasksOutput: {
+            /** @description Soft-edged highlights mask */
+            highlights_mask: components["schemas"]["ImageField"];
+            /** @description Soft-edged midtones mask */
+            midtones_mask: components["schemas"]["ImageField"];
+            /** @description Soft-edged shadows mask */
+            shadows_mask: components["schemas"]["ImageField"];
+            /**
+             * Width
+             * @description Width of the input/outputs
+             */
+            width: number;
+            /**
+             * Height
+             * @description Height of the input/outputs
+             */
+            height: number;
+            /**
+             * type
+             * @default shmmask_output
+             * @constant
+             */
+            type: "shmmask_output";
         };
         /**
          * Show Image
@@ -24919,6 +38069,74 @@ export type components = {
              */
             format: "checkpoint";
         };
+        /**
+         * Spherical Distortion
+         * @description Applies spherical distortion to an image and fills the frame with the resulting image
+         */
+        SphericalDistortionInvocation: {
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to distort
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * K1
+             * @description k1
+             * @default 0.3
+             */
+            k1?: number;
+            /**
+             * K2
+             * @description k2
+             * @default 0.1
+             */
+            k2?: number;
+            /**
+             * P1
+             * @description p1
+             * @default 0
+             */
+            p1?: number;
+            /**
+             * P2
+             * @description p2
+             * @default 0
+             */
+            p2?: number;
+            /**
+             * type
+             * @default spherical_distortion
+             * @constant
+             */
+            type: "spherical_distortion";
+        };
         /** StarredImagesResult */
         StarredImagesResult: {
             /**
@@ -24995,6 +38213,42 @@ export type components = {
             previous_names?: string[];
         };
         /**
+         * Store Flux Conditioning
+         * @description Stores a FLUX Conditioning object (CLIP and T5 embeddings) into an SQLite database.
+         *     Returns a unique identifier for retrieval.
+         *     Includes database size management with proactive deletion and VACUUM.
+         */
+        StoreFluxConditioningInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * @description The FLUX Conditioning object to store.
+             * @default null
+             */
+            conditioning?: components["schemas"]["FluxConditioningField"] | null;
+            /**
+             * type
+             * @default store_flux_conditioning
+             * @constant
+             */
+            type: "store_flux_conditioning";
+        };
+        /**
          * String2Output
          * @description Base class for invocations that output two strings
          */
@@ -25059,6 +38313,53 @@ export type components = {
             type: "string_batch";
         };
         /**
+         * String Collection Index
+         * @description CollectionIndex Picks an index out of a collection with a random option
+         */
+        StringCollectionIndexInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Random
+             * @description Random Index?
+             * @default true
+             */
+            random?: boolean;
+            /**
+             * Index
+             * @description zero based index into collection (note index will wrap around if out of bounds)
+             * @default 0
+             */
+            index?: number;
+            /**
+             * Collection
+             * @description string collection
+             * @default null
+             */
+            collection?: string[] | null;
+            /**
+             * type
+             * @default string_collection_index
+             * @constant
+             */
+            type: "string_collection_index";
+        };
+        /**
          * String Collection Primitive
          * @description A collection of string primitive values
          */
@@ -25094,6 +38395,111 @@ export type components = {
             type: "string_collection";
         };
         /**
+         * String Collection Joiner
+         * @description Takes a collection of strings and returns a single string with all the collections items, separated by the input delimiter.
+         */
+        StringCollectionJoinerInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Delimiter
+             * @description The character to place between each string.
+             * @default ,
+             */
+            delimiter?: string;
+            /**
+             * Collection
+             * @description The string collection to join.
+             * @default null
+             */
+            collection?: string[] | null;
+            /**
+             * Escape Delimiter
+             * @description Wehter we should escape the delimiter
+             * @default false
+             */
+            escape_delimiter?: boolean;
+            /**
+             * type
+             * @default string_collection_joiner_invocation
+             * @constant
+             */
+            type: "string_collection_joiner_invocation";
+        };
+        /**
+         * StringCollectionJoinerOutput
+         * @description String Collection Joiner Output
+         */
+        StringCollectionJoinerOutput: {
+            /**
+             * Result
+             * @description The joined string
+             */
+            result: string;
+            /**
+             * type
+             * @default string_collection_joiner_output
+             * @constant
+             */
+            type: "string_collection_joiner_output";
+        };
+        /**
+         * String Collection Primitive Linked
+         * @description Allows creation of collection and optionally add a collection
+         */
+        StringCollectionLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Collection
+             * @description The collection of string values
+             * @default []
+             */
+            collection?: string[];
+            /**
+             * type
+             * @default string_collection_linked
+             * @constant
+             */
+            type: "string_collection_linked";
+            /**
+             * Value
+             * @description The string value
+             * @default null
+             */
+            value?: string | null;
+        };
+        /**
          * StringCollectionOutput
          * @description Base class for nodes that output a collection of strings
          */
@@ -25109,6 +38515,53 @@ export type components = {
              * @constant
              */
             type: "string_collection_output";
+        };
+        /**
+         * String Collection Toggle
+         * @description Allows boolean selection between two separate string collection inputs
+         */
+        StringCollectionToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * Col1
+             * @description First String Collection Input
+             * @default null
+             */
+            col1?: string[] | null;
+            /**
+             * Col2
+             * @description Second String Collection Input
+             * @default null
+             */
+            col2?: string[] | null;
+            /**
+             * type
+             * @default string_collection_toggle
+             * @constant
+             */
+            type: "string_collection_toggle";
         };
         /**
          * String Generator
@@ -25455,6 +38908,468 @@ export type components = {
             type: "string_split_neg";
         };
         /**
+         * String to Collection Splitter
+         * @description Takes a delimited string and splits it into a collection.
+         */
+        StringToCollectionSplitterInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Delimiter
+             * @description The character dividing each string.
+             * @default ,
+             */
+            delimiter?: string;
+            /**
+             * String
+             * @description The string to split.
+             * @default null
+             */
+            string?: string | null;
+            /**
+             * Escape Delimiter
+             * @description Whether we should unescape the delimiter
+             * @default false
+             */
+            unescape_delimiter?: boolean;
+            /**
+             * type
+             * @default string_to_collection_splitter_invocation
+             * @constant
+             */
+            type: "string_to_collection_splitter_invocation";
+        };
+        /**
+         * String To Float
+         * @description Converts a string to a float
+         */
+        StringToFloatInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Float String
+             * @description string containing a float to convert
+             * @default null
+             */
+            float_string?: string | null;
+            /**
+             * type
+             * @default string_to_float
+             * @constant
+             */
+            type: "string_to_float";
+        };
+        /**
+         * String To Int
+         * @description Converts a string to an integer
+         */
+        StringToIntInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Int String
+             * @description string containing an integer to convert
+             * @default null
+             */
+            int_string?: string | null;
+            /**
+             * type
+             * @default string_to_int
+             * @constant
+             */
+            type: "string_to_int";
+        };
+        /**
+         * String To LoRA
+         * @description Loads a lora from a json string, outputting its submodels.
+         */
+        StringToLoraInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Model String
+             * @description string containing a Model to convert
+             * @default null
+             */
+            model_string?: string | null;
+            /**
+             * type
+             * @default string_to_lora
+             * @constant
+             */
+            type: "string_to_lora";
+        };
+        /**
+         * StringToLoraOutput
+         * @description String to Lora model output
+         */
+        StringToLoraOutput: {
+            /**
+             * Model
+             * @description LoRA model to load
+             */
+            model: components["schemas"]["ModelIdentifierField"];
+            /**
+             * Name
+             * @description Model Name
+             */
+            name: string;
+            /**
+             * type
+             * @default string_to_lora_output
+             * @constant
+             */
+            type: "string_to_lora_output";
+        };
+        /**
+         * String To Main Model
+         * @description Loads a main model from a json string, outputting its submodels.
+         */
+        StringToMainModelInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Model String
+             * @description string containing a Model to convert
+             * @default null
+             */
+            model_string?: string | null;
+            /**
+             * type
+             * @default string_to_main_model
+             * @constant
+             */
+            type: "string_to_main_model";
+        };
+        /**
+         * StringToMainModelOutput
+         * @description String to main model output
+         */
+        StringToMainModelOutput: {
+            /**
+             * Model
+             * @description Main model (UNet, VAE, CLIP) to load
+             */
+            model: components["schemas"]["ModelIdentifierField"];
+            /**
+             * Name
+             * @description Model Name
+             */
+            name: string;
+            /**
+             * type
+             * @default string_to_main_model_output
+             * @constant
+             */
+            type: "string_to_main_model_output";
+        };
+        /**
+         * String To Model
+         * @description Loads a model from a json string, outputting its submodels.
+         */
+        StringToModelInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Model String
+             * @description string containing a Model to convert
+             * @default null
+             */
+            model_string?: string | null;
+            /**
+             * type
+             * @default string_to_model
+             * @constant
+             */
+            type: "string_to_model";
+        };
+        /**
+         * StringToModelOutput
+         * @description String to model output
+         */
+        StringToModelOutput: {
+            /**
+             * Model
+             * @description Model identifier
+             */
+            model: components["schemas"]["ModelIdentifierField"];
+            /**
+             * Name
+             * @description Model Name
+             */
+            name: string;
+            /**
+             * type
+             * @default string_to_model_output
+             * @constant
+             */
+            type: "string_to_model_output";
+        };
+        /**
+         * String To SDXL Main Model
+         * @description Loads a SDXL model from a json string, outputting its submodels.
+         */
+        StringToSDXLModelInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Model String
+             * @description string containing a Model to convert
+             * @default null
+             */
+            model_string?: string | null;
+            /**
+             * type
+             * @default string_to_sdxl_model
+             * @constant
+             */
+            type: "string_to_sdxl_model";
+        };
+        /**
+         * StringToSDXLModelOutput
+         * @description String to SDXL main model output
+         */
+        StringToSDXLModelOutput: {
+            /**
+             * Model
+             * @description Main model (UNet, VAE, CLIP) to load
+             */
+            model: components["schemas"]["ModelIdentifierField"];
+            /**
+             * Name
+             * @description Model Name
+             */
+            name: string;
+            /**
+             * type
+             * @default string_to_sdxl_model_output
+             * @constant
+             */
+            type: "string_to_sdxl_model_output";
+        };
+        /**
+         * String To Scheduler
+         * @description Converts a string to a scheduler
+         */
+        StringToSchedulerInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Scheduler String
+             * @description string containing a scheduler to convert
+             * @default null
+             */
+            scheduler_string?: string | null;
+            /**
+             * type
+             * @default string_to_scheduler
+             * @constant
+             */
+            type: "string_to_scheduler";
+        };
+        /**
+         * String Toggle
+         * @description Allows boolean selection between two separate string inputs
+         */
+        StringToggleInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Use Second
+             * @description Use 2nd Input
+             * @default false
+             */
+            use_second?: boolean;
+            /**
+             * String 1
+             * @description First String Input
+             * @default null
+             */
+            str1?: string | null;
+            /**
+             * String 2
+             * @description Second String Input
+             * @default null
+             */
+            str2?: string | null;
+            /**
+             * type
+             * @default string_toggle
+             * @constant
+             */
+            type: "string_toggle";
+        };
+        /**
+         * Strings To CSV
+         * @description Strings To CSV converts a a list of Strings into a CSV
+         */
+        StringsToCSVInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Strings
+             * @description String or Collection of Strings to convert to CSV format
+             * @default
+             */
+            strings?: string | string[];
+            /**
+             * type
+             * @default strings_to_csv
+             * @constant
+             */
+            type: "strings_to_csv";
+        };
+        /**
          * StylePresetField
          * @description A style preset primitive field
          */
@@ -25638,6 +39553,91 @@ export type components = {
              * @constant
              */
             type: "t2i_adapter";
+        };
+        /**
+         * T2I-Adapter-Linked
+         * @description Collects T2I-Adapter info to pass to other nodes.
+         */
+        T2IAdapterLinkedInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The IP-Adapter image prompt.
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * T2I-Adapter Model
+             * @description The T2I-Adapter model.
+             * @default null
+             */
+            t2i_adapter_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Weight
+             * @description The weight given to the T2I-Adapter
+             * @default 1
+             */
+            weight?: number | number[];
+            /**
+             * Begin Step Percent
+             * @description When the T2I-Adapter is first applied (% of total steps)
+             * @default 0
+             */
+            begin_step_percent?: number;
+            /**
+             * End Step Percent
+             * @description When the T2I-Adapter is last applied (% of total steps)
+             * @default 1
+             */
+            end_step_percent?: number;
+            /**
+             * Resize Mode
+             * @description The resize mode applied to the T2I-Adapter input image so that it matches the target output size.
+             * @default just_resize
+             * @enum {string}
+             */
+            resize_mode?: "just_resize" | "crop_resize" | "fill_resize" | "just_resize_simple";
+            /**
+             * type
+             * @default t2i_adapter_linked
+             * @constant
+             */
+            type: "t2i_adapter_linked";
+            /**
+             * T2I Adapter List
+             * @description T2I-Adapter(s) to apply
+             * @default null
+             */
+            t2i_adapter_list?: components["schemas"]["T2IAdapterField"] | components["schemas"]["T2IAdapterField"][] | null;
+        };
+        /** T2IAdapterListOutput */
+        T2IAdapterListOutput: {
+            /**
+             * T2I Adapter List
+             * @description T2I-Adapter(s) to apply
+             */
+            t2i_adapter_list: components["schemas"]["T2IAdapterField"][];
+            /**
+             * type
+             * @default t2i_adapter_list_output
+             * @constant
+             */
+            type: "t2i_adapter_list_output";
         };
         /** T2IAdapterMetadataField */
         T2IAdapterMetadataField: {
@@ -26427,12 +40427,487 @@ export type components = {
              */
             tensor_name: string;
         };
+        /**
+         * Text Mask
+         * @description Creates a 2D rendering of a text mask from a given font.
+         *
+         *     Create a white on black (or black on white) text image for use with controlnets or further processing in other nodes. Specify any TTF/OTF font file available to Invoke and control parameters to resize, rotate, and reposition the text.
+         *
+         *     Currently this only generates one line of text, but it can be layered with other images using the Image Compositor node or any other such tool.
+         */
+        TextMaskInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Width
+             * @description The width of the desired mask
+             * @default 512
+             */
+            width?: number;
+            /**
+             * Height
+             * @description The height of the desired mask
+             * @default 512
+             */
+            height?: number;
+            /**
+             * Text
+             * @description The text to render
+             * @default
+             */
+            text?: string;
+            /**
+             * Font
+             * @description Path to a FreeType-supported TTF/OTF font file
+             * @default
+             */
+            font?: string;
+            /**
+             * Size
+             * @description Desired point size of text to use
+             * @default 64
+             */
+            size?: number;
+            /**
+             * Angle
+             * @description Angle of rotation to apply to the text
+             * @default 0
+             */
+            angle?: number;
+            /**
+             * X Offset
+             * @description x-offset for text rendering
+             * @default 24
+             */
+            x_offset?: number;
+            /**
+             * Y Offset
+             * @description y-offset for text rendering
+             * @default 36
+             */
+            y_offset?: number;
+            /**
+             * Invert
+             * @description Whether to invert color of the output
+             * @default false
+             */
+            invert?: boolean;
+            /**
+             * type
+             * @default text_mask
+             * @constant
+             */
+            type: "text_mask";
+        };
+        /**
+         * Text to Mask Advanced (Clipseg)
+         * @description Uses the Clipseg model to generate an image mask from a text prompt.
+         *
+         *     Output up to four prompt masks combined with logical "and", logical "or", or as separate channels of an RGBA image.
+         */
+        TextToMaskClipsegAdvancedInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image from which to create a mask
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Invert Output
+             * @description Off: white on black / On: black on white
+             * @default true
+             */
+            invert_output?: boolean;
+            /**
+             * Prompt 1
+             * @description First prompt with which to create a mask
+             * @default null
+             */
+            prompt_1?: string | null;
+            /**
+             * Prompt 2
+             * @description Second prompt with which to create a mask (optional)
+             * @default null
+             */
+            prompt_2?: string | null;
+            /**
+             * Prompt 3
+             * @description Third prompt with which to create a mask (optional)
+             * @default null
+             */
+            prompt_3?: string | null;
+            /**
+             * Prompt 4
+             * @description Fourth prompt with which to create a mask (optional)
+             * @default null
+             */
+            prompt_4?: string | null;
+            /**
+             * Combine
+             * @description How to combine the results
+             * @default or
+             * @enum {string}
+             */
+            combine?: "or" | "and" | "butnot" | "none (rgba multiplex)";
+            /**
+             * Smoothing
+             * @description Radius of blur to apply before thresholding
+             * @default 4
+             */
+            smoothing?: number;
+            /**
+             * Subject Threshold
+             * @description Threshold above which is considered the subject
+             * @default 1
+             */
+            subject_threshold?: number;
+            /**
+             * Background Threshold
+             * @description Threshold below which is considered the background
+             * @default 0
+             */
+            background_threshold?: number;
+            /**
+             * type
+             * @default txt2mask_clipseg_adv
+             * @constant
+             */
+            type: "txt2mask_clipseg_adv";
+        };
+        /**
+         * Text to Mask (Clipseg)
+         * @description Uses the Clipseg model to generate an image mask from a text prompt.
+         *
+         *     Input a prompt and an image to generate a mask representing areas of the image matched by the prompt.
+         */
+        TextToMaskClipsegInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image from which to create a mask
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Invert Output
+             * @description Off: white on black / On: black on white
+             * @default true
+             */
+            invert_output?: boolean;
+            /**
+             * Prompt
+             * @description The prompt with which to create a mask
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * Smoothing
+             * @description Radius of blur to apply before thresholding
+             * @default 4
+             */
+            smoothing?: number;
+            /**
+             * Subject Threshold
+             * @description Threshold above which is considered the subject
+             * @default 0.4
+             */
+            subject_threshold?: number;
+            /**
+             * Background Threshold
+             * @description Threshold below which is considered the background
+             * @default 0.4
+             */
+            background_threshold?: number;
+            /**
+             * Mask Expand Or Contract
+             * @description Pixels by which to grow (or shrink) mask after thresholding
+             * @default 0
+             */
+            mask_expand_or_contract?: number;
+            /**
+             * Mask Blur
+             * @description Radius of blur to apply after thresholding
+             * @default 0
+             */
+            mask_blur?: number;
+            /**
+             * type
+             * @default txt2mask_clipseg
+             * @constant
+             */
+            type: "txt2mask_clipseg";
+        };
+        /**
+         * Text Font to Image
+         * @description Turn Text into an image
+         */
+        TextfontimageInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default false
+             */
+            use_cache?: boolean;
+            /**
+             * Text Input
+             * @description The text from which to generate an image
+             * @default Invoke AI
+             */
+            text_input?: string;
+            /**
+             * Text Input Second Row
+             * @description The second row of text to add below the first text
+             * @default null
+             */
+            text_input_second_row?: string | null;
+            /**
+             * Second Row Font Size
+             * @description Font size for the second row of text (optional)
+             * @default 35
+             */
+            second_row_font_size?: number | null;
+            /**
+             * Font Url
+             * @description URL address of the font file to download
+             * @default https://www.1001fonts.com/download/font/caliban.medium.ttf
+             */
+            font_url?: string | null;
+            /**
+             * Local Font Path
+             * @description Local font file path (overrides font_url)
+             * @default null
+             */
+            local_font_path?: string | null;
+            /**
+             * Local Font
+             * @description Name of the local font file to use from the font_cache folder
+             * @default None
+             * @constant
+             */
+            local_font?: "None";
+            /**
+             * Image Width
+             * @description Width of the output image
+             * @default 1024
+             */
+            image_width?: number;
+            /**
+             * Image Height
+             * @description Height of the output image
+             * @default 512
+             */
+            image_height?: number;
+            /**
+             * Padding
+             * @description Padding around the text in pixels
+             * @default 100
+             */
+            padding?: number;
+            /**
+             * Row Gap
+             * @description Gap between the two rows of text in pixels
+             * @default 50
+             */
+            row_gap?: number;
+            /**
+             * type
+             * @default Text_Font_to_Image
+             * @constant
+             */
+            type: "Text_Font_to_Image";
+        };
+        /**
+         * Thresholding
+         * @description Puts out 3 masks for a source image representing highlights, midtones, and shadows
+         */
+        ThresholdingInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * @description The image to add film grain to
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * Highlights Point
+             * @description Highlight point
+             * @default 170
+             */
+            highlights_point?: number;
+            /**
+             * Shadows Point
+             * @description Shadow point
+             * @default 85
+             */
+            shadows_point?: number;
+            /**
+             * Lut Blur
+             * @description LUT blur
+             * @default 0
+             */
+            lut_blur?: number;
+            /**
+             * type
+             * @default thresholding
+             * @constant
+             */
+            type: "thresholding";
+        };
+        /**
+         * ThresholdingOutput
+         * @description Thresholding output class
+         */
+        ThresholdingOutput: {
+            highlights_mask: components["schemas"]["ImageField"];
+            midtones_mask: components["schemas"]["ImageField"];
+            shadows_mask: components["schemas"]["ImageField"];
+            /**
+             * type
+             * @default thresholding_output
+             * @constant
+             */
+            type: "thresholding_output";
+        };
         /** Tile */
         Tile: {
             /** @description The coordinates of this tile relative to its parent image. */
             coords: components["schemas"]["TBLR"];
             /** @description The amount of overlap with adjacent tiles on each side of this tile. */
             overlap: components["schemas"]["TBLR"];
+        };
+        /**
+         * TileSizeOutput
+         * @description Tile Size Output
+         */
+        TileSizeOutput: {
+            /**
+             * Tile Width
+             * @description Tile Width
+             */
+            tile_width: number;
+            /**
+             * Tile Height
+             * @description Tile Height
+             */
+            tile_height: number;
+            /**
+             * type
+             * @default tile_size_output
+             * @constant
+             */
+            type: "tile_size_output";
         };
         /**
          * Tile to Properties
@@ -26653,6 +41128,87 @@ export type components = {
              * @constant
              */
             type: "tiled_multi_diffusion_denoise_latents";
+        };
+        /**
+         * TilesOutput
+         * @description Tiles Output
+         */
+        TilesOutput: {
+            /**
+             * Tiles
+             * @description Tiles Collection
+             */
+            tiles: string[];
+            /**
+             * type
+             * @default tiles_output
+             * @constant
+             */
+            type: "tiles_output";
+        };
+        /**
+         * Tracery
+         * @description Takes a collection of json grammars and outputs an expanded string.
+         */
+        TraceryInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Seed
+             * @description A seed for this run.
+             * @default 42
+             */
+            seed?: number;
+            /**
+             * Grammars
+             * @description A collection of grammars.
+             * @default null
+             */
+            grammars?: string[] | null;
+            /**
+             * Prompt
+             * @description The prompt to expand
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * type
+             * @default tracery_invocation
+             * @constant
+             */
+            type: "tracery_invocation";
+        };
+        /**
+         * TraceryOutput
+         * @description Tracery Output
+         */
+        TraceryOutput: {
+            /**
+             * Result
+             * @description The expanded string
+             */
+            result: string;
+            /**
+             * type
+             * @default tracery_output
+             * @constant
+             */
+            type: "tracery_output";
         };
         /** TransformerField */
         TransformerField: {
@@ -27672,6 +42228,35 @@ export type components = {
             /** Error Type */
             type: string;
         };
+        /** WeightedStringOutput */
+        WeightedStringOutput: {
+            /**
+             * Cleaned Text
+             * @description The input string with weights and parentheses removed
+             */
+            cleaned_text: string;
+            /**
+             * Phrases
+             * @description List of weighted phrases or words
+             */
+            phrases: string[];
+            /**
+             * Weights
+             * @description Associated weights for each phrase
+             */
+            weights: number[];
+            /**
+             * Positions
+             * @description Start positions of each phrase in the cleaned string
+             */
+            positions: number[];
+            /**
+             * type
+             * @default weighted_string_output
+             * @constant
+             */
+            type: "weighted_string_output";
+        };
         /** Workflow */
         Workflow: {
             /**
@@ -27952,6 +42537,411 @@ export type components = {
             form?: {
                 [key: string]: components["schemas"]["JsonValue"];
             } | null;
+        };
+        /**
+         * XY Expand
+         * @description Takes an XY Item and outputs the X and Y as individual strings
+         */
+        XYExpandInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Xy Item
+             * @description The XY Item
+             * @default null
+             */
+            xy_item?: string | null;
+            /**
+             * type
+             * @default xy_expand
+             * @constant
+             */
+            type: "xy_expand";
+        };
+        /**
+         * XYExpandOutput
+         * @description Two strings that are expanded from an XY Item
+         */
+        XYExpandOutput: {
+            /**
+             * X Item
+             * @description The X item
+             */
+            x_item: string;
+            /**
+             * Y Item
+             * @description The y item
+             */
+            y_item: string;
+            /**
+             * type
+             * @default xy_expand_output
+             * @constant
+             */
+            type: "xy_expand_output";
+        };
+        /**
+         * XYImage Collect
+         * @description Takes xItem, yItem and an Image and outputs it as an XYImage Item (x_item,y_item,image_name)array converted to json
+         */
+        XYImageCollectInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * X Item
+             * @description The X item
+             * @default null
+             */
+            x_item?: string | null;
+            /**
+             * Y Item
+             * @description The Y item
+             * @default null
+             */
+            y_item?: string | null;
+            /**
+             * @description The image to turn into grids
+             * @default null
+             */
+            image?: components["schemas"]["ImageField"] | null;
+            /**
+             * type
+             * @default xy_image_collect
+             * @constant
+             */
+            type: "xy_image_collect";
+        };
+        /**
+         * XYImage Expand
+         * @description Takes an XYImage item and outputs the XItem,YItem, Image, width & height
+         */
+        XYImageExpandInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Xyimage Item
+             * @description The XYImage collection item
+             * @default null
+             */
+            xyimage_item?: string | null;
+            /**
+             * type
+             * @default xy_image_expand
+             * @constant
+             */
+            type: "xy_image_expand";
+        };
+        /**
+         * XYImageExpandOutput
+         * @description XY Image Expand Output
+         */
+        XYImageExpandOutput: {
+            /**
+             * X Item
+             * @description The X item
+             */
+            x_item: string;
+            /**
+             * Y Item
+             * @description The y item
+             */
+            y_item: string;
+            /** @description The Image item */
+            image: components["schemas"]["ImageField"];
+            /**
+             * Width
+             * @description The width of the image in pixels
+             */
+            width: number;
+            /**
+             * Height
+             * @description The height of the image in pixels
+             */
+            height: number;
+            /**
+             * type
+             * @default xy_image_expand_output
+             * @constant
+             */
+            type: "xy_image_expand_output";
+        };
+        /**
+         * XYImage Tiles To Image
+         * @description Takes a collection of XYImage Tiles (json of array(x_pos,y_pos,image_name)) and create an image from overlapping tiles
+         */
+        XYImageTilesToImageInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Xyimages
+             * @description The xyImage Collection
+             * @default []
+             */
+            xyimages?: string[];
+            /**
+             * Blend Mode
+             * @description Seam blending type Linear or Smart
+             * @default seam-grad
+             * @enum {string}
+             */
+            blend_mode?: "Linear" | "seam-grad" | "seam-sobel1" | "seam-sobel3" | "seam-sobel5" | "seam-sobel7" | "seam-scharr";
+            /**
+             * Blur Size
+             * @description Size of the blur & Gutter to use with Smart Seam
+             * @default 16
+             */
+            blur_size?: number;
+            /**
+             * Search Size
+             * @description Seam search size in pixels 1-4 are sensible sizes
+             * @default 1
+             */
+            search_size?: number;
+            /**
+             * type
+             * @default xy_image_tiles_to_image
+             * @constant
+             */
+            type: "xy_image_tiles_to_image";
+        };
+        /**
+         * XYImages To Grid
+         * @description Takes Collection of XYImages (json of (x_item,y_item,image_name)array), sorts the images into X,Y and creates a grid image with labels
+         */
+        XYImagesToGridInvocation: {
+            /**
+             * @description The board to save the image to
+             * @default null
+             */
+            board?: components["schemas"]["BoardField"] | null;
+            /**
+             * @description Optional metadata to be saved with the image
+             * @default null
+             */
+            metadata?: components["schemas"]["MetadataField"] | null;
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * Xyimages
+             * @description The XYImage item Collection
+             * @default []
+             */
+            xyimages?: string[];
+            /**
+             * Scale Factor
+             * @description The factor by which to scale the images
+             * @default 1
+             */
+            scale_factor?: number;
+            /**
+             * Resample Mode
+             * @description The resampling mode
+             * @default bicubic
+             * @enum {string}
+             */
+            resample_mode?: "nearest" | "box" | "bilinear" | "hamming" | "bicubic" | "lanczos";
+            /**
+             * Left Label Width
+             * @description Width of the left label area
+             * @default 100
+             */
+            left_label_width?: number;
+            /**
+             * Label Font Size
+             * @description Size of the font to use for labels
+             * @default 16
+             */
+            label_font_size?: number;
+            /**
+             * type
+             * @default xy_images_to_grid
+             * @constant
+             */
+            type: "xy_images_to_grid";
+        };
+        /**
+         * XY Product CSV
+         * @description Converts X and Y CSV strings to an XY Item collection with every combination of X and Y
+         */
+        XYProductCSVInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * X
+             * @description x string
+             * @default null
+             */
+            x?: string | null;
+            /**
+             * Y
+             * @description y string
+             * @default null
+             */
+            y?: string | null;
+            /**
+             * type
+             * @default xy_product_csv
+             * @constant
+             */
+            type: "xy_product_csv";
+        };
+        /**
+         * XY Product
+         * @description Takes X and Y string collections and outputs a XY Item collection with every combination of X and Y
+         */
+        XYProductInvocation: {
+            /**
+             * Id
+             * @description The id of this instance of an invocation. Must be unique among all instances of invocations.
+             */
+            id: string;
+            /**
+             * Is Intermediate
+             * @description Whether or not this is an intermediate invocation.
+             * @default false
+             */
+            is_intermediate?: boolean;
+            /**
+             * Use Cache
+             * @description Whether or not to use the cache
+             * @default true
+             */
+            use_cache?: boolean;
+            /**
+             * X Collection
+             * @description The X collection
+             * @default []
+             */
+            x_collection?: string[];
+            /**
+             * Y Collection
+             * @description The Y collection
+             * @default []
+             */
+            y_collection?: string[];
+            /**
+             * type
+             * @default xy_product
+             * @constant
+             */
+            type: "xy_product";
+        };
+        /**
+         * XYProductOutput
+         * @description XYCProductOutput a collection that contains every combination of the input collections
+         */
+        XYProductOutput: {
+            /**
+             * Xy Item Collection
+             * @description The XY Item collection
+             */
+            xy_item_collection: string[];
+            /**
+             * type
+             * @default xy_collect_output
+             * @constant
+             */
+            type: "xy_collect_output";
         };
         /**
          * ZImageConditioningField
@@ -29147,6 +44137,10 @@ export interface operations {
                 model_name?: string | null;
                 /** @description Exact match on the format of the model (e.g. 'diffusers') */
                 model_format?: components["schemas"]["ModelFormat"] | null;
+                /** @description The field to order by */
+                order_by?: components["schemas"]["ModelRecordOrderBy"];
+                /** @description The direction to order by */
+                direction?: components["schemas"]["SQLiteDirection"];
             };
             header?: never;
             path?: never;
