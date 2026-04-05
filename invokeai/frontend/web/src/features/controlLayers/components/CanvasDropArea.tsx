@@ -12,6 +12,7 @@ const addControlLayerFromImageDndTargetData = newCanvasEntityFromImageDndTarget.
 const addRegionalGuidanceReferenceImageFromImageDndTargetData = newCanvasEntityFromImageDndTarget.getData({
   type: 'regional_guidance_with_reference_image',
 });
+const addInpaintMaskFromImageDndTargetData = newCanvasEntityFromImageDndTarget.getData({ type: 'inpaint_mask' });
 const addResizedControlLayerFromImageDndTargetData = newCanvasEntityFromImageDndTarget.getData({
   type: 'control_layer',
   withResize: true,
@@ -25,7 +26,7 @@ export const CanvasDropArea = memo(() => {
     <>
       <Grid
         gridTemplateRows="1fr 1fr"
-        gridTemplateColumns="1fr 1fr"
+        gridTemplateColumns="repeat(6, 1fr)"
         position="absolute"
         top={0}
         right={0}
@@ -33,7 +34,7 @@ export const CanvasDropArea = memo(() => {
         left={0}
         pointerEvents="none"
       >
-        <GridItem position="relative">
+        <GridItem position="relative" colSpan={3}>
           <DndDropTarget
             dndTarget={newCanvasEntityFromImageDndTarget}
             dndTargetData={addRasterLayerFromImageDndTargetData}
@@ -41,7 +42,7 @@ export const CanvasDropArea = memo(() => {
             isDisabled={isBusy}
           />
         </GridItem>
-        <GridItem position="relative">
+        <GridItem position="relative" colSpan={3}>
           <DndDropTarget
             dndTarget={newCanvasEntityFromImageDndTarget}
             dndTargetData={addControlLayerFromImageDndTargetData}
@@ -49,7 +50,7 @@ export const CanvasDropArea = memo(() => {
             isDisabled={isBusy}
           />
         </GridItem>
-        <GridItem position="relative">
+        <GridItem position="relative" colSpan={2}>
           <DndDropTarget
             dndTarget={newCanvasEntityFromImageDndTarget}
             dndTargetData={addRegionalGuidanceReferenceImageFromImageDndTargetData}
@@ -57,7 +58,15 @@ export const CanvasDropArea = memo(() => {
             isDisabled={isBusy}
           />
         </GridItem>
-        <GridItem position="relative">
+        <GridItem position="relative" colSpan={2}>
+          <DndDropTarget
+            dndTarget={newCanvasEntityFromImageDndTarget}
+            dndTargetData={addInpaintMaskFromImageDndTargetData}
+            label={t('controlLayers.canvasContextMenu.newInpaintMask')}
+            isDisabled={isBusy}
+          />
+        </GridItem>
+        <GridItem position="relative" colSpan={2}>
           <DndDropTarget
             dndTarget={newCanvasEntityFromImageDndTarget}
             dndTargetData={addResizedControlLayerFromImageDndTargetData}
