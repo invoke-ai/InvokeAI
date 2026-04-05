@@ -516,6 +516,19 @@ class BulkDeleteModelsResponse(BaseModel):
     failed: List[dict] = Field(description="List of failed deletions with error messages")
 
 
+class BulkReidentifyModelsRequest(BaseModel):
+    """Request body for bulk model reidentification."""
+
+    keys: List[str] = Field(description="List of model keys to reidentify")
+
+
+class BulkReidentifyModelsResponse(BaseModel):
+    """Response body for bulk model reidentification."""
+
+    succeeded: List[str] = Field(description="List of successfully reidentified model keys")
+    failed: List[dict] = Field(description="List of failed reidentifications with error messages")
+
+
 @model_manager_router.post(
     "/i/bulk_delete",
     operation_id="bulk_delete_models",
@@ -555,6 +568,67 @@ async def bulk_delete_models(
 
     logger.info(f"Bulk delete completed: {len(deleted)} deleted, {len(failed)} failed")
     return BulkDeleteModelsResponse(deleted=deleted, failed=failed)
+
+
+@model_manager_router.post(
+    "/i/bulk_reidentify",
+    operation_id="bulk_reidentify_models",
+    responses={
+        200: {"description": "Models reidentified (possibly with some failures)"},
+    },
+    status_code=200,
+)
+async def bulk_reidentify_models(
+    current_admin: AdminUserOrDefault,
+    request: BulkReidentifyModelsRequest = Body(description="List of model keys to reidentify"),
+) -> BulkReidentifyModelsResponse:
+    """
+    Reidentify multiple models by re-probing their weights files.
+
+    Returns a list of successfully reidentified keys and failed reidentifications with error messages.
+    """
+    logger = ApiDependencies.invoker.services.logger
+    store = ApiDependencies.invoker.services.model_manager.store
+    models_path = ApiDependencies.invoker.services.configuration.models_path
+
+    succeeded = []
+    failed = []
+
+    for key in request.keys:
+        try:
+            config = store.get_model(key)
+            if pathlib.Path(config.path).is_relative_to(models_path):
+                model_path = pathlib.Path(config.path)
+            else:
+                model_path = models_path / config.path
+            mod = ModelOnDisk(model_path)
+            result = ModelConfigFactory.from_model_on_disk(mod)
+            if result.config is None:
+                raise InvalidModelException("Unable to identify model format")
+
+            # Retain user-editable fields from the original config
+            result.config.path = config.path
+            result.config.key = config.key
+            result.config.name = config.name
+            result.config.description = config.description
+            result.config.cover_image = config.cover_image
+            if hasattr(config, "trigger_phrases") and hasattr(result.config, "trigger_phrases"):
+                result.config.trigger_phrases = config.trigger_phrases
+            result.config.source = config.source
+            result.config.source_type = config.source_type
+
+            store.replace_model(config.key, result.config)
+            succeeded.append(key)
+            logger.info(f"Reidentified model: {key}")
+        except UnknownModelException as e:
+            logger.error(f"Failed to reidentify model {key}: {str(e)}")
+            failed.append({"key": key, "error": str(e)})
+        except Exception as e:
+            logger.error(f"Failed to reidentify model {key}: {str(e)}")
+            failed.append({"key": key, "error": str(e)})
+
+    logger.info(f"Bulk reidentify completed: {len(succeeded)} succeeded, {len(failed)} failed")
+    return BulkReidentifyModelsResponse(succeeded=succeeded, failed=failed)
 
 
 @model_manager_router.delete(
