@@ -2909,6 +2909,8 @@
             "previous": "Previous",
             "next": "Next",
             "saveToGallery": "Save To Gallery",
+            "hideThumbnails": "Hide Thumbnails",
+            "showThumbnails": "Show Thumbnails",
             "showResultsOn": "Showing Results",
             "showResultsOff": "Hiding Results"
         },
