@@ -7,6 +7,7 @@ import { memo, useCallback } from 'react';
 import { PiXBold } from 'react-icons/pi';
 
 import { ModelListBulkActions } from './ModelListBulkActions';
+import { ModelSortControl } from './ModelSortControl';
 import { ModelTypeFilter } from './ModelTypeFilter';
 
 export const ModelListNavigation = memo(() => {
@@ -48,6 +49,9 @@ export const ModelListNavigation = memo(() => {
               </InputRightElement>
             )}
           </InputGroup>
+        </Flex>
+        <Flex shrink={0}>
+          <ModelSortControl />
         </Flex>
         <Flex shrink={0}>
           <ModelTypeFilter />

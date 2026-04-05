@@ -111,9 +111,13 @@ type DeleteOrphanedModelsResponse = {
   errors: Record<string, string>;
 };
 
+type GetModelConfigsArg = {
+  order_by?: string;
+  direction?: string;
+} | void;
+
 const modelConfigsAdapter = createEntityAdapter<AnyModelConfig, string>({
   selectId: (entity) => entity.key,
-  sortComparer: (a, b) => a.name.localeCompare(b.name),
 });
 export const modelConfigsAdapterSelectors = modelConfigsAdapter.getSelectors(undefined, getSelectorsOptions);
 
@@ -338,8 +342,11 @@ export const modelsApi = api.injectEndpoints({
       },
       invalidatesTags: ['ModelInstalls'],
     }),
-    getModelConfigs: build.query<EntityState<AnyModelConfig, string>, void>({
-      query: () => ({ url: buildModelsUrl() }),
+    getModelConfigs: build.query<EntityState<AnyModelConfig, string>, GetModelConfigsArg>({
+      query: (arg) => {
+        const queryStr = arg ? `?${queryString.stringify(arg)}` : '';
+        return { url: buildModelsUrl(queryStr) };
+      },
       providesTags: (result) => {
         const tags: ApiTagDescription[] = [{ type: 'ModelConfig', id: LIST_TAG }];
         if (result) {
@@ -498,5 +505,5 @@ export const {
   useDeleteOrphanedModelsMutation,
 } = modelsApi;
 
-export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select();
+export const selectModelConfigsQuery = modelsApi.endpoints.getModelConfigs.select(undefined);
 export const selectMissingModelsQuery = modelsApi.endpoints.getMissingModels.select();

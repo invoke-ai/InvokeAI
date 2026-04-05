@@ -14,7 +14,9 @@ from invokeai.app.services.model_records import (
     ModelRecordServiceBase,
     ModelRecordServiceSQL,
     UnknownModelException,
+    ModelRecordOrderBy,
 )
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SDXL_Config
@@ -363,6 +365,71 @@ def test_filter_2(store: ModelRecordServiceBase):
     )
     assert len(matches) == 1
 
+def test_search_by_attr_sorting(store: ModelRecordServiceSQL):
+    config1 = Main_Diffusers_SD1_Config(
+        path="/tmp/config1",
+        name="alpha",
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.Main,
+        hash="CONFIG1HASH",
+        file_size=1000,
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
+    )
+    config2 = Main_Diffusers_SD2_Config(
+        path="/tmp/config2",
+        name="beta",
+        base=BaseModelType.StableDiffusion2,
+        type=ModelType.Main,
+        hash="CONFIG2HASH",
+        file_size=2000,
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
+    )
+    config3 = VAE_Diffusers_SD1_Config(
+        path="/tmp/config3",
+        name="gamma",
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.VAE,
+        hash="CONFIG3HASH",
+        file_size=500,
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        repo_variant=ModelRepoVariant.Default,
+    )
+    for c in config1, config2, config3:
+        store.add_model(c)
+
+    # Test sorting by Name Ascending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Name, direction=SQLiteDirection.Ascending)
+    assert len(matches) == 3
+    assert matches[0].name == "alpha"
+    assert matches[1].name == "beta"
+    assert matches[2].name == "gamma"
+
+    # Test sorting by Name Descending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Name, direction=SQLiteDirection.Descending)
+    assert matches[0].name == "gamma"
+    assert matches[1].name == "beta"
+    assert matches[2].name == "alpha"
+
+    # Test sorting by Size Ascending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Size, direction=SQLiteDirection.Ascending)
+    assert matches[0].name == "gamma" # 500
+    assert matches[1].name == "alpha" # 1000
+    assert matches[2].name == "beta" # 2000
+
+    # Test sorting by Size Descending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Size, direction=SQLiteDirection.Descending)
+    assert matches[0].name == "beta" # 2000
+    assert matches[1].name == "alpha" # 1000
+    assert matches[2].name == "gamma" # 500
 
 def test_model_record_changes():
     # This test guards against some unexpected behaviours from pydantic's union evaluation. See #6035
