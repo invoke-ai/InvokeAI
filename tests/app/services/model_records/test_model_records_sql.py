@@ -11,13 +11,13 @@ from pydantic import ValidationError
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_records import (
     DuplicateModelException,
+    ModelRecordOrderBy,
     ModelRecordServiceBase,
     ModelRecordServiceSQL,
     UnknownModelException,
-    ModelRecordOrderBy,
 )
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SDXL_Config
 from invokeai.backend.model_manager.configs.main import (
@@ -365,6 +365,7 @@ def test_filter_2(store: ModelRecordServiceBase):
     )
     assert len(matches) == 1
 
+
 def test_search_by_attr_sorting(store: ModelRecordServiceSQL):
     config1 = Main_Diffusers_SD1_Config(
         path="/tmp/config1",
@@ -421,15 +422,16 @@ def test_search_by_attr_sorting(store: ModelRecordServiceSQL):
 
     # Test sorting by Size Ascending
     matches = store.search_by_attr(order_by=ModelRecordOrderBy.Size, direction=SQLiteDirection.Ascending)
-    assert matches[0].name == "gamma" # 500
-    assert matches[1].name == "alpha" # 1000
-    assert matches[2].name == "beta" # 2000
+    assert matches[0].name == "gamma"  # 500
+    assert matches[1].name == "alpha"  # 1000
+    assert matches[2].name == "beta"  # 2000
 
     # Test sorting by Size Descending
     matches = store.search_by_attr(order_by=ModelRecordOrderBy.Size, direction=SQLiteDirection.Descending)
-    assert matches[0].name == "beta" # 2000
-    assert matches[1].name == "alpha" # 1000
-    assert matches[2].name == "gamma" # 500
+    assert matches[0].name == "beta"  # 2000
+    assert matches[1].name == "alpha"  # 1000
+    assert matches[2].name == "gamma"  # 500
+
 
 def test_model_record_changes():
     # This test guards against some unexpected behaviours from pydantic's union evaluation. See #6035
