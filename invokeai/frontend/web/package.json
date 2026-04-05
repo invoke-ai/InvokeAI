@@ -35,6 +35,7 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "vitest",
+    "test:run": "vitest run",
     "test:ui": "vitest --coverage --ui",
     "test:no-watch": "vitest --no-watch"
   },
