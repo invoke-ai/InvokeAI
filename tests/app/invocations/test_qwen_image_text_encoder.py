@@ -11,13 +11,19 @@ from invokeai.app.invocations.qwen_image_text_encoder import (
 class TestBuildPrompt:
     """Test the _build_prompt function for edit vs generate modes."""
 
-    def test_no_images_still_has_placeholder(self):
-        """With 0 images, should still include one vision placeholder (for the VL encoder)."""
+    def test_no_images_uses_generate_template(self):
+        """With 0 images, should use the generate (txt2img) template with no vision placeholder."""
         prompt = _build_prompt("a beautiful sunset", 0)
         assert "a beautiful sunset" in prompt
         assert "<|im_start|>assistant" in prompt
-        # On the edit branch, 0 images still uses the edit template with one placeholder
-        assert "<|vision_start|><|image_pad|><|vision_end|>" in prompt
+        # Generate mode: no vision placeholders, uses the "describe the image" system prompt
+        assert "<|vision_start|>" not in prompt
+        assert "Describe the image by detailing" in prompt
+
+    def test_no_images_does_not_use_edit_template(self):
+        """With 0 images, should NOT use the edit system prompt."""
+        prompt = _build_prompt("a beautiful sunset", 0)
+        assert "Describe the key features of the input image" not in prompt
 
     def test_edit_mode_one_image(self):
         """With 1 image, should use the edit template with one vision placeholder."""
@@ -25,6 +31,8 @@ class TestBuildPrompt:
         assert "Describe the key features of the input image" in prompt
         assert prompt.count("<|vision_start|><|image_pad|><|vision_end|>") == 1
         assert "change hair to red" in prompt
+        # Should NOT use the generate system prompt
+        assert "Describe the image by detailing" not in prompt
 
     def test_edit_mode_multiple_images(self):
         """With multiple images, should include one placeholder per image."""
