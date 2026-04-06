@@ -249,6 +249,10 @@ export const isQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwe
   return config.type === 'qwen3_encoder';
 };
 
+export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwen3EncoderModelConfig => {
+  return config.type === 'qwen3_encoder' && config.variant === 'qwen3_06b';
+};
+
 export const isCLIPEmbedModelConfigOrSubmodel = (
   config: AnyModelConfig,
   excludeSubmodels?: boolean

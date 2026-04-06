@@ -12,7 +12,7 @@ import {
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAnimaVAEModels, useQwen3EncoderModels, useT5EncoderModels } from 'services/api/hooks/modelsByType';
+import { useAnimaQwen3EncoderModels, useAnimaVAEModels, useT5EncoderModels } from 'services/api/hooks/modelsByType';
 import type { Qwen3EncoderModelConfig, T5EncoderModelConfig, VAEModelConfig } from 'services/api/types';
 
 /**
@@ -66,7 +66,7 @@ const ParamAnimaQwen3EncoderModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const animaQwen3EncoderModel = useAppSelector(selectAnimaQwen3EncoderModel);
-  const [modelConfigs, { isLoading }] = useQwen3EncoderModels();
+  const [modelConfigs, { isLoading }] = useAnimaQwen3EncoderModels();
 
   const _onChange = useCallback(
     (model: Qwen3EncoderModelConfig | null) => {

@@ -42,6 +42,7 @@ import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import {
+  selectAnimaQwen3EncoderModels,
   selectAnimaVAEModels,
   selectFluxVAEModels,
   selectGlobalRefImageModels,
@@ -180,7 +181,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           const hasValidConfig = animaVaeModel && animaQwen3EncoderModel && animaT5EncoderModel;
 
           if (!hasValidConfig) {
-            const availableQwen3Encoders = selectQwen3EncoderModels(state);
+            const availableQwen3Encoders = selectAnimaQwen3EncoderModels(state);
             const availableAnimaVAEs = selectAnimaVAEModels(state);
             const availableT5Encoders = selectT5EncoderModels(state);
 
