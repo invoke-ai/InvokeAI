@@ -350,19 +350,6 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     if (tool === 'lasso') {
-      const canvasState = this.manager.stateApi.getCanvasState();
-      const hasVisibleRasterContent =
-        !canvasState.rasterLayers.isHidden &&
-        canvasState.rasterLayers.entities.some((layer) => layer.isEnabled && layer.objects.length > 0);
-
-      if (!hasVisibleRasterContent) {
-        return false;
-      }
-
-      if (canvasState.inpaintMasks.isHidden) {
-        return false;
-      }
-
       if (this.manager.$isBusy.get()) {
         return false;
       }

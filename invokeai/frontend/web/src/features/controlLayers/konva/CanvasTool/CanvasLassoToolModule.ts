@@ -452,11 +452,6 @@ export class CanvasLassoToolModule extends CanvasModuleBase {
   };
 
   private commitContour = (points: Coordinate[], simplifyFreehand: boolean = false) => {
-    const canvasState = this.manager.stateApi.getCanvasState();
-    if (canvasState.inpaintMasks.isHidden) {
-      return;
-    }
-
     const contourPoints = simplifyFreehand ? this.simplifyFreehandContour(points) : points;
     if (contourPoints.length < 3) {
       return;
@@ -540,10 +535,6 @@ export class CanvasLassoToolModule extends CanvasModuleBase {
 
   private getActiveInpaintMaskId = (): string | null => {
     const canvasState = this.manager.stateApi.getCanvasState();
-    if (canvasState.inpaintMasks.isHidden) {
-      return null;
-    }
-
     const selectedEntityIdentifier = canvasState.selectedEntityIdentifier;
     if (selectedEntityIdentifier?.type === 'inpaint_mask') {
       const selectedMask = canvasState.inpaintMasks.entities.find(
