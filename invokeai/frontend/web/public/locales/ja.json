@@ -157,7 +157,7 @@
         "noImageSelected": "画像が選択されていません",
         "deleteSelection": "選択中のものを削除",
         "downloadSelection": "選択中のものをダウンロード",
-        "starImage": "スターをつける",
+        "starImage": "スター",
         "viewerImage": "閲覧画像",
         "compareImage": "比較画像",
         "openInViewer": "ビューアで開く",
@@ -190,7 +190,7 @@
         "selectAllOnPage": "ページ上のすべてを選択",
         "images": "画像",
         "assetsTab": "プロジェクトで使用するためにアップロードされたファイル。",
-        "imagesTab": "Invoke内で作成および保存された画像。",
+        "imagesTab": "Invoke内であなたが作成および保存した画像。",
         "assets": "アセット",
         "useForPromptGeneration": "プロンプト生成に使用する",
         "jump": "ジャンプ",
@@ -198,7 +198,8 @@
         "unableToLoad": "ギャラリーを読み込めません",
         "selectAnImageToCompare": "比較する画像を選択",
         "openViewer": "ビューアーを開く",
-        "closeViewer": "ビューアーを閉じる"
+        "closeViewer": "ビューアーを閉じる",
+        "usePagedGalleryView": "ページ型ギャラリービューを使う"
     },
     "hotkeys": {
         "searchHotkeys": "ホットキーを検索",
@@ -515,6 +516,9 @@
                 "title": "生成タブを選択",
                 "desc": "生成タブを選択。",
                 "key": "1"
+            },
+            "promptWeightUp": {
+                "title": "選択したプロンプトの重みを増加"
             }
         },
         "hotkeys": "ホットキー",
@@ -568,7 +572,30 @@
                 "title": "画像にスターを付ける/スターを外す",
                 "desc": "選択した画像にスターを付けたり、スターを外したりします。"
             }
-        }
+        },
+        "editMode": "編集モード",
+        "viewMode": "ビューモード",
+        "editHotkey": "ホットキーの編集",
+        "addHotkey": "ホットキーの追加",
+        "resetToDefault": "デフォルトにリセット",
+        "resetAll": "全てをデフォルトにリセット",
+        "resetAllConfirmation": "すべてのホットキーをデフォルトに戻してよろしいですか？この操作は取り消せません。",
+        "enterHotkeys": "カンマ区切りでホットキーを入力してください",
+        "save": "保存",
+        "cancel": "キャンセル",
+        "modifiers": "モディファイア",
+        "syntaxHelp": "構文のヘルプ",
+        "multipleHotkeys": "カンマで区切られた複数のホットキー",
+        "help": "ヘルプ",
+        "noHotkeysRecorded": "まだホットキーが記録されていません",
+        "pressKeys": "キーを押してください...",
+        "setHotkey": "セット",
+        "setAnother": "他をセット",
+        "removeLastHotkey": "最後のホットキーを削除",
+        "clearAll": "全てをクリア",
+        "duplicateWarning": "このホットキーはすでに記録済みです",
+        "conflictWarning": "はすでに \"{{hotkeyTitle}}\" で使われています",
+        "thisHotkey": "このホットキー"
     },
     "modelManager": {
         "modelManager": "モデルマネージャ",
@@ -1083,7 +1110,7 @@
         "batchQueuedDesc_other": "{{count}} セッションをキューの{{direction}}に追加しました",
         "graphQueued": "グラフをキューに追加しました",
         "batch": "バッチ",
-        "clearQueueAlertDialog": "キューをクリアすると、処理中の項目は直ちにキャンセルされ、キューは完全にクリアされます。保留中のフィルターもキャンセルされます。",
+        "clearQueueAlertDialog": "キューをクリアすると、処理中の項目は直ちにキャンセルされ、キューは完全にクリアされます。保留中のフィルターもキャンセルされ、ステージングエリアもリセットされます。",
         "pending": "保留中",
         "resumeFailed": "処理の再開に問題があります",
         "clear": "クリア",
@@ -1135,7 +1162,13 @@
         "sortColumn": "列の並べ替え",
         "sortBy": "{{column}}で並べ替え",
         "sortOrderAscending": "昇順",
-        "sortOrderDescending": "降順"
+        "sortOrderDescending": "降順",
+        "cancelFailedAccessDenied": "アイテムのキャンセル中に問題が発生しました：アクセスが拒否されました",
+        "clearFailedAccessDenied": "キューのクリア中に問題が発生しました：アクセスが拒否されました",
+        "paused": "一時停止中",
+        "user": "ユーザー",
+        "fieldValuesHidden": "<非表示>",
+        "cannotViewDetails": "このキューアイテムを閲覧する権限がありません"
     },
     "models": {
         "noMatchingModels": "一致するモデルがありません",
@@ -1381,7 +1414,13 @@
         "deletedImagesCannotBeRestored": "削除された画像は復元できません。",
         "hideBoards": "ボードを隠す",
         "locateInGalery": "ギャラリーで検索",
-        "viewBoards": "ボードを表示"
+        "viewBoards": "ボードを表示",
+        "pause": "一時停止",
+        "resume": "再開",
+        "restartFailed": "再起動に失敗しました",
+        "restartFile": "ファイルを再起動",
+        "restartRequired": "再起動が必要です",
+        "resumeRefused": "サーバーで再開が拒否されました。再起動が必要です。"
     },
     "invocationCache": {
         "invocationCache": "呼び出しキャッシュ",
@@ -2786,5 +2825,100 @@
     },
     "lora": {
         "weight": "重み"
+    },
+    "auth": {
+        "login": {
+            "title": "Invokeにサインイン",
+            "email": "Eメール",
+            "emailPlaceholder": "Eメール",
+            "password": "パスワード",
+            "passwordPlaceholder": "パスワード",
+            "rememberMe": "7日間は記憶",
+            "signIn": "サインイン",
+            "signingIn": "サインイン中...",
+            "loginFailed": "ログインに失敗しました。正しい内容かを確認してください。"
+        },
+        "setup": {
+            "title": "Invokeへようこそ",
+            "subtitle": "管理者アカウントをセットアップします",
+            "email": "Eメール",
+            "emailPlaceholder": "hoge@example.com",
+            "emailHelper": "これはサインインに使うユーザー名になります",
+            "displayName": "表示名",
+            "displayNamePlaceholder": "管理者",
+            "displayNameHelper": "アプリケーションの中で表示される名前です",
+            "password": "パスワード",
+            "passwordPlaceholder": "パスワード",
+            "passwordHelper": "大文字、小文字、数字を組み合わせた8文字以上",
+            "passwordTooShort": "パスワードは8文字以上である必要があります",
+            "passwordMissingRequirements": "パスワードは小文字、大文字、数字を含まなければなりません",
+            "confirmPassword": "パスワードの確認",
+            "confirmPasswordPlaceholder": "パスワードの確認",
+            "passwordsDoNotMatch": "パスワードが一致しません",
+            "createAccount": "管理者アカウントを作る",
+            "creatingAccount": "設定中...",
+            "setupFailed": "セットアップに失敗しました。もう一度試してください。",
+            "passwordHelperRelaxed": "パスワードを入力してください（強度が表示されます）"
+        },
+        "userMenu": "ユーザーメニュー",
+        "admin": "管理",
+        "logout": "ログアウト",
+        "adminOnlyFeature": "この機能は管理者のみ使用できます。",
+        "profile": {
+            "menuItem": "プロフィール",
+            "title": "プロフィール",
+            "email": "Eメール",
+            "emailReadOnly": "Eメールアドレスは変更できません",
+            "displayName": "表示名",
+            "displayNamePlaceholder": "あなたの名前",
+            "changePassword": "パスワードの変更",
+            "currentPassword": "現在のパスワード",
+            "currentPasswordPlaceholder": "現在のパスワード",
+            "newPassword": "新しいパスワード",
+            "newPasswordPlaceholder": "新しいパスワード",
+            "confirmPassword": "新しいパスワードの確認",
+            "confirmPasswordPlaceholder": "新しいパスワードの確認",
+            "passwordsDoNotMatch": "パスワードが一致しません",
+            "saveSuccess": "プロフィールのアップデートに成功しました",
+            "saveFailed": "プロフィールの保存に失敗しました。もう一度試してください。"
+        },
+        "userManagement": {
+            "menuItem": "ユーザー管理",
+            "title": "ユーザー管理",
+            "email": "Eメール",
+            "emailPlaceholder": "hoge@example.com",
+            "displayName": "表示名",
+            "displayNamePlaceholder": "表示名",
+            "password": "パスワード",
+            "passwordPlaceholder": "パスワード",
+            "newPassword": "新しいパスワード",
+            "newPasswordPlaceholder": "現在のパスワードを維持するには空白にしておいてください",
+            "role": "ロール",
+            "status": "ステータス",
+            "actions": "アクション",
+            "isAdmin": "管理者",
+            "user": "ユーザー",
+            "you": "あなた",
+            "createUser": "ユーザーの作成",
+            "editUser": "ユーザーの編集",
+            "deleteUser": "ユーザーの削除",
+            "deleteConfirm": "本当に \"{{name}}\" を削除しますか？このアクションは取り消せません。",
+            "generatePassword": "強力なパスワードを生成",
+            "showPassword": "パスワードの表示",
+            "hidePassword": "パスワードを隠す",
+            "activate": "有効化",
+            "deactivate": "非有効化",
+            "saveFailed": "ユーザーの保存に失敗しました。もう一度実行してください。",
+            "deleteFailed": "ユーザーの削除に失敗しました。もう一度実行してください。",
+            "loadFailed": "ユーザーのロードに失敗しました。",
+            "back": "戻る",
+            "cannotDeleteSelf": "あなた自身のアカウントを削除することはできません",
+            "cannotDeactivateSelf": "あなた自身のアカウントを非有効化することはできません"
+        },
+        "passwordStrength": {
+            "weak": "弱いパスワード",
+            "moderate": "適切なパスワード",
+            "strong": "強力なパスワード"
+        }
     }
 }
