@@ -11,6 +11,7 @@ from invokeai.app.services.events.events_common import (
     DownloadCancelledEvent,
     DownloadCompleteEvent,
     DownloadErrorEvent,
+    DownloadPausedEvent,
     DownloadProgressEvent,
     DownloadStartedEvent,
     EventBase,
@@ -30,6 +31,7 @@ from invokeai.app.services.events.events_common import (
     QueueClearedEvent,
     QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
+    RecallParametersUpdatedEvent,
 )
 
 if TYPE_CHECKING:
@@ -110,6 +112,10 @@ class EventServiceBase:
         """Emitted when a queue is cleared"""
         self.dispatch(QueueClearedEvent.build(queue_id))
 
+    def emit_recall_parameters_updated(self, queue_id: str, parameters: dict) -> None:
+        """Emitted when recall parameters are updated"""
+        self.dispatch(RecallParametersUpdatedEvent.build(queue_id, parameters))
+
     # endregion
 
     # region Download
@@ -129,6 +135,10 @@ class EventServiceBase:
     def emit_download_cancelled(self, job: "DownloadJob") -> None:
         """Emitted when a download is cancelled"""
         self.dispatch(DownloadCancelledEvent.build(job))
+
+    def emit_download_paused(self, job: "DownloadJob") -> None:
+        """Emitted when a download is paused"""
+        self.dispatch(DownloadPausedEvent.build(job))
 
     def emit_download_error(self, job: "DownloadJob") -> None:
         """Emitted when a download encounters an error"""

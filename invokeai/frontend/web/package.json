@@ -21,7 +21,7 @@
   "scripts": {
     "dev": "vite dev",
     "dev:host": "vite dev --host",
-    "build": "pnpm run lint && vite build",
+    "build": "pnpm run lint && vitest run && vite build",
     "typegen": "node scripts/typegen.js",
     "preview": "vite preview",
     "lint:knip": "knip --tags=-knipignore",
@@ -35,6 +35,7 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "vitest",
+    "test:run": "vitest run",
     "test:ui": "vitest --coverage --ui",
     "test:no-watch": "vitest --no-watch"
   },
@@ -89,6 +90,7 @@
     "react-icons": "^5.5.0",
     "react-redux": "9.2.0",
     "react-resizable-panels": "^3.0.3",
+    "react-router-dom": "^7.12.0",
     "react-textarea-autosize": "^8.5.9",
     "react-use": "^17.6.0",
     "react-virtuoso": "^4.13.0",

@@ -4,6 +4,7 @@ from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
+from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import (
@@ -24,6 +25,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueItemNotFoundError,
     SessionQueueStatus,
 )
+from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
 session_queue_router = APIRouter(prefix="/v1/queue", tags=["queue"])
@@ -36,6 +38,40 @@ class SessionQueueAndProcessorStatus(BaseModel):
     processor: SessionProcessorStatus
 
 
+def sanitize_queue_item_for_user(
+    queue_item: SessionQueueItem, current_user_id: str, is_admin: bool
+) -> SessionQueueItem:
+    """Sanitize queue item for non-admin users viewing other users' items.
+
+    For non-admin users viewing queue items belonging to other users,
+    the field_values, session graph, and workflow should be hidden/cleared to protect privacy.
+
+    Args:
+        queue_item: The queue item to sanitize
+        current_user_id: The ID of the current user viewing the item
+        is_admin: Whether the current user is an admin
+
+    Returns:
+        The sanitized queue item (sensitive fields cleared if necessary)
+    """
+    # Admins and item owners can see everything
+    if is_admin or queue_item.user_id == current_user_id:
+        return queue_item
+
+    # For non-admins viewing other users' items, clear sensitive fields
+    # Create a shallow copy to avoid mutating the original
+    sanitized_item = queue_item.model_copy(deep=False)
+    sanitized_item.field_values = None
+    sanitized_item.workflow = None
+    # Clear the session graph by replacing it with an empty graph execution state
+    # This prevents information leakage through the generation graph
+    sanitized_item.session = GraphExecutionState(
+        id=queue_item.session.id,
+        graph=Graph(),
+    )
+    return sanitized_item
+
+
 @session_queue_router.post(
     "/{queue_id}/enqueue_batch",
     operation_id="enqueue_batch",
@@ -44,14 +80,15 @@ class SessionQueueAndProcessorStatus(BaseModel):
     },
 )
 async def enqueue_batch(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch: Batch = Body(description="Batch to process"),
     prepend: bool = Body(default=False, description="Whether or not to prepend this batch in the queue"),
 ) -> EnqueueBatchResult:
-    """Processes a batch and enqueues the output graphs for execution."""
+    """Processes a batch and enqueues the output graphs for execution for the current user."""
     try:
         return await ApiDependencies.invoker.services.session_queue.enqueue_batch(
-            queue_id=queue_id, batch=batch, prepend=prepend
+            queue_id=queue_id, batch=batch, prepend=prepend, user_id=current_user.user_id
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while enqueuing batch: {e}")
@@ -65,15 +102,18 @@ async def enqueue_batch(
     },
 )
 async def list_all_queue_items(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     destination: Optional[str] = Query(default=None, description="The destination of queue items to fetch"),
 ) -> list[SessionQueueItem]:
     """Gets all queue items"""
     try:
-        return ApiDependencies.invoker.services.session_queue.list_all_queue_items(
+        items = ApiDependencies.invoker.services.session_queue.list_all_queue_items(
             queue_id=queue_id,
             destination=destination,
         )
+        # Sanitize items for non-admin users
+        return [sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin) for item in items]
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue items: {e}")
 
@@ -102,6 +142,7 @@ async def get_queue_item_ids(
     responses={200: {"model": list[SessionQueueItem]}},
 )
 async def get_queue_items_by_item_ids(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(
         embed=True, description="Object containing list of queue item ids to fetch queue items for"
@@ -118,7 +159,9 @@ async def get_queue_items_by_item_ids(
                 queue_item = session_queue_service.get_queue_item(item_id=item_id)
                 if queue_item.queue_id != queue_id:  # Auth protection for items from other queues
                     continue
-                queue_items.append(queue_item)
+                # Sanitize item for non-admin users
+                sanitized_item = sanitize_queue_item_for_user(queue_item, current_user.user_id, current_user.is_admin)
+                queue_items.append(sanitized_item)
             except Exception:
                 # Skip missing queue items - they may have been deleted between item id fetch and queue item fetch
                 continue
@@ -134,9 +177,10 @@ async def get_queue_items_by_item_ids(
     responses={200: {"model": SessionProcessorStatus}},
 )
 async def resume(
+    current_user: AdminUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionProcessorStatus:
-    """Resumes session processor"""
+    """Resumes session processor. Admin only."""
     try:
         return ApiDependencies.invoker.services.session_processor.resume()
     except Exception as e:
@@ -148,10 +192,11 @@ async def resume(
     operation_id="pause",
     responses={200: {"model": SessionProcessorStatus}},
 )
-async def Pause(
+async def pause(
+    current_user: AdminUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionProcessorStatus:
-    """Pauses session processor"""
+    """Pauses session processor. Admin only."""
     try:
         return ApiDependencies.invoker.services.session_processor.pause()
     except Exception as e:
@@ -164,11 +209,16 @@ async def Pause(
     responses={200: {"model": CancelAllExceptCurrentResult}},
 )
 async def cancel_all_except_current(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> CancelAllExceptCurrentResult:
-    """Immediately cancels all queue items except in-processing items"""
+    """Immediately cancels all queue items except in-processing items. Non-admin users can only cancel their own items."""
     try:
-        return ApiDependencies.invoker.services.session_queue.cancel_all_except_current(queue_id=queue_id)
+        # Admin users can cancel all items, non-admin users can only cancel their own
+        user_id = None if current_user.is_admin else current_user.user_id
+        return ApiDependencies.invoker.services.session_queue.cancel_all_except_current(
+            queue_id=queue_id, user_id=user_id
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while canceling all except current: {e}")
 
@@ -179,11 +229,16 @@ async def cancel_all_except_current(
     responses={200: {"model": DeleteAllExceptCurrentResult}},
 )
 async def delete_all_except_current(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> DeleteAllExceptCurrentResult:
-    """Immediately deletes all queue items except in-processing items"""
+    """Immediately deletes all queue items except in-processing items. Non-admin users can only delete their own items."""
     try:
-        return ApiDependencies.invoker.services.session_queue.delete_all_except_current(queue_id=queue_id)
+        # Admin users can delete all items, non-admin users can only delete their own
+        user_id = None if current_user.is_admin else current_user.user_id
+        return ApiDependencies.invoker.services.session_queue.delete_all_except_current(
+            queue_id=queue_id, user_id=user_id
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while deleting all except current: {e}")
 
@@ -194,13 +249,16 @@ async def delete_all_except_current(
     responses={200: {"model": CancelByBatchIDsResult}},
 )
 async def cancel_by_batch_ids(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch_ids: list[str] = Body(description="The list of batch_ids to cancel all queue items for", embed=True),
 ) -> CancelByBatchIDsResult:
-    """Immediately cancels all queue items from the given batch ids"""
+    """Immediately cancels all queue items from the given batch ids. Non-admin users can only cancel their own items."""
     try:
+        # Admin users can cancel all items, non-admin users can only cancel their own
+        user_id = None if current_user.is_admin else current_user.user_id
         return ApiDependencies.invoker.services.session_queue.cancel_by_batch_ids(
-            queue_id=queue_id, batch_ids=batch_ids
+            queue_id=queue_id, batch_ids=batch_ids, user_id=user_id
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while canceling by batch id: {e}")
@@ -212,13 +270,16 @@ async def cancel_by_batch_ids(
     responses={200: {"model": CancelByDestinationResult}},
 )
 async def cancel_by_destination(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     destination: str = Query(description="The destination to cancel all queue items for"),
 ) -> CancelByDestinationResult:
-    """Immediately cancels all queue items with the given origin"""
+    """Immediately cancels all queue items with the given destination. Non-admin users can only cancel their own items."""
     try:
+        # Admin users can cancel all items, non-admin users can only cancel their own
+        user_id = None if current_user.is_admin else current_user.user_id
         return ApiDependencies.invoker.services.session_queue.cancel_by_destination(
-            queue_id=queue_id, destination=destination
+            queue_id=queue_id, destination=destination, user_id=user_id
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while canceling by destination: {e}")
@@ -230,12 +291,28 @@ async def cancel_by_destination(
     responses={200: {"model": RetryItemsResult}},
 )
 async def retry_items_by_id(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_ids: list[int] = Body(description="The queue item ids to retry"),
 ) -> RetryItemsResult:
-    """Immediately cancels all queue items with the given origin"""
+    """Retries the given queue items. Users can only retry their own items unless they are an admin."""
     try:
+        # Check authorization: user must own all items or be an admin
+        if not current_user.is_admin:
+            for item_id in item_ids:
+                try:
+                    queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+                    if queue_item.user_id != current_user.user_id:
+                        raise HTTPException(
+                            status_code=403, detail=f"You do not have permission to retry queue item {item_id}"
+                        )
+                except SessionQueueItemNotFoundError:
+                    # Skip items that don't exist - they will be handled by retry_items_by_id
+                    continue
+
         return ApiDependencies.invoker.services.session_queue.retry_items_by_id(queue_id=queue_id, item_ids=item_ids)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while retrying queue items: {e}")
 
@@ -248,15 +325,25 @@ async def retry_items_by_id(
     },
 )
 async def clear(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> ClearResult:
-    """Clears the queue entirely, immediately canceling the currently-executing session"""
+    """Clears the queue entirely. Admin users clear all items; non-admin users only clear their own items. If there's a currently-executing item, users can only cancel it if they own it or are an admin."""
     try:
         queue_item = ApiDependencies.invoker.services.session_queue.get_current(queue_id)
         if queue_item is not None:
+            # Check authorization for canceling the current item
+            if queue_item.user_id != current_user.user_id and not current_user.is_admin:
+                raise HTTPException(
+                    status_code=403, detail="You do not have permission to cancel the currently executing queue item"
+                )
             ApiDependencies.invoker.services.session_queue.cancel_queue_item(queue_item.item_id)
-        clear_result = ApiDependencies.invoker.services.session_queue.clear(queue_id)
+        # Admin users can clear all items, non-admin users can only clear their own
+        user_id = None if current_user.is_admin else current_user.user_id
+        clear_result = ApiDependencies.invoker.services.session_queue.clear(queue_id, user_id=user_id)
         return clear_result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while clearing queue: {e}")
 
@@ -269,11 +356,14 @@ async def clear(
     },
 )
 async def prune(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> PruneResult:
-    """Prunes all completed or errored queue items"""
+    """Prunes all completed or errored queue items. Non-admin users can only prune their own items."""
     try:
-        return ApiDependencies.invoker.services.session_queue.prune(queue_id)
+        # Admin users can prune all items, non-admin users can only prune their own
+        user_id = None if current_user.is_admin else current_user.user_id
+        return ApiDependencies.invoker.services.session_queue.prune(queue_id, user_id=user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while pruning queue: {e}")
 
@@ -320,11 +410,12 @@ async def get_next_queue_item(
     },
 )
 async def get_queue_status(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionQueueAndProcessorStatus:
     """Gets the status of the session queue"""
     try:
-        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id)
+        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id, user_id=current_user.user_id)
         processor = ApiDependencies.invoker.services.session_processor.get_status()
         return SessionQueueAndProcessorStatus(queue=queue, processor=processor)
     except Exception as e:
@@ -358,6 +449,7 @@ async def get_batch_status(
     response_model_exclude_none=True,
 )
 async def get_queue_item(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_id: int = Path(description="The queue item to get"),
 ) -> SessionQueueItem:
@@ -366,7 +458,8 @@ async def get_queue_item(
         queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id=item_id)
         if queue_item.queue_id != queue_id:
             raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
-        return queue_item
+        # Sanitize item for non-admin users
+        return sanitize_queue_item_for_user(queue_item, current_user.user_id, current_user.is_admin)
     except SessionQueueItemNotFoundError:
         raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
     except Exception as e:
@@ -378,12 +471,24 @@ async def get_queue_item(
     operation_id="delete_queue_item",
 )
 async def delete_queue_item(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_id: int = Path(description="The queue item to delete"),
 ) -> None:
-    """Deletes a queue item"""
+    """Deletes a queue item. Users can only delete their own items unless they are an admin."""
     try:
+        # Get the queue item to check ownership
+        queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+
+        # Check authorization: user must own the item or be an admin
+        if queue_item.user_id != current_user.user_id and not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="You do not have permission to delete this queue item")
+
         ApiDependencies.invoker.services.session_queue.delete_queue_item(item_id)
+    except SessionQueueItemNotFoundError:
+        raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while deleting queue item: {e}")
 
@@ -396,14 +501,24 @@ async def delete_queue_item(
     },
 )
 async def cancel_queue_item(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     item_id: int = Path(description="The queue item to cancel"),
 ) -> SessionQueueItem:
-    """Deletes a queue item"""
+    """Cancels a queue item. Users can only cancel their own items unless they are an admin."""
     try:
+        # Get the queue item to check ownership
+        queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+
+        # Check authorization: user must own the item or be an admin
+        if queue_item.user_id != current_user.user_id and not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="You do not have permission to cancel this queue item")
+
         return ApiDependencies.invoker.services.session_queue.cancel_queue_item(item_id)
     except SessionQueueItemNotFoundError:
         raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while canceling queue item: {e}")
 
@@ -432,13 +547,16 @@ async def counts_by_destination(
     responses={200: {"model": DeleteByDestinationResult}},
 )
 async def delete_by_destination(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to query"),
     destination: str = Path(description="The destination to query"),
 ) -> DeleteByDestinationResult:
-    """Deletes all items with the given destination"""
+    """Deletes all items with the given destination. Non-admin users can only delete their own items."""
     try:
+        # Admin users can delete all items, non-admin users can only delete their own
+        user_id = None if current_user.is_admin else current_user.user_id
         return ApiDependencies.invoker.services.session_queue.delete_by_destination(
-            queue_id=queue_id, destination=destination
+            queue_id=queue_id, destination=destination, user_id=user_id
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while deleting by destination: {e}")

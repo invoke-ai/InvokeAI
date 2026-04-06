@@ -11,6 +11,7 @@ import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/
 import { isFlux2ReferenceImageConfig, isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { zImageField } from 'features/nodes/types/common';
+import { addFlux2KleinLoRAs } from 'features/nodes/util/graph/generation/addFlux2KleinLoRAs';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addFLUXReduxes } from 'features/nodes/util/graph/generation/addFLUXRedux';
@@ -259,6 +260,9 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     const flux2Denoise = denoise as Invocation<'flux2_denoise'>;
     const flux2ModelLoader = modelLoader as Invocation<'flux2_klein_model_loader'>;
     const flux2L2i = l2i as Invocation<'flux2_vae_decode'>;
+    const flux2Cond = posCond as Invocation<'flux2_klein_text_encoder'>;
+
+    addFlux2KleinLoRAs(state, g, flux2Denoise, flux2ModelLoader, flux2Cond);
 
     // FLUX.2 Klein has built-in multi-reference image editing - no separate model needed
     const validFlux2RefImageConfigs = selectRefImagesSlice(state)
@@ -267,10 +271,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
     if (validFlux2RefImageConfigs.length > 0) {
-      const flux2KontextCollect = g.addNode({
-        type: 'collect',
-        id: getPrefixedId('flux2_kontext_collect'),
-      });
+      let prevCollect: Invocation<'collect'> | null = null;
       for (const { config } of validFlux2RefImageConfigs) {
         // FLUX.2 uses the same flux_kontext node - it just packages the image
         const kontextConditioning = g.addNode({
@@ -278,9 +279,18 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
           id: getPrefixedId('flux_kontext'),
           image: zImageField.parse(config.image?.crop?.image ?? config.image?.original.image),
         });
-        g.addEdge(kontextConditioning, 'kontext_cond', flux2KontextCollect, 'item');
+        const collectNode = g.addNode({
+          type: 'collect',
+          id: getPrefixedId('flux2_kontext_collect'),
+        });
+        g.addEdge(kontextConditioning, 'kontext_cond', collectNode, 'item');
+        if (prevCollect !== null) {
+          g.addEdge(prevCollect, 'collection', collectNode, 'collection');
+        }
+        prevCollect = collectNode;
       }
-      g.addEdge(flux2KontextCollect, 'collection', flux2Denoise, 'kontext_conditioning');
+      assert(prevCollect !== null);
+      g.addEdge(prevCollect, 'collection', flux2Denoise, 'kontext_conditioning');
 
       g.upsertMetadata({ ref_images: validFlux2RefImageConfigs }, 'merge');
     }

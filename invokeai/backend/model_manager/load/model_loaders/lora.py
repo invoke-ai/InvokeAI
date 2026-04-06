@@ -25,12 +25,19 @@ from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_ut
     is_state_dict_likely_in_flux_aitoolkit_format,
     lora_model_from_flux_aitoolkit_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_bfl_peft_format,
+    lora_model_from_flux2_bfl_peft_state_dict,
+    lora_model_from_flux_bfl_peft_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import (
     is_state_dict_likely_flux_control,
     lora_model_from_flux_control_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_utils import (
+    is_state_dict_flux2_diffusers_format,
     is_state_dict_likely_in_flux_diffusers_format,
+    lora_model_from_flux2_diffusers_state_dict,
     lora_model_from_flux_diffusers_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
@@ -101,7 +108,7 @@ class LoRALoader(ModelLoader):
         if self._model_base == BaseModelType.StableDiffusionXL:
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
-        elif self._model_base == BaseModelType.Flux:
+        elif self._model_base in (BaseModelType.Flux, BaseModelType.Flux2):
             if config.format is ModelFormat.OMI:
                 # HACK(ryand): We set alpha=None for diffusers PEFT format models. These models are typically
                 # distributed as a single file without the associated metadata containing the alpha value. We chose
@@ -113,7 +120,12 @@ class LoRALoader(ModelLoader):
                 model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
             elif config.format is ModelFormat.LyCORIS:
                 if is_state_dict_likely_in_flux_diffusers_format(state_dict=state_dict):
-                    model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
+                    if is_state_dict_flux2_diffusers_format(state_dict=state_dict):
+                        # Flux2 Klein native diffusers naming (to_qkv_mlp_proj, ff.linear_in, etc.)
+                        model = lora_model_from_flux2_diffusers_state_dict(state_dict=state_dict, alpha=None)
+                    else:
+                        # Flux.1 diffusers naming (to_q/to_k/to_v, ff.net.0.proj, etc.)
+                        model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
                 elif is_state_dict_likely_in_flux_kohya_format(state_dict=state_dict):
                     model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_in_flux_onetrainer_format(state_dict=state_dict):
@@ -124,6 +136,14 @@ class LoRALoader(ModelLoader):
                     model = lora_model_from_flux_aitoolkit_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_in_flux_xlabs_format(state_dict=state_dict):
                     model = lora_model_from_flux_xlabs_state_dict(state_dict=state_dict)
+                elif is_state_dict_likely_in_flux_bfl_peft_format(state_dict=state_dict):
+                    if self._model_base == BaseModelType.Flux2:
+                        # FLUX.2 Klein uses Flux2Transformer2DModel (diffusers naming),
+                        # so we need to convert BFL keys to diffusers naming.
+                        model = lora_model_from_flux2_bfl_peft_state_dict(state_dict=state_dict, alpha=None)
+                    else:
+                        # FLUX.1 uses BFL Flux class, so BFL keys work directly.
+                        model = lora_model_from_flux_bfl_peft_state_dict(state_dict=state_dict, alpha=None)
                 else:
                     raise ValueError("LoRA model is in unsupported FLUX format")
             else:

@@ -1,4 +1,5 @@
 import { Divider, Flex, Spacer } from '@invoke-ai/ui-library';
+import { UserMenu } from 'features/auth/components/UserMenu';
 import InvokeAILogoComponent from 'features/system/components/InvokeAILogoComponent';
 import SettingsMenu from 'features/system/components/SettingsModal/SettingsMenu';
 import StatusIndicator from 'features/system/components/StatusIndicator';
@@ -39,6 +40,7 @@ export const VerticalNavBar = memo(() => {
 
       <Divider />
 
+      <UserMenu />
       <Notifications />
       <VideosModalButton />
       <SettingsMenu />
