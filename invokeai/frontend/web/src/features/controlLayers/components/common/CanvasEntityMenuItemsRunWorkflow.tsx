@@ -17,7 +17,7 @@ export const CanvasEntityMenuItemsRunWorkflow = memo(() => {
 
   return (
     <MenuItem onClick={onClick} icon={<PiFlowArrowBold />}>
-      {t('controlLayers.workflowIntegration.runWorkflow', 'Run Workflow')}
+      {t('controlLayers.workflowIntegration.runWorkflow')}
     </MenuItem>
   );
 });

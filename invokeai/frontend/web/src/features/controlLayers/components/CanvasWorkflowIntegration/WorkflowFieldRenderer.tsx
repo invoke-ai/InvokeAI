@@ -485,8 +485,8 @@ const ImageFieldComponent = memo(
         </Flex>
         <Text fontSize="sm" color="base.400" ml={6} mb={2}>
           {isSelected
-            ? t('controlLayers.workflowIntegration.imageFieldSelected', 'This field will receive the canvas image')
-            : t('controlLayers.workflowIntegration.imageFieldNotSelected', 'Click to use this field for canvas image')}
+            ? t('controlLayers.workflowIntegration.imageFieldSelected')
+            : t('controlLayers.workflowIntegration.imageFieldNotSelected')}
         </Text>
 
         {/* Show image upload/preview for non-selected fields */}

@@ -53,17 +53,14 @@ export const CanvasWorkflowIntegrationModal = memo(() => {
       <ModalOverlay />
       <ModalContent>
         <ModalHeader>
-          <Heading size="md">{t('controlLayers.workflowIntegration.title', 'Run Workflow on Canvas')}</Heading>
+          <Heading size="md">{t('controlLayers.workflowIntegration.title')}</Heading>
         </ModalHeader>
         <ModalCloseButton isDisabled={isProcessing} />
 
         <ModalBody>
           <Flex direction="column" gap={4}>
             <Text fontSize="sm" color="base.400">
-              {t(
-                'controlLayers.workflowIntegration.description',
-                'Select a workflow with a Canvas Output node and an image parameter to run on the current canvas layer. You can adjust parameters before executing. The result will be added back to the canvas.'
-              )}
+              {t('controlLayers.workflowIntegration.description')}
             </Text>
 
             <CanvasWorkflowIntegrationWorkflowSelector />
@@ -81,10 +78,10 @@ export const CanvasWorkflowIntegrationModal = memo(() => {
             <Button
               onClick={onExecute}
               isDisabled={!canExecute || isProcessing}
-              loadingText={t('controlLayers.workflowIntegration.executing', 'Executing...')}
+              loadingText={t('controlLayers.workflowIntegration.executing')}
             >
               {isProcessing && <Spinner size="sm" mr={2} />}
-              {t('controlLayers.workflowIntegration.execute', 'Execute Workflow')}
+              {t('controlLayers.workflowIntegration.execute')}
             </Button>
           </ButtonGroup>
         </ModalFooter>

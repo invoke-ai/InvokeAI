@@ -54,8 +54,8 @@ export const CanvasWorkflowIntegrationWorkflowSelector = memo(() => {
         <Spinner size="sm" />
         <Text>
           {isFiltering
-            ? t('controlLayers.workflowIntegration.filteringWorkflows', 'Filtering workflows...')
-            : t('controlLayers.workflowIntegration.loadingWorkflows', 'Loading workflows...')}
+            ? t('controlLayers.workflowIntegration.filteringWorkflows')
+            : t('controlLayers.workflowIntegration.loadingWorkflows')}
         </Text>
       </Flex>
     );
@@ -65,26 +65,23 @@ export const CanvasWorkflowIntegrationWorkflowSelector = memo(() => {
     return (
       <Text color="warning.400" fontSize="sm">
         {workflows.length === 0
-          ? t('controlLayers.workflowIntegration.noWorkflowsFound', 'No workflows found.')
-          : t(
-              'controlLayers.workflowIntegration.noWorkflowsWithImageField',
-              'No compatible workflows found. A workflow needs a Form Builder with an image input field and a Canvas Output node.'
-            )}
+          ? t('controlLayers.workflowIntegration.noWorkflowsFound')
+          : t('controlLayers.workflowIntegration.noWorkflowsWithImageField')}
       </Text>
     );
   }
 
   return (
     <FormControl>
-      <FormLabel>{t('controlLayers.workflowIntegration.selectWorkflow', 'Select Workflow')}</FormLabel>
+      <FormLabel>{t('controlLayers.workflowIntegration.selectWorkflow')}</FormLabel>
       <Select
-        placeholder={t('controlLayers.workflowIntegration.selectPlaceholder', 'Choose a workflow...')}
+        placeholder={t('controlLayers.workflowIntegration.selectPlaceholder')}
         value={selectedWorkflowId || ''}
         onChange={onChange}
       >
         {filteredWorkflows.map((workflow) => (
           <option key={workflow.workflow_id} value={workflow.workflow_id}>
-            {workflow.name || t('controlLayers.workflowIntegration.unnamedWorkflow', 'Unnamed Workflow')}
+            {workflow.name || t('controlLayers.workflowIntegration.unnamedWorkflow')}
           </option>
         ))}
       </Select>

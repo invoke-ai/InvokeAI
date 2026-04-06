@@ -169,7 +169,7 @@ export const WorkflowFormPreview = memo(() => {
     return (
       <Flex alignItems="center" gap={2}>
         <Spinner size="sm" />
-        <Text>{t('controlLayers.workflowIntegration.loadingParameters', 'Loading workflow parameters...')}</Text>
+        <Text>{t('controlLayers.workflowIntegration.loadingParameters')}</Text>
       </Flex>
     );
   }
@@ -183,10 +183,7 @@ export const WorkflowFormPreview = memo(() => {
   if (Object.keys(elements).length === 0 || !rootElementId) {
     return (
       <Text fontSize="sm" color="error.400">
-        {t(
-          'controlLayers.workflowIntegration.noFormBuilderError',
-          'This workflow has no form builder and cannot be used. Please select a different workflow.'
-        )}
+        {t('controlLayers.workflowIntegration.noFormBuilderError')}
       </Text>
     );
   }

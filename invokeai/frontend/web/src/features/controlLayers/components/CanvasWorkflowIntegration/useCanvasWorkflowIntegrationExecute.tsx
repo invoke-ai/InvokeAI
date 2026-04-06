@@ -269,11 +269,8 @@ export const useCanvasWorkflowIntegrationExecute = () => {
       // Results will appear in the staging area where user can accept/discard them
       toast({
         status: 'success',
-        title: t('controlLayers.workflowIntegration.executionStarted', 'Workflow execution started'),
-        description: t(
-          'controlLayers.workflowIntegration.executionStartedDescription',
-          'The result will appear in the staging area when complete.'
-        ),
+        title: t('controlLayers.workflowIntegration.executionStarted'),
+        description: t('controlLayers.workflowIntegration.executionStartedDescription'),
       });
 
       dispatch(canvasWorkflowIntegrationClosed());
@@ -282,7 +279,7 @@ export const useCanvasWorkflowIntegrationExecute = () => {
       dispatch(canvasWorkflowIntegrationProcessingCompleted());
       toast({
         status: 'error',
-        title: t('controlLayers.workflowIntegration.executionFailed', 'Failed to execute workflow'),
+        title: t('controlLayers.workflowIntegration.executionFailed'),
         description: error instanceof Error ? error.message : 'Unknown error',
       });
     }
