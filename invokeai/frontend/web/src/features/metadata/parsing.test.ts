@@ -13,12 +13,9 @@ const createMockStore = () => ({
 const createStore = () => createMockStore() as any;
 
 describe('Qwen metadata parsing', () => {
-  it('does not report missing Qwen metadata keys as available when require is "all"', async () => {
+  it('does not report missing Qwen metadata keys as available', async () => {
     const store = createStore();
 
-    // When requiring ALL handlers to have metadata, empty metadata should fail
-    // because some handlers (like component source) resolve to null which is
-    // a valid parse result. We test with a handler that would fail on missing data.
     const hasMetadata = await MetadataUtils.hasMetadataByHandlers({
       metadata: {},
       handlers: [
@@ -27,16 +24,14 @@ describe('Qwen metadata parsing', () => {
         ImageMetadataHandlers.QwenImageShift,
       ],
       store,
-      require: 'some',
+      require: 'all',
     });
 
-    // The handlers are lenient and always resolve (with defaults), so
-    // hasMetadata is true even for empty metadata. This is intentional —
-    // it allows recall to reset to defaults for older images.
-    expect(hasMetadata).toBe(true);
+    // Handlers reject when keys are absent, so hasMetadata should be false
+    expect(hasMetadata).toBe(false);
   });
 
-  it('recalls Qwen handlers with default values when metadata keys are absent', async () => {
+  it('does not recall Qwen values when metadata keys are absent', async () => {
     const store = createStore();
 
     const recalled = await MetadataUtils.recallByHandlers({
@@ -50,11 +45,10 @@ describe('Qwen metadata parsing', () => {
       silent: true,
     });
 
-    // All 3 handlers succeed with defaults (null, 'none', null)
-    expect(recalled.size).toBe(3);
-    // They dispatch their default values (which reset state to defaults)
+    // No keys present → handlers reject → 0 recalls, no dispatches
+    expect(recalled.size).toBe(0);
     const mockStore = store as ReturnType<typeof createMockStore>;
-    expect(mockStore.dispatch).toHaveBeenCalledTimes(3);
+    expect(mockStore.dispatch).not.toHaveBeenCalled();
   });
 
   it('recalls Qwen handlers with actual values when metadata keys are present', async () => {
@@ -76,7 +70,25 @@ describe('Qwen metadata parsing', () => {
     });
 
     expect(recalled.size).toBe(3);
-    const mockStore2 = store as ReturnType<typeof createMockStore>;
-    expect(mockStore2.dispatch).toHaveBeenCalledTimes(3);
+    const mockStore = store as ReturnType<typeof createMockStore>;
+    expect(mockStore.dispatch).toHaveBeenCalledTimes(3);
+  });
+
+  it('recalls Qwen component source as null when key is present but value is null', async () => {
+    const store = createStore();
+
+    const recalled = await MetadataUtils.recallByHandlers({
+      metadata: {
+        qwen_image_component_source: null,
+      },
+      handlers: [ImageMetadataHandlers.QwenImageComponentSource],
+      store,
+      silent: true,
+    });
+
+    // Key is present with null value → handler resolves with null → 1 recall
+    expect(recalled.size).toBe(1);
+    const mockStore = store as ReturnType<typeof createMockStore>;
+    expect(mockStore.dispatch).toHaveBeenCalledTimes(1);
   });
 });

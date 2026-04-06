@@ -240,8 +240,12 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         neg_prompt_mask = None
         # Match the diffusers pipeline: only enable CFG when cfg_scale > 1 AND negative conditioning is provided.
         # With cfg_scale <= 1, the negative prediction is unused, so skip it entirely.
-        cfg_scale_value = self.cfg_scale if isinstance(self.cfg_scale, float) else self.cfg_scale[0]
-        do_classifier_free_guidance = self.negative_conditioning is not None and cfg_scale_value > 1.0
+        # For per-step arrays, enable CFG if any step has scale > 1.
+        if isinstance(self.cfg_scale, list):
+            any_cfg_above_one = any(v > 1.0 for v in self.cfg_scale)
+        else:
+            any_cfg_above_one = self.cfg_scale > 1.0
+        do_classifier_free_guidance = self.negative_conditioning is not None and any_cfg_above_one
         if do_classifier_free_guidance:
             neg_prompt_embeds, neg_prompt_mask = self._load_text_conditioning(
                 context=context,

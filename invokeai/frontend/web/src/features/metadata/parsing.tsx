@@ -685,15 +685,15 @@ const QwenImageComponentSource: SingleMetadataHandler<ModelIdentifierField | nul
   [SingleMetadataKey]: true,
   type: 'QwenImageComponentSource',
   parse: (metadata, _store) => {
-    try {
-      const raw = getProperty(metadata, 'qwen_image_component_source');
-      if (raw === null || raw === undefined) {
-        return Promise.resolve(null);
-      }
-      return Promise.resolve(zModelIdentifierField.parse(raw));
-    } catch {
+    const raw = getProperty(metadata, 'qwen_image_component_source');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
       return Promise.resolve(null);
     }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
   },
   recall: (value, store) => {
     store.dispatch(qwenImageComponentSourceSelected(value));
@@ -711,13 +711,13 @@ const QwenImageQuantization: SingleMetadataHandler<'none' | 'int8' | 'nf4'> = {
   [SingleMetadataKey]: true,
   type: 'QwenImageQuantization',
   parse: (metadata, _store) => {
-    try {
-      const raw = getProperty(metadata, 'qwen_image_quantization');
-      const parsed = z.enum(['none', 'int8', 'nf4']).parse(raw);
-      return Promise.resolve(parsed);
-    } catch {
-      return Promise.resolve('none' as const);
+    const raw = getProperty(metadata, 'qwen_image_quantization');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
     }
+    const parsed = z.enum(['none', 'int8', 'nf4']).parse(raw);
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(qwenImageQuantizationChanged(value));
@@ -735,16 +735,16 @@ const QwenImageShift: SingleMetadataHandler<number | null> = {
   [SingleMetadataKey]: true,
   type: 'QwenImageShift',
   parse: (metadata, _store) => {
-    try {
-      const raw = getProperty(metadata, 'qwen_image_shift');
-      if (raw === null || raw === undefined) {
-        return Promise.resolve(null);
-      }
-      const parsed = z.number().parse(raw);
-      return Promise.resolve(parsed);
-    } catch {
+    const raw = getProperty(metadata, 'qwen_image_shift');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
       return Promise.resolve(null);
     }
+    const parsed = z.number().parse(raw);
+    return Promise.resolve(parsed);
   },
   recall: (value, store) => {
     store.dispatch(qwenImageShiftChanged(value));
