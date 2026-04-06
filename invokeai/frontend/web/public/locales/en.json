@@ -1490,6 +1490,7 @@
         "copyImage": "Copy Image",
         "denoisingStrength": "Denoising Strength",
         "disabledNoRasterContent": "Disabled (No Raster Content)",
+        "disabledNotSupported": "Not supported by model",
         "downloadImage": "Download Image",
         "general": "General",
         "guidance": "Guidance",

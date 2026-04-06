@@ -636,19 +636,42 @@ export const zLoRA = z.object({
 });
 export type LoRA = z.infer<typeof zLoRA>;
 
-export const zAspectRatioID = z.enum(['Free', '21:9', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16', '9:21']);
+export const zAspectRatioID = z.enum([
+  'Free',
+  '8:1',
+  '4:1',
+  '21:9',
+  '16:9',
+  '3:2',
+  '5:4',
+  '4:3',
+  '1:1',
+  '3:4',
+  '4:5',
+  '2:3',
+  '9:16',
+  '1:4',
+  '9:21',
+  '1:8',
+]);
 export type AspectRatioID = z.infer<typeof zAspectRatioID>;
 export const isAspectRatioID = (v: unknown): v is AspectRatioID => zAspectRatioID.safeParse(v).success;
 export const ASPECT_RATIO_MAP: Record<Exclude<AspectRatioID, 'Free'>, { ratio: number; inverseID: AspectRatioID }> = {
+  '8:1': { ratio: 8 / 1, inverseID: '1:8' },
+  '4:1': { ratio: 4 / 1, inverseID: '1:4' },
   '21:9': { ratio: 21 / 9, inverseID: '9:21' },
   '16:9': { ratio: 16 / 9, inverseID: '9:16' },
   '3:2': { ratio: 3 / 2, inverseID: '2:3' },
+  '5:4': { ratio: 5 / 4, inverseID: '4:5' },
   '4:3': { ratio: 4 / 3, inverseID: '4:3' },
   '1:1': { ratio: 1, inverseID: '1:1' },
   '3:4': { ratio: 3 / 4, inverseID: '4:3' },
+  '4:5': { ratio: 4 / 5, inverseID: '5:4' },
   '2:3': { ratio: 2 / 3, inverseID: '3:2' },
   '9:16': { ratio: 9 / 16, inverseID: '16:9' },
+  '1:4': { ratio: 1 / 4, inverseID: '4:1' },
   '9:21': { ratio: 9 / 21, inverseID: '21:9' },
+  '1:8': { ratio: 1 / 8, inverseID: '8:1' },
 };
 
 const zAspectRatioConfig = z.object({

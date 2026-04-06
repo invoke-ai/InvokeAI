@@ -6,7 +6,6 @@ import { type ModelIdentifierField, zImageField } from 'features/nodes/types/com
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   getOriginalAndScaledSizesForOtherModes,
-  getOriginalAndScaledSizesForTextToImage,
   selectCanvasOutputFields,
 } from 'features/nodes/util/graph/graphBuilderUtils';
 import {
@@ -110,16 +109,15 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
     }
   }
 
-  if (generationMode === 'txt2img') {
-    const { scaledSize } = getOriginalAndScaledSizesForTextToImage(state);
-    externalNode.width = scaledSize.width;
-    externalNode.height = scaledSize.height;
-  } else {
+  // External models require specific dimensions matching their supported presets.
+  // Always use params dimensions (from selected preset) for the API width/height.
+  externalNode.width = params.dimensions.width;
+  externalNode.height = params.dimensions.height;
+
+  if (generationMode !== 'txt2img') {
     assert(manager, 'Canvas manager is required for img2img/inpaint');
     const canvasSettings = selectCanvasSettingsSlice(state);
-    const { scaledSize, rect } = getOriginalAndScaledSizesForOtherModes(state);
-    externalNode.width = scaledSize.width;
-    externalNode.height = scaledSize.height;
+    const { rect } = getOriginalAndScaledSizesForOtherModes(state);
 
     const rasterAdapters = manager.compositor.getVisibleAdaptersOfType('raster_layer');
     const initImage = await manager.compositor.getCompositeImageDTO(rasterAdapters, rect, {

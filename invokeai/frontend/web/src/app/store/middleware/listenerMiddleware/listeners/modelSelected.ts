@@ -4,9 +4,11 @@ import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/c
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
 import {
+  aspectRatioIdChanged,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
   modelChanged,
+  resolutionPresetSelected,
   setZImageScheduler,
   syncedToOptimalDimension,
   vaeSelected,
@@ -24,7 +26,7 @@ import {
   selectBboxModelBase,
   selectCanvasSlice,
 } from 'features/controlLayers/store/selectors';
-import { getEntityIdentifier, isFlux2ReferenceImageConfig } from 'features/controlLayers/store/types';
+import { getEntityIdentifier, isAspectRatioID, isFlux2ReferenceImageConfig } from 'features/controlLayers/store/types';
 import {
   initialFlux2ReferenceImage,
   initialFluxKontextReferenceImage,
@@ -46,7 +48,7 @@ import {
   selectZImageDiffusersModels,
 } from 'services/api/hooks/modelsByType';
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
-import { isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
+import { isExternalApiModelConfig, isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
 
 const log = logger('models');
 
@@ -350,6 +352,34 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         if (!isStaging) {
           // Canvas tab only syncs if not staging
           dispatch(bboxSyncedToOptimalDimension());
+        }
+      }
+
+      // When switching to an external model, sync bbox to the model's first preset dimensions
+      if (newBase === 'external') {
+        const modelConfigsResult = selectModelConfigsQuery(getState());
+        if (modelConfigsResult.data) {
+          const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+          if (newModelConfig && isExternalApiModelConfig(newModelConfig)) {
+            const { aspect_ratio_sizes, resolution_presets } = newModelConfig.capabilities;
+            if (resolution_presets && resolution_presets.length > 0) {
+              const firstPreset = resolution_presets[0]!;
+              dispatch(
+                resolutionPresetSelected({
+                  imageSize: firstPreset.image_size,
+                  aspectRatio: firstPreset.aspect_ratio,
+                  width: firstPreset.width,
+                  height: firstPreset.height,
+                })
+              );
+            } else if (aspect_ratio_sizes) {
+              const firstRatio = Object.keys(aspect_ratio_sizes)[0];
+              const firstSize = firstRatio ? aspect_ratio_sizes[firstRatio] : undefined;
+              if (firstRatio && firstSize && isAspectRatioID(firstRatio)) {
+                dispatch(aspectRatioIdChanged({ id: firstRatio, fixedSize: firstSize }));
+              }
+            }
+          }
         }
       }
     },
