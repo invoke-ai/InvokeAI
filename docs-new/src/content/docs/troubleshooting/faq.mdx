@@ -82,15 +82,15 @@ A workaround is to tune memory allocation with an environment variable:
 MALLOC_MMAP_THRESHOLD_=1048576
 ```
 
-!!! warning "Speed vs Memory Tradeoff"
+:::caution[Speed vs Memory Tradeoff]
+  Your generations may be slower overall when setting this environment variable.
+:::
 
-    Your generations may be slower overall when setting this environment variable.
+:::note[Possibly dependent on `libc` implementation]
+  It's not known if this issue occurs with other `libc` implementations such as `musl`.
 
-!!! info "Possibly dependent on `libc` implementation"
-
-    It's not known if this issue occurs with other `libc` implementations such as `musl`.
-
-    If you encounter this issue and your system uses a different implementation, please try this environment variable and let us know if it fixes the issue.
+  If you encounter this issue and your system uses a different implementation, please try this environment variable and let us know if it fixes the issue.
+:::
 
 <h3>Detailed Discussion</h3>
 

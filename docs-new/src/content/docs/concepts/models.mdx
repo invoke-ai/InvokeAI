@@ -47,10 +47,10 @@ HuggingFace repos can be structured in any way. Some model authors include multi
 
 In this situation, you may need to provide some additional information to identify the model you want, by adding `:subfolder_name` to the repo ID.
 
-!!! example
+:::note[Example]
+  Say you have a repo ID `monster-labs/control_v1p_sd15_qrcode_monster`, and the model you want is inside the `v2` subfolder.
 
-    Say you have a repo ID `monster-labs/control_v1p_sd15_qrcode_monster`, and the model you want is inside the `v2` subfolder.
-
-    Add `:v2` to the repo ID and use that when installing the model: `monster-labs/control_v1p_sd15_qrcode_monster:v2`
+  Add `:v2` to the repo ID and use that when installing the model: `monster-labs/control_v1p_sd15_qrcode_monster:v2`
+:::
 
 [set up in the config file]: /configuration/invokeai-yaml

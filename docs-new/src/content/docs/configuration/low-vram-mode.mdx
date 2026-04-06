@@ -18,13 +18,13 @@ enable_partial_loading: true
 
 It is possible to fine-tune the settings for best performance or if you still get out-of-memory errors (OOMs).
 
-!!! tip "How to find `invokeai.yaml`"
+:::tip[How to find `invokeai.yaml`]
+  The `invokeai.yaml` configuration file lives in your install directory. To access it, run the **Invoke Community Edition** launcher and click the install location. This will open your install directory in a file explorer window.
 
-    The `invokeai.yaml` configuration file lives in your install directory. To access it, run the **Invoke Community Edition** launcher and click the install location. This will open your install directory in a file explorer window.
+  You'll see `invokeai.yaml` there and can edit it with any text editor. After making changes, restart Invoke.
 
-    You'll see `invokeai.yaml` there and can edit it with any text editor. After making changes, restart Invoke.
-
-    If you don't see `invokeai.yaml`, launch Invoke once. It will create the file on its first startup.
+  If you don't see `invokeai.yaml`, launch Invoke once. It will create the file on its first startup.
+:::
 
 ## Details and fine-tuning
 
@@ -94,17 +94,17 @@ max_cache_ram_gb: 28
 max_cache_vram_gb: 16
 ```
 
-!!! warning "Max safe value for `max_cache_vram_gb`"
+:::caution[Max safe value for `max_cache_vram_gb`]
+  Most users should not manually configure the `max_cache_vram_gb`. This configuration value takes precedence over the `device_working_mem_gb` and any operations that explicitly reserve additional working memory (e.g. VAE decode). As such, manually configuring it increases the likelihood of encountering out-of-memory errors.
 
-    Most users should not manually configure the `max_cache_vram_gb`. This configuration value takes precedence over the `device_working_mem_gb` and any operations that explicitly reserve additional working memory (e.g. VAE decode). As such, manually configuring it increases the likelihood of encountering out-of-memory errors.
+  For users who wish to configure `max_cache_vram_gb`, the max safe value can be determined by subtracting `device_working_mem_gb` from your GPU's VRAM. As described below, the default for `device_working_mem_gb` is 3GB.
 
-    For users who wish to configure `max_cache_vram_gb`, the max safe value can be determined by subtracting `device_working_mem_gb` from your GPU's VRAM. As described below, the default for `device_working_mem_gb` is 3GB.
+  For example, if you have a 12GB GPU, the max safe value for `max_cache_vram_gb` is `12GB - 3GB = 9GB`.
 
-    For example, if you have a 12GB GPU, the max safe value for `max_cache_vram_gb` is `12GB - 3GB = 9GB`.
+  If you had increased `device_working_mem_gb` to 4GB, then the max safe value for `max_cache_vram_gb` is `12GB - 4GB = 8GB`.
 
-    If you had increased `device_working_mem_gb` to 4GB, then the max safe value for `max_cache_vram_gb` is `12GB - 4GB = 8GB`.
-
-    Most users who override `max_cache_vram_gb` are doing so because they wish to use significantly less VRAM, and should be setting `max_cache_vram_gb` to a value significantly less than the 'max safe value'.
+  Most users who override `max_cache_vram_gb` are doing so because they wish to use significantly less VRAM, and should be setting `max_cache_vram_gb` to a value significantly less than the 'max safe value'.
+:::
 
 ### Working memory
 
@@ -121,15 +121,15 @@ You can increase the working memory size in `invokeai.yaml` to prevent OOMs:
 device_working_mem_gb: 4
 ```
 
-!!! tip "Operations may request more working memory"
+:::tip[Operations may request more working memory]
+  For some operations, we can determine VRAM requirements in advance and allocate additional working memory to prevent OOMs.
 
-    For some operations, we can determine VRAM requirements in advance and allocate additional working memory to prevent OOMs.
+  VAE decoding is one such operation. This operation converts the generation process's output into an image. For large image outputs, this might use more than the default working memory size of 3GB.
 
-    VAE decoding is one such operation. This operation converts the generation process's output into an image. For large image outputs, this might use more than the default working memory size of 3GB.
+  During this decoding step, Invoke calculates how much VRAM will be required to decode and requests that much VRAM from the model manager. If the amount exceeds the working memory size, the model manager will offload cached model layers from VRAM until there's enough VRAM to decode.
 
-    During this decoding step, Invoke calculates how much VRAM will be required to decode and requests that much VRAM from the model manager. If the amount exceeds the working memory size, the model manager will offload cached model layers from VRAM until there's enough VRAM to decode.
-
-    Once decoding completes, the model manager "reclaims" the extra VRAM allocated as working memory for future model loading operations.
+  Once decoding completes, the model manager "reclaims" the extra VRAM allocated as working memory for future model loading operations.
+:::
 
 ### Keeping a RAM weight copy
 
