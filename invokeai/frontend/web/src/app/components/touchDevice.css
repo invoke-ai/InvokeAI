@@ -1,6 +1,6 @@
 /* Hide tooltips on touch devices where hover gets "stuck" */
 @media (hover: none) {
-  .chakra-tooltip {
+  [role="tooltip"] {
     visibility: hidden !important;
     opacity: 0 !important;
   }
