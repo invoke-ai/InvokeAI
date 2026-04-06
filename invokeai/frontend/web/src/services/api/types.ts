@@ -246,7 +246,7 @@ export const isT5EncoderModelConfig = (
 };
 
 export const isQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwen3EncoderModelConfig => {
-  return config.type === 'qwen3_encoder';
+  return config.type === 'qwen3_encoder' && config.variant !== 'qwen3_06b';
 };
 
 export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwen3EncoderModelConfig => {
