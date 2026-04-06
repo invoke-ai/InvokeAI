@@ -16,6 +16,7 @@ const zAuthState = z.object({
   token: z.string().nullable(),
   user: zUser.nullable(),
   isLoading: z.boolean(),
+  sessionExpired: z.boolean(),
 });
 
 type User = z.infer<typeof zUser>;
@@ -34,6 +35,7 @@ const initialState: AuthState = {
   token: getStoredAuthToken(),
   user: null,
   isLoading: false,
+  sessionExpired: false,
 };
 
 const getInitialAuthState = (): AuthState => initialState;
@@ -46,6 +48,7 @@ const authSlice = createSlice({
       state.token = action.payload.token;
       state.user = action.payload.user;
       state.isAuthenticated = true;
+      state.sessionExpired = false;
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.setItem('auth_token', action.payload.token);
       }
@@ -54,6 +57,16 @@ const authSlice = createSlice({
       state.token = null;
       state.user = null;
       state.isAuthenticated = false;
+      state.sessionExpired = false;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('auth_token');
+      }
+    },
+    sessionExpiredLogout: (state) => {
+      state.token = null;
+      state.user = null;
+      state.isAuthenticated = false;
+      state.sessionExpired = true;
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.removeItem('auth_token');
       }
@@ -64,7 +77,7 @@ const authSlice = createSlice({
   },
 });
 
-export const { setCredentials, logout, setLoading } = authSlice.actions;
+export const { setCredentials, logout, sessionExpiredLogout, setLoading } = authSlice.actions;
 
 export const authSliceConfig: SliceConfig<typeof authSlice> = {
   slice: authSlice,
@@ -73,7 +86,7 @@ export const authSliceConfig: SliceConfig<typeof authSlice> = {
   persistConfig: {
     migrate: () => getInitialAuthState(),
     // Don't persist auth state - token is stored in localStorage
-    persistDenylist: ['isAuthenticated', 'token', 'user', 'isLoading'],
+    persistDenylist: ['isAuthenticated', 'token', 'user', 'isLoading', 'sessionExpired'],
   },
 };
 
@@ -81,3 +94,4 @@ export const selectIsAuthenticated = (state: { auth: AuthState }) => state.auth.
 export const selectCurrentUser = (state: { auth: AuthState }) => state.auth.user;
 export const selectAuthToken = (state: { auth: AuthState }) => state.auth.token;
 export const selectIsAuthLoading = (state: { auth: AuthState }) => state.auth.isLoading;
+export const selectSessionExpired = (state: { auth: AuthState }) => state.auth.sessionExpired;

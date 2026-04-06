@@ -25,7 +25,8 @@
             "rememberMe": "Remember me for 7 days",
             "signIn": "Sign In",
             "signingIn": "Signing in...",
-            "loginFailed": "Login failed. Please check your credentials."
+            "loginFailed": "Login failed. Please check your credentials.",
+            "sessionExpired": "Your credentials have expired. Please log in again to resume."
         },
         "setup": {
             "title": "Welcome to InvokeAI",
