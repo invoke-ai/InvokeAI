@@ -21,7 +21,7 @@
   "scripts": {
     "dev": "vite dev",
     "dev:host": "vite dev --host",
-    "build": "pnpm run lint && vite build",
+    "build": "pnpm run lint && vitest run && vite build",
     "typegen": "node scripts/typegen.js",
     "preview": "vite preview",
     "lint:knip": "knip --tags=-knipignore",
@@ -35,6 +35,7 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "test": "vitest",
+    "test:run": "vitest run",
     "test:ui": "vitest --coverage --ui",
     "test:no-watch": "vitest --no-watch"
   },
