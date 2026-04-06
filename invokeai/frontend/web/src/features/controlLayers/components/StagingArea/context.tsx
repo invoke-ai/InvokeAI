@@ -59,6 +59,9 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
       },
       onDiscard: ({ item_id, status }) => {
         store.dispatch(canvasQueueItemDiscarded({ itemId: item_id }));
+        if (selectQueueItems(store.getState()).length === 0) {
+          store.dispatch(canvasSessionReset());
+        }
         if (status === 'in_progress' || status === 'pending') {
           store.dispatch(queueApi.endpoints.cancelQueueItem.initiate({ item_id }, { track: false }));
         }

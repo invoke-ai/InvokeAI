@@ -133,9 +133,6 @@ class DefaultSessionRunner(SessionRunnerBase):
 
                 self._on_after_run_node(invocation, queue_item, output)
 
-        except KeyboardInterrupt:
-            # TODO(psyche): This is expected to be caught in the main thread. Do we need to catch this here?
-            pass
         except CanceledException:
             # A CanceledException is raised during the denoising step callback if the cancel event is set. We don't need
             # to do any handling here, and no error should be set - just pass and the cancellation will be handled
