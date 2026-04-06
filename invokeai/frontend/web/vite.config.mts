@@ -39,6 +39,7 @@ export default defineConfig(({ mode }) => {
       host: '0.0.0.0',
     },
     test: {
+      reporters: [['default', { summary: false }]],
       typecheck: {
         enabled: true,
         ignoreSourceErrors: true,
