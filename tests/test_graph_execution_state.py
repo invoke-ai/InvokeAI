@@ -5,6 +5,7 @@ import pytest
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from invokeai.app.invocations.collections import RangeInvocation
+from invokeai.app.invocations.logic import IfInvocation, IfInvocationOutput
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
 from invokeai.app.services.shared.graph import (
     CollectInvocation,
@@ -298,6 +299,44 @@ def test_graph_validate_self_collector_without_item_inputs_raises_invalid_edge_e
 
     with pytest.raises(InvalidEdgeError):
         graph.validate_self()
+
+
+def test_if_invocation_selects_true_input_value():
+    invocation = IfInvocation(id="if", condition=True, true_input="true", false_input="false")
+
+    output = invocation.invoke(Mock(InvocationContext))
+
+    assert output.value == "true"
+
+
+def test_if_invocation_outputs_none_when_selected_input_is_missing():
+    invocation = IfInvocation(id="if", condition=False, true_input="true")
+
+    output = invocation.invoke(Mock(InvocationContext))
+
+    assert output.value is None
+
+
+def test_if_invocation_output_allows_missing_value_on_deserialization():
+    output = IfInvocationOutput.model_validate({"type": "if_output"})
+
+    assert output.value is None
+
+
+def test_if_invocation_output_connects_to_downstream_input():
+    graph = Graph()
+    graph.add_node(IfInvocation(id="if", condition=True, true_input="connected value", false_input="unused"))
+    graph.add_node(PromptTestInvocation(id="prompt"))
+    graph.add_edge(create_edge("if", "value", "prompt", "prompt"))
+
+    g = GraphExecutionState(graph=graph)
+    while not g.is_complete():
+        invoke_next(g)
+
+    prepared_prompt_nodes = g.source_prepared_mapping["prompt"]
+    assert len(prepared_prompt_nodes) == 1
+    prepared_prompt_node_id = next(iter(prepared_prompt_nodes))
+    assert g.results[prepared_prompt_node_id].prompt == "connected value"
 
 
 def test_are_connection_types_compatible_accepts_subclass_to_base():
