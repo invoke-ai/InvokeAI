@@ -126,6 +126,7 @@ async def list_all_queue_items(
     },
 )
 async def get_queue_item_ids(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
 ) -> ItemIdsResult:
@@ -376,11 +377,15 @@ async def prune(
     },
 )
 async def get_current_queue_item(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> Optional[SessionQueueItem]:
     """Gets the currently execution queue item"""
     try:
-        return ApiDependencies.invoker.services.session_queue.get_current(queue_id)
+        item = ApiDependencies.invoker.services.session_queue.get_current(queue_id)
+        if item is not None:
+            item = sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin)
+        return item
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while getting current queue item: {e}")
 
@@ -393,11 +398,15 @@ async def get_current_queue_item(
     },
 )
 async def get_next_queue_item(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> Optional[SessionQueueItem]:
     """Gets the next queue item, without executing it"""
     try:
-        return ApiDependencies.invoker.services.session_queue.get_next(queue_id)
+        item = ApiDependencies.invoker.services.session_queue.get_next(queue_id)
+        if item is not None:
+            item = sanitize_queue_item_for_user(item, current_user.user_id, current_user.is_admin)
+        return item
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while getting next queue item: {e}")
 
@@ -430,6 +439,7 @@ async def get_queue_status(
     },
 )
 async def get_batch_status(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch_id: str = Path(description="The batch to get the status of"),
 ) -> BatchStatus:
@@ -529,6 +539,7 @@ async def cancel_queue_item(
     responses={200: {"model": SessionQueueCountsByDestination}},
 )
 async def counts_by_destination(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to query"),
     destination: str = Query(description="The destination to query"),
 ) -> SessionQueueCountsByDestination:

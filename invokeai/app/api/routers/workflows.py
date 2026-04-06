@@ -259,8 +259,12 @@ async def delete_workflow_thumbnail(
 async def get_workflow_thumbnail(
     workflow_id: str = Path(description="The id of the workflow thumbnail to get"),
 ) -> FileResponse:
-    """Gets a workflow's thumbnail image"""
+    """Gets a workflow's thumbnail image.
 
+    This endpoint is intentionally unauthenticated because browsers load images
+    via <img src> tags which cannot send Bearer tokens. Workflow IDs are UUIDs,
+    providing security through unguessability.
+    """
     try:
         path = ApiDependencies.invoker.services.workflow_thumbnails.get_path(workflow_id)
 
@@ -368,7 +372,17 @@ async def counts_by_category(
     operation_id="update_opened_at",
 )
 async def update_opened_at(
+    current_user: CurrentUserOrDefault,
     workflow_id: str = Path(description="The workflow to update"),
 ) -> None:
     """Updates the opened_at field of a workflow"""
+    try:
+        existing = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+    except WorkflowNotFoundError:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    config = ApiDependencies.invoker.services.configuration
+    if config.multiuser and not current_user.is_admin and existing.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
+
     ApiDependencies.invoker.services.workflow_records.update_opened_at(workflow_id)

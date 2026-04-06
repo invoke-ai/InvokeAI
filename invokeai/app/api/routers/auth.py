@@ -104,7 +104,10 @@ async def get_setup_status() -> SetupStatusResponse:
     # In multiuser mode, check if an admin exists
     user_service = ApiDependencies.invoker.services.users
     setup_required = not user_service.has_admin()
-    admin_email = user_service.get_admin_email()
+
+    # Only expose admin_email during initial setup to avoid leaking
+    # administrator identity on public deployments.
+    admin_email = user_service.get_admin_email() if setup_required else None
 
     return SetupStatusResponse(
         setup_required=setup_required,

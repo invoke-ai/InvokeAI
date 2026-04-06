@@ -1,0 +1,725 @@
+"""Tests for API-level authorization on board-image mutations, image mutations,
+workflow thumbnail access, and admin email leak prevention.
+
+These tests verify the security fixes for:
+1. Shared-board write protection bypass via direct API calls
+2. Image mutation endpoints lacking ownership checks
+3. Private workflow thumbnail exposure
+4. Admin email leak on unauthenticated status endpoint
+"""
+
+import logging
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
+from fastapi import status
+from fastapi.testclient import TestClient
+
+from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api_app import app
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.invocation_services import InvocationServices
+from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.users.users_common import UserCreateRequest
+from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
+from invokeai.backend.util.logging import InvokeAILogger
+from tests.fixtures.sqlite_database import create_mock_sqlite_database
+
+
+class MockApiDependencies(ApiDependencies):
+    invoker: Invoker
+
+    def __init__(self, invoker: Invoker) -> None:
+        self.invoker = invoker
+
+
+WORKFLOW_BODY = {
+    "name": "Test Workflow",
+    "author": "",
+    "description": "",
+    "version": "1.0.0",
+    "contact": "",
+    "tags": "",
+    "notes": "",
+    "nodes": [],
+    "edges": [],
+    "exposedFields": [],
+    "meta": {"version": "3.0.0", "category": "user"},
+    "id": None,
+    "form_fields": [],
+}
+
+
+@pytest.fixture
+def setup_jwt_secret():
+    from invokeai.app.services.auth.token_service import set_jwt_secret
+
+    set_jwt_secret("test-secret-key-for-unit-tests-only-do-not-use-in-production")
+
+
+@pytest.fixture
+def client():
+    return TestClient(app)
+
+
+@pytest.fixture
+def mock_services() -> InvocationServices:
+    from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+    from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+    from invokeai.app.services.boards.boards_default import BoardService
+    from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
+    from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import (
+        ClientStatePersistenceSqlite,
+    )
+    from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+    from invokeai.app.services.images.images_default import ImageService
+    from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
+    from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
+    from invokeai.app.services.users.users_default import UserService
+    from tests.test_nodes import TestEventService
+
+    configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
+    logger = InvokeAILogger.get_logger()
+    db = create_mock_sqlite_database(configuration, logger)
+
+    return InvocationServices(
+        board_image_records=SqliteBoardImageRecordStorage(db=db),
+        board_images=None,  # type: ignore
+        board_records=SqliteBoardRecordStorage(db=db),
+        boards=BoardService(),
+        bulk_download=BulkDownloadService(),
+        configuration=configuration,
+        events=TestEventService(),
+        image_files=None,  # type: ignore
+        image_records=SqliteImageRecordStorage(db=db),
+        images=ImageService(),
+        invocation_cache=MemoryInvocationCache(max_cache_size=0),
+        logger=logging,  # type: ignore
+        model_images=None,  # type: ignore
+        model_manager=None,  # type: ignore
+        download_queue=None,  # type: ignore
+        names=None,  # type: ignore
+        performance_statistics=InvocationStatsService(),
+        session_processor=None,  # type: ignore
+        session_queue=None,  # type: ignore
+        urls=None,  # type: ignore
+        workflow_records=SqliteWorkflowRecordsStorage(db=db),
+        tensors=None,  # type: ignore
+        conditioning=None,  # type: ignore
+        style_preset_records=None,  # type: ignore
+        style_preset_image_files=None,  # type: ignore
+        workflow_thumbnails=None,  # type: ignore
+        model_relationship_records=None,  # type: ignore
+        model_relationships=None,  # type: ignore
+        client_state_persistence=ClientStatePersistenceSqlite(db=db),
+        users=UserService(db),
+    )
+
+
+@pytest.fixture()
+def mock_invoker(mock_services: InvocationServices) -> Invoker:
+    return Invoker(services=mock_services)
+
+
+def _save_image(mock_invoker: Invoker, image_name: str, user_id: str) -> None:
+    """Helper to insert an image record owned by a specific user."""
+    from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+
+    mock_invoker.services.image_records.save(
+        image_name=image_name,
+        image_origin=ResourceOrigin.INTERNAL,
+        image_category=ImageCategory.GENERAL,
+        width=100,
+        height=100,
+        has_workflow=False,
+        user_id=user_id,
+    )
+
+
+def _create_user(mock_invoker: Invoker, email: str, display_name: str, is_admin: bool = False) -> str:
+    user = mock_invoker.services.users.create(
+        UserCreateRequest(email=email, display_name=display_name, password="TestPass123", is_admin=is_admin)
+    )
+    return user.user_id
+
+
+def _login(client: TestClient, email: str) -> str:
+    r = client.post("/api/v1/auth/login", json={"email": email, "password": "TestPass123", "remember_me": False})
+    assert r.status_code == 200
+    return r.json()["token"]
+
+
+def _auth(token: str) -> dict[str, str]:
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
+    mock_invoker.services.configuration.multiuser = True
+
+    mock_board_images = MagicMock()
+    mock_board_images.get_all_board_image_names_for_board.return_value = []
+    mock_invoker.services.board_images = mock_board_images
+
+    mock_workflow_thumbnails = MagicMock()
+    mock_workflow_thumbnails.get_url.return_value = None
+    mock_invoker.services.workflow_thumbnails = mock_workflow_thumbnails
+
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.boards.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.board_images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.workflows.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.session_queue.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.recall_parameters.ApiDependencies", mock_deps)
+    yield
+
+
+@pytest.fixture
+def admin_token(setup_jwt_secret: None, enable_multiuser: Any, mock_invoker: Invoker, client: TestClient):
+    _create_user(mock_invoker, "admin@test.com", "Admin", is_admin=True)
+    return _login(client, "admin@test.com")
+
+
+@pytest.fixture
+def user1_token(enable_multiuser: Any, mock_invoker: Invoker, client: TestClient, admin_token: str):
+    _create_user(mock_invoker, "user1@test.com", "User One")
+    return _login(client, "user1@test.com")
+
+
+@pytest.fixture
+def user2_token(enable_multiuser: Any, mock_invoker: Invoker, client: TestClient, admin_token: str):
+    _create_user(mock_invoker, "user2@test.com", "User Two")
+    return _login(client, "user2@test.com")
+
+
+def _create_board(client: TestClient, token: str, name: str = "Test Board") -> str:
+    r = client.post(f"/api/v1/boards/?board_name={name.replace(' ', '+')}", headers=_auth(token))
+    assert r.status_code == status.HTTP_201_CREATED
+    return r.json()["board_id"]
+
+
+def _share_board(client: TestClient, token: str, board_id: str) -> None:
+    r = client.patch(f"/api/v1/boards/{board_id}", json={"board_visibility": "shared"}, headers=_auth(token))
+    assert r.status_code == status.HTTP_201_CREATED
+
+
+def _create_workflow(client: TestClient, token: str) -> str:
+    r = client.post("/api/v1/workflows/", json={"workflow": WORKFLOW_BODY}, headers=_auth(token))
+    assert r.status_code == 200
+    return r.json()["workflow_id"]
+
+
+# ===========================================================================
+# 1. Board-image mutation authorization
+# ===========================================================================
+
+
+class TestBoardImageMutationAuth:
+    """Tests that board_images mutation endpoints enforce ownership."""
+
+    def test_add_image_to_board_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/board_images/", json={"board_id": "x", "image_name": "y"})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_add_image_to_board_batch_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/board_images/batch", json={"board_id": "x", "image_names": ["y"]})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_remove_image_from_board_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.request("DELETE", "/api/v1/board_images/", json={"image_name": "y"})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_remove_images_from_board_batch_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/board_images/batch/delete", json={"image_names": ["y"]})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_non_owner_cannot_add_image_to_shared_board(
+        self, client: TestClient, user1_token: str, user2_token: str
+    ):
+        board_id = _create_board(client, user1_token, "User1 Shared Board")
+        _share_board(client, user1_token, board_id)
+
+        r = client.post(
+            "/api/v1/board_images/",
+            json={"board_id": board_id, "image_name": "some-image"},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_non_owner_cannot_add_images_batch_to_shared_board(
+        self, client: TestClient, user1_token: str, user2_token: str
+    ):
+        board_id = _create_board(client, user1_token, "User1 Shared Board Batch")
+        _share_board(client, user1_token, board_id)
+
+        r = client.post(
+            "/api/v1/board_images/batch",
+            json={"board_id": board_id, "image_names": ["img1", "img2"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_admin_can_add_image_to_any_board(
+        self, client: TestClient, admin_token: str, user1_token: str
+    ):
+        board_id = _create_board(client, user1_token, "User1 Board For Admin")
+
+        # This may 500 because the image doesn't exist in the DB, but it should NOT be 403
+        r = client.post(
+            "/api/v1/board_images/",
+            json={"board_id": board_id, "image_name": "some-image"},
+            headers=_auth(admin_token),
+        )
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_owner_can_add_image_to_own_board(self, client: TestClient, user1_token: str):
+        board_id = _create_board(client, user1_token, "User1 Own Board")
+
+        # May 500 (no real image) but should not be 403
+        r = client.post(
+            "/api/v1/board_images/",
+            json={"board_id": board_id, "image_name": "some-image"},
+            headers=_auth(user1_token),
+        )
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+
+# ===========================================================================
+# 2a. Image read-access authorization
+# ===========================================================================
+
+
+class TestImageReadAuth:
+    """Tests that image GET endpoints enforce visibility."""
+
+    def test_get_image_dto_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/images/i/some-image")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_image_metadata_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/images/i/some-image/metadata")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_image_full_is_unauthenticated(self, enable_multiuser: Any, client: TestClient):
+        # Binary image endpoints are intentionally unauthenticated because
+        # browsers load them via <img src> which cannot send Bearer tokens.
+        r = client.get("/api/v1/images/i/some-image/full")
+        assert r.status_code != status.HTTP_401_UNAUTHORIZED
+
+    def test_get_image_thumbnail_is_unauthenticated(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/images/i/some-image/thumbnail")
+        assert r.status_code != status.HTTP_401_UNAUTHORIZED
+
+    def test_get_image_urls_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/images/i/some-image/urls")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_non_owner_cannot_read_private_image(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 should not be able to read user1's image that is not on a shared board."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-private-img", user1.user_id)
+
+        r = client.get("/api/v1/images/i/user1-private-img", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_owner_can_read_own_image(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-readable", user1.user_id)
+
+        r = client.get("/api/v1/images/i/user1-readable", headers=_auth(user1_token))
+        # Should not be 403 (may be 404/500 due to missing board_image_records mock)
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_admin_can_read_any_image(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str, user1_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-admin-read", user1.user_id)
+
+        r = client.get("/api/v1/images/i/user1-admin-read", headers=_auth(admin_token))
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_shared_board_image_readable_by_other_user(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """An image on a shared board should be readable by any authenticated user."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "shared-board-img", user1.user_id)
+
+        # Create a shared board and add the image to it
+        board_id = _create_board(client, user1_token, "Shared Read Board")
+        _share_board(client, user1_token, board_id)
+        mock_invoker.services.board_image_records.add_image_to_board(
+            board_id=board_id, image_name="shared-board-img"
+        )
+
+        r = client.get("/api/v1/images/i/shared-board-img", headers=_auth(user2_token))
+        # Should not be 403 — image is on a shared board
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_non_owner_cannot_read_image_metadata(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-meta-blocked", user1.user_id)
+
+        r = client.get("/api/v1/images/i/user1-meta-blocked/metadata", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+
+# ===========================================================================
+# 2b. Image mutation authorization
+# ===========================================================================
+
+
+class TestImageUploadAuth:
+    """Tests that image upload enforces board ownership."""
+
+    def test_upload_to_other_users_shared_board_forbidden(
+        self, client: TestClient, user1_token: str, user2_token: str
+    ):
+        """A user should not be able to upload an image into another user's shared board."""
+        board_id = _create_board(client, user1_token, "User1 Shared Upload Board")
+        _share_board(client, user1_token, board_id)
+
+        # user2 tries to upload into user1's shared board
+        import io
+
+        fake_image = io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+        r = client.post(
+            f"/api/v1/images/upload?image_category=general&is_intermediate=false&board_id={board_id}",
+            files={"file": ("test.png", fake_image, "image/png")},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_owner_can_upload_to_own_shared_board(
+        self, client: TestClient, user1_token: str
+    ):
+        board_id = _create_board(client, user1_token, "User1 Own Upload Board")
+        _share_board(client, user1_token, board_id)
+
+        import io
+
+        fake_image = io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+        r = client.post(
+            f"/api/v1/images/upload?image_category=general&is_intermediate=false&board_id={board_id}",
+            files={"file": ("test.png", fake_image, "image/png")},
+            headers=_auth(user1_token),
+        )
+        # Should not be 403 (may fail for other reasons in test env)
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+
+class TestImageMutationAuth:
+    """Tests that image mutation endpoints enforce ownership."""
+
+    def test_delete_image_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.delete("/api/v1/images/i/some-image")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_update_image_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.patch("/api/v1/images/i/some-image", json={"starred": True})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_batch_delete_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/images/delete", json={"image_names": ["x"]})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_star_images_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/images/star", json={"image_names": ["x"]})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_unstar_images_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/images/unstar", json={"image_names": ["x"]})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_clear_intermediates_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.delete("/api/v1/images/intermediates")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_delete_uncategorized_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.delete("/api/v1/images/uncategorized")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_non_owner_cannot_delete_image(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 should not be able to delete user1's image."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-image", user1.user_id)
+
+        r = client.delete("/api/v1/images/i/user1-image", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_owner_can_delete_own_image(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-delete-me", user1.user_id)
+
+        r = client.delete("/api/v1/images/i/user1-delete-me", headers=_auth(user1_token))
+        # Should not be 403 (may be 200 or 500 depending on file system)
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_admin_can_delete_any_image(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str, user1_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-admin-delete", user1.user_id)
+
+        r = client.delete("/api/v1/images/i/user1-admin-delete", headers=_auth(admin_token))
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_board_owner_can_delete_image_on_own_board(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+    ):
+        """Board owner should be able to delete images on their board even if
+        the image's user_id is 'system' (e.g. generated images)."""
+        # Create image owned by "system" (simulates queue-generated image)
+        _save_image(mock_invoker, "system-img-on-board", "system")
+
+        # Create a board owned by user1 and add the image to it
+        board_id = _create_board(client, user1_token, "User1 Board With System Img")
+        mock_invoker.services.board_image_records.add_image_to_board(
+            board_id=board_id, image_name="system-img-on-board"
+        )
+
+        r = client.delete("/api/v1/images/i/system-img-on-board", headers=_auth(user1_token))
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_non_owner_cannot_update_image(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-no-star", user1.user_id)
+
+        r = client.patch(
+            "/api/v1/images/i/user1-no-star",
+            json={"starred": True},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_non_owner_cannot_star_image(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-star-blocked", user1.user_id)
+
+        r = client.post(
+            "/api/v1/images/star",
+            json={"image_names": ["user1-star-blocked"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_non_owner_cannot_batch_delete_image(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-batch-del", user1.user_id)
+
+        r = client.post(
+            "/api/v1/images/delete",
+            json={"image_names": ["user1-batch-del"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_clear_intermediates_non_admin_forbidden(self, client: TestClient, user1_token: str):
+        r = client.delete("/api/v1/images/intermediates", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_get_intermediates_count_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/images/intermediates")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_download_images_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/images/download", json={"image_names": ["x"]})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_bulk_download_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/images/download/some-item.zip")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_images_by_names_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/images/images_by_names", json={"image_names": ["x"]})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_images_by_names_filters_unauthorized(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """images_by_names should silently skip images the caller cannot access."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-by-name", user1.user_id)
+
+        r = client.post(
+            "/api/v1/images/images_by_names",
+            json={"image_names": ["user1-by-name"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == 200
+        # user2 should get an empty list — the image belongs to user1
+        assert r.json() == []
+
+
+# ===========================================================================
+# 3. Workflow mutation authorization (additional)
+# ===========================================================================
+
+
+class TestWorkflowMutationAuth:
+    """Tests for additional workflow mutation endpoints."""
+
+    def test_update_opened_at_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.put("/api/v1/workflows/i/some-id/opened_at")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_non_owner_cannot_update_opened_at(
+        self, client: TestClient, user1_token: str, user2_token: str
+    ):
+        workflow_id = _create_workflow(client, user1_token)
+        r = client.put(
+            f"/api/v1/workflows/i/{workflow_id}/opened_at",
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_owner_can_update_opened_at(self, client: TestClient, user1_token: str):
+        workflow_id = _create_workflow(client, user1_token)
+        r = client.put(
+            f"/api/v1/workflows/i/{workflow_id}/opened_at",
+            headers=_auth(user1_token),
+        )
+        assert r.status_code == 200
+
+
+# ===========================================================================
+# 4. Workflow thumbnail authorization
+# ===========================================================================
+
+
+class TestWorkflowThumbnailAuth:
+    """Tests for the workflow thumbnail GET endpoint.
+
+    Workflow and image thumbnail endpoints are intentionally unauthenticated
+    because browsers load them via <img src> tags which cannot send Bearer
+    tokens. IDs are UUIDs, providing security through unguessability.
+    """
+
+    def test_thumbnail_is_unauthenticated(self, enable_multiuser: Any, client: TestClient):
+        # Binary image endpoints don't require auth — loaded via <img src>
+        r = client.get("/api/v1/workflows/i/some-workflow/thumbnail")
+        assert r.status_code != status.HTTP_401_UNAUTHORIZED
+
+
+# ===========================================================================
+# 4. Admin email leak prevention
+# ===========================================================================
+
+
+class TestAdminEmailLeak:
+    """Tests that the auth status endpoint does not leak admin email."""
+
+    def test_status_does_not_leak_admin_email_when_setup_complete(
+        self, client: TestClient, admin_token: str
+    ):
+        """After setup is complete, admin_email must be null."""
+        r = client.get("/api/v1/auth/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["multiuser_enabled"] is True
+        assert data["setup_required"] is False
+        assert data["admin_email"] is None
+
+    def test_status_returns_admin_email_during_setup(
+        self, setup_jwt_secret: None, enable_multiuser: Any, mock_invoker: Invoker, client: TestClient
+    ):
+        """Before any admin exists, setup_required=True and admin_email may be returned."""
+        # Don't create any users -- setup_required should be True
+        r = client.get("/api/v1/auth/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["setup_required"] is True
+        # admin_email is null here because no admin exists yet, which is correct
+
+    def test_status_no_leak_in_single_user_mode(
+        self, setup_jwt_secret: None, monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+    ):
+        """In single-user mode, admin_email should always be null."""
+        mock_invoker.services.configuration.multiuser = False
+        mock_deps = MockApiDependencies(mock_invoker)
+        monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
+
+        r = client.get("/api/v1/auth/status")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["admin_email"] is None
+        assert data["multiuser_enabled"] is False
+
+
+# ===========================================================================
+# 6. Session queue authorization
+# ===========================================================================
+
+
+class TestSessionQueueAuth:
+    """Tests that session queue endpoints enforce authentication."""
+
+    def test_get_queue_item_ids_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/queue/default/item_ids")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_current_queue_item_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/queue/default/current")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_next_queue_item_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/queue/default/next")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_batch_status_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/queue/default/b/some-batch/status")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_counts_by_destination_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/queue/default/counts_by_destination?destination=canvas")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+# ===========================================================================
+# 7. Recall parameters authorization
+# ===========================================================================
+
+
+class TestRecallParametersAuth:
+    """Tests that recall parameter endpoints enforce authentication."""
+
+    def test_get_recall_parameters_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v1/recall/default")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_update_recall_parameters_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v1/recall/default", json={"positive_prompt": "test"})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED

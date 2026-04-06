@@ -46,6 +46,20 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
         return deserialize_image_record(dict(result))
 
+    def get_user_id(self, image_name: str) -> Optional[str]:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT user_id FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
+            if not result:
+                return None
+            return cast(Optional[str], dict(result).get("user_id"))
+
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         with self._db.transaction() as cursor:
             try:

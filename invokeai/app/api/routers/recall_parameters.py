@@ -7,6 +7,7 @@ from fastapi import Body, HTTPException, Path
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
 
+from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.backend.image_util.controlnet_processor import process_controlnet_image
 from invokeai.backend.model_manager.taxonomy import ModelType
@@ -297,6 +298,7 @@ def resolve_ip_adapter_models(ip_adapters: list[IPAdapterRecallParameter]) -> li
     response_model=dict[str, Any],
 )
 async def update_recall_parameters(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(..., description="The queue id to perform this operation on"),
     parameters: RecallParameter = Body(..., description="Recall parameters to update"),
 ) -> dict[str, Any]:
@@ -425,6 +427,7 @@ async def update_recall_parameters(
     response_model=dict[str, Any],
 )
 async def get_recall_parameters(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(..., description="The queue id to retrieve parameters for"),
 ) -> dict[str, Any]:
     """

@@ -98,6 +98,11 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def get_user_id(self, image_name: str) -> Optional[str]:
+        """Gets the user_id of the image owner. Returns None if image not found."""
+        pass
+
+    @abstractmethod
     def get_most_recent_image_for_board(self, board_id: str) -> Optional[ImageRecord]:
         """Gets the most recent image for a board."""
         pass
