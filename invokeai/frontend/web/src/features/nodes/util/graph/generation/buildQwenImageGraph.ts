@@ -144,10 +144,11 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     : [];
 
   if (validRefImageConfigs.length > 0) {
-    const refImgCollect = g.addNode({
-      type: 'collect',
-      id: getPrefixedId('qwen_ref_img_collect'),
-    });
+    // Use collector chaining to preserve reference image ordering.
+    // Each image gets its own collect node; each subsequent collector chains
+    // from the previous one via collection → collection edge.
+    // (Same pattern as FLUX.2 Klein's kontext conditioning.)
+    let prevCollect: Invocation<'collect'> | null = null;
     for (const { config } of validRefImageConfigs) {
       const imgField = zImageField.parse(config.image?.crop?.image ?? config.image?.original.image);
       const imageNode = g.addNode({
@@ -155,10 +156,19 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
         id: getPrefixedId('qwen_ref_img'),
         image: imgField,
       });
-      g.addEdge(imageNode, 'image', refImgCollect, 'item');
+      const collectNode = g.addNode({
+        type: 'collect',
+        id: getPrefixedId('qwen_ref_img_collect'),
+      });
+      g.addEdge(imageNode, 'image', collectNode, 'item');
+      if (prevCollect !== null) {
+        g.addEdge(prevCollect, 'collection', collectNode, 'collection');
+      }
+      prevCollect = collectNode;
     }
+    assert(prevCollect !== null);
     // Pass reference images to text encoder for vision-language conditioning
-    g.addEdge(refImgCollect, 'collection', posCond, 'reference_images');
+    g.addEdge(prevCollect, 'collection', posCond, 'reference_images');
 
     // Also VAE-encode the first reference image as latents for the denoising transformer.
     // The transformer expects [noisy_patches ; ref_patches] in its sequence.

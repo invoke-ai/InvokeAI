@@ -317,6 +317,81 @@ describe('buildQwenImageGraph', () => {
     params = { ...defaultParams };
   });
 
+  it('uses chained collectors to preserve reference image ordering for edit-variant models', async () => {
+    // Override the model to be an edit variant
+    const { selectMainModelConfig } = await import('features/controlLayers/store/paramsSlice');
+    const editModel = { ...model, variant: 'edit' };
+    vi.mocked(selectMainModelConfig).mockReturnValue(editModel as never);
+
+    // Also need fetchModelConfigWithTypeGuard to return edit variant
+    const { fetchModelConfigWithTypeGuard } = await import('features/metadata/util/modelFetchingHelpers');
+    vi.mocked(fetchModelConfigWithTypeGuard).mockResolvedValue(editModel as never);
+
+    // Add a second reference image to the mock slice
+    const { selectRefImagesSlice } = await import('features/controlLayers/store/refImagesSlice');
+    vi.mocked(selectRefImagesSlice).mockReturnValue({
+      entities: [
+        {
+          id: 'ref-image-1',
+          isEnabled: true,
+          config: {
+            type: 'qwen_image_reference_image',
+            image: { original: { image: { image_name: 'ref1.png', width: 512, height: 512 } } },
+          },
+        },
+        {
+          id: 'ref-image-2',
+          isEnabled: true,
+          config: {
+            type: 'qwen_image_reference_image',
+            image: { original: { image: { image_name: 'ref2.png', width: 512, height: 512 } } },
+          },
+        },
+      ],
+    } as never);
+
+    const { g } = await buildQwenImageGraph({
+      generationMode: 'txt2img',
+      manager: null,
+      state: {
+        system: { shouldUseNSFWChecker: false, shouldUseWatermarker: false },
+      } as never,
+    });
+
+    const graph = g.getGraph();
+    const nodeIds = Object.keys(graph.nodes);
+
+    // Should have exactly 2 collect nodes (one per reference image, chained)
+    const collectNodeIds = nodeIds.filter((id) => id.startsWith('qwen_ref_img_collect:'));
+    expect(collectNodeIds).toHaveLength(2);
+
+    // Each collect node should receive exactly one image as 'item'
+    for (const collectId of collectNodeIds) {
+      const itemEdges = graph.edges.filter(
+        (edge) => edge.destination.node_id === collectId && edge.destination.field === 'item'
+      );
+      expect(itemEdges).toHaveLength(1);
+    }
+
+    // The second collect node should chain from the first via collection → collection
+    const chainEdges = graph.edges.filter(
+      (edge) => edge.source.field === 'collection' && edge.destination.field === 'collection'
+    );
+    expect(chainEdges).toHaveLength(1);
+    expect(chainEdges[0]!.source.node_id).toBe(collectNodeIds[0]);
+    expect(chainEdges[0]!.destination.node_id).toBe(collectNodeIds[1]);
+
+    // The final collect node should connect to the text encoder's reference_images input
+    const refImagesEdge = graph.edges.find((edge) => edge.destination.field === 'reference_images');
+    expect(refImagesEdge).toBeDefined();
+    expect(refImagesEdge!.source.node_id).toBe(collectNodeIds[1]);
+
+    // Restore original mocks
+    vi.mocked(selectMainModelConfig).mockReturnValue(model as never);
+    vi.mocked(fetchModelConfigWithTypeGuard).mockResolvedValue(model as never);
+    vi.mocked(selectRefImagesSlice).mockReturnValue(refImagesSlice as never);
+  });
+
   it('does not include hidden Qwen reference images for generate-variant models', async () => {
     const { g } = await buildQwenImageGraph({
       generationMode: 'txt2img',
