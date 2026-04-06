@@ -1,4 +1,4 @@
-import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
+import { Menu, MenuButton, MenuItem, MenuList, Portal, useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import type {
   EdgeChange,
@@ -33,6 +33,7 @@ import {
   $lastEdgeUpdateMouseEvent,
   $pendingConnection,
   $viewport,
+  connectorInserted,
   edgesChanged,
   nodesChanged,
   redo,
@@ -47,17 +48,22 @@ import {
   selectNodesSlice,
 } from 'features/nodes/store/selectors';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
+import { selectWorkflowMode } from 'features/nodes/store/workflowLibrarySlice';
 import { selectSelectionMode, selectShouldSnapToGrid } from 'features/nodes/store/workflowSettingsSlice';
 import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
+import { isConnectorNode } from 'features/nodes/types/invocation';
+import { buildConnectorNode } from 'features/nodes/util/node/buildConnectorNode';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { CSSProperties, MouseEvent, RefObject } from 'react';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { PiPlugsConnectedBold } from 'react-icons/pi';
 
 import CustomConnectionLine from './connectionLines/CustomConnectionLine';
 import InvocationCollapsedEdge from './edges/InvocationCollapsedEdge';
 import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
+import ConnectorNode from './nodes/Connector/ConnectorNode';
 import CurrentImageNode from './nodes/CurrentImage/CurrentImageNode';
 import InvocationNodeWrapper from './nodes/Invocation/InvocationNodeWrapper';
 import NotesNode from './nodes/Notes/NotesNode';
@@ -70,6 +76,7 @@ const edgeTypes = {
 
 const nodeTypes = {
   invocation: InvocationNodeWrapper,
+  connector: ConnectorNode,
   current_image: CurrentImageNode,
   notes: NotesNode,
 } as const;
@@ -88,10 +95,14 @@ export const Flow = memo(() => {
   const viewport = useStore($viewport);
   const shouldSnapToGrid = useAppSelector(selectShouldSnapToGrid);
   const selectionMode = useAppSelector(selectSelectionMode);
+  const workflowMode = useAppSelector(selectWorkflowMode);
   const { onConnectStart, onConnect, onConnectEnd } = useConnection();
   const flowWrapper = useRef<HTMLDivElement>(null);
   const isValidConnection = useIsValidConnection();
   const updateNodeInternals = useUpdateNodeInternals();
+  const [paneMenuState, setPaneMenuState] = useState<{ x: number; y: number; clientX: number; clientY: number } | null>(
+    null
+  );
 
   useFocusRegion('workflows', flowWrapper);
 
@@ -129,6 +140,7 @@ export const Flow = memo(() => {
   const { onCloseGlobal } = useGlobalMenuClose();
   const handlePaneClick = useCallback(() => {
     onCloseGlobal();
+    setPaneMenuState(null);
   }, [onCloseGlobal]);
 
   const onInit: OnInit<AnyNode, AnyEdge> = useCallback((flow) => {
@@ -146,6 +158,60 @@ export const Flow = memo(() => {
       );
     }
   }, []);
+
+  const onPaneContextMenu: NonNullable<ReactFlowProps['onPaneContextMenu']> = useCallback(
+    (event) => {
+      if (workflowMode !== 'edit' || event.shiftKey) {
+        return;
+      }
+      event.preventDefault();
+      setPaneMenuState({ x: event.pageX, y: event.pageY, clientX: event.clientX, clientY: event.clientY });
+    },
+    [workflowMode]
+  );
+
+  const onClosePaneMenu = useCallback(() => {
+    setPaneMenuState(null);
+  }, []);
+
+  const addConnectorAtPaneMenuPosition = useCallback(() => {
+    if (!paneMenuState) {
+      return;
+    }
+    const flow = $flow.get();
+    if (!flow) {
+      return;
+    }
+    const connector = buildConnectorNode(
+      flow.screenToFlowPosition({
+        x: paneMenuState.clientX,
+        y: paneMenuState.clientY,
+      })
+    );
+    dispatch(nodesChanged([{ type: 'add', item: connector }]));
+    setPaneMenuState(null);
+  }, [dispatch, paneMenuState]);
+
+  const onEdgeDoubleClick = useCallback<NonNullable<ReactFlowProps['onEdgeDoubleClick']>>(
+    (event, edge) => {
+      if (workflowMode !== 'edit' || edge.type !== 'default' || edge.hidden) {
+        return;
+      }
+      const flow = $flow.get();
+      if (!flow) {
+        return;
+      }
+      const connector = buildConnectorNode(
+        flow.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        })
+      );
+      dispatch(connectorInserted({ edgeId: edge.id, connector }));
+      updateNodeInternals([edge.source, edge.target, connector.id]);
+    },
+    [dispatch, updateNodeInternals, workflowMode]
+  );
 
   // #region Updatable Edges
 
@@ -209,6 +275,23 @@ export const Flow = memo(() => {
 
   // #endregion
 
+  const renderedNodes = useMemo(
+    () => (workflowMode === 'view' ? nodes.filter((node) => !isConnectorNode(node)) : nodes),
+    [nodes, workflowMode]
+  );
+
+  const renderedEdges = useMemo(
+    () =>
+      workflowMode === 'view'
+        ? edges.filter((edge) => {
+            const sourceNode = nodes.find((node) => node.id === edge.source);
+            const targetNode = nodes.find((node) => node.id === edge.target);
+            return !isConnectorNode(sourceNode) && !isConnectorNode(targetNode);
+          })
+        : edges,
+    [edges, nodes, workflowMode]
+  );
+
   return (
     <>
       <ReactFlow<AnyNode, AnyEdge>
@@ -217,8 +300,8 @@ export const Flow = memo(() => {
         defaultViewport={viewport}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        nodes={nodes}
-        edges={edges}
+        nodes={renderedNodes}
+        edges={renderedEdges}
         onInit={onInit}
         onMouseMove={onMouseMove}
         onNodesChange={onNodesChange}
@@ -230,6 +313,7 @@ export const Flow = memo(() => {
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
         onMoveEnd={handleMoveEnd}
+        onEdgeDoubleClick={onEdgeDoubleClick}
         connectionLineComponent={CustomConnectionLine}
         isValidConnection={isValidConnection}
         minZoom={0.1}
@@ -239,6 +323,7 @@ export const Flow = memo(() => {
         proOptions={proOptions}
         style={flowStyles}
         onPaneClick={handlePaneClick}
+        onPaneContextMenu={onPaneContextMenu}
         deleteKeyCode={null}
         selectionMode={selectionMode === 'full' ? SelectionMode.Full : SelectionMode.Partial}
         elevateEdgesOnSelect
@@ -249,6 +334,25 @@ export const Flow = memo(() => {
       >
         <Background gap={snapGrid} offset={snapGrid} />
       </ReactFlow>
+      <Portal>
+        <Menu isOpen={paneMenuState !== null} onClose={onClosePaneMenu} placement="auto-start" gutter={0}>
+          <MenuButton
+            aria-hidden
+            position="absolute"
+            left={paneMenuState?.x ?? -9999}
+            top={paneMenuState?.y ?? -9999}
+            w={1}
+            h={1}
+            pointerEvents="none"
+            bg="transparent"
+          />
+          <MenuList>
+            <MenuItem icon={<PiPlugsConnectedBold />} onClick={addConnectorAtPaneMenuPosition}>
+              Add Connector
+            </MenuItem>
+          </MenuList>
+        </Menu>
+      </Portal>
       <HotkeyIsolator flowWrapper={flowWrapper} />
     </>
   );

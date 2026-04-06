@@ -20,6 +20,8 @@ import {
   reparentElement,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { type NodesState, zNodesState } from 'features/nodes/store/types';
+import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
+import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
   BoardFieldValue,
@@ -65,8 +67,8 @@ import {
   zStringGeneratorFieldValue,
   zStylePresetFieldValue,
 } from 'features/nodes/types/field';
-import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
-import { isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
+import type { AnyEdge, AnyNode, ConnectorNode } from 'features/nodes/types/invocation';
+import { isConnectorNode, isInvocationNode, isNotesNode } from 'features/nodes/types/invocation';
 import type {
   BuilderForm,
   ContainerElement,
@@ -103,7 +105,7 @@ export const getInitialWorkflow = (): Omit<NodesState, 'mode' | 'formFieldInitia
     tags: '',
     notes: '',
     exposedFields: [],
-    meta: { version: '3.0.0', category: 'user' },
+    meta: { version: '4.0.0', category: 'user' },
     form: getDefaultForm(),
     nodes: [],
     edges: [],
@@ -396,11 +398,59 @@ const slice = createSlice({
         }
       }
     },
+    connectorInserted: (
+      state,
+      action: PayloadAction<{
+        edgeId: string;
+        connector: ConnectorNode;
+      }>
+    ) => {
+      const { edgeId, connector } = action.payload;
+      const edge = state.edges.find((candidate) => candidate.id === edgeId);
+      if (!edge || edge.type !== 'default') {
+        return;
+      }
+      state.nodes.push({ ...SHARED_NODE_PROPERTIES, ...connector } as (typeof state.nodes)[number]);
+      state.edges = state.edges.filter((candidate) => candidate.id !== edgeId);
+      state.edges.push(
+        connectionToEdge({
+          source: edge.source,
+          sourceHandle: edge.sourceHandle ?? null,
+          target: connector.id,
+          targetHandle: CONNECTOR_INPUT_HANDLE,
+        }),
+        connectionToEdge({
+          source: connector.id,
+          sourceHandle: CONNECTOR_OUTPUT_HANDLE,
+          target: edge.target,
+          targetHandle: edge.targetHandle ?? null,
+        })
+      );
+    },
+    connectorDeleted: (
+      state,
+      action: PayloadAction<{
+        connectorId: string;
+        spliceConnections: {
+          source: string;
+          sourceHandle: string;
+          target: string;
+          targetHandle: string;
+        }[];
+      }>
+    ) => {
+      const { connectorId, spliceConnections } = action.payload;
+      state.nodes = state.nodes.filter((node) => node.id !== connectorId);
+      state.edges = state.edges.filter((edge) => edge.source !== connectorId && edge.target !== connectorId);
+      for (const connection of spliceConnections) {
+        state.edges.push(connectionToEdge(connection));
+      }
+    },
     nodeLabelChanged: (state, action: PayloadAction<{ nodeId: string; label: string }>) => {
       const { nodeId, label } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
       const node = state.nodes?.[nodeIndex];
-      if (isInvocationNode(node) || isNotesNode(node)) {
+      if (isInvocationNode(node) || isNotesNode(node) || isConnectorNode(node)) {
         node.data.label = label;
       }
     },
@@ -614,6 +664,8 @@ export const {
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
+  connectorDeleted,
+  connectorInserted,
   nodeLabelChanged,
   nodeNotesChanged,
   nodesChanged,

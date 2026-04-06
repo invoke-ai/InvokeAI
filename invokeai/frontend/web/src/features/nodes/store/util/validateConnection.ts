@@ -1,10 +1,16 @@
 import type { Connection as NullableConnection } from '@xyflow/react';
 import type { Templates } from 'features/nodes/store/types';
 import { areTypesEqual } from 'features/nodes/store/util/areTypesEqual';
+import {
+  CONNECTOR_INPUT_HANDLE,
+  CONNECTOR_OUTPUT_HANDLE,
+  resolveConnectorSource,
+} from 'features/nodes/store/util/connectorTopology';
 import { getCollectItemType } from 'features/nodes/store/util/getCollectItemType';
 import { getHasCycles } from 'features/nodes/store/util/getHasCycles';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
-import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
+import type { AnyEdge, AnyNode, InvocationNode } from 'features/nodes/types/invocation';
+import { isConnectorNode, isInvocationNode } from 'features/nodes/types/invocation';
 import type { SetNonNullable } from 'type-fest';
 
 type Connection = SetNonNullable<NullableConnection>;
@@ -17,6 +23,12 @@ type ValidateConnectionFunc = (
   ignoreEdge: AnyEdge | null,
   strict?: boolean
 ) => string | null;
+
+type EffectiveSource = {
+  node: InvocationNode;
+  handle: string;
+  fieldTemplate: NonNullable<Templates[string]>['outputs'][string];
+};
 
 const getEqualityPredicate =
   (c: Connection) =>
@@ -52,6 +64,65 @@ const isSingleCollectionPairOfSameBaseType = (
   return firstType.batch === secondType.batch && (isSingleToCollection || isCollectionToSingle);
 };
 
+const getEffectiveSource = (
+  sourceId: string,
+  sourceHandle: string,
+  nodes: AnyNode[],
+  edges: AnyEdge[],
+  templates: Templates
+): EffectiveSource | 'nodes.missingNode' | 'nodes.missingInvocationTemplate' | 'nodes.missingFieldTemplate' | null => {
+  const sourceNode = nodes.find((n) => n.id === sourceId);
+  if (!sourceNode) {
+    return 'nodes.missingNode';
+  }
+
+  if (isConnectorNode(sourceNode)) {
+    if (sourceHandle !== CONNECTOR_OUTPUT_HANDLE) {
+      return 'nodes.missingFieldTemplate';
+    }
+
+    const resolvedSource = resolveConnectorSource(sourceNode.id, nodes, edges);
+    if (!resolvedSource) {
+      return null;
+    }
+
+    return getEffectiveSource(resolvedSource.nodeId, resolvedSource.fieldName, nodes, edges, templates);
+  }
+
+  if (!isInvocationNode(sourceNode)) {
+    return 'nodes.missingInvocationTemplate';
+  }
+
+  const sourceTemplate = templates[sourceNode.data.type];
+  if (!sourceTemplate) {
+    return 'nodes.missingInvocationTemplate';
+  }
+
+  const sourceFieldTemplate = sourceTemplate.outputs[sourceHandle];
+  if (!sourceFieldTemplate) {
+    return 'nodes.missingFieldTemplate';
+  }
+
+  return {
+    node: sourceNode,
+    handle: sourceHandle,
+    fieldTemplate: sourceFieldTemplate,
+  };
+};
+
+const getEffectiveSourceForEdge = (
+  edge: AnyEdge,
+  nodes: AnyNode[],
+  edges: AnyEdge[],
+  templates: Templates
+): EffectiveSource | 'nodes.missingNode' | 'nodes.missingInvocationTemplate' | 'nodes.missingFieldTemplate' | null => {
+  if (edge.type !== 'default' || typeof edge.sourceHandle !== 'string') {
+    return null;
+  }
+
+  return getEffectiveSource(edge.source, edge.sourceHandle, nodes, edges, templates);
+};
+
 /**
  * Validates a connection between two fields
  * @returns A translation key for an error if the connection is invalid, otherwise null
@@ -83,29 +154,42 @@ export const validateConnection: ValidateConnectionFunc = (
       return 'nodes.cannotDuplicateConnection';
     }
 
-    const sourceNode = nodes.find((n) => n.id === c.source);
-    if (!sourceNode) {
-      return 'nodes.missingNode';
-    }
-
     const targetNode = nodes.find((n) => n.id === c.target);
     if (!targetNode) {
       return 'nodes.missingNode';
     }
 
-    const sourceTemplate = templates[sourceNode.data.type];
-    if (!sourceTemplate) {
+    const effectiveSource = getEffectiveSource(c.source, c.sourceHandle, nodes, filteredEdges, templates);
+    if (effectiveSource === 'nodes.missingNode') {
+      return 'nodes.missingNode';
+    }
+    if (effectiveSource === 'nodes.missingInvocationTemplate') {
+      return 'nodes.missingInvocationTemplate';
+    }
+    if (effectiveSource === 'nodes.missingFieldTemplate') {
+      return 'nodes.missingFieldTemplate';
+    }
+
+    if (isConnectorNode(targetNode)) {
+      if (c.targetHandle !== CONNECTOR_INPUT_HANDLE) {
+        return 'nodes.missingFieldTemplate';
+      }
+
+      if (filteredEdges.find(getTargetEqualityPredicate(c))) {
+        return 'nodes.inputMayOnlyHaveOneConnection';
+      }
+
+      // Unresolved connector chains are allowed to terminate on another connector.
+      return null;
+    }
+
+    if (!isInvocationNode(targetNode)) {
       return 'nodes.missingInvocationTemplate';
     }
 
     const targetTemplate = templates[targetNode.data.type];
     if (!targetTemplate) {
       return 'nodes.missingInvocationTemplate';
-    }
-
-    const sourceFieldTemplate = sourceTemplate.outputs[c.sourceHandle];
-    if (!sourceFieldTemplate) {
-      return 'nodes.missingFieldTemplate';
     }
 
     const targetFieldTemplate = targetTemplate.inputs[c.targetHandle];
@@ -117,9 +201,15 @@ export const validateConnection: ValidateConnectionFunc = (
       return 'nodes.cannotConnectToDirectInput';
     }
 
+    if (!effectiveSource) {
+      return 'nodes.fieldTypesMustMatch';
+    }
+
+    const { node: sourceNode, handle: sourceHandle, fieldTemplate: sourceFieldTemplate } = effectiveSource;
+
     if (targetNode.data.type === 'collect' && c.targetHandle === 'item') {
       // Collect nodes shouldn't mix and match field types.
-      const collectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
+      const collectItemType = getCollectItemType(templates, nodes, filteredEdges, targetNode.id);
       if (collectItemType && !areTypesEqual(sourceFieldTemplate.type, collectItemType)) {
         return 'nodes.cannotMixAndMatchCollectionItemTypes';
       }
@@ -127,13 +217,13 @@ export const validateConnection: ValidateConnectionFunc = (
 
     if (
       sourceNode.data.type === 'collect' &&
-      c.sourceHandle === 'collection' &&
+      sourceHandle === 'collection' &&
       targetNode.data.type === 'collect' &&
       c.targetHandle === 'collection'
     ) {
       // Chained collect nodes should preserve a single item type when both ends are already typed.
-      const sourceCollectItemType = getCollectItemType(templates, nodes, edges, sourceNode.id);
-      const targetCollectItemType = getCollectItemType(templates, nodes, edges, targetNode.id);
+      const sourceCollectItemType = getCollectItemType(templates, nodes, filteredEdges, sourceNode.id);
+      const targetCollectItemType = getCollectItemType(templates, nodes, filteredEdges, targetNode.id);
       if (
         sourceCollectItemType &&
         targetCollectItemType &&
@@ -148,33 +238,24 @@ export const validateConnection: ValidateConnectionFunc = (
       const siblingInputEdge = filteredEdges.find((e) => e.target === c.target && e.targetHandle === siblingHandle);
 
       if (siblingInputEdge) {
-        if (siblingInputEdge.source === null || siblingInputEdge.source === undefined) {
+        const siblingEffectiveSource = getEffectiveSourceForEdge(siblingInputEdge, nodes, filteredEdges, templates);
+        if (siblingEffectiveSource === 'nodes.missingNode') {
           return 'nodes.missingNode';
         }
-
-        if (siblingInputEdge.sourceHandle === null || siblingInputEdge.sourceHandle === undefined) {
-          return 'nodes.missingFieldTemplate';
-        }
-
-        const siblingSourceNode = nodes.find((n) => n.id === siblingInputEdge.source);
-        if (!siblingSourceNode) {
-          return 'nodes.missingNode';
-        }
-
-        const siblingSourceTemplate = templates[siblingSourceNode.data.type];
-        if (!siblingSourceTemplate) {
+        if (siblingEffectiveSource === 'nodes.missingInvocationTemplate') {
           return 'nodes.missingInvocationTemplate';
         }
-
-        const siblingSourceFieldTemplate = siblingSourceTemplate.outputs[siblingInputEdge.sourceHandle];
-        if (!siblingSourceFieldTemplate) {
+        if (siblingEffectiveSource === 'nodes.missingFieldTemplate') {
           return 'nodes.missingFieldTemplate';
+        }
+        if (!siblingEffectiveSource) {
+          return 'nodes.fieldTypesMustMatch';
         }
 
         const areIfInputTypesCompatible =
-          validateConnectionTypes(sourceFieldTemplate.type, siblingSourceFieldTemplate.type) ||
-          validateConnectionTypes(siblingSourceFieldTemplate.type, sourceFieldTemplate.type) ||
-          isSingleCollectionPairOfSameBaseType(sourceFieldTemplate.type, siblingSourceFieldTemplate.type);
+          validateConnectionTypes(sourceFieldTemplate.type, siblingEffectiveSource.fieldTemplate.type) ||
+          validateConnectionTypes(siblingEffectiveSource.fieldTemplate.type, sourceFieldTemplate.type) ||
+          isSingleCollectionPairOfSameBaseType(sourceFieldTemplate.type, siblingEffectiveSource.fieldTemplate.type);
 
         if (!areIfInputTypesCompatible) {
           return 'nodes.fieldTypesMustMatch';
@@ -189,30 +270,16 @@ export const validateConnection: ValidateConnectionFunc = (
       }
     }
 
-    if (sourceNode.data.type === 'if' && c.sourceHandle === 'value') {
+    if (sourceNode.data.type === 'if' && sourceHandle === 'value') {
       const ifInputEdges = filteredEdges.filter(
         (e) => e.target === sourceNode.id && typeof e.targetHandle === 'string' && isIfInputHandle(e.targetHandle)
       );
       const ifInputTypes = ifInputEdges.flatMap((edge) => {
-        if (edge.source === null || edge.source === undefined) {
+        const ifInputSource = getEffectiveSourceForEdge(edge, nodes, filteredEdges, templates);
+        if (!ifInputSource || typeof ifInputSource === 'string') {
           return [];
         }
-        if (edge.sourceHandle === null || edge.sourceHandle === undefined) {
-          return [];
-        }
-        const ifInputSourceNode = nodes.find((n) => n.id === edge.source);
-        if (!ifInputSourceNode) {
-          return [];
-        }
-        const ifInputSourceTemplate = templates[ifInputSourceNode.data.type];
-        if (!ifInputSourceTemplate) {
-          return [];
-        }
-        const ifInputSourceFieldTemplate = ifInputSourceTemplate.outputs[edge.sourceHandle];
-        if (!ifInputSourceFieldTemplate) {
-          return [];
-        }
-        return [ifInputSourceFieldTemplate.type];
+        return [ifInputSource.fieldTemplate.type];
       });
 
       if (ifInputTypes.length > 0) {

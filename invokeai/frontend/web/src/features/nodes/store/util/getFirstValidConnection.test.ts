@@ -1,5 +1,6 @@
 import { deepClone } from 'common/util/deepClone';
 import { unset } from 'es-toolkit/compat';
+import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
 import {
   getFirstValidConnection,
   getSourceCandidateFields,
@@ -7,6 +8,18 @@ import {
 } from 'features/nodes/store/util/getFirstValidConnection';
 import { add, buildEdge, buildNode, img_resize, templates } from 'features/nodes/store/util/testUtils';
 import { describe, expect, it } from 'vitest';
+
+const buildConnectorNode = (id: string) => ({
+  id,
+  type: 'connector' as const,
+  position: { x: 0, y: 0 },
+  data: {
+    id,
+    type: 'connector' as const,
+    label: 'Connector',
+    isOpen: true,
+  },
+});
 
 describe('getFirstValidConnection', () => {
   it('should return null if the pending and candidate nodes are the same node', () => {
@@ -120,6 +133,33 @@ describe('getFirstValidConnection', () => {
       expect(r).toEqual(null);
     });
   });
+
+  it('should resolve connector target candidates when connecting an invocation output to a connector', () => {
+    const n1 = buildNode(add);
+    const connector = buildConnectorNode('connector-1');
+    expect(getFirstValidConnection(n1.id, 'value', connector.id, null, [n1, connector], [], templates, null)).toEqual({
+      source: n1.id,
+      sourceHandle: 'value',
+      target: connector.id,
+      targetHandle: CONNECTOR_INPUT_HANDLE,
+    });
+  });
+
+  it('should resolve connector source candidates when connecting a connector to a typed invocation input', () => {
+    const n1 = buildNode(add);
+    const connector = buildConnectorNode('connector-1');
+    const n2 = buildNode(img_resize);
+    const edges = [buildEdge(n1.id, 'value', connector.id, CONNECTOR_INPUT_HANDLE)];
+
+    expect(
+      getFirstValidConnection(connector.id, null, n2.id, 'width', [n1, connector, n2], edges, templates, null)
+    ).toEqual({
+      source: connector.id,
+      sourceHandle: CONNECTOR_OUTPUT_HANDLE,
+      target: n2.id,
+      targetHandle: 'width',
+    });
+  });
 });
 
 describe('getTargetCandidateFields', () => {
@@ -158,6 +198,46 @@ describe('getTargetCandidateFields', () => {
     const nodes = [n1, n2];
     const edgePendingUpdate = buildEdge(n1.id, 'width', n2.id, 'width');
     const r = getTargetCandidateFields(n1.id, 'width', n2.id, nodes, [], templates, edgePendingUpdate);
+    expect(r).toEqual([img_resize.inputs['width'], img_resize.inputs['height']]);
+  });
+  it('should return the connector input handle when the target is a connector', () => {
+    const n1 = buildNode(add);
+    const connector = buildConnectorNode('connector-1');
+    const r = getTargetCandidateFields(n1.id, 'value', connector.id, [n1, connector], [], templates, null);
+    expect(r.map((field) => field.name)).toEqual([CONNECTOR_INPUT_HANDLE]);
+  });
+  it('should not advertise typed target candidates for an unresolved connector output', () => {
+    const connector = buildConnectorNode('connector-1');
+    const n2 = buildNode(img_resize);
+    const r = getTargetCandidateFields(
+      connector.id,
+      CONNECTOR_OUTPUT_HANDLE,
+      n2.id,
+      [connector, n2],
+      [],
+      templates,
+      null
+    );
+    expect(r).toEqual([]);
+  });
+  it('should resolve chained connector sources like the direct upstream source', () => {
+    const n1 = buildNode(add);
+    const connectorA = buildConnectorNode('connector-a');
+    const connectorB = buildConnectorNode('connector-b');
+    const n2 = buildNode(img_resize);
+    const edges = [
+      buildEdge(n1.id, 'value', connectorA.id, CONNECTOR_INPUT_HANDLE),
+      buildEdge(connectorA.id, CONNECTOR_OUTPUT_HANDLE, connectorB.id, CONNECTOR_INPUT_HANDLE),
+    ];
+    const r = getTargetCandidateFields(
+      connectorB.id,
+      CONNECTOR_OUTPUT_HANDLE,
+      n2.id,
+      [n1, connectorA, connectorB, n2],
+      edges,
+      templates,
+      null
+    );
     expect(r).toEqual([img_resize.inputs['width'], img_resize.inputs['height']]);
   });
 });
@@ -199,5 +279,19 @@ describe('getSourceCandidateFields', () => {
     const edgePendingUpdate = buildEdge(n1.id, 'width', n2.id, 'width');
     const r = getSourceCandidateFields(n2.id, 'width', n1.id, nodes, [], templates, edgePendingUpdate);
     expect(r).toEqual([img_resize.outputs['width'], img_resize.outputs['height']]);
+  });
+  it('should return the connector output handle when the source is a connector with a typed upstream source', () => {
+    const n1 = buildNode(add);
+    const connector = buildConnectorNode('connector-1');
+    const n2 = buildNode(img_resize);
+    const edges = [buildEdge(n1.id, 'value', connector.id, CONNECTOR_INPUT_HANDLE)];
+    const r = getSourceCandidateFields(n2.id, 'width', connector.id, [n1, connector, n2], edges, templates, null);
+    expect(r.map((field) => field.name)).toEqual([CONNECTOR_OUTPUT_HANDLE]);
+  });
+  it('should not return connector source candidates when the connector chain is unresolved', () => {
+    const connector = buildConnectorNode('connector-1');
+    const n2 = buildNode(img_resize);
+    const r = getSourceCandidateFields(n2.id, 'width', connector.id, [connector, n2], [], templates, null);
+    expect(r).toEqual([]);
   });
 });
