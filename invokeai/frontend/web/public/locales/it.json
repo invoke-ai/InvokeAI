@@ -3009,9 +3009,9 @@
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
-            "Supporto FLUX.2 Klein: InvokeAI ora supporta i nuovi modelli FLUX.2 Klein (varianti 4B e 9B) con formati GGUF, FP8 e Diffusers. Le funzionalità includono txt2img, img2img, inpainting e outpainting. Consultare la sezione \"Modelli di partenza\" per iniziare.",
-            "Il supporto DyPE per i modelli FLUX migliora le immagini ad alta risoluzione (da >1536 px fino a 4K). Vai alla sezione \"Opzioni avanzate\" per attivarlo.",
-            "Diversità Z-Image Turbo: attiva 'Seed Variance Enhancer' in 'Opzioni avanzate' per aggiungere diversità alle tue generazioni ZiT."
+            "La modalità multiutente supporta più utenti isolati sullo stesso server.",
+            "Supporto migliorato per i modelli Z-Image e FLUX.2.",
+            "Numerosi miglioramenti dell'interfaccia utente e nuove funzionalità Tela."
         ],
         "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente",
         "takeUserSurvey": "📣 Facci sapere cosa ne pensi di InvokeAI. Partecipa al nostro sondaggio sull'esperienza utente!"
