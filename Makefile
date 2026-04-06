@@ -14,6 +14,7 @@ help:
 	@echo "update-config-docstring  Update the app's config docstring so mkdocs can autogenerate it correctly."
 	@echo "frontend-install         Install the pnpm modules needed for the frontend"
 	@echo "frontend-build           Build the frontend for localhost:9090"
+	@echo "frontend-test            Run the frontend test suite once"
 	@echo "frontend-dev             Run the frontend in developer mode on localhost:5173"
 	@echo "frontend-typegen         Generate types for the frontend from the OpenAPI schema"
 	@echo "frontend-lint            Run frontend checks and fixable lint/format steps"
@@ -56,6 +57,10 @@ frontend-install:
 # Build the frontend
 frontend-build:
 	cd invokeai/frontend/web && pnpm build
+
+# Run the frontend test suite once
+frontend-test:
+	cd invokeai/frontend/web && pnpm run test:run
 
 # Run the frontend in dev mode
 frontend-dev:
