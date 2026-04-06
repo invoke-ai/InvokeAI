@@ -15,16 +15,25 @@ hero:
       variant: minimal
 ---
 
+import { Image } from 'astro:assets'
 import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
 import DownloadOptions from '@components/DownloadOptions.astro';
 
-![Invoke Web UI](./assets/invoke-web-server-1.png)
+import splashImage from './assets/invoke-web-server-1.png'
+
+<div class="splash-img">
+  <Image
+    src={splashImage}
+    alt="Invoke WebUI"
+    loading="eager"
+  />
+</div>
 
 ## The Creative Engine
 
 Invoke provides the most feature-complete and professional toolkit for AI image generation, built with production workflows in mind.
 
-<CardGrid stagger={true}>
+<CardGrid>
   <Card title="Unified Canvas" icon="pencil">
     Experience true **Layer-based Canvas Editing**. Invoke's powerful canvas allows you to draw, paint, sketch, and edit your creations with unhindered precision. Each layer can be independently manipulated—giving you the freedom to compose intricate scenes seamlessly without breaking a sweat.
   </Card>
@@ -66,7 +75,7 @@ Invoke is designed to keep your creative flow moving. Unlike other tools that fe
 
 Whether you are looking to install the app, get support, train your own models, or contribute to the project, the Invoke community has you covered.
 
-<CardGrid stagger={true}>
+<CardGrid>
   <Card title="Get Installed" icon="download">
     Ready to dive in? The [Invoke Launcher](installation/quick_start.md) is the fastest way to get up and running on Windows, macOS, and Linux. For advanced setups, try [Docker](installation/docker.md) or a [manual Python installation](installation/manual.md).
 
