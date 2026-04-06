@@ -11,14 +11,20 @@ import { Virtuoso } from 'react-virtuoso';
 import type { S } from 'services/api/types';
 
 import { useStagingAreaContext } from './context';
-import { getQueueItemElementId } from './shared';
+import { getQueueItemElementId, STAGING_AREA_THUMBNAIL_STRIP_HEIGHT } from './shared';
 
 const log = logger('system');
 
 const virtuosoStyles = {
   width: '100%',
-  height: '72px',
+  height: STAGING_AREA_THUMBNAIL_STRIP_HEIGHT,
 } satisfies CSSProperties;
+
+const applyViewportStyles = (viewport: HTMLElement) => {
+  viewport.style.overflowX = `var(--os-viewport-overflow-x)`;
+  viewport.style.overflowY = `var(--os-viewport-overflow-y)`;
+  viewport.style.textAlign = 'center';
+};
 
 /**
  * Scroll the item at the given index into view if it is not currently visible.
@@ -88,11 +94,7 @@ const useScrollableStagingArea = (rootRef: RefObject<HTMLDivElement>) => {
     defer: true,
     events: {
       initialized(osInstance) {
-        // force overflow styles
-        const { viewport } = osInstance.elements();
-        viewport.style.overflowX = `var(--os-viewport-overflow-x)`;
-        viewport.style.overflowY = `var(--os-viewport-overflow-y)`;
-        viewport.style.textAlign = 'center';
+        applyViewportStyles(osInstance.elements().viewport);
       },
     },
     options: {
@@ -113,6 +115,9 @@ const useScrollableStagingArea = (rootRef: RefObject<HTMLDivElement>) => {
     const { current: root } = rootRef;
 
     if (scroller && root) {
+      // Apply the viewport layout styles before overlayscrollbars initializes to avoid a left-aligned first paint.
+      applyViewportStyles(scroller);
+
       initialize({
         target: root,
         elements: {
@@ -131,7 +136,6 @@ const useScrollableStagingArea = (rootRef: RefObject<HTMLDivElement>) => {
 
 export const StagingAreaItemsList = memo(() => {
   const canvasManager = useCanvasManager();
-
   const ctx = useStagingAreaContext();
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
@@ -143,7 +147,7 @@ export const StagingAreaItemsList = memo(() => {
 
   useEffect(() => {
     return canvasManager.stagingArea.connectToSession(ctx.$items, ctx.$selectedItem);
-  }, [canvasManager, ctx.$progressData, ctx.$items, ctx.$selectedItem]);
+  }, [canvasManager, ctx.$items, ctx.$selectedItem]);
 
   useEffect(() => {
     return ctx.$selectedItemIndex.listen((selectedItemIndex) => {
