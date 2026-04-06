@@ -321,10 +321,6 @@ export class CanvasEntityObjectRenderer extends CanvasModuleBase {
   };
 
   updateOpacity = throttle(() => {
-    if (!this.parent.konva.layer.visible()) {
-      return;
-    }
-
     this.log.trace('Updating opacity');
 
     const opacity = this.parent.state.opacity;

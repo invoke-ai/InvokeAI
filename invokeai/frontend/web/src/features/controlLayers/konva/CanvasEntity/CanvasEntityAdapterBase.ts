@@ -542,6 +542,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
       this.renderer.updateCompositingRectSize();
       this.renderer.updateCompositingRectPosition();
       this.renderer.updateCompositingRectFill();
+      this.renderer.updateOpacity();
     }
     this.renderer.syncKonvaCache();
   };
