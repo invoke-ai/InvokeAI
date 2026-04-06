@@ -82,6 +82,7 @@ beforeEach(() => {
   mockParams = {
     steps: 20,
     guidance: 4.5,
+    dimensions: { width: 768, height: 512, aspectRatio: { id: '3:2', value: 1.5, isLocked: true } },
   } as ParamsState;
   mockSizes = { scaledSize: { width: 768, height: 512 } };
 
