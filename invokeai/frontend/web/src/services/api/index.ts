@@ -7,6 +7,7 @@ import type {
   TagDescription,
 } from '@reduxjs/toolkit/query/react';
 import { buildCreateApi, coreModule, fetchBaseQuery, reactHooksModule } from '@reduxjs/toolkit/query/react';
+import { sessionExpiredLogout } from 'features/auth/store/authSlice';
 import queryString from 'query-string';
 import stableHash from 'stable-hash';
 
@@ -68,22 +69,27 @@ export const getBaseUrl = (): string => {
   return window.location.origin;
 };
 
-const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = (args, api, extraOptions) => {
+const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryError> = async (
+  args,
+  api,
+  extraOptions
+) => {
   const isOpenAPIRequest =
     (args instanceof Object && args.url.includes('openapi.json')) ||
     (typeof args === 'string' && args.includes('openapi.json'));
+
+  const isAuthEndpoint =
+    (args instanceof Object &&
+      typeof args.url === 'string' &&
+      (args.url.includes('/auth/login') || args.url.includes('/auth/setup'))) ||
+    (typeof args === 'string' && (args.includes('/auth/login') || args.includes('/auth/setup')));
+
+  const token = localStorage.getItem('auth_token');
 
   const fetchBaseQueryArgs: FetchBaseQueryArgs = {
     baseUrl: getBaseUrl(),
     prepareHeaders: (headers) => {
       // Add auth token to all requests except setup and login
-      const token = localStorage.getItem('auth_token');
-      const isAuthEndpoint =
-        (args instanceof Object &&
-          typeof args.url === 'string' &&
-          (args.url.includes('/auth/login') || args.url.includes('/auth/setup'))) ||
-        (typeof args === 'string' && (args.includes('/auth/login') || args.includes('/auth/setup')));
-
       if (token && !isAuthEndpoint) {
         headers.set('Authorization', `Bearer ${token}`);
       }
@@ -98,7 +104,25 @@ const dynamicBaseQuery: BaseQueryFn<string | FetchArgs, unknown, FetchBaseQueryE
 
   const rawBaseQuery = fetchBaseQuery(fetchBaseQueryArgs);
 
-  return rawBaseQuery(args, api, extraOptions);
+  const result = await rawBaseQuery(args, api, extraOptions);
+
+  // If we sent an auth token but got 401, the token is invalid/expired.
+  // Only trigger session expiry when we actually sent a token — unauthenticated
+  // requests (e.g. client_state queries during page load) should not cause logout.
+  if (result.error && result.error.status === 401 && !isAuthEndpoint && token) {
+    api.dispatch(sessionExpiredLogout());
+  }
+
+  // Sliding window token refresh: if the server returned a refreshed token,
+  // update localStorage so subsequent requests use the new expiry.
+  if (!result.error && result.meta?.response) {
+    const refreshedToken = result.meta.response.headers.get('X-Refreshed-Token');
+    if (refreshedToken) {
+      localStorage.setItem('auth_token', refreshedToken);
+    }
+  }
+
+  return result;
 };
 
 const createLruSelector = createSelectorCreator({
