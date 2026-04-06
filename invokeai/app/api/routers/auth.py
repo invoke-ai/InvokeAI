@@ -158,6 +158,7 @@ async def login(
         user_id=user.user_id,
         email=user.email,
         is_admin=user.is_admin,
+        remember_me=request.remember_me,
     )
     token = create_access_token(token_data, expires_delta)
 
