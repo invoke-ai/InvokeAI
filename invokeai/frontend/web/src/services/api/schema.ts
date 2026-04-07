@@ -1571,7 +1571,8 @@ export type paths = {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Runtime Config */
+        patch: operations["update_runtime_config"];
         trace?: never;
     };
     "/api/v1/app/logging": {
@@ -14950,6 +14951,17 @@ export type components = {
             set_fields: string[];
             /** @description The InvokeAI App Config */
             config: components["schemas"]["InvokeAIAppConfig"];
+        };
+        /**
+         * UpdateAppGenerationSettingsRequest
+         * @description Writable generation-related app settings.
+         */
+        UpdateAppGenerationSettingsRequest: {
+            /**
+             * Max Queue History
+             * @description Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.
+             */
+            max_queue_history?: number | null;
         };
         /**
          * Adjust Image Hue Plus
@@ -32054,6 +32066,30 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvokeAIAppConfigWithSetFields"];
+                };
+            };
+        };
+    };
+    update_runtime_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAppGenerationSettingsRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
