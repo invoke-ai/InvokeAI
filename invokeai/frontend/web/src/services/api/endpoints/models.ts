@@ -52,6 +52,14 @@ type BulkDeleteModelsResponse = {
   failed: string[];
 };
 
+type BulkReidentifyModelsArg = {
+  keys: string[];
+};
+type BulkReidentifyModelsResponse = {
+  succeeded: string[];
+  failed: string[];
+};
+
 type ConvertMainModelResponse =
   paths['/api/v2/models/convert/{key}']['put']['responses']['200']['content']['application/json'];
 
@@ -431,6 +439,16 @@ export const modelsApi = api.injectEndpoints({
         }
       },
     }),
+    bulkReidentifyModels: build.mutation<BulkReidentifyModelsResponse, BulkReidentifyModelsArg>({
+      query: ({ keys }) => {
+        return {
+          url: buildModelsUrl('i/bulk_reidentify'),
+          method: 'POST',
+          body: { keys },
+        };
+      },
+      invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
+    }),
     getOrphanedModels: build.query<GetOrphanedModelsResponse, void>({
       query: () => ({
         url: buildModelsUrl('sync/orphaned'),
@@ -475,6 +493,7 @@ export const {
   useResetHFTokenMutation,
   useEmptyModelCacheMutation,
   useReidentifyModelMutation,
+  useBulkReidentifyModelsMutation,
   useGetOrphanedModelsQuery,
   useDeleteOrphanedModelsMutation,
 } = modelsApi;
