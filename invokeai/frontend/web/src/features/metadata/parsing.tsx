@@ -844,6 +844,9 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
     assert(isCompatibleWithMainModel(parsed, store));
+    // Z-Image and FLUX.2 Klein have dedicated VAE handlers; avoid rendering a duplicate row.
+    const base = selectBase(store.getState());
+    assert(base !== 'z-image' && base !== 'flux2', 'VAEModel handler does not apply to Z-Image or FLUX.2 Klein');
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {

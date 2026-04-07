@@ -232,6 +232,9 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       steps,
       scheduler: fluxScheduler,
     };
+    if (model.variant === 'klein_9b_base') {
+      flux2Metadata.guidance = guidance;
+    }
     if (kleinVaeModel) {
       flux2Metadata.vae = kleinVaeModel;
     }
