@@ -197,7 +197,9 @@ class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
 
         cls._validate_base(mod)
 
-        prediction_type = override_fields.pop("prediction_type", None) or cls._get_scheduler_prediction_type_or_raise(mod)
+        prediction_type = override_fields.pop("prediction_type", None) or cls._get_scheduler_prediction_type_or_raise(
+            mod
+        )
 
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
@@ -896,7 +898,9 @@ class Main_SD_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):
 
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
-        prediction_type = override_fields.pop("prediction_type", None) or cls._get_scheduler_prediction_type_or_raise(mod)
+        prediction_type = override_fields.pop("prediction_type", None) or cls._get_scheduler_prediction_type_or_raise(
+            mod
+        )
 
         repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
 

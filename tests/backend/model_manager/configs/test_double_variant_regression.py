@@ -11,10 +11,7 @@ with explicitly computed values.
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from invokeai.backend.model_manager.taxonomy import QwenImageVariantType
-
 
 # Required fields for the Pydantic config model
 _REQUIRED_FIELDS = {
@@ -56,7 +53,9 @@ class TestDoubleVariantRegression:
 
         from invokeai.backend.model_manager.configs.base import ModelRepoVariant
 
-        with patch.object(Main_Diffusers_QwenImage_Config, "_get_repo_variant_or_raise", return_value=ModelRepoVariant("")):
+        with patch.object(
+            Main_Diffusers_QwenImage_Config, "_get_repo_variant_or_raise", return_value=ModelRepoVariant("")
+        ):
             with patch.object(
                 Main_Diffusers_QwenImage_Config,
                 "_get_qwen_image_variant",
@@ -82,7 +81,9 @@ class TestDoubleVariantRegression:
             "variant": QwenImageVariantType.Edit,  # explicitly override to Edit
         }
 
-        with patch.object(Main_Diffusers_QwenImage_Config, "_get_repo_variant_or_raise", return_value=ModelRepoVariant("")):
+        with patch.object(
+            Main_Diffusers_QwenImage_Config, "_get_repo_variant_or_raise", return_value=ModelRepoVariant("")
+        ):
             with patch.object(
                 Main_Diffusers_QwenImage_Config,
                 "_get_qwen_image_variant",
