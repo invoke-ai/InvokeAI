@@ -10,7 +10,7 @@ These tests verify the security fixes for:
 
 import logging
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi import status
@@ -237,9 +237,7 @@ class TestBoardImageMutationAuth:
         r = client.post("/api/v1/board_images/batch/delete", json={"image_names": ["y"]})
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_non_owner_cannot_add_image_to_shared_board(
-        self, client: TestClient, user1_token: str, user2_token: str
-    ):
+    def test_non_owner_cannot_add_image_to_shared_board(self, client: TestClient, user1_token: str, user2_token: str):
         board_id = _create_board(client, user1_token, "User1 Shared Board")
         _share_board(client, user1_token, board_id)
 
@@ -263,9 +261,7 @@ class TestBoardImageMutationAuth:
         )
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_admin_can_add_image_to_any_board(
-        self, client: TestClient, admin_token: str, user1_token: str
-    ):
+    def test_admin_can_add_image_to_any_board(self, client: TestClient, admin_token: str, user1_token: str):
         board_id = _create_board(client, user1_token, "User1 Board For Admin")
 
         # This may 500 because the image doesn't exist in the DB, but it should NOT be 403
@@ -329,9 +325,7 @@ class TestImageReadAuth:
         r = client.get("/api/v1/images/i/user1-private-img", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_owner_can_read_own_image(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str
-    ):
+    def test_owner_can_read_own_image(self, client: TestClient, mock_invoker: Invoker, user1_token: str):
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None
         _save_image(mock_invoker, "user1-readable", user1.user_id)
@@ -361,9 +355,7 @@ class TestImageReadAuth:
         # Create a shared board and add the image to it
         board_id = _create_board(client, user1_token, "Shared Read Board")
         _share_board(client, user1_token, board_id)
-        mock_invoker.services.board_image_records.add_image_to_board(
-            board_id=board_id, image_name="shared-board-img"
-        )
+        mock_invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name="shared-board-img")
 
         r = client.get("/api/v1/images/i/shared-board-img", headers=_auth(user2_token))
         # Should not be 403 — image is on a shared board
@@ -388,9 +380,7 @@ class TestImageReadAuth:
 class TestImageUploadAuth:
     """Tests that image upload enforces board ownership."""
 
-    def test_upload_to_other_users_shared_board_forbidden(
-        self, client: TestClient, user1_token: str, user2_token: str
-    ):
+    def test_upload_to_other_users_shared_board_forbidden(self, client: TestClient, user1_token: str, user2_token: str):
         """A user should not be able to upload an image into another user's shared board."""
         board_id = _create_board(client, user1_token, "User1 Shared Upload Board")
         _share_board(client, user1_token, board_id)
@@ -406,9 +396,7 @@ class TestImageUploadAuth:
         )
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_owner_can_upload_to_own_shared_board(
-        self, client: TestClient, user1_token: str
-    ):
+    def test_owner_can_upload_to_own_shared_board(self, client: TestClient, user1_token: str):
         board_id = _create_board(client, user1_token, "User1 Own Upload Board")
         _share_board(client, user1_token, board_id)
 
@@ -466,9 +454,7 @@ class TestImageMutationAuth:
         r = client.delete("/api/v1/images/i/user1-image", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_owner_can_delete_own_image(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str
-    ):
+    def test_owner_can_delete_own_image(self, client: TestClient, mock_invoker: Invoker, user1_token: str):
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None
         _save_image(mock_invoker, "user1-delete-me", user1.user_id)
@@ -596,9 +582,7 @@ class TestWorkflowMutationAuth:
         r = client.put("/api/v1/workflows/i/some-id/opened_at")
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_non_owner_cannot_update_opened_at(
-        self, client: TestClient, user1_token: str, user2_token: str
-    ):
+    def test_non_owner_cannot_update_opened_at(self, client: TestClient, user1_token: str, user2_token: str):
         workflow_id = _create_workflow(client, user1_token)
         r = client.put(
             f"/api/v1/workflows/i/{workflow_id}/opened_at",
@@ -642,9 +626,7 @@ class TestWorkflowThumbnailAuth:
 class TestAdminEmailLeak:
     """Tests that the auth status endpoint does not leak admin email."""
 
-    def test_status_does_not_leak_admin_email_when_setup_complete(
-        self, client: TestClient, admin_token: str
-    ):
+    def test_status_does_not_leak_admin_email_when_setup_complete(self, client: TestClient, admin_token: str):
         """After setup is complete, admin_email must be null."""
         r = client.get("/api/v1/auth/status")
         assert r.status_code == 200
