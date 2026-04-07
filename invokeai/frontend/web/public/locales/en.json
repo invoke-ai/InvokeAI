@@ -25,7 +25,8 @@
             "rememberMe": "Remember me for 7 days",
             "signIn": "Sign In",
             "signingIn": "Signing in...",
-            "loginFailed": "Login failed. Please check your credentials."
+            "loginFailed": "Login failed. Please check your credentials.",
+            "sessionExpired": "Your credentials have expired. Please log in again to resume."
         },
         "setup": {
             "title": "Welcome to InvokeAI",
@@ -1012,6 +1013,15 @@
         "reidentifySuccess": "Model reidentified successfully",
         "reidentifyUnknown": "Unable to identify model",
         "reidentifyError": "Error reidentifying model",
+        "reidentifyModels": "Reidentify Models",
+        "reidentifyModelsConfirm": "Are you sure you want to reidentify {{count}} model(s)? This will re-probe their weights files to determine the correct format and settings.",
+        "reidentifyWarning": "This will reset any custom settings you may have applied to these models.",
+        "modelsReidentified": "Successfully reidentified {{count}} model(s)",
+        "modelsReidentifyFailed": "Failed to reidentify models",
+        "someModelsFailedToReidentify": "{{count}} model(s) could not be reidentified",
+        "modelsReidentifiedPartial": "Partially completed",
+        "someModelsReidentified": "{{succeeded}} reidentified, {{failed}} failed",
+        "modelsReidentifyError": "Error reidentifying models",
         "updatePath": "Update Path",
         "updatePathTooltip": "Update the file path for this model if you have moved the model files to a new location.",
         "updatePathDescription": "Enter the new path to the model file or directory. Use this if you have manually moved the model files on disk.",
@@ -2891,6 +2901,8 @@
             "previous": "Previous",
             "next": "Next",
             "saveToGallery": "Save To Gallery",
+            "hideThumbnails": "Hide Thumbnails",
+            "showThumbnails": "Show Thumbnails",
             "showResultsOn": "Showing Results",
             "showResultsOff": "Hiding Results"
         },
