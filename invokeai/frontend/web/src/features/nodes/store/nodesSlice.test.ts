@@ -56,7 +56,10 @@ describe('nodesSlice connector actions', () => {
       buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a'),
     ];
 
-    const nextState = nodesSliceConfig.slice.reducer(initialState, nodesChanged([{ type: 'remove', id: connector.id }]));
+    const nextState = nodesSliceConfig.slice.reducer(
+      initialState,
+      nodesChanged([{ type: 'remove', id: connector.id }])
+    );
 
     expect(nextState.nodes.map((node) => node.id)).toEqual([source.id, target.id]);
     expect(nextState.edges).toEqual([buildEdge(source.id, 'value', target.id, 'a')]);
@@ -76,7 +79,10 @@ describe('nodesSlice connector actions', () => {
       buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, targetB.id, 'b'),
     ];
 
-    const nextState = nodesSliceConfig.slice.reducer(initialState, nodesChanged([{ type: 'remove', id: connector.id }]));
+    const nextState = nodesSliceConfig.slice.reducer(
+      initialState,
+      nodesChanged([{ type: 'remove', id: connector.id }])
+    );
 
     expect(nextState.nodes.map((node) => node.id)).toEqual([source.id, targetA.id, targetB.id]);
     expect(nextState.edges).toEqual([
@@ -93,7 +99,10 @@ describe('nodesSlice connector actions', () => {
     initialState.nodes = [source, connector];
     initialState.edges = [buildEdge(source.id, 'value', connector.id, CONNECTOR_INPUT_HANDLE)];
 
-    const nextState = nodesSliceConfig.slice.reducer(initialState, nodesChanged([{ type: 'remove', id: connector.id }]));
+    const nextState = nodesSliceConfig.slice.reducer(
+      initialState,
+      nodesChanged([{ type: 'remove', id: connector.id }])
+    );
 
     expect(nextState.nodes.map((node) => node.id)).toEqual([source.id]);
     expect(nextState.edges).toEqual([]);
@@ -113,7 +122,10 @@ describe('nodesSlice connector actions', () => {
       buildEdge(connectorB.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a'),
     ];
 
-    const nextState = nodesSliceConfig.slice.reducer(initialState, nodesChanged([{ type: 'remove', id: connectorA.id }]));
+    const nextState = nodesSliceConfig.slice.reducer(
+      initialState,
+      nodesChanged([{ type: 'remove', id: connectorA.id }])
+    );
 
     expect(nextState.nodes.map((node) => node.id)).toEqual([source.id, connectorB.id, target.id]);
     expect(nextState.edges).toHaveLength(2);
