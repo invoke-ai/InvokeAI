@@ -51,7 +51,7 @@ import { selectSelectionMode, selectShouldSnapToGrid } from 'features/nodes/stor
 import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import type { CSSProperties, MouseEvent } from 'react';
+import type { CSSProperties, MouseEvent, RefObject } from 'react';
 import { memo, useCallback, useMemo, useRef } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 
@@ -61,6 +61,7 @@ import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
 import CurrentImageNode from './nodes/CurrentImage/CurrentImageNode';
 import InvocationNodeWrapper from './nodes/Invocation/InvocationNodeWrapper';
 import NotesNode from './nodes/Notes/NotesNode';
+import { isWorkflowHotkeyEnabled, shouldIgnoreWorkflowCopyHotkey } from './workflowHotkeys';
 
 const edgeTypes = {
   collapsed: InvocationCollapsedEdge,
@@ -248,14 +249,14 @@ export const Flow = memo(() => {
       >
         <Background gap={snapGrid} offset={snapGrid} />
       </ReactFlow>
-      <HotkeyIsolator />
+      <HotkeyIsolator flowWrapper={flowWrapper} />
     </>
   );
 });
 
 Flow.displayName = 'Flow';
 
-const HotkeyIsolator = memo(() => {
+const HotkeyIsolator = memo(({ flowWrapper }: { flowWrapper: RefObject<HTMLDivElement> }) => {
   const mayUndo = useAppSelector(selectMayUndo);
   const mayRedo = useAppSelector(selectMayRedo);
 
@@ -270,8 +271,12 @@ const HotkeyIsolator = memo(() => {
     id: 'copySelection',
     category: 'workflows',
     callback: copySelection,
-    options: { enabled: isWorkflowsFocused, preventDefault: true },
-    dependencies: [copySelection],
+    options: {
+      enabled: isWorkflowHotkeyEnabled(isWorkflowsFocused),
+      preventDefault: true,
+      ignoreEventWhen: () => shouldIgnoreWorkflowCopyHotkey(window.getSelection(), flowWrapper.current),
+    },
+    dependencies: [copySelection, isWorkflowsFocused],
   });
 
   const selectAll = useCallback(() => {
@@ -299,7 +304,7 @@ const HotkeyIsolator = memo(() => {
     id: 'selectAll',
     category: 'workflows',
     callback: selectAll,
-    options: { enabled: isWorkflowsFocused, preventDefault: true },
+    options: { enabled: isWorkflowHotkeyEnabled(isWorkflowsFocused), preventDefault: true },
     dependencies: [selectAll, isWorkflowsFocused],
   });
 
@@ -307,7 +312,7 @@ const HotkeyIsolator = memo(() => {
     id: 'pasteSelection',
     category: 'workflows',
     callback: pasteSelection,
-    options: { enabled: isWorkflowsFocused, preventDefault: true },
+    options: { enabled: isWorkflowHotkeyEnabled(isWorkflowsFocused), preventDefault: true },
     dependencies: [pasteSelection, isWorkflowsFocused],
   });
 
@@ -315,7 +320,7 @@ const HotkeyIsolator = memo(() => {
     id: 'pasteSelectionWithEdges',
     category: 'workflows',
     callback: pasteSelectionWithEdges,
-    options: { enabled: isWorkflowsFocused, preventDefault: true },
+    options: { enabled: isWorkflowHotkeyEnabled(isWorkflowsFocused), preventDefault: true },
     dependencies: [pasteSelectionWithEdges, isWorkflowsFocused],
   });
 
@@ -325,7 +330,7 @@ const HotkeyIsolator = memo(() => {
     callback: () => {
       store.dispatch(undo());
     },
-    options: { enabled: isWorkflowsFocused && mayUndo, preventDefault: true },
+    options: { enabled: isWorkflowHotkeyEnabled(isWorkflowsFocused) && mayUndo, preventDefault: true },
     dependencies: [store, mayUndo, isWorkflowsFocused],
   });
 
@@ -335,7 +340,7 @@ const HotkeyIsolator = memo(() => {
     callback: () => {
       store.dispatch(redo());
     },
-    options: { enabled: isWorkflowsFocused && mayRedo, preventDefault: true },
+    options: { enabled: isWorkflowHotkeyEnabled(isWorkflowsFocused) && mayRedo, preventDefault: true },
     dependencies: [store, mayRedo, isWorkflowsFocused],
   });
 
@@ -373,7 +378,7 @@ const HotkeyIsolator = memo(() => {
     id: 'deleteSelection',
     category: 'workflows',
     callback: deleteSelection,
-    options: { preventDefault: true, enabled: isWorkflowsFocused },
+    options: { preventDefault: true, enabled: isWorkflowHotkeyEnabled(isWorkflowsFocused) },
     dependencies: [deleteSelection, isWorkflowsFocused],
   });
 
