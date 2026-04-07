@@ -71,7 +71,7 @@ t5_base_encoder = StarterModel(
     name="t5_base_encoder",
     base=BaseModelType.Any,
     source="InvokeAI/t5-v1_1-xxl::bfloat16",
-    description="T5-XXL text encoder (used in FLUX pipelines). ~8GB",
+    description="T5-XXL text encoder (used in FLUX pipelines). ~9.5GB",
     type=ModelType.T5Encoder,
 )
 
@@ -156,7 +156,7 @@ flux_kontext_quantized = StarterModel(
     name="FLUX.1 Kontext dev (quantized)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF/resolve/main/flux1-kontext-dev-Q4_K_M.gguf",
-    description="FLUX.1 Kontext dev quantized (q4_k_m). Total size with dependencies: ~14GB",
+    description="FLUX.1 Kontext dev quantized (q4_k_m). Total size with dependencies: ~12GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
@@ -164,7 +164,7 @@ flux_krea = StarterModel(
     name="FLUX.1 Krea dev",
     base=BaseModelType.Flux,
     source="https://huggingface.co/InvokeAI/FLUX.1-Krea-dev/resolve/main/flux1-krea-dev.safetensors",
-    description="FLUX.1 Krea dev. Total size with dependencies: ~33GB",
+    description="FLUX.1 Krea dev. Total size with dependencies: ~29GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
@@ -172,7 +172,7 @@ flux_krea_quantized = StarterModel(
     name="FLUX.1 Krea dev (quantized)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/InvokeAI/FLUX.1-Krea-dev-GGUF/resolve/main/flux1-krea-dev-Q4_K_M.gguf",
-    description="FLUX.1 Krea dev quantized (q4_k_m). Total size with dependencies: ~14GB",
+    description="FLUX.1 Krea dev quantized (q4_k_m). Total size with dependencies: ~12GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
@@ -180,7 +180,7 @@ sd35_medium = StarterModel(
     name="SD3.5 Medium",
     base=BaseModelType.StableDiffusion3,
     source="stabilityai/stable-diffusion-3.5-medium",
-    description="Medium SD3.5 Model: ~15GB",
+    description="Medium SD3.5 Model: ~16GB",
     type=ModelType.Main,
     dependencies=[],
 )
@@ -188,7 +188,7 @@ sd35_large = StarterModel(
     name="SD3.5 Large",
     base=BaseModelType.StableDiffusion3,
     source="stabilityai/stable-diffusion-3.5-large",
-    description="Large SD3.5 Model: ~19G",
+    description="Large SD3.5 Model: ~28GB",
     type=ModelType.Main,
     dependencies=[],
 )
@@ -644,7 +644,7 @@ cogview4 = StarterModel(
     name="CogView4",
     base=BaseModelType.CogView4,
     source="THUDM/CogView4-6B",
-    description="The base CogView4 model (~29GB).",
+    description="The base CogView4 model (~31GB).",
     type=ModelType.Main,
 )
 # endregion
@@ -695,7 +695,7 @@ flux2_vae = StarterModel(
     name="FLUX.2 VAE",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-4B::vae",
-    description="FLUX.2 VAE (16-channel, same architecture as FLUX.1 VAE). ~335MB",
+    description="FLUX.2 VAE (16-channel, same architecture as FLUX.1 VAE). ~168MB",
     type=ModelType.VAE,
 )
 
@@ -719,7 +719,7 @@ flux2_klein_4b = StarterModel(
     name="FLUX.2 Klein 4B (Diffusers)",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-4B",
-    description="FLUX.2 Klein 4B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~10GB",
+    description="FLUX.2 Klein 4B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~16GB",
     type=ModelType.Main,
 )
 
@@ -745,7 +745,7 @@ flux2_klein_9b = StarterModel(
     name="FLUX.2 Klein 9B (Diffusers)",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-9B",
-    description="FLUX.2 Klein 9B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~20GB",
+    description="FLUX.2 Klein 9B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~35GB",
     type=ModelType.Main,
 )
 
@@ -821,7 +821,7 @@ z_image_turbo = StarterModel(
     name="Z-Image Turbo",
     base=BaseModelType.ZImage,
     source="Tongyi-MAI/Z-Image-Turbo",
-    description="Z-Image Turbo - fast 6B parameter text-to-image model with 8 inference steps. Supports bilingual prompts (English & Chinese). ~30.6GB",
+    description="Z-Image Turbo - fast 6B parameter text-to-image model with 8 inference steps. Supports bilingual prompts (English & Chinese). ~33GB",
     type=ModelType.Main,
 )
 
