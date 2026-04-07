@@ -36,29 +36,28 @@ const handleStyles = {
 
 const inputHandleStyles = {
   ...handleStyles,
-  insetInlineStart: '-0.25rem',
+  insetInlineStart: 0,
+  justifyContent: 'flex-start',
 } satisfies CSSProperties;
 
 const outputHandleStyles = {
   ...handleStyles,
-  insetInlineEnd: '-0.25rem',
+  insetInlineEnd: 0,
+  justifyContent: 'flex-end',
 } satisfies CSSProperties;
 
 const ConnectorNode = ({ id, selected }: NodeProps<Node<ConnectorNodeData>>) => {
   return (
-    <NonInvocationNodeWrapper nodeId={id} selected={selected} width={16} borderRadius="full" withChrome={false}>
+    <NonInvocationNodeWrapper nodeId={id} selected={selected} width={25} borderRadius="full" withChrome={false}>
       <Box
         data-connector-node-context-menu="true"
         data-connector-node-id={id}
         position="relative"
-        w={16}
-        h={16}
+        w={25}
+        h={25}
         display="flex"
         alignItems="center"
         justifyContent="center"
-        borderRadius="full"
-        bg={selected ? 'base.650' : 'base.700'}
-        boxShadow={selected ? '0 0 0 2px var(--invoke-colors-blue-300)' : '0 0 0 1px var(--invoke-colors-base-500)'}
       >
         <Handle
           className={NO_DRAG_CLASS}
@@ -69,7 +68,18 @@ const ConnectorNode = ({ id, selected }: NodeProps<Node<ConnectorNodeData>>) => 
         >
           <Box sx={handleVisualSx} />
         </Handle>
-        <Icon as={PiDotOutlineFill} boxSize={8} color={selected ? 'base.50' : 'base.100'} />
+        <Box
+          w={13}
+          h={13}
+          display="flex"
+          alignItems="center"
+          justifyContent="center"
+          borderRadius="full"
+          bg={selected ? 'base.650' : 'base.700'}
+          boxShadow={selected ? '0 0 0 2px var(--invoke-colors-blue-300)' : '0 0 0 1px var(--invoke-colors-base-500)'}
+        >
+          <Icon as={PiDotOutlineFill} boxSize={5} color={selected ? 'base.50' : 'base.100'} />
+        </Box>
         <Handle
           className={NO_DRAG_CLASS}
           type="source"
