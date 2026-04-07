@@ -250,17 +250,18 @@ describe('validateWorkflow', () => {
     expect(validationResult.warnings).toEqual([]);
   });
 
-  it('should delete unresolved connector output edges that cannot be valid at runtime', async () => {
+  it('should retain unresolved connector output edges that establish downstream constraints in the editor', async () => {
     const workflow = getWorkflow();
     workflow.nodes.push(buildConnectorNode('connector-1'));
-    workflow.edges.push({
+    const unresolvedEdge = {
       id: 'e1',
-      type: 'default',
+      type: 'default' as const,
       source: 'connector-1',
       sourceHandle: CONNECTOR_OUTPUT_HANDLE,
       target: workflow.nodes[1]!.id,
       targetHandle: 'image',
-    });
+    };
+    workflow.edges.push(unresolvedEdge);
 
     const validationResult = await validateWorkflow({
       workflow,
@@ -270,7 +271,7 @@ describe('validateWorkflow', () => {
       checkModelAccess: resolveTrue,
     });
 
-    expect(validationResult.workflow.edges).toEqual([]);
-    expect(validationResult.warnings.length).toBe(1);
+    expect(validationResult.workflow.edges).toEqual([unresolvedEdge]);
+    expect(validationResult.warnings).toEqual([]);
   });
 });

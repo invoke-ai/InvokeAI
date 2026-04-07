@@ -114,4 +114,13 @@ describe('connectorTopology', () => {
       },
     ]);
   });
+
+  it('returns no splice-through edges when a connector has downstream targets but no upstream source', () => {
+    const connector = buildConnectorNode('connector-1');
+    const target = buildNode(sub);
+    const nodes: AnyNode[] = [connector, target];
+    const edges = [buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a')];
+
+    expect(getConnectorDeletionSpliceConnections(connector.id, nodes, edges, templates)).toBe(null);
+  });
 });

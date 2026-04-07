@@ -34,7 +34,6 @@ import {
   $pendingConnection,
   $templates,
   $viewport,
-  connectorDeleted,
   connectorInserted,
   edgesChanged,
   nodesChanged,
@@ -115,6 +114,7 @@ export const Flow = memo(() => {
   const { onConnectStart, onConnect, onConnectEnd } = useConnection();
   const flowWrapper = useRef<HTMLDivElement>(null);
   const contextMenuStateRef = useRef<WorkflowContextMenuState>(null);
+  const pendingNodeInternalsUpdateRef = useRef<string[] | null>(null);
   const isValidConnection = useIsValidConnection();
   const updateNodeInternals = useUpdateNodeInternals();
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
@@ -181,6 +181,23 @@ export const Flow = memo(() => {
     }
   }, []);
 
+  useEffect(() => {
+    const pendingNodeIds = pendingNodeInternalsUpdateRef.current;
+    if (!pendingNodeIds) {
+      return;
+    }
+
+    pendingNodeInternalsUpdateRef.current = null;
+
+    const frameId = requestAnimationFrame(() => {
+      updateNodeInternals([...new Set(pendingNodeIds)]);
+    });
+
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [edges, nodes, updateNodeInternals]);
+
   const addConnectorAtPaneMenuPosition = useCallback(() => {
     const contextMenuState = contextMenuStateRef.current;
     if (contextMenuState?.kind !== 'pane') {
@@ -217,12 +234,20 @@ export const Flow = memo(() => {
     if (contextMenuState?.kind !== 'connector' || !connectorSpliceConnections) {
       return;
     }
-    dispatch(
-      connectorDeleted({
-        connectorId: contextMenuState.connectorId,
-        spliceConnections: connectorSpliceConnections,
-      })
-    );
+    const connectorEdgeRemovals: EdgeChange<AnyEdge>[] = edges
+      .filter((edge) => edge.source === contextMenuState.connectorId || edge.target === contextMenuState.connectorId)
+      .map((edge) => ({ type: 'remove', id: edge.id }));
+    const spliceEdgeAdditions: EdgeChange<AnyEdge>[] = connectorSpliceConnections.map((connection) => ({
+      type: 'add',
+      item: connectionToEdge(connection),
+    }));
+
+    pendingNodeInternalsUpdateRef.current = [
+      contextMenuState.connectorId,
+      ...connectorSpliceConnections.flatMap((connection) => [connection.source, connection.target]),
+    ];
+    dispatch(edgesChanged([...connectorEdgeRemovals, ...spliceEdgeAdditions]));
+    dispatch(nodesChanged([{ type: 'remove', id: contextMenuState.connectorId }]));
     contextMenuStateRef.current = null;
     setContextMenuPosition(null);
   }, [dispatch, edges, nodes, templates]);

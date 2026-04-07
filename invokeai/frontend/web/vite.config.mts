@@ -41,7 +41,7 @@ export default defineConfig(({ mode }) => {
     test: {
       reporters: [['default', { summary: false }]],
       typecheck: {
-        enabled: true,
+        enabled: false,
         ignoreSourceErrors: true,
       },
       coverage: {

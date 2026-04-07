@@ -20,7 +20,12 @@ import {
   reparentElement,
 } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { type NodesState, zNodesState } from 'features/nodes/store/types';
-import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from 'features/nodes/store/util/connectorTopology';
+import {
+  CONNECTOR_INPUT_HANDLE,
+  CONNECTOR_OUTPUT_HANDLE,
+  getConnectorOutputEdges,
+  resolveConnectorSource,
+} from 'features/nodes/store/util/connectorTopology';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type {
@@ -177,6 +182,33 @@ const slice = createSlice({
   initialState: getInitialState(),
   reducers: {
     nodesChanged: (state, action: PayloadAction<NodeChange<AnyNode>[]>) => {
+      const removedConnectorSpliceEdges: AnyEdge[] = action.payload.flatMap((change) => {
+        if (change.type !== 'remove') {
+          return [];
+        }
+
+        const node = state.nodes.find((candidate) => candidate.id === change.id);
+        if (!isConnectorNode(node)) {
+          return [];
+        }
+
+        const resolvedSource = resolveConnectorSource(node.id, state.nodes, state.edges);
+        if (!resolvedSource) {
+          return [];
+        }
+
+        return getConnectorOutputEdges(node.id, state.edges)
+          .filter((edge): edge is AnyEdge & { type: 'default'; targetHandle: string } => edge.type === 'default')
+          .map((edge) =>
+            connectionToEdge({
+              source: resolvedSource.nodeId,
+              sourceHandle: resolvedSource.fieldName,
+              target: edge.target,
+              targetHandle: edge.targetHandle,
+            })
+          );
+      });
+
       // TODO(psyche): The below TS issue was recently fixed upstream. Need to upgrade @xyflow/react and then we
       // should be able to remove this cast.
       //
@@ -207,6 +239,12 @@ const slice = createSlice({
         }
         if (edgeChanges.length > 0) {
           state.edges = applyEdgeChanges<AnyEdge>(edgeChanges, state.edges);
+        }
+        if (removedConnectorSpliceEdges.length > 0) {
+          state.edges = applyEdgeChanges<AnyEdge>(
+            removedConnectorSpliceEdges.map((edge) => ({ type: 'add', item: edge })),
+            state.edges
+          );
         }
       }
 
@@ -427,25 +465,6 @@ const slice = createSlice({
         })
       );
     },
-    connectorDeleted: (
-      state,
-      action: PayloadAction<{
-        connectorId: string;
-        spliceConnections: {
-          source: string;
-          sourceHandle: string;
-          target: string;
-          targetHandle: string;
-        }[];
-      }>
-    ) => {
-      const { connectorId, spliceConnections } = action.payload;
-      state.nodes = state.nodes.filter((node) => node.id !== connectorId);
-      state.edges = state.edges.filter((edge) => edge.source !== connectorId && edge.target !== connectorId);
-      for (const connection of spliceConnections) {
-        state.edges.push(connectionToEdge(connection));
-      }
-    },
     nodeLabelChanged: (state, action: PayloadAction<{ nodeId: string; label: string }>) => {
       const { nodeId, label } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
@@ -664,7 +683,6 @@ export const {
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
-  connectorDeleted,
   connectorInserted,
   nodeLabelChanged,
   nodeNotesChanged,

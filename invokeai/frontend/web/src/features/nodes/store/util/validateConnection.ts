@@ -9,6 +9,7 @@ import {
 import { getCollectItemType } from 'features/nodes/store/util/getCollectItemType';
 import { getHasCycles } from 'features/nodes/store/util/getHasCycles';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
+import type { FieldType } from 'features/nodes/types/field';
 import type { AnyEdge, AnyNode, InvocationNode } from 'features/nodes/types/invocation';
 import { isConnectorNode, isInvocationNode } from 'features/nodes/types/invocation';
 import type { SetNonNullable } from 'type-fest';
@@ -53,15 +54,86 @@ const isIfInputHandle = (handle: string): handle is (typeof IF_INPUT_HANDLES)[nu
   return IF_INPUT_HANDLES.includes(handle as (typeof IF_INPUT_HANDLES)[number]);
 };
 
-const isSingleCollectionPairOfSameBaseType = (
-  firstType: { name: string; cardinality: string; batch: boolean },
-  secondType: { name: string; cardinality: string; batch: boolean }
-) => {
+const isSingleCollectionPairOfSameBaseType = (firstType: FieldType, secondType: FieldType) => {
   const isSingleToCollection =
     firstType.cardinality === 'SINGLE' && secondType.cardinality === 'COLLECTION' && firstType.name === secondType.name;
   const isCollectionToSingle =
     firstType.cardinality === 'COLLECTION' && secondType.cardinality === 'SINGLE' && firstType.name === secondType.name;
   return firstType.batch === secondType.batch && (isSingleToCollection || isCollectionToSingle);
+};
+
+const areFieldTypesCompatible = (firstType: FieldType, secondType: FieldType) =>
+  validateConnectionTypes(firstType, secondType) ||
+  validateConnectionTypes(secondType, firstType) ||
+  isSingleCollectionPairOfSameBaseType(firstType, secondType);
+
+type ConnectorTerminalTargetEdge = AnyEdge & {
+  type: 'default';
+  sourceHandle: string;
+  targetHandle: string;
+};
+
+const getConnectorTerminalTargetEdges = (connectorId: string, nodes: AnyNode[], edges: AnyEdge[]) => {
+  const visited = new Set<string>();
+  const resolve = (currentConnectorId: string): ConnectorTerminalTargetEdge[] => {
+    if (visited.has(currentConnectorId)) {
+      return [];
+    }
+    visited.add(currentConnectorId);
+
+    return edges.flatMap((edge) => {
+      if (
+        edge.type !== 'default' ||
+        edge.source !== currentConnectorId ||
+        edge.sourceHandle !== CONNECTOR_OUTPUT_HANDLE ||
+        typeof edge.targetHandle !== 'string'
+      ) {
+        return [];
+      }
+
+      const targetNode = nodes.find((node) => node.id === edge.target);
+      if (targetNode && isConnectorNode(targetNode)) {
+        return resolve(targetNode.id);
+      }
+
+      return [edge as ConnectorTerminalTargetEdge];
+    });
+  };
+
+  return resolve(connectorId);
+};
+
+const getConnectorSubgraphEdgeIds = (connectorId: string, nodes: AnyNode[], edges: AnyEdge[]) => {
+  const visited = new Set<string>();
+  const edgeIds = new Set<string>();
+
+  const visit = (currentConnectorId: string) => {
+    if (visited.has(currentConnectorId)) {
+      return;
+    }
+    visited.add(currentConnectorId);
+
+    edges.forEach((edge) => {
+      if (
+        edge.type !== 'default' ||
+        edge.source !== currentConnectorId ||
+        edge.sourceHandle !== CONNECTOR_OUTPUT_HANDLE ||
+        typeof edge.targetHandle !== 'string'
+      ) {
+        return;
+      }
+
+      edgeIds.add(edge.id);
+
+      const targetNode = nodes.find((node) => node.id === edge.target);
+      if (targetNode && isConnectorNode(targetNode)) {
+        visit(targetNode.id);
+      }
+    });
+  };
+
+  visit(connectorId);
+  return edgeIds;
 };
 
 const getEffectiveSource = (
@@ -155,6 +227,7 @@ export const validateConnection: ValidateConnectionFunc = (
     }
 
     const targetNode = nodes.find((n) => n.id === c.target);
+    const sourceNode = nodes.find((n) => n.id === c.source);
     if (!targetNode) {
       return 'nodes.missingNode';
     }
@@ -177,6 +250,32 @@ export const validateConnection: ValidateConnectionFunc = (
 
       if (filteredEdges.find(getTargetEqualityPredicate(c))) {
         return 'nodes.inputMayOnlyHaveOneConnection';
+      }
+
+      if (effectiveSource) {
+        const connectorSubgraphEdgeIds = getConnectorSubgraphEdgeIds(targetNode.id, nodes, filteredEdges);
+        const stagedEdges = filteredEdges.filter((edge) => !connectorSubgraphEdgeIds.has(edge.id));
+        const terminalTargetEdges = getConnectorTerminalTargetEdges(targetNode.id, nodes, filteredEdges);
+
+        for (const terminalTargetEdge of terminalTargetEdges) {
+          const downstreamValidation = validateConnection(
+            {
+              source: c.source,
+              sourceHandle: c.sourceHandle,
+              target: terminalTargetEdge.target,
+              targetHandle: terminalTargetEdge.targetHandle,
+            },
+            nodes,
+            stagedEdges,
+            templates,
+            null,
+            true
+          );
+
+          if (downstreamValidation !== null) {
+            return downstreamValidation;
+          }
+        }
       }
 
       // Unresolved connector chains are allowed to terminate on another connector.
@@ -202,10 +301,39 @@ export const validateConnection: ValidateConnectionFunc = (
     }
 
     if (!effectiveSource) {
+      if (sourceNode && isConnectorNode(sourceNode) && c.sourceHandle === CONNECTOR_OUTPUT_HANDLE) {
+        const existingTerminalTargetEdges = getConnectorTerminalTargetEdges(sourceNode.id, nodes, filteredEdges).filter(
+          (edge) => !(edge.target === c.target && edge.targetHandle === c.targetHandle)
+        );
+
+        for (const terminalTargetEdge of existingTerminalTargetEdges) {
+          const constrainedTargetNode = nodes.find((node) => node.id === terminalTargetEdge.target);
+          if (!constrainedTargetNode || !isInvocationNode(constrainedTargetNode)) {
+            return 'nodes.missingInvocationTemplate';
+          }
+
+          const constrainedTargetTemplate = templates[constrainedTargetNode.data.type];
+          if (!constrainedTargetTemplate) {
+            return 'nodes.missingInvocationTemplate';
+          }
+
+          const constrainedTargetFieldTemplate = constrainedTargetTemplate.inputs[terminalTargetEdge.targetHandle];
+          if (!constrainedTargetFieldTemplate) {
+            return 'nodes.missingFieldTemplate';
+          }
+
+          if (!areFieldTypesCompatible(constrainedTargetFieldTemplate.type, targetFieldTemplate.type)) {
+            return 'nodes.fieldTypesMustMatch';
+          }
+        }
+
+        return null;
+      }
+
       return 'nodes.fieldTypesMustMatch';
     }
 
-    const { node: sourceNode, handle: sourceHandle, fieldTemplate: sourceFieldTemplate } = effectiveSource;
+    const { node: resolvedSourceNode, handle: sourceHandle, fieldTemplate: sourceFieldTemplate } = effectiveSource;
 
     if (targetNode.data.type === 'collect' && c.targetHandle === 'item') {
       // Collect nodes shouldn't mix and match field types.
@@ -216,13 +344,13 @@ export const validateConnection: ValidateConnectionFunc = (
     }
 
     if (
-      sourceNode.data.type === 'collect' &&
+      resolvedSourceNode.data.type === 'collect' &&
       sourceHandle === 'collection' &&
       targetNode.data.type === 'collect' &&
       c.targetHandle === 'collection'
     ) {
       // Chained collect nodes should preserve a single item type when both ends are already typed.
-      const sourceCollectItemType = getCollectItemType(templates, nodes, filteredEdges, sourceNode.id);
+      const sourceCollectItemType = getCollectItemType(templates, nodes, filteredEdges, resolvedSourceNode.id);
       const targetCollectItemType = getCollectItemType(templates, nodes, filteredEdges, targetNode.id);
       if (
         sourceCollectItemType &&
@@ -270,9 +398,10 @@ export const validateConnection: ValidateConnectionFunc = (
       }
     }
 
-    if (sourceNode.data.type === 'if' && sourceHandle === 'value') {
+    if (resolvedSourceNode.data.type === 'if' && sourceHandle === 'value') {
       const ifInputEdges = filteredEdges.filter(
-        (e) => e.target === sourceNode.id && typeof e.targetHandle === 'string' && isIfInputHandle(e.targetHandle)
+        (e) =>
+          e.target === resolvedSourceNode.id && typeof e.targetHandle === 'string' && isIfInputHandle(e.targetHandle)
       );
       const ifInputTypes = ifInputEdges.flatMap((edge) => {
         const ifInputSource = getEffectiveSourceForEdge(edge, nodes, filteredEdges, templates);

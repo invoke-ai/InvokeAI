@@ -534,13 +534,43 @@ describe(validateConnection.name, () => {
       expect(r).toEqual('nodes.fieldTypesMustMatch');
     });
 
-    it('should reject unresolved connector output to invocation input', () => {
+    it('should accept unresolved connector output to a typed invocation input as the first downstream constraint', () => {
       const connector = buildConnectorNode('connector-1');
       const n2 = buildNode(sub);
       const r = validateConnection(
         { source: connector.id, sourceHandle: CONNECTOR_OUTPUT_HANDLE, target: n2.id, targetHandle: 'a' },
         [connector, n2],
         [],
+        templates,
+        null
+      );
+      expect(r).toEqual(null);
+    });
+
+    it('should reject unresolved connector output when it conflicts with an existing downstream typed constraint', () => {
+      const connector = buildConnectorNode('connector-1');
+      const n1 = buildNode(sub);
+      const n2 = buildNode(img_resize);
+      const edges = [buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, n1.id, 'a')];
+      const r = validateConnection(
+        { source: connector.id, sourceHandle: CONNECTOR_OUTPUT_HANDLE, target: n2.id, targetHandle: 'image' },
+        [connector, n1, n2],
+        edges,
+        templates,
+        null
+      );
+      expect(r).toEqual('nodes.fieldTypesMustMatch');
+    });
+
+    it('should reject connecting an incompatible upstream source into a connector with downstream typed constraints', () => {
+      const source = buildNode(main_model_loader);
+      const connector = buildConnectorNode('connector-1');
+      const target = buildNode(sub);
+      const edges = [buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a')];
+      const r = validateConnection(
+        { source: source.id, sourceHandle: 'vae', target: connector.id, targetHandle: CONNECTOR_INPUT_HANDLE },
+        [source, connector, target],
+        edges,
         templates,
         null
       );

@@ -162,7 +162,10 @@ export const getSourceCandidateFields = (
 
   if (isConnectorNode(sourceNode)) {
     const sourceFieldType = resolveConnectorSourceFieldType(sourceNode.id, nodes, edges, templates);
-    if (!sourceFieldType) {
+    const targetTemplate = !isConnectorNode(targetNode) ? templates[targetNode.data.type] : null;
+    const targetFieldType = targetTemplate?.inputs[targetHandle]?.type;
+    const candidateType = sourceFieldType ?? targetFieldType;
+    if (!candidateType) {
       return [];
     }
 
@@ -172,7 +175,7 @@ export const getSourceCandidateFields = (
       description: '',
       fieldKind: 'output',
       ui_hidden: false,
-      type: sourceFieldType,
+      type: candidateType,
     } satisfies FieldOutputTemplate;
 
     const c = { source, sourceHandle: candidate.name, target, targetHandle };

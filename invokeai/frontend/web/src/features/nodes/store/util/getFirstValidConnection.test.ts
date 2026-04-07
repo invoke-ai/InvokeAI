@@ -6,7 +6,7 @@ import {
   getSourceCandidateFields,
   getTargetCandidateFields,
 } from 'features/nodes/store/util/getFirstValidConnection';
-import { add, buildEdge, buildNode, img_resize, templates } from 'features/nodes/store/util/testUtils';
+import { add, buildEdge, buildNode, img_resize, sub, templates } from 'features/nodes/store/util/testUtils';
 import { describe, expect, it } from 'vitest';
 
 const buildConnectorNode = (id: string) => ({
@@ -206,9 +206,9 @@ describe('getTargetCandidateFields', () => {
     const r = getTargetCandidateFields(n1.id, 'value', connector.id, [n1, connector], [], templates, null);
     expect(r.map((field) => field.name)).toEqual([CONNECTOR_INPUT_HANDLE]);
   });
-  it('should not advertise typed target candidates for an unresolved connector output', () => {
+  it('should advertise typed target candidates for an unresolved connector output when no downstream constraint exists', () => {
     const connector = buildConnectorNode('connector-1');
-    const n2 = buildNode(img_resize);
+    const n2 = buildNode(sub);
     const r = getTargetCandidateFields(
       connector.id,
       CONNECTOR_OUTPUT_HANDLE,
@@ -218,7 +218,23 @@ describe('getTargetCandidateFields', () => {
       templates,
       null
     );
-    expect(r).toEqual([]);
+    expect(r.map((field) => field.name)).toEqual(['a', 'b']);
+  });
+  it('should only advertise compatible typed target candidates for an unresolved connector output with downstream constraints', () => {
+    const connector = buildConnectorNode('connector-1');
+    const n1 = buildNode(sub);
+    const n2 = buildNode(img_resize);
+    const edges = [buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, n1.id, 'a')];
+    const r = getTargetCandidateFields(
+      connector.id,
+      CONNECTOR_OUTPUT_HANDLE,
+      n2.id,
+      [connector, n1, n2],
+      edges,
+      templates,
+      null
+    );
+    expect(r.map((field) => field.name)).toEqual(['width', 'height']);
   });
   it('should resolve chained connector sources like the direct upstream source', () => {
     const n1 = buildNode(add);
@@ -288,10 +304,10 @@ describe('getSourceCandidateFields', () => {
     const r = getSourceCandidateFields(n2.id, 'width', connector.id, [n1, connector, n2], edges, templates, null);
     expect(r.map((field) => field.name)).toEqual([CONNECTOR_OUTPUT_HANDLE]);
   });
-  it('should not return connector source candidates when the connector chain is unresolved', () => {
+  it('should return a target-constrained connector source candidate when the connector chain is unresolved', () => {
     const connector = buildConnectorNode('connector-1');
     const n2 = buildNode(img_resize);
     const r = getSourceCandidateFields(n2.id, 'width', connector.id, [connector, n2], [], templates, null);
-    expect(r).toEqual([]);
+    expect(r.map((field) => field.name)).toEqual([CONNECTOR_OUTPUT_HANDLE]);
   });
 });

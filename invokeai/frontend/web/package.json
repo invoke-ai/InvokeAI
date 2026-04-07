@@ -21,7 +21,7 @@
   "scripts": {
     "dev": "vite dev",
     "dev:host": "vite dev --host",
-    "build": "pnpm run lint && vitest run && vite build",
+    "build": "pnpm run lint && vitest run --maxWorkers=50% && vite build",
     "typegen": "node scripts/typegen.js",
     "preview": "vite preview",
     "lint:knip": "knip --tags=-knipignore",
@@ -34,10 +34,10 @@
     "preinstall": "npx only-allow pnpm",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "test": "vitest",
-    "test:run": "vitest run",
-    "test:ui": "vitest --coverage --ui",
-    "test:no-watch": "vitest --no-watch"
+    "test": "vitest --maxWorkers=50%",
+    "test:run": "vitest run --maxWorkers=50%",
+    "test:ui": "vitest --coverage --ui --maxWorkers=50%",
+    "test:no-watch": "vitest --no-watch --maxWorkers=50%"
   },
   "dependencies": {
     "@atlaskit/pragmatic-drag-and-drop": "^1.7.4",
