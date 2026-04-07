@@ -881,11 +881,11 @@ anima_vae = StarterModel(
     format=ModelFormat.Checkpoint,
 )
 
-anima_preview2 = StarterModel(
-    name="Anima Preview 2",
+anima_preview3 = StarterModel(
+    name="Anima Preview 3",
     base=BaseModelType.Anima,
-    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-preview2.safetensors",
-    description="Anima Preview 2 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-preview3-base.safetensors",
+    description="Anima Preview 3 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
     type=ModelType.Main,
     format=ModelFormat.Checkpoint,
     dependencies=[anima_qwen3_encoder, anima_vae, t5_base_encoder],
@@ -987,7 +987,7 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
-    anima_preview2,
+    anima_preview3,
     anima_qwen3_encoder,
     anima_vae,
 ]
@@ -1059,7 +1059,7 @@ flux2_klein_bundle: list[StarterModel] = [
 ]
 
 anima_bundle: list[StarterModel] = [
-    anima_preview2,
+    anima_preview3,
     anima_qwen3_encoder,
     anima_vae,
     t5_base_encoder,
