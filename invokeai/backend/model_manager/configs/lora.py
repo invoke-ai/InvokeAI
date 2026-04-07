@@ -711,6 +711,8 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             state_dict,
             {
                 "diffusion_model.layers.",  # Z-Image S3-DiT layer pattern
+                "transformer.layers.",  # OneTrainer/diffusers prefix variant
+                "base_model.model.transformer.layers.",  # PEFT-wrapped variant
             },
         )
 
@@ -747,6 +749,8 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             state_dict,
             {
                 "diffusion_model.layers.",  # Z-Image S3-DiT layer pattern
+                "transformer.layers.",  # OneTrainer/diffusers prefix variant
+                "base_model.model.transformer.layers.",  # PEFT-wrapped variant
             },
         )
 
