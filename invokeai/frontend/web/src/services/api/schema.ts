@@ -14640,14 +14640,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models/.convert_cache
+             * @default models\.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models/.download_cache
+             * @default models\.download_cache
              */
             download_cache_dir?: string;
             /**
@@ -14951,17 +14951,6 @@ export type components = {
             set_fields: string[];
             /** @description The InvokeAI App Config */
             config: components["schemas"]["InvokeAIAppConfig"];
-        };
-        /**
-         * UpdateAppGenerationSettingsRequest
-         * @description Writable generation-related app settings.
-         */
-        UpdateAppGenerationSettingsRequest: {
-            /**
-             * Max Queue History
-             * @description Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.
-             */
-            max_queue_history?: number | null;
         };
         /**
          * Adjust Image Hue Plus
@@ -27031,6 +27020,17 @@ export type components = {
             unstarred_images: string[];
         };
         /**
+         * UpdateAppGenerationSettingsRequest
+         * @description Writable generation-related app settings.
+         */
+        UpdateAppGenerationSettingsRequest: {
+            /**
+             * Max Queue History
+             * @description Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.
+             */
+            max_queue_history?: number | null;
+        };
+        /**
          * UserDTO
          * @description User data transfer object.
          */
@@ -32098,6 +32098,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InvokeAIAppConfigWithSetFields"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
