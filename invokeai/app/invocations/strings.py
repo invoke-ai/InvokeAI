@@ -94,7 +94,9 @@ class StringJoinInvocation(BaseInvocation):
         return StringOutput(value=((self.string_left or "") + (self.string_right or "")))
 
 
-@invocation("string_join_three", title="String Join Three", tags=["string", "join"], category="strings", version="1.0.1")
+@invocation(
+    "string_join_three", title="String Join Three", tags=["string", "join"], category="strings", version="1.0.1"
+)
 class StringJoinThreeInvocation(BaseInvocation):
     """Joins string left to string middle to string right"""
 
