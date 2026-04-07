@@ -44,6 +44,10 @@ from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils 
     is_state_dict_likely_in_flux_kohya_format,
     lora_model_from_flux_kohya_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.flux_onetrainer_bfl_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_onetrainer_bfl_format,
+    lora_model_from_flux_onetrainer_bfl_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_utils import (
     is_state_dict_likely_in_flux_onetrainer_format,
     lora_model_from_flux_onetrainer_state_dict,
@@ -128,6 +132,8 @@ class LoRALoader(ModelLoader):
                         model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
                 elif is_state_dict_likely_in_flux_kohya_format(state_dict=state_dict):
                     model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
+                elif is_state_dict_likely_in_flux_onetrainer_bfl_format(state_dict=state_dict):
+                    model = lora_model_from_flux_onetrainer_bfl_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_in_flux_onetrainer_format(state_dict=state_dict):
                     model = lora_model_from_flux_onetrainer_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_flux_control(state_dict=state_dict):
