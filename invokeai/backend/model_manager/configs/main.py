@@ -1226,8 +1226,8 @@ class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, C
             },
         )
 
-        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
-        variant = override_fields.get("variant") or cls._get_qwen_image_variant(mod)
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_qwen_image_variant(mod)
 
         return cls(
             **override_fields,
