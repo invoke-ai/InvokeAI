@@ -221,6 +221,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     z_image_seed_variance_enabled: seedVarianceEnabled,
     z_image_seed_variance_strength: seedVarianceStrength,
     z_image_seed_variance_randomize_percent: seedVarianceRandomizePercent,
+    z_image_shift: zImageShift ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');
