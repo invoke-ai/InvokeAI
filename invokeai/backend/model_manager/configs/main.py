@@ -197,9 +197,9 @@ class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
 
         cls._validate_base(mod)
 
-        prediction_type = override_fields.get("prediction_type") or cls._get_scheduler_prediction_type_or_raise(mod)
+        prediction_type = override_fields.pop("prediction_type", None) or cls._get_scheduler_prediction_type_or_raise(mod)
 
-        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
         return cls(**override_fields, prediction_type=prediction_type, variant=variant)
 
@@ -462,7 +462,7 @@ class Main_Checkpoint_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
 
         cls._validate_does_not_look_like_gguf_quantized(mod)
 
-        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
         return cls(**override_fields, variant=variant)
 
@@ -537,7 +537,7 @@ class Main_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Con
 
         cls._validate_does_not_look_like_gguf_quantized(mod)
 
-        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
         return cls(**override_fields, variant=variant)
 
@@ -595,7 +595,7 @@ class Main_BnBNF4_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
 
         cls._validate_model_looks_like_bnb_quantized(mod)
 
-        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
         return cls(**override_fields, variant=variant)
 
@@ -646,7 +646,7 @@ class Main_GGUF_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
 
         cls._validate_is_not_flux2(mod)
 
-        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
         return cls(**override_fields, variant=variant)
 
@@ -704,7 +704,7 @@ class Main_GGUF_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Ba
 
         cls._validate_is_flux2(mod)
 
-        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
         return cls(**override_fields, variant=variant)
 
@@ -760,9 +760,9 @@ class Main_Diffusers_FLUX_Config(Diffusers_Config_Base, Main_Config_Base, Config
             },
         )
 
-        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
-        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
 
         return cls(
             **override_fields,
@@ -814,9 +814,9 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
             },
         )
 
-        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
-        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
 
         return cls(
             **override_fields,
@@ -894,11 +894,11 @@ class Main_SD_Diffusers_Config_Base(Diffusers_Config_Base, Main_Config_Base):
 
         cls._validate_base(mod)
 
-        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
-        prediction_type = override_fields.get("prediction_type") or cls._get_scheduler_prediction_type_or_raise(mod)
+        prediction_type = override_fields.pop("prediction_type", None) or cls._get_scheduler_prediction_type_or_raise(mod)
 
-        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
 
         return cls(
             **override_fields,
@@ -1004,9 +1004,9 @@ class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_
             },
         )
 
-        submodels = override_fields.get("submodels") or cls._get_submodels_or_raise(mod)
+        submodels = override_fields.pop("submodels", None) or cls._get_submodels_or_raise(mod)
 
-        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
 
         return cls(
             **override_fields,
@@ -1079,7 +1079,7 @@ class Main_Diffusers_CogView4_Config(Diffusers_Config_Base, Main_Config_Base, Co
             },
         )
 
-        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
 
         return cls(
             **override_fields,
@@ -1107,9 +1107,9 @@ class Main_Diffusers_ZImage_Config(Diffusers_Config_Base, Main_Config_Base, Conf
             },
         )
 
-        variant = override_fields.get("variant") or cls._get_variant_or_raise(mod)
+        variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
 
-        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
 
         return cls(
             **override_fields,
@@ -1153,7 +1153,7 @@ class Main_Checkpoint_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Co
 
         cls._validate_does_not_look_like_gguf_quantized(mod)
 
-        variant = override_fields.get("variant", ZImageVariantType.Turbo)
+        variant = override_fields.pop("variant", None) or ZImageVariantType.Turbo
 
         return cls(**override_fields, variant=variant)
 
@@ -1187,7 +1187,7 @@ class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
 
         cls._validate_looks_like_gguf_quantized(mod)
 
-        variant = override_fields.get("variant", ZImageVariantType.Turbo)
+        variant = override_fields.pop("variant", None) or ZImageVariantType.Turbo
 
         return cls(**override_fields, variant=variant)
 
@@ -1288,9 +1288,10 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         # Infer variant from filename if not explicitly provided.
         # GGUF files have no metadata to distinguish edit from generate models,
         # but filenames containing "edit" (case-insensitive) are a strong heuristic.
-        if "variant" not in override_fields or override_fields.get("variant") is None:
+        explicit_variant = override_fields.pop("variant", None)
+        if explicit_variant is None:
             filename = mod.path.stem.lower()
             if "edit" in filename:
-                override_fields = {**override_fields, "variant": QwenImageVariantType.Edit}
+                explicit_variant = QwenImageVariantType.Edit
 
-        return cls(**override_fields)
+        return cls(**override_fields, variant=explicit_variant)
