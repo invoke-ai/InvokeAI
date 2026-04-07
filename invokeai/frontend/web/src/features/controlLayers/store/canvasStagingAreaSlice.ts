@@ -11,16 +11,18 @@ import { assert } from 'tsafe';
 import z from 'zod';
 
 const zCanvasStagingAreaState = z.object({
-  _version: z.literal(1),
+  _version: z.literal(2),
   canvasSessionId: z.string(),
   canvasDiscardedQueueItems: z.array(z.number().int()),
+  areThumbnailsVisible: z.boolean(),
 });
 type CanvasStagingAreaState = z.infer<typeof zCanvasStagingAreaState>;
 
 const getInitialState = (): CanvasStagingAreaState => ({
-  _version: 1,
+  _version: 2,
   canvasSessionId: getPrefixedId('canvas'),
   canvasDiscardedQueueItems: [],
+  areThumbnailsVisible: true,
 });
 
 const slice = createSlice({
@@ -33,11 +35,15 @@ const slice = createSlice({
         state.canvasDiscardedQueueItems.push(itemId);
       }
     },
+    canvasSessionThumbnailsVisibilityToggled: (state) => {
+      state.areThumbnailsVisible = !state.areThumbnailsVisible;
+    },
     canvasSessionReset: {
       reducer: (state, action: PayloadAction<{ canvasSessionId: string }>) => {
         const { canvasSessionId } = action.payload;
         state.canvasSessionId = canvasSessionId;
         state.canvasDiscardedQueueItems = [];
+        state.areThumbnailsVisible = true;
       },
       prepare: () => {
         return {
@@ -50,7 +56,7 @@ const slice = createSlice({
   },
 });
 
-export const { canvasSessionReset, canvasQueueItemDiscarded } = slice.actions;
+export const { canvasSessionReset, canvasQueueItemDiscarded, canvasSessionThumbnailsVisibilityToggled } = slice.actions;
 
 export const canvasSessionSliceConfig: SliceConfig<typeof slice> = {
   slice,
@@ -62,6 +68,12 @@ export const canvasSessionSliceConfig: SliceConfig<typeof slice> = {
       if (!('_version' in state)) {
         state._version = 1;
         state.canvasSessionId = state.canvasSessionId ?? getPrefixedId('canvas');
+        state.canvasDiscardedQueueItems = state.canvasDiscardedQueueItems ?? [];
+      }
+
+      if (state._version === 1) {
+        state._version = 2;
+        state.areThumbnailsVisible = true;
       }
 
       return zCanvasStagingAreaState.parse(state);
@@ -71,6 +83,7 @@ export const canvasSessionSliceConfig: SliceConfig<typeof slice> = {
 
 export const selectCanvasSessionSlice = (s: RootState) => s[slice.name];
 export const selectCanvasSessionId = createSelector(selectCanvasSessionSlice, ({ canvasSessionId }) => canvasSessionId);
+export const selectCanvasSessionAreThumbnailsVisible = (s: RootState) => s[slice.name].areThumbnailsVisible;
 
 const selectDiscardedItems = createSelector(
   selectCanvasSessionSlice,
