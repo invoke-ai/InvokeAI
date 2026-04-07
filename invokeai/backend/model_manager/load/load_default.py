@@ -124,6 +124,108 @@ class ModelLoader(ModelLoaderBase):
             variant=config.repo_variant if isinstance(config, Diffusers_Config_Base) else None,
         )
 
+    def _should_use_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> bool:
+        """Check if FP8 layerwise casting should be applied to a model."""
+        # FP8 storage only works on CUDA
+        if self._torch_device.type != "cuda":
+            return False
+
+        # Z-Image has dtype mismatch issues with diffusers' layerwise casting
+        # (skipped modules produce bf16, hooked modules expect fp16).
+        from invokeai.backend.model_manager.taxonomy import BaseModelType
+
+        if hasattr(config, "base") and config.base == BaseModelType.ZImage:
+            return False
+
+        # Don't apply FP8 to text encoders, tokenizers, schedulers, etc.
+        _excluded_submodel_types = {
+            SubModelType.TextEncoder,
+            SubModelType.TextEncoder2,
+            SubModelType.TextEncoder3,
+            SubModelType.Tokenizer,
+            SubModelType.Tokenizer2,
+            SubModelType.Tokenizer3,
+            SubModelType.Scheduler,
+            SubModelType.SafetyChecker,
+        }
+        if submodel_type in _excluded_submodel_types:
+            return False
+
+        # Check default_settings.fp8_storage (Main models, ControlNet)
+        if hasattr(config, "default_settings") and config.default_settings is not None:
+            if hasattr(config.default_settings, "fp8_storage") and config.default_settings.fp8_storage is True:
+                return True
+
+        return False
+
+    def _apply_fp8_layerwise_casting(
+        self, model: AnyModel, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
+    ) -> AnyModel:
+        """Apply FP8 layerwise casting to a model if enabled in its config."""
+        if not self._should_use_fp8(config, submodel_type):
+            return model
+
+        storage_dtype = torch.float8_e4m3fn
+        compute_dtype = self._torch_dtype
+
+        # Detect the model's current dtype to use as compute dtype, since models
+        # (e.g. Flux) may require a specific dtype (bf16) that differs from the global torch dtype (fp16).
+        if isinstance(model, torch.nn.Module):
+            first_param = next(model.parameters(), None)
+            if first_param is not None:
+                compute_dtype = first_param.dtype
+
+        from diffusers.models.modeling_utils import ModelMixin
+
+        if isinstance(model, ModelMixin):
+            model.enable_layerwise_casting(
+                storage_dtype=storage_dtype,
+                compute_dtype=compute_dtype,
+            )
+        elif isinstance(model, torch.nn.Module):
+            self._apply_fp8_to_nn_module(model, storage_dtype=storage_dtype, compute_dtype=compute_dtype)
+        else:
+            return model
+
+        param_bytes = sum(p.nelement() * p.element_size() for p in model.parameters())
+        self._logger.info(
+            f"FP8 layerwise casting enabled for {config.name} "
+            f"(storage=float8_e4m3fn, compute={compute_dtype}, "
+            f"param_size={param_bytes / (1024**2):.0f}MB)"
+        )
+        return model
+
+    @staticmethod
+    def _apply_fp8_to_nn_module(model: torch.nn.Module, storage_dtype: torch.dtype, compute_dtype: torch.dtype) -> None:
+        """Apply FP8 layerwise casting to a plain nn.Module using forward hooks."""
+        for module in model.modules():
+            params = list(module.parameters(recurse=False))
+            if not params:
+                continue
+
+            # Convert this module's own parameters to FP8 storage dtype
+            for param in params:
+                param.data = param.data.to(storage_dtype)
+
+            # Pre-hook: cast to compute dtype before forward
+            def _make_pre_hook(dt: torch.dtype):
+                def hook(mod: torch.nn.Module, _args: object) -> None:
+                    for p in mod.parameters(recurse=False):
+                        p.data = p.data.to(dt)
+
+                return hook
+
+            # Post-hook: cast back to storage dtype after forward
+            def _make_post_hook(dt: torch.dtype):
+                def hook(mod: torch.nn.Module, _args: object, _output: object) -> None:
+                    for p in mod.parameters(recurse=False):
+                        p.data = p.data.to(dt)
+
+                return hook
+
+            module.register_forward_pre_hook(_make_pre_hook(compute_dtype))
+            module.register_forward_hook(_make_post_hook(storage_dtype))
+
     # This needs to be implemented in the subclass
     def _load_model(
         self,

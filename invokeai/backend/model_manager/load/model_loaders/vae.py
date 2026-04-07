@@ -29,9 +29,11 @@ class VAELoader(GenericDiffusersLoader):
         submodel_type: Optional[SubModelType] = None,
     ) -> AnyModel:
         if isinstance(config, VAE_Checkpoint_Config_Base):
-            return AutoencoderKL.from_single_file(
+            result = AutoencoderKL.from_single_file(
                 config.path,
                 torch_dtype=self._torch_dtype,
             )
+            result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
+            return result
         else:
             return super()._load_model(config, submodel_type)
