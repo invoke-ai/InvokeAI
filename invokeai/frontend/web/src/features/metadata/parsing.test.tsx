@@ -87,10 +87,7 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
       nextResolved = fakeModel('qwen3_encoder', 'flux2');
       const store = makeStore();
 
-      const parsed = await ImageMetadataHandlers.KleinQwen3EncoderModel.parse(
-        { qwen3_encoder: nextResolved },
-        store
-      );
+      const parsed = await ImageMetadataHandlers.KleinQwen3EncoderModel.parse({ qwen3_encoder: nextResolved }, store);
 
       expect(parsed.key).toBe('qwen3_encoder-key');
       expect(parsed.type).toBe('qwen3_encoder');
