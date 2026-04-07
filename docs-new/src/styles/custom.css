@@ -349,6 +349,8 @@ article.card {
 }
 
 .splash-img {
+  --thickness: 2px;
+
   position: relative;
 
   img {
@@ -369,8 +371,8 @@ article.card {
   /* Border */
   &::before {
     z-index: 1;
-    inset: -2px;
-    border-radius: var(--radius);
+    inset: calc(-1 * var(--thickness));
+    border-radius: calc(var(--radius) + var(--thickness));
     background-image: linear-gradient(
       rgb(var(--sl-color-accent-2-rgb)),
       rgb(var(--sl-color-accent-2-rgb), 0) 80%
@@ -389,7 +391,7 @@ article.card {
     filter: blur(24px);
     inset: -6px;
     opacity: 0.7; 
-    border-radius: 50px;
+    border-radius: calc(var(--radius) * 3);
     opacity: 0.65;
   }
 }
