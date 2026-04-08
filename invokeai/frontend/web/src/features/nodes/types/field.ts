@@ -702,7 +702,7 @@ export const isSchedulerFieldInputTemplate = buildTemplateTypeGuard<SchedulerFie
 // #endregion
 
 // #region SavedWorkflowField
-export const zSavedWorkflowFieldValue = z.string();
+const zSavedWorkflowFieldValue = z.string();
 const zSavedWorkflowFieldInputInstance = zFieldInputInstanceBase.extend({
   value: zSavedWorkflowFieldValue,
 });
@@ -716,7 +716,6 @@ const zSavedWorkflowFieldInputTemplate = zFieldInputTemplateBase.extend({
 const zSavedWorkflowFieldOutputTemplate = zFieldOutputTemplateBase.extend({
   type: zSavedWorkflowFieldType,
 });
-export type SavedWorkflowFieldValue = z.infer<typeof zSavedWorkflowFieldValue>;
 export type SavedWorkflowFieldInputInstance = z.infer<typeof zSavedWorkflowFieldInputInstance>;
 export type SavedWorkflowFieldInputTemplate = z.infer<typeof zSavedWorkflowFieldInputTemplate>;
 export const isSavedWorkflowFieldInputInstance = buildInstanceTypeGuard(zSavedWorkflowFieldInputInstance);

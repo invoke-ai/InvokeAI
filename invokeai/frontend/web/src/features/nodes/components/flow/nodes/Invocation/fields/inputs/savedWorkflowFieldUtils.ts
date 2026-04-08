@@ -5,14 +5,12 @@ export const MISSING_WORKFLOW_OPTION_VALUE = '__missing_workflow__';
 export const MISSING_SELECTION_LABEL = 'Missing or inaccessible workflow';
 export const EMPTY_SELECTION_LABEL = 'Choose a workflow';
 
-export type SavedWorkflowSelectionState =
+type SavedWorkflowSelectionState =
   | { status: 'unselected' }
   | { status: 'selected'; workflow: WorkflowRecordListItemWithThumbnailDTO }
   | { status: 'missing'; workflowId: string };
 
-export const buildSavedWorkflowOptions = (
-  workflows: WorkflowRecordListItemWithThumbnailDTO[]
-): ComboboxOption[] => {
+export const buildSavedWorkflowOptions = (workflows: WorkflowRecordListItemWithThumbnailDTO[]): ComboboxOption[] => {
   return workflows.map((workflow) => ({
     label: workflow.name,
     value: workflow.workflow_id,
@@ -35,9 +33,7 @@ export const getSavedWorkflowSelectionState = (
   return { status: 'missing', workflowId };
 };
 
-export const getSavedWorkflowSelectionOption = (
-  selectionState: SavedWorkflowSelectionState
-): ComboboxOption | null => {
+export const getSavedWorkflowSelectionOption = (selectionState: SavedWorkflowSelectionState): ComboboxOption | null => {
   if (selectionState.status === 'unselected') {
     return null;
   }

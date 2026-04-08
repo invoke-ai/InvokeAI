@@ -1,5 +1,5 @@
 import { getInitialWorkflow } from 'features/nodes/store/nodesSlice';
-import { buildNode,call_saved_workflow } from 'features/nodes/store/util/testUtils';
+import { buildNode, call_saved_workflow } from 'features/nodes/store/util/testUtils';
 import { describe, expect, it } from 'vitest';
 
 describe('buildWorkflowFast', () => {
@@ -14,7 +14,11 @@ describe('buildWorkflowFast', () => {
 
     const { buildWorkflowFast } = await import('features/nodes/util/workflow/buildWorkflow');
     const node = buildNode(call_saved_workflow);
-    node.data.inputs.workflow_id.value = 'workflow-123';
+    const workflowIdInput = node.data.inputs.workflow_id;
+    if (!workflowIdInput) {
+      throw new Error('Expected workflow_id input');
+    }
+    workflowIdInput.value = 'workflow-123';
 
     const workflow = buildWorkflowFast({
       _version: 1,
@@ -30,6 +34,10 @@ describe('buildWorkflowFast', () => {
       throw new Error('Expected invocation node');
     }
     expect(workflow.nodes[0].data.type).toBe('call_saved_workflow');
-    expect(workflow.nodes[0].data.inputs.workflow_id.value).toBe('workflow-123');
+    const serializedWorkflowIdInput = workflow.nodes[0].data.inputs.workflow_id;
+    if (!serializedWorkflowIdInput) {
+      throw new Error('Expected serialized workflow_id input');
+    }
+    expect(serializedWorkflowIdInput.value).toBe('workflow-123');
   });
 });
