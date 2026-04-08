@@ -483,6 +483,59 @@ class _ExecutionScheduler:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
 
+    def _validate_exec_node_ready_state(self, exec_node_id: str) -> None:
+        if exec_node_id not in self._state.execution_graph.nodes:
+            raise KeyError(f"exec node {exec_node_id} missing from execution_graph")
+        if exec_node_id not in self._state.indegree:
+            raise KeyError(f"indegree missing for exec node {exec_node_id}")
+
+    def _should_skip_ready_enqueue(self, exec_node_id: str) -> bool:
+        return (
+            self._state.indegree[exec_node_id] != 0
+            or exec_node_id in self._state.executed
+            or self._state._is_deferred_by_unresolved_if(exec_node_id)
+        )
+
+    def _get_ready_queue(self, exec_node_id: str) -> Deque[str]:
+        node_obj = self._state.execution_graph.nodes[exec_node_id]
+        return self.queue_for(self._state._type_key(node_obj))
+
+    def _insert_ready_node(self, queue: Deque[str], exec_node_id: str) -> None:
+        exec_node_path = self._state._get_iteration_path(exec_node_id)
+        for i, existing in enumerate(queue):
+            if self._state._get_iteration_path(existing) > exec_node_path:
+                queue.insert(i, exec_node_id)
+                return
+        queue.append(exec_node_id)
+
+    def _record_completed_node(self, exec_node_id: str, output: BaseInvocationOutput) -> None:
+        self._state._set_prepared_exec_state(exec_node_id, "executed")
+        self._state.executed.add(exec_node_id)
+        self._state.results[exec_node_id] = output
+
+    def _mark_source_node_complete(self, exec_node_id: str) -> None:
+        registry = self._state._prepared_registry()
+        source_node_id = registry.get_source_node_id(exec_node_id)
+        prepared_nodes = registry.get_prepared_ids(source_node_id)
+        if all(node_id in self._state.executed for node_id in prepared_nodes):
+            self._state.executed.add(source_node_id)
+            self._state.executed_history.append(source_node_id)
+
+    def _decrement_child_indegree(self, child_exec_node_id: str, parent_exec_node_id: str) -> None:
+        if child_exec_node_id not in self._state.indegree:
+            raise KeyError(f"indegree missing for exec node {child_exec_node_id}")
+        if self._state.indegree[child_exec_node_id] == 0:
+            raise RuntimeError(f"indegree underflow for {child_exec_node_id} from parent {parent_exec_node_id}")
+        self._state.indegree[child_exec_node_id] -= 1
+
+    def _release_downstream_nodes(self, exec_node_id: str) -> None:
+        for edge in self._state.execution_graph._get_output_edges(exec_node_id):
+            child = edge.destination.node_id
+            self._decrement_child_indegree(child, exec_node_id)
+            self._state._try_resolve_if_node(child)
+            if self._state.indegree[child] == 0:
+                self.enqueue_if_ready(child)
+
     def queue_for(self, cls_name: str) -> Deque[str]:
         q = self._state._ready_queues.get(cls_name)
         if q is None:
@@ -499,26 +552,14 @@ class _ExecutionScheduler:
 
     def enqueue_if_ready(self, exec_node_id: str) -> None:
         """Push exec_node_id to its class queue if unmet inputs == 0."""
-        if exec_node_id not in self._state.execution_graph.nodes:
-            raise KeyError(f"exec node {exec_node_id} missing from execution_graph")
-        if exec_node_id not in self._state.indegree:
-            raise KeyError(f"indegree missing for exec node {exec_node_id}")
-        if self._state.indegree[exec_node_id] != 0 or exec_node_id in self._state.executed:
+        self._validate_exec_node_ready_state(exec_node_id)
+        if self._should_skip_ready_enqueue(exec_node_id):
             return
-        if self._state._is_deferred_by_unresolved_if(exec_node_id):
-            return
-        node_obj = self._state.execution_graph.nodes[exec_node_id]
-        q = self.queue_for(self._state._type_key(node_obj))
-        if exec_node_id in q:
+        queue = self._get_ready_queue(exec_node_id)
+        if exec_node_id in queue:
             return
         self._state._set_prepared_exec_state(exec_node_id, "ready")
-        exec_node_path = self._state._get_iteration_path(exec_node_id)
-        for i, existing in enumerate(q):
-            if self._state._get_iteration_path(existing) > exec_node_path:
-                q.insert(i, exec_node_id)
-                break
-        else:
-            q.append(exec_node_id)
+        self._insert_ready_node(queue, exec_node_id)
 
     def get_next_node(self) -> Optional[BaseInvocation]:
         """Gets the next ready node: FIFO within class, drain class before switching."""
@@ -547,28 +588,9 @@ class _ExecutionScheduler:
         if exec_node_id not in self._state.execution_graph.nodes:
             return
 
-        self._state._set_prepared_exec_state(exec_node_id, "executed")
-        self._state.executed.add(exec_node_id)
-        self._state.results[exec_node_id] = output
-
-        registry = self._state._prepared_registry()
-        source_node_id = registry.get_source_node_id(exec_node_id)
-        prepared_nodes = registry.get_prepared_ids(source_node_id)
-
-        if all(n in self._state.executed for n in prepared_nodes):
-            self._state.executed.add(source_node_id)
-            self._state.executed_history.append(source_node_id)
-
-        for edge in self._state.execution_graph._get_output_edges(exec_node_id):
-            child = edge.destination.node_id
-            if child not in self._state.indegree:
-                raise KeyError(f"indegree missing for exec node {child}")
-            if self._state.indegree[child] == 0:
-                raise RuntimeError(f"indegree underflow for {child} from parent {exec_node_id}")
-            self._state.indegree[child] -= 1
-            self._state._try_resolve_if_node(child)
-            if self._state.indegree[child] == 0:
-                self.enqueue_if_ready(child)
+        self._record_completed_node(exec_node_id, output)
+        self._mark_source_node_complete(exec_node_id)
+        self._release_downstream_nodes(exec_node_id)
 
 
 class _ExecutionRuntime:
