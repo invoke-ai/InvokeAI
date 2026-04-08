@@ -3,6 +3,7 @@
 import copy
 import itertools
 from collections import deque
+from dataclasses import dataclass
 from typing import Any, Deque, Iterable, Optional, Type, TypeVar, Union, get_args, get_origin
 
 import networkx as nx
@@ -62,6 +63,13 @@ class Edge(BaseModel):
 
     def __str__(self):
         return f"{self.source.node_id}.{self.source.field} -> {self.destination.node_id}.{self.destination.field}"
+
+
+@dataclass
+class _PreparedExecNodeMetadata:
+    source_node_id: str
+    iteration_path: Optional[tuple[int, ...]] = None
+    state: str = "pending"
 
 
 def get_output_field_type(node: BaseInvocation, field: str) -> Any:
@@ -916,18 +924,39 @@ class GraphExecutionState(BaseModel):
     _iteration_path_cache: dict[str, tuple[int, ...]] = PrivateAttr(default_factory=dict)
     _if_branch_exclusive_sources: dict[str, dict[str, set[str]]] = PrivateAttr(default_factory=dict)
     _resolved_if_exec_branches: dict[str, str] = PrivateAttr(default_factory=dict)
+    _prepared_exec_metadata: dict[str, _PreparedExecNodeMetadata] = PrivateAttr(default_factory=dict)
 
     def _type_key(self, node_obj: BaseInvocation) -> str:
         return node_obj.__class__.__name__
 
+    def _register_prepared_exec_node(self, exec_node_id: str, source_node_id: str) -> None:
+        self._prepared_exec_metadata[exec_node_id] = _PreparedExecNodeMetadata(source_node_id=source_node_id)
+
+    def _get_prepared_exec_metadata(self, exec_node_id: str) -> _PreparedExecNodeMetadata:
+        metadata = self._prepared_exec_metadata.get(exec_node_id)
+        if metadata is None:
+            source_node_id = self.prepared_source_mapping[exec_node_id]
+            metadata = _PreparedExecNodeMetadata(source_node_id=source_node_id)
+            self._prepared_exec_metadata[exec_node_id] = metadata
+        return metadata
+
+    def _set_prepared_exec_state(self, exec_node_id: str, state: str) -> None:
+        self._get_prepared_exec_metadata(exec_node_id).state = state
+
     def _get_iteration_path(self, exec_node_id: str) -> tuple[int, ...]:
         """Best-effort outer->inner iteration indices for an execution node, stopping at collectors."""
+        metadata = self._prepared_exec_metadata.get(exec_node_id)
+        if metadata is not None and metadata.iteration_path is not None:
+            return metadata.iteration_path
+
         cached = self._iteration_path_cache.get(exec_node_id)
         if cached is not None:
             return cached
 
         # Only prepared execution nodes participate; otherwise treat as non-iterated.
-        source_node_id = self.prepared_source_mapping.get(exec_node_id)
+        source_node_id = (
+            metadata.source_node_id if metadata is not None else self.prepared_source_mapping.get(exec_node_id)
+        )
         if source_node_id is None:
             self._iteration_path_cache[exec_node_id] = ()
             return ()
@@ -964,6 +993,8 @@ class GraphExecutionState(BaseModel):
 
         result = tuple(path)
         self._iteration_path_cache[exec_node_id] = result
+        if metadata is not None:
+            metadata.iteration_path = result
         return result
 
     def _queue_for(self, cls_name: str) -> Deque[str]:
@@ -1030,6 +1061,7 @@ class GraphExecutionState(BaseModel):
 
     def _mark_exec_node_skipped(self, exec_node_id: str) -> None:
         self._remove_from_ready_queues(exec_node_id)
+        self._set_prepared_exec_state(exec_node_id, "skipped")
         self.executed.add(exec_node_id)
 
         source_node_id = self.prepared_source_mapping[exec_node_id]
@@ -1049,7 +1081,9 @@ class GraphExecutionState(BaseModel):
             return
 
         for edge in condition_edges:
-            setattr(node, edge.destination.field, copydeep(getattr(self.results[edge.source.node_id], edge.source.field)))
+            setattr(
+                node, edge.destination.field, copydeep(getattr(self.results[edge.source.node_id], edge.source.field))
+            )
 
         selected_field = "true_input" if node.condition else "false_input"
         unselected_field = "false_input" if node.condition else "true_input"
@@ -1099,6 +1133,7 @@ class GraphExecutionState(BaseModel):
         q = self._queue_for(self._type_key(node_obj))
         if nid in q:
             return
+        self._set_prepared_exec_state(nid, "ready")
         nid_path = self._get_iteration_path(nid)
         # Insert in lexicographic outer->inner order; preserve FIFO for equal paths.
         for i, existing in enumerate(q):
@@ -1165,6 +1200,7 @@ class GraphExecutionState(BaseModel):
             return  # TODO: log error?
 
         # Mark node as executed
+        self._set_prepared_exec_state(node_id, "executed")
         self.executed.add(node_id)
         self.results[node_id] = output
 
@@ -1254,6 +1290,7 @@ class GraphExecutionState(BaseModel):
             # Add to execution graph
             self.execution_graph.add_node(new_node)
             self.prepared_source_mapping[new_node.id] = node_id
+            self._register_prepared_exec_node(new_node.id, node_id)
             if node_id not in self.source_prepared_mapping:
                 self.source_prepared_mapping[node_id] = set()
             self.source_prepared_mapping[node_id].add(new_node.id)
