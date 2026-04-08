@@ -207,12 +207,12 @@ def test_call_saved_workflows_invocation_allows_admin_to_access_private_workflow
     assert output.value == 0
 
 
-def test_call_saved_workflows_invocation_schema_hides_editor_managed_fields():
+def test_call_saved_workflows_invocation_schema_declares_saved_workflow_ui_type():
     from invokeai.app.invocations.call_saved_workflows import CallSavedWorkflowsInvocation
 
     schema = CallSavedWorkflowsInvocation.model_json_schema()
     workflow_id = schema["properties"]["workflow_id"]
 
     assert workflow_id["default"] == ""
-    assert workflow_id["ui_hidden"] is True
     assert workflow_id["input"] == "any"
+    assert workflow_id["ui_type"] == "SavedWorkflowField"

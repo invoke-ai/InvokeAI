@@ -9,9 +9,7 @@ import { selectNodes } from 'features/nodes/store/selectors';
 import type { InvocationNodeData } from 'features/nodes/types/invocation';
 import { memo, useMemo } from 'react';
 
-import CallSavedWorkflowsNode from './CallSavedWorkflowsNode';
 import { InvocationNodeContextProvider } from './context';
-import { getInvocationNodeBodyComponentKey } from './getInvocationNodeBodyComponent';
 import InvocationNodeUnknownFallback from './InvocationNodeUnknownFallback';
 
 const InvocationNodeWrapper = (props: NodeProps<Node<InvocationNodeData>>) => {
@@ -19,7 +17,6 @@ const InvocationNodeWrapper = (props: NodeProps<Node<InvocationNodeData>>) => {
   const { id: nodeId, type, isOpen, label } = data;
   const templates = useStore($templates);
   const hasTemplate = useMemo(() => Boolean(templates[type]), [templates, type]);
-  const bodyComponentKey = useMemo(() => getInvocationNodeBodyComponentKey(type), [type]);
   const selectNodeExists = useMemo(
     () => createSelector(selectNodes, (nodes) => Boolean(nodes.find((n) => n.id === nodeId))),
     [nodeId]
@@ -43,11 +40,7 @@ const InvocationNodeWrapper = (props: NodeProps<Node<InvocationNodeData>>) => {
   return (
     <InvocationNodeContextProvider nodeId={nodeId}>
       <NodeWrapper nodeId={nodeId} selected={selected}>
-        {bodyComponentKey === 'call_saved_workflows' ? (
-          <CallSavedWorkflowsNode nodeId={nodeId} isOpen={isOpen} />
-        ) : (
-          <InvocationNode nodeId={nodeId} isOpen={isOpen} />
-        )}
+        <InvocationNode nodeId={nodeId} isOpen={isOpen} />
       </NodeWrapper>
     </InvocationNodeContextProvider>
   );

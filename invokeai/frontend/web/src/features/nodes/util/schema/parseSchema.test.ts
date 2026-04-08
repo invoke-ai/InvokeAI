@@ -21,5 +21,7 @@ describe('parseSchema', () => {
   it('should parse the call_saved_workflows node template', () => {
     const parsed = parseSchema(schema);
     expect(stripUndefinedDeep(parsed.call_saved_workflows)).toEqual(stripUndefinedDeep(call_saved_workflows));
+    expect(parsed.call_saved_workflows.inputs.workflow_id.type.name).toBe('SavedWorkflowField');
+    expect(parsed.call_saved_workflows.inputs.workflow_id.ui_type).toBe('SavedWorkflowField');
   });
 });

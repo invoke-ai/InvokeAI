@@ -1,5 +1,5 @@
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.fields import InputField
+from invokeai.app.invocations.fields import InputField, UIType
 from invokeai.app.invocations.primitives import IntegerOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowCategory, WorkflowNotFoundError
@@ -20,7 +20,7 @@ class CallSavedWorkflowsInvocation(BaseInvocation):
     workflow_id: str = InputField(
         default="",
         description="The selected saved workflow ID, managed by the workflow editor UI.",
-        ui_hidden=True,
+        ui_type=UIType.SavedWorkflow,
     )
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
