@@ -38,6 +38,9 @@ from invokeai.backend.flux2.sampling_utils import (
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.lora_conversions.flux_bfl_peft_lora_conversion_utils import (
+    convert_bfl_lora_patch_to_diffusers,
+)
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
@@ -503,11 +506,17 @@ class Flux2DenoiseInvocation(BaseInvocation):
         return mask.expand_as(latents)
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
-        """Iterate over LoRA models to apply."""
+        """Iterate over LoRA models to apply.
+
+        Converts BFL-format LoRA keys to diffusers format if needed, since FLUX.2 Klein
+        uses Flux2Transformer2DModel (diffusers naming) but LoRAs may have been loaded
+        with BFL naming (e.g. when a Klein 4B LoRA is misidentified as FLUX.1).
+        """
         for lora in self.transformer.loras:
             lora_info = context.models.load(lora.lora)
             assert isinstance(lora_info.model, ModelPatchRaw)
-            yield (lora_info.model, lora.weight)
+            converted = convert_bfl_lora_patch_to_diffusers(lora_info.model)
+            yield (converted, lora.weight)
             del lora_info
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:

@@ -12,33 +12,71 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 def is_state_dict_likely_in_flux_diffusers_format(state_dict: dict[str | int, torch.Tensor]) -> bool:
     """Checks if the provided state dict is likely in the Diffusers FLUX LoRA format.
 
+    This detects both Flux.1 diffusers format (separate to_q/to_k/to_v, ff.net.0.proj) and
+    Flux2 Klein diffusers format (fused to_qkv_mlp_proj, ff.linear_in).
+
     This is intended to be a reasonably high-precision detector, but it is not guaranteed to have perfect precision. (A
     perfect-precision detector would require checking all keys against a whitelist and verifying tensor shapes.)
     """
-    # First, check that all keys end in "lora_A.weight" or "lora_B.weight" (i.e. are in PEFT format).
-    all_keys_in_peft_format = all(
-        k.endswith(("lora_A.weight", "lora_B.weight")) for k in state_dict.keys() if isinstance(k, str)
-    )
+    # Check that all keys are LoRA weight keys (either PEFT or standard format).
+    # Some LoRAs use a mix of formats (PEFT for some layers, standard for others).
+    _LORA_SUFFIXES = ("lora_A.weight", "lora_B.weight", "lora.down.weight", "lora.up.weight")
+    all_keys_are_lora = all(k.endswith(_LORA_SUFFIXES) for k in state_dict.keys() if isinstance(k, str))
+    if not all_keys_are_lora:
+        return False
 
+    # --- Flux.1 diffusers key patterns (separate Q/K/V, ff.net.0.proj) ---
     # Check if keys use transformer prefix
-    transformer_prefix_keys = [
+    flux1_transformer_keys = [
         "transformer.single_transformer_blocks.0.attn.to_q.lora_A.weight",
         "transformer.single_transformer_blocks.0.attn.to_q.lora_B.weight",
         "transformer.transformer_blocks.0.attn.add_q_proj.lora_A.weight",
         "transformer.transformer_blocks.0.attn.add_q_proj.lora_B.weight",
     ]
-    transformer_keys_present = all(k in state_dict for k in transformer_prefix_keys)
+    flux1_transformer_present = all(k in state_dict for k in flux1_transformer_keys)
 
     # Check if keys use base_model.model prefix
-    base_model_prefix_keys = [
+    flux1_base_model_keys = [
         "base_model.model.single_transformer_blocks.0.attn.to_q.lora_A.weight",
         "base_model.model.single_transformer_blocks.0.attn.to_q.lora_B.weight",
         "base_model.model.transformer_blocks.0.attn.add_q_proj.lora_A.weight",
         "base_model.model.transformer_blocks.0.attn.add_q_proj.lora_B.weight",
     ]
-    base_model_keys_present = all(k in state_dict for k in base_model_prefix_keys)
+    flux1_base_model_present = all(k in state_dict for k in flux1_base_model_keys)
 
-    return all_keys_in_peft_format and (transformer_keys_present or base_model_keys_present)
+    if flux1_transformer_present or flux1_base_model_present:
+        return True
+
+    # --- Flux2 Klein diffusers key patterns (fused QKV+MLP, ff.linear_in) ---
+    # These use Flux2Transformer2DModel naming which differs from Flux.1.
+    for prefix in ["transformer.", "base_model.model."]:
+        has_single = any(
+            k.startswith(f"{prefix}single_transformer_blocks.") and "to_qkv_mlp_proj" in k for k in state_dict
+        )
+        has_double = any(k.startswith(f"{prefix}transformer_blocks.") for k in state_dict if isinstance(k, str))
+        if has_single or has_double:
+            # Verify it's actually Flux2 naming by checking for a Flux2-specific key pattern.
+            # Flux2 uses ff.linear_in (not ff.net.0.proj) and attn.to_add_out (not attn.to_add_out in Flux.1 too,
+            # but fused to_qkv_mlp_proj is unique to Flux2).
+            has_flux2_keys = any(
+                ("to_qkv_mlp_proj" in k or "ff.linear_in" in k or "ff_context.linear_in" in k)
+                for k in state_dict
+                if isinstance(k, str)
+            )
+            if has_flux2_keys:
+                return True
+
+    return False
+
+
+def is_state_dict_flux2_diffusers_format(state_dict: dict[str | int, torch.Tensor]) -> bool:
+    """Checks if the state dict uses Flux2 Klein native diffusers naming (not Flux.1 diffusers naming).
+
+    Returns True only for Flux2 Klein diffusers format (to_qkv_mlp_proj, ff.linear_in, etc.),
+    NOT for Flux.1 diffusers format (to_q/to_k/to_v, ff.net.0.proj).
+    """
+    str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+    return any("to_qkv_mlp_proj" in k or "ff.linear_in" in k or "ff_context.linear_in" in k for k in str_keys)
 
 
 def lora_model_from_flux_diffusers_state_dict(
@@ -249,6 +287,84 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
     layers_with_prefix = {f"{FLUX_LORA_TRANSFORMER_PREFIX}{k}": v for k, v in layers.items()}
 
     return layers_with_prefix
+
+
+def lora_model_from_flux2_diffusers_state_dict(
+    state_dict: Dict[str, torch.Tensor], alpha: float | None
+) -> ModelPatchRaw:
+    """Convert a Flux2 Klein native diffusers format LoRA state dict to a ModelPatchRaw.
+
+    Flux2 Klein diffusers LoRAs use key names that match Flux2Transformer2DModel directly
+    (e.g. transformer_blocks.0.attn.to_add_out, single_transformer_blocks.0.attn.to_qkv_mlp_proj).
+    The conversion strips the model prefix (transformer. or base_model.model.) and adds
+    the InvokeAI prefix.
+
+    Some LoRAs use a mix of PEFT format (lora_A.weight/lora_B.weight) and standard format
+    (lora.down.weight/lora.up.weight) for different layers. Both are handled here.
+    """
+    grouped_state_dict = _group_by_layer_mixed_format(state_dict)
+
+    # Determine and strip prefix
+    has_base_model_prefix = any(k.startswith("base_model.model.") for k in grouped_state_dict.keys())
+    if has_base_model_prefix:
+        grouped_state_dict = {k.replace("base_model.model.", "", 1): v for k, v in grouped_state_dict.items()}
+    else:
+        grouped_state_dict = {k.replace("transformer.", "", 1): v for k, v in grouped_state_dict.items()}
+
+    layers: dict[str, BaseLayerPatch] = {}
+    for layer_key, src_layer_dict in grouped_state_dict.items():
+        # Normalize to InvokeAI naming (lora_down.weight / lora_up.weight)
+        values: dict[str, torch.Tensor] = {}
+        if "lora_A.weight" in src_layer_dict:
+            values["lora_down.weight"] = src_layer_dict["lora_A.weight"]
+            values["lora_up.weight"] = src_layer_dict["lora_B.weight"]
+        elif "lora.down.weight" in src_layer_dict:
+            values["lora_down.weight"] = src_layer_dict["lora.down.weight"]
+            values["lora_up.weight"] = src_layer_dict["lora.up.weight"]
+        else:
+            values = src_layer_dict
+
+        if alpha is not None and "alpha" not in values:
+            values["alpha"] = torch.tensor(alpha)
+
+        layers[f"{FLUX_LORA_TRANSFORMER_PREFIX}{layer_key}"] = any_lora_layer_from_state_dict(values)
+
+    return ModelPatchRaw(layers=layers)
+
+
+def _group_by_layer_mixed_format(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:
+    """Groups keys by layer, handling both PEFT and standard LoRA suffixes.
+
+    PEFT format:    layer_name.lora_A.weight → layer=layer_name, suffix=lora_A.weight
+    Standard format: layer_name.lora.down.weight → layer=layer_name, suffix=lora.down.weight
+    """
+    layer_dict: dict[str, dict[str, torch.Tensor]] = {}
+    for key in state_dict:
+        if not isinstance(key, str):
+            continue
+
+        # Determine suffix length based on the key ending
+        if key.endswith((".lora_A.weight", ".lora_B.weight")):
+            # PEFT format: split off 2 parts (lora_A + weight)
+            parts = key.rsplit(".", maxsplit=2)
+            layer_name = parts[0]
+            suffix = ".".join(parts[1:])
+        elif key.endswith((".lora.down.weight", ".lora.up.weight")):
+            # Standard format: split off 3 parts (lora + down/up + weight)
+            parts = key.rsplit(".", maxsplit=3)
+            layer_name = parts[0]
+            suffix = ".".join(parts[1:])
+        else:
+            # Unknown format, use 2-part split as fallback
+            parts = key.rsplit(".", maxsplit=2)
+            layer_name = parts[0]
+            suffix = ".".join(parts[1:])
+
+        if layer_name not in layer_dict:
+            layer_dict[layer_name] = {}
+        layer_dict[layer_name][suffix] = state_dict[key]
+
+    return layer_dict
 
 
 def _group_by_layer(state_dict: Dict[str, torch.Tensor]) -> dict[str, dict[str, torch.Tensor]]:

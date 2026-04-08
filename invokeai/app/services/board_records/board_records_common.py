@@ -16,6 +16,8 @@ class BoardRecord(BaseModelExcludeNull):
     """The unique ID of the board."""
     board_name: str = Field(description="The name of the board.")
     """The name of the board."""
+    user_id: str = Field(description="The user ID of the board owner.")
+    """The user ID of the board owner."""
     created_at: Union[datetime, str] = Field(description="The created timestamp of the board.")
     """The created timestamp of the image."""
     updated_at: Union[datetime, str] = Field(description="The updated timestamp of the board.")
@@ -35,6 +37,8 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
 
     board_id = board_dict.get("board_id", "unknown")
     board_name = board_dict.get("board_name", "unknown")
+    # Default to 'system' for backwards compatibility with boards created before multiuser support
+    user_id = board_dict.get("user_id", "system")
     cover_image_name = board_dict.get("cover_image_name", "unknown")
     created_at = board_dict.get("created_at", get_iso_timestamp())
     updated_at = board_dict.get("updated_at", get_iso_timestamp())
@@ -44,6 +48,7 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
     return BoardRecord(
         board_id=board_id,
         board_name=board_name,
+        user_id=user_id,
         cover_image_name=cover_image_name,
         created_at=created_at,
         updated_at=updated_at,

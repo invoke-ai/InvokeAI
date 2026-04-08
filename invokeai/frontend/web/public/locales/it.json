@@ -822,7 +822,29 @@
         "orphanedModelsDeleted": "Eliminato con successo {{count}} modello orfano",
         "orphanedModelsDeleteErrors": "Alcuni modelli non possono essere eliminati",
         "orphanedModelsDeleteFailed": "Impossibile eliminare i modelli orfani",
-        "errorLoadingOrphanedModels": "Errore durante il caricamento dei modelli orfani. Riprova."
+        "errorLoadingOrphanedModels": "Errore durante il caricamento dei modelli orfani. Riprova.",
+        "pause": "Pausa",
+        "pauseAll": "Metti in pausa tutto",
+        "pauseAllTooltip": "Metti in pausa tutti i download attivi",
+        "resume": "Riprendi",
+        "resumeAll": "Riprendi tutto",
+        "resumeAllTooltip": "Riprendi tutti i download in pausa",
+        "restartFailed": "Riavvio non riuscito",
+        "restartFile": "Riavvia il file",
+        "restartRequired": "Riavvio richiesto",
+        "resumeRefused": "Ripristino rifiutato dal server. Riavvio richiesto.",
+        "backendDisconnected": "Backend disconnesso",
+        "cancelAll": "Annulla tutto",
+        "cancelAllTooltip": "Annulla tutti i download attivi",
+        "selectModelToView": "Seleziona un modello per visualizzarne i dettagli",
+        "exportSettings": "Impostazioni di esportazione",
+        "importSettings": "Impostazioni di importazione",
+        "settingsExported": "Impostazioni del modello esportate",
+        "settingsImported": "Impostazioni del modello importate",
+        "settingsImportedPartial": "Impostazioni del modello parzialmente importate. Le impostazioni incompatibili sono state ignorate: {{fields}}",
+        "settingsImportFailed": "Impossibile importare le impostazioni del modello",
+        "settingsImportIncompatible": "Il file delle impostazioni non contiene impostazioni compatibili per questo tipo di modello",
+        "settingsImportInvalidFile": "File di impostazioni non valido"
     },
     "parameters": {
         "images": "Immagini",
@@ -993,7 +1015,8 @@
         "showDetailedInvocationProgress": "Mostra dettagli avanzamento",
         "enableHighlightFocusedRegions": "Evidenzia le regioni interessate",
         "modelDescriptionsDisabled": "Descrizioni dei modelli nei menu a discesa disabilitate",
-        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disattivate. Abilitale nelle Impostazioni."
+        "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disattivate. Abilitale nelle Impostazioni.",
+        "preferAttentionStyleNumeric": "Preferisci lo stile di attenzione numerico"
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -1096,7 +1119,14 @@
         "invalidBbox": "Riquadro di delimitazione non valido",
         "invalidBboxDesc": "Il riquadro di delimitazione non ha dimensioni valide",
         "kleinEncoderClearedDescription": "Selezionare un encoder Qwen3 compatibile per la nuova variante del modello Klein",
-        "kleinEncoderCleared": "Encoder Qwen3 cancellato"
+        "kleinEncoderCleared": "Encoder Qwen3 cancellato",
+        "schedulerReset": "Ripristino campionatore",
+        "schedulerResetZImageBase": "Il campionatore LCM non è compatibile con i modelli Z-Image Base. Reimpostare su Euler.",
+        "modelDownloadPaused": "Download del modello in pausa",
+        "modelDownloadResumed": "Ripresa del download",
+        "modelDownloadRestartFailed": "Riavvia i download non riusciti",
+        "modelDownloadRestartFile": "Riavvio del download del file",
+        "modelDownloadRestartedFromScratch": "Manca una parte del file. Riavviato il download dall'inizio."
     },
     "accessibility": {
         "invokeProgressBar": "Barra di avanzamento generazione",
@@ -1355,7 +1385,13 @@
         "locateInGalery": "Trova nella Galleria",
         "deletedImagesCannotBeRestored": "Le immagini eliminate non possono essere ripristinate.",
         "hideBoards": "Nascondi bacheche",
-        "viewBoards": "Visualizza le bacheche"
+        "viewBoards": "Visualizza le bacheche",
+        "pause": "Pausa",
+        "resume": "Riprendi",
+        "restartFailed": "Riavvio non riuscito",
+        "restartFile": "Riavvia il file",
+        "restartRequired": "Riavvio richiesto",
+        "resumeRefused": "Ripristino rifiutato dal server. Riavvio richiesto."
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -1447,7 +1483,13 @@
         "sortOrderDescending": "Discendente",
         "createdAt": "Creato",
         "completedAt": "Completato",
-        "batchFieldValues": "Valori del campo Lotto"
+        "batchFieldValues": "Valori del campo Lotto",
+        "paused": "In pausa",
+        "cancelFailedAccessDenied": "Problema durante l'annullamento dell'articolo: accesso negato",
+        "clearFailedAccessDenied": "Problema durante la cancellazione della coda: accesso negato",
+        "user": "Utente",
+        "cannotViewDetails": "Non hai l'autorizzazione per visualizzare i dettagli di questo elemento della coda",
+        "fieldValuesHidden": "<Nascosto>"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -2342,7 +2384,8 @@
             "move": "Sposta",
             "brush": "Pennello",
             "eraser": "Cancellino",
-            "gradient": "Gradiente"
+            "gradient": "Gradiente",
+            "text": "Testo"
         },
         "filter": {
             "apply": "Applica",
@@ -2554,7 +2597,8 @@
                 "isEmpty": "{{title}} è vuoto",
                 "isDisabled": "{{title}} è disabilitato"
             },
-            "scaledBbox": "Riquadro scalato"
+            "scaledBbox": "Riquadro scalato",
+            "textSessionActive": "L'inserimento del testo è attivo"
         },
         "canvasContextMenu": {
             "newControlLayer": "Nuovo Livello di Controllo",
@@ -2595,7 +2639,7 @@
             "desc": "Seleziona un singolo oggetto di destinazione. Una volta completata la selezione, fai clic su <Bold>Applica</Bold> per eliminare tutto ciò che si trova al di fuori dell'area selezionata, oppure salva la selezione come nuovo livello.",
             "visualModeDesc": "La modalità visiva utilizza input di tipo riquadro e punto per selezionare un oggetto.",
             "visualMode1": "Fai clic e trascina per disegnare un riquadro attorno all'oggetto che desideri selezionare. Puoi ottenere risultati migliori disegnando il riquadro un po' più grande o più piccolo dell'oggetto.",
-            "visualMode2": "Fare clic per aggiungere un punto di <Bold>iinclusione</Bold>i verde oppure fare clic tenendo premuto Maiusc per aggiungere un punto di <Bold>iesclusione</Bold>i rosso per indicare al modello cosa includere o escludere.",
+            "visualMode2": "Fai clic per aggiungere un punto verde <Bold>includi</Bold> oppure fai clic tenendo premuto il tasto Maiusc per aggiungere un punto rosso <Bold>escludi</Bold> per indicare al modello cosa includere o escludere.",
             "visualMode3": "I punti possono essere utilizzati per perfezionare una selezione di caselle oppure in modo indipendente.",
             "promptModeDesc": "La modalità Prompt utilizza l'input di testo per selezionare un oggetto.",
             "promptMode1": "Digitare una breve descrizione dell'oggetto che si desidera selezionare.",
@@ -2771,6 +2815,17 @@
             "linear": "Lineare",
             "radial": "Radiale",
             "clip": "Ritaglia gradiente"
+        },
+        "text": {
+            "font": "Carattere",
+            "size": "Dimensione",
+            "bold": "Grassetto",
+            "italic": "Italico",
+            "underline": "Sottolineato",
+            "strikethrough": "Barrato",
+            "alignLeft": "Allinea a sinistra",
+            "alignCenter": "Allinea al centro",
+            "alignRight": "Allinea a destra"
         }
     },
     "ui": {
@@ -2954,9 +3009,9 @@
         "readReleaseNotes": "Leggi le note di rilascio",
         "watchRecentReleaseVideos": "Guarda i video su questa versione",
         "items": [
-            "Supporto FLUX.2 Klein: InvokeAI ora supporta i nuovi modelli FLUX.2 Klein (varianti 4B e 9B) con formati GGUF, FP8 e Diffusers. Le funzionalità includono txt2img, img2img, inpainting e outpainting. Consultare la sezione \"Modelli di partenza\" per iniziare.",
-            "Il supporto DyPE per i modelli FLUX migliora le immagini ad alta risoluzione (da >1536 px fino a 4K). Vai alla sezione \"Opzioni avanzate\" per attivarlo.",
-            "Diversità Z-Image Turbo: attiva 'Seed Variance Enhancer' in 'Opzioni avanzate' per aggiungere diversità alle tue generazioni ZiT."
+            "La modalità multiutente supporta più utenti isolati sullo stesso server.",
+            "Supporto migliorato per i modelli Z-Image e FLUX.2.",
+            "Numerosi miglioramenti dell'interfaccia utente e nuove funzionalità Tela."
         ],
         "watchUiUpdatesOverview": "Guarda la panoramica degli aggiornamenti dell'interfaccia utente",
         "takeUserSurvey": "📣 Facci sapere cosa ne pensi di InvokeAI. Partecipa al nostro sondaggio sull'esperienza utente!"
@@ -3010,5 +3065,86 @@
     },
     "lora": {
         "weight": "Peso"
+    },
+    "auth": {
+        "login": {
+            "title": "Accedi a InvokeAI",
+            "rememberMe": "Ricordami per 7 giorni",
+            "signIn": "Accedi",
+            "signingIn": "Accesso in corso...",
+            "loginFailed": "Accesso non riuscito. Controlla le tue credenziali."
+        },
+        "setup": {
+            "title": "Benvenuti a InvokeAI",
+            "subtitle": "Configura il tuo account amministratore per iniziare",
+            "emailHelper": "Questo sarà il tuo nome utente per accedere",
+            "displayName": "Nome da visualizzare",
+            "displayNamePlaceholder": "Amministratore",
+            "displayNameHelper": "Il tuo nome come apparirà nell'applicazione",
+            "passwordHelper": "Deve contenere almeno 8 caratteri, tra maiuscole, minuscole e numeri",
+            "passwordTooShort": "La password deve essere lunga almeno 8 caratteri",
+            "passwordMissingRequirements": "La password deve contenere maiuscole, minuscole e numeri",
+            "confirmPassword": "Conferma password",
+            "confirmPasswordPlaceholder": "Conferma password",
+            "passwordsDoNotMatch": "Le password non corrispondono",
+            "createAccount": "Crea un account amministratore",
+            "creatingAccount": "Impostazione in corso...",
+            "setupFailed": "Installazione non riuscita. Riprova.",
+            "passwordHelperRelaxed": "Inserisci una password qualsiasi (verrà visualizzata la sua robustezza)"
+        },
+        "userMenu": "Menu utente",
+        "logout": "Esci",
+        "adminOnlyFeature": "Questa funzionalità è disponibile solo per gli amministratori.",
+        "profile": {
+            "menuItem": "Il mio profilo",
+            "title": "Il mio profilo",
+            "emailReadOnly": "L'indirizzo email non può essere modificato",
+            "displayName": "Nome da visualizzare",
+            "displayNamePlaceholder": "Il tuo nome",
+            "changePassword": "Cambiare la password",
+            "currentPassword": "Password attuale",
+            "currentPasswordPlaceholder": "Password attuale",
+            "newPassword": "Nuova password",
+            "newPasswordPlaceholder": "Nuova password",
+            "confirmPassword": "Conferma nuova password",
+            "confirmPasswordPlaceholder": "Conferma nuova password",
+            "passwordsDoNotMatch": "Le password non corrispondono",
+            "saveSuccess": "Profilo aggiornato con successo",
+            "saveFailed": "Impossibile salvare il profilo. Riprova."
+        },
+        "userManagement": {
+            "menuItem": "Gestione utenti",
+            "title": "Gestione utenti",
+            "displayName": "Nome da visualizzare",
+            "displayNamePlaceholder": "Nome da visualizzare",
+            "newPassword": "Nuova password",
+            "newPasswordPlaceholder": "Lasciare vuoto per mantenere la password corrente",
+            "role": "Ruolo",
+            "status": "Stato",
+            "actions": "Azioni",
+            "isAdmin": "Amministratore",
+            "user": "Utente",
+            "you": "Tu",
+            "createUser": "Crea utente",
+            "editUser": "Modifica utente",
+            "deleteUser": "Elimina utente",
+            "deleteConfirm": "Vuoi davvero eliminare \"{{name}}\"? Questa azione non può essere annullata.",
+            "generatePassword": "Genera una password complessa",
+            "showPassword": "Mostra password",
+            "hidePassword": "Nascondi password",
+            "activate": "Attiva",
+            "deactivate": "Disattiva",
+            "saveFailed": "Impossibile salvare l'utente. Riprova.",
+            "deleteFailed": "Impossibile eliminare l'utente. Riprova.",
+            "loadFailed": "Impossibile caricare gli utenti.",
+            "back": "Indietro",
+            "cannotDeleteSelf": "Non puoi eliminare il tuo account",
+            "cannotDeactivateSelf": "Non puoi disattivare il tuo account"
+        },
+        "passwordStrength": {
+            "weak": "Password debole",
+            "moderate": "Password moderata",
+            "strong": "Password forte"
+        }
     }
 }

@@ -6,5 +6,8 @@ import { useCallback } from 'react';
  */
 export const useIsUncommittedCanvasTextSessionActive = () => {
   const canvasManager = useCanvasManagerSafe();
-  return useCallback(() => canvasManager?.tool.tools.text.$session.get() !== null, [canvasManager]);
+  return useCallback(
+    () => canvasManager !== null && canvasManager.tool.tools.text.$session.get() !== null,
+    [canvasManager]
+  );
 };
