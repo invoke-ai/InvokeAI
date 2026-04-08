@@ -410,6 +410,56 @@ class _ExecutionMaterializer:
         g = it_graph or self.iterator_graph()
         return [n for n in nx.ancestors(g, node_id) if isinstance(self._state.graph.get_node(n), IterateInvocation)]
 
+    def _get_prepared_nodes_for_source(self, source_node_id: str) -> set[str]:
+        return self._state.source_prepared_mapping[source_node_id]
+
+    def _get_parent_iterator_exec_nodes(
+        self, source_node_id: str, graph: nx.DiGraph, prepared_iterator_nodes: list[str]
+    ) -> list[tuple[str, str]]:
+        iterator_source_node_mapping = [
+            (prepared_exec_node_id, self._state.prepared_source_mapping[prepared_exec_node_id])
+            for prepared_exec_node_id in prepared_iterator_nodes
+        ]
+        return [
+            iterator_mapping
+            for iterator_mapping in iterator_source_node_mapping
+            if nx.has_path(graph, iterator_mapping[1], source_node_id)
+        ]
+
+    def _matches_parent_iterators(
+        self, candidate_exec_node_id: str, parent_iterators: list[tuple[str, str]], execution_graph: nx.DiGraph
+    ) -> bool:
+        return all(
+            nx.has_path(execution_graph, parent_iterator_exec_id, candidate_exec_node_id)
+            for parent_iterator_exec_id, _ in parent_iterators
+        )
+
+    def _get_direct_prepared_iterator_match(
+        self,
+        prepared_nodes: set[str],
+        prepared_iterator_nodes: list[str],
+        parent_iterators: list[tuple[str, str]],
+        execution_graph: nx.DiGraph,
+    ) -> Optional[str]:
+        prepared_iterator = next((node_id for node_id in prepared_nodes if node_id in prepared_iterator_nodes), None)
+        if prepared_iterator is None:
+            return None
+        if self._matches_parent_iterators(prepared_iterator, parent_iterators, execution_graph):
+            return prepared_iterator
+        return None
+
+    def _find_prepared_node_matching_iterators(
+        self, prepared_nodes: set[str], parent_iterators: list[tuple[str, str]], execution_graph: nx.DiGraph
+    ) -> Optional[str]:
+        return next(
+            (
+                node_id
+                for node_id in prepared_nodes
+                if self._matches_parent_iterators(node_id, parent_iterators, execution_graph)
+            ),
+            None,
+        )
+
     def get_iteration_node(
         self,
         source_node_id: str,
@@ -417,23 +467,19 @@ class _ExecutionMaterializer:
         execution_graph: nx.DiGraph,
         prepared_iterator_nodes: list[str],
     ) -> Optional[str]:
-        prepared_nodes = self._state.source_prepared_mapping[source_node_id]
+        prepared_nodes = self._get_prepared_nodes_for_source(source_node_id)
         if len(prepared_nodes) == 1:
             return next(iter(prepared_nodes))
 
-        iterator_source_node_mapping = [(n, self._state.prepared_source_mapping[n]) for n in prepared_iterator_nodes]
-        parent_iterators = [itn for itn in iterator_source_node_mapping if nx.has_path(graph, itn[1], source_node_id)]
+        parent_iterators = self._get_parent_iterator_exec_nodes(source_node_id, graph, prepared_iterator_nodes)
 
-        prepared_iterator = next((n for n in prepared_nodes if n in prepared_iterator_nodes), None)
-        if prepared_iterator is not None:
-            if all(nx.has_path(execution_graph, pit[0], prepared_iterator) for pit in parent_iterators):
-                return prepared_iterator
-            return None
-
-        return next(
-            (n for n in prepared_nodes if all(nx.has_path(execution_graph, pit[0], n) for pit in parent_iterators)),
-            None,
+        direct_iterator_match = self._get_direct_prepared_iterator_match(
+            prepared_nodes, prepared_iterator_nodes, parent_iterators, execution_graph
         )
+        if direct_iterator_match is not None:
+            return direct_iterator_match
+
+        return self._find_prepared_node_matching_iterators(prepared_nodes, parent_iterators, execution_graph)
 
     def prepare(self, base_g: Optional[nx.DiGraph] = None) -> Optional[str]:
         g = base_g or self._state.graph.nx_graph_flat()
@@ -1655,6 +1701,18 @@ class GraphExecutionState(BaseModel):
     def _enqueue_if_ready(self, nid: str) -> None:
         self._scheduler().enqueue_if_ready(nid)
 
+    def _prepare_until_node_ready(self) -> Optional[BaseInvocation]:
+        base_graph = self.graph.nx_graph_flat()
+        prepared_id = self._materializer().prepare(base_graph)
+        next_node: Optional[BaseInvocation] = None
+
+        while prepared_id is not None:
+            prepared_id = self._materializer().prepare(base_graph)
+            if next_node is None:
+                next_node = self._get_next_node()
+
+        return next_node
+
     model_config = ConfigDict(
         json_schema_extra={
             "required": [
@@ -1686,14 +1744,7 @@ class GraphExecutionState(BaseModel):
         # If there are no prepared nodes, prepare some nodes
         next_node = self._get_next_node()
         if next_node is None:
-            base_g = self.graph.nx_graph_flat()
-            prepared_id = self._materializer().prepare(base_g)
-
-            # Prepare as many nodes as we can
-            while prepared_id is not None:
-                prepared_id = self._materializer().prepare(base_g)
-                if next_node is None:
-                    next_node = self._get_next_node()
+            next_node = self._prepare_until_node_ready()
 
         # Get values from edges
         if next_node is not None:
