@@ -200,4 +200,51 @@ describe('setEventListeners workflow live updates', () => {
       })
     );
   });
+
+  it('clears selected workflow ids when access is lost via a workflow_deleted event', () => {
+    const socket = createMockSocket();
+    const dispatch = vi.fn();
+    const store = {
+      dispatch,
+      getState: vi.fn(() => ({
+        nodes: {
+          present: {
+            nodes: [
+              {
+                id: 'call-saved-workflows-node',
+                type: 'invocation',
+                data: {
+                  id: 'call-saved-workflows-node',
+                  type: 'call_saved_workflows',
+                  inputs: {
+                    workflow_id: {
+                      value: 'wf-shared',
+                    },
+                  },
+                },
+              },
+            ],
+          },
+        },
+      })),
+    };
+
+    setEventListeners({
+      socket: socket as never,
+      store: store as never,
+      setIsConnected: vi.fn(),
+    });
+
+    socket.trigger('workflow_deleted', { workflow_id: 'wf-shared' });
+
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          nodeId: 'call-saved-workflows-node',
+          fieldName: 'workflow_id',
+          value: '',
+        }),
+      })
+    );
+  });
 });

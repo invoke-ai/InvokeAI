@@ -67,6 +67,7 @@ def build_context(
     queue_user_id: str = "owner-1",
     multiuser: bool = False,
     user_is_admin: bool = False,
+    user_exists: bool = True,
     workflow_not_found: bool = False,
 ):
     services = SimpleNamespace(
@@ -74,7 +75,7 @@ def build_context(
         users=Mock(),
         workflow_records=Mock(),
     )
-    services.users.get.return_value = build_user_dto(user_id=queue_user_id, is_admin=user_is_admin)
+    services.users.get.return_value = build_user_dto(user_id=queue_user_id, is_admin=user_is_admin) if user_exists else None
 
     if workflow_not_found:
         services.workflow_records.get.side_effect = WorkflowNotFoundError("missing")
@@ -205,6 +206,27 @@ def test_call_saved_workflows_invocation_allows_admin_to_access_private_workflow
     )
 
     assert output.value == 0
+
+
+def test_call_saved_workflows_invocation_raises_when_private_workflow_user_record_is_missing():
+    from invokeai.app.invocations.call_saved_workflows import CallSavedWorkflowsInvocation
+
+    invocation = CallSavedWorkflowsInvocation(id="test-node", workflow_id="private-workflow")
+
+    with pytest.raises(ValueError, match="is not accessible"):
+        invocation.invoke(
+            build_context(
+                workflow_record=build_workflow_record_dto(
+                    workflow_id="private-workflow",
+                    user_id="owner-1",
+                    category=WorkflowCategory.User,
+                    is_public=False,
+                ),
+                queue_user_id="other-user",
+                multiuser=True,
+                user_exists=False,
+            )
+        )
 
 
 def test_call_saved_workflows_invocation_schema_declares_saved_workflow_ui_type():

@@ -8,12 +8,15 @@ import type { SavedWorkflowFieldInputInstance, SavedWorkflowFieldInputTemplate }
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListWorkflowsInfiniteInfiniteQuery } from 'services/api/endpoints/workflows';
-import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
+import {
+  buildSavedWorkflowOptions,
+  EMPTY_SELECTION_LABEL,
+  getSavedWorkflowSelectionOption,
+  getSavedWorkflowSelectionState,
+  getSavedWorkflowSelectionStatusLabel,
+} from './savedWorkflowFieldUtils';
 import type { FieldComponentProps } from './types';
-
-const MISSING_WORKFLOW_OPTION_VALUE = '__missing_workflow__';
-const MISSING_SELECTION_LABEL = 'Missing or inaccessible workflow';
 
 const queryArg = {
   page: 0,
@@ -34,27 +37,6 @@ const queryOptions = {
   }),
 } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[1];
 
-type SelectionState =
-  | { status: 'unselected' }
-  | { status: 'selected'; workflow: WorkflowRecordListItemWithThumbnailDTO }
-  | { status: 'missing'; workflowId: string };
-
-const getSelectionState = (
-  workflows: WorkflowRecordListItemWithThumbnailDTO[],
-  workflowId: string
-): SelectionState => {
-  if (!workflowId) {
-    return { status: 'unselected' };
-  }
-
-  const workflow = workflows.find((workflow) => workflow.workflow_id === workflowId);
-  if (workflow) {
-    return { status: 'selected', workflow };
-  }
-
-  return { status: 'missing', workflowId };
-};
-
 const SavedWorkflowFieldInputComponent = (
   props: FieldComponentProps<SavedWorkflowFieldInputInstance, SavedWorkflowFieldInputTemplate>
 ) => {
@@ -63,34 +45,10 @@ const SavedWorkflowFieldInputComponent = (
   const { t } = useTranslation();
   const { items, isLoading, isFetching } = useListWorkflowsInfiniteInfiniteQuery(queryArg, queryOptions);
 
-  const options = useMemo<ComboboxOption[]>(
-    () =>
-      items.map((workflow) => ({
-        label: workflow.name,
-        value: workflow.workflow_id,
-      })),
-    [items]
-  );
-
-  const selectionState = useMemo(() => getSelectionState(items, field.value), [field.value, items]);
-
-  const value = useMemo<ComboboxOption | null>(() => {
-    if (selectionState.status === 'unselected') {
-      return null;
-    }
-
-    if (selectionState.status === 'selected') {
-      return {
-        label: selectionState.workflow.name,
-        value: selectionState.workflow.workflow_id,
-      };
-    }
-
-    return {
-      label: MISSING_SELECTION_LABEL,
-      value: MISSING_WORKFLOW_OPTION_VALUE,
-    };
-  }, [selectionState]);
+  const options = useMemo<ComboboxOption[]>(() => buildSavedWorkflowOptions(items), [items]);
+  const selectionState = useMemo(() => getSavedWorkflowSelectionState(items, field.value), [field.value, items]);
+  const value = useMemo<ComboboxOption | null>(() => getSavedWorkflowSelectionOption(selectionState), [selectionState]);
+  const statusLabel = useMemo(() => getSavedWorkflowSelectionStatusLabel(selectionState), [selectionState]);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
@@ -129,9 +87,7 @@ const SavedWorkflowFieldInputComponent = (
           )}
         </Flex>
       ) : (
-        <Badge variant="subtle">
-          {selectionState.status === 'missing' ? MISSING_SELECTION_LABEL : 'Choose a workflow'}
-        </Badge>
+        <Badge variant="subtle">{statusLabel ?? EMPTY_SELECTION_LABEL}</Badge>
       )}
       {isFetching && (
         <Text variant="subtext" fontSize="xs">
