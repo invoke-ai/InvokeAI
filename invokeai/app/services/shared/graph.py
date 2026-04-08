@@ -67,12 +67,16 @@ class Edge(BaseModel):
 
 @dataclass
 class _PreparedExecNodeMetadata:
+    """Cached metadata for a materialized execution node."""
+
     source_node_id: str
     iteration_path: Optional[tuple[int, ...]] = None
     state: str = "pending"
 
 
 class _PreparedExecRegistry:
+    """Tracks prepared execution nodes and their relationship to source graph nodes."""
+
     def __init__(
         self,
         prepared_source_mapping: dict[str, str],
@@ -117,6 +121,8 @@ class _PreparedExecRegistry:
 
 
 class _IfBranchScheduler:
+    """Applies lazy `If` semantics by deferring, releasing, and skipping branch-local exec nodes."""
+
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
 
@@ -274,6 +280,8 @@ class _IfBranchScheduler:
 
 
 class _ExecutionMaterializer:
+    """Expands source-graph nodes into concrete execution-graph nodes for the current runtime state."""
+
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
 
@@ -470,6 +478,8 @@ class _ExecutionMaterializer:
 
 
 class _ExecutionScheduler:
+    """Owns ready-queue ordering and indegree-driven execution transitions."""
+
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
 
@@ -562,6 +572,8 @@ class _ExecutionScheduler:
 
 
 class _ExecutionRuntime:
+    """Provides runtime-only helpers such as iteration-path lookup and input hydration."""
+
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
 
@@ -960,6 +972,8 @@ class AnyInvocationOutput(BaseInvocationOutput):
 
 
 class Graph(BaseModel):
+    """A validated invocation graph made of nodes and typed edges."""
+
     id: str = Field(description="The id of this graph", default_factory=uuid_string)
     # TODO: use a list (and never use dict in a BaseModel) because pydantic/fastapi hates me
     nodes: dict[str, AnyInvocation] = Field(description="The nodes in this graph", default_factory=dict)
@@ -1465,7 +1479,7 @@ class Graph(BaseModel):
 
 
 class GraphExecutionState(BaseModel):
-    """Tracks the state of a graph execution"""
+    """Tracks source-graph expansion, execution progress, and runtime results."""
 
     id: str = Field(description="The id of the execution state", default_factory=uuid_string)
     # TODO: Store a reference to the graph instead of the actual graph?
