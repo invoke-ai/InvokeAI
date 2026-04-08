@@ -7,6 +7,7 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocati
 from invokeai.app.invocations.collections import RangeInvocation
 from invokeai.app.invocations.logic import IfInvocation, IfInvocationOutput
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
+from invokeai.app.invocations.primitives import BooleanInvocation
 from invokeai.app.services.shared.graph import (
     CollectInvocation,
     Graph,
@@ -42,6 +43,19 @@ def invoke_next(g: GraphExecutionState) -> tuple[Optional[BaseInvocation], Optio
     g.complete(n.id, o)
 
     return (n, o)
+
+
+def execute_all_nodes(g: GraphExecutionState) -> list[str]:
+    """Execute the graph to completion and return source node ids in execution order."""
+
+    executed_source_ids: list[str] = []
+    while True:
+        invocation, _output = invoke_next(g)
+        if invocation is None:
+            break
+        executed_source_ids.append(g.prepared_source_mapping[invocation.id])
+
+    return executed_source_ids
 
 
 def test_graph_state_executes_in_order(simple_graph: Graph):
@@ -337,6 +351,169 @@ def test_if_invocation_output_connects_to_downstream_input():
     assert len(prepared_prompt_nodes) == 1
     prepared_prompt_node_id = next(iter(prepared_prompt_nodes))
     assert g.results[prepared_prompt_node_id].prompt == "connected value"
+
+
+def test_if_graph_current_behavior_executes_both_branches_and_shared_ancestors():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=True))
+    graph.add_node(PromptTestInvocation(id="shared", prompt="shared value"))
+    graph.add_node(PromptTestInvocation(id="true_mid"))
+    graph.add_node(PromptTestInvocation(id="true_leaf"))
+    graph.add_node(PromptTestInvocation(id="false_mid"))
+    graph.add_node(PromptTestInvocation(id="false_leaf"))
+    graph.add_node(PromptTestInvocation(id="side_consumer"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(PromptTestInvocation(id="selected_output"))
+
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("shared", "prompt", "true_mid", "prompt"))
+    graph.add_edge(create_edge("true_mid", "prompt", "true_leaf", "prompt"))
+    graph.add_edge(create_edge("true_leaf", "prompt", "if", "true_input"))
+    graph.add_edge(create_edge("shared", "prompt", "false_mid", "prompt"))
+    graph.add_edge(create_edge("false_mid", "prompt", "false_leaf", "prompt"))
+    graph.add_edge(create_edge("false_leaf", "prompt", "if", "false_input"))
+    graph.add_edge(create_edge("shared", "prompt", "side_consumer", "prompt"))
+    graph.add_edge(create_edge("if", "value", "selected_output", "prompt"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    assert set(executed_source_ids) == {
+        "condition",
+        "shared",
+        "true_mid",
+        "true_leaf",
+        "false_mid",
+        "false_leaf",
+        "side_consumer",
+        "if",
+        "selected_output",
+    }
+    assert executed_source_ids.count("false_mid") == 1
+    assert executed_source_ids.count("false_leaf") == 1
+
+    prepared_selected_output_id = next(iter(g.source_prepared_mapping["selected_output"]))
+    assert g.results[prepared_selected_output_id].prompt == "shared value"
+
+
+def test_if_graph_current_behavior_executes_both_simple_branches():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=True))
+    graph.add_node(PromptTestInvocation(id="true_value", prompt="true branch"))
+    graph.add_node(PromptTestInvocation(id="false_value", prompt="false branch"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(PromptTestInvocation(id="selected_output"))
+
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("true_value", "prompt", "if", "true_input"))
+    graph.add_edge(create_edge("false_value", "prompt", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "selected_output", "prompt"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    assert set(executed_source_ids) == {"condition", "true_value", "false_value", "if", "selected_output"}
+    prepared_selected_output_id = next(iter(g.source_prepared_mapping["selected_output"]))
+    assert g.results[prepared_selected_output_id].prompt == "true branch"
+
+
+@pytest.mark.xfail(strict=True, reason="If-node branch pruning has not been implemented yet")
+def test_if_graph_optimized_behavior_executes_only_selected_simple_branch():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=True))
+    graph.add_node(PromptTestInvocation(id="true_value", prompt="true branch"))
+    graph.add_node(PromptTestInvocation(id="false_value", prompt="false branch"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(PromptTestInvocation(id="selected_output"))
+
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("true_value", "prompt", "if", "true_input"))
+    graph.add_edge(create_edge("false_value", "prompt", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "selected_output", "prompt"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    assert set(executed_source_ids) == {"condition", "true_value", "if", "selected_output"}
+    assert "false_value" not in executed_source_ids
+
+
+@pytest.mark.xfail(strict=True, reason="If-node branch pruning has not been implemented yet")
+def test_if_graph_optimized_behavior_skips_unselected_branch_but_keeps_shared_ancestors():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=True))
+    graph.add_node(PromptTestInvocation(id="shared", prompt="shared value"))
+    graph.add_node(PromptTestInvocation(id="true_mid"))
+    graph.add_node(PromptTestInvocation(id="true_leaf"))
+    graph.add_node(PromptTestInvocation(id="false_mid"))
+    graph.add_node(PromptTestInvocation(id="false_leaf"))
+    graph.add_node(PromptTestInvocation(id="side_consumer"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(PromptTestInvocation(id="selected_output"))
+
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("shared", "prompt", "true_mid", "prompt"))
+    graph.add_edge(create_edge("true_mid", "prompt", "true_leaf", "prompt"))
+    graph.add_edge(create_edge("true_leaf", "prompt", "if", "true_input"))
+    graph.add_edge(create_edge("shared", "prompt", "false_mid", "prompt"))
+    graph.add_edge(create_edge("false_mid", "prompt", "false_leaf", "prompt"))
+    graph.add_edge(create_edge("false_leaf", "prompt", "if", "false_input"))
+    graph.add_edge(create_edge("shared", "prompt", "side_consumer", "prompt"))
+    graph.add_edge(create_edge("if", "value", "selected_output", "prompt"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    assert set(executed_source_ids) == {
+        "condition",
+        "shared",
+        "true_mid",
+        "true_leaf",
+        "side_consumer",
+        "if",
+        "selected_output",
+    }
+    assert "false_mid" not in executed_source_ids
+    assert "false_leaf" not in executed_source_ids
+
+
+@pytest.mark.xfail(strict=True, reason="If-node branch pruning has not been implemented yet")
+def test_if_graph_optimized_behavior_skips_distant_unselected_ancestors_only_when_exclusive():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=False))
+    graph.add_node(PromptTestInvocation(id="shared_root", prompt="shared value"))
+    graph.add_node(PromptTestInvocation(id="true_shared_mid"))
+    graph.add_node(PromptTestInvocation(id="true_exclusive_leaf"))
+    graph.add_node(PromptTestInvocation(id="false_mid"))
+    graph.add_node(PromptTestInvocation(id="false_leaf"))
+    graph.add_node(PromptTestInvocation(id="shared_observer"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(PromptTestInvocation(id="selected_output"))
+
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("shared_root", "prompt", "true_shared_mid", "prompt"))
+    graph.add_edge(create_edge("true_shared_mid", "prompt", "true_exclusive_leaf", "prompt"))
+    graph.add_edge(create_edge("true_exclusive_leaf", "prompt", "if", "true_input"))
+    graph.add_edge(create_edge("shared_root", "prompt", "false_mid", "prompt"))
+    graph.add_edge(create_edge("false_mid", "prompt", "false_leaf", "prompt"))
+    graph.add_edge(create_edge("false_leaf", "prompt", "if", "false_input"))
+    graph.add_edge(create_edge("true_shared_mid", "prompt", "shared_observer", "prompt"))
+    graph.add_edge(create_edge("if", "value", "selected_output", "prompt"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    assert set(executed_source_ids) == {
+        "condition",
+        "shared_root",
+        "true_shared_mid",
+        "false_mid",
+        "false_leaf",
+        "shared_observer",
+        "if",
+        "selected_output",
+    }
+    assert "true_exclusive_leaf" not in executed_source_ids
 
 
 def test_are_connection_types_compatible_accepts_subclass_to_base():
