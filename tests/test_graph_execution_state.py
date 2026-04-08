@@ -7,7 +7,7 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocati
 from invokeai.app.invocations.collections import RangeInvocation
 from invokeai.app.invocations.logic import IfInvocation, IfInvocationOutput
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
-from invokeai.app.invocations.primitives import BooleanInvocation
+from invokeai.app.invocations.primitives import BooleanCollectionInvocation, BooleanInvocation
 from invokeai.app.services.shared.graph import (
     CollectInvocation,
     Graph,
@@ -16,12 +16,7 @@ from invokeai.app.services.shared.graph import (
 )
 
 # This import must happen before other invoke imports or test in other files(!!) break
-from tests.test_nodes import (
-    PromptCollectionTestInvocation,
-    PromptTestInvocation,
-    TextToImageTestInvocation,
-    create_edge,
-)
+from tests.test_nodes import AnyTypeTestInvocation, PromptCollectionTestInvocation, PromptTestInvocation, TextToImageTestInvocation, create_edge
 
 
 @pytest.fixture
@@ -513,6 +508,72 @@ def test_if_graph_optimized_behavior_skips_distant_unselected_ancestors_only_whe
         "selected_output",
     }
     assert "true_exclusive_leaf" not in executed_source_ids
+
+
+def test_if_graph_optimized_behavior_prunes_branches_per_iteration():
+    graph = Graph()
+    graph.add_node(BooleanCollectionInvocation(id="conditions", collection=[True, False, True]))
+    graph.add_node(IterateInvocation(id="condition_iter"))
+    graph.add_node(AnyTypeTestInvocation(id="true_branch"))
+    graph.add_node(AnyTypeTestInvocation(id="false_branch"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="collect"))
+
+    graph.add_edge(create_edge("conditions", "collection", "condition_iter", "collection"))
+    graph.add_edge(create_edge("condition_iter", "item", "if", "condition"))
+    graph.add_edge(create_edge("condition_iter", "item", "true_branch", "value"))
+    graph.add_edge(create_edge("true_branch", "value", "if", "true_input"))
+    graph.add_edge(create_edge("condition_iter", "item", "false_branch", "value"))
+    graph.add_edge(create_edge("false_branch", "value", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "collect", "item"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    prepared_collect_id = next(iter(g.source_prepared_mapping["collect"]))
+    assert g.results[prepared_collect_id].collection == [True, False, True]
+    assert executed_source_ids.count("condition_iter") == 3
+    assert executed_source_ids.count("true_branch") == 2
+    assert executed_source_ids.count("false_branch") == 1
+    assert executed_source_ids.count("if") == 3
+
+
+def test_if_graph_optimized_behavior_keeps_shared_live_consumers_per_iteration():
+    graph = Graph()
+    graph.add_node(BooleanCollectionInvocation(id="conditions", collection=[True, False, False]))
+    graph.add_node(IterateInvocation(id="condition_iter"))
+    graph.add_node(AnyTypeTestInvocation(id="shared_branch"))
+    graph.add_node(AnyTypeTestInvocation(id="true_leaf"))
+    graph.add_node(AnyTypeTestInvocation(id="false_branch"))
+    graph.add_node(AnyTypeTestInvocation(id="observer"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(CollectInvocation(id="selected_collect"))
+    graph.add_node(CollectInvocation(id="observer_collect"))
+
+    graph.add_edge(create_edge("conditions", "collection", "condition_iter", "collection"))
+    graph.add_edge(create_edge("condition_iter", "item", "if", "condition"))
+    graph.add_edge(create_edge("condition_iter", "item", "shared_branch", "value"))
+    graph.add_edge(create_edge("shared_branch", "value", "true_leaf", "value"))
+    graph.add_edge(create_edge("true_leaf", "value", "if", "true_input"))
+    graph.add_edge(create_edge("condition_iter", "item", "false_branch", "value"))
+    graph.add_edge(create_edge("false_branch", "value", "if", "false_input"))
+    graph.add_edge(create_edge("shared_branch", "value", "observer", "value"))
+    graph.add_edge(create_edge("if", "value", "selected_collect", "item"))
+    graph.add_edge(create_edge("observer", "value", "observer_collect", "item"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    prepared_selected_collect_id = next(iter(g.source_prepared_mapping["selected_collect"]))
+    assert g.results[prepared_selected_collect_id].collection == [True, False, False]
+    prepared_observer_collect_id = next(iter(g.source_prepared_mapping["observer_collect"]))
+    assert g.results[prepared_observer_collect_id].collection == [True, False, False]
+
+    assert executed_source_ids.count("condition_iter") == 3
+    assert executed_source_ids.count("shared_branch") == 3
+    assert executed_source_ids.count("observer") == 3
+    assert executed_source_ids.count("true_leaf") == 1
+    assert executed_source_ids.count("false_branch") == 2
 
 
 def test_are_connection_types_compatible_accepts_subclass_to_base():

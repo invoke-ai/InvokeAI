@@ -1003,14 +1003,20 @@ class GraphExecutionState(BaseModel):
         self._if_branch_exclusive_sources[if_node_id] = branch_sources
         return branch_sources
 
-    def _is_deferred_by_unresolved_if(self, source_node_id: str) -> bool:
-        for node_id, node in self.graph.nodes.items():
-            if not isinstance(node, IfInvocation):
+    def _is_deferred_by_unresolved_if(self, exec_node_id: str) -> bool:
+        source_node_id = self.prepared_source_mapping[exec_node_id]
+        iteration_path = self._get_iteration_path(exec_node_id)
+
+        for prepared_if_id, source_if_id in self.prepared_source_mapping.items():
+            if source_if_id not in self.graph.nodes:
                 continue
-            prepared_if_nodes = self.source_prepared_mapping.get(node_id)
-            if prepared_if_nodes and all(prepared_id in self._resolved_if_exec_branches for prepared_id in prepared_if_nodes):
+            if not isinstance(self.graph.get_node(source_if_id), IfInvocation):
                 continue
-            branches = self._get_if_branch_exclusive_sources(node_id)
+            if prepared_if_id in self._resolved_if_exec_branches:
+                continue
+            if self._get_iteration_path(prepared_if_id) != iteration_path:
+                continue
+            branches = self._get_if_branch_exclusive_sources(source_if_id)
             if source_node_id in branches["true_input"] or source_node_id in branches["false_input"]:
                 return True
         return False
@@ -1059,8 +1065,11 @@ class GraphExecutionState(BaseModel):
                 raise RuntimeError(f"indegree underflow for {exec_node_id} when pruning {unselected_field}")
             self.indegree[exec_node_id] -= 1
 
+        iteration_path = self._get_iteration_path(exec_node_id)
         for prepared_id, prepared_source in self.prepared_source_mapping.items():
             if prepared_id in self.executed:
+                continue
+            if self._get_iteration_path(prepared_id) != iteration_path:
                 continue
             if prepared_source in exclusive_sources[selected_field]:
                 self._enqueue_if_ready(prepared_id)
@@ -1084,11 +1093,12 @@ class GraphExecutionState(BaseModel):
             raise KeyError(f"indegree missing for exec node {nid}")
         if self.indegree[nid] != 0 or nid in self.executed:
             return
-        source_node_id = self.prepared_source_mapping[nid]
-        if self._is_deferred_by_unresolved_if(source_node_id):
+        if self._is_deferred_by_unresolved_if(nid):
             return
         node_obj = self.execution_graph.nodes[nid]
         q = self._queue_for(self._type_key(node_obj))
+        if nid in q:
+            return
         nid_path = self._get_iteration_path(nid)
         # Insert in lexicographic outer->inner order; preserve FIFO for equal paths.
         for i, existing in enumerate(q):
