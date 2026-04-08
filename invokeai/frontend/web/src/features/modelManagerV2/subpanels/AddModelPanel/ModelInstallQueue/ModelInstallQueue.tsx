@@ -2,6 +2,7 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Box,
   Button,
+  ButtonGroup,
   Flex,
   Heading,
   IconButton,
@@ -257,38 +258,38 @@ export const ModelInstallQueue = memo(() => {
             </Button>
           )}
 
-          <Button
-            leftIcon={<PiBroomBold />}
-            size="sm"
-            isDisabled={!pruneAvailable || isBulkActionRunning || isPruning}
-            onClick={pruneCompletedModelInstalls}
-            variant="outline"
-            colorScheme="orange"
-          >
-            {t('modelManager.prune')}
-          </Button>
-
-          {/* Destructive Actions go to the dropdown menu */}
-          <Menu>
-            <MenuButton
-              as={IconButton}
+          {/* Destructive Actions go to the button group/menu */}
+          <ButtonGroup>
+            <Button
+              leftIcon={<PiBroomBold />}
               size="sm"
-              aria-label={t('accessibility.menu')}
-              icon={<PiCaretDownBold />}
-              disabled={!pruneAvailable && !hasCancelableInstalls}
-            />
-            <MenuList>
-              <MenuItem
-                color="error.300"
-                icon={<PiXBold />}
-                isDisabled={!hasCancelableInstalls || isBulkActionRunning || isPruning}
-                onClick={cancelAll}
-                isDestructive
-              >
-                {t('modelManager.cancelAll')}
-              </MenuItem>
-            </MenuList>
-          </Menu>
+              isDisabled={!pruneAvailable || isBulkActionRunning || isPruning}
+              onClick={pruneCompletedModelInstalls}
+              variant="outline"
+            >
+              {t('modelManager.prune')}
+            </Button>
+            <Menu>
+              <MenuButton
+                as={IconButton}
+                size="sm"
+                aria-label={t('accessibility.menu')}
+                icon={<PiCaretDownBold />}
+                disabled={!pruneAvailable && !hasCancelableInstalls}
+              />
+              <MenuList>
+                <MenuItem
+                  color="error.300"
+                  icon={<PiXBold />}
+                  isDisabled={!hasCancelableInstalls || isBulkActionRunning || isPruning}
+                  onClick={cancelAll}
+                  isDestructive
+                >
+                  {t('modelManager.cancelAll')}
+                </MenuItem>
+              </MenuList>
+            </Menu>
+          </ButtonGroup>
         </Flex>
       </Flex>
 
