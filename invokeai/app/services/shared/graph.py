@@ -1389,36 +1389,59 @@ class Graph(BaseModel):
         if new_output is not None:
             outputs.append(new_output)
 
-        if len(inputs) == 0:
-            return "Iterator must have a collection input edge"
+        return self._validate_iterator_connections(inputs, outputs)
 
-        # Only one input is allowed for iterators
-        if len(inputs) > 1:
-            return "Iterator may only have one input edge"
+    def _validate_iterator_connections(self, inputs: list[EdgeConnection], outputs: list[EdgeConnection]) -> str | None:
+        presence_error = self._validate_iterator_input_presence(inputs)
+        if presence_error is not None:
+            return presence_error
 
         input_node = self.get_node(inputs[0].node_id)
-
-        # Get input and output fields (the fields linked to the iterator's input/output)
         input_field_type = get_output_field_type(input_node, inputs[0].field)
-        output_field_types = [get_input_field_type(self.get_node(e.node_id), e.field) for e in outputs]
+        output_field_types = self._get_iterator_output_field_types(outputs)
 
-        # Input type must be a list
+        input_type_error = self._validate_iterator_input_type(input_field_type)
+        if input_type_error is not None:
+            return input_type_error
+
+        output_type_error = self._validate_iterator_output_types(input_field_type, output_field_types)
+        if output_type_error is not None:
+            return output_type_error
+
+        return self._validate_iterator_collector_input(input_node, output_field_types)
+
+    def _validate_iterator_input_presence(self, inputs: list[EdgeConnection]) -> str | None:
+        if len(inputs) == 0:
+            return "Iterator must have a collection input edge"
+        if len(inputs) > 1:
+            return "Iterator may only have one input edge"
+        return None
+
+    def _get_iterator_output_field_types(self, outputs: list[EdgeConnection]) -> list[Any]:
+        return [get_input_field_type(self.get_node(e.node_id), e.field) for e in outputs]
+
+    def _validate_iterator_input_type(self, input_field_type: Any) -> str | None:
         if get_origin(input_field_type) is not list:
             return "Iterator input must be a collection"
+        return None
 
-        # Validate that all outputs match the input type
+    def _validate_iterator_output_types(self, input_field_type: Any, output_field_types: list[Any]) -> str | None:
         input_field_item_type = get_args(input_field_type)[0]
-        if not all((are_connection_types_compatible(input_field_item_type, t) for t in output_field_types)):
+        if not all(are_connection_types_compatible(input_field_item_type, t) for t in output_field_types):
             return "Iterator outputs must connect to an input with a matching type"
+        return None
 
-        # Collector input type must match all iterator output types
-        if isinstance(input_node, CollectInvocation):
-            input_root_type = self._get_collector_input_root_type(input_node.id)
-            if input_root_type is None:
-                return "Iterator input collector must have at least one item or collection input edge"
-            if not all((are_connection_types_compatible(input_root_type, t) for t in output_field_types)):
-                return "Iterator collection type must match all iterator output types"
+    def _validate_iterator_collector_input(
+        self, input_node: BaseInvocation, output_field_types: list[Any]
+    ) -> str | None:
+        if not isinstance(input_node, CollectInvocation):
+            return None
 
+        input_root_type = self._get_collector_input_root_type(input_node.id)
+        if input_root_type is None:
+            return "Iterator input collector must have at least one item or collection input edge"
+        if not all(are_connection_types_compatible(input_root_type, t) for t in output_field_types):
+            return "Iterator collection type must match all iterator output types"
         return None
 
     def _resolve_collector_input_types(self, node_id: str, visited: Optional[set[str]] = None) -> set[Any]:
