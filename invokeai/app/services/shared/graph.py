@@ -1135,6 +1135,65 @@ class Graph(BaseModel):
         except ValueError:
             pass
 
+    def _validate_unique_node_ids(self) -> None:
+        node_ids = [n.id for n in self.nodes.values()]
+        seen = set()
+        duplicate_node_ids = {nid for nid in node_ids if (nid in seen) or seen.add(nid)}
+        if duplicate_node_ids:
+            raise DuplicateNodeIdError(f"Node ids must be unique, found duplicates {duplicate_node_ids}")
+
+    def _validate_node_id_mapping(self) -> None:
+        for node_dict_id, node in self.nodes.items():
+            if node_dict_id != node.id:
+                raise NodeIdMismatchError(f"Node ids must match, got {node_dict_id} and {node.id}")
+
+    def _validate_edge_nodes_and_fields(self) -> None:
+        for edge in self.edges:
+            source_node = self.nodes.get(edge.source.node_id, None)
+            if source_node is None:
+                raise NodeNotFoundError(f"Edge source node {edge.source.node_id} does not exist in the graph")
+
+            destination_node = self.nodes.get(edge.destination.node_id, None)
+            if destination_node is None:
+                raise NodeNotFoundError(f"Edge destination node {edge.destination.node_id} does not exist in the graph")
+
+            if edge.source.field not in source_node.get_output_annotation().model_fields:
+                raise NodeFieldNotFoundError(
+                    f"Edge source field {edge.source.field} does not exist in node {edge.source.node_id}"
+                )
+
+            if edge.destination.field not in type(destination_node).model_fields:
+                raise NodeFieldNotFoundError(
+                    f"Edge destination field {edge.destination.field} does not exist in node {edge.destination.node_id}"
+                )
+
+    def _validate_graph_is_acyclic(self) -> None:
+        graph = self.nx_graph_flat()
+        if not nx.is_directed_acyclic_graph(graph):
+            raise CyclicalGraphError("Graph contains cycles")
+
+    def _validate_edge_type_compatibility(self) -> None:
+        for edge in self.edges:
+            if not are_connections_compatible(
+                self.get_node(edge.source.node_id),
+                edge.source.field,
+                self.get_node(edge.destination.node_id),
+                edge.destination.field,
+            ):
+                raise InvalidEdgeError(f"Edge source and target types do not match ({edge})")
+
+    def _validate_special_nodes(self) -> None:
+        # TODO: may need to validate all iterators & collectors in subgraphs so edge connections in parent graphs will be available
+        for node in self.nodes.values():
+            if isinstance(node, IterateInvocation):
+                err = self._is_iterator_connection_valid(node.id)
+                if err is not None:
+                    raise InvalidEdgeError(f"Invalid iterator node ({node.id}): {err}")
+            if isinstance(node, CollectInvocation):
+                err = self._is_collector_connection_valid(node.id)
+                if err is not None:
+                    raise InvalidEdgeError(f"Invalid collector node ({node.id}): {err}")
+
     def validate_self(self) -> None:
         """
         Validates the graph.
@@ -1149,67 +1208,12 @@ class Graph(BaseModel):
         - `InvalidEdgeError`
         """
 
-        # Validate that all node ids are unique
-        node_ids = [n.id for n in self.nodes.values()]
-        seen = set()
-        duplicate_node_ids = {nid for nid in node_ids if (nid in seen) or seen.add(nid)}
-        if duplicate_node_ids:
-            raise DuplicateNodeIdError(f"Node ids must be unique, found duplicates {duplicate_node_ids}")
-
-        # Validate that all node ids match the keys in the nodes dict
-        for k, v in self.nodes.items():
-            if k != v.id:
-                raise NodeIdMismatchError(f"Node ids must match, got {k} and {v.id}")
-
-        # Validate that all edges match nodes and fields in the graph
-        for edge in self.edges:
-            source_node = self.nodes.get(edge.source.node_id, None)
-            if source_node is None:
-                raise NodeNotFoundError(f"Edge source node {edge.source.node_id} does not exist in the graph")
-
-            destination_node = self.nodes.get(edge.destination.node_id, None)
-            if destination_node is None:
-                raise NodeNotFoundError(f"Edge destination node {edge.destination.node_id} does not exist in the graph")
-
-            # output fields are not on the node object directly, they are on the output type
-            if edge.source.field not in source_node.get_output_annotation().model_fields:
-                raise NodeFieldNotFoundError(
-                    f"Edge source field {edge.source.field} does not exist in node {edge.source.node_id}"
-                )
-
-            # input fields are on the node
-            if edge.destination.field not in type(destination_node).model_fields:
-                raise NodeFieldNotFoundError(
-                    f"Edge destination field {edge.destination.field} does not exist in node {edge.destination.node_id}"
-                )
-
-        # Validate there are no cycles
-        g = self.nx_graph_flat()
-        if not nx.is_directed_acyclic_graph(g):
-            raise CyclicalGraphError("Graph contains cycles")
-
-        # Validate all edge connections are valid
-        for edge in self.edges:
-            if not are_connections_compatible(
-                self.get_node(edge.source.node_id),
-                edge.source.field,
-                self.get_node(edge.destination.node_id),
-                edge.destination.field,
-            ):
-                raise InvalidEdgeError(f"Edge source and target types do not match ({edge})")
-
-        # Validate all iterators & collectors
-        # TODO: may need to validate all iterators & collectors in subgraphs so edge connections in parent graphs will be available
-        for node in self.nodes.values():
-            if isinstance(node, IterateInvocation):
-                err = self._is_iterator_connection_valid(node.id)
-                if err is not None:
-                    raise InvalidEdgeError(f"Invalid iterator node ({node.id}): {err}")
-            if isinstance(node, CollectInvocation):
-                err = self._is_collector_connection_valid(node.id)
-                if err is not None:
-                    raise InvalidEdgeError(f"Invalid collector node ({node.id}): {err}")
-
+        self._validate_unique_node_ids()
+        self._validate_node_id_mapping()
+        self._validate_edge_nodes_and_fields()
+        self._validate_graph_is_acyclic()
+        self._validate_edge_type_compatibility()
+        self._validate_special_nodes()
         return None
 
     def is_valid(self) -> bool:
@@ -1241,56 +1245,56 @@ class Graph(BaseModel):
         """Checks if the destination field for an edge is of type typing.Any"""
         return get_input_field_type(self.get_node(edge.destination.node_id), edge.destination.field) == list[Any]
 
-    def _validate_edge(self, edge: Edge):
-        """Validates that a new edge doesn't create a cycle in the graph"""
-
-        # Validate that the nodes exist
+    def _get_edge_nodes(self, edge: Edge) -> tuple[BaseInvocation, BaseInvocation]:
         try:
-            from_node = self.get_node(edge.source.node_id)
-            to_node = self.get_node(edge.destination.node_id)
+            return self.get_node(edge.source.node_id), self.get_node(edge.destination.node_id)
         except NodeNotFoundError:
             raise InvalidEdgeError(f"One or both nodes don't exist ({edge})")
 
-        # Validate that an edge to this node+field doesn't already exist
+    def _validate_edge_destination_uniqueness(self, edge: Edge, destination_node: BaseInvocation) -> None:
         input_edges = self._get_input_edges(edge.destination.node_id, edge.destination.field)
         if len(input_edges) > 0 and (
-            not isinstance(to_node, CollectInvocation) or edge.destination.field != ITEM_FIELD
+            not isinstance(destination_node, CollectInvocation) or edge.destination.field != ITEM_FIELD
         ):
             raise InvalidEdgeError(f"Edge already exists ({edge})")
 
-        # Validate that no cycles would be created
-        g = self.nx_graph_flat()
-        g.add_edge(edge.source.node_id, edge.destination.node_id)
-        if not nx.is_directed_acyclic_graph(g):
+    def _validate_edge_would_not_create_cycle(self, edge: Edge) -> None:
+        graph = self.nx_graph_flat()
+        graph.add_edge(edge.source.node_id, edge.destination.node_id)
+        if not nx.is_directed_acyclic_graph(graph):
             raise InvalidEdgeError(f"Edge creates a cycle in the graph ({edge})")
 
-        # Validate that the field types are compatible
-        if not are_connections_compatible(from_node, edge.source.field, to_node, edge.destination.field):
+    def _validate_edge_field_compatibility(
+        self, edge: Edge, source_node: BaseInvocation, destination_node: BaseInvocation
+    ) -> None:
+        if not are_connections_compatible(source_node, edge.source.field, destination_node, edge.destination.field):
             raise InvalidEdgeError(f"Field types are incompatible ({edge})")
 
-        # Validate if iterator output type matches iterator input type (if this edge results in both being set)
-        if isinstance(to_node, IterateInvocation) and edge.destination.field == COLLECTION_FIELD:
+    def _validate_iterator_edge_rules(
+        self, edge: Edge, source_node: BaseInvocation, destination_node: BaseInvocation
+    ) -> None:
+        if isinstance(destination_node, IterateInvocation) and edge.destination.field == COLLECTION_FIELD:
             err = self._is_iterator_connection_valid(edge.destination.node_id, new_input=edge.source)
             if err is not None:
                 raise InvalidEdgeError(f"Iterator input type does not match iterator output type ({edge}): {err}")
 
-        # Validate if iterator input type matches output type (if this edge results in both being set)
-        if isinstance(from_node, IterateInvocation) and edge.source.field == ITEM_FIELD:
+        if isinstance(source_node, IterateInvocation) and edge.source.field == ITEM_FIELD:
             err = self._is_iterator_connection_valid(edge.source.node_id, new_output=edge.destination)
             if err is not None:
                 raise InvalidEdgeError(f"Iterator output type does not match iterator input type ({edge}): {err}")
 
-        # Validate if collector input type matches output type (if this edge results in both being set)
-        if isinstance(to_node, CollectInvocation) and edge.destination.field in (ITEM_FIELD, COLLECTION_FIELD):
+    def _validate_collector_edge_rules(
+        self, edge: Edge, source_node: BaseInvocation, destination_node: BaseInvocation
+    ) -> None:
+        if isinstance(destination_node, CollectInvocation) and edge.destination.field in (ITEM_FIELD, COLLECTION_FIELD):
             err = self._is_collector_connection_valid(
                 edge.destination.node_id, new_input=edge.source, new_input_field=edge.destination.field
             )
             if err is not None:
                 raise InvalidEdgeError(f"Collector output type does not match collector input type ({edge}): {err}")
 
-        # Validate if collector output type matches input type (if this edge results in both being set) - skip if the destination field is not Any or list[Any]
         if (
-            isinstance(from_node, CollectInvocation)
+            isinstance(source_node, CollectInvocation)
             and edge.source.field == COLLECTION_FIELD
             and not self._is_destination_field_list_of_Any(edge)
             and not self._is_destination_field_Any(edge)
@@ -1298,6 +1302,15 @@ class Graph(BaseModel):
             err = self._is_collector_connection_valid(edge.source.node_id, new_output=edge.destination)
             if err is not None:
                 raise InvalidEdgeError(f"Collector input type does not match collector output type ({edge}): {err}")
+
+    def _validate_edge(self, edge: Edge):
+        """Validates that a new edge doesn't create a cycle in the graph"""
+        source_node, destination_node = self._get_edge_nodes(edge)
+        self._validate_edge_destination_uniqueness(edge, destination_node)
+        self._validate_edge_would_not_create_cycle(edge)
+        self._validate_edge_field_compatibility(edge, source_node, destination_node)
+        self._validate_iterator_edge_rules(edge, source_node, destination_node)
+        self._validate_collector_edge_rules(edge, source_node, destination_node)
 
     def has_node(self, node_id: str) -> bool:
         """Determines whether or not a node exists in the graph."""
