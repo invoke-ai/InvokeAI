@@ -72,6 +72,49 @@ export const add: InvocationTemplate = {
   classification: 'stable',
 };
 
+export const call_saved_workflows: InvocationTemplate = {
+  title: 'Call Saved Workflows',
+  type: 'call_saved_workflows',
+  version: '1.0.0',
+  tags: ['workflow', 'saved', 'library'],
+  description: 'Displays and later executes against the saved workflow library.',
+  outputType: 'integer_output',
+  inputs: {
+    workflow_id: {
+      name: 'workflow_id',
+      title: 'Workflow Id',
+      required: false,
+      description: 'The selected saved workflow ID, managed by the workflow editor UI.',
+      fieldKind: 'input',
+      input: 'any',
+      ui_hidden: true,
+      type: {
+        name: 'StringField',
+        cardinality: 'SINGLE',
+        batch: false,
+      },
+      default: '',
+    },
+  },
+  outputs: {
+    value: {
+      fieldKind: 'output',
+      name: 'value',
+      title: 'Value',
+      description: 'The output integer',
+      type: {
+        name: 'IntegerField',
+        cardinality: 'SINGLE',
+        batch: false,
+      },
+      ui_hidden: false,
+    },
+  },
+  useCache: false,
+  nodePack: 'invokeai',
+  classification: 'beta',
+};
+
 export const sub: InvocationTemplate = {
   title: 'Subtract Integers',
   type: 'sub',
@@ -530,6 +573,7 @@ const iterate: InvocationTemplate = {
 
 export const templates: Templates = {
   add,
+  call_saved_workflows,
   sub,
   collect,
   iterate,
@@ -547,6 +591,63 @@ export const schema = {
   },
   components: {
     schemas: {
+      CallSavedWorkflowsInvocation: {
+        properties: {
+          id: {
+            type: 'string',
+            title: 'Id',
+            description: 'The id of this instance of an invocation. Must be unique among all instances of invocations.',
+            field_kind: 'node_attribute',
+          },
+          is_intermediate: {
+            type: 'boolean',
+            title: 'Is Intermediate',
+            description: 'Whether or not this is an intermediate invocation.',
+            default: false,
+            field_kind: 'node_attribute',
+            ui_type: 'IsIntermediate',
+          },
+          use_cache: {
+            type: 'boolean',
+            title: 'Use Cache',
+            description: 'Whether or not to use the cache',
+            default: false,
+            field_kind: 'node_attribute',
+          },
+          workflow_id: {
+            type: 'string',
+            title: 'Workflow Id',
+            description: 'The selected saved workflow ID, managed by the workflow editor UI.',
+            default: '',
+            field_kind: 'input',
+            input: 'any',
+            orig_default: '',
+            orig_required: false,
+            ui_hidden: true,
+          },
+          type: {
+            type: 'string',
+            enum: ['call_saved_workflows'],
+            const: 'call_saved_workflows',
+            title: 'type',
+            default: 'call_saved_workflows',
+            field_kind: 'node_attribute',
+          },
+        },
+        type: 'object',
+        required: ['type', 'id'],
+        title: 'Call Saved Workflows',
+        description: 'Displays and later executes against the saved workflow library.',
+        category: 'workflow',
+        classification: 'beta',
+        node_pack: 'invokeai',
+        tags: ['workflow', 'saved', 'library'],
+        version: '1.0.0',
+        output: {
+          $ref: '#/components/schemas/IntegerOutput',
+        },
+        class: 'invocation',
+      },
       AddInvocation: {
         properties: {
           id: {

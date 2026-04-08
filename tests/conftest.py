@@ -23,6 +23,7 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.users.users_default import UserService
+from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
@@ -57,7 +58,7 @@ def mock_services() -> InvocationServices:
         session_processor=None,  # type: ignore
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
-        workflow_records=None,  # type: ignore
+        workflow_records=SqliteWorkflowRecordsStorage(db=db),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore

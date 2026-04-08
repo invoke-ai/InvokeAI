@@ -1,5 +1,5 @@
 import { omit, pick } from 'es-toolkit/compat';
-import { schema, templates } from 'features/nodes/store/util/testUtils';
+import { call_saved_workflows, schema, templates } from 'features/nodes/store/util/testUtils';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { describe, expect, it } from 'vitest';
 
@@ -17,5 +17,9 @@ describe('parseSchema', () => {
   it('should include only allowed nodes', () => {
     const parsed = parseSchema(schema, ['add']);
     expect(stripUndefinedDeep(parsed)).toEqual(stripUndefinedDeep(pick(templates, 'add')));
+  });
+  it('should parse the call_saved_workflows node template', () => {
+    const parsed = parseSchema(schema);
+    expect(stripUndefinedDeep(parsed.call_saved_workflows)).toEqual(stripUndefinedDeep(call_saved_workflows));
   });
 });
