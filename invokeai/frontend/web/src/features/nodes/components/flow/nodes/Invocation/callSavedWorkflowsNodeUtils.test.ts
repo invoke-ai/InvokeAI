@@ -53,7 +53,7 @@ describe('callSavedWorkflowsNodeUtils', () => {
   it('returns null when no workflow is selected', () => {
     expect(getSavedWorkflowSelectionState(workflows, '')).toEqual({ status: 'unselected' });
     expect(getSelectedWorkflow(workflows, '')).toBeNull();
-    expect(getSelectedWorkflowOption(workflows, '', 'Missing workflow')).toBeNull();
+    expect(getSelectedWorkflowOption(workflows, '', 'Missing or inaccessible workflow')).toBeNull();
   });
 
   it('returns a selected state when the workflow id resolves', () => {
@@ -68,8 +68,8 @@ describe('callSavedWorkflowsNodeUtils', () => {
       status: 'missing',
       workflowId: 'missing-workflow',
     });
-    expect(getSelectedWorkflowOption(workflows, 'missing-workflow', 'Missing workflow')).toEqual({
-      label: 'Missing workflow',
+    expect(getSelectedWorkflowOption(workflows, 'missing-workflow', 'Missing or inaccessible workflow')).toEqual({
+      label: 'Missing or inaccessible workflow',
       value: MISSING_WORKFLOW_OPTION_VALUE,
     });
   });

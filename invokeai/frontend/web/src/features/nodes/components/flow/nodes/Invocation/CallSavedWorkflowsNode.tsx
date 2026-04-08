@@ -19,6 +19,8 @@ import {
 } from './callSavedWorkflowsNodeUtils';
 import InvocationNodeHeader from './InvocationNodeHeader';
 
+const MISSING_SELECTION_LABEL = 'Missing or inaccessible workflow';
+
 type Props = {
   nodeId: string;
   isOpen: boolean;
@@ -75,7 +77,7 @@ const CallSavedWorkflowsNode = ({ nodeId, isOpen }: Props) => {
   const options = useMemo(() => buildSavedWorkflowOptions(items), [items]);
   const selectionState = useMemo(() => getSavedWorkflowSelectionState(items, workflowId), [items, workflowId]);
   const selectedOption = useMemo(
-    () => getSelectedWorkflowOption(items, workflowId, 'Missing workflow'),
+    () => getSelectedWorkflowOption(items, workflowId, MISSING_SELECTION_LABEL),
     [items, workflowId]
   );
 
@@ -206,7 +208,7 @@ const SelectionStatusBadge = memo(
 
     return (
       <Badge variant="subtle">
-        {selectionState.status === 'missing' ? 'Missing workflow' : 'Choose a workflow'}
+        {selectionState.status === 'missing' ? MISSING_SELECTION_LABEL : 'Choose a workflow'}
       </Badge>
     );
   }
