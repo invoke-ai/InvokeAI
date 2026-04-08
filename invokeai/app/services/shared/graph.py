@@ -393,6 +393,98 @@ class _ExecutionMaterializer:
         return next(iter(new_node_ids), None)
 
 
+class _ExecutionScheduler:
+    def __init__(self, state: "GraphExecutionState") -> None:
+        self._state = state
+
+    def queue_for(self, cls_name: str) -> Deque[str]:
+        q = self._state._ready_queues.get(cls_name)
+        if q is None:
+            q = deque()
+            self._state._ready_queues[cls_name] = q
+        return q
+
+    def remove_from_ready_queues(self, exec_node_id: str) -> None:
+        for q in self._state._ready_queues.values():
+            try:
+                q.remove(exec_node_id)
+            except ValueError:
+                continue
+
+    def enqueue_if_ready(self, exec_node_id: str) -> None:
+        """Push exec_node_id to its class queue if unmet inputs == 0."""
+        if exec_node_id not in self._state.execution_graph.nodes:
+            raise KeyError(f"exec node {exec_node_id} missing from execution_graph")
+        if exec_node_id not in self._state.indegree:
+            raise KeyError(f"indegree missing for exec node {exec_node_id}")
+        if self._state.indegree[exec_node_id] != 0 or exec_node_id in self._state.executed:
+            return
+        if self._state._is_deferred_by_unresolved_if(exec_node_id):
+            return
+        node_obj = self._state.execution_graph.nodes[exec_node_id]
+        q = self.queue_for(self._state._type_key(node_obj))
+        if exec_node_id in q:
+            return
+        self._state._set_prepared_exec_state(exec_node_id, "ready")
+        exec_node_path = self._state._get_iteration_path(exec_node_id)
+        for i, existing in enumerate(q):
+            if self._state._get_iteration_path(existing) > exec_node_path:
+                q.insert(i, exec_node_id)
+                break
+        else:
+            q.append(exec_node_id)
+
+    def get_next_node(self) -> Optional[BaseInvocation]:
+        """Gets the next ready node: FIFO within class, drain class before switching."""
+        if self._state._active_class:
+            q = self._state._ready_queues.get(self._state._active_class)
+            while q:
+                exec_node_id = q.popleft()
+                if exec_node_id not in self._state.executed:
+                    return self._state.execution_graph.nodes[exec_node_id]
+            self._state._active_class = None
+
+        seen = set(self._state.ready_order)
+        for cls_name in self._state.ready_order:
+            q = self._state._ready_queues.get(cls_name)
+            if q:
+                self._state._active_class = cls_name
+                return self.get_next_node()
+        for cls_name in sorted(k for k in self._state._ready_queues.keys() if k not in seen):
+            q = self._state._ready_queues[cls_name]
+            if q:
+                self._state._active_class = cls_name
+                return self.get_next_node()
+        return None
+
+    def complete(self, exec_node_id: str, output: BaseInvocationOutput) -> None:
+        if exec_node_id not in self._state.execution_graph.nodes:
+            return
+
+        self._state._set_prepared_exec_state(exec_node_id, "executed")
+        self._state.executed.add(exec_node_id)
+        self._state.results[exec_node_id] = output
+
+        registry = self._state._prepared_registry()
+        source_node_id = registry.get_source_node_id(exec_node_id)
+        prepared_nodes = registry.get_prepared_ids(source_node_id)
+
+        if all(n in self._state.executed for n in prepared_nodes):
+            self._state.executed.add(source_node_id)
+            self._state.executed_history.append(source_node_id)
+
+        for edge in self._state.execution_graph._get_output_edges(exec_node_id):
+            child = edge.destination.node_id
+            if child not in self._state.indegree:
+                raise KeyError(f"indegree missing for exec node {child}")
+            if self._state.indegree[child] == 0:
+                raise RuntimeError(f"indegree underflow for {child} from parent {exec_node_id}")
+            self._state.indegree[child] -= 1
+            self._state._try_resolve_if_node(child)
+            if self._state.indegree[child] == 0:
+                self.enqueue_if_ready(child)
+
+
 def get_output_field_type(node: BaseInvocation, field: str) -> Any:
     # TODO(psyche): This is awkward - if field_info is None, it means the field is not defined in the output, which
     # really should raise. The consumers of this utility expect it to never raise, and return None instead. Fixing this
@@ -1249,6 +1341,7 @@ class GraphExecutionState(BaseModel):
     _prepared_exec_registry: Optional[_PreparedExecRegistry] = PrivateAttr(default=None)
     _if_branch_scheduler: Optional[_IfBranchScheduler] = PrivateAttr(default=None)
     _execution_materializer: Optional[_ExecutionMaterializer] = PrivateAttr(default=None)
+    _execution_scheduler: Optional[_ExecutionScheduler] = PrivateAttr(default=None)
 
     def _type_key(self, node_obj: BaseInvocation) -> str:
         return node_obj.__class__.__name__
@@ -1271,6 +1364,11 @@ class GraphExecutionState(BaseModel):
         if self._execution_materializer is None:
             self._execution_materializer = _ExecutionMaterializer(self)
         return self._execution_materializer
+
+    def _scheduler(self) -> _ExecutionScheduler:
+        if self._execution_scheduler is None:
+            self._execution_scheduler = _ExecutionScheduler(self)
+        return self._execution_scheduler
 
     def _register_prepared_exec_node(self, exec_node_id: str, source_node_id: str) -> None:
         self._prepared_registry().register(exec_node_id, source_node_id)
@@ -1336,11 +1434,7 @@ class GraphExecutionState(BaseModel):
         return result
 
     def _queue_for(self, cls_name: str) -> Deque[str]:
-        q = self._ready_queues.get(cls_name)
-        if q is None:
-            q = deque()
-            self._ready_queues[cls_name] = q
-        return q
+        return self._scheduler().queue_for(cls_name)
 
     def _get_if_branch_exclusive_sources(self, if_node_id: str) -> dict[str, set[str]]:
         return self._if_scheduler().get_branch_exclusive_sources(if_node_id)
@@ -1349,11 +1443,7 @@ class GraphExecutionState(BaseModel):
         return self._if_scheduler().is_deferred_by_unresolved_if(exec_node_id)
 
     def _remove_from_ready_queues(self, exec_node_id: str) -> None:
-        for q in self._ready_queues.values():
-            try:
-                q.remove(exec_node_id)
-            except ValueError:
-                continue
+        self._scheduler().remove_from_ready_queues(exec_node_id)
 
     def _mark_exec_node_skipped(self, exec_node_id: str) -> None:
         self._if_scheduler().mark_exec_node_skipped(exec_node_id)
@@ -1368,29 +1458,7 @@ class GraphExecutionState(BaseModel):
         self.ready_order = names
 
     def _enqueue_if_ready(self, nid: str) -> None:
-        """Push nid to its class queue if unmet inputs == 0."""
-        # Invariants: exec node exists and has an indegree entry
-        if nid not in self.execution_graph.nodes:
-            raise KeyError(f"exec node {nid} missing from execution_graph")
-        if nid not in self.indegree:
-            raise KeyError(f"indegree missing for exec node {nid}")
-        if self.indegree[nid] != 0 or nid in self.executed:
-            return
-        if self._is_deferred_by_unresolved_if(nid):
-            return
-        node_obj = self.execution_graph.nodes[nid]
-        q = self._queue_for(self._type_key(node_obj))
-        if nid in q:
-            return
-        self._set_prepared_exec_state(nid, "ready")
-        nid_path = self._get_iteration_path(nid)
-        # Insert in lexicographic outer->inner order; preserve FIFO for equal paths.
-        for i, existing in enumerate(q):
-            if self._get_iteration_path(existing) > nid_path:
-                q.insert(i, nid)
-                break
-        else:
-            q.append(nid)
+        self._scheduler().enqueue_if_ready(nid)
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -1444,36 +1512,7 @@ class GraphExecutionState(BaseModel):
 
     def complete(self, node_id: str, output: BaseInvocationOutput) -> None:
         """Marks a node as complete"""
-
-        if node_id not in self.execution_graph.nodes:
-            return  # TODO: log error?
-
-        # Mark node as executed
-        self._set_prepared_exec_state(node_id, "executed")
-        self.executed.add(node_id)
-        self.results[node_id] = output
-
-        # Check if source node is complete (all prepared nodes are complete)
-        registry = self._prepared_registry()
-        source_node = registry.get_source_node_id(node_id)
-        prepared_nodes = registry.get_prepared_ids(source_node)
-
-        if all(n in self.executed for n in prepared_nodes):
-            self.executed.add(source_node)
-            self.executed_history.append(source_node)
-
-        # Decrement children indegree and enqueue when ready
-        for e in self.execution_graph._get_output_edges(node_id):
-            child = e.destination.node_id
-            if child not in self.indegree:
-                raise KeyError(f"indegree missing for exec node {child}")
-            # Only decrement if there's something to satisfy
-            if self.indegree[child] == 0:
-                raise RuntimeError(f"indegree underflow for {child} from parent {node_id}")
-            self.indegree[child] -= 1
-            self._try_resolve_if_node(child)
-            if self.indegree[child] == 0:
-                self._enqueue_if_ready(child)
+        self._scheduler().complete(node_id, output)
 
     def set_node_error(self, node_id: str, error: str):
         """Marks a node as errored"""
@@ -1510,31 +1549,7 @@ class GraphExecutionState(BaseModel):
         return self._materializer().get_iteration_node(source_node_id, graph, execution_graph, prepared_iterator_nodes)
 
     def _get_next_node(self) -> Optional[BaseInvocation]:
-        """Gets the next ready node: FIFO within class, drain class before switching."""
-        # 1) Continue draining the active class
-        if self._active_class:
-            q = self._ready_queues.get(self._active_class)
-            while q:
-                nid = q.popleft()
-                if nid not in self.executed:
-                    return self.execution_graph.nodes[nid]
-            # emptied: release active class
-            self._active_class = None
-
-        # 2) Pick next class by priority, then by class name
-        seen = set(self.ready_order)
-        for cls_name in self.ready_order:
-            q = self._ready_queues.get(cls_name)
-            if q:
-                self._active_class = cls_name
-                # recurse to drain newly set active class
-                return self._get_next_node()
-        for cls_name in sorted(k for k in self._ready_queues.keys() if k not in seen):
-            q = self._ready_queues[cls_name]
-            if q:
-                self._active_class = cls_name
-                return self._get_next_node()
-        return None
+        return self._scheduler().get_next_node()
 
     def _prepare_inputs(self, node: BaseInvocation):
         input_edges = self.execution_graph._get_input_edges(node.id)
