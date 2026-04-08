@@ -1446,6 +1446,13 @@ class Graph(BaseModel):
 
         return input_types
 
+    def _get_type_tree_root_types(self, input_types: set[Any]) -> list[Any]:
+        type_tree = nx.DiGraph()
+        type_tree.add_nodes_from(input_types)
+        type_tree.add_edges_from([e for e in itertools.permutations(input_types, 2) if issubclass(e[1], e[0])])
+        type_degrees = type_tree.in_degree(type_tree.nodes)
+        return [t[0] for t in type_degrees if t[1] == 0]  # type: ignore
+
     def _get_collector_input_root_type(self, node_id: str) -> Any | None:
         input_types = self._resolve_collector_input_types(node_id)
         non_any_input_types = {t for t in input_types if t != Any}
@@ -1454,22 +1461,18 @@ class Graph(BaseModel):
         if len(non_any_input_types) == 0:
             return None
 
-        type_tree = nx.DiGraph()
-        type_tree.add_nodes_from(non_any_input_types)
-        type_tree.add_edges_from([e for e in itertools.permutations(non_any_input_types, 2) if issubclass(e[1], e[0])])
-        type_degrees = type_tree.in_degree(type_tree.nodes)
-        root_types = [t[0] for t in type_degrees if t[1] == 0]  # type: ignore
+        root_types = self._get_type_tree_root_types(non_any_input_types)
         if len(root_types) != 1:
             return Any
         return root_types[0]
 
-    def _is_collector_connection_valid(
+    def _get_collector_connections(
         self,
         node_id: str,
         new_input: Optional[EdgeConnection] = None,
         new_input_field: Optional[str] = None,
         new_output: Optional[EdgeConnection] = None,
-    ) -> str | None:
+    ) -> tuple[list[EdgeConnection], list[EdgeConnection], list[EdgeConnection]]:
         item_inputs = [e.source for e in self._get_input_edges(node_id, ITEM_FIELD)]
         collection_inputs = [e.source for e in self._get_input_edges(node_id, COLLECTION_FIELD)]
         outputs = [e.destination for e in self._get_output_edges(node_id, COLLECTION_FIELD)]
@@ -1480,58 +1483,65 @@ class Graph(BaseModel):
                 item_inputs.append(new_input)
             elif field == COLLECTION_FIELD:
                 collection_inputs.append(new_input)
+
         if new_output is not None:
             outputs.append(new_output)
 
-        if len(item_inputs) == 0 and len(collection_inputs) == 0:
-            return "Collector must have at least one item or collection input edge"
+        return item_inputs, collection_inputs, outputs
 
-        # Get input and output fields (the fields linked to the collector's input/output)
+    def _get_collector_port_types(
+        self,
+        item_inputs: list[EdgeConnection],
+        collection_inputs: list[EdgeConnection],
+        outputs: list[EdgeConnection],
+    ) -> tuple[list[Any], list[Any], list[Any]]:
         item_input_field_types = [get_output_field_type(self.get_node(e.node_id), e.field) for e in item_inputs]
         collection_input_field_types = [
             get_output_field_type(self.get_node(e.node_id), e.field) for e in collection_inputs
         ]
         output_field_types = [get_input_field_type(self.get_node(e.node_id), e.field) for e in outputs]
+        return item_input_field_types, collection_input_field_types, output_field_types
 
-        if not all((is_list_or_contains_list(t) or is_any(t) for t in collection_input_field_types)):
-            return "Collector collection input must be a collection"
-
-        # Validate that all inputs are derived from or match a single type
-        input_field_types = {
+    def _resolve_item_input_types(self, item_input_field_types: list[Any]) -> set[Any]:
+        return {
             resolved_type
             for input_field_type in item_input_field_types
             for resolved_type in (
                 [input_field_type] if get_origin(input_field_type) is None else get_args(input_field_type)
             )
             if resolved_type != NoneType
-        }  # Get unique types
+        }
 
+    def _resolve_collection_input_types(
+        self, collection_inputs: list[EdgeConnection], collection_input_field_types: list[Any]
+    ) -> set[Any]:
+        input_field_types: set[Any] = set()
         for input_conn, input_field_type in zip(collection_inputs, collection_input_field_types, strict=False):
             source_node = self.get_node(input_conn.node_id)
             if isinstance(source_node, CollectInvocation) and input_conn.field == COLLECTION_FIELD:
                 input_field_types.update(self._resolve_collector_input_types(source_node.id))
                 continue
             input_field_types.update(extract_collection_item_types(input_field_type))
+        return input_field_types
 
+    def _validate_collector_collection_inputs(self, collection_input_field_types: list[Any]) -> str | None:
+        if not all((is_list_or_contains_list(t) or is_any(t) for t in collection_input_field_types)):
+            return "Collector collection input must be a collection"
+        return None
+
+    def _get_collector_input_root_type_from_resolved_types(self, input_field_types: set[Any]) -> Any | None:
         non_any_input_field_types = {t for t in input_field_types if t != Any}
-        type_tree = nx.DiGraph()
-        type_tree.add_nodes_from(non_any_input_field_types)
-        type_tree.add_edges_from(
-            [e for e in itertools.permutations(non_any_input_field_types, 2) if issubclass(e[1], e[0])]
-        )
-        type_degrees = type_tree.in_degree(type_tree.nodes)
-        root_types = [t[0] for t in type_degrees if t[1] == 0]  # type: ignore
+        root_types = self._get_type_tree_root_types(non_any_input_field_types)
         if len(root_types) > 1:
-            return "Collector input collection items must be of a single type"
+            return "multiple"
+        return root_types[0] if len(root_types) == 1 else None
 
-        # Get the input root type (if known)
-        input_root_type = root_types[0] if len(root_types) == 1 else None
-
-        # Verify that all outputs are lists
+    def _validate_collector_output_types(
+        self, output_field_types: list[Any], input_root_type: Any | None
+    ) -> str | None:
         if not all(is_list_or_contains_list(t) or is_any(t) for t in output_field_types):
             return "Collector output must connect to a collection input"
 
-        # Verify that all outputs match the input type (are a base class or the same class)
         if input_root_type is not None:
             if not all(
                 is_any(t)
@@ -1543,8 +1553,11 @@ class Graph(BaseModel):
         elif any(not is_any(t) and get_args(t)[0] != Any for t in output_field_types):
             return "Collector outputs must connect to a collection input with a matching type"
 
-        # If this collector outputs to another collector's collection input, validate against the downstream
-        # collector's resolved input type (if available).
+        return None
+
+    def _validate_downstream_collector_outputs(
+        self, outputs: list[EdgeConnection], input_root_type: Any | None
+    ) -> str | None:
         for output in outputs:
             output_node = self.get_node(output.node_id)
             if not isinstance(output_node, CollectInvocation) or output.field != COLLECTION_FIELD:
@@ -1558,6 +1571,44 @@ class Graph(BaseModel):
                 continue
             if not are_connection_types_compatible(input_root_type, output_root_type):
                 return "Collector outputs must connect to a collection input with a matching type"
+        return None
+
+    def _is_collector_connection_valid(
+        self,
+        node_id: str,
+        new_input: Optional[EdgeConnection] = None,
+        new_input_field: Optional[str] = None,
+        new_output: Optional[EdgeConnection] = None,
+    ) -> str | None:
+        item_inputs, collection_inputs, outputs = self._get_collector_connections(
+            node_id, new_input=new_input, new_input_field=new_input_field, new_output=new_output
+        )
+
+        if len(item_inputs) == 0 and len(collection_inputs) == 0:
+            return "Collector must have at least one item or collection input edge"
+
+        item_input_field_types, collection_input_field_types, output_field_types = self._get_collector_port_types(
+            item_inputs, collection_inputs, outputs
+        )
+
+        collection_input_error = self._validate_collector_collection_inputs(collection_input_field_types)
+        if collection_input_error is not None:
+            return collection_input_error
+
+        input_field_types = self._resolve_item_input_types(item_input_field_types)
+        input_field_types.update(self._resolve_collection_input_types(collection_inputs, collection_input_field_types))
+
+        input_root_type = self._get_collector_input_root_type_from_resolved_types(input_field_types)
+        if input_root_type == "multiple":
+            return "Collector input collection items must be of a single type"
+
+        output_type_error = self._validate_collector_output_types(output_field_types, input_root_type)
+        if output_type_error is not None:
+            return output_type_error
+
+        downstream_output_error = self._validate_downstream_collector_outputs(outputs, input_root_type)
+        if downstream_output_error is not None:
+            return downstream_output_error
 
         return None
 
