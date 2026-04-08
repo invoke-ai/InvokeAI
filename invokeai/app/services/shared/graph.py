@@ -280,7 +280,12 @@ class _IfBranchScheduler:
 
 
 class _ExecutionMaterializer:
-    """Expands source-graph nodes into concrete execution-graph nodes for the current runtime state."""
+    """Expands source-graph nodes into concrete execution-graph nodes for the current runtime state.
+
+    `GraphExecutionState.next()` calls into this helper when no prepared exec node is ready. The materializer chooses
+    the next source node that can be expanded, creates the corresponding exec nodes in the execution graph, wires their
+    inputs, and initializes their scheduler state.
+    """
 
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
