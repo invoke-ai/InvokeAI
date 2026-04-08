@@ -120,6 +120,94 @@ class _IfBranchScheduler:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
 
+    def _get_branch_input_sources(self, if_node_id: str, branch_field: str) -> set[str]:
+        return {e.source.node_id for e in self._state.graph._get_input_edges(if_node_id, branch_field)}
+
+    def _expand_with_ancestors(self, node_ids: set[str]) -> set[str]:
+        expanded = set(node_ids)
+        source_graph = self._state.graph.nx_graph_flat()
+        for node_id in list(expanded):
+            expanded.update(nx.ancestors(source_graph, node_id))
+        return expanded
+
+    def _node_outputs_stay_in_branch(
+        self, node_id: str, if_node_id: str, branch_field: str, branch_nodes: set[str]
+    ) -> bool:
+        output_edges = self._state.graph._get_output_edges(node_id)
+        return all(
+            edge.destination.node_id in branch_nodes
+            or (edge.destination.node_id == if_node_id and edge.destination.field == branch_field)
+            for edge in output_edges
+        )
+
+    def _prune_nonexclusive_branch_nodes(
+        self, if_node_id: str, branch_field: str, candidate_nodes: set[str]
+    ) -> set[str]:
+        exclusive_nodes = set(candidate_nodes)
+        changed = True
+        while changed:
+            changed = False
+            for node_id in list(exclusive_nodes):
+                if self._node_outputs_stay_in_branch(node_id, if_node_id, branch_field, exclusive_nodes):
+                    continue
+                exclusive_nodes.remove(node_id)
+                changed = True
+        return exclusive_nodes
+
+    def _get_matching_prepared_if_ids(self, if_node_id: str, iteration_path: tuple[int, ...]) -> list[str]:
+        prepared_if_ids = self._state._prepared_registry().get_prepared_ids(if_node_id)
+        return [pid for pid in prepared_if_ids if self._state._get_iteration_path(pid) == iteration_path]
+
+    def _has_unresolved_matching_if(self, if_node_id: str, iteration_path: tuple[int, ...]) -> bool:
+        matching_prepared_if_ids = self._get_matching_prepared_if_ids(if_node_id, iteration_path)
+        if not matching_prepared_if_ids:
+            return True
+        return not all(pid in self._state._resolved_if_exec_branches for pid in matching_prepared_if_ids)
+
+    def _apply_condition_inputs(self, exec_node_id: str, node: IfInvocation) -> bool:
+        condition_edges = self._state.execution_graph._get_input_edges(exec_node_id, "condition")
+        if any(edge.source.node_id not in self._state.executed for edge in condition_edges):
+            return False
+
+        for edge in condition_edges:
+            setattr(
+                node,
+                edge.destination.field,
+                copydeep(getattr(self._state.results[edge.source.node_id], edge.source.field)),
+            )
+        return True
+
+    def _get_selected_branch_fields(self, node: IfInvocation) -> tuple[str, str]:
+        selected_field = "true_input" if node.condition else "false_input"
+        unselected_field = "false_input" if node.condition else "true_input"
+        return selected_field, unselected_field
+
+    def _prune_unselected_if_inputs(self, exec_node_id: str, unselected_field: str) -> None:
+        for edge in self._state.execution_graph._get_input_edges(exec_node_id, unselected_field):
+            if edge.source.node_id in self._state.executed:
+                continue
+            if self._state.indegree[exec_node_id] == 0:
+                raise RuntimeError(f"indegree underflow for {exec_node_id} when pruning {unselected_field}")
+            self._state.indegree[exec_node_id] -= 1
+
+    def _apply_branch_resolution(
+        self,
+        exec_node_id: str,
+        iteration_path: tuple[int, ...],
+        exclusive_sources: dict[str, set[str]],
+        selected_field: str,
+        unselected_field: str,
+    ) -> None:
+        for prepared_id, prepared_source in self._state.prepared_source_mapping.items():
+            if prepared_id in self._state.executed:
+                continue
+            if self._state._get_iteration_path(prepared_id) != iteration_path:
+                continue
+            if prepared_source in exclusive_sources[selected_field]:
+                self._state._enqueue_if_ready(prepared_id)
+            elif prepared_source in exclusive_sources[unselected_field]:
+                self.mark_exec_node_skipped(prepared_id)
+
     def get_branch_exclusive_sources(self, if_node_id: str) -> dict[str, set[str]]:
         cached = self._state._if_branch_exclusive_sources.get(if_node_id)
         if cached is not None:
@@ -127,32 +215,17 @@ class _IfBranchScheduler:
 
         branch_sources: dict[str, set[str]] = {}
         for branch_field in ("true_input", "false_input"):
-            candidate = {e.source.node_id for e in self._state.graph._get_input_edges(if_node_id, branch_field)}
-            for node_id in list(candidate):
-                candidate.update(nx.ancestors(self._state.graph.nx_graph_flat(), node_id))
-
-            changed = True
-            while changed:
-                changed = False
-                for node_id in list(candidate):
-                    output_edges = self._state.graph._get_output_edges(node_id)
-                    if all(
-                        e.destination.node_id in candidate
-                        or (e.destination.node_id == if_node_id and e.destination.field == branch_field)
-                        for e in output_edges
-                    ):
-                        continue
-                    candidate.remove(node_id)
-                    changed = True
-
-            branch_sources[branch_field] = candidate
+            direct_inputs = self._get_branch_input_sources(if_node_id, branch_field)
+            candidate_nodes = self._expand_with_ancestors(direct_inputs)
+            branch_sources[branch_field] = self._prune_nonexclusive_branch_nodes(
+                if_node_id, branch_field, candidate_nodes
+            )
 
         self._state._if_branch_exclusive_sources[if_node_id] = branch_sources
         return branch_sources
 
     def is_deferred_by_unresolved_if(self, exec_node_id: str) -> bool:
-        registry = self._state._prepared_registry()
-        source_node_id = registry.get_source_node_id(exec_node_id)
+        source_node_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
         iteration_path = self._state._get_iteration_path(exec_node_id)
 
         for source_if_id, source_if_node in self._state.graph.nodes.items():
@@ -163,13 +236,7 @@ class _IfBranchScheduler:
             if source_node_id not in branches["true_input"] and source_node_id not in branches["false_input"]:
                 continue
 
-            prepared_if_ids = registry.get_prepared_ids(source_if_id)
-            matching_prepared_if_ids = [
-                pid for pid in prepared_if_ids if self._state._get_iteration_path(pid) == iteration_path
-            ]
-            if not matching_prepared_if_ids:
-                return True
-            if not all(pid in self._state._resolved_if_exec_branches for pid in matching_prepared_if_ids):
+            if self._has_unresolved_matching_if(source_if_id, iteration_path):
                 return True
         return False
 
@@ -191,42 +258,18 @@ class _IfBranchScheduler:
         if not isinstance(node, IfInvocation):
             return
 
-        condition_edges = self._state.execution_graph._get_input_edges(exec_node_id, "condition")
-        if any(edge.source.node_id not in self._state.executed for edge in condition_edges):
+        if not self._apply_condition_inputs(exec_node_id, node):
             return
 
-        for edge in condition_edges:
-            setattr(
-                node,
-                edge.destination.field,
-                copydeep(getattr(self._state.results[edge.source.node_id], edge.source.field)),
-            )
-
-        selected_field = "true_input" if node.condition else "false_input"
-        unselected_field = "false_input" if node.condition else "true_input"
+        selected_field, unselected_field = self._get_selected_branch_fields(node)
         self._state._resolved_if_exec_branches[exec_node_id] = selected_field
 
         source_if_node_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
         exclusive_sources = self.get_branch_exclusive_sources(source_if_node_id)
 
-        for edge in self._state.execution_graph._get_input_edges(exec_node_id, unselected_field):
-            if edge.source.node_id in self._state.executed:
-                continue
-            if self._state.indegree[exec_node_id] == 0:
-                raise RuntimeError(f"indegree underflow for {exec_node_id} when pruning {unselected_field}")
-            self._state.indegree[exec_node_id] -= 1
-
         iteration_path = self._state._get_iteration_path(exec_node_id)
-        for prepared_id, prepared_source in self._state.prepared_source_mapping.items():
-            if prepared_id in self._state.executed:
-                continue
-            if self._state._get_iteration_path(prepared_id) != iteration_path:
-                continue
-            if prepared_source in exclusive_sources[selected_field]:
-                self._state._enqueue_if_ready(prepared_id)
-            elif prepared_source in exclusive_sources[unselected_field]:
-                self.mark_exec_node_skipped(prepared_id)
-
+        self._prune_unselected_if_inputs(exec_node_id, unselected_field)
+        self._apply_branch_resolution(exec_node_id, iteration_path, exclusive_sources, selected_field, unselected_field)
         self._state._enqueue_if_ready(exec_node_id)
 
 
