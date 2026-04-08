@@ -230,6 +230,169 @@ class _IfBranchScheduler:
         self._state._enqueue_if_ready(exec_node_id)
 
 
+class _ExecutionMaterializer:
+    def __init__(self, state: "GraphExecutionState") -> None:
+        self._state = state
+
+    def create_execution_node(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
+        """Prepares an iteration node and connects all edges, returning the new node id"""
+
+        node = self._state.graph.get_node(node_id)
+
+        self_iteration_count = -1
+
+        # If this is an iterator node, we must create a copy for each iteration
+        if isinstance(node, IterateInvocation):
+            input_collection_edge = next(iter(self._state.graph._get_input_edges(node_id, COLLECTION_FIELD)))
+            input_collection_prepared_node_id = next(
+                n[1] for n in iteration_node_map if n[0] == input_collection_edge.source.node_id
+            )
+            input_collection_prepared_node_output = self._state.results[input_collection_prepared_node_id]
+            input_collection = getattr(input_collection_prepared_node_output, input_collection_edge.source.field)
+            self_iteration_count = len(input_collection)
+
+        new_nodes: list[str] = []
+        if self_iteration_count == 0:
+            return new_nodes
+
+        input_edges = self._state.graph._get_input_edges(node_id)
+
+        new_edges: list[Edge] = []
+        for edge in input_edges:
+            for input_node_id in (n[1] for n in iteration_node_map if n[0] == edge.source.node_id):
+                new_edge = Edge(
+                    source=EdgeConnection(node_id=input_node_id, field=edge.source.field),
+                    destination=EdgeConnection(node_id="", field=edge.destination.field),
+                )
+                new_edges.append(new_edge)
+
+        for i in range(self_iteration_count) if self_iteration_count > 0 else [-1]:
+            new_node = node.model_copy(deep=True)
+            new_node.id = uuid_string()
+
+            if isinstance(new_node, IterateInvocation):
+                new_node.index = i
+
+            self._state.execution_graph.add_node(new_node)
+            self._state._register_prepared_exec_node(new_node.id, node_id)
+
+            for edge in new_edges:
+                new_edge = Edge(
+                    source=edge.source,
+                    destination=EdgeConnection(node_id=new_node.id, field=edge.destination.field),
+                )
+                self._state.execution_graph.add_edge(new_edge)
+
+            inputs = self._state.execution_graph._get_input_edges(new_node.id)
+            unmet = sum(1 for e in inputs if e.source.node_id not in self._state.executed)
+            self._state.indegree[new_node.id] = unmet
+            self._state._try_resolve_if_node(new_node.id)
+            self._state._enqueue_if_ready(new_node.id)
+
+            new_nodes.append(new_node.id)
+
+        return new_nodes
+
+    def iterator_graph(self, base: Optional[nx.DiGraph] = None) -> nx.DiGraph:
+        """Gets a DiGraph with edges to collectors removed so an ancestor search produces all active iterators for any node"""
+        g = base.copy() if base is not None else self._state.graph.nx_graph_flat()
+        collectors = (
+            n for n in self._state.graph.nodes if isinstance(self._state.graph.get_node(n), CollectInvocation)
+        )
+        for c in collectors:
+            g.remove_edges_from(list(g.in_edges(c)))
+        return g
+
+    def get_node_iterators(self, node_id: str, it_graph: Optional[nx.DiGraph] = None) -> list[str]:
+        g = it_graph or self.iterator_graph()
+        return [n for n in nx.ancestors(g, node_id) if isinstance(self._state.graph.get_node(n), IterateInvocation)]
+
+    def get_iteration_node(
+        self,
+        source_node_id: str,
+        graph: nx.DiGraph,
+        execution_graph: nx.DiGraph,
+        prepared_iterator_nodes: list[str],
+    ) -> Optional[str]:
+        prepared_nodes = self._state.source_prepared_mapping[source_node_id]
+        if len(prepared_nodes) == 1:
+            return next(iter(prepared_nodes))
+
+        iterator_source_node_mapping = [(n, self._state.prepared_source_mapping[n]) for n in prepared_iterator_nodes]
+        parent_iterators = [itn for itn in iterator_source_node_mapping if nx.has_path(graph, itn[1], source_node_id)]
+
+        prepared_iterator = next((n for n in prepared_nodes if n in prepared_iterator_nodes), None)
+        if prepared_iterator is not None:
+            if all(nx.has_path(execution_graph, pit[0], prepared_iterator) for pit in parent_iterators):
+                return prepared_iterator
+            return None
+
+        return next(
+            (n for n in prepared_nodes if all(nx.has_path(execution_graph, pit[0], n) for pit in parent_iterators)),
+            None,
+        )
+
+    def prepare(self, base_g: Optional[nx.DiGraph] = None) -> Optional[str]:
+        g = base_g or self._state.graph.nx_graph_flat()
+
+        sorted_nodes = nx.topological_sort(g)
+
+        def unprepared(n: str) -> bool:
+            return n not in self._state.source_prepared_mapping
+
+        def iter_inputs_ready(n: str) -> bool:
+            if not isinstance(self._state.graph.get_node(n), IterateInvocation):
+                return True
+            return all(u in self._state.executed for u, _ in g.in_edges(n))
+
+        def no_unexecuted_iter_ancestors(n: str) -> bool:
+            return not any(
+                isinstance(self._state.graph.get_node(a), IterateInvocation) and a not in self._state.executed
+                for a in nx.ancestors(g, n)
+            )
+
+        next_node_id = next(
+            (n for n in sorted_nodes if unprepared(n) and iter_inputs_ready(n) and no_unexecuted_iter_ancestors(n)),
+            None,
+        )
+
+        if next_node_id is None:
+            return None
+
+        next_node_parents = [u for u, _ in g.in_edges(next_node_id)]
+        next_node = self._state.graph.get_node(next_node_id)
+        new_node_ids: list[str] = []
+
+        if isinstance(next_node, CollectInvocation):
+            all_iteration_mappings = []
+            for source_node_id in next_node_parents:
+                prepared_nodes = self._state.source_prepared_mapping[source_node_id]
+                all_iteration_mappings.extend([(source_node_id, p) for p in prepared_nodes])
+
+            create_results = self.create_execution_node(next_node_id, all_iteration_mappings)
+            if create_results is not None:
+                new_node_ids.extend(create_results)
+        else:
+            it_g = self.iterator_graph(g)
+            iterator_nodes = self.get_node_iterators(next_node_id, it_g)
+            iterator_nodes_prepared = [list(self._state.source_prepared_mapping[n]) for n in iterator_nodes]
+            iterator_node_prepared_combinations = list(itertools.product(*iterator_nodes_prepared))
+
+            eg = self._state.execution_graph.nx_graph_flat()
+            prepared_parent_mappings = [
+                [(n, self.get_iteration_node(n, g, eg, it)) for n in next_node_parents]
+                for it in iterator_node_prepared_combinations
+            ]
+            prepared_parent_mappings = [m for m in prepared_parent_mappings if all(p[1] is not None for p in m)]
+
+            for iteration_mappings in prepared_parent_mappings:
+                create_results = self.create_execution_node(next_node_id, iteration_mappings)
+                if create_results is not None:
+                    new_node_ids.extend(create_results)
+
+        return next(iter(new_node_ids), None)
+
+
 def get_output_field_type(node: BaseInvocation, field: str) -> Any:
     # TODO(psyche): This is awkward - if field_info is None, it means the field is not defined in the output, which
     # really should raise. The consumers of this utility expect it to never raise, and return None instead. Fixing this
@@ -1085,6 +1248,7 @@ class GraphExecutionState(BaseModel):
     _prepared_exec_metadata: dict[str, _PreparedExecNodeMetadata] = PrivateAttr(default_factory=dict)
     _prepared_exec_registry: Optional[_PreparedExecRegistry] = PrivateAttr(default=None)
     _if_branch_scheduler: Optional[_IfBranchScheduler] = PrivateAttr(default=None)
+    _execution_materializer: Optional[_ExecutionMaterializer] = PrivateAttr(default=None)
 
     def _type_key(self, node_obj: BaseInvocation) -> str:
         return node_obj.__class__.__name__
@@ -1102,6 +1266,11 @@ class GraphExecutionState(BaseModel):
         if self._if_branch_scheduler is None:
             self._if_branch_scheduler = _IfBranchScheduler(self)
         return self._if_branch_scheduler
+
+    def _materializer(self) -> _ExecutionMaterializer:
+        if self._execution_materializer is None:
+            self._execution_materializer = _ExecutionMaterializer(self)
+        return self._execution_materializer
 
     def _register_prepared_exec_node(self, exec_node_id: str, source_node_id: str) -> None:
         self._prepared_registry().register(exec_node_id, source_node_id)
@@ -1255,11 +1424,11 @@ class GraphExecutionState(BaseModel):
         next_node = self._get_next_node()
         if next_node is None:
             base_g = self.graph.nx_graph_flat()
-            prepared_id = self._prepare(base_g)
+            prepared_id = self._materializer().prepare(base_g)
 
             # Prepare as many nodes as we can
             while prepared_id is not None:
-                prepared_id = self._prepare(base_g)
+                prepared_id = self._materializer().prepare(base_g)
                 if next_node is None:
                     next_node = self._get_next_node()
 
@@ -1320,162 +1489,16 @@ class GraphExecutionState(BaseModel):
         return len(self.errors) > 0
 
     def _create_execution_node(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
-        """Prepares an iteration node and connects all edges, returning the new node id"""
-
-        node = self.graph.get_node(node_id)
-
-        self_iteration_count = -1
-
-        # If this is an iterator node, we must create a copy for each iteration
-        if isinstance(node, IterateInvocation):
-            # Get input collection edge (should error if there are no inputs)
-            input_collection_edge = next(iter(self.graph._get_input_edges(node_id, COLLECTION_FIELD)))
-            input_collection_prepared_node_id = next(
-                n[1] for n in iteration_node_map if n[0] == input_collection_edge.source.node_id
-            )
-            input_collection_prepared_node_output = self.results[input_collection_prepared_node_id]
-            input_collection = getattr(input_collection_prepared_node_output, input_collection_edge.source.field)
-            self_iteration_count = len(input_collection)
-
-        new_nodes: list[str] = []
-        if self_iteration_count == 0:
-            # TODO: should this raise a warning? It might just happen if an empty collection is input, and should be valid.
-            return new_nodes
-
-        # Get all input edges
-        input_edges = self.graph._get_input_edges(node_id)
-
-        # Create new edges for this iteration
-        # For collect nodes, this may contain multiple inputs to the same field
-        new_edges: list[Edge] = []
-        for edge in input_edges:
-            for input_node_id in (n[1] for n in iteration_node_map if n[0] == edge.source.node_id):
-                new_edge = Edge(
-                    source=EdgeConnection(node_id=input_node_id, field=edge.source.field),
-                    destination=EdgeConnection(node_id="", field=edge.destination.field),
-                )
-                new_edges.append(new_edge)
-
-        # Create a new node (or one for each iteration of this iterator)
-        for i in range(self_iteration_count) if self_iteration_count > 0 else [-1]:
-            # Create a new node
-            new_node = node.model_copy(deep=True)
-
-            # Create the node id (use a random uuid)
-            new_node.id = uuid_string()
-
-            # Set the iteration index for iteration invocations
-            if isinstance(new_node, IterateInvocation):
-                new_node.index = i
-
-            # Add to execution graph
-            self.execution_graph.add_node(new_node)
-            self._register_prepared_exec_node(new_node.id, node_id)
-
-            # Add new edges to execution graph
-            for edge in new_edges:
-                new_edge = Edge(
-                    source=edge.source,
-                    destination=EdgeConnection(node_id=new_node.id, field=edge.destination.field),
-                )
-                self.execution_graph.add_edge(new_edge)
-
-            # Initialize indegree as unmet inputs only and enqueue if ready
-            inputs = self.execution_graph._get_input_edges(new_node.id)
-            unmet = sum(1 for e in inputs if e.source.node_id not in self.executed)
-            self.indegree[new_node.id] = unmet
-            self._try_resolve_if_node(new_node.id)
-            self._enqueue_if_ready(new_node.id)
-
-            new_nodes.append(new_node.id)
-
-        return new_nodes
+        return self._materializer().create_execution_node(node_id, iteration_node_map)
 
     def _iterator_graph(self, base: Optional[nx.DiGraph] = None) -> nx.DiGraph:
-        """Gets a DiGraph with edges to collectors removed so an ancestor search produces all active iterators for any node"""
-        g = base.copy() if base is not None else self.graph.nx_graph_flat()
-        collectors = (n for n in self.graph.nodes if isinstance(self.graph.get_node(n), CollectInvocation))
-        for c in collectors:
-            g.remove_edges_from(list(g.in_edges(c)))
-        return g
+        return self._materializer().iterator_graph(base)
 
     def _get_node_iterators(self, node_id: str, it_graph: Optional[nx.DiGraph] = None) -> list[str]:
-        """Gets iterators for a node"""
-        g = it_graph or self._iterator_graph()
-        return [n for n in nx.ancestors(g, node_id) if isinstance(self.graph.get_node(n), IterateInvocation)]
+        return self._materializer().get_node_iterators(node_id, it_graph)
 
     def _prepare(self, base_g: Optional[nx.DiGraph] = None) -> Optional[str]:
-        # Get flattened source graph
-        g = base_g or self.graph.nx_graph_flat()
-
-        # Find next node that:
-        # - was not already prepared
-        # - is not an iterate node whose inputs have not been executed
-        # - does not have an unexecuted iterate ancestor
-        sorted_nodes = nx.topological_sort(g)
-
-        def unprepared(n: str) -> bool:
-            return n not in self.source_prepared_mapping
-
-        def iter_inputs_ready(n: str) -> bool:
-            if not isinstance(self.graph.get_node(n), IterateInvocation):
-                return True
-            return all(u in self.executed for u, _ in g.in_edges(n))
-
-        def no_unexecuted_iter_ancestors(n: str) -> bool:
-            return not any(
-                isinstance(self.graph.get_node(a), IterateInvocation) and a not in self.executed
-                for a in nx.ancestors(g, n)
-            )
-
-        next_node_id = next(
-            (n for n in sorted_nodes if unprepared(n) and iter_inputs_ready(n) and no_unexecuted_iter_ancestors(n)),
-            None,
-        )
-
-        if next_node_id is None:
-            return None
-
-        # Get all parents of the next node
-        next_node_parents = [u for u, _ in g.in_edges(next_node_id)]
-
-        # Create execution nodes
-        next_node = self.graph.get_node(next_node_id)
-        new_node_ids = []
-        if isinstance(next_node, CollectInvocation):
-            # Collapse all iterator input mappings and create a single execution node for the collect invocation
-            all_iteration_mappings = []
-            for source_node_id in next_node_parents:
-                prepared_nodes = self.source_prepared_mapping[source_node_id]
-                all_iteration_mappings.extend([(source_node_id, p) for p in prepared_nodes])
-
-            create_results = self._create_execution_node(next_node_id, all_iteration_mappings)
-            if create_results is not None:
-                new_node_ids.extend(create_results)
-        else:  # Iterators or normal nodes
-            # Get all iterator combinations for this node
-            # Will produce a list of lists of prepared iterator nodes, from which results can be iterated
-            it_g = self._iterator_graph(g)
-            iterator_nodes = self._get_node_iterators(next_node_id, it_g)
-            iterator_nodes_prepared = [list(self.source_prepared_mapping[n]) for n in iterator_nodes]
-            iterator_node_prepared_combinations = list(itertools.product(*iterator_nodes_prepared))
-
-            # Select the correct prepared parents for each iteration
-            # For every iterator, the parent must either not be a child of that iterator, or must match the prepared iteration for that iterator
-            eg = self.execution_graph.nx_graph_flat()
-            prepared_parent_mappings = [
-                [(n, self._get_iteration_node(n, g, eg, it)) for n in next_node_parents]
-                for it in iterator_node_prepared_combinations
-            ]  # type: ignore
-            prepared_parent_mappings = [m for m in prepared_parent_mappings if all(p[1] is not None for p in m)]
-
-            # Create execution node for each iteration
-            for iteration_mappings in prepared_parent_mappings:
-                create_results = self._create_execution_node(next_node_id, iteration_mappings)  # type: ignore
-                if create_results is not None:
-                    new_node_ids.extend(create_results)
-
-        return next(iter(new_node_ids), None)
+        return self._materializer().prepare(base_g)
 
     def _get_iteration_node(
         self,
@@ -1484,26 +1507,7 @@ class GraphExecutionState(BaseModel):
         execution_graph: nx.DiGraph,
         prepared_iterator_nodes: list[str],
     ) -> Optional[str]:
-        """Gets the prepared version of the specified source node that matches every iteration specified"""
-        prepared_nodes = self.source_prepared_mapping[source_node_id]
-        if len(prepared_nodes) == 1:
-            return next(iter(prepared_nodes))
-
-        # Filter to only iterator nodes that are a parent of the specified node, in tuple format (prepared, source)
-        iterator_source_node_mapping = [(n, self.prepared_source_mapping[n]) for n in prepared_iterator_nodes]
-        parent_iterators = [itn for itn in iterator_source_node_mapping if nx.has_path(graph, itn[1], source_node_id)]
-
-        # If the requested node is an iterator, only accept it if it is compatible with all parent iterators
-        prepared_iterator = next((n for n in prepared_nodes if n in prepared_iterator_nodes), None)
-        if prepared_iterator is not None:
-            if all(nx.has_path(execution_graph, pit[0], prepared_iterator) for pit in parent_iterators):
-                return prepared_iterator
-            return None
-
-        return next(
-            (n for n in prepared_nodes if all(nx.has_path(execution_graph, pit[0], n) for pit in parent_iterators)),
-            None,
-        )
+        return self._materializer().get_iteration_node(source_node_id, graph, execution_graph, prepared_iterator_nodes)
 
     def _get_next_node(self) -> Optional[BaseInvocation]:
         """Gets the next ready node: FIFO within class, drain class before switching."""
