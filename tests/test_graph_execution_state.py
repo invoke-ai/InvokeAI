@@ -353,6 +353,7 @@ def test_if_invocation_output_connects_to_downstream_input():
     assert g.results[prepared_prompt_node_id].prompt == "connected value"
 
 
+@pytest.mark.xfail(strict=True, reason="Legacy eager If-node execution should no longer occur")
 def test_if_graph_current_behavior_executes_both_branches_and_shared_ancestors():
     graph = Graph()
     graph.add_node(BooleanInvocation(id="condition", value=True))
@@ -396,6 +397,7 @@ def test_if_graph_current_behavior_executes_both_branches_and_shared_ancestors()
     assert g.results[prepared_selected_output_id].prompt == "shared value"
 
 
+@pytest.mark.xfail(strict=True, reason="Legacy eager If-node execution should no longer occur")
 def test_if_graph_current_behavior_executes_both_simple_branches():
     graph = Graph()
     graph.add_node(BooleanInvocation(id="condition", value=True))
@@ -417,7 +419,6 @@ def test_if_graph_current_behavior_executes_both_simple_branches():
     assert g.results[prepared_selected_output_id].prompt == "true branch"
 
 
-@pytest.mark.xfail(strict=True, reason="If-node branch pruning has not been implemented yet")
 def test_if_graph_optimized_behavior_executes_only_selected_simple_branch():
     graph = Graph()
     graph.add_node(BooleanInvocation(id="condition", value=True))
@@ -438,7 +439,6 @@ def test_if_graph_optimized_behavior_executes_only_selected_simple_branch():
     assert "false_value" not in executed_source_ids
 
 
-@pytest.mark.xfail(strict=True, reason="If-node branch pruning has not been implemented yet")
 def test_if_graph_optimized_behavior_skips_unselected_branch_but_keeps_shared_ancestors():
     graph = Graph()
     graph.add_node(BooleanInvocation(id="condition", value=True))
@@ -477,7 +477,6 @@ def test_if_graph_optimized_behavior_skips_unselected_branch_but_keeps_shared_an
     assert "false_leaf" not in executed_source_ids
 
 
-@pytest.mark.xfail(strict=True, reason="If-node branch pruning has not been implemented yet")
 def test_if_graph_optimized_behavior_skips_distant_unselected_ancestors_only_when_exclusive():
     graph = Graph()
     graph.add_node(BooleanInvocation(id="condition", value=False))

@@ -28,6 +28,7 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.fields import Input, InputField, OutputField, UIType
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import uuid_string
@@ -913,6 +914,8 @@ class GraphExecutionState(BaseModel):
     ready_order: list[str] = Field(default_factory=list)
     indegree: dict[str, int] = Field(default_factory=dict, description="Remaining unmet input count for exec nodes")
     _iteration_path_cache: dict[str, tuple[int, ...]] = PrivateAttr(default_factory=dict)
+    _if_branch_exclusive_sources: dict[str, dict[str, set[str]]] = PrivateAttr(default_factory=dict)
+    _resolved_if_exec_branches: dict[str, str] = PrivateAttr(default_factory=dict)
 
     def _type_key(self, node_obj: BaseInvocation) -> str:
         return node_obj.__class__.__name__
@@ -970,6 +973,102 @@ class GraphExecutionState(BaseModel):
             self._ready_queues[cls_name] = q
         return q
 
+    def _get_if_branch_exclusive_sources(self, if_node_id: str) -> dict[str, set[str]]:
+        cached = self._if_branch_exclusive_sources.get(if_node_id)
+        if cached is not None:
+            return cached
+
+        branch_sources: dict[str, set[str]] = {}
+        for branch_field in ("true_input", "false_input"):
+            candidate = {e.source.node_id for e in self.graph._get_input_edges(if_node_id, branch_field)}
+            for node_id in list(candidate):
+                candidate.update(nx.ancestors(self.graph.nx_graph_flat(), node_id))
+
+            changed = True
+            while changed:
+                changed = False
+                for node_id in list(candidate):
+                    output_edges = self.graph._get_output_edges(node_id)
+                    if all(
+                        e.destination.node_id in candidate
+                        or (e.destination.node_id == if_node_id and e.destination.field == branch_field)
+                        for e in output_edges
+                    ):
+                        continue
+                    candidate.remove(node_id)
+                    changed = True
+
+            branch_sources[branch_field] = candidate
+
+        self._if_branch_exclusive_sources[if_node_id] = branch_sources
+        return branch_sources
+
+    def _is_deferred_by_unresolved_if(self, source_node_id: str) -> bool:
+        for node_id, node in self.graph.nodes.items():
+            if not isinstance(node, IfInvocation):
+                continue
+            prepared_if_nodes = self.source_prepared_mapping.get(node_id)
+            if prepared_if_nodes and all(prepared_id in self._resolved_if_exec_branches for prepared_id in prepared_if_nodes):
+                continue
+            branches = self._get_if_branch_exclusive_sources(node_id)
+            if source_node_id in branches["true_input"] or source_node_id in branches["false_input"]:
+                return True
+        return False
+
+    def _remove_from_ready_queues(self, exec_node_id: str) -> None:
+        for q in self._ready_queues.values():
+            try:
+                q.remove(exec_node_id)
+            except ValueError:
+                continue
+
+    def _mark_exec_node_skipped(self, exec_node_id: str) -> None:
+        self._remove_from_ready_queues(exec_node_id)
+        self.executed.add(exec_node_id)
+
+        source_node_id = self.prepared_source_mapping[exec_node_id]
+        prepared_nodes = self.source_prepared_mapping[source_node_id]
+        if all(n in self.executed for n in prepared_nodes):
+            self.executed.add(source_node_id)
+
+    def _try_resolve_if_node(self, exec_node_id: str) -> None:
+        if exec_node_id in self._resolved_if_exec_branches:
+            return
+        node = self.execution_graph.get_node(exec_node_id)
+        if not isinstance(node, IfInvocation):
+            return
+
+        condition_edges = self.execution_graph._get_input_edges(exec_node_id, "condition")
+        if any(edge.source.node_id not in self.executed for edge in condition_edges):
+            return
+
+        for edge in condition_edges:
+            setattr(node, edge.destination.field, copydeep(getattr(self.results[edge.source.node_id], edge.source.field)))
+
+        selected_field = "true_input" if node.condition else "false_input"
+        unselected_field = "false_input" if node.condition else "true_input"
+        self._resolved_if_exec_branches[exec_node_id] = selected_field
+
+        source_if_node_id = self.prepared_source_mapping[exec_node_id]
+        exclusive_sources = self._get_if_branch_exclusive_sources(source_if_node_id)
+
+        for edge in self.execution_graph._get_input_edges(exec_node_id, unselected_field):
+            if edge.source.node_id in self.executed:
+                continue
+            if self.indegree[exec_node_id] == 0:
+                raise RuntimeError(f"indegree underflow for {exec_node_id} when pruning {unselected_field}")
+            self.indegree[exec_node_id] -= 1
+
+        for prepared_id, prepared_source in self.prepared_source_mapping.items():
+            if prepared_id in self.executed:
+                continue
+            if prepared_source in exclusive_sources[selected_field]:
+                self._enqueue_if_ready(prepared_id)
+            elif prepared_source in exclusive_sources[unselected_field]:
+                self._mark_exec_node_skipped(prepared_id)
+
+        self._enqueue_if_ready(exec_node_id)
+
     def set_ready_order(self, order: Iterable[Type[BaseInvocation] | str]) -> None:
         names: list[str] = []
         for x in order:
@@ -984,6 +1083,9 @@ class GraphExecutionState(BaseModel):
         if nid not in self.indegree:
             raise KeyError(f"indegree missing for exec node {nid}")
         if self.indegree[nid] != 0 or nid in self.executed:
+            return
+        source_node_id = self.prepared_source_mapping[nid]
+        if self._is_deferred_by_unresolved_if(source_node_id):
             return
         node_obj = self.execution_graph.nodes[nid]
         q = self._queue_for(self._type_key(node_obj))
@@ -1073,6 +1175,7 @@ class GraphExecutionState(BaseModel):
             if self.indegree[child] == 0:
                 raise RuntimeError(f"indegree underflow for {child} from parent {node_id}")
             self.indegree[child] -= 1
+            self._try_resolve_if_node(child)
             if self.indegree[child] == 0:
                 self._enqueue_if_ready(child)
 
@@ -1157,6 +1260,7 @@ class GraphExecutionState(BaseModel):
             inputs = self.execution_graph._get_input_edges(new_node.id)
             unmet = sum(1 for e in inputs if e.source.node_id not in self.executed)
             self.indegree[new_node.id] = unmet
+            self._try_resolve_if_node(new_node.id)
             self._enqueue_if_ready(new_node.id)
 
             new_nodes.append(new_node.id)
@@ -1325,6 +1429,17 @@ class GraphExecutionState(BaseModel):
                 copydeep(getattr(self.results[e.source.node_id], e.source.field)) for e in item_edges
             )
             node.collection = output_collection
+        elif isinstance(node, IfInvocation):
+            selected_field = self._resolved_if_exec_branches.get(node.id)
+            allowed_fields = {"condition", selected_field} if selected_field is not None else {"condition"}
+            for edge in input_edges:
+                if edge.destination.field not in allowed_fields:
+                    continue
+                setattr(
+                    node,
+                    edge.destination.field,
+                    copydeep(getattr(self.results[edge.source.node_id], edge.source.field)),
+                )
         else:
             for edge in input_edges:
                 setattr(
