@@ -1,11 +1,22 @@
-import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Badge, Flex, Spinner, Text } from '@invoke-ai/ui-library';
+import type { ComboboxOnChange, ComboboxOption, SystemStyleObject } from '@invoke-ai/ui-library';
+import { Badge, Combobox, Flex, FormControl, Spinner, Text } from '@invoke-ai/ui-library';
+import { createSelector } from '@reduxjs/toolkit';
 import { EMPTY_ARRAY } from 'app/store/constants';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { memo, useMemo } from 'react';
+import { fieldValueReset } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
+import { NO_DRAG_CLASS, NO_FIT_ON_DOUBLE_CLICK_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
+import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useListWorkflowsInfiniteInfiniteQuery } from 'services/api/endpoints/workflows';
 import type { S } from 'services/api/types';
 
+import {
+  buildSavedWorkflowOptions,
+  getSavedWorkflowSelectionState,
+  getSelectedWorkflowOption,
+} from './callSavedWorkflowsNodeUtils';
 import InvocationNodeHeader from './InvocationNodeHeader';
 
 type Props = {
@@ -45,7 +56,41 @@ const queryOptions = {
 } satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[1];
 
 const CallSavedWorkflowsNode = ({ nodeId, isOpen }: Props) => {
+  const dispatch = useAppDispatch();
   const { items, isLoading, isFetching } = useListWorkflowsInfiniteInfiniteQuery(queryArg, queryOptions);
+  const selectWorkflowId = useMemo(
+    () =>
+      createSelector(selectNodesSlice, (nodes) => {
+        const node = nodes.nodes.find((node) => node.id === nodeId);
+        if (node?.type !== 'invocation') {
+          return '';
+        }
+
+        const workflowId = node.data.inputs.workflow_id?.value;
+        return typeof workflowId === 'string' ? workflowId : '';
+      }),
+    [nodeId]
+  );
+  const workflowId = useAppSelector(selectWorkflowId);
+  const options = useMemo(() => buildSavedWorkflowOptions(items), [items]);
+  const selectionState = useMemo(() => getSavedWorkflowSelectionState(items, workflowId), [items, workflowId]);
+  const selectedOption = useMemo(
+    () => getSelectedWorkflowOption(items, workflowId, 'Missing workflow'),
+    [items, workflowId]
+  );
+
+  const onChange = useCallback<ComboboxOnChange>(
+    (value) => {
+      dispatch(
+        fieldValueReset({
+          nodeId,
+          fieldName: 'workflow_id',
+          value: value?.value ?? '',
+        })
+      );
+    },
+    [dispatch, nodeId]
+  );
 
   return (
     <>
@@ -58,7 +103,17 @@ const CallSavedWorkflowsNode = ({ nodeId, isOpen }: Props) => {
             </Text>
             <Badge variant="subtle">{items.length}</Badge>
           </Flex>
-          {isLoading ? <LoadingState /> : <WorkflowItems items={items} isFetching={isFetching} />}
+          {isLoading ? (
+            <LoadingState />
+          ) : (
+            <WorkflowPicker
+              options={options}
+              selectionState={selectionState}
+              selectedOption={selectedOption}
+              isFetching={isFetching}
+              onChange={onChange}
+            />
+          )}
         </Flex>
       </Flex>
     </>
@@ -76,40 +131,54 @@ const LoadingState = memo(() => {
 });
 LoadingState.displayName = 'LoadingState';
 
-const WorkflowItems = memo(
-  ({ items, isFetching }: { items: S['WorkflowRecordListItemWithThumbnailDTO'][]; isFetching: boolean }) => {
-    const visibleItems = useMemo(() => items.slice(0, 8), [items]);
+const WorkflowPicker = memo(
+  ({
+    options,
+    selectionState,
+    selectedOption,
+    isFetching,
+    onChange,
+  }: {
+    options: ComboboxOption[];
+    selectionState:
+      | { status: 'unselected' }
+      | { status: 'selected'; workflow: S['WorkflowRecordListItemWithThumbnailDTO'] }
+      | { status: 'missing'; workflowId: string };
+    selectedOption: ComboboxOption | null;
+    isFetching: boolean;
+    onChange: ComboboxOnChange;
+  }) => {
+    const { t } = useTranslation();
+    const noOptionsMessage = useCallback(() => t('nodes.noMatchingWorkflows'), [t]);
 
-    if (visibleItems.length === 0) {
-      return <IAINoContentFallback icon={null} label="No saved workflows" fontSize="sm" py={4} />;
+    if (options.length === 0) {
+      return <IAINoContentFallback icon={null} label={t('nodes.noWorkflows')} fontSize="sm" py={4} />;
     }
 
     return (
       <Flex flexDir="column" gap={1}>
-        {visibleItems.map((workflow) => (
-          <Flex
-            key={workflow.workflow_id}
-            alignItems="center"
-            justifyContent="space-between"
-            gap={2}
-            borderRadius="base"
-            bg="base.800"
-            px={2}
-            py={1.5}
-          >
-            <Text fontSize="sm" noOfLines={1}>
-              {workflow.name}
+        <FormControl className={`${NO_WHEEL_CLASS} ${NO_DRAG_CLASS} ${NO_FIT_ON_DOUBLE_CLICK_CLASS}`}>
+          <Combobox
+            value={selectedOption}
+            options={options}
+            onChange={onChange}
+            placeholder={t('controlLayers.workflowIntegration.selectPlaceholder')}
+            noOptionsMessage={noOptionsMessage}
+            isClearable
+          />
+        </FormControl>
+        {selectionState.status === 'selected' ? (
+          <Flex alignItems="center" gap={1} flexWrap="wrap">
+            <Text fontSize="xs" variant="subtext" noOfLines={1}>
+              {selectionState.workflow.name}
             </Text>
-            <Flex alignItems="center" gap={1} flexShrink={0}>
-              {workflow.category === 'default' && <Badge variant="subtle">Default</Badge>}
-              {workflow.is_public && workflow.category !== 'default' && <Badge variant="subtle">Shared</Badge>}
-            </Flex>
+            {selectionState.workflow.category === 'default' && <Badge variant="subtle">Default</Badge>}
+            {selectionState.workflow.is_public && selectionState.workflow.category !== 'default' && (
+              <Badge variant="subtle">Shared</Badge>
+            )}
           </Flex>
-        ))}
-        {items.length > visibleItems.length && (
-          <Text variant="subtext" fontSize="xs">
-            Showing {visibleItems.length} of {items.length} workflows
-          </Text>
+        ) : (
+          <SelectionStatusBadge selectionState={selectionState} />
         )}
         {isFetching && (
           <Text variant="subtext" fontSize="xs">
@@ -120,4 +189,26 @@ const WorkflowItems = memo(
     );
   }
 );
-WorkflowItems.displayName = 'WorkflowItems';
+WorkflowPicker.displayName = 'WorkflowPicker';
+
+const SelectionStatusBadge = memo(
+  ({
+    selectionState,
+  }: {
+    selectionState:
+      | { status: 'unselected' }
+      | { status: 'selected'; workflow: S['WorkflowRecordListItemWithThumbnailDTO'] }
+      | { status: 'missing'; workflowId: string };
+  }) => {
+    if (selectionState.status === 'selected') {
+      return null;
+    }
+
+    return (
+      <Badge variant="subtle">
+        {selectionState.status === 'missing' ? 'Missing workflow' : 'Choose a workflow'}
+      </Badge>
+    );
+  }
+);
+SelectionStatusBadge.displayName = 'SelectionStatusBadge';

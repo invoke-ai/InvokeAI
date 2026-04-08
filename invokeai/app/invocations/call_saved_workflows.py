@@ -23,4 +23,7 @@ class CallSavedWorkflowsInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
+        if not self.workflow_id:
+            raise ValueError("A saved workflow must be selected before executing call_saved_workflows.")
+
         return IntegerOutput(value=0)

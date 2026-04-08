@@ -25,6 +25,8 @@ import type {
 } from 'features/controlLayers/store/types';
 import { getControlLayerState, getReferenceImageState } from 'features/controlLayers/store/util';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
+import { fieldValueReset } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
@@ -122,6 +124,26 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('workflow_deleted', (data) => {
     log.debug({ data }, 'Workflow deleted');
     invalidateWorkflowLibrary();
+
+    const nodes = selectNodesSlice(getState()).nodes;
+
+    for (const node of nodes) {
+      if (node.type !== 'invocation' || node.data.type !== 'call_saved_workflows') {
+        continue;
+      }
+
+      if (node.data.inputs.workflow_id?.value !== data.workflow_id) {
+        continue;
+      }
+
+      dispatch(
+        fieldValueReset({
+          nodeId: node.id,
+          fieldName: 'workflow_id',
+          value: '',
+        })
+      );
+    }
   });
 
   socket.on('invocation_started', (data) => {
