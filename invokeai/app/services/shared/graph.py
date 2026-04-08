@@ -277,61 +277,113 @@ class _ExecutionMaterializer:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
 
+    def _get_iterator_iteration_count(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> int:
+        input_collection_edge = next(iter(self._state.graph._get_input_edges(node_id, COLLECTION_FIELD)))
+        input_collection_prepared_node_id = next(
+            prepared_id
+            for source_id, prepared_id in iteration_node_map
+            if source_id == input_collection_edge.source.node_id
+        )
+        input_collection_output = self._state.results[input_collection_prepared_node_id]
+        input_collection = getattr(input_collection_output, input_collection_edge.source.field)
+        return len(input_collection)
+
+    def _get_new_node_iterations(
+        self, node: BaseInvocation, node_id: str, iteration_node_map: list[tuple[str, str]]
+    ) -> list[int]:
+        if not isinstance(node, IterateInvocation):
+            return [-1]
+
+        iteration_count = self._get_iterator_iteration_count(node_id, iteration_node_map)
+        if iteration_count == 0:
+            return []
+        return list(range(iteration_count))
+
+    def _build_execution_edges(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> list[Edge]:
+        input_edges = self._state.graph._get_input_edges(node_id)
+        new_edges: list[Edge] = []
+        for edge in input_edges:
+            matching_inputs = [
+                prepared_id for source_id, prepared_id in iteration_node_map if source_id == edge.source.node_id
+            ]
+            for input_node_id in matching_inputs:
+                new_edges.append(
+                    Edge(
+                        source=EdgeConnection(node_id=input_node_id, field=edge.source.field),
+                        destination=EdgeConnection(node_id="", field=edge.destination.field),
+                    )
+                )
+        return new_edges
+
+    def _create_execution_node_copy(self, node: BaseInvocation, node_id: str, iteration_index: int) -> BaseInvocation:
+        new_node = node.model_copy(deep=True)
+        new_node.id = uuid_string()
+
+        if isinstance(new_node, IterateInvocation):
+            new_node.index = iteration_index
+
+        self._state.execution_graph.add_node(new_node)
+        self._state._register_prepared_exec_node(new_node.id, node_id)
+        return new_node
+
+    def _attach_execution_edges(self, exec_node_id: str, new_edges: list[Edge]) -> None:
+        for edge in new_edges:
+            self._state.execution_graph.add_edge(
+                Edge(
+                    source=edge.source,
+                    destination=EdgeConnection(node_id=exec_node_id, field=edge.destination.field),
+                )
+            )
+
+    def _initialize_execution_node(self, exec_node_id: str) -> None:
+        inputs = self._state.execution_graph._get_input_edges(exec_node_id)
+        unmet = sum(1 for edge in inputs if edge.source.node_id not in self._state.executed)
+        self._state.indegree[exec_node_id] = unmet
+        self._state._try_resolve_if_node(exec_node_id)
+        self._state._enqueue_if_ready(exec_node_id)
+
+    def _get_collect_iteration_mappings(self, parent_node_ids: list[str]) -> list[tuple[str, str]]:
+        all_iteration_mappings: list[tuple[str, str]] = []
+        for source_node_id in parent_node_ids:
+            prepared_nodes = self._state.source_prepared_mapping[source_node_id]
+            all_iteration_mappings.extend((source_node_id, prepared_id) for prepared_id in prepared_nodes)
+        return all_iteration_mappings
+
+    def _get_parent_iteration_mappings(self, next_node_id: str, graph: nx.DiGraph) -> list[list[tuple[str, str]]]:
+        parent_node_ids = [source_id for source_id, _ in graph.in_edges(next_node_id)]
+        iterator_graph = self.iterator_graph(graph)
+        iterator_nodes = self.get_node_iterators(next_node_id, iterator_graph)
+        iterator_nodes_prepared = [list(self._state.source_prepared_mapping[node_id]) for node_id in iterator_nodes]
+        iterator_node_prepared_combinations = list(itertools.product(*iterator_nodes_prepared))
+
+        execution_graph = self._state.execution_graph.nx_graph_flat()
+        prepared_parent_mappings = [
+            [
+                (node_id, self.get_iteration_node(node_id, graph, execution_graph, prepared_iterators))
+                for node_id in parent_node_ids
+            ]
+            for prepared_iterators in iterator_node_prepared_combinations
+        ]
+        return [
+            mapping
+            for mapping in prepared_parent_mappings
+            if all(prepared_id is not None for _, prepared_id in mapping)
+        ]
+
     def create_execution_node(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
         """Prepares an iteration node and connects all edges, returning the new node id"""
 
         node = self._state.graph.get_node(node_id)
+        iteration_indexes = self._get_new_node_iterations(node, node_id, iteration_node_map)
+        if not iteration_indexes:
+            return []
 
-        self_iteration_count = -1
-
-        # If this is an iterator node, we must create a copy for each iteration
-        if isinstance(node, IterateInvocation):
-            input_collection_edge = next(iter(self._state.graph._get_input_edges(node_id, COLLECTION_FIELD)))
-            input_collection_prepared_node_id = next(
-                n[1] for n in iteration_node_map if n[0] == input_collection_edge.source.node_id
-            )
-            input_collection_prepared_node_output = self._state.results[input_collection_prepared_node_id]
-            input_collection = getattr(input_collection_prepared_node_output, input_collection_edge.source.field)
-            self_iteration_count = len(input_collection)
-
+        new_edges = self._build_execution_edges(node_id, iteration_node_map)
         new_nodes: list[str] = []
-        if self_iteration_count == 0:
-            return new_nodes
-
-        input_edges = self._state.graph._get_input_edges(node_id)
-
-        new_edges: list[Edge] = []
-        for edge in input_edges:
-            for input_node_id in (n[1] for n in iteration_node_map if n[0] == edge.source.node_id):
-                new_edge = Edge(
-                    source=EdgeConnection(node_id=input_node_id, field=edge.source.field),
-                    destination=EdgeConnection(node_id="", field=edge.destination.field),
-                )
-                new_edges.append(new_edge)
-
-        for i in range(self_iteration_count) if self_iteration_count > 0 else [-1]:
-            new_node = node.model_copy(deep=True)
-            new_node.id = uuid_string()
-
-            if isinstance(new_node, IterateInvocation):
-                new_node.index = i
-
-            self._state.execution_graph.add_node(new_node)
-            self._state._register_prepared_exec_node(new_node.id, node_id)
-
-            for edge in new_edges:
-                new_edge = Edge(
-                    source=edge.source,
-                    destination=EdgeConnection(node_id=new_node.id, field=edge.destination.field),
-                )
-                self._state.execution_graph.add_edge(new_edge)
-
-            inputs = self._state.execution_graph._get_input_edges(new_node.id)
-            unmet = sum(1 for e in inputs if e.source.node_id not in self._state.executed)
-            self._state.indegree[new_node.id] = unmet
-            self._state._try_resolve_if_node(new_node.id)
-            self._state._enqueue_if_ready(new_node.id)
-
+        for iteration_index in iteration_indexes:
+            new_node = self._create_execution_node_copy(node, node_id, iteration_index)
+            self._attach_execution_edges(new_node.id, new_edges)
+            self._initialize_execution_node(new_node.id)
             new_nodes.append(new_node.id)
 
         return new_nodes
@@ -377,58 +429,39 @@ class _ExecutionMaterializer:
 
     def prepare(self, base_g: Optional[nx.DiGraph] = None) -> Optional[str]:
         g = base_g or self._state.graph.nx_graph_flat()
-
-        sorted_nodes = nx.topological_sort(g)
-
-        def unprepared(n: str) -> bool:
-            return n not in self._state.source_prepared_mapping
-
-        def iter_inputs_ready(n: str) -> bool:
-            if not isinstance(self._state.graph.get_node(n), IterateInvocation):
-                return True
-            return all(u in self._state.executed for u, _ in g.in_edges(n))
-
-        def no_unexecuted_iter_ancestors(n: str) -> bool:
-            return not any(
-                isinstance(self._state.graph.get_node(a), IterateInvocation) and a not in self._state.executed
-                for a in nx.ancestors(g, n)
-            )
-
         next_node_id = next(
-            (n for n in sorted_nodes if unprepared(n) and iter_inputs_ready(n) and no_unexecuted_iter_ancestors(n)),
+            (
+                node_id
+                for node_id in nx.topological_sort(g)
+                if node_id not in self._state.source_prepared_mapping
+                and (
+                    not isinstance(self._state.graph.get_node(node_id), IterateInvocation)
+                    or all(source_id in self._state.executed for source_id, _ in g.in_edges(node_id))
+                )
+                and not any(
+                    isinstance(self._state.graph.get_node(ancestor_id), IterateInvocation)
+                    and ancestor_id not in self._state.executed
+                    for ancestor_id in nx.ancestors(g, node_id)
+                )
+            ),
             None,
         )
 
         if next_node_id is None:
             return None
 
-        next_node_parents = [u for u, _ in g.in_edges(next_node_id)]
         next_node = self._state.graph.get_node(next_node_id)
         new_node_ids: list[str] = []
 
         if isinstance(next_node, CollectInvocation):
-            all_iteration_mappings = []
-            for source_node_id in next_node_parents:
-                prepared_nodes = self._state.source_prepared_mapping[source_node_id]
-                all_iteration_mappings.extend([(source_node_id, p) for p in prepared_nodes])
-
-            create_results = self.create_execution_node(next_node_id, all_iteration_mappings)
+            next_node_parents = [source_id for source_id, _ in g.in_edges(next_node_id)]
+            create_results = self.create_execution_node(
+                next_node_id, self._get_collect_iteration_mappings(next_node_parents)
+            )
             if create_results is not None:
                 new_node_ids.extend(create_results)
         else:
-            it_g = self.iterator_graph(g)
-            iterator_nodes = self.get_node_iterators(next_node_id, it_g)
-            iterator_nodes_prepared = [list(self._state.source_prepared_mapping[n]) for n in iterator_nodes]
-            iterator_node_prepared_combinations = list(itertools.product(*iterator_nodes_prepared))
-
-            eg = self._state.execution_graph.nx_graph_flat()
-            prepared_parent_mappings = [
-                [(n, self.get_iteration_node(n, g, eg, it)) for n in next_node_parents]
-                for it in iterator_node_prepared_combinations
-            ]
-            prepared_parent_mappings = [m for m in prepared_parent_mappings if all(p[1] is not None for p in m)]
-
-            for iteration_mappings in prepared_parent_mappings:
+            for iteration_mappings in self._get_parent_iteration_mappings(next_node_id, g):
                 create_results = self.create_execution_node(next_node_id, iteration_mappings)
                 if create_results is not None:
                     new_node_ids.extend(create_results)
