@@ -98,6 +98,32 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     setIsConnected(false);
   });
 
+  const invalidateWorkflowLibrary = () => {
+    dispatch(
+      api.util.invalidateTags([
+        { type: 'Workflow', id: LIST_TAG },
+        'WorkflowTags',
+        'WorkflowTagCounts',
+        'WorkflowCategoryCounts',
+      ])
+    );
+  };
+
+  socket.on('workflow_created', (data) => {
+    log.debug({ data }, 'Workflow created');
+    invalidateWorkflowLibrary();
+  });
+
+  socket.on('workflow_updated', (data) => {
+    log.debug({ data }, 'Workflow updated');
+    invalidateWorkflowLibrary();
+  });
+
+  socket.on('workflow_deleted', (data) => {
+    log.debug({ data }, 'Workflow deleted');
+    invalidateWorkflowLibrary();
+  });
+
   socket.on('invocation_started', (data) => {
     if (finishedQueueItemIds.has(data.item_id)) {
       return;

@@ -66,15 +66,23 @@ async def update_workflow(
     workflow: Workflow = Body(description="The updated workflow", embed=True),
 ) -> WorkflowRecordDTO:
     """Updates a workflow"""
+    try:
+        existing = ApiDependencies.invoker.services.workflow_records.get(workflow.id)
+    except WorkflowNotFoundError:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
     config = ApiDependencies.invoker.services.configuration
     if config.multiuser:
-        try:
-            existing = ApiDependencies.invoker.services.workflow_records.get(workflow.id)
-        except WorkflowNotFoundError:
-            raise HTTPException(status_code=404, detail="Workflow not found")
         if not current_user.is_admin and existing.user_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
-    return ApiDependencies.invoker.services.workflow_records.update(workflow=workflow)
+    updated = ApiDependencies.invoker.services.workflow_records.update(workflow=workflow)
+    ApiDependencies.invoker.services.events.emit_workflow_updated(
+        workflow_id=updated.workflow_id,
+        user_id=updated.user_id,
+        old_is_public=existing.is_public,
+        new_is_public=updated.is_public,
+    )
+    return updated
 
 
 @workflows_router.delete(
@@ -86,12 +94,13 @@ async def delete_workflow(
     workflow_id: str = Path(description="The workflow to delete"),
 ) -> None:
     """Deletes a workflow"""
+    try:
+        existing = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+    except WorkflowNotFoundError:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
     config = ApiDependencies.invoker.services.configuration
     if config.multiuser:
-        try:
-            existing = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
-        except WorkflowNotFoundError:
-            raise HTTPException(status_code=404, detail="Workflow not found")
         if not current_user.is_admin and existing.user_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="Not authorized to delete this workflow")
     try:
@@ -100,6 +109,11 @@ async def delete_workflow(
         # It's OK if the workflow has no thumbnail file. We can still delete the workflow.
         pass
     ApiDependencies.invoker.services.workflow_records.delete(workflow_id)
+    ApiDependencies.invoker.services.events.emit_workflow_deleted(
+        workflow_id=existing.workflow_id,
+        user_id=existing.user_id,
+        is_public=existing.is_public,
+    )
 
 
 @workflows_router.post(
@@ -114,7 +128,13 @@ async def create_workflow(
     workflow: WorkflowWithoutID = Body(description="The workflow to create", embed=True),
 ) -> WorkflowRecordDTO:
     """Creates a workflow"""
-    return ApiDependencies.invoker.services.workflow_records.create(workflow=workflow, user_id=current_user.user_id)
+    created = ApiDependencies.invoker.services.workflow_records.create(workflow=workflow, user_id=current_user.user_id)
+    ApiDependencies.invoker.services.events.emit_workflow_created(
+        workflow_id=created.workflow_id,
+        user_id=created.user_id,
+        is_public=created.is_public,
+    )
+    return created
 
 
 @workflows_router.get(
@@ -302,9 +322,14 @@ async def update_workflow_is_public(
     if config.multiuser and not current_user.is_admin and existing.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
 
-    return ApiDependencies.invoker.services.workflow_records.update_is_public(
-        workflow_id=workflow_id, is_public=is_public
+    updated = ApiDependencies.invoker.services.workflow_records.update_is_public(workflow_id=workflow_id, is_public=is_public)
+    ApiDependencies.invoker.services.events.emit_workflow_updated(
+        workflow_id=updated.workflow_id,
+        user_id=updated.user_id,
+        old_is_public=existing.is_public,
+        new_is_public=updated.is_public,
     )
+    return updated
 
 
 @workflows_router.get("/tags", operation_id="get_all_tags")

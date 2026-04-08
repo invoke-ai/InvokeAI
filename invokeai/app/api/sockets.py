@@ -37,6 +37,10 @@ from invokeai.app.services.events.events_common import (
     QueueEventBase,
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
+    WorkflowCreatedEvent,
+    WorkflowDeletedEvent,
+    WorkflowEventBase,
+    WorkflowUpdatedEvent,
     register_events,
 )
 from invokeai.backend.util.logging import InvokeAILogger
@@ -86,6 +90,7 @@ MODEL_EVENTS = {
 }
 
 BULK_DOWNLOAD_EVENTS = {BulkDownloadStartedEvent, BulkDownloadCompleteEvent, BulkDownloadErrorEvent}
+WORKFLOW_EVENTS = {WorkflowCreatedEvent, WorkflowUpdatedEvent, WorkflowDeletedEvent}
 
 
 class SocketIO:
@@ -115,6 +120,7 @@ class SocketIO:
         register_events(QUEUE_EVENTS, self._handle_queue_event)
         register_events(MODEL_EVENTS, self._handle_model_event)
         register_events(BULK_DOWNLOAD_EVENTS, self._handle_bulk_image_download_event)
+        register_events(WORKFLOW_EVENTS, self._handle_workflow_event)
 
     async def _handle_connect(self, sid: str, environ: dict, auth: dict | None) -> bool:
         """Handle socket connection and authenticate the user.
@@ -145,6 +151,10 @@ class SocketIO:
                 logger.info(
                     f"Socket {sid} connected with user_id: {token_data.user_id}, is_admin: {token_data.is_admin}"
                 )
+                await self._sio.enter_room(sid, f"user:{token_data.user_id}")
+                await self._sio.enter_room(sid, "workflows:shared")
+                if token_data.is_admin:
+                    await self._sio.enter_room(sid, "admin")
                 return True
 
         # If no valid token, store system user for backward compatibility
@@ -266,3 +276,28 @@ class SocketIO:
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
         await self._sio.emit(event=event[0], data=event[1].model_dump(mode="json"), room=event[1].bulk_download_id)
+
+    async def _handle_workflow_event(self, event: FastAPIEvent[WorkflowEventBase]) -> None:
+        event_name, event_data = event
+        payload = event_data.model_dump(mode="json")
+
+        await self._sio.emit(event=event_name, data=payload, room=f"user:{event_data.user_id}")
+        await self._sio.emit(event=event_name, data=payload, room="admin")
+
+        if event_name == "workflow_created":
+            if getattr(event_data, "is_public", False):
+                await self._sio.emit(event=event_name, data=payload, room="workflows:shared")
+            return
+
+        if event_name == "workflow_deleted":
+            if getattr(event_data, "is_public", False):
+                await self._sio.emit(event=event_name, data=payload, room="workflows:shared")
+            return
+
+        if event_name == "workflow_updated":
+            if getattr(event_data, "new_is_public", False):
+                await self._sio.emit(event=event_name, data=payload, room="workflows:shared")
+            elif getattr(event_data, "old_is_public", False):
+                await self._sio.emit(
+                    event="workflow_deleted", data={"workflow_id": event_data.workflow_id}, room="workflows:shared"
+                )
