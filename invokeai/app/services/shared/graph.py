@@ -577,24 +577,20 @@ class _ExecutionRuntime:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
 
-    def get_iteration_path(self, exec_node_id: str) -> tuple[int, ...]:
-        """Best-effort outer->inner iteration indices for an execution node, stopping at collectors."""
+    def _get_cached_iteration_path(self, exec_node_id: str) -> Optional[tuple[int, ...]]:
         registry = self._state._prepared_registry()
         metadata_iteration_path = registry.get_iteration_path(exec_node_id)
         if metadata_iteration_path is not None:
             return metadata_iteration_path
 
-        cached = self._state._iteration_path_cache.get(exec_node_id)
-        if cached is not None:
-            return cached
+        return self._state._iteration_path_cache.get(exec_node_id)
 
-        source_node_id = (
-            registry.get_source_node_id(exec_node_id) if exec_node_id in self._state.prepared_source_mapping else None
-        )
-        if source_node_id is None:
-            self._state._iteration_path_cache[exec_node_id] = ()
-            return ()
+    def _get_iteration_source_node_id(self, exec_node_id: str) -> Optional[str]:
+        if exec_node_id not in self._state.prepared_source_mapping:
+            return None
+        return self._state._prepared_registry().get_source_node_id(exec_node_id)
 
+    def _get_ordered_iterator_sources(self, source_node_id: str) -> list[str]:
         iterator_graph = self._state._iterator_graph(self._state.graph.nx_graph())
         iterator_sources = [
             node_id
@@ -605,14 +601,22 @@ class _ExecutionRuntime:
         topo = list(nx.topological_sort(iterator_graph))
         topo_index = {node_id: i for i, node_id in enumerate(topo)}
         iterator_sources.sort(key=lambda node_id: topo_index.get(node_id, 0))
+        return iterator_sources
 
+    def _get_iterator_exec_id(
+        self, iterator_source_id: str, exec_node_id: str, execution_graph: nx.DiGraph
+    ) -> Optional[str]:
+        prepared = self._state.source_prepared_mapping.get(iterator_source_id)
+        if not prepared:
+            return None
+        return next((pid for pid in prepared if nx.has_path(execution_graph, pid, exec_node_id)), None)
+
+    def _build_iteration_path(self, exec_node_id: str, source_node_id: str) -> tuple[int, ...]:
+        iterator_sources = self._get_ordered_iterator_sources(source_node_id)
         execution_graph = self._state.execution_graph.nx_graph()
         path: list[int] = []
         for iterator_source_id in iterator_sources:
-            prepared = self._state.source_prepared_mapping.get(iterator_source_id)
-            if not prepared:
-                continue
-            iterator_exec_id = next((pid for pid in prepared if nx.has_path(execution_graph, pid, exec_node_id)), None)
+            iterator_exec_id = self._get_iterator_exec_id(iterator_source_id, exec_node_id, execution_graph)
             if iterator_exec_id is None:
                 continue
             iterator_node = self._state.execution_graph.nodes.get(iterator_exec_id)
@@ -623,52 +627,78 @@ class _ExecutionRuntime:
         if isinstance(node_obj, IterateInvocation):
             path.append(node_obj.index)
 
-        result = tuple(path)
-        self._state._iteration_path_cache[exec_node_id] = result
-        registry.set_iteration_path(exec_node_id, result)
-        return result
+        return tuple(path)
+
+    def _cache_iteration_path(self, exec_node_id: str, iteration_path: tuple[int, ...]) -> tuple[int, ...]:
+        self._state._iteration_path_cache[exec_node_id] = iteration_path
+        self._state._prepared_registry().set_iteration_path(exec_node_id, iteration_path)
+        return iteration_path
+
+    def get_iteration_path(self, exec_node_id: str) -> tuple[int, ...]:
+        """Best-effort outer->inner iteration indices for an execution node, stopping at collectors."""
+        cached = self._get_cached_iteration_path(exec_node_id)
+        if cached is not None:
+            return cached
+
+        source_node_id = self._get_iteration_source_node_id(exec_node_id)
+        if source_node_id is None:
+            return self._cache_iteration_path(exec_node_id, ())
+
+        return self._cache_iteration_path(exec_node_id, self._build_iteration_path(exec_node_id, source_node_id))
+
+    def _sort_collect_input_edges(self, input_edges: list[Edge], field_name: str) -> list[Edge]:
+        matching_edges = [edge for edge in input_edges if edge.destination.field == field_name]
+        matching_edges.sort(key=lambda edge: (self.get_iteration_path(edge.source.node_id), edge.source.node_id))
+        return matching_edges
+
+    def _get_copied_result_value(self, edge: Edge) -> Any:
+        return copydeep(getattr(self._state.results[edge.source.node_id], edge.source.field))
+
+    def _build_collect_collection(self, input_edges: list[Edge]) -> list[Any]:
+        item_edges = self._sort_collect_input_edges(input_edges, ITEM_FIELD)
+        collection_edges = self._sort_collect_input_edges(input_edges, COLLECTION_FIELD)
+
+        output_collection = []
+        for edge in collection_edges:
+            source_value = self._get_copied_result_value(edge)
+            if isinstance(source_value, list):
+                output_collection.extend(source_value)
+            else:
+                output_collection.append(source_value)
+        output_collection.extend(self._get_copied_result_value(edge) for edge in item_edges)
+        return output_collection
+
+    def _set_node_inputs(
+        self, node: BaseInvocation, input_edges: list[Edge], allowed_fields: Optional[set[str]] = None
+    ) -> None:
+        for edge in input_edges:
+            if allowed_fields is not None and edge.destination.field not in allowed_fields:
+                continue
+            setattr(node, edge.destination.field, self._get_copied_result_value(edge))
+
+    def _prepare_collect_inputs(self, node: "CollectInvocation", input_edges: list[Edge]) -> None:
+        node.collection = self._build_collect_collection(input_edges)
+
+    def _prepare_if_inputs(self, node: IfInvocation, input_edges: list[Edge]) -> None:
+        selected_field = self._state._resolved_if_exec_branches.get(node.id)
+        allowed_fields = {"condition", selected_field} if selected_field is not None else {"condition"}
+        self._set_node_inputs(node, input_edges, allowed_fields)
+
+    def _prepare_default_inputs(self, node: BaseInvocation, input_edges: list[Edge]) -> None:
+        self._set_node_inputs(node, input_edges)
 
     def prepare_inputs(self, node: BaseInvocation) -> None:
         input_edges = self._state.execution_graph._get_input_edges(node.id)
 
         if isinstance(node, CollectInvocation):
-            item_edges = [e for e in input_edges if e.destination.field == ITEM_FIELD]
-            item_edges.sort(key=lambda e: (self.get_iteration_path(e.source.node_id), e.source.node_id))
-            collection_edges = [e for e in input_edges if e.destination.field == COLLECTION_FIELD]
-            collection_edges.sort(key=lambda e: (self.get_iteration_path(e.source.node_id), e.source.node_id))
-
-            output_collection = []
-            for edge in collection_edges:
-                source_value = copydeep(getattr(self._state.results[edge.source.node_id], edge.source.field))
-                if isinstance(source_value, list):
-                    output_collection.extend(source_value)
-                else:
-                    output_collection.append(source_value)
-            output_collection.extend(
-                copydeep(getattr(self._state.results[e.source.node_id], e.source.field)) for e in item_edges
-            )
-            node.collection = output_collection
+            self._prepare_collect_inputs(node, input_edges)
             return
 
         if isinstance(node, IfInvocation):
-            selected_field = self._state._resolved_if_exec_branches.get(node.id)
-            allowed_fields = {"condition", selected_field} if selected_field is not None else {"condition"}
-            for edge in input_edges:
-                if edge.destination.field not in allowed_fields:
-                    continue
-                setattr(
-                    node,
-                    edge.destination.field,
-                    copydeep(getattr(self._state.results[edge.source.node_id], edge.source.field)),
-                )
+            self._prepare_if_inputs(node, input_edges)
             return
 
-        for edge in input_edges:
-            setattr(
-                node,
-                edge.destination.field,
-                copydeep(getattr(self._state.results[edge.source.node_id], edge.source.field)),
-            )
+        self._prepare_default_inputs(node, input_edges)
 
 
 def get_output_field_type(node: BaseInvocation, field: str) -> Any:
