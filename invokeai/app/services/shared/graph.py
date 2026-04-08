@@ -72,6 +72,50 @@ class _PreparedExecNodeMetadata:
     state: str = "pending"
 
 
+class _PreparedExecRegistry:
+    def __init__(
+        self,
+        prepared_source_mapping: dict[str, str],
+        source_prepared_mapping: dict[str, set[str]],
+        metadata: dict[str, _PreparedExecNodeMetadata],
+    ) -> None:
+        self._prepared_source_mapping = prepared_source_mapping
+        self._source_prepared_mapping = source_prepared_mapping
+        self._metadata = metadata
+
+    def register(self, exec_node_id: str, source_node_id: str) -> None:
+        self._prepared_source_mapping[exec_node_id] = source_node_id
+        self._metadata[exec_node_id] = _PreparedExecNodeMetadata(source_node_id=source_node_id)
+        if source_node_id not in self._source_prepared_mapping:
+            self._source_prepared_mapping[source_node_id] = set()
+        self._source_prepared_mapping[source_node_id].add(exec_node_id)
+
+    def get_metadata(self, exec_node_id: str) -> _PreparedExecNodeMetadata:
+        metadata = self._metadata.get(exec_node_id)
+        if metadata is None:
+            metadata = _PreparedExecNodeMetadata(source_node_id=self._prepared_source_mapping[exec_node_id])
+            self._metadata[exec_node_id] = metadata
+        return metadata
+
+    def get_source_node_id(self, exec_node_id: str) -> str:
+        metadata = self._metadata.get(exec_node_id)
+        if metadata is not None:
+            return metadata.source_node_id
+        return self._prepared_source_mapping[exec_node_id]
+
+    def get_prepared_ids(self, source_node_id: str) -> set[str]:
+        return self._source_prepared_mapping.get(source_node_id, set())
+
+    def set_state(self, exec_node_id: str, state: str) -> None:
+        self.get_metadata(exec_node_id).state = state
+
+    def get_iteration_path(self, exec_node_id: str) -> Optional[tuple[int, ...]]:
+        return self._metadata.get(exec_node_id, _PreparedExecNodeMetadata(source_node_id="")).iteration_path
+
+    def set_iteration_path(self, exec_node_id: str, iteration_path: tuple[int, ...]) -> None:
+        self.get_metadata(exec_node_id).iteration_path = iteration_path
+
+
 def get_output_field_type(node: BaseInvocation, field: str) -> Any:
     # TODO(psyche): This is awkward - if field_info is None, it means the field is not defined in the output, which
     # really should raise. The consumers of this utility expect it to never raise, and return None instead. Fixing this
@@ -925,29 +969,35 @@ class GraphExecutionState(BaseModel):
     _if_branch_exclusive_sources: dict[str, dict[str, set[str]]] = PrivateAttr(default_factory=dict)
     _resolved_if_exec_branches: dict[str, str] = PrivateAttr(default_factory=dict)
     _prepared_exec_metadata: dict[str, _PreparedExecNodeMetadata] = PrivateAttr(default_factory=dict)
+    _prepared_exec_registry: Optional[_PreparedExecRegistry] = PrivateAttr(default=None)
 
     def _type_key(self, node_obj: BaseInvocation) -> str:
         return node_obj.__class__.__name__
 
+    def _prepared_registry(self) -> _PreparedExecRegistry:
+        if self._prepared_exec_registry is None:
+            self._prepared_exec_registry = _PreparedExecRegistry(
+                prepared_source_mapping=self.prepared_source_mapping,
+                source_prepared_mapping=self.source_prepared_mapping,
+                metadata=self._prepared_exec_metadata,
+            )
+        return self._prepared_exec_registry
+
     def _register_prepared_exec_node(self, exec_node_id: str, source_node_id: str) -> None:
-        self._prepared_exec_metadata[exec_node_id] = _PreparedExecNodeMetadata(source_node_id=source_node_id)
+        self._prepared_registry().register(exec_node_id, source_node_id)
 
     def _get_prepared_exec_metadata(self, exec_node_id: str) -> _PreparedExecNodeMetadata:
-        metadata = self._prepared_exec_metadata.get(exec_node_id)
-        if metadata is None:
-            source_node_id = self.prepared_source_mapping[exec_node_id]
-            metadata = _PreparedExecNodeMetadata(source_node_id=source_node_id)
-            self._prepared_exec_metadata[exec_node_id] = metadata
-        return metadata
+        return self._prepared_registry().get_metadata(exec_node_id)
 
     def _set_prepared_exec_state(self, exec_node_id: str, state: str) -> None:
-        self._get_prepared_exec_metadata(exec_node_id).state = state
+        self._prepared_registry().set_state(exec_node_id, state)
 
     def _get_iteration_path(self, exec_node_id: str) -> tuple[int, ...]:
         """Best-effort outer->inner iteration indices for an execution node, stopping at collectors."""
-        metadata = self._prepared_exec_metadata.get(exec_node_id)
-        if metadata is not None and metadata.iteration_path is not None:
-            return metadata.iteration_path
+        registry = self._prepared_registry()
+        metadata_iteration_path = registry.get_iteration_path(exec_node_id)
+        if metadata_iteration_path is not None:
+            return metadata_iteration_path
 
         cached = self._iteration_path_cache.get(exec_node_id)
         if cached is not None:
@@ -955,7 +1005,7 @@ class GraphExecutionState(BaseModel):
 
         # Only prepared execution nodes participate; otherwise treat as non-iterated.
         source_node_id = (
-            metadata.source_node_id if metadata is not None else self.prepared_source_mapping.get(exec_node_id)
+            registry.get_source_node_id(exec_node_id) if exec_node_id in self.prepared_source_mapping else None
         )
         if source_node_id is None:
             self._iteration_path_cache[exec_node_id] = ()
@@ -993,8 +1043,7 @@ class GraphExecutionState(BaseModel):
 
         result = tuple(path)
         self._iteration_path_cache[exec_node_id] = result
-        if metadata is not None:
-            metadata.iteration_path = result
+        registry.set_iteration_path(exec_node_id, result)
         return result
 
     def _queue_for(self, cls_name: str) -> Deque[str]:
@@ -1035,7 +1084,8 @@ class GraphExecutionState(BaseModel):
         return branch_sources
 
     def _is_deferred_by_unresolved_if(self, exec_node_id: str) -> bool:
-        source_node_id = self.prepared_source_mapping[exec_node_id]
+        registry = self._prepared_registry()
+        source_node_id = registry.get_source_node_id(exec_node_id)
         iteration_path = self._get_iteration_path(exec_node_id)
 
         for source_if_id, source_if_node in self.graph.nodes.items():
@@ -1046,7 +1096,7 @@ class GraphExecutionState(BaseModel):
             if source_node_id not in branches["true_input"] and source_node_id not in branches["false_input"]:
                 continue
 
-            prepared_if_ids = self.source_prepared_mapping.get(source_if_id, set())
+            prepared_if_ids = registry.get_prepared_ids(source_if_id)
             matching_prepared_if_ids = [
                 pid for pid in prepared_if_ids if self._get_iteration_path(pid) == iteration_path
             ]
@@ -1068,8 +1118,9 @@ class GraphExecutionState(BaseModel):
         self._set_prepared_exec_state(exec_node_id, "skipped")
         self.executed.add(exec_node_id)
 
-        source_node_id = self.prepared_source_mapping[exec_node_id]
-        prepared_nodes = self.source_prepared_mapping[source_node_id]
+        registry = self._prepared_registry()
+        source_node_id = registry.get_source_node_id(exec_node_id)
+        prepared_nodes = registry.get_prepared_ids(source_node_id)
         if all(n in self.executed for n in prepared_nodes):
             self.executed.add(source_node_id)
 
@@ -1093,7 +1144,7 @@ class GraphExecutionState(BaseModel):
         unselected_field = "false_input" if node.condition else "true_input"
         self._resolved_if_exec_branches[exec_node_id] = selected_field
 
-        source_if_node_id = self.prepared_source_mapping[exec_node_id]
+        source_if_node_id = self._prepared_registry().get_source_node_id(exec_node_id)
         exclusive_sources = self._get_if_branch_exclusive_sources(source_if_node_id)
 
         for edge in self.execution_graph._get_input_edges(exec_node_id, unselected_field):
@@ -1209,8 +1260,9 @@ class GraphExecutionState(BaseModel):
         self.results[node_id] = output
 
         # Check if source node is complete (all prepared nodes are complete)
-        source_node = self.prepared_source_mapping[node_id]
-        prepared_nodes = self.source_prepared_mapping[source_node]
+        registry = self._prepared_registry()
+        source_node = registry.get_source_node_id(node_id)
+        prepared_nodes = registry.get_prepared_ids(source_node)
 
         if all(n in self.executed for n in prepared_nodes):
             self.executed.add(source_node)
@@ -1293,11 +1345,7 @@ class GraphExecutionState(BaseModel):
 
             # Add to execution graph
             self.execution_graph.add_node(new_node)
-            self.prepared_source_mapping[new_node.id] = node_id
             self._register_prepared_exec_node(new_node.id, node_id)
-            if node_id not in self.source_prepared_mapping:
-                self.source_prepared_mapping[node_id] = set()
-            self.source_prepared_mapping[node_id].add(new_node.id)
 
             # Add new edges to execution graph
             for edge in new_edges:
