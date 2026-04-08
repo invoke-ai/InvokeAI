@@ -1038,17 +1038,21 @@ class GraphExecutionState(BaseModel):
         source_node_id = self.prepared_source_mapping[exec_node_id]
         iteration_path = self._get_iteration_path(exec_node_id)
 
-        for prepared_if_id, source_if_id in self.prepared_source_mapping.items():
-            if source_if_id not in self.graph.nodes:
+        for source_if_id, source_if_node in self.graph.nodes.items():
+            if not isinstance(source_if_node, IfInvocation):
                 continue
-            if not isinstance(self.graph.get_node(source_if_id), IfInvocation):
-                continue
-            if prepared_if_id in self._resolved_if_exec_branches:
-                continue
-            if self._get_iteration_path(prepared_if_id) != iteration_path:
-                continue
+
             branches = self._get_if_branch_exclusive_sources(source_if_id)
-            if source_node_id in branches["true_input"] or source_node_id in branches["false_input"]:
+            if source_node_id not in branches["true_input"] and source_node_id not in branches["false_input"]:
+                continue
+
+            prepared_if_ids = self.source_prepared_mapping.get(source_if_id, set())
+            matching_prepared_if_ids = [
+                pid for pid in prepared_if_ids if self._get_iteration_path(pid) == iteration_path
+            ]
+            if not matching_prepared_if_ids:
+                return True
+            if not all(pid in self._resolved_if_exec_branches for pid in matching_prepared_if_ids):
                 return True
         return False
 
