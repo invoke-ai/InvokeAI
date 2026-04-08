@@ -208,18 +208,6 @@ export const ModelInstallQueue = memo(() => {
     );
   }, [data]);
 
-  const isPrunePriority = useMemo(() => {
-    if (!pruneAvailable) {
-      return false;
-    }
-
-    if (hasCancelableInstalls) {
-      return false;
-    }
-
-    return true;
-  }, [pruneAvailable, hasCancelableInstalls]);
-
   const pauseAll = useCallback(() => {
     void runBulkAction('pause', pauseableInstallIds);
   }, [pauseableInstallIds, runBulkAction]);
@@ -269,18 +257,16 @@ export const ModelInstallQueue = memo(() => {
             </Button>
           )}
 
-          {/* When no other actions, offer to prune */}
-          {isPrunePriority && (
-            <Button
-              leftIcon={<PiBroomBold />}
-              size="sm"
-              isDisabled={!pruneAvailable || isBulkActionRunning || isPruning}
-              onClick={pruneCompletedModelInstalls}
-              variant="outline"
-            >
-              {t('modelManager.prune')}
-            </Button>
-          )}
+          <Button
+            leftIcon={<PiBroomBold />}
+            size="sm"
+            isDisabled={!pruneAvailable || isBulkActionRunning || isPruning}
+            onClick={pruneCompletedModelInstalls}
+            variant="outline"
+            colorScheme="orange"
+          >
+            {t('modelManager.prune')}
+          </Button>
 
           {/* Destructive Actions go to the dropdown menu */}
           <Menu>
@@ -292,15 +278,6 @@ export const ModelInstallQueue = memo(() => {
               disabled={!pruneAvailable && !hasCancelableInstalls}
             />
             <MenuList>
-              {!isPrunePriority && (
-                <MenuItem
-                  icon={<PiBroomBold />}
-                  isDisabled={!pruneAvailable || isBulkActionRunning || isPruning}
-                  onClick={pruneCompletedModelInstalls}
-                >
-                  {t('modelManager.prune')}
-                </MenuItem>
-              )}
               <MenuItem
                 color="error.300"
                 icon={<PiXBold />}
