@@ -79,6 +79,50 @@ app = FastAPI(
 )
 
 
+class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
+    """Refresh the JWT token on each authenticated response.
+
+    When a request includes a valid Bearer token, the response includes a
+    X-Refreshed-Token header with a new token that has a fresh expiry.
+    This implements sliding-window session expiry: the session only expires
+    after a period of *inactivity*, not a fixed time after login.
+    """
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint):
+        response = await call_next(request)
+
+        # Only refresh on mutating requests (POST/PUT/PATCH/DELETE) — these indicate
+        # genuine user activity. GET requests are often background fetches (RTK Query
+        # cache revalidation, refetch-on-focus, etc.) and should not reset the
+        # inactivity timer.
+        if response.status_code < 400 and request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            auth_header = request.headers.get("authorization", "")
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+                try:
+                    from datetime import timedelta
+
+                    from invokeai.app.api.routers.auth import TOKEN_EXPIRATION_NORMAL, TOKEN_EXPIRATION_REMEMBER_ME
+                    from invokeai.app.services.auth.token_service import create_access_token, verify_token
+
+                    token_data = verify_token(token)
+                    if token_data is not None:
+                        # Use the remember_me claim from the token to determine the
+                        # correct refresh duration. This avoids the bug where a 7-day
+                        # token with <24h remaining would be silently downgraded to 1 day.
+                        if token_data.remember_me:
+                            expires_delta = timedelta(days=TOKEN_EXPIRATION_REMEMBER_ME)
+                        else:
+                            expires_delta = timedelta(days=TOKEN_EXPIRATION_NORMAL)
+
+                        new_token = create_access_token(token_data, expires_delta)
+                        response.headers["X-Refreshed-Token"] = new_token
+                except Exception:
+                    pass  # Don't fail the request if token refresh fails
+
+        return response
+
+
 class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
     """When a request is made to the root path with a query string, redirect to the root path without the query string.
 
@@ -99,6 +143,7 @@ class RedirectRootWithQueryStringMiddleware(BaseHTTPMiddleware):
 
 # Add the middleware
 app.add_middleware(RedirectRootWithQueryStringMiddleware)
+app.add_middleware(SlidingWindowTokenMiddleware)
 
 
 # Add event handler
@@ -117,6 +162,7 @@ app.add_middleware(
     allow_credentials=app_config.allow_credentials,
     allow_methods=app_config.allow_methods,
     allow_headers=app_config.allow_headers,
+    expose_headers=["X-Refreshed-Token"],
 )
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
