@@ -28,8 +28,8 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.fields import Input, InputField, OutputField, UIType
+from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import uuid_string
 

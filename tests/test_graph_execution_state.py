@@ -16,7 +16,13 @@ from invokeai.app.services.shared.graph import (
 )
 
 # This import must happen before other invoke imports or test in other files(!!) break
-from tests.test_nodes import AnyTypeTestInvocation, PromptCollectionTestInvocation, PromptTestInvocation, TextToImageTestInvocation, create_edge
+from tests.test_nodes import (
+    AnyTypeTestInvocation,
+    PromptCollectionTestInvocation,
+    PromptTestInvocation,
+    TextToImageTestInvocation,
+    create_edge,
+)
 
 
 @pytest.fixture
