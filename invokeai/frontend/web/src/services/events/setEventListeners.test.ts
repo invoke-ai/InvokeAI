@@ -97,7 +97,7 @@ describe('setEventListeners workflow live updates', () => {
     );
   });
 
-  it('clears selected workflow ids from call_saved_workflows nodes on workflow_deleted', () => {
+  it('clears selected workflow ids from call_saved_workflow nodes on workflow_deleted', () => {
     const socket = createMockSocket();
     const dispatch = vi.fn();
     const store = {
@@ -111,7 +111,7 @@ describe('setEventListeners workflow live updates', () => {
                 type: 'invocation',
                 data: {
                   id: 'call-saved-workflows-node',
-                  type: 'call_saved_workflows',
+                  type: 'call_saved_workflow',
                   inputs: {
                     workflow_id: {
                       value: 'wf-1',
@@ -144,7 +144,7 @@ describe('setEventListeners workflow live updates', () => {
     );
   });
 
-  it('does not clear selected workflow ids from call_saved_workflows nodes on workflow_updated', () => {
+  it('does not clear selected workflow ids from call_saved_workflow nodes on workflow_updated', () => {
     const socket = createMockSocket();
     const dispatch = vi.fn();
     const store = {
@@ -158,7 +158,7 @@ describe('setEventListeners workflow live updates', () => {
                 type: 'invocation',
                 data: {
                   id: 'call-saved-workflows-node',
-                  type: 'call_saved_workflows',
+                  type: 'call_saved_workflow',
                   inputs: {
                     workflow_id: {
                       value: 'wf-1',
@@ -215,7 +215,7 @@ describe('setEventListeners workflow live updates', () => {
                 type: 'invocation',
                 data: {
                   id: 'call-saved-workflows-node',
-                  type: 'call_saved_workflows',
+                  type: 'call_saved_workflow',
                   inputs: {
                     workflow_id: {
                       value: 'wf-shared',

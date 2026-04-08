@@ -72,12 +72,12 @@ export const add: InvocationTemplate = {
   classification: 'stable',
 };
 
-export const call_saved_workflows: InvocationTemplate = {
-  title: 'Call Saved Workflows',
-  type: 'call_saved_workflows',
+export const call_saved_workflow: InvocationTemplate = {
+  title: 'Call Saved Workflow',
+  type: 'call_saved_workflow',
   version: '1.0.0',
   tags: ['workflow', 'saved', 'library'],
-  description: 'Displays and later executes against the saved workflow library.',
+  description: 'Displays and later executes against a selected saved workflow.',
   outputType: 'integer_output',
   inputs: {
     workflow_id: {
@@ -579,7 +579,7 @@ const iterate: InvocationTemplate = {
 
 export const templates: Templates = {
   add,
-  call_saved_workflows,
+  call_saved_workflow,
   sub,
   collect,
   iterate,
@@ -597,7 +597,7 @@ export const schema = {
   },
   components: {
     schemas: {
-      CallSavedWorkflowsInvocation: {
+      CallSavedWorkflowInvocation: {
         properties: {
           id: {
             type: 'string',
@@ -634,17 +634,17 @@ export const schema = {
           },
           type: {
             type: 'string',
-            enum: ['call_saved_workflows'],
-            const: 'call_saved_workflows',
+            enum: ['call_saved_workflow'],
+            const: 'call_saved_workflow',
             title: 'type',
-            default: 'call_saved_workflows',
+            default: 'call_saved_workflow',
             field_kind: 'node_attribute',
           },
         },
         type: 'object',
         required: ['type', 'id'],
-        title: 'Call Saved Workflows',
-        description: 'Displays and later executes against the saved workflow library.',
+        title: 'Call Saved Workflow',
+        description: 'Displays and later executes against a selected saved workflow.',
         category: 'workflow',
         classification: 'beta',
         node_pack: 'invokeai',

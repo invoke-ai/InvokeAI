@@ -1,5 +1,5 @@
 import { omit, pick } from 'es-toolkit/compat';
-import { call_saved_workflows, schema, templates } from 'features/nodes/store/util/testUtils';
+import { call_saved_workflow, schema, templates } from 'features/nodes/store/util/testUtils';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { describe, expect, it } from 'vitest';
 
@@ -18,10 +18,10 @@ describe('parseSchema', () => {
     const parsed = parseSchema(schema, ['add']);
     expect(stripUndefinedDeep(parsed)).toEqual(stripUndefinedDeep(pick(templates, 'add')));
   });
-  it('should parse the call_saved_workflows node template', () => {
+  it('should parse the call_saved_workflow node template', () => {
     const parsed = parseSchema(schema);
-    expect(stripUndefinedDeep(parsed.call_saved_workflows)).toEqual(stripUndefinedDeep(call_saved_workflows));
-    expect(parsed.call_saved_workflows.inputs.workflow_id.type.name).toBe('SavedWorkflowField');
-    expect(parsed.call_saved_workflows.inputs.workflow_id.ui_type).toBe('SavedWorkflowField');
+    expect(stripUndefinedDeep(parsed.call_saved_workflow)).toEqual(stripUndefinedDeep(call_saved_workflow));
+    expect(parsed.call_saved_workflow.inputs.workflow_id.type.name).toBe('SavedWorkflowField');
+    expect(parsed.call_saved_workflow.inputs.workflow_id.ui_type).toBe('SavedWorkflowField');
   });
 });

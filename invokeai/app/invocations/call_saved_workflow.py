@@ -6,16 +6,16 @@ from invokeai.app.services.workflow_records.workflow_records_common import Workf
 
 
 @invocation(
-    "call_saved_workflows",
-    title="Call Saved Workflows",
+    "call_saved_workflow",
+    title="Call Saved Workflow",
     tags=["workflow", "saved", "library"],
     category="workflow",
     version="1.0.0",
     use_cache=False,
     classification=Classification.Beta,
 )
-class CallSavedWorkflowsInvocation(BaseInvocation):
-    """Displays and later executes against the saved workflow library."""
+class CallSavedWorkflowInvocation(BaseInvocation):
+    """Displays and later executes against a selected saved workflow."""
 
     workflow_id: str = InputField(
         default="",
@@ -25,7 +25,7 @@ class CallSavedWorkflowsInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> IntegerOutput:
         if not self.workflow_id:
-            raise ValueError("A saved workflow must be selected before executing call_saved_workflows.")
+            raise ValueError("A saved workflow must be selected before executing call_saved_workflow.")
 
         try:
             workflow_record = context._services.workflow_records.get(self.workflow_id)

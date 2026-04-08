@@ -128,7 +128,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const nodes = selectNodesSlice(getState()).nodes;
 
     for (const node of nodes) {
-      if (node.type !== 'invocation' || node.data.type !== 'call_saved_workflows') {
+      if (node.type !== 'invocation' || node.data.type !== 'call_saved_workflow') {
         continue;
       }
 

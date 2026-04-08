@@ -75,7 +75,9 @@ def build_context(
         users=Mock(),
         workflow_records=Mock(),
     )
-    services.users.get.return_value = build_user_dto(user_id=queue_user_id, is_admin=user_is_admin) if user_exists else None
+    services.users.get.return_value = (
+        build_user_dto(user_id=queue_user_id, is_admin=user_is_admin) if user_exists else None
+    )
 
     if workflow_not_found:
         services.workflow_records.get.side_effect = WorkflowNotFoundError("missing")
@@ -88,13 +90,13 @@ def build_context(
     return context
 
 
-def test_call_saved_workflows_invocation_contract():
-    from invokeai.app.invocations.call_saved_workflows import CallSavedWorkflowsInvocation
+def test_call_saved_workflow_invocation_contract():
+    from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
     from invokeai.app.invocations.primitives import IntegerOutput
 
-    invocation = CallSavedWorkflowsInvocation(id="test-node", workflow_id="workflow-123")
+    invocation = CallSavedWorkflowInvocation(id="test-node", workflow_id="workflow-123")
 
-    assert invocation.get_type() == "call_saved_workflows"
+    assert invocation.get_type() == "call_saved_workflow"
     assert invocation.workflow_id == "workflow-123"
 
     output = invocation.invoke(build_context())
@@ -103,28 +105,28 @@ def test_call_saved_workflows_invocation_contract():
     assert output.value == 0
 
 
-def test_call_saved_workflows_invocation_raises_when_workflow_id_is_empty():
-    from invokeai.app.invocations.call_saved_workflows import CallSavedWorkflowsInvocation
+def test_call_saved_workflow_invocation_raises_when_workflow_id_is_empty():
+    from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 
-    invocation = CallSavedWorkflowsInvocation(id="test-node")
+    invocation = CallSavedWorkflowInvocation(id="test-node")
 
     with pytest.raises(ValueError, match="saved workflow must be selected"):
         invocation.invoke(build_context())
 
 
-def test_call_saved_workflows_invocation_raises_when_workflow_does_not_exist():
-    from invokeai.app.invocations.call_saved_workflows import CallSavedWorkflowsInvocation
+def test_call_saved_workflow_invocation_raises_when_workflow_does_not_exist():
+    from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 
-    invocation = CallSavedWorkflowsInvocation(id="test-node", workflow_id="missing-workflow")
+    invocation = CallSavedWorkflowInvocation(id="test-node", workflow_id="missing-workflow")
 
     with pytest.raises(ValueError, match="could not be found"):
         invocation.invoke(build_context(workflow_not_found=True))
 
 
-def test_call_saved_workflows_invocation_raises_when_workflow_is_not_accessible():
-    from invokeai.app.invocations.call_saved_workflows import CallSavedWorkflowsInvocation
+def test_call_saved_workflow_invocation_raises_when_workflow_is_not_accessible():
+    from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 
-    invocation = CallSavedWorkflowsInvocation(id="test-node", workflow_id="private-workflow")
+    invocation = CallSavedWorkflowInvocation(id="test-node", workflow_id="private-workflow")
 
     with pytest.raises(ValueError, match="is not accessible"):
         invocation.invoke(
@@ -142,10 +144,10 @@ def test_call_saved_workflows_invocation_raises_when_workflow_is_not_accessible(
         )
 
 
-def test_call_saved_workflows_invocation_allows_shared_workflow_for_non_owner():
-    from invokeai.app.invocations.call_saved_workflows import CallSavedWorkflowsInvocation
+def test_call_saved_workflow_invocation_allows_shared_workflow_for_non_owner():
+    from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 
-    invocation = CallSavedWorkflowsInvocation(id="test-node", workflow_id="shared-workflow")
+    invocation = CallSavedWorkflowInvocation(id="test-node", workflow_id="shared-workflow")
 
     output = invocation.invoke(
         build_context(
@@ -164,10 +166,10 @@ def test_call_saved_workflows_invocation_allows_shared_workflow_for_non_owner():
     assert output.value == 0
 
 
-def test_call_saved_workflows_invocation_allows_default_workflow_for_non_owner():
-    from invokeai.app.invocations.call_saved_workflows import CallSavedWorkflowsInvocation
+def test_call_saved_workflow_invocation_allows_default_workflow_for_non_owner():
+    from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 
-    invocation = CallSavedWorkflowsInvocation(id="test-node", workflow_id="default-workflow")
+    invocation = CallSavedWorkflowInvocation(id="test-node", workflow_id="default-workflow")
 
     output = invocation.invoke(
         build_context(
@@ -186,10 +188,10 @@ def test_call_saved_workflows_invocation_allows_default_workflow_for_non_owner()
     assert output.value == 0
 
 
-def test_call_saved_workflows_invocation_allows_admin_to_access_private_workflow():
-    from invokeai.app.invocations.call_saved_workflows import CallSavedWorkflowsInvocation
+def test_call_saved_workflow_invocation_allows_admin_to_access_private_workflow():
+    from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 
-    invocation = CallSavedWorkflowsInvocation(id="test-node", workflow_id="private-workflow")
+    invocation = CallSavedWorkflowInvocation(id="test-node", workflow_id="private-workflow")
 
     output = invocation.invoke(
         build_context(
@@ -208,10 +210,10 @@ def test_call_saved_workflows_invocation_allows_admin_to_access_private_workflow
     assert output.value == 0
 
 
-def test_call_saved_workflows_invocation_raises_when_private_workflow_user_record_is_missing():
-    from invokeai.app.invocations.call_saved_workflows import CallSavedWorkflowsInvocation
+def test_call_saved_workflow_invocation_raises_when_private_workflow_user_record_is_missing():
+    from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 
-    invocation = CallSavedWorkflowsInvocation(id="test-node", workflow_id="private-workflow")
+    invocation = CallSavedWorkflowInvocation(id="test-node", workflow_id="private-workflow")
 
     with pytest.raises(ValueError, match="is not accessible"):
         invocation.invoke(
@@ -229,10 +231,10 @@ def test_call_saved_workflows_invocation_raises_when_private_workflow_user_recor
         )
 
 
-def test_call_saved_workflows_invocation_schema_declares_saved_workflow_ui_type():
-    from invokeai.app.invocations.call_saved_workflows import CallSavedWorkflowsInvocation
+def test_call_saved_workflow_invocation_schema_declares_saved_workflow_ui_type():
+    from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 
-    schema = CallSavedWorkflowsInvocation.model_json_schema()
+    schema = CallSavedWorkflowInvocation.model_json_schema()
     workflow_id = schema["properties"]["workflow_id"]
 
     assert workflow_id["default"] == ""

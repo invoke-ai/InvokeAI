@@ -1,9 +1,9 @@
-import { call_saved_workflows, buildNode } from 'features/nodes/store/util/testUtils';
 import { getInitialWorkflow } from 'features/nodes/store/nodesSlice';
+import { buildNode,call_saved_workflow } from 'features/nodes/store/util/testUtils';
 import { describe, expect, it } from 'vitest';
 
 describe('buildWorkflowFast', () => {
-  it('persists the selected workflow id for call_saved_workflows nodes', async () => {
+  it('persists the selected workflow id for call_saved_workflow nodes', async () => {
     Object.assign(globalThis, {
       window: {
         location: {
@@ -13,7 +13,7 @@ describe('buildWorkflowFast', () => {
     });
 
     const { buildWorkflowFast } = await import('features/nodes/util/workflow/buildWorkflow');
-    const node = buildNode(call_saved_workflows);
+    const node = buildNode(call_saved_workflow);
     node.data.inputs.workflow_id.value = 'workflow-123';
 
     const workflow = buildWorkflowFast({
@@ -29,7 +29,7 @@ describe('buildWorkflowFast', () => {
     if (workflow.nodes[0]?.type !== 'invocation') {
       throw new Error('Expected invocation node');
     }
-    expect(workflow.nodes[0].data.type).toBe('call_saved_workflows');
+    expect(workflow.nodes[0].data.type).toBe('call_saved_workflow');
     expect(workflow.nodes[0].data.inputs.workflow_id.value).toBe('workflow-123');
   });
 });
