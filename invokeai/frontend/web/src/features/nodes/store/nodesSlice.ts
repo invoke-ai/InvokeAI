@@ -85,6 +85,7 @@ import {
   isNodeFieldElement,
   isTextElement,
 } from 'features/nodes/types/workflow';
+import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import { atom, computed } from 'nanostores';
 import type { MouseEvent } from 'react';
 import type { UndoableOptions } from 'redux-undo';
@@ -92,6 +93,8 @@ import { assert } from 'tsafe';
 import type { z } from 'zod';
 
 import type { PendingConnection, Templates } from './types';
+
+const CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX = 'saved_workflow_input::';
 
 export const getInitialWorkflow = (): Omit<NodesState, 'mode' | 'formFieldInitialValues' | '_version'> => {
   return {
@@ -481,6 +484,46 @@ const slice = createSlice({
       }
       field.description = val || '';
     },
+    callSavedWorkflowDynamicFieldsChanged: (
+      state,
+      action: PayloadAction<{
+        nodeId: string;
+        fields: Array<{
+          fieldName: string;
+          fieldTemplate: Parameters<typeof buildFieldInputInstance>[1];
+          label: string;
+          description: string;
+        }>;
+      }>
+    ) => {
+      const { nodeId, fields } = action.payload;
+      const node = state.nodes.find((n) => n.id === nodeId);
+      if (!isInvocationNode(node) || node.data.type !== 'call_saved_workflow') {
+        return;
+      }
+
+      const nextFieldNames = new Set(fields.map((field) => field.fieldName));
+
+      for (const fieldName of Object.keys(node.data.inputs)) {
+        if (fieldName.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX) && !nextFieldNames.has(fieldName)) {
+          delete node.data.inputs[fieldName];
+        }
+      }
+
+      for (const { fieldName, fieldTemplate, label, description } of fields) {
+        const existing = node.data.inputs[fieldName];
+        if (existing) {
+          existing.label = label;
+          existing.description = description;
+          continue;
+        }
+
+        const instance = buildFieldInputInstance(fieldName, fieldTemplate);
+        instance.label = label;
+        instance.description = description;
+        node.data.inputs[fieldName] = instance;
+      }
+    },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
       const { nodeId, value } = action.payload;
       const nodeIndex = state.nodes.findIndex((n) => n.id === nodeId);
@@ -611,6 +654,7 @@ export const {
   fieldStringGeneratorValueChanged,
   fieldImageGeneratorValueChanged,
   fieldDescriptionChanged,
+  callSavedWorkflowDynamicFieldsChanged,
   nodeEditorReset,
   nodeIsIntermediateChanged,
   nodeIsOpenChanged,
@@ -855,3 +899,5 @@ export const getFormFieldInitialValues = (form: BuilderForm, nodes: NodesState['
 
   return formFieldInitialValues;
 };
+
+export { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX };
