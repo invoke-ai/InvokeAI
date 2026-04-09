@@ -2511,6 +2511,10 @@
         "text": {
             "font": "Font",
             "size": "Size",
+            "lineHeight": "Spacing",
+            "lineHeightDense": "Dense",
+            "lineHeightNormal": "Normal",
+            "lineHeightSpacious": "Spacious",
             "bold": "Bold",
             "italic": "Italic",
             "underline": "Underline",
@@ -2518,6 +2522,8 @@
             "alignLeft": "Align Left",
             "alignCenter": "Align Center",
             "alignRight": "Align Right",
+            "customFonts": "User Fonts",
+            "builtInFonts": "Built-in Fonts",
             "px": "px"
         },
         "newCanvasFromImage": "New Canvas from Image",
