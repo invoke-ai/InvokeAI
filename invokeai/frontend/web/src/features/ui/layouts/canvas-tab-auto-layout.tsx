@@ -1,11 +1,10 @@
 import type { DockviewApi, GridviewApi, IDockviewReactProps, IGridviewReactProps } from 'dockview';
 import { DockviewReact, GridviewReact, LayoutPriority, Orientation } from 'dockview';
 import { CanvasLayersPanel } from 'features/controlLayers/components/CanvasLayersPanelContent';
-import { BoardsPanel } from 'features/gallery/components/BoardsListPanelContent';
-import { GalleryPanel } from 'features/gallery/components/GalleryPanel';
+import { BottomGalleryPanel } from 'features/gallery/components/BottomGalleryPanel';
 import { ImageViewerPanel } from 'features/gallery/components/ImageViewer/ImageViewerPanel';
+import { FloatingLayerPanelButtons } from 'features/ui/components/FloatingLayerPanelButtons';
 import { FloatingCanvasLeftPanelButtons } from 'features/ui/components/FloatingLeftPanelButtons';
-import { FloatingRightPanelButtons } from 'features/ui/components/FloatingRightPanelButtons';
 import type {
   AutoLayoutDockviewComponents,
   AutoLayoutGridviewComponents,
@@ -28,15 +27,12 @@ import { DockviewTabLaunchpad } from './DockviewTabLaunchpad';
 import { navigationApi } from './navigation-api';
 import { PanelHotkeysLogical } from './PanelHotkeysLogical';
 import {
-  BOARD_PANEL_MIN_HEIGHT_PX,
-  BOARDS_PANEL_ID,
-  CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX,
+  BOTTOM_GALLERY_DEFAULT_HEIGHT_PX,
+  BOTTOM_GALLERY_MIN_HEIGHT_PX,
+  BOTTOM_GALLERY_PANEL_ID,
   DOCKVIEW_TAB_CANVAS_VIEWER_ID,
   DOCKVIEW_TAB_CANVAS_WORKSPACE_ID,
   DOCKVIEW_TAB_LAUNCHPAD_ID,
-  GALLERY_PANEL_DEFAULT_HEIGHT_PX,
-  GALLERY_PANEL_ID,
-  GALLERY_PANEL_MIN_HEIGHT_PX,
   LAUNCHPAD_PANEL_ID,
   LAYERS_PANEL_ID,
   LAYERS_PANEL_MIN_HEIGHT_PX,
@@ -46,6 +42,7 @@ import {
   RIGHT_PANEL_ID,
   RIGHT_PANEL_MIN_SIZE_PX,
   SETTINGS_PANEL_ID,
+  TOP_AREA_ID,
   VIEWER_PANEL_ID,
   WORKSPACE_PANEL_ID,
 } from './shared';
@@ -134,46 +131,22 @@ const MainPanel = memo(() => {
         tabComponents={tabComponents}
       />
       <FloatingCanvasLeftPanelButtons />
-      <FloatingRightPanelButtons />
+      <FloatingLayerPanelButtons />
       <PanelHotkeysLogical />
     </>
   );
 });
 MainPanel.displayName = 'MainPanel';
 
+/**
+ * Right panel on canvas tab contains only the layers panel (no gallery/boards).
+ */
 const rightPanelComponents: AutoLayoutGridviewComponents = {
-  [BOARDS_PANEL_ID]: withPanelContainer(BoardsPanel),
-  [GALLERY_PANEL_ID]: withPanelContainer(GalleryPanel),
   [LAYERS_PANEL_ID]: withPanelContainer(CanvasLayersPanel),
 };
 
 const initializeRightPanelLayout = (tab: TabName, api: GridviewApi) => {
   navigationApi.registerContainer(tab, 'right', api, () => {
-    const gallery = api.addPanel<GridviewPanelParameters>({
-      id: GALLERY_PANEL_ID,
-      component: GALLERY_PANEL_ID,
-      minimumWidth: RIGHT_PANEL_MIN_SIZE_PX,
-      minimumHeight: GALLERY_PANEL_MIN_HEIGHT_PX,
-      params: {
-        tab,
-        focusRegion: 'gallery',
-      },
-    });
-
-    const boards = api.addPanel<GridviewPanelParameters>({
-      id: BOARDS_PANEL_ID,
-      component: BOARDS_PANEL_ID,
-      minimumHeight: BOARD_PANEL_MIN_HEIGHT_PX,
-      params: {
-        tab,
-        focusRegion: 'boards',
-      },
-      position: {
-        direction: 'above',
-        referencePanel: gallery.id,
-      },
-    });
-
     api.addPanel<GridviewPanelParameters>({
       id: LAYERS_PANEL_ID,
       component: LAYERS_PANEL_ID,
@@ -182,14 +155,7 @@ const initializeRightPanelLayout = (tab: TabName, api: GridviewApi) => {
         tab,
         focusRegion: 'layers',
       },
-      position: {
-        direction: 'below',
-        referencePanel: gallery.id,
-      },
     });
-
-    gallery.api.setSize({ height: GALLERY_PANEL_DEFAULT_HEIGHT_PX });
-    boards.api.setSize({ height: CANVAS_BOARD_PANEL_DEFAULT_HEIGHT_PX });
   });
 };
 
@@ -250,14 +216,17 @@ const LeftPanel = memo(() => {
 });
 LeftPanel.displayName = 'LeftPanel';
 
-const rootPanelComponents: RootLayoutGridviewComponents = {
+/**
+ * Top area for canvas: left panel + main panel + right panel (layers only) side by side.
+ */
+const topAreaComponents: RootLayoutGridviewComponents = {
   [LEFT_PANEL_ID]: LeftPanel,
   [MAIN_PANEL_ID]: MainPanel,
   [RIGHT_PANEL_ID]: RightPanel,
 };
 
-const initializeRootPanelLayout = (tab: TabName, api: GridviewApi) => {
-  navigationApi.registerContainer(tab, 'root', api, () => {
+const initializeTopAreaLayout = (tab: TabName, api: GridviewApi) => {
+  navigationApi.registerContainer(tab, 'top-area', api, () => {
     const main = api.addPanel({
       id: MAIN_PANEL_ID,
       component: MAIN_PANEL_ID,
@@ -291,6 +260,61 @@ const initializeRootPanelLayout = (tab: TabName, api: GridviewApi) => {
   });
 };
 
+const TopArea = memo(() => {
+  const { tab } = useAutoLayoutContext();
+
+  const onReady = useCallback<IGridviewReactProps['onReady']>(
+    ({ api }) => {
+      initializeTopAreaLayout(tab, api);
+    },
+    [tab]
+  );
+  return (
+    <GridviewReact
+      className="dockview-theme-invoke"
+      components={topAreaComponents}
+      onReady={onReady}
+      orientation={Orientation.VERTICAL}
+    />
+  );
+});
+TopArea.displayName = 'TopArea';
+
+const bottomGalleryComponents: AutoLayoutGridviewComponents = {
+  [BOTTOM_GALLERY_PANEL_ID]: withPanelContainer(BottomGalleryPanel),
+};
+
+const rootPanelComponents: RootLayoutGridviewComponents = {
+  [TOP_AREA_ID]: TopArea,
+  [BOTTOM_GALLERY_PANEL_ID]: bottomGalleryComponents[BOTTOM_GALLERY_PANEL_ID]!,
+};
+
+const initializeRootPanelLayout = (tab: TabName, api: GridviewApi) => {
+  navigationApi.registerContainer(tab, 'root', api, () => {
+    const topArea = api.addPanel<GridviewPanelParameters>({
+      id: TOP_AREA_ID,
+      component: TOP_AREA_ID,
+      priority: LayoutPriority.High,
+    });
+
+    const bottomGallery = api.addPanel<GridviewPanelParameters>({
+      id: BOTTOM_GALLERY_PANEL_ID,
+      component: BOTTOM_GALLERY_PANEL_ID,
+      minimumHeight: BOTTOM_GALLERY_MIN_HEIGHT_PX,
+      params: {
+        tab,
+        focusRegion: 'gallery',
+      },
+      position: {
+        direction: 'below',
+        referencePanel: topArea.id,
+      },
+    });
+
+    bottomGallery.api.setSize({ height: BOTTOM_GALLERY_DEFAULT_HEIGHT_PX });
+  });
+};
+
 export const CanvasTabAutoLayout = memo(() => {
   const onReady = useCallback<IGridviewReactProps['onReady']>(({ api }) => {
     initializeRootPanelLayout('canvas', api);
@@ -309,7 +333,7 @@ export const CanvasTabAutoLayout = memo(() => {
         className="dockview-theme-invoke"
         components={rootPanelComponents}
         onReady={onReady}
-        orientation={Orientation.VERTICAL}
+        orientation={Orientation.HORIZONTAL}
       />
     </AutoLayoutProvider>
   );

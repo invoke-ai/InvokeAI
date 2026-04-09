@@ -45,7 +45,7 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
 
   if (!editable.isEditing) {
     return (
-      <Flex alignItems="center" gap={3} onMouseOver={isHovering.setTrue} onMouseOut={isHovering.setFalse}>
+      <Flex alignItems="center" gap={1} onMouseOver={isHovering.setTrue} onMouseOut={isHovering.setFalse} h={7}>
         <Text
           size="sm"
           fontWeight="semibold"
@@ -62,7 +62,7 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
             aria-label="edit name"
             icon={<PiPencilBold />}
             size="sm"
-            variant="ghost"
+            variant="link"
             onClick={editable.startEditing}
           />
         )}
@@ -76,6 +76,8 @@ export const BoardEditableTitle = memo(({ board, isSelected }: Props) => {
       {...editable.inputProps}
       variant="outline"
       isDisabled={updateBoardResult.isLoading}
+      h={7}
+      px={2}
       _focusVisible={{ borderWidth: 1, borderColor: 'invokeBlueAlpha.400', borderRadius: 'base' }}
     />
   );

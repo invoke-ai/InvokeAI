@@ -23,7 +23,7 @@ export const zGalleryState = z.object({
   shouldAutoSwitch: z.boolean(),
   autoAssignBoardOnClick: z.boolean(),
   autoAddBoardId: zBoardId,
-  galleryImageMinimumWidth: z.number(),
+  galleryColumns: z.number(),
   selectedBoardId: zBoardId,
   galleryView: zGalleryView,
   boardSearchText: z.string(),
@@ -37,6 +37,7 @@ export const zGalleryState = z.object({
   shouldShowArchivedBoards: z.boolean(),
   boardsListOrderBy: zBoardRecordOrderBy,
   boardsListOrderDir: zOrderDir,
+  showAspectRatioThumbnails: z.boolean(),
 });
 
 export type GalleryState = z.infer<typeof zGalleryState>;

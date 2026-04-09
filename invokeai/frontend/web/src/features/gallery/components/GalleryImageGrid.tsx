@@ -1,15 +1,20 @@
 import { Box, Flex, forwardRef, Grid, GridItem, Spinner, Text } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { getFocusedRegion, useIsRegionFocused } from 'common/hooks/focus';
 import { useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
+import { $galleryProgressItems, selectFilteredGalleryProgressItems } from 'features/gallery/store/galleryProgressStore';
 import type { selectGetImageNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
-  selectGalleryImageMinimumWidth,
+  selectGalleryColumns,
+  selectGalleryView,
   selectImageToCompare,
   selectLastSelectedItem,
+  selectSelectedBoardId,
   selectSelection,
   selectSelectionCount,
+  selectShowAspectRatioThumbnails,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -33,6 +38,7 @@ import { useDebounce } from 'use-debounce';
 import { getItemIndex } from './getItemIndex';
 import { getItemsPerRow } from './getItemsPerRow';
 import { GalleryImage, GalleryImagePlaceholder } from './ImageGrid/GalleryImage';
+import { GalleryProgressTile } from './ImageGrid/GalleryProgressTile';
 import { GallerySelectionCountTag } from './ImageGrid/GallerySelectionCountTag';
 import { scrollIntoView } from './scrollIntoView';
 import { useGalleryImageNames } from './use-gallery-image-names';
@@ -40,9 +46,18 @@ import { useScrollableGallery } from './useScrollableGallery';
 
 type ListImageNamesQueryArgs = ReturnType<typeof selectGetImageNamesQueryArgs>;
 
+/**
+ * A gallery grid item is either a progress item ID (number) or an image name (string).
+ * Progress items are prepended at the top of the grid.
+ */
+type GalleryGridItem = number | string;
+
+const EMPTY_PROGRESS_IDS: number[] = [];
+
 type GridContext = {
   queryArgs: ListImageNamesQueryArgs;
   imageNames: string[];
+  showAspectRatioThumbnails: boolean;
 };
 
 /**
@@ -79,8 +94,11 @@ const ImageAtPosition = memo(({ imageName }: { index: number; imageName: string 
 });
 ImageAtPosition.displayName = 'ImageAtPosition';
 
-const computeItemKey: GridComputeItemKey<string, GridContext> = (index, imageName, { queryArgs }) => {
-  return `${JSON.stringify(queryArgs)}-${imageName ?? index}`;
+const computeItemKey: GridComputeItemKey<GalleryGridItem, GridContext> = (index, item, { queryArgs }) => {
+  if (typeof item === 'number') {
+    return `progress-${item}`;
+  }
+  return `${JSON.stringify(queryArgs)}-${item ?? index}`;
 };
 
 const canHandleGridArrowNavigation = (
@@ -281,7 +299,8 @@ const useKeepSelectedImageInView = (
   imageNames: string[],
   virtuosoRef: React.RefObject<VirtuosoGridHandle>,
   rootRef: React.RefObject<HTMLDivElement>,
-  rangeRef: MutableRefObject<ListRange>
+  rangeRef: MutableRefObject<ListRange>,
+  progressOffset: number
 ) => {
   const selection = useAppSelector(selectSelection);
 
@@ -300,9 +319,9 @@ const useKeepSelectedImageInView = (
     }
 
     setTimeout(() => {
-      scrollIntoView(targetImageName, imageNames, rootEl, virtuosoGridHandle, range);
+      scrollIntoView(targetImageName, imageNames, rootEl, virtuosoGridHandle, range, progressOffset);
     }, 0);
-  }, [imageNames, rangeRef, rootRef, virtuosoRef, selection]);
+  }, [imageNames, rangeRef, rootRef, virtuosoRef, selection, progressOffset]);
 };
 
 const useStarImageHotkey = () => {
@@ -342,39 +361,80 @@ type GalleryImageGridContentProps = {
   isLoading: boolean;
   queryArgs: ListImageNamesQueryArgs;
   rootRef?: React.RefObject<HTMLDivElement>;
+  showProgressTiles?: boolean;
 };
 
 export const GalleryImageGridContent = memo(
-  ({ imageNames, navigationImageNames, isLoading, queryArgs, rootRef: rootRefProp }: GalleryImageGridContentProps) => {
+  ({
+    imageNames,
+    navigationImageNames,
+    isLoading,
+    queryArgs,
+    rootRef: rootRefProp,
+    showProgressTiles = true,
+  }: GalleryImageGridContentProps) => {
     const virtuosoRef = useRef<VirtuosoGridHandle>(null);
     const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
     const internalRootRef = useRef<HTMLDivElement>(null);
     const rootRef = rootRefProp ?? internalRootRef;
+    const showAspectRatioThumbnails = useAppSelector(selectShowAspectRatioThumbnails);
 
-    // Use range-based fetching for bulk loading image DTOs into cache based on the visible range
+    // Read progress items from the nanostore, filtered by selected board and gallery view
+    const selectedBoardId = useAppSelector(selectSelectedBoardId);
+    const galleryView = useAppSelector(selectGalleryView);
+    const allProgressItems = useStore($galleryProgressItems);
+
+    const progressItemIds = useMemo(() => {
+      if (!showProgressTiles || galleryView !== 'images') {
+        return EMPTY_PROGRESS_IDS;
+      }
+      const filtered = selectFilteredGalleryProgressItems(allProgressItems, selectedBoardId);
+      if (filtered.length === 0) {
+        return EMPTY_PROGRESS_IDS;
+      }
+      return filtered.map((item) => item.itemId);
+    }, [showProgressTiles, allProgressItems, selectedBoardId, galleryView]);
+
+    // Combined data: progress item IDs (numbers) followed by image names (strings)
+    const gridData = useMemo<GalleryGridItem[]>(
+      () => (progressItemIds.length > 0 ? [...progressItemIds, ...imageNames] : imageNames),
+      [progressItemIds, imageNames]
+    );
+
+    // Use range-based fetching for bulk loading image DTOs into cache based on the visible range.
+    // We offset the range by the number of progress items since they are prepended to the grid data.
     const { onRangeChanged } = useRangeBasedImageFetching({
       imageNames,
       enabled: !isLoading,
     });
 
     useStarImageHotkey();
-    useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
+    useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef, progressItemIds.length);
     useKeyboardNavigation(navigationImageNames ?? imageNames, virtuosoRef, rootRef);
     const scrollerRef = useScrollableGallery(rootRef);
 
     /*
      * We have to keep track of the visible range for keep-selected-image-in-view functionality and push the range to
-     * the range-based image fetching hook.
+     * the range-based image fetching hook. The range from Virtuoso includes progress items at the front, so we offset
+     * it before passing to the image fetching hook.
      */
     const handleRangeChanged = useCallback(
       (range: ListRange) => {
         rangeRef.current = range;
-        onRangeChanged(range);
+        const offset = progressItemIds.length;
+        const adjustedRange: ListRange = {
+          startIndex: Math.max(0, range.startIndex - offset),
+          endIndex: Math.max(0, range.endIndex - offset),
+        };
+        onRangeChanged(adjustedRange);
       },
-      [onRangeChanged]
+      [onRangeChanged, progressItemIds.length]
     );
 
-    const context = useMemo<GridContext>(() => ({ imageNames, queryArgs }), [imageNames, queryArgs]);
+    const context = useMemo<GridContext>(
+      () => ({ imageNames, queryArgs, showAspectRatioThumbnails }),
+      [imageNames, queryArgs, showAspectRatioThumbnails]
+    );
 
     if (isLoading) {
       return (
@@ -385,7 +445,7 @@ export const GalleryImageGridContent = memo(
       );
     }
 
-    if (imageNames.length === 0) {
+    if (gridData.length === 0) {
       return (
         <Flex w="full" h="full" alignItems="center" justifyContent="center">
           <Text color="base.300">No images found</Text>
@@ -396,10 +456,10 @@ export const GalleryImageGridContent = memo(
     return (
       // This wrapper component is necessary to initialize the overlay scrollbars!
       <Box data-overlayscrollbars-initialize="" ref={rootRef} position="relative" w="full" h="full">
-        <VirtuosoGrid<string, GridContext>
+        <VirtuosoGrid<GalleryGridItem, GridContext>
           ref={virtuosoRef}
           context={context}
-          data={imageNames}
+          data={gridData}
           increaseViewportBy={4096}
           itemContent={itemContent}
           computeItemKey={computeItemKey}
@@ -437,8 +497,8 @@ const scrollSeekConfiguration: ScrollSeekConfiguration = {
 const style = { height: '100%', width: '100%' };
 
 const selectGridTemplateColumns = createSelector(
-  selectGalleryImageMinimumWidth,
-  (galleryImageMinimumWidth) => `repeat(auto-fill, minmax(${galleryImageMinimumWidth}px, 1fr))`
+  selectGalleryColumns,
+  (galleryColumns) => `repeat(${galleryColumns}, 1fr)`
 );
 
 // Grid components
@@ -450,20 +510,27 @@ const ListComponent: GridComponents<GridContext>['List'] = forwardRef(({ context
 });
 ListComponent.displayName = 'ListComponent';
 
-const itemContent: GridItemContent<string, GridContext> = (index, imageName) => {
-  return <ImageAtPosition index={index} imageName={imageName} />;
+const itemContent: GridItemContent<GalleryGridItem, GridContext> = (index, item) => {
+  if (typeof item === 'number') {
+    return <GalleryProgressTile itemId={item} />;
+  }
+  return <ImageAtPosition index={index} imageName={item} />;
 };
 
-const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef(({ context: _, ...rest }, ref) => (
-  <GridItem ref={ref} aspectRatio="1/1" {...rest} />
+const ItemComponent: GridComponents<GridContext>['Item'] = forwardRef(({ context, ...rest }, ref) => (
+  <GridItem ref={ref} aspectRatio={context?.showAspectRatioThumbnails ? undefined : '1/1'} {...rest} />
 ));
 ItemComponent.displayName = 'ItemComponent';
 
-const ScrollSeekPlaceholderComponent: GridComponents<GridContext>['ScrollSeekPlaceholder'] = (props) => (
-  <GridItem aspectRatio="1/1" {...props}>
-    <GalleryImagePlaceholder />
-  </GridItem>
-);
+const ScrollSeekPlaceholderComponent: GridComponents<GridContext>['ScrollSeekPlaceholder'] = (props) => {
+  // eslint-disable-next-line react/prop-types
+  const aspectRatio = props.context?.showAspectRatioThumbnails ? undefined : '1/1';
+  return (
+    <GridItem aspectRatio={aspectRatio} {...props}>
+      <GalleryImagePlaceholder />
+    </GridItem>
+  );
+};
 
 ScrollSeekPlaceholderComponent.displayName = 'ScrollSeekPlaceholderComponent';
 

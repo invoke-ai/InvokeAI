@@ -482,10 +482,13 @@
         "displayBoardSearch": "Board Search",
         "displaySearch": "Image Search",
         "download": "Download",
+        "expandGallery": "Show Gallery",
+        "collapseGallery": "Hide Gallery",
         "exitBoardSearch": "Exit Board Search",
         "exitSearch": "Exit Image Search",
         "featuresWillReset": "If you delete this image, those features will immediately be reset.",
         "galleryImageSize": "Image Size",
+        "columns": "Columns",
         "gallerySettings": "Gallery Settings",
         "go": "Go",
         "image": "image",
@@ -530,7 +533,12 @@
         "openViewer": "Open Viewer",
         "closeViewer": "Close Viewer",
         "move": "Move",
-        "useForPromptGeneration": "Use for Prompt Generation"
+        "useForPromptGeneration": "Use for Prompt Generation",
+        "showBoardsSidebar": "Expand Boards",
+        "hideBoardsSidebar": "Minimize Boards",
+        "showSquareThumbnails": "Show Square Thumbnails",
+        "showAspectRatioThumbnails": "Show Aspect Ratio Thumbnails",
+        "toggleAspectRatio": "Toggle Aspect Ratio"
     },
     "hotkeys": {
         "hotkeys": "Hotkeys",
