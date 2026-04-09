@@ -6,6 +6,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import {
   selectFluxDypePreset,
+  selectIsAnima,
   selectIsCogView4,
   selectIsFLUX,
   selectIsFlux2,
@@ -14,6 +15,7 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
+import ParamAnimaScheduler from 'features/parameters/components/Core/ParamAnimaScheduler';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
 import ParamFluxDypeExponent from 'features/parameters/components/Core/ParamFluxDypeExponent';
 import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDypePreset';
@@ -44,6 +46,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
+  const isAnima = useAppSelector(selectIsAnima);
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
 
   const selectBadges = useMemo(
@@ -82,9 +85,10 @@ export const GenerationSettingsAccordion = memo(() => {
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && <ParamScheduler />}
+              {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && !isAnima && <ParamScheduler />}
               {isFLUX && <ParamFluxScheduler />}
               {isZImage && <ParamZImageScheduler />}
+              {isAnima && <ParamAnimaScheduler />}
               <ParamSteps />
               {(isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
               {!isFLUX && !isFlux2 && <ParamCFGScale />}

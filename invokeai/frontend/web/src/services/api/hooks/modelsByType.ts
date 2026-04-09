@@ -11,6 +11,8 @@ import {
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 import {
+  isAnimaQwen3EncoderModelConfig,
+  isAnimaVAEModelConfig,
   isCLIPEmbedModelConfigOrSubmodel,
   isControlLayerModelConfig,
   isControlNetModelConfig,
@@ -68,6 +70,8 @@ export const useEmbeddingModels = buildModelsHook(isTIModelConfig);
 export const useVAEModels = () => buildModelsHook(isVAEModelConfigOrSubmodel)();
 export const useFlux1VAEModels = () => buildModelsHook(isFlux1VAEModelConfig)();
 export const useFlux2VAEModels = () => buildModelsHook(isFlux2VAEModelConfig)();
+export const useAnimaVAEModels = () => buildModelsHook(isAnimaVAEModelConfig)();
+export const useAnimaQwen3EncoderModels = () => buildModelsHook(isAnimaQwen3EncoderModelConfig)();
 export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
@@ -103,6 +107,9 @@ export const selectGlobalRefImageModels = buildModelsSelector(
 export const selectRegionalRefImageModels = buildModelsSelector(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config)
 );
+export const selectAnimaQwen3EncoderModels = buildModelsSelector(isAnimaQwen3EncoderModelConfig);
 export const selectQwen3EncoderModels = buildModelsSelector(isQwen3EncoderModelConfig);
 export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
+export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
+export const selectT5EncoderModels = buildModelsSelector(isT5EncoderModelConfigOrSubmodel);
