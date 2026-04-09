@@ -6,9 +6,8 @@ import type { ChangeEventHandler } from 'react';
 import { memo, useCallback } from 'react';
 import { PiXBold } from 'react-icons/pi';
 
+import { ModelFilterMenu } from './ModelFilterMenu';
 import { ModelListBulkActions } from './ModelListBulkActions';
-import { ModelSortControl } from './ModelSortControl';
-import { ModelTypeFilter } from './ModelTypeFilter';
 
 export const ModelListNavigation = memo(() => {
   const dispatch = useAppDispatch();
@@ -51,10 +50,7 @@ export const ModelListNavigation = memo(() => {
           </InputGroup>
         </Flex>
         <Flex shrink={0}>
-          <ModelSortControl />
-        </Flex>
-        <Flex shrink={0}>
-          <ModelTypeFilter />
+          <ModelFilterMenu />
         </Flex>
       </Flex>
       <ModelListBulkActions />
