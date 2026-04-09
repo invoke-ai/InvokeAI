@@ -21,6 +21,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import lora_model_from_anima_state_dict
 from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_utils import (
     is_state_dict_likely_in_flux_aitoolkit_format,
     lora_model_from_flux_aitoolkit_state_dict,
@@ -43,6 +44,10 @@ from invokeai.backend.patches.lora_conversions.flux_diffusers_lora_conversion_ut
 from invokeai.backend.patches.lora_conversions.flux_kohya_lora_conversion_utils import (
     is_state_dict_likely_in_flux_kohya_format,
     lora_model_from_flux_kohya_state_dict,
+)
+from invokeai.backend.patches.lora_conversions.flux_onetrainer_bfl_lora_conversion_utils import (
+    is_state_dict_likely_in_flux_onetrainer_bfl_format,
+    lora_model_from_flux_onetrainer_bfl_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.flux_onetrainer_lora_conversion_utils import (
     is_state_dict_likely_in_flux_onetrainer_format,
@@ -128,6 +133,8 @@ class LoRALoader(ModelLoader):
                         model = lora_model_from_flux_diffusers_state_dict(state_dict=state_dict, alpha=None)
                 elif is_state_dict_likely_in_flux_kohya_format(state_dict=state_dict):
                     model = lora_model_from_flux_kohya_state_dict(state_dict=state_dict)
+                elif is_state_dict_likely_in_flux_onetrainer_bfl_format(state_dict=state_dict):
+                    model = lora_model_from_flux_onetrainer_bfl_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_in_flux_onetrainer_format(state_dict=state_dict):
                     model = lora_model_from_flux_onetrainer_state_dict(state_dict=state_dict)
                 elif is_state_dict_likely_flux_control(state_dict=state_dict):
@@ -155,6 +162,9 @@ class LoRALoader(ModelLoader):
             # Z-Image LoRAs use diffusers PEFT format with transformer and/or Qwen3 encoder layers.
             # We set alpha=None to use rank as alpha (common default).
             model = lora_model_from_z_image_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.Anima:
+            # Anima LoRAs use Kohya-style or diffusers PEFT format targeting Cosmos DiT blocks.
+            model = lora_model_from_anima_state_dict(state_dict=state_dict, alpha=None)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 

@@ -1,6 +1,8 @@
 import { createSelector } from '@reduxjs/toolkit';
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+
+export { getPrefixedId };
 import { selectSaveAllImagesToGallery } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import {
@@ -205,7 +207,7 @@ export const getInfill = (
   assert(false, 'Unknown infill method');
 };
 
-const CANVAS_OUTPUT_PREFIX = 'canvas_output';
+export const CANVAS_OUTPUT_PREFIX = 'canvas_output';
 
 export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNodes>) => {
   return (
@@ -213,7 +215,8 @@ export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNo
     modelLoader.type === 'flux2_klein_model_loader' ||
     modelLoader.type === 'sd3_model_loader' ||
     modelLoader.type === 'cogview4_model_loader' ||
-    modelLoader.type === 'z_image_model_loader'
+    modelLoader.type === 'z_image_model_loader' ||
+    modelLoader.type === 'anima_model_loader'
   );
 };
 
@@ -255,6 +258,17 @@ export const getDenoisingStartAndEnd = (state: RootState): { denoising_start: nu
           denoising_end: 1,
         };
       }
+    }
+    case 'anima': {
+      // Anima uses a fixed shift=3.0 which makes the sigma schedule highly non-linear.
+      // Without rescaling, most of the visual 'change' is concentrated in the high denoise
+      // strength range (>0.8). The exponent 0.2 spreads the effective range more evenly,
+      // matching the approach used for FLUX and SD3.
+      const animaExponent = optimizedDenoisingEnabled ? 0.2 : 1;
+      return {
+        denoising_start: 1 - denoisingStrength ** animaExponent,
+        denoising_end: 1,
+      };
     }
     case 'sd-1':
     case 'sd-2':
