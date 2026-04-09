@@ -71,7 +71,7 @@ t5_base_encoder = StarterModel(
     name="t5_base_encoder",
     base=BaseModelType.Any,
     source="InvokeAI/t5-v1_1-xxl::bfloat16",
-    description="T5-XXL text encoder (used in FLUX pipelines). ~8GB",
+    description="T5-XXL text encoder (used in FLUX pipelines). ~9.5GB",
     type=ModelType.T5Encoder,
 )
 
@@ -156,7 +156,7 @@ flux_kontext_quantized = StarterModel(
     name="FLUX.1 Kontext dev (quantized)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF/resolve/main/flux1-kontext-dev-Q4_K_M.gguf",
-    description="FLUX.1 Kontext dev quantized (q4_k_m). Total size with dependencies: ~14GB",
+    description="FLUX.1 Kontext dev quantized (q4_k_m). Total size with dependencies: ~12GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
@@ -164,7 +164,7 @@ flux_krea = StarterModel(
     name="FLUX.1 Krea dev",
     base=BaseModelType.Flux,
     source="https://huggingface.co/InvokeAI/FLUX.1-Krea-dev/resolve/main/flux1-krea-dev.safetensors",
-    description="FLUX.1 Krea dev. Total size with dependencies: ~33GB",
+    description="FLUX.1 Krea dev. Total size with dependencies: ~29GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
@@ -172,7 +172,7 @@ flux_krea_quantized = StarterModel(
     name="FLUX.1 Krea dev (quantized)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/InvokeAI/FLUX.1-Krea-dev-GGUF/resolve/main/flux1-krea-dev-Q4_K_M.gguf",
-    description="FLUX.1 Krea dev quantized (q4_k_m). Total size with dependencies: ~14GB",
+    description="FLUX.1 Krea dev quantized (q4_k_m). Total size with dependencies: ~12GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
@@ -180,7 +180,7 @@ sd35_medium = StarterModel(
     name="SD3.5 Medium",
     base=BaseModelType.StableDiffusion3,
     source="stabilityai/stable-diffusion-3.5-medium",
-    description="Medium SD3.5 Model: ~15GB",
+    description="Medium SD3.5 Model: ~16GB",
     type=ModelType.Main,
     dependencies=[],
 )
@@ -188,7 +188,7 @@ sd35_large = StarterModel(
     name="SD3.5 Large",
     base=BaseModelType.StableDiffusion3,
     source="stabilityai/stable-diffusion-3.5-large",
-    description="Large SD3.5 Model: ~19G",
+    description="Large SD3.5 Model: ~28GB",
     type=ModelType.Main,
     dependencies=[],
 )
@@ -644,7 +644,7 @@ cogview4 = StarterModel(
     name="CogView4",
     base=BaseModelType.CogView4,
     source="THUDM/CogView4-6B",
-    description="The base CogView4 model (~29GB).",
+    description="The base CogView4 model (~31GB).",
     type=ModelType.Main,
 )
 # endregion
@@ -695,7 +695,7 @@ flux2_vae = StarterModel(
     name="FLUX.2 VAE",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-4B::vae",
-    description="FLUX.2 VAE (16-channel, same architecture as FLUX.1 VAE). ~335MB",
+    description="FLUX.2 VAE (16-channel, same architecture as FLUX.1 VAE). ~168MB",
     type=ModelType.VAE,
 )
 
@@ -719,7 +719,7 @@ flux2_klein_4b = StarterModel(
     name="FLUX.2 Klein 4B (Diffusers)",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-4B",
-    description="FLUX.2 Klein 4B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~10GB",
+    description="FLUX.2 Klein 4B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~16GB",
     type=ModelType.Main,
 )
 
@@ -745,7 +745,7 @@ flux2_klein_9b = StarterModel(
     name="FLUX.2 Klein 9B (Diffusers)",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-9B",
-    description="FLUX.2 Klein 9B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~20GB",
+    description="FLUX.2 Klein 9B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~35GB",
     type=ModelType.Main,
 )
 
@@ -821,7 +821,7 @@ z_image_turbo = StarterModel(
     name="Z-Image Turbo",
     base=BaseModelType.ZImage,
     source="Tongyi-MAI/Z-Image-Turbo",
-    description="Z-Image Turbo - fast 6B parameter text-to-image model with 8 inference steps. Supports bilingual prompts (English & Chinese). ~30.6GB",
+    description="Z-Image Turbo - fast 6B parameter text-to-image model with 8 inference steps. Supports bilingual prompts (English & Chinese). ~33GB",
     type=ModelType.Main,
 )
 
@@ -859,6 +859,36 @@ z_image_controlnet_tile = StarterModel(
     source="https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Tile-2.1-8steps.safetensors",
     description="Dedicated Tile ControlNet for Z-Image Turbo. Useful for upscaling and adding detail. ~6.7GB",
     type=ModelType.ControlNet,
+)
+# endregion
+
+# region Anima
+anima_qwen3_encoder = StarterModel(
+    name="Anima Qwen3 0.6B Text Encoder",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/text_encoders/qwen_3_06b_base.safetensors",
+    description="Qwen3 0.6B text encoder for Anima. ~1.2GB",
+    type=ModelType.Qwen3Encoder,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_vae = StarterModel(
+    name="Anima QwenImage VAE",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors",
+    description="QwenImage VAE for Anima (fine-tuned Wan 2.1 VAE, 16 latent channels). ~200MB",
+    type=ModelType.VAE,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_preview3 = StarterModel(
+    name="Anima Preview 3",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-preview3-base.safetensors",
+    description="Anima Preview 3 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    dependencies=[anima_qwen3_encoder, anima_vae, t5_base_encoder],
 )
 # endregion
 
@@ -957,6 +987,9 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
+    anima_preview3,
+    anima_qwen3_encoder,
+    anima_vae,
 ]
 
 sd1_bundle: list[StarterModel] = [
@@ -1025,12 +1058,20 @@ flux2_klein_bundle: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
 ]
 
+anima_bundle: list[StarterModel] = [
+    anima_preview3,
+    anima_qwen3_encoder,
+    anima_vae,
+    t5_base_encoder,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
     BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
     BaseModelType.Flux2: StarterModelBundle(name="FLUX.2 Klein", models=flux2_klein_bundle),
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
+    BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"

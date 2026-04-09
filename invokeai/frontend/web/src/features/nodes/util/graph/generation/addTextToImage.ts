@@ -22,7 +22,14 @@ export const addTextToImage = ({
   denoise,
   l2i,
 }: AddTextToImageArg): Invocation<
-  'img_resize' | 'l2i' | 'flux_vae_decode' | 'flux2_vae_decode' | 'sd3_l2i' | 'cogview4_l2i' | 'z_image_l2i'
+  | 'img_resize'
+  | 'l2i'
+  | 'flux_vae_decode'
+  | 'flux2_vae_decode'
+  | 'sd3_l2i'
+  | 'cogview4_l2i'
+  | 'z_image_l2i'
+  | 'anima_l2i'
 > => {
   denoise.denoising_start = 0;
   denoise.denoising_end = 1;
@@ -34,7 +41,8 @@ export const addTextToImage = ({
     denoise.type === 'flux_denoise' ||
     denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||
-    denoise.type === 'z_image_denoise'
+    denoise.type === 'z_image_denoise' ||
+    denoise.type === 'anima_denoise'
   ) {
     denoise.width = scaledSize.width;
     denoise.height = scaledSize.height;

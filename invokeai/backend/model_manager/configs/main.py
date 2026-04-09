@@ -76,6 +76,8 @@ class MainModelDefaultSettings(BaseModel):
                 else:
                     # Turbo (distilled) uses fewer steps, no CFG
                     return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
+            case BaseModelType.Anima:
+                return cls(steps=35, cfg_scale=4.5, width=1024, height=1024)
             case BaseModelType.Flux2:
                 # Different defaults based on variant
                 if variant == Flux2VariantType.Klein9BBase:
@@ -323,6 +325,16 @@ def _is_flux2_model(state_dict: dict[str | int, Any]) -> bool:
     return False
 
 
+def _filename_suggests_base(name: str) -> bool:
+    """Check if a model name/filename suggests it is a Base (undistilled) variant.
+
+    Klein 9B Base and Klein 9B have identical architectures and cannot be distinguished
+    from the state dict. We use the filename as a heuristic: filenames containing "base"
+    (e.g. "flux-2-klein-base-9b", "FLUX.2-klein-base-9B") indicate the undistilled model.
+    """
+    return "base" in name.lower()
+
+
 def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
     """Determine FLUX.2 variant from state dict.
 
@@ -330,9 +342,9 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
     - Klein 4B: context_in_dim = 7680 (3 × Qwen3-4B hidden_size 2560)
     - Klein 9B: context_in_dim = 12288 (3 × Qwen3-8B hidden_size 4096)
 
-    Note: Klein 9B Base (undistilled) also has context_in_dim = 12288 but is rare.
-    We default to Klein9B (distilled) for all 9B models since GGUF models may not
-    include guidance embedding keys needed to distinguish them.
+    Note: Klein 9B (distilled) and Klein 9B Base (undistilled) have identical architectures
+    and cannot be distinguished from the state dict alone. This function defaults to Klein9B
+    for all 9B models. Callers should use filename heuristics to detect Klein9BBase.
 
     Supports both BFL format (checkpoint) and diffusers format keys:
     - BFL format: txt_in.weight (context embedder)
@@ -366,7 +378,7 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
                 context_in_dim = shape[1]
                 # Determine variant based on context dimension
                 if context_in_dim == KLEIN_9B_CONTEXT_DIM:
-                    # Default to Klein9B (distilled) - the official/common 9B model
+                    # Default to Klein9B - callers use filename heuristics to detect Klein9BBase
                     return Flux2VariantType.Klein9B
                 elif context_in_dim == KLEIN_4B_CONTEXT_DIM:
                     return Flux2VariantType.Klein4B
@@ -553,6 +565,11 @@ class Main_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         if variant is None:
             raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
 
+        # Klein 9B Base and Klein 9B have identical architectures.
+        # Use filename heuristic to detect the Base (undistilled) variant.
+        if variant == Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein9BBase
+
         return variant
 
     @classmethod
@@ -720,6 +737,11 @@ class Main_GGUF_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Ba
         if variant is None:
             raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
 
+        # Klein 9B Base and Klein 9B have identical architectures.
+        # Use filename heuristic to detect the Base (undistilled) variant.
+        if variant == Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein9BBase
+
         return variant
 
     @classmethod
@@ -829,12 +851,8 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         - Klein 4B: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
         - Klein 9B/9B Base: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
 
-        To distinguish Klein 9B (distilled) from Klein 9B Base (undistilled),
-        we check guidance_embeds:
-        - Klein 9B (distilled): guidance_embeds = False (guidance is "baked in" during distillation)
-        - Klein 9B Base (undistilled): guidance_embeds = True (needs guidance at inference)
-
-        Note: The official BFL Klein 9B model is the distilled version with guidance_embeds=False.
+        Klein 9B (distilled) and Klein 9B Base (undistilled) have identical architectures
+        and both have guidance_embeds=False. We use a filename heuristic to detect Base models.
         """
         KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
         KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
@@ -842,17 +860,12 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         transformer_config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
 
         joint_attention_dim = transformer_config.get("joint_attention_dim", 4096)
-        guidance_embeds = transformer_config.get("guidance_embeds", False)
 
         # Determine variant based on joint_attention_dim
         if joint_attention_dim == KLEIN_9B_CONTEXT_DIM:
-            # Check guidance_embeds to distinguish distilled from undistilled
-            # Klein 9B (distilled): guidance_embeds = False (guidance is baked in)
-            # Klein 9B Base (undistilled): guidance_embeds = True (needs guidance)
-            if guidance_embeds:
+            if _filename_suggests_base(mod.name):
                 return Flux2VariantType.Klein9BBase
-            else:
-                return Flux2VariantType.Klein9B
+            return Flux2VariantType.Klein9B
         elif joint_attention_dim == KLEIN_4B_CONTEXT_DIM:
             return Flux2VariantType.Klein4B
         elif joint_attention_dim > 4096:
@@ -1084,6 +1097,44 @@ class Main_Diffusers_CogView4_Config(Diffusers_Config_Base, Main_Config_Base, Co
         )
 
 
+def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Anima model keys.
+
+    Anima models are identified by the presence of `llm_adapter` keys
+    (unique to Anima - the LLM Adapter that bridges Qwen3 text encoder to the Cosmos DiT)
+    alongside Cosmos Predict2 DiT keys (blocks, t_embedder, x_embedder, final_layer).
+
+    The checkpoint keys may have a `net.` prefix (e.g. `net.llm_adapter.`, `net.blocks.`).
+    """
+    has_llm_adapter = False
+    has_cosmos_dit = False
+
+    # Cosmos DiT key prefixes — support both with and without `net.` prefix
+    cosmos_prefixes = (
+        "blocks.",
+        "t_embedder.",
+        "x_embedder.",
+        "final_layer.",
+        "net.blocks.",
+        "net.t_embedder.",
+        "net.x_embedder.",
+        "net.final_layer.",
+    )
+
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        if key.startswith("llm_adapter.") or key.startswith("net.llm_adapter."):
+            has_llm_adapter = True
+        for prefix in cosmos_prefixes:
+            if key.startswith(prefix):
+                has_cosmos_dit = True
+        if has_llm_adapter and has_cosmos_dit:
+            return True
+
+    return False
+
+
 class Main_Diffusers_ZImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base)."""
 
@@ -1199,3 +1250,30 @@ class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
         has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
         if not has_ggml_tensors:
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
+class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Anima single-file checkpoint models (safetensors).
+
+    Anima is built on NVIDIA Cosmos Predict2 DiT with a custom LLM Adapter
+    that bridges Qwen3 0.6B text encoder outputs to the DiT.
+    """
+
+    base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_anima_model(mod)
+
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_anima_model(cls, mod: ModelOnDisk) -> None:
+        has_anima_keys = _has_anima_keys(mod.load_state_dict())
+        if not has_anima_keys:
+            raise NotAMatchError("state dict does not look like an Anima model")

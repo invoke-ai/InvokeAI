@@ -52,6 +52,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
     """Indicates the model is associated with Z-Image model architecture, including Z-Image-Turbo."""
+    Anima = "anima"
+    """Indicates the model is associated with Anima model architecture (Cosmos Predict2 DiT + LLM Adapter)."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -152,6 +154,9 @@ class Qwen3VariantType(str, Enum):
     Qwen3_8B = "qwen3_8b"
     """Qwen3 8B text encoder (hidden_size=4096). Used by FLUX.2 Klein 9B."""
 
+    Qwen3_06B = "qwen3_06b"
+    """Qwen3 0.6B text encoder (hidden_size=1024). Used by Anima."""
+
 
 class ModelFormat(str, Enum):
     """Storage format of model."""
@@ -210,6 +215,7 @@ class FluxLoRAFormat(str, Enum):
     AIToolkit = "flux.aitoolkit"
     XLabs = "flux.xlabs"
     BflPeft = "flux.bfl_peft"
+    OneTrainerBfl = "flux.onetrainer_bfl"
 
 
 AnyVariant: TypeAlias = Union[
