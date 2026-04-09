@@ -173,14 +173,16 @@ This matters even if the parent workflow was authored in a context where the chi
 
 ### 8. Recursion And Nesting
 
-Initial implementation should forbid:
+Nested and recursive `call_saved_workflow` execution should be allowed, but bounded.
 
-- direct self-call
-- obvious recursion cycles
-- nested `call_saved_workflow` inside a called child workflow
+Initial implementation should enforce:
 
-This keeps the first runtime implementation bounded.
-Nested calls can be revisited later.
+- nested workflow calls are allowed
+- recursive workflow calls are allowed
+- maximum workflow call depth is capped at 4 call frames
+- the depth cap is enforced at runtime, based on the active call stack, not by static validation alone
+
+This allows legitimate recursive or conditionally terminating workflow structures while still preventing unbounded call growth.
 
 ## Where The Runtime Work Belongs
 
@@ -298,8 +300,8 @@ The frontend should not be the authoritative implementation of execution semanti
 3. Define a minimal parent-child session relationship model.
 4. Prototype runtime input passing for `call_saved_workflow` without nested calls.
 5. Add the workflow return node with frontend and Python enforcement that only one return node may exist per workflow.
-6. Add strict recursion guards.
-7. Add end-to-end tests for successful child call execution, missing child workflow, unauthorized child workflow, duplicate return nodes, and child failure propagation.
+6. Add runtime call-stack tracking and maximum-depth enforcement.
+7. Add end-to-end tests for successful child call execution, missing child workflow, unauthorized child workflow, duplicate return nodes, maximum-depth failures, and child failure propagation.
 
 ## Minimum Test Matrix For The Next Phase
 
@@ -316,8 +318,8 @@ Negative tests:
 - unauthorized selected workflow fails cleanly
 - child workflow missing return definition fails cleanly if returns are required
 - duplicate workflow return nodes are rejected
-- direct self-call is rejected
-- nested workflow calls are rejected in the first implementation
+- recursive calls that exceed the maximum depth are rejected
+- nested calls that exceed the maximum depth are rejected
 - child workflow failure propagates to the parent
 - cancellation while child is running produces a deterministic failure state
 
