@@ -235,6 +235,7 @@ Responsibilities:
 - provide that collection back to the parent call site when invoked through `call_saved_workflow`
 - remain inert from a caller perspective when the workflow is run independently
 - guarantee that only one such node exists per workflow
+- behave as a normal node in the editor, with singularity enforced by both frontend and Python validation/runtime code
 
 This should likely become the canonical reusable return mechanism for any future subworkflow call behavior.
 
@@ -246,6 +247,26 @@ Session/runtime state will likely need to record:
 - child execution belonging to a parent node call site
 - result propagation back to the parent
 - strict failure propagation rules
+
+### Workflow Return Value Flow
+
+The workflow return value should not be persisted back into the saved workflow record and should not be derived from frontend state.
+
+The intended runtime flow is:
+
+1. The child workflow computes the `workflow_return` node's collection input like any other node input.
+2. When the child reaches `workflow_return`, runtime captures the resolved collection value as the child workflow result.
+3. That result is stored in child execution state, or equivalent parent-child call-frame state, until the child finishes.
+4. When the child finishes successfully, the captured collection is passed back to the suspended parent call site.
+5. `call_saved_workflow` completes using that collection as its output value.
+6. The parent workflow resumes execution.
+
+Consequences of this model:
+
+- `workflow_return` is a normal invocation node in the child workflow
+- only one workflow return result may exist, because only one return node is allowed per workflow
+- the child result should live in runtime/session state, not in workflow persistence
+- return propagation should be explicit and deterministic
 
 ## Frontend Responsibilities In The Long-Term Design
 
@@ -267,7 +288,7 @@ The frontend should not be the authoritative implementation of execution semanti
 3. The first runtime version should use the explicit workflow return node with a single collection-valued return, rather than inputs-only or ad hoc fixed outputs.
 4. Should child execution inherit all parent execution context, or only selected parts?
 5. What cancellation semantics apply if the parent session is cancelled while a child workflow is running?
-6. What metadata should be stored on queue items or sessions to represent call relationships?
+6. What metadata should be stored on queue items or sessions to represent call relationships and the captured child return value?
 7. Do dynamic input identities need a more stable external interface ID before runtime work begins?
 
 ## Recommended Next Steps
