@@ -10,6 +10,7 @@ import { FloatFieldInputAndSlider } from 'features/nodes/components/flow/nodes/I
 import { FloatFieldSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldSlider';
 import { InputFieldEditModeNodes } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldEditModeNodes';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
+import { InputFieldWrapper } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldWrapper';
 import BoardFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/BoardFieldInputComponent';
 import BooleanFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/BooleanFieldInputComponent';
 import ColorFieldInputComponent from 'features/nodes/components/flow/nodes/Invocation/fields/inputs/ColorFieldInputComponent';
@@ -93,22 +94,18 @@ const bodySx: SystemStyleObject = {
 };
 
 const dynamicFieldSx: SystemStyleObject = {
-  py: 0.5,
+  px: 2,
   flexDir: 'column',
   w: 'full',
-  position: 'relative',
 };
 
 const fieldBodySx: SystemStyleObject = {
-  ml: 2,
-  borderWidth: '1px',
-  borderRadius: 'base',
-  borderColor: 'base.700',
   px: 2,
-  py: 1.5,
-  minH: 12,
+  py: 1,
   gap: 1,
   flexDir: 'column',
+  w: 'full',
+  pointerEvents: 'auto',
 };
 
 const handleSx: SystemStyleObject = {
@@ -222,20 +219,22 @@ const DynamicFieldRow = memo(
     }
 
     return (
-      <Flex sx={dynamicFieldSx}>
-        <DynamicInputFieldHandle fieldName={field.fieldName} template={field.fieldTemplate} />
-        <Flex sx={fieldBodySx}>
-          <Text fontSize="sm" fontWeight="semibold" color="base.300" noOfLines={1}>
-            {instance.label || field.fieldTemplate.title}
-          </Text>
-          <DynamicFieldInputRenderer
-            nodeId={nodeId}
-            instance={instance}
-            template={field.fieldTemplate}
-            settings={field.settings}
-          />
+      <InputFieldWrapper>
+        <Flex sx={dynamicFieldSx}>
+          <Flex sx={fieldBodySx}>
+            <Text fontSize="sm" fontWeight="semibold" color="base.300" noOfLines={1}>
+              {instance.label || field.fieldTemplate.title}
+            </Text>
+            <DynamicFieldInputRenderer
+              nodeId={nodeId}
+              instance={instance}
+              template={field.fieldTemplate}
+              settings={field.settings}
+            />
+          </Flex>
         </Flex>
-      </Flex>
+        <DynamicInputFieldHandle fieldName={field.fieldName} template={field.fieldTemplate} />
+      </InputFieldWrapper>
     );
   }
 );
