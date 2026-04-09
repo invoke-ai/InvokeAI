@@ -46,6 +46,7 @@ from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    AnimaConditioningInfo,
     BasicConditioningInfo,
     CogView4ConditioningInfo,
     ConditioningFieldData,
@@ -140,6 +141,7 @@ class ApiDependencies:
                     SD3ConditioningInfo,
                     CogView4ConditioningInfo,
                     ZImageConditioningInfo,
+                    AnimaConditioningInfo,
                 ],
                 ephemeral=True,
             ),
