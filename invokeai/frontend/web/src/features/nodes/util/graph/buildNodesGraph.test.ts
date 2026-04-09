@@ -40,6 +40,7 @@ describe('buildNodesGraph', () => {
             initialValue: 23,
           },
         ],
+        edgeIdsToRemove: [],
       })
     );
 
