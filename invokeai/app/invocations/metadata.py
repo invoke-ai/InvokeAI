@@ -166,6 +166,10 @@ GENERATION_MODES = Literal[
     "z_image_img2img",
     "z_image_inpaint",
     "z_image_outpaint",
+    "anima_txt2img",
+    "anima_img2img",
+    "anima_inpaint",
+    "anima_outpaint",
 ]
 
 
