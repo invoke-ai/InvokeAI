@@ -10,6 +10,7 @@ from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowMeta,
     WorkflowNotFoundError,
     WorkflowRecordDTO,
+    WorkflowWithoutIDValidator,
 )
 
 
@@ -240,3 +241,59 @@ def test_call_saved_workflow_invocation_schema_declares_saved_workflow_ui_type()
     assert workflow_id["default"] == ""
     assert workflow_id["input"] == "any"
     assert workflow_id["ui_type"] == "SavedWorkflowField"
+
+
+def test_workflow_return_invocation_contract():
+    from invokeai.app.invocations.workflow_return import WorkflowReturnInvocation, WorkflowReturnOutput
+
+    invocation = WorkflowReturnInvocation(id="return-node", collection=["a", 1, {"x": True}])
+
+    assert invocation.get_type() == "workflow_return"
+
+    output = invocation.invoke(build_context())
+
+    assert isinstance(output, WorkflowReturnOutput)
+    assert output.collection == ["a", 1, {"x": True}]
+
+
+def test_workflow_return_invocation_schema_declares_collection_ui_type():
+    from invokeai.app.invocations.workflow_return import WorkflowReturnInvocation
+
+    schema = WorkflowReturnInvocation.model_json_schema()
+    collection = schema["properties"]["collection"]
+
+    assert collection["input"] == "any"
+    assert collection["ui_type"] == "CollectionField"
+
+
+def test_workflow_without_id_validator_rejects_duplicate_workflow_return_nodes():
+    with pytest.raises(ValueError, match="workflow_return"):
+        WorkflowWithoutIDValidator.validate_python(
+            {
+                "name": "Workflow With Duplicate Returns",
+                "author": "Tester",
+                "description": "",
+                "version": "1.0.0",
+                "contact": "",
+                "tags": "",
+                "notes": "",
+                "exposedFields": [],
+                "meta": {"version": "1.0.0", "category": "user"},
+                "nodes": [
+                    {
+                        "id": "return-1",
+                        "type": "invocation",
+                        "data": {"id": "return-1", "type": "workflow_return"},
+                        "position": {"x": 0, "y": 0},
+                    },
+                    {
+                        "id": "return-2",
+                        "type": "invocation",
+                        "data": {"id": "return-2", "type": "workflow_return"},
+                        "position": {"x": 100, "y": 0},
+                    },
+                ],
+                "edges": [],
+                "form": None,
+            }
+        )

@@ -363,24 +363,38 @@ const zValidatedBuilderForm = zBuilderForm
 //# endregion
 
 // #region Workflow
-export const zWorkflowV3 = z.object({
-  id: z.string().min(1).optional(),
-  name: z.string(),
-  author: z.string(),
-  description: z.string(),
-  version: z.string(),
-  contact: z.string(),
-  tags: z.string(),
-  notes: z.string(),
-  nodes: z.array(zWorkflowNode),
-  edges: z.array(zWorkflowEdge),
-  exposedFields: z.array(zFieldIdentifier),
-  meta: z.object({
-    category: zWorkflowCategory.default('user'),
-    version: z.literal('3.0.0'),
-  }),
-  // Use the validated form schema!
-  form: zValidatedBuilderForm,
-});
+export const zWorkflowV3 = z
+  .object({
+    id: z.string().min(1).optional(),
+    name: z.string(),
+    author: z.string(),
+    description: z.string(),
+    version: z.string(),
+    contact: z.string(),
+    tags: z.string(),
+    notes: z.string(),
+    nodes: z.array(zWorkflowNode),
+    edges: z.array(zWorkflowEdge),
+    exposedFields: z.array(zFieldIdentifier),
+    meta: z.object({
+      category: zWorkflowCategory.default('user'),
+      version: z.literal('3.0.0'),
+    }),
+    // Use the validated form schema!
+    form: zValidatedBuilderForm,
+  })
+  .superRefine((workflow, ctx) => {
+    const workflowReturnCount = workflow.nodes.filter(
+      (node) => node.type === 'invocation' && node.data.type === 'workflow_return'
+    ).length;
+
+    if (workflowReturnCount > 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'A workflow may not contain more than one workflow_return node.',
+        path: ['nodes'],
+      });
+    }
+  });
 export type WorkflowV3 = z.infer<typeof zWorkflowV3>;
 // #endregion

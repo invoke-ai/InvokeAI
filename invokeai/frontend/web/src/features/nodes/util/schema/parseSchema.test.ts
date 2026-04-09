@@ -1,5 +1,5 @@
 import { omit, pick } from 'es-toolkit/compat';
-import { call_saved_workflow, schema, templates } from 'features/nodes/store/util/testUtils';
+import { call_saved_workflow, schema, templates, workflow_return } from 'features/nodes/store/util/testUtils';
 import { parseSchema } from 'features/nodes/util/schema/parseSchema';
 import { describe, expect, it } from 'vitest';
 
@@ -31,5 +31,19 @@ describe('parseSchema', () => {
     }
     expect(workflowIdInput.type.name).toBe('SavedWorkflowField');
     expect(workflowIdInput.ui_type).toBe('SavedWorkflowField');
+  });
+  it('should parse the workflow_return node template', () => {
+    const parsed = parseSchema(schema);
+    expect(stripUndefinedDeep(parsed.workflow_return)).toEqual(stripUndefinedDeep(workflow_return));
+    const template = parsed.workflow_return;
+    if (!template) {
+      throw new Error('Expected workflow_return template');
+    }
+    const collectionInput = template.inputs.collection;
+    if (!collectionInput) {
+      throw new Error('Expected collection input');
+    }
+    expect(collectionInput.type.name).toBe('CollectionField');
+    expect(collectionInput.ui_type).toBe('CollectionField');
   });
 });

@@ -143,7 +143,7 @@ Recommended model:
 
 - introduce a workflow return node analogous in concept to Canvas Output
 - the child workflow declares what values it returns through that explicit node
-- the return node accepts a collection input
+- the return node accepts a `list[Any]` collection input
 - when the workflow is run independently, the return node has no caller-visible effect
 - when the workflow is run via `call_saved_workflow`, that collection becomes the return value of the call
 - `call_saved_workflow` should expose that collection as its return value in the first runtime version
@@ -231,7 +231,7 @@ A dedicated child-workflow return node should be introduced.
 Responsibilities:
 
 - define the return interface of the called workflow
-- accept a collection input representing the workflow result
+- accept a `list[Any]` collection input representing the workflow result
 - provide that collection back to the parent call site when invoked through `call_saved_workflow`
 - remain inert from a caller perspective when the workflow is run independently
 - guarantee that only one such node exists per workflow
@@ -307,7 +307,7 @@ Positive tests:
 
 - parent workflow calls child workflow successfully with literal arguments
 - parent workflow calls child workflow successfully with connected arguments
-- child workflow returns its explicit collection value to the parent
+- child workflow returns its explicit `list[Any]` collection value to the parent
 - runtime enforces child defaults when parent does not override them
 
 Negative tests:

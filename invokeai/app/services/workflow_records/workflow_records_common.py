@@ -73,6 +73,23 @@ class WorkflowWithoutID(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
+    @field_validator("nodes")
+    @classmethod
+    def validate_workflow_return_node_uniqueness(cls, nodes: list[dict[str, JsonValue]]):
+        workflow_return_count = 0
+
+        for node in nodes:
+            if not isinstance(node, dict) or node.get("type") != "invocation":
+                continue
+            data = node.get("data")
+            if isinstance(data, dict) and data.get("type") == "workflow_return":
+                workflow_return_count += 1
+
+        if workflow_return_count > 1:
+            raise ValueError("A workflow may not contain more than one workflow_return node.")
+
+        return nodes
+
 
 WorkflowWithoutIDValidator = TypeAdapter(WorkflowWithoutID)
 
