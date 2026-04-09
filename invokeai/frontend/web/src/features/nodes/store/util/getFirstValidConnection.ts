@@ -3,7 +3,12 @@ import { map } from 'es-toolkit/compat';
 import type { Templates } from 'features/nodes/store/types';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
-import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
+import {
+  type AnyEdge,
+  type AnyNode,
+  getInvocationNodeInputTemplate,
+  isInvocationNode,
+} from 'features/nodes/types/invocation';
 
 /**
  *
@@ -132,8 +137,11 @@ export const getSourceCandidateFields = (
   if (!sourceTemplate || !targetTemplate) {
     return [];
   }
+  if (!isInvocationNode(targetNode)) {
+    return [];
+  }
 
-  const targetField = targetTemplate.inputs[targetHandle];
+  const targetField = getInvocationNodeInputTemplate(targetNode.data, targetTemplate, targetHandle);
 
   if (!targetField) {
     return [];

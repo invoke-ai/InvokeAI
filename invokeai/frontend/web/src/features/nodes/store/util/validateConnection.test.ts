@@ -1,9 +1,21 @@
 import { deepClone } from 'common/util/deepClone';
 import { set } from 'es-toolkit/compat';
+import { callSavedWorkflowDynamicFieldsChanged, nodesSliceConfig } from 'features/nodes/store/nodesSlice';
+import type { IntegerFieldInputTemplate } from 'features/nodes/types/field';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import { describe, expect, it } from 'vitest';
 
-import { add, buildEdge, buildNode, collect, img_resize, main_model_loader, sub, templates } from './testUtils';
+import {
+  add,
+  buildEdge,
+  buildNode,
+  call_saved_workflow,
+  collect,
+  img_resize,
+  main_model_loader,
+  sub,
+  templates,
+} from './testUtils';
 import { validateConnection } from './validateConnection';
 
 const ifTemplate: InvocationTemplate = {
@@ -195,6 +207,44 @@ describe(validateConnection.name, () => {
       const r = validateConnection(c, nodes, [], templates, null);
       expect(r).toEqual('nodes.missingFieldTemplate');
     });
+  });
+
+  it('accepts connections to dynamic saved workflow input fields', () => {
+    const addIntegerInputTemplate = add.inputs.a as IntegerFieldInputTemplate;
+    const state = nodesSliceConfig.getInitialState();
+    const sourceNode = buildNode(add);
+    const targetNode = buildNode(call_saved_workflow);
+    state.nodes.push(sourceNode, targetNode);
+
+    const nextState = nodesSliceConfig.slice.reducer(
+      state,
+      callSavedWorkflowDynamicFieldsChanged({
+        nodeId: targetNode.id,
+        fields: [
+          {
+            fieldName: 'saved_workflow_input::node-1::a',
+            fieldTemplate: {
+              ...addIntegerInputTemplate,
+              name: 'saved_workflow_input::node-1::a',
+              title: 'Left Addend',
+              input: 'any',
+            },
+            label: 'Left Addend',
+            description: 'The first number',
+            initialValue: 23,
+          },
+        ],
+      })
+    );
+
+    const c = {
+      source: sourceNode.id,
+      sourceHandle: 'value',
+      target: targetNode.id,
+      targetHandle: 'saved_workflow_input::node-1::a',
+    };
+    const r = validateConnection(c, nextState.nodes, [], templates, null);
+    expect(r).toEqual(null);
   });
 
   describe('duplicate connections', () => {

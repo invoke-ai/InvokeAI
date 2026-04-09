@@ -508,10 +508,12 @@ const slice = createSlice({
       for (const fieldName of Object.keys(node.data.inputs)) {
         if (fieldName.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX) && !nextFieldNames.has(fieldName)) {
           delete node.data.inputs[fieldName];
+          delete node.data.dynamicInputTemplates[fieldName];
         }
       }
 
       for (const { fieldName, fieldTemplate, label, description, initialValue } of fields) {
+        node.data.dynamicInputTemplates[fieldName] = fieldTemplate;
         const existing = node.data.inputs[fieldName];
         if (existing) {
           existing.label = label;

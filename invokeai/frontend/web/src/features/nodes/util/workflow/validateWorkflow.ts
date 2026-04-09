@@ -8,6 +8,7 @@ import {
   isModelFieldType,
   isModelIdentifierFieldInputInstance,
 } from 'features/nodes/types/field';
+import { getInvocationNodeInputTemplate } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import {
   buildNodeFieldElement,
@@ -96,7 +97,7 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
     }
 
     for (const input of Object.values(node.data.inputs)) {
-      const fieldTemplate = template.inputs[input.name];
+      const fieldTemplate = getInvocationNodeInputTemplate(node.data, template, input.name);
 
       if (!fieldTemplate) {
         const message = t('nodes.missingFieldTemplate');
@@ -208,7 +209,13 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
       );
     }
 
-    if (targetNode && targetTemplate && edge.type === 'default' && !(edge.targetHandle in targetTemplate.inputs)) {
+    if (
+      targetNode &&
+      isWorkflowInvocationNode(targetNode) &&
+      targetTemplate &&
+      edge.type === 'default' &&
+      !getInvocationNodeInputTemplate(targetNode.data, targetTemplate, edge.targetHandle)
+    ) {
       // The edge's target/input node field does not exist
       issues.push(
         t('nodes.targetNodeFieldDoesNotExist', {
@@ -243,14 +250,14 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
 
     for (const { nodeId, fieldName } of reverseExposedFields) {
       const node = nodes.find(({ id }) => id === nodeId);
-      if (!node) {
+      if (!node || !isWorkflowInvocationNode(node)) {
         continue;
       }
       const nodeTemplate = templates[node.data.type];
       if (!nodeTemplate) {
         continue;
       }
-      const fieldTemplate = nodeTemplate.inputs[fieldName];
+      const fieldTemplate = getInvocationNodeInputTemplate(node.data, nodeTemplate, fieldName);
       if (!fieldTemplate) {
         continue;
       }

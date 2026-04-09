@@ -4,7 +4,12 @@ import { areTypesEqual } from 'features/nodes/store/util/areTypesEqual';
 import { getCollectItemType } from 'features/nodes/store/util/getCollectItemType';
 import { getHasCycles } from 'features/nodes/store/util/getHasCycles';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
-import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
+import {
+  type AnyEdge,
+  type AnyNode,
+  getInvocationNodeInputTemplate,
+  isInvocationNode,
+} from 'features/nodes/types/invocation';
 import type { SetNonNullable } from 'type-fest';
 
 type Connection = SetNonNullable<NullableConnection>;
@@ -102,13 +107,16 @@ export const validateConnection: ValidateConnectionFunc = (
     if (!targetTemplate) {
       return 'nodes.missingInvocationTemplate';
     }
+    if (!isInvocationNode(targetNode)) {
+      return 'nodes.missingInvocationTemplate';
+    }
 
     const sourceFieldTemplate = sourceTemplate.outputs[c.sourceHandle];
     if (!sourceFieldTemplate) {
       return 'nodes.missingFieldTemplate';
     }
 
-    const targetFieldTemplate = targetTemplate.inputs[c.targetHandle];
+    const targetFieldTemplate = getInvocationNodeInputTemplate(targetNode.data, targetTemplate, c.targetHandle);
     if (!targetFieldTemplate) {
       return 'nodes.missingFieldTemplate';
     }

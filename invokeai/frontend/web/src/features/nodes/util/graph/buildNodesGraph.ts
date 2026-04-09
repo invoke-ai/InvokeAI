@@ -7,7 +7,7 @@ import type { Templates } from 'features/nodes/store/types';
 import type { BoardField } from 'features/nodes/types/common';
 import type { BoardFieldInputInstance } from 'features/nodes/types/field';
 import { isBoardFieldInputInstance, isBoardFieldInputTemplate } from 'features/nodes/types/field';
-import { isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
+import { getInvocationNodeInputTemplate, isExecutableNode, isInvocationNode } from 'features/nodes/types/invocation';
 import type { AnyInvocation, Graph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -58,7 +58,7 @@ export const buildNodesGraph = (state: RootState, templates: Templates): Require
     const transformedInputs = reduce(
       inputs,
       (inputsAccumulator, input, name) => {
-        const fieldTemplate = nodeTemplate.inputs[name];
+        const fieldTemplate = getInvocationNodeInputTemplate(data, nodeTemplate, name);
         if (!fieldTemplate) {
           log.warn({ id, name }, 'Field template not found!');
           return inputsAccumulator;
