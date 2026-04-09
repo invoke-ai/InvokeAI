@@ -38,6 +38,7 @@ describe('callSavedWorkflowDynamicFieldsChanged', () => {
             initialValue: 23,
           },
         ],
+        edgeIdsToRemove: [],
       })
     );
 
@@ -71,6 +72,7 @@ describe('callSavedWorkflowDynamicFieldsChanged', () => {
             initialValue: 23,
           },
         ],
+        edgeIdsToRemove: [],
       })
     );
 
@@ -96,6 +98,7 @@ describe('callSavedWorkflowDynamicFieldsChanged', () => {
             initialValue: 23,
           },
         ],
+        edgeIdsToRemove: [],
       })
     );
 
@@ -128,6 +131,7 @@ describe('callSavedWorkflowDynamicFieldsChanged', () => {
             initialValue: 23,
           },
         ],
+        edgeIdsToRemove: [],
       })
     );
 
@@ -136,6 +140,7 @@ describe('callSavedWorkflowDynamicFieldsChanged', () => {
       callSavedWorkflowDynamicFieldsChanged({
         nodeId: node.id,
         fields: [],
+        edgeIdsToRemove: [],
       })
     );
 
@@ -146,5 +151,31 @@ describe('callSavedWorkflowDynamicFieldsChanged', () => {
 
     expect(resyncedNode.data.inputs[fieldName]).toBeUndefined();
     expect(resyncedNode.data.dynamicInputTemplates[fieldName]).toBeUndefined();
+  });
+
+  it('removes specified inbound edges during dynamic field resync', () => {
+    const state = nodesSliceConfig.getInitialState();
+    const sourceNode = buildNode(addTemplate);
+    const targetNode = buildNode(callSavedWorkflowTemplate);
+    state.nodes.push(sourceNode, targetNode);
+    state.edges.push({
+      id: 'edge-1',
+      type: 'default',
+      source: sourceNode.id,
+      sourceHandle: 'value',
+      target: targetNode.id,
+      targetHandle: 'saved_workflow_input::node-1::a',
+    });
+
+    const nextState = nodesSliceConfig.slice.reducer(
+      state,
+      callSavedWorkflowDynamicFieldsChanged({
+        nodeId: targetNode.id,
+        fields: [],
+        edgeIdsToRemove: ['edge-1'],
+      })
+    );
+
+    expect(nextState.edges).toHaveLength(0);
   });
 });

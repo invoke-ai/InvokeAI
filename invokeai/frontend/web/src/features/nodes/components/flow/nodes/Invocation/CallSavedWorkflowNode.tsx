@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Badge, Flex, Grid, GridItem } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
-import { useAppDispatch } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InputFieldEditModeNodes } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldEditModeNodes';
 import { InputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/InputFieldGate';
 import { OutputFieldGate } from 'features/nodes/components/flow/nodes/Invocation/fields/OutputFieldGate';
@@ -12,11 +12,12 @@ import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstanc
 import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
 import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
 import { $templates, callSavedWorkflowDynamicFieldsChanged } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { SavedWorkflowFieldInputInstance } from 'features/nodes/types/field';
-import { memo, useEffect, useMemo } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 
-import { getSavedWorkflowDynamicFields } from './callSavedWorkflowFormUtils';
+import { getSavedWorkflowDynamicEdgeIdsToRemove, getSavedWorkflowDynamicFields } from './callSavedWorkflowFormUtils';
 
 const bodySx: SystemStyleObject = {
   flexDirection: 'column',
@@ -47,16 +48,37 @@ const CallSavedWorkflowNode = ({ nodeId, isOpen }: Props) => {
   const workflowIdField = useInputFieldInstance<SavedWorkflowFieldInputInstance>('workflow_id');
   const templates = useStore($templates);
   const dispatch = useAppDispatch();
+  const nodesState = useAppSelector(selectNodesSlice);
 
   const { data: workflow } = useGetWorkflowQuery(workflowIdField.value, {
     skip: !workflowIdField.value,
   });
 
   const dynamicFields = useMemo(() => getSavedWorkflowDynamicFields(workflow, templates), [templates, workflow]);
+  const edgeIdsToRemove = useMemo(
+    () =>
+      getSavedWorkflowDynamicEdgeIdsToRemove({
+        nodeId,
+        fields: dynamicFields,
+        nodes: nodesState.nodes,
+        edges: nodesState.edges,
+        templates,
+      }),
+    [dynamicFields, nodeId, nodesState.edges, nodesState.nodes, templates]
+  );
+  const syncKey = useMemo(
+    () => JSON.stringify({ fields: dynamicFields, edgeIdsToRemove }),
+    [dynamicFields, edgeIdsToRemove]
+  );
+  const lastSyncKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    dispatch(callSavedWorkflowDynamicFieldsChanged({ nodeId, fields: dynamicFields }));
-  }, [dispatch, dynamicFields, nodeId]);
+    if (lastSyncKeyRef.current === syncKey) {
+      return;
+    }
+    lastSyncKeyRef.current = syncKey;
+    dispatch(callSavedWorkflowDynamicFieldsChanged({ nodeId, fields: dynamicFields, edgeIdsToRemove }));
+  }, [dispatch, dynamicFields, edgeIdsToRemove, nodeId, syncKey]);
 
   return (
     <>

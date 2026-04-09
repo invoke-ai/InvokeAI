@@ -1,8 +1,11 @@
 import { addElement, getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from 'features/nodes/store/nodesSlice';
 import type { Templates } from 'features/nodes/store/types';
+import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
 import type { FieldInputTemplate, StatefulFieldValue } from 'features/nodes/types/field';
 import { isStatefulFieldType } from 'features/nodes/types/field';
+import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
+import { isInvocationNode } from 'features/nodes/types/invocation';
 import {
   type BuilderForm,
   buildNodeFieldElement,
@@ -243,4 +246,52 @@ export const getSavedWorkflowDynamicFields = (
   }
 
   return dynamicFields;
+};
+
+export const getSavedWorkflowDynamicEdgeIdsToRemove = ({
+  nodeId,
+  fields,
+  nodes,
+  edges,
+  templates,
+}: {
+  nodeId: string;
+  fields: SavedWorkflowDynamicField[];
+  nodes: AnyNode[];
+  edges: AnyEdge[];
+  templates: Templates;
+}): string[] => {
+  const nextFieldTemplates = new Map(fields.map((field) => [field.fieldName, field.fieldTemplate]));
+
+  return edges.flatMap((edge) => {
+    if (edge.type !== 'default' || edge.target !== nodeId || !edge.targetHandle) {
+      return [];
+    }
+
+    if (!edge.targetHandle.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)) {
+      return [];
+    }
+
+    const targetFieldTemplate = nextFieldTemplates.get(edge.targetHandle);
+    if (!targetFieldTemplate || targetFieldTemplate.input === 'direct' || !edge.sourceHandle) {
+      return [edge.id];
+    }
+
+    const sourceNode = nodes.find((node) => node.id === edge.source);
+    if (!sourceNode || !isInvocationNode(sourceNode)) {
+      return [edge.id];
+    }
+
+    const sourceTemplate = templates[sourceNode.data.type];
+    const sourceFieldTemplate = sourceTemplate?.outputs[edge.sourceHandle];
+    if (!sourceFieldTemplate) {
+      return [edge.id];
+    }
+
+    if (!validateConnectionTypes(sourceFieldTemplate.type, targetFieldTemplate.type)) {
+      return [edge.id];
+    }
+
+    return [];
+  });
 };

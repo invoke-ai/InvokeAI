@@ -40,6 +40,7 @@ describe('getInvocationNodeErrors', () => {
             initialValue: 23,
           },
         ],
+        edgeIdsToRemove: [],
       })
     );
 

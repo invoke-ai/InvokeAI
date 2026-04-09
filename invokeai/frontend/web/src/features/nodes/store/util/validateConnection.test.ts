@@ -234,6 +234,7 @@ describe(validateConnection.name, () => {
             initialValue: 23,
           },
         ],
+        edgeIdsToRemove: [],
       })
     );
 

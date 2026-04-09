@@ -1,4 +1,5 @@
-import { templates } from 'features/nodes/store/util/testUtils';
+import { buildEdge, buildNode, call_saved_workflow, templates } from 'features/nodes/store/util/testUtils';
+import type { BooleanFieldInputTemplate } from 'features/nodes/types/field';
 import {
   type BuilderForm,
   buildHeading,
@@ -11,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getRenderableWorkflowForm,
+  getSavedWorkflowDynamicEdgeIdsToRemove,
   getSavedWorkflowDynamicFields,
   getSavedWorkflowFormFieldData,
 } from './callSavedWorkflowFormUtils';
@@ -183,5 +185,83 @@ describe('callSavedWorkflowFormUtils', () => {
     expect(dynamicFields[1]?.fieldTemplate.ui_order).toBe(1);
     expect(dynamicFields[0]?.initialValue).toBe(1);
     expect(dynamicFields[1]?.initialValue).toBe(2);
+  });
+
+  it('preserves inbound edges when the same exposed dynamic field remains compatible', () => {
+    const sourceNode = buildNode(addTemplate);
+    const targetNode = buildNode(call_saved_workflow);
+    const fields = getSavedWorkflowDynamicFields(
+      buildWorkflowResponse({
+        exposedFields: [{ nodeId: 'node-1', fieldName: 'a' }],
+      }),
+      templates
+    );
+
+    const edgeIdsToRemove = getSavedWorkflowDynamicEdgeIdsToRemove({
+      nodeId: targetNode.id,
+      fields,
+      nodes: [sourceNode, targetNode],
+      edges: [buildEdge(sourceNode.id, 'value', targetNode.id, 'saved_workflow_input::node-1::a')],
+      templates,
+    });
+
+    expect(edgeIdsToRemove).toEqual([]);
+  });
+
+  it('removes inbound edges when a previously connected field is no longer exposed', () => {
+    const sourceNode = buildNode(addTemplate);
+    const targetNode = buildNode(call_saved_workflow);
+    const edge = buildEdge(sourceNode.id, 'value', targetNode.id, 'saved_workflow_input::node-1::a');
+
+    const edgeIdsToRemove = getSavedWorkflowDynamicEdgeIdsToRemove({
+      nodeId: targetNode.id,
+      fields: [],
+      nodes: [sourceNode, targetNode],
+      edges: [edge],
+      templates,
+    });
+
+    expect(edgeIdsToRemove).toEqual([edge.id]);
+  });
+
+  it('removes inbound edges when an exposed field changes to an incompatible type', () => {
+    const sourceNode = buildNode(addTemplate);
+    const targetNode = buildNode(call_saved_workflow);
+    const edge = buildEdge(sourceNode.id, 'value', targetNode.id, 'saved_workflow_input::node-1::a');
+
+    const booleanTemplate: BooleanFieldInputTemplate = {
+      name: 'saved_workflow_input::node-1::a',
+      title: 'Enabled',
+      required: false,
+      description: 'Whether the workflow is enabled',
+      fieldKind: 'input',
+      input: 'any',
+      ui_hidden: false,
+      default: false,
+      type: {
+        name: 'BooleanField',
+        cardinality: 'SINGLE',
+        batch: false,
+      },
+    };
+
+    const edgeIdsToRemove = getSavedWorkflowDynamicEdgeIdsToRemove({
+      nodeId: targetNode.id,
+      fields: [
+        {
+          fieldName: 'saved_workflow_input::node-1::a',
+          fieldTemplate: booleanTemplate,
+          label: 'Enabled',
+          description: 'Whether the workflow is enabled',
+          initialValue: false,
+          settings: undefined,
+        },
+      ],
+      nodes: [sourceNode, targetNode],
+      edges: [edge],
+      templates,
+    });
+
+    expect(edgeIdsToRemove).toEqual([edge.id]);
   });
 });

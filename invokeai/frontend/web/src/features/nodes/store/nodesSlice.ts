@@ -495,9 +495,10 @@ const slice = createSlice({
           description: string;
           initialValue: StatefulFieldValue;
         }>;
+        edgeIdsToRemove: string[];
       }>
     ) => {
-      const { nodeId, fields } = action.payload;
+      const { nodeId, fields, edgeIdsToRemove } = action.payload;
       const node = state.nodes.find((n) => n.id === nodeId);
       if (!isInvocationNode(node) || node.data.type !== 'call_saved_workflow') {
         return;
@@ -526,6 +527,11 @@ const slice = createSlice({
         instance.description = description;
         instance.value = initialValue;
         node.data.inputs[fieldName] = instance;
+      }
+
+      if (edgeIdsToRemove.length > 0) {
+        const edgeIdsToRemoveSet = new Set(edgeIdsToRemove);
+        state.edges = state.edges.filter((edge) => !edgeIdsToRemoveSet.has(edge.id));
       }
     },
     notesNodeValueChanged: (state, action: PayloadAction<{ nodeId: string; value: string }>) => {
