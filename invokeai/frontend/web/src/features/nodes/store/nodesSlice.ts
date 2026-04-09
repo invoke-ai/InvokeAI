@@ -493,6 +493,7 @@ const slice = createSlice({
           fieldTemplate: Parameters<typeof buildFieldInputInstance>[1];
           label: string;
           description: string;
+          initialValue: StatefulFieldValue;
         }>;
       }>
     ) => {
@@ -510,7 +511,7 @@ const slice = createSlice({
         }
       }
 
-      for (const { fieldName, fieldTemplate, label, description } of fields) {
+      for (const { fieldName, fieldTemplate, label, description, initialValue } of fields) {
         const existing = node.data.inputs[fieldName];
         if (existing) {
           existing.label = label;
@@ -521,6 +522,7 @@ const slice = createSlice({
         const instance = buildFieldInputInstance(fieldName, fieldTemplate);
         instance.label = label;
         instance.description = description;
+        instance.value = initialValue;
         node.data.inputs[fieldName] = instance;
       }
     },

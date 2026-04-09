@@ -1,7 +1,9 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Badge, Flex, Grid, GridItem, Text } from '@invoke-ai/ui-library';
+import { Badge, Box, Flex, Grid, GridItem, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
+import { Handle, Position } from '@xyflow/react';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { getFieldColor } from 'features/nodes/components/flow/edges/util/getEdgeColor';
 import { useInvocationNodeContext } from 'features/nodes/components/flow/nodes/Invocation/context';
 import { FloatFieldInput } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldInput';
 import { FloatFieldInputAndSlider } from 'features/nodes/components/flow/nodes/Invocation/fields/FloatField/FloatFieldInputAndSlider';
@@ -27,6 +29,7 @@ import InvocationNodeFooter from 'features/nodes/components/flow/nodes/Invocatio
 import InvocationNodeHeader from 'features/nodes/components/flow/nodes/Invocation/InvocationNodeHeader';
 import { useInputFieldInstance } from 'features/nodes/hooks/useInputFieldInstance';
 import { useOutputFieldNames } from 'features/nodes/hooks/useOutputFieldNames';
+import { useFieldTypeName } from 'features/nodes/hooks/usePrettyFieldType';
 import { useWithFooter } from 'features/nodes/hooks/useWithFooter';
 import { $templates, callSavedWorkflowDynamicFieldsChanged } from 'features/nodes/store/nodesSlice';
 import type {
@@ -61,12 +64,14 @@ import {
   isEnumFieldInputInstance,
   isFloatFieldInputInstance,
   isIntegerFieldInputInstance,
+  isModelFieldType,
   isModelIdentifierFieldInputInstance,
   isSchedulerFieldInputInstance,
   isStringFieldInputInstance,
   isStylePresetFieldInputInstance,
 } from 'features/nodes/types/field';
 import type { NodeFieldElement } from 'features/nodes/types/workflow';
+import type { CSSProperties } from 'react';
 import { memo, useEffect, useMemo } from 'react';
 import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 
@@ -88,21 +93,54 @@ const bodySx: SystemStyleObject = {
 };
 
 const dynamicFieldSx: SystemStyleObject = {
-  px: 2,
-  py: 1,
-  gap: 1,
+  py: 0.5,
   flexDir: 'column',
   w: 'full',
+  position: 'relative',
 };
 
 const fieldBodySx: SystemStyleObject = {
+  ml: 2,
   borderWidth: '1px',
   borderRadius: 'base',
   borderColor: 'base.700',
   px: 2,
   py: 1.5,
   minH: 12,
+  gap: 1,
+  flexDir: 'column',
 };
+
+const handleSx: SystemStyleObject = {
+  position: 'relative',
+  width: 'full',
+  height: 'full',
+  borderStyle: 'solid',
+  borderWidth: 4,
+  pointerEvents: 'none',
+  '&[data-cardinality="SINGLE"]': {
+    borderWidth: 0,
+  },
+  borderRadius: '100%',
+  '&[data-is-model-field="true"], &[data-is-batch-field="true"]': {
+    borderRadius: 4,
+  },
+  '&[data-is-batch-field="true"]': {
+    transform: 'rotate(45deg)',
+  },
+};
+
+const handleStyles = {
+  position: 'absolute',
+  width: '1rem',
+  height: '1rem',
+  zIndex: 1,
+  background: 'none',
+  border: 'none',
+  insetInlineStart: '-0.5rem',
+  top: '50%',
+  transform: 'translateY(-50%)',
+} satisfies CSSProperties;
 
 type Props = {
   nodeId: string;
@@ -185,10 +223,11 @@ const DynamicFieldRow = memo(
 
     return (
       <Flex sx={dynamicFieldSx}>
-        <Text fontSize="sm" fontWeight="semibold" color="base.300" noOfLines={1}>
-          {instance.label || field.fieldTemplate.title}
-        </Text>
+        <DynamicInputFieldHandle fieldName={field.fieldName} template={field.fieldTemplate} />
         <Flex sx={fieldBodySx}>
+          <Text fontSize="sm" fontWeight="semibold" color="base.300" noOfLines={1}>
+            {instance.label || field.fieldTemplate.title}
+          </Text>
           <DynamicFieldInputRenderer
             nodeId={nodeId}
             instance={instance}
@@ -201,6 +240,28 @@ const DynamicFieldRow = memo(
   }
 );
 DynamicFieldRow.displayName = 'DynamicFieldRow';
+
+const DynamicInputFieldHandle = memo(({ fieldName, template }: { fieldName: string; template: FieldInputTemplate }) => {
+  const fieldTypeName = useFieldTypeName(template.type);
+  const fieldColor = useMemo(() => getFieldColor(template.type), [template.type]);
+  const isModelField = useMemo(() => isModelFieldType(template.type), [template.type]);
+
+  return (
+    <Tooltip label={fieldTypeName} placement="start">
+      <Handle type="target" id={fieldName} position={Position.Left} style={handleStyles}>
+        <Box
+          sx={handleSx}
+          data-cardinality={template.type.cardinality}
+          data-is-batch-field={template.type.batch}
+          data-is-model-field={isModelField}
+          backgroundColor={template.type.cardinality === 'SINGLE' ? fieldColor : 'base.900'}
+          borderColor={fieldColor}
+        />
+      </Handle>
+    </Tooltip>
+  );
+});
+DynamicInputFieldHandle.displayName = 'DynamicInputFieldHandle';
 
 const DynamicFieldInputRenderer = memo(
   ({

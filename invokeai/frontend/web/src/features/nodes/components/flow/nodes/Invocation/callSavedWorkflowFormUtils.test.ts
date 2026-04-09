@@ -181,5 +181,7 @@ describe('callSavedWorkflowFormUtils', () => {
     expect(dynamicFields[1]?.fieldTemplate.title).toBe('B');
     expect(dynamicFields[0]?.fieldTemplate.name).toBe(dynamicFields[0]?.fieldName);
     expect(dynamicFields[1]?.fieldTemplate.ui_order).toBe(1);
+    expect(dynamicFields[0]?.initialValue).toBe(1);
+    expect(dynamicFields[1]?.initialValue).toBe(2);
   });
 });

@@ -1,7 +1,7 @@
 import { addElement, getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from 'features/nodes/store/nodesSlice';
 import type { Templates } from 'features/nodes/store/types';
-import type { FieldInputTemplate } from 'features/nodes/types/field';
+import type { FieldInputTemplate, StatefulFieldValue } from 'features/nodes/types/field';
 import { isStatefulFieldType } from 'features/nodes/types/field';
 import {
   type BuilderForm,
@@ -21,7 +21,7 @@ type WorkflowNodeLike = {
   data?: {
     id?: string;
     type?: string;
-    inputs?: Record<string, { label?: string; description?: string }>;
+    inputs?: Record<string, { label?: string; description?: string; value?: StatefulFieldValue }>;
   };
 };
 
@@ -42,6 +42,7 @@ type SavedWorkflowDynamicField = {
   fieldTemplate: FieldInputTemplate;
   label: string;
   description: string;
+  initialValue: StatefulFieldValue;
   settings: NodeFieldElement['data']['settings'];
 };
 
@@ -236,6 +237,7 @@ export const getSavedWorkflowDynamicFields = (
       }),
       label,
       description,
+      initialValue: field.value,
       settings: element.data.settings,
     });
   }
