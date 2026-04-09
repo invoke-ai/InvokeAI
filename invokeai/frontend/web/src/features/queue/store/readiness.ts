@@ -270,6 +270,18 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     }
   }
 
+  if (model?.base === 'anima') {
+    if (!params.animaVaeModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noAnimaVaeModelSelected') });
+    }
+    if (!params.animaQwen3EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noAnimaQwen3EncoderModelSelected') });
+    }
+    if (!params.animaT5EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noAnimaT5EncoderModelSelected') });
+    }
+  }
+
   if (model) {
     for (const lora of loras.filter(({ isEnabled }) => isEnabled === true)) {
       if (model.base !== lora.model.base) {
@@ -645,6 +657,18 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
     const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
     if (!hasQwen3Source) {
       reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
+    }
+  }
+
+  if (model?.base === 'anima') {
+    if (!params.animaVaeModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noAnimaVaeModelSelected') });
+    }
+    if (!params.animaQwen3EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noAnimaQwen3EncoderModelSelected') });
+    }
+    if (!params.animaT5EncoderModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.noAnimaT5EncoderModelSelected') });
     }
   }
 
