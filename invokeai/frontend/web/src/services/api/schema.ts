@@ -11292,7 +11292,10 @@ export type components = {
              */
             type: "gradient_mask_output";
         };
-        /** Graph */
+        /**
+         * Graph
+         * @description A validated invocation graph made of nodes and typed edges.
+         */
         Graph: {
             /**
              * Id
@@ -11314,7 +11317,7 @@ export type components = {
         };
         /**
          * GraphExecutionState
-         * @description Tracks the state of a graph execution
+         * @description Tracks source-graph expansion, execution progress, and runtime results.
          */
         GraphExecutionState: {
             /**
