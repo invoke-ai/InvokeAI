@@ -1716,7 +1716,12 @@ const slice = createSlice({
       state.inpaintMasks = snapshot.inpaintMasks;
       state.rasterLayers = snapshot.rasterLayers;
       state.regionalGuidance = snapshot.regionalGuidance;
+      // Restore bbox from snapshot but preserve the current modelBase to avoid desync
+      // with the currently selected model (same pattern as resetState).
+      const currentModelBase = state.bbox.modelBase;
       state.bbox = snapshot.bbox;
+      state.bbox.modelBase = currentModelBase;
+      syncScaledSize(state);
       state.selectedEntityIdentifier = snapshot.selectedEntityIdentifier;
       state.bookmarkedEntityIdentifier = snapshot.bookmarkedEntityIdentifier;
       return state;
@@ -1903,6 +1908,10 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
   filter: (action, _state, _history) => {
     // Ignore all actions from other slices
     if (!action.type.startsWith(slice.name)) {
+      return false;
+    }
+    // Snapshot restore replaces the canvas state and should not be undoable
+    if (action.type === canvasSnapshotRestored.type) {
       return false;
     }
     // Throttle rapid actions of the same type

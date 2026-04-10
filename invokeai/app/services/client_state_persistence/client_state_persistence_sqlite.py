@@ -50,7 +50,7 @@ class ClientStatePersistenceSqlite(ClientStatePersistenceABC):
                 """
                 SELECT key FROM client_state
                 WHERE user_id = ? AND key LIKE ?
-                ORDER BY rowid DESC
+                ORDER BY updated_at DESC
                 """,
                 (user_id, f"{prefix}%"),
             )

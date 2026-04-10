@@ -12,6 +12,7 @@ import {
 } from '@invoke-ai/ui-library';
 import type { SnapshotInfo } from 'features/controlLayers/hooks/useCanvasSnapshots';
 import { useCanvasSnapshots } from 'features/controlLayers/hooks/useCanvasSnapshots';
+import { useCanvasIsStaging } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { toast } from 'features/toast/toast';
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react';
 import { memo, useCallback, useState } from 'react';
@@ -23,10 +24,12 @@ const SnapshotItem = memo(
     snapshot,
     onRestore,
     onDelete,
+    isRestoreDisabled,
   }: {
     snapshot: SnapshotInfo;
     onRestore: (key: string, name: string) => void;
     onDelete: (e: MouseEvent, key: string, name: string) => void;
+    isRestoreDisabled: boolean;
   }) => {
     const handleClick = useCallback(() => {
       onRestore(snapshot.key, snapshot.name);
@@ -40,7 +43,7 @@ const SnapshotItem = memo(
     );
 
     return (
-      <MenuItem onClick={handleClick}>
+      <MenuItem onClick={handleClick} isDisabled={isRestoreDisabled}>
         <Flex w="full" justifyContent="space-between" alignItems="center">
           <Text fontSize="sm" noOfLines={1}>
             {snapshot.name}
@@ -52,6 +55,7 @@ const SnapshotItem = memo(
             variant="ghost"
             colorScheme="error"
             onClick={handleDelete}
+            isDisabled={isRestoreDisabled}
           />
         </Flex>
       </MenuItem>
@@ -74,6 +78,7 @@ const getDefaultSnapshotName = (): string => {
 export const CanvasToolbarSnapshotMenuButton = memo(() => {
   const { t } = useTranslation();
   const { snapshots, saveSnapshot, restoreSnapshot, deleteSnapshot } = useCanvasSnapshots();
+  const isStaging = useCanvasIsStaging();
   const [snapshotName, setSnapshotName] = useState('');
 
   const onNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
@@ -104,9 +109,23 @@ export const CanvasToolbarSnapshotMenuButton = memo(() => {
 
   const onRestore = useCallback(
     async (key: string, name: string) => {
-      const success = await restoreSnapshot(key);
-      if (success) {
-        toast({ title: t('controlLayers.snapshot.snapshotRestored', { name }), status: 'info' });
+      const result = await restoreSnapshot(key);
+      if (result.success) {
+        if (result.missingImageCount && result.missingImageCount > 0) {
+          toast({
+            title: t('controlLayers.snapshot.snapshotRestored', { name }),
+            description: t('controlLayers.snapshot.snapshotMissingImages', { count: result.missingImageCount }),
+            status: 'warning',
+          });
+        } else {
+          toast({ title: t('controlLayers.snapshot.snapshotRestored', { name }), status: 'info' });
+        }
+      } else if (result.error === 'incompatible') {
+        toast({
+          title: t('controlLayers.snapshot.snapshotRestoreFailed'),
+          description: t('controlLayers.snapshot.snapshotIncompatible'),
+          status: 'error',
+        });
       } else {
         toast({ title: t('controlLayers.snapshot.snapshotRestoreFailed'), status: 'error' });
       }
@@ -160,7 +179,13 @@ export const CanvasToolbarSnapshotMenuButton = memo(() => {
             <MenuDivider />
             <MenuGroup title={t('controlLayers.snapshot.restoreSnapshot')}>
               {snapshots.map((snapshot) => (
-                <SnapshotItem key={snapshot.key} snapshot={snapshot} onRestore={onRestore} onDelete={onDelete} />
+                <SnapshotItem
+                  key={snapshot.key}
+                  snapshot={snapshot}
+                  onRestore={onRestore}
+                  onDelete={onDelete}
+                  isRestoreDisabled={isStaging}
+                />
               ))}
             </MenuGroup>
           </>
