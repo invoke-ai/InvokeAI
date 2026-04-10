@@ -840,6 +840,8 @@ describe('StagingAreaApi', () => {
       api.$items.set([createMockQueueItem({ item_id: 1 })]);
       api.$lastStartedItemId.set(1);
       api.$lastCompletedItemId.set(1);
+      api._seenItemStatusRanks.set(1, 2);
+      api._seenItemStatusSequences.set(1, 3);
       api.$progressData.setKey(1, {
         itemId: 1,
         progressEvent: null,
@@ -856,6 +858,8 @@ describe('StagingAreaApi', () => {
       expect(api.$lastStartedItemId.get()).toBe(null);
       expect(api.$lastCompletedItemId.get()).toBe(null);
       expect(api.$progressData.get()).toEqual({});
+      expect(api._seenItemStatusRanks.size).toBe(0);
+      expect(api._seenItemStatusSequences.size).toBe(0);
     });
   });
 
@@ -1132,14 +1136,14 @@ describe('StagingAreaApi', () => {
         const completedItem = createMockQueueItem({
           item_id: 1,
           status: 'completed',
+          status_sequence: 2,
         });
-        (completedItem as typeof completedItem & { status_sequence?: number }).status_sequence = 2;
 
         const failedItem = createMockQueueItem({
           item_id: 1,
           status: 'failed',
+          status_sequence: 3,
         });
-        (failedItem as typeof failedItem & { status_sequence?: number }).status_sequence = 3;
 
         await api.onItemsChangedEvent([completedItem]);
         await api.onItemsChangedEvent([failedItem]);
@@ -1153,26 +1157,52 @@ describe('StagingAreaApi', () => {
           item_id: 1,
           destination: sessionId,
           status: 'completed',
+          status_sequence: 3,
         });
-        (completedEvent as typeof completedEvent & { status_sequence?: number }).status_sequence = 3;
 
         api.onQueueItemStatusChangedEvent(completedEvent);
 
         const staleInProgressItem = createMockQueueItem({
           item_id: 1,
           status: 'in_progress',
+          status_sequence: 2,
           session: {
             id: sessionId,
             source_prepared_mapping: {},
             results: {},
           },
         });
-        (staleInProgressItem as typeof staleInProgressItem & { status_sequence?: number }).status_sequence = 2;
 
         await api.onItemsChangedEvent([staleInProgressItem]);
 
         expect(api.$items.get()).toEqual([]);
         expect(api.$isPending.get()).toBe(false);
+      });
+
+      it('should prune seen item ordering when an item leaves the staging area', async () => {
+        await api.onItemsChangedEvent([
+          createMockQueueItem({
+            item_id: 1,
+            status: 'completed',
+            status_sequence: 2,
+          }),
+        ]);
+
+        expect(api._seenItemStatusRanks.get(1)).toBe(2);
+        expect(api._seenItemStatusSequences.get(1)).toBe(2);
+
+        await api.onItemsChangedEvent([
+          createMockQueueItem({
+            item_id: 2,
+            status: 'pending',
+            status_sequence: 0,
+          }),
+        ]);
+
+        expect(api._seenItemStatusRanks.has(1)).toBe(false);
+        expect(api._seenItemStatusSequences.has(1)).toBe(false);
+        expect(api._seenItemStatusRanks.get(2)).toBe(0);
+        expect(api._seenItemStatusSequences.get(2)).toBe(0);
       });
 
       it('should load all images from multiple canvas_output nodes', async () => {

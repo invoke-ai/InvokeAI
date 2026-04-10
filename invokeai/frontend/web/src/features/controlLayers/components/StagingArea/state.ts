@@ -65,8 +65,6 @@ export const getInitialProgressData = (itemId: number): ProgressData => ({
 type ProgressDataMap = Record<number, ProgressData | undefined>;
 
 const TERMINAL_QUEUE_ITEM_STATUS_RANK = 2;
-type QueueItemWithStatusSequence = S['SessionQueueItem'] & { status_sequence?: number | null };
-type QueueItemStatusChangedEventWithStatusSequence = S['QueueItemStatusChangedEvent'] & { status_sequence?: number | null };
 
 const getQueueItemStatusRank = (status: S['SessionQueueItem']['status']): number => {
   switch (status) {
@@ -109,6 +107,63 @@ export class StagingAreaApi {
    */
   _seenItemStatusRanks = new Map<number, number>();
   _seenItemStatusSequences = new Map<number, number>();
+
+  _recordSeenItemOrdering = (
+    itemId: number,
+    status: S['SessionQueueItem']['status'],
+    statusSequence?: number
+  ): void => {
+    if (statusSequence !== undefined) {
+      const previousSequence = this._seenItemStatusSequences.get(itemId) ?? -1;
+      if (statusSequence > previousSequence) {
+        this._seenItemStatusSequences.set(itemId, statusSequence);
+      }
+    }
+
+    const nextRank = getQueueItemStatusRank(status);
+    const previousRank = this._seenItemStatusRanks.get(itemId) ?? -1;
+    if (nextRank > previousRank) {
+      this._seenItemStatusRanks.set(itemId, nextRank);
+    }
+  };
+
+  _shouldAcceptQueueItem = (item: S['SessionQueueItem']): boolean => {
+    const statusSequence = getStatusSequence(item);
+    const previousSequence = this._seenItemStatusSequences.get(item.item_id);
+    const previousRank = this._seenItemStatusRanks.get(item.item_id);
+    const nextRank = getQueueItemStatusRank(item.status);
+
+    if (statusSequence !== undefined) {
+      if (previousSequence === undefined) {
+        return true;
+      }
+      if (statusSequence > previousSequence) {
+        return true;
+      }
+      if (statusSequence < previousSequence) {
+        return false;
+      }
+      return previousRank === undefined || nextRank >= previousRank;
+    }
+
+    return previousRank === undefined || nextRank >= previousRank;
+  };
+
+  _pruneSeenItemOrdering = (items: S['SessionQueueItem'][]): void => {
+    const itemIds = new Set(items.map(({ item_id }) => item_id));
+
+    for (const itemId of this._seenItemStatusRanks.keys()) {
+      if (!itemIds.has(itemId)) {
+        this._seenItemStatusRanks.delete(itemId);
+      }
+    }
+
+    for (const itemId of this._seenItemStatusSequences.keys()) {
+      if (!itemIds.has(itemId)) {
+        this._seenItemStatusSequences.delete(itemId);
+      }
+    }
+  };
 
   /** Item ID of the last started item. Used for auto-switch on start. */
   $lastStartedItemId = atom<number | null>(null);
@@ -376,19 +431,7 @@ export class StagingAreaApi {
     if (data.destination !== this._sessionId) {
       return;
     }
-    const eventWithStatusSequence = data as QueueItemStatusChangedEventWithStatusSequence;
-    const statusSequence = getStatusSequence(eventWithStatusSequence);
-    if (statusSequence !== undefined) {
-      const previousSequence = this._seenItemStatusSequences.get(data.item_id) ?? -1;
-      if (statusSequence > previousSequence) {
-        this._seenItemStatusSequences.set(data.item_id, statusSequence);
-      }
-    }
-    const nextRank = getQueueItemStatusRank(data.status);
-    const previousRank = this._seenItemStatusRanks.get(data.item_id) ?? -1;
-    if (nextRank > previousRank) {
-      this._seenItemStatusRanks.set(data.item_id, nextRank);
-    }
+    this._recordSeenItemOrdering(data.item_id, data.status, getStatusSequence(data));
     if (data.status === 'completed') {
       /**
        * There is an unpleasant bit of indirection here. When an item is completed, and auto-switch is set to
@@ -416,50 +459,22 @@ export class StagingAreaApi {
     const generation = ++this._itemsEventGeneration;
 
     const oldItems = this.$items.get();
+    const oldItemsById = new Map(oldItems.map((item) => [item.item_id, item]));
     let didSubstituteStaleItem = false;
     const nextItems = items.flatMap((item) => {
-      const itemWithStatusSequence = item as QueueItemWithStatusSequence;
-      const statusSequence = getStatusSequence(itemWithStatusSequence);
-      const previousSequence = this._seenItemStatusSequences.get(item.item_id);
-      const previousRank = this._seenItemStatusRanks.get(item.item_id);
-      let shouldAccept = false;
-
-      if (statusSequence !== undefined) {
-        if (previousSequence === undefined) {
-          shouldAccept = true;
-        } else if (statusSequence > previousSequence) {
-          shouldAccept = true;
-        } else if (statusSequence === previousSequence) {
-          shouldAccept = previousRank === undefined || getQueueItemStatusRank(item.status) >= previousRank;
-        }
-      } else {
-        shouldAccept = previousRank === undefined || getQueueItemStatusRank(item.status) >= previousRank;
-      }
-
-      if (shouldAccept) {
+      if (this._shouldAcceptQueueItem(item)) {
         return [item];
       }
       didSubstituteStaleItem = true;
-      const previousItem = oldItems.find(({ item_id }) => item_id === item.item_id);
+      const previousItem = oldItemsById.get(item.item_id);
       return previousItem ? [previousItem] : [];
     });
     const normalizedItems = didSubstituteStaleItem ? nextItems : items;
 
     for (const item of normalizedItems) {
-      const itemWithStatusSequence = item as QueueItemWithStatusSequence;
-      const statusSequence = getStatusSequence(itemWithStatusSequence);
-      const nextRank = getQueueItemStatusRank(item.status);
-      const previousRank = this._seenItemStatusRanks.get(item.item_id) ?? -1;
-      if (statusSequence !== undefined) {
-        const previousSequence = this._seenItemStatusSequences.get(item.item_id) ?? -1;
-        if (statusSequence > previousSequence) {
-          this._seenItemStatusSequences.set(item.item_id, statusSequence);
-        }
-      }
-      if (nextRank > previousRank) {
-        this._seenItemStatusRanks.set(item.item_id, nextRank);
-      }
+      this._recordSeenItemOrdering(item.item_id, item.status, getStatusSequence(item));
     }
+    this._pruneSeenItemOrdering(normalizedItems);
 
     if (normalizedItems === oldItems) {
       return;

@@ -17,7 +17,11 @@ def session_queue(mock_invoker: Invoker) -> SqliteSessionQueue:
     return queue
 
 
-def _insert_queue_item(session_queue: SqliteSessionQueue) -> int:
+def _insert_queue_item(
+    session_queue: SqliteSessionQueue,
+    queue_id: str = "default",
+    destination: str | None = None,
+) -> int:
     graph = Graph()
     graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
     session = GraphExecutionState(graph=graph)
@@ -41,7 +45,7 @@ def _insert_queue_item(session_queue: SqliteSessionQueue) -> int:
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("default", session_json, session.id, batch_id, None, 0, None, None, None, None, "system"),
+            (queue_id, session_json, session.id, batch_id, None, 0, None, None, destination, None, "system"),
         )
         return cursor.lastrowid
 
@@ -71,3 +75,16 @@ def test_status_sequence_increments_for_queue_item_lifecycle(
     assert len(status_events) == 2
     assert [event.status for event in status_events] == ["in_progress", "completed"]
     assert [event.status_sequence for event in status_events] == [1, 2]
+
+
+def test_status_sequence_increments_for_bulk_cancel_paths(session_queue: SqliteSessionQueue) -> None:
+    first_item_id = _insert_queue_item(session_queue)
+    second_item_id = _insert_queue_item(session_queue)
+
+    result = session_queue.cancel_all_except_current("default")
+
+    assert result.canceled == 2
+    assert session_queue.get_queue_item(first_item_id).status == "canceled"
+    assert session_queue.get_queue_item(first_item_id).status_sequence == 1
+    assert session_queue.get_queue_item(second_item_id).status == "canceled"
+    assert session_queue.get_queue_item(second_item_id).status_sequence == 1

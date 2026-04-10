@@ -265,10 +265,15 @@ def test_migration_28_adds_status_sequence_to_session_queue(memory_db_conn: sqli
     cursor.execute("INSERT INTO session_queue (item_id, status) VALUES (1, 'pending');")
 
     Migration28Callback()(cursor)
+    Migration28Callback()(cursor)
 
     cursor.execute("PRAGMA table_info(session_queue);")
-    columns = {row[1]: row for row in cursor.fetchall()}
-    assert "status_sequence" in columns
+    columns = [row[1] for row in cursor.fetchall()]
+    assert columns.count("status_sequence") == 1
+
+    cursor.execute("PRAGMA table_info(session_queue);")
+    columns_by_name = {row[1]: row for row in cursor.fetchall()}
+    assert "status_sequence" in columns_by_name
 
     cursor.execute("SELECT status_sequence FROM session_queue WHERE item_id = 1;")
     assert cursor.fetchone()[0] == 0
