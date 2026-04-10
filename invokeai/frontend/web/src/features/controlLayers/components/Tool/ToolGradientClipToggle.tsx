@@ -17,7 +17,7 @@ export const ToolGradientClipToggle = memo(() => {
     dispatch(settingsGradientClipToggled());
   }, [dispatch]);
 
-  const label = t('controlLayers.gradient.clip', { defaultValue: 'Clip Gradient' });
+  const label = t('controlLayers.gradient.clip');
 
   return (
     <Tooltip label={label}>
