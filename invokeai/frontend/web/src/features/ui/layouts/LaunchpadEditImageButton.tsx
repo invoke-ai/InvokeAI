@@ -43,7 +43,7 @@ export const LaunchpadEditImageButton = memo((props: { extraAction?: () => void 
       <DndDropTarget
         dndTarget={newCanvasFromImageDndTarget}
         dndTargetData={dndTargetData}
-        label="Drop"
+        label={t('gallery.drop')}
         isDisabled={isStaging}
       />
     </LaunchpadButton>

@@ -118,7 +118,11 @@ const AddRefImageDropTargetAndButton = memo(() => {
       >
         {t('controlLayers.referenceImage')}
         <input {...uploadApi.getUploadInputProps()} />
-        <DndDropTarget label="Drop" dndTarget={addGlobalReferenceImageDndTarget} dndTargetData={dndTargetData} />
+        <DndDropTarget
+          label={t('gallery.drop')}
+          dndTarget={addGlobalReferenceImageDndTarget}
+          dndTargetData={dndTargetData}
+        />
       </Button>
       {tab === 'canvas' && (
         <CanvasManagerProviderGate>
