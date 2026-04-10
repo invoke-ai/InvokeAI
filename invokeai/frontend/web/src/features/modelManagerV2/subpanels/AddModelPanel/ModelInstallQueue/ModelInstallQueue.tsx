@@ -1,11 +1,29 @@
-import { Box, Button, Flex, Heading } from '@invoke-ai/ui-library';
-import { useStore } from '@nanostores/react';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import {
+  Box,
+  Button,
+  ButtonGroup,
+  Flex,
+  Heading,
+  IconButton,
+  Menu,
+  MenuButton,
+  MenuItem,
+  MenuList,
+  Table,
+  Tbody,
+  Td,
+  Text,
+  Th,
+  Thead,
+  Tr,
+} from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { getApiErrorDetail } from 'features/modelManagerV2/util/getApiErrorDetail';
 import { toast } from 'features/toast/toast';
-import { t } from 'i18next';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
-import { PiPauseBold, PiPlayBold, PiXBold } from 'react-icons/pi';
+import { useTranslation } from 'react-i18next';
+import { PiBroomBold, PiCaretDownBold, PiPauseFill, PiPlayFill, PiXBold } from 'react-icons/pi';
 import {
   useCancelModelInstallMutation,
   useListModelInstallsQuery,
@@ -14,7 +32,6 @@ import {
   useResumeModelInstallMutation,
 } from 'services/api/endpoints/models';
 import type { ModelInstallJob } from 'services/api/types';
-import { $isConnected } from 'services/events/stores';
 
 import { ModelInstallQueueItem } from './ModelInstallQueueItem';
 
@@ -22,11 +39,48 @@ const hasRestartRequired = (job: ModelInstallJob) => {
   return job.download_parts?.some((part) => part.resume_required || part.status === 'error') ?? false;
 };
 
+const ModelQueueTableSx: SystemStyleObject = {
+  '& tbody tr:nth-of-type(odd)': {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  '& tbody tr:nth-of-type(even)': {
+    backgroundColor: 'transparent',
+  },
+  'td, th': {
+    borderColor: 'base.700',
+  },
+
+  th: {
+    position: 'sticky',
+    top: 0,
+    zIndex: 1,
+    backgroundColor: 'base.800',
+    py: 2,
+  },
+
+  'th:first-of-type': {
+    borderTopLeftRadius: 'base',
+  },
+  'th:last-of-type': {
+    borderTopRightRadius: 'base',
+  },
+  'tr:last-of-type td:first-of-type': {
+    borderBottomLeftRadius: 'base',
+  },
+  'tr:last-of-type td:last-of-type': {
+    borderBottomRightRadius: 'base',
+  },
+};
+
 export const ModelInstallQueue = memo(() => {
-  const isConnected = useStore($isConnected);
+  const { t } = useTranslation();
   const { data } = useListModelInstallsQuery();
   const [bulkActionInProgress, setBulkActionInProgress] = useState<'pause' | 'resume' | 'cancel' | null>(null);
   const bulkActionLockRef = useRef(false);
+
+  const reversedData = useMemo(() => {
+    return data?.toReversed() ?? [];
+  }, [data]);
 
   const [cancelModelInstall] = useCancelModelInstallMutation();
   const [pauseModelInstall] = usePauseModelInstallMutation();
@@ -51,7 +105,7 @@ export const ModelInstallQueue = memo(() => {
         continue;
       }
 
-      if (model.status === 'running') {
+      if (model.status === 'running' || model.status === 'downloads_done') {
         cancelable.push(model.id);
       }
     }
@@ -121,7 +175,7 @@ export const ModelInstallQueue = memo(() => {
         setBulkActionInProgress(null);
       }
     },
-    [cancelModelInstall, isPruning, pauseModelInstall, resumeModelInstall]
+    [cancelModelInstall, isPruning, pauseModelInstall, resumeModelInstall, t]
   );
 
   const pruneCompletedModelInstalls = useCallback(async () => {
@@ -143,13 +197,11 @@ export const ModelInstallQueue = memo(() => {
         status: 'error',
       });
     }
-  }, [_pruneCompletedModelInstalls]);
+  }, [_pruneCompletedModelInstalls, t]);
 
   const hasPauseableInstalls = pauseableInstallIds.length > 0;
   const hasResumableInstalls = resumableInstallIds.length > 0;
   const hasCancelableInstalls = cancelableInstallIds.length > 0;
-  const showResumeAll = !hasPauseableInstalls && hasResumableInstalls;
-  const pauseResumeAvailable = hasPauseableInstalls || hasResumableInstalls;
 
   const pruneAvailable = useMemo(() => {
     return data?.some(
@@ -157,17 +209,13 @@ export const ModelInstallQueue = memo(() => {
     );
   }, [data]);
 
-  const pauseResumeLabel = showResumeAll ? t('modelManager.resumeAll') : t('modelManager.pauseAll');
-  const pauseResumeTooltip = showResumeAll ? t('modelManager.resumeAllTooltip') : t('modelManager.pauseAllTooltip');
-
-  const pauseOrResumeAll = useCallback(() => {
-    if (showResumeAll) {
-      void runBulkAction('resume', resumableInstallIds);
-      return;
-    }
-
+  const pauseAll = useCallback(() => {
     void runBulkAction('pause', pauseableInstallIds);
-  }, [pauseableInstallIds, resumableInstallIds, runBulkAction, showResumeAll]);
+  }, [pauseableInstallIds, runBulkAction]);
+
+  const resumeAll = useCallback(() => {
+    void runBulkAction('resume', resumableInstallIds);
+  }, [resumableInstallIds, runBulkAction]);
 
   const cancelAll = useCallback(() => {
     void runBulkAction('cancel', cancelableInstallIds);
@@ -176,57 +224,101 @@ export const ModelInstallQueue = memo(() => {
   const isBulkActionRunning = bulkActionInProgress !== null;
 
   return (
-    <Flex flexDir="column" p={3} h="full" gap={3}>
+    <Flex flexDir="column" h="full" gap={4}>
+      {/* Model Queue Header */}
       <Flex justifyContent="space-between" alignItems="center">
         <Flex alignItems="center" gap={2}>
-          <Heading size="sm">{t('modelManager.installQueue')}</Heading>
-          {!isConnected && (
-            <Box layerStyle="first" px={2} py={0.5} borderRadius="base">
-              <Heading size="sm" color="error.300">
-                {t('modelManager.backendDisconnected')}
-              </Heading>
-            </Box>
-          )}
+          <Heading size="md">{t('modelManager.installQueue')}</Heading>
         </Flex>
-        <Flex gap={2} alignItems="center">
-          <Button
-            size="sm"
-            leftIcon={showResumeAll ? <PiPlayBold /> : <PiPauseBold />}
-            isDisabled={!pauseResumeAvailable || isBulkActionRunning || isPruning}
-            isLoading={bulkActionInProgress === 'pause' || bulkActionInProgress === 'resume'}
-            onClick={pauseOrResumeAll}
-            tooltip={pauseResumeTooltip}
-          >
-            {pauseResumeLabel}
-          </Button>
-          <Button
-            size="sm"
-            leftIcon={<PiXBold />}
-            isDisabled={!hasCancelableInstalls || isBulkActionRunning || isPruning}
-            isLoading={bulkActionInProgress === 'cancel'}
-            onClick={cancelAll}
-            tooltip={t('modelManager.cancelAllTooltip')}
-          >
-            {t('modelManager.cancelAll')}
-          </Button>
-          <Button
-            size="sm"
-            isDisabled={!pruneAvailable || isBulkActionRunning}
-            isLoading={isPruning}
-            onClick={pruneCompletedModelInstalls}
-            tooltip={t('modelManager.pruneTooltip')}
-          >
-            {t('modelManager.prune')}
-          </Button>
+
+        {/* Bulk Actions */}
+        {/* Non-destructive, easily-ccessible actions */}
+        <Flex gap={2}>
+          {hasPauseableInstalls && (
+            <Button
+              size="sm"
+              leftIcon={<PiPauseFill />}
+              isDisabled={isBulkActionRunning || isPruning}
+              onClick={pauseAll}
+              variant="outline"
+            >
+              {t('modelManager.pauseAll')}
+            </Button>
+          )}
+
+          {hasResumableInstalls && (
+            <Button
+              size="sm"
+              leftIcon={<PiPlayFill />}
+              isDisabled={isBulkActionRunning || isPruning}
+              onClick={resumeAll}
+              variant="outline"
+            >
+              {t('modelManager.resumeAll')}
+            </Button>
+          )}
+
+          {/* Destructive Actions go to the button group/menu */}
+          <ButtonGroup>
+            <Button
+              leftIcon={<PiBroomBold />}
+              size="sm"
+              isDisabled={!pruneAvailable || isBulkActionRunning || isPruning}
+              onClick={pruneCompletedModelInstalls}
+              variant="outline"
+            >
+              {t('modelManager.prune')}
+            </Button>
+            <Menu>
+              <MenuButton
+                as={IconButton}
+                size="sm"
+                aria-label={t('accessibility.menu')}
+                icon={<PiCaretDownBold />}
+                disabled={!pruneAvailable && !hasCancelableInstalls}
+              />
+              <MenuList>
+                <MenuItem
+                  color="error.300"
+                  icon={<PiXBold />}
+                  isDisabled={!hasCancelableInstalls || isBulkActionRunning || isPruning}
+                  onClick={cancelAll}
+                  isDestructive
+                >
+                  {t('modelManager.cancelAll')}
+                </MenuItem>
+              </MenuList>
+            </Menu>
+          </ButtonGroup>
         </Flex>
       </Flex>
-      <Box layerStyle="first" p={3} borderRadius="base" w="full" h="full">
+
+      {/* Model Queue List */}
+      <Box layerStyle="second" borderRadius="base" w="full" h="full">
         <ScrollableContent>
-          <Flex flexDir="column-reverse" gap="2" w="full">
-            {data?.map((model) => (
-              <ModelInstallQueueItem key={model.id} installJob={model} />
-            ))}
-          </Flex>
+          <Table size="sm" sx={ModelQueueTableSx}>
+            <Thead>
+              <Tr>
+                <Th minWidth="50px"></Th>
+                <Th width="80%">Name</Th>
+                <Th minWidth="130px">Status</Th>
+                <Th minWidth="160px" textAlign="right">
+                  Actions
+                </Th>
+              </Tr>
+            </Thead>
+            <Tbody>
+              {data?.length === 0 ? (
+                <Tr>
+                  <Td colSpan={4} textAlign="center" py={8}>
+                    <Text variant="subtext">{t('modelManager.queueEmpty')}</Text>
+                  </Td>
+                </Tr>
+              ) : (
+                reversedData?.map((model) => <ModelInstallQueueItem key={model.id} installJob={model} />)
+              )}
+            </Tbody>
+          </Table>
         </ScrollableContent>
       </Box>
     </Flex>
