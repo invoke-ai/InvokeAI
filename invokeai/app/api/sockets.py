@@ -254,9 +254,7 @@ class SocketIO:
                 user_room = f"user:{event_data.user_id}"
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
-                logger.debug(
-                    f"Emitted private recall_parameters_updated event to user room {user_room} and admin room"
-                )
+                logger.debug(f"Emitted private recall_parameters_updated event to user room {user_room} and admin room")
 
             else:
                 # For other queue events (like QueueClearedEvent, BatchEnqueuedEvent), emit to all subscribers

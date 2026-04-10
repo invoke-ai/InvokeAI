@@ -817,9 +817,7 @@ class SqliteSessionQueue(SessionQueueBase):
         counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
 
         # For non-admin users, hide current item details if they don't own it
-        show_current_item = current_item is not None and (
-            user_id is None or current_item.user_id == user_id
-        )
+        show_current_item = current_item is not None and (user_id is None or current_item.user_id == user_id)
 
         return SessionQueueStatus(
             queue_id=queue_id,

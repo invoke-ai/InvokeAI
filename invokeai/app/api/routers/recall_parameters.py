@@ -398,7 +398,9 @@ async def update_recall_parameters(
             logger.info(
                 f"Emitting recall_parameters_updated event for queue {queue_id} with {len(provided_params)} parameters"
             )
-            ApiDependencies.invoker.services.events.emit_recall_parameters_updated(queue_id, current_user.user_id, provided_params)
+            ApiDependencies.invoker.services.events.emit_recall_parameters_updated(
+                queue_id, current_user.user_id, provided_params
+            )
             logger.info("Successfully emitted recall_parameters_updated event")
         except Exception as e:
             logger.error(f"Error emitting recall parameters event: {e}", exc_info=True)
