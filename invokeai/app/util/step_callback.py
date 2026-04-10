@@ -133,6 +133,29 @@ FLUX2_LATENT_RGB_FACTORS = [
 
 FLUX2_LATENT_RGB_BIAS = [-0.0329, -0.0718, -0.0851]
 
+# Anima uses Wan 2.1 VAE with 16 latent channels.
+# Factors from ComfyUI: https://github.com/Comfy-Org/ComfyUI/blob/main/comfy/latent_formats.py
+ANIMA_LATENT_RGB_FACTORS = [
+    [-0.1299, -0.1692, 0.2932],
+    [0.0671, 0.0406, 0.0442],
+    [0.3568, 0.2548, 0.1747],
+    [0.0372, 0.2344, 0.1420],
+    [0.0313, 0.0189, -0.0328],
+    [0.0296, -0.0956, -0.0665],
+    [-0.3477, -0.4059, -0.2925],
+    [0.0166, 0.1902, 0.1975],
+    [-0.0412, 0.0267, -0.1364],
+    [-0.1293, 0.0740, 0.1636],
+    [0.0680, 0.3019, 0.1128],
+    [0.0032, 0.0581, 0.0639],
+    [-0.1251, 0.0927, 0.1699],
+    [0.0060, -0.0633, 0.0005],
+    [0.3477, 0.2275, 0.2950],
+    [0.1984, 0.0913, 0.1861],
+]
+
+ANIMA_LATENT_RGB_BIAS = [-0.1835, -0.0868, -0.3360]
+
 
 def sample_to_lowres_estimated_image(
     samples: torch.Tensor,
@@ -217,6 +240,10 @@ def diffusion_step_callback(
     elif base_model == BaseModelType.ZImage:
         # Z-Image uses FLUX-compatible VAE with 16 latent channels
         latent_rgb_factors = FLUX_LATENT_RGB_FACTORS
+    elif base_model == BaseModelType.Anima:
+        # Anima uses Wan 2.1 VAE with 16 latent channels
+        latent_rgb_factors = ANIMA_LATENT_RGB_FACTORS
+        latent_rgb_bias = ANIMA_LATENT_RGB_BIAS
     else:
         raise ValueError(f"Unsupported base model: {base_model}")
 
