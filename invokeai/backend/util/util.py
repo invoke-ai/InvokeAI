@@ -24,7 +24,7 @@ def slugify(value: str, allow_unicode: bool = False) -> str:
     else:
         value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
     value = re.sub(r"[/]", "_", value.lower())
-    value = re.sub(r"[^.\w\s-]", "", value.lower())
+    value = re.sub(r"[^\.\w\s-]", "", value.lower())
     return re.sub(r"[-\s]+", "-", value).strip("-_")
 
 
@@ -43,8 +43,6 @@ def directory_size(directory: Path) -> int:
     for root, dirs, files in os.walk(directory):
         for f in files:
             sum += Path(root, f).stat().st_size
-        for d in dirs:
-            sum += Path(root, d).stat().st_size
     return sum
 
 
