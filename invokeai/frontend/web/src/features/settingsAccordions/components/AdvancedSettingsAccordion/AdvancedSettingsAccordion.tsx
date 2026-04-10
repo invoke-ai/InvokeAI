@@ -22,7 +22,6 @@ import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip
 import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
 import ParamQwenImageComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageComponentSourceSelect';
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
-import ParamQwenImageShift from 'features/parameters/components/Advanced/ParamQwenImageShift';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
@@ -154,7 +153,6 @@ export const AdvancedSettingsAccordion = memo(() => {
           <FormControlGroup>
             <ParamQwenImageComponentSourceSelect />
             <ParamQwenImageQuantization />
-            <ParamQwenImageShift />
           </FormControlGroup>
         )}
         {isAnima && (
