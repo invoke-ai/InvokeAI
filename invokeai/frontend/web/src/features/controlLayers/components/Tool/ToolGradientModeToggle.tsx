@@ -15,18 +15,18 @@ export const ToolGradientModeToggle = memo(() => {
 
   return (
     <ButtonGroup isAttached size="sm">
-      <Tooltip label={t('controlLayers.gradient.linear', { defaultValue: 'Linear' })}>
+      <Tooltip label={t('controlLayers.gradient.linear')}>
         <IconButton
-          aria-label={t('controlLayers.gradient.linear', { defaultValue: 'Linear' })}
+          aria-label={t('controlLayers.gradient.linear')}
           icon={<GradientLinearIcon />}
           colorScheme={gradientType === 'linear' ? 'invokeBlue' : 'base'}
           variant="solid"
           onClick={onLinearClick}
         />
       </Tooltip>
-      <Tooltip label={t('controlLayers.gradient.radial', { defaultValue: 'Radial' })}>
+      <Tooltip label={t('controlLayers.gradient.radial')}>
         <IconButton
-          aria-label={t('controlLayers.gradient.radial', { defaultValue: 'Radial' })}
+          aria-label={t('controlLayers.gradient.radial')}
           icon={<GradientRadialIcon />}
           colorScheme={gradientType === 'radial' ? 'invokeBlue' : 'base'}
           variant="solid"
