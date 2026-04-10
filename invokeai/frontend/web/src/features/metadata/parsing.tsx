@@ -43,6 +43,7 @@ import {
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceRandomizePercent,
   setZImageSeedVarianceStrength,
+  setZImageShift,
   vaeSelected,
   widthChanged,
   zImageQwen3EncoderModelSelected,
@@ -686,6 +687,24 @@ const ZImageSeedVarianceRandomizePercent: SingleMetadataHandler<number> = {
 };
 //#endregion ZImageSeedVarianceRandomizePercent
 
+//#region ZImageShift
+const ZImageShift: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'ZImageShift',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'z_image_shift');
+    const parsed = z.number().min(0).max(3).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setZImageShift(value));
+  },
+  i18nKey: 'metadata.zImageShift',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion ZImageShift
+
 //#region RefinerModel
 const RefinerModel: SingleMetadataHandler<ParameterSDXLRefinerModel> = {
   [SingleMetadataKey]: true,
@@ -1314,6 +1333,7 @@ export const ImageMetadataHandlers = {
   ZImageSeedVarianceEnabled,
   ZImageSeedVarianceStrength,
   ZImageSeedVarianceRandomizePercent,
+  ZImageShift,
   LoRAs,
   CanvasLayers,
   RefImages,

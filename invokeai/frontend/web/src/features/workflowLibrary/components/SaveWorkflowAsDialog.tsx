@@ -167,7 +167,7 @@ Content.displayName = 'Content';
 const NoWorkflowToSaveContent = memo(() => {
   return (
     <AlertDialogContent>
-      <IAINoContentFallback icon={null} label="No workflow to save" />
+      <IAINoContentFallback icon={null} label={t('workflows.noWorkflowToSave')} />
     </AlertDialogContent>
   );
 });
