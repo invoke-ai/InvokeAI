@@ -150,6 +150,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   cogview4: 'red',
   'z-image': 'cyan',
   external: 'orange',
+  anima: 'invokePurple',
   unknown: 'red',
 };
 
@@ -193,6 +194,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   cogview4: 'CogView4',
   'z-image': 'Z-Image',
   external: 'External',
+  anima: 'Anima',
   unknown: 'Unknown',
 };
 
@@ -211,6 +213,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   cogview4: 'CogView4',
   'z-image': 'Z-Image',
   external: 'External',
+  anima: 'Anima',
   unknown: 'Unknown',
 };
 
@@ -230,6 +233,7 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   gigantic: 'CLIP G',
   qwen3_4b: 'Qwen3 4B',
   qwen3_8b: 'Qwen3 8B',
+  qwen3_06b: 'Qwen3 0.6B',
 };
 
 export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
@@ -262,4 +266,5 @@ export const SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS: BaseModelType[] = [
   'cogview4',
   'sd-3',
   'z-image',
+  'anima',
 ];

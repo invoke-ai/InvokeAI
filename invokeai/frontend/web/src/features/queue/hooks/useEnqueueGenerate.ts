@@ -7,6 +7,7 @@ import { withResult, withResultAsync } from 'common/util/result';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
+import { buildAnimaGraph } from 'features/nodes/util/graph/generation/buildAnimaGraph';
 import { buildCogView4Graph } from 'features/nodes/util/graph/generation/buildCogView4Graph';
 import { buildExternalGraph } from 'features/nodes/util/graph/generation/buildExternalGraph';
 import { buildFLUXGraph } from 'features/nodes/util/graph/generation/buildFLUXGraph';
@@ -56,6 +57,8 @@ const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
         return await buildZImageGraph(graphBuilderArg);
       case 'external':
         return await buildExternalGraph(graphBuilderArg);
+      case 'anima':
+        return await buildAnimaGraph(graphBuilderArg);
       default:
         assert(false, `No graph builders for base ${base}`);
     }
