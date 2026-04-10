@@ -1499,6 +1499,7 @@
         "info": "Info",
         "invoke": {
             "addingImagesTo": "Adding images to",
+            "boardNotWritable": "You do not have write access to board \"{{boardName}}\". Select a board you own or switch to Uncategorized.",
             "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your account settings to upgrade.",
             "invoke": "Invoke",
             "missingFieldTemplate": "Missing field template",

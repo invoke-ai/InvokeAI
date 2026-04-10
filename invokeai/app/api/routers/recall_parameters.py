@@ -337,14 +337,14 @@ async def update_recall_parameters(
         if not provided_params:
             return {"status": "no_parameters_provided", "updated_count": 0}
 
-        # Store each parameter in client state using a consistent key format
+        # Store each parameter in client state scoped to the current user
         updated_count = 0
         for param_key, param_value in provided_params.items():
             # Convert parameter values to JSON strings for storage
             value_str = json.dumps(param_value)
             try:
                 ApiDependencies.invoker.services.client_state_persistence.set_by_key(
-                    queue_id, f"recall_{param_key}", value_str
+                    current_user.user_id, f"recall_{param_key}", value_str
                 )
                 updated_count += 1
             except Exception as e:

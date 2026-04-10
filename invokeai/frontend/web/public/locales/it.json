@@ -844,7 +844,16 @@
         "settingsImportedPartial": "Impostazioni del modello parzialmente importate. Le impostazioni incompatibili sono state ignorate: {{fields}}",
         "settingsImportFailed": "Impossibile importare le impostazioni del modello",
         "settingsImportIncompatible": "Il file delle impostazioni non contiene impostazioni compatibili per questo tipo di modello",
-        "settingsImportInvalidFile": "File di impostazioni non valido"
+        "settingsImportInvalidFile": "File di impostazioni non valido",
+        "reidentifyModels": "Re-identificare i modelli",
+        "reidentifyModelsConfirm": "Sei sicuro di voler re-identificare {{count}} modello(i)? Questa operazione eseguirà una nuova scansione dei relativi file dei pesi per determinarne il formato e le impostazioni corrette.",
+        "reidentifyWarning": "Questa operazione ripristinerà tutte le impostazioni personalizzate che potresti aver applicato a questi modelli.",
+        "modelsReidentified": "{{count}} modello(i) re-identificato(i) con successo",
+        "modelsReidentifyFailed": "Impossibile re-identificare i modelli",
+        "someModelsFailedToReidentify": "Non è stato possibile re-identificare {{count}} modello(i)",
+        "modelsReidentifiedPartial": "Completato parzialmente",
+        "someModelsReidentified": "{{succeeded}} re-identificato(i), {{failed}} fallito(i)",
+        "modelsReidentifyError": "Errore nella re-identificazione dei modelli"
     },
     "parameters": {
         "images": "Immagini",
@@ -2585,7 +2594,9 @@
             "saveToGallery": "Salva nella Galleria",
             "previous": "Precedente",
             "showResultsOn": "Visualizzare i risultati",
-            "showResultsOff": "Nascondere i risultati"
+            "showResultsOff": "Nascondere i risultati",
+            "hideThumbnails": "Nascondi le miniature",
+            "showThumbnails": "Mostra miniature"
         },
         "HUD": {
             "bbox": "Riquadro di delimitazione",
@@ -2826,6 +2837,27 @@
             "alignLeft": "Allinea a sinistra",
             "alignCenter": "Allinea al centro",
             "alignRight": "Allinea a destra"
+        },
+        "workflowIntegration": {
+            "title": "Eseguire il flusso di lavoro sula Tela",
+            "description": "Seleziona un flusso di lavoro con un nodo Output su tela e un parametro immagine da eseguire sul livello corrente della tela. Puoi regolare i parametri prima dell'esecuzione. Il risultato verrà aggiunto nuovamente alla tela.",
+            "execute": "Eseguire il flusso di lavoro",
+            "executing": "Esecuzione in corso...",
+            "runWorkflow": "Avvia il flusso di lavoro",
+            "filteringWorkflows": "Filtraggio dei flussi di lavoro...",
+            "loadingWorkflows": "Caricamento dei flussi di lavoro...",
+            "noWorkflowsFound": "Nessun flusso di lavoro trovato.",
+            "noWorkflowsWithImageField": "Nessun flusso di lavoro compatibile trovato. Un flusso di lavoro richiede un Generatore Modello con un campo di input immagine e un nodo Output su tela.",
+            "selectWorkflow": "Seleziona il flusso di lavoro",
+            "selectPlaceholder": "Scegli un flusso di lavoro...",
+            "unnamedWorkflow": "Flusso di lavoro senza nome",
+            "loadingParameters": "Caricamento dei parametri del flusso di lavoro in corso...",
+            "noFormBuilderError": "Questo flusso di lavoro non dispone di un generatore di moduli e non può essere utilizzato. Selezionare un flusso di lavoro diverso.",
+            "imageFieldSelected": "Questo campo riceverà l'immagine della tela",
+            "imageFieldNotSelected": "Fai clic su questo campo per usarlo per l'immagine sulla tela",
+            "executionStarted": "L'esecuzione del flusso di lavoro è stata avviata",
+            "executionStartedDescription": "Il risultato apparirà nell'area di lavoro una volta completata l'operazione.",
+            "executionFailed": "Impossibile eseguire il flusso di lavoro"
         }
     },
     "ui": {
@@ -3072,7 +3104,8 @@
             "rememberMe": "Ricordami per 7 giorni",
             "signIn": "Accedi",
             "signingIn": "Accesso in corso...",
-            "loginFailed": "Accesso non riuscito. Controlla le tue credenziali."
+            "loginFailed": "Accesso non riuscito. Controlla le tue credenziali.",
+            "sessionExpired": "Le tue credenziali sono scadute. Effettua nuovamente l'accesso per continuare."
         },
         "setup": {
             "title": "Benvenuti a InvokeAI",
