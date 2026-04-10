@@ -1819,6 +1819,67 @@ class GraphExecutionState(BaseModel):
 
         return next_node
 
+    def _reset_runtime_caches(self) -> None:
+        self._ready_queues = {}
+        self._active_class = None
+        self._iteration_path_cache = {}
+        self._if_branch_exclusive_sources = {}
+        self._resolved_if_exec_branches = {}
+        self._prepared_exec_metadata = {}
+        self._prepared_exec_registry = None
+        self._if_branch_scheduler = None
+        self._execution_materializer = None
+        self._execution_scheduler = None
+        self._execution_runtime = None
+
+    def _rehydrate_prepared_exec_metadata(self) -> None:
+        registry = self._prepared_registry()
+        for exec_node_id, source_node_id in self.prepared_source_mapping.items():
+            metadata = registry.get_metadata(exec_node_id)
+            metadata.source_node_id = source_node_id
+            if exec_node_id in self.executed:
+                metadata.state = "executed" if exec_node_id in self.results else "skipped"
+            elif self.indegree.get(exec_node_id) == 0:
+                metadata.state = "ready"
+            else:
+                metadata.state = "pending"
+
+    def _rehydrate_resolved_if_exec_branches(self) -> None:
+        for exec_node_id, node in self.execution_graph.nodes.items():
+            if not isinstance(node, IfInvocation):
+                continue
+
+            condition_edges = self.execution_graph._get_input_edges(exec_node_id, "condition")
+            if any(edge.source.node_id not in self.executed for edge in condition_edges):
+                continue
+
+            for edge in condition_edges:
+                setattr(
+                    node,
+                    edge.destination.field,
+                    copydeep(getattr(self.results[edge.source.node_id], edge.source.field)),
+                )
+
+            self._resolved_if_exec_branches[exec_node_id] = "true_input" if node.condition else "false_input"
+
+    def _rehydrate_ready_queues(self) -> None:
+        execution_graph = self.execution_graph.nx_graph_flat()
+        for exec_node_id in nx.topological_sort(execution_graph):
+            if exec_node_id in self.executed:
+                continue
+            if self.indegree.get(exec_node_id) != 0:
+                continue
+            self._enqueue_if_ready(exec_node_id)
+
+    def _rehydrate_runtime_state(self) -> None:
+        self._reset_runtime_caches()
+        self._rehydrate_prepared_exec_metadata()
+        self._rehydrate_resolved_if_exec_branches()
+        self._rehydrate_ready_queues()
+
+    def model_post_init(self, __context: Any) -> None:
+        self._rehydrate_runtime_state()
+
     model_config = ConfigDict(
         json_schema_extra={
             "required": [

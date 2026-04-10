@@ -2,6 +2,7 @@ from typing import Optional
 from unittest.mock import Mock
 
 import pytest
+from pydantic import TypeAdapter
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, InvocationContext
 from invokeai.app.invocations.collections import RangeInvocation
@@ -135,6 +136,37 @@ def test_graph_state_collects():
     assert isinstance(n6[0], CollectInvocation)
 
     assert sorted(g.results[n6[0].id].collection) == sorted(test_prompts)
+
+
+def test_graph_state_resumes_partially_executed_session_after_json_round_trip():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="c", start=1, stop=5, step=1))
+    graph.add_node(IterateInvocation(id="iter"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect"))
+
+    graph.add_edge(create_edge("c", "collection", "iter", "collection"))
+    graph.add_edge(create_edge("iter", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+
+    for _ in range(4):
+        invocation, output = invoke_next(state)
+        assert invocation is not None
+        assert output is not None
+
+    raw = state.model_dump_json(warnings=False, exclude_none=True)
+    resumed = TypeAdapter(GraphExecutionState).validate_json(raw, strict=False)
+
+    executed_source_ids = execute_all_nodes(resumed)
+
+    assert executed_source_ids
+    assert "add" in executed_source_ids
+    assert "collect" in resumed.source_prepared_mapping
+
+    prepared_collect_id = next(iter(resumed.source_prepared_mapping["collect"]))
+    assert resumed.results[prepared_collect_id].collection == [2, 3, 4, 5]
 
 
 def test_graph_state_prepares_eagerly():
