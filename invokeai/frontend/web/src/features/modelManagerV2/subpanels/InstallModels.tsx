@@ -1,5 +1,5 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Box, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
+import { Box, Divider, Flex, Heading, Tab, TabList, TabPanel, TabPanels, Tabs } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { $installModelsTabIndex } from 'features/modelManagerV2/store/installModelsStore';
 import { StarterModelsForm } from 'features/modelManagerV2/subpanels/AddModelPanel/StarterModels/StarterModelsForm';
@@ -88,7 +88,8 @@ export const InstallModels = memo(() => {
           </TabPanel>
         </TabPanels>
       </Tabs>
-      <Box layerStyle="second" borderRadius="base" h="50%">
+      <Divider />
+      <Box h="65%">
         <ModelInstallQueue />
       </Box>
     </Flex>
