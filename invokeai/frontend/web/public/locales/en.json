@@ -1001,6 +1001,7 @@
         "seedVarianceEnabled": "Seed Variance Enabled",
         "seedVarianceStrength": "Seed Variance Strength",
         "seedVarianceRandomizePercent": "Seed Variance Randomize %",
+        "zImageShift": "Z-Image Shift",
         "seed": "Seed",
         "steps": "Steps",
         "strength": "Image to image strength",
