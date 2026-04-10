@@ -25,6 +25,7 @@ import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamZImageScheduler from 'features/parameters/components/Core/ParamZImageScheduler';
+import ParamZImageShift from 'features/parameters/components/Core/ParamZImageShift';
 import ParamZImageSeedVarianceSettings from 'features/parameters/components/SeedVariance/ParamZImageSeedVarianceSettings';
 import { MainModelPicker } from 'features/settingsAccordions/components/GenerationSettingsAccordion/MainModelPicker';
 import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
@@ -92,6 +93,7 @@ export const GenerationSettingsAccordion = memo(() => {
               <ParamSteps />
               {(isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
               {!isFLUX && !isFlux2 && <ParamCFGScale />}
+              {isZImage && <ParamZImageShift />}
               {isFLUX && <ParamFluxDypePreset />}
               {isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeScale />}
               {isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
