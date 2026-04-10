@@ -86,6 +86,9 @@ const slice = createSlice({
     setZImageScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
       state.zImageScheduler = action.payload;
     },
+    setZImageShift: (state, action: PayloadAction<number | null>) => {
+      state.zImageShift = action.payload;
+    },
     setZImageSeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
       state.zImageSeedVarianceEnabled = action.payload;
     },
@@ -535,6 +538,7 @@ export const {
   setFluxDypeScale,
   setFluxDypeExponent,
   setZImageScheduler,
+  setZImageShift,
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
   setZImageSeedVarianceRandomizePercent,
@@ -696,6 +700,7 @@ export const selectFluxDypePreset = createParamsSelector((params) => params.flux
 export const selectFluxDypeScale = createParamsSelector((params) => params.fluxDypeScale);
 export const selectFluxDypeExponent = createParamsSelector((params) => params.fluxDypeExponent);
 export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
+export const selectZImageShift = createParamsSelector((params) => params.zImageShift);
 export const selectZImageSeedVarianceEnabled = createParamsSelector((params) => params.zImageSeedVarianceEnabled);
 export const selectZImageSeedVarianceStrength = createParamsSelector((params) => params.zImageSeedVarianceStrength);
 export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(
