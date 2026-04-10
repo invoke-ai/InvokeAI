@@ -111,6 +111,7 @@ export const selectRegionalRefImageModels = buildModelsSelector(
 );
 export const selectAnimaQwen3EncoderModels = buildModelsSelector(isAnimaQwen3EncoderModelConfig);
 export const selectQwen3EncoderModels = buildModelsSelector(isQwen3EncoderModelConfig);
+export const selectQwenImageDiffusersModels = buildModelsSelector(isQwenImageDiffusersMainModelConfig);
 export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);

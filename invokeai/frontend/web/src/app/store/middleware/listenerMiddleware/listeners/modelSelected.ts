@@ -53,6 +53,7 @@ import {
   selectFluxVAEModels,
   selectGlobalRefImageModels,
   selectQwen3EncoderModels,
+  selectQwenImageDiffusersModels,
   selectRegionalRefImageModels,
   selectT5EncoderModels,
   selectZImageDiffusersModels,
@@ -248,6 +249,15 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           if (qwenImageComponentSource) {
             dispatch(qwenImageComponentSourceSelected(null));
             modelsUpdatedDisabledOrCleared += 1;
+          }
+        } else {
+          // Switching to Qwen Image - auto-default component source to first available diffusers model
+          if (!qwenImageComponentSource) {
+            const availableQwenImageDiffusers = selectQwenImageDiffusersModels(state);
+            const diffusersModel = availableQwenImageDiffusers[0];
+            if (diffusersModel) {
+              dispatch(qwenImageComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
+            }
           }
         }
 
