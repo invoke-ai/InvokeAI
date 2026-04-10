@@ -253,7 +253,13 @@ export const Flow = memo(() => {
   const connectorSpliceConnections = useMemo(
     () =>
       contextMenuState?.kind === 'connector'
-        ? getConnectorDeletionSpliceConnections(contextMenuState.connectorId, nodes, edges, templates, validateConnection)
+        ? getConnectorDeletionSpliceConnections(
+            contextMenuState.connectorId,
+            nodes,
+            edges,
+            templates,
+            validateConnection
+          )
         : null,
     [contextMenuState, edges, nodes, templates]
   );
