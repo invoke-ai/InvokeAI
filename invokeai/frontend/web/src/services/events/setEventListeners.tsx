@@ -53,6 +53,8 @@ type SetEventListenersArg = {
   setIsConnected: (isConnected: boolean) => void;
 };
 
+type QueueItemWithStatusSequence = { status_sequence?: number | null };
+
 const selectModelInstalls = modelsApi.endpoints.listModelInstalls.select();
 
 /**
@@ -387,6 +389,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const {
       item_id,
       status,
+      status_sequence,
       batch_status,
       error_type,
       error_message,
@@ -403,6 +406,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     dispatch(
       queueApi.util.updateQueryData('getQueueItem', item_id, (draft) => {
         draft.status = status;
+        (draft as typeof draft & QueueItemWithStatusSequence).status_sequence = status_sequence;
         draft.started_at = started_at;
         draft.updated_at = updated_at;
         draft.completed_at = completed_at;
@@ -420,6 +424,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
           const item = draft.find((i) => i.item_id === item_id);
           if (item) {
             item.status = status;
+            (item as typeof item & QueueItemWithStatusSequence).status_sequence = status_sequence;
             item.started_at = started_at;
             item.updated_at = updated_at;
             item.completed_at = completed_at;

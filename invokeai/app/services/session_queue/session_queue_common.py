@@ -219,6 +219,10 @@ class SessionQueueItem(BaseModel):
 
     item_id: int = Field(description="The identifier of the session queue item")
     status: QUEUE_ITEM_STATUS = Field(default="pending", description="The status of this queue item")
+    status_sequence: int | None = Field(
+        default=None,
+        description="A monotonically increasing version for this queue item's visible status lifecycle",
+    )
     priority: int = Field(default=0, description="The priority of this queue item")
     batch_id: str = Field(description="The ID of the batch associated with this queue item")
     origin: str | None = Field(

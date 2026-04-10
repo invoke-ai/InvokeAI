@@ -1037,6 +1037,144 @@ describe('StagingAreaApi', () => {
         expect(progressData[1]?.imageDTOs[1]).toBe(imageDTO2);
       });
 
+      it('should ignore a stale pending snapshot after an item has already completed', async () => {
+        const imageDTO = createMockImageDTO({ image_name: 'output1.png' });
+        mockApp._setImageDTO('output1.png', imageDTO);
+
+        const completedItems = [
+          createMockQueueItem({
+            item_id: 1,
+            status: 'completed',
+            session: {
+              id: sessionId,
+              source_prepared_mapping: {
+                'canvas_output:abc': ['prepared-1'],
+              },
+              results: {
+                'prepared-1': { image: { image_name: 'output1.png' } },
+              },
+            },
+          }),
+        ];
+
+        const stalePendingItems = [
+          createMockQueueItem({
+            item_id: 1,
+            status: 'pending',
+            session: {
+              id: sessionId,
+              source_prepared_mapping: {},
+              results: {},
+            },
+          }),
+        ];
+
+        await api.onItemsChangedEvent(completedItems);
+        await api.onItemsChangedEvent(stalePendingItems);
+
+        expect(api.$items.get()).toHaveLength(1);
+        expect(api.$items.get()[0]?.status).toBe('completed');
+        expect(api.$isPending.get()).toBe(false);
+        expect(api.$progressData.get()[1]?.imageDTOs).toEqual([imageDTO]);
+      });
+
+      it('should ignore a stale pending snapshot after a completed status event arrives first', async () => {
+        api.onQueueItemStatusChangedEvent(
+          createMockQueueItemStatusChangedEvent({
+            item_id: 1,
+            destination: sessionId,
+            status: 'completed',
+          })
+        );
+
+        await api.onItemsChangedEvent([
+          createMockQueueItem({
+            item_id: 1,
+            status: 'pending',
+            session: {
+              id: sessionId,
+              source_prepared_mapping: {},
+              results: {},
+            },
+          }),
+        ]);
+
+        expect(api.$items.get()).toEqual([]);
+        expect(api.$isPending.get()).toBe(false);
+      });
+
+      it('should ignore a stale in_progress snapshot after a completed status event arrives first', async () => {
+        api.onQueueItemStatusChangedEvent(
+          createMockQueueItemStatusChangedEvent({
+            item_id: 1,
+            destination: sessionId,
+            status: 'completed',
+          })
+        );
+
+        await api.onItemsChangedEvent([
+          createMockQueueItem({
+            item_id: 1,
+            status: 'in_progress',
+            session: {
+              id: sessionId,
+              source_prepared_mapping: {},
+              results: {},
+            },
+          }),
+        ]);
+
+        expect(api.$items.get()).toEqual([]);
+        expect(api.$isPending.get()).toBe(false);
+      });
+
+      it('should prefer the higher status_sequence when terminal snapshots disagree', async () => {
+        const completedItem = createMockQueueItem({
+          item_id: 1,
+          status: 'completed',
+        });
+        (completedItem as typeof completedItem & { status_sequence?: number }).status_sequence = 2;
+
+        const failedItem = createMockQueueItem({
+          item_id: 1,
+          status: 'failed',
+        });
+        (failedItem as typeof failedItem & { status_sequence?: number }).status_sequence = 3;
+
+        await api.onItemsChangedEvent([completedItem]);
+        await api.onItemsChangedEvent([failedItem]);
+
+        expect(api.$items.get()).toHaveLength(1);
+        expect(api.$items.get()[0]?.status).toBe('failed');
+      });
+
+      it('should ignore a lower status_sequence on stale in_progress snapshots', async () => {
+        const completedEvent = createMockQueueItemStatusChangedEvent({
+          item_id: 1,
+          destination: sessionId,
+          status: 'completed',
+        });
+        (completedEvent as typeof completedEvent & { status_sequence?: number }).status_sequence = 3;
+
+        api.onQueueItemStatusChangedEvent(completedEvent);
+
+        const staleInProgressItem = createMockQueueItem({
+          item_id: 1,
+          status: 'in_progress',
+          session: {
+            id: sessionId,
+            source_prepared_mapping: {},
+            results: {},
+          },
+        });
+        (staleInProgressItem as typeof staleInProgressItem & { status_sequence?: number }).status_sequence = 2;
+
+        await api.onItemsChangedEvent([staleInProgressItem]);
+
+        expect(api.$items.get()).toEqual([]);
+        expect(api.$isPending.get()).toBe(false);
+      });
+
       it('should load all images from multiple canvas_output nodes', async () => {
         const imageDTO1 = createMockImageDTO({ image_name: 'output1.png' });
         const imageDTO2 = createMockImageDTO({ image_name: 'output2.png' });
