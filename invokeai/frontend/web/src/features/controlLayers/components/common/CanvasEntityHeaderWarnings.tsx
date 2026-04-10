@@ -74,7 +74,7 @@ export const CanvasEntityHeaderWarnings = memo(() => {
       size="sm"
       variant="link"
       alignSelf="stretch"
-      aria-label="warnings"
+      aria-label={t('common.warnings')}
       tooltip={<TooltipContent warnings={warnings} />}
       icon={<PiWarningBold />}
       colorScheme="warning"
