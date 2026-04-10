@@ -216,6 +216,59 @@ def test_graph_executes_depth_first():
     assert_topo_order_and_all_executed(g, order)
 
 
+def test_graph_scheduler_drains_active_class_before_switching():
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="prompt_a", prompt="a"))
+    graph.add_node(PromptTestInvocation(id="prompt_b", prompt="b"))
+    graph.add_node(TextToImageTestInvocation(id="image"))
+
+    g = GraphExecutionState(graph=graph)
+    g.set_ready_order([PromptTestInvocation, TextToImageTestInvocation])
+
+    first = invoke_next(g)[0]
+    second = invoke_next(g)[0]
+    third = invoke_next(g)[0]
+
+    assert first is not None
+    assert g.prepared_source_mapping[first.id] == "prompt_a"
+    assert g.prepared_source_mapping[second.id] == "prompt_b"
+    assert g.prepared_source_mapping[third.id] == "image"
+
+
+def test_graph_scheduler_skips_stale_ready_entries():
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="prompt_a", prompt="a"))
+    graph.add_node(PromptTestInvocation(id="prompt_b", prompt="b"))
+
+    g = GraphExecutionState(graph=graph)
+    g.set_ready_order([PromptTestInvocation])
+
+    first = invoke_next(g)[0]
+    assert first is not None
+
+    prompt_queue = g._queue_for(PromptTestInvocation.__name__)
+    prompt_queue.appendleft(first.id)
+
+    second = g.next()
+
+    assert second is not None
+    assert second.id != first.id
+    assert g.prepared_source_mapping[second.id] == "prompt_b"
+
+
+def test_graph_scheduler_falls_back_to_non_priority_ready_classes():
+    graph = Graph()
+    graph.add_node(TextToImageTestInvocation(id="image"))
+
+    g = GraphExecutionState(graph=graph)
+    g.set_ready_order([PromptTestInvocation])
+
+    next_node = g.next()
+
+    assert next_node is not None
+    assert g.prepared_source_mapping[next_node.id] == "image"
+
+
 # Because this tests deterministic ordering, we run it multiple times
 @pytest.mark.parametrize("execution_number", range(5))
 def test_graph_iterate_execution_order(execution_number: int):
@@ -440,6 +493,26 @@ def test_if_graph_optimized_behavior_executes_only_selected_simple_branch():
     assert "false_value" not in executed_source_ids
 
 
+def test_if_graph_optimized_behavior_records_skipped_branch_in_execution_history():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=True))
+    graph.add_node(PromptTestInvocation(id="true_value", prompt="true branch"))
+    graph.add_node(PromptTestInvocation(id="false_value", prompt="false branch"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(PromptTestInvocation(id="selected_output"))
+
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("true_value", "prompt", "if", "true_input"))
+    graph.add_edge(create_edge("false_value", "prompt", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "selected_output", "prompt"))
+
+    g = GraphExecutionState(graph=graph)
+    execute_all_nodes(g)
+
+    assert set(g.executed_history) == {"condition", "true_value", "false_value", "if", "selected_output"}
+    assert g.executed_history.count("false_value") == 1
+
+
 def test_if_graph_optimized_behavior_skips_unselected_branch_but_keeps_shared_ancestors():
     graph = Graph()
     graph.add_node(BooleanInvocation(id="condition", value=True))
@@ -514,6 +587,101 @@ def test_if_graph_optimized_behavior_skips_distant_unselected_ancestors_only_whe
         "selected_output",
     }
     assert "true_exclusive_leaf" not in executed_source_ids
+
+
+def test_if_graph_optimized_behavior_allows_selected_missing_branch_input():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=False))
+    graph.add_node(PromptTestInvocation(id="true_value", prompt="true branch"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(AnyTypeTestInvocation(id="selected_output"))
+
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("true_value", "prompt", "if", "true_input"))
+    graph.add_edge(create_edge("if", "value", "selected_output", "value"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    prepared_selected_output_id = next(iter(g.source_prepared_mapping["selected_output"]))
+    assert g.results[prepared_selected_output_id].value is None
+    assert set(executed_source_ids) == {"condition", "if", "selected_output"}
+    assert "true_value" not in executed_source_ids
+
+
+def test_if_graph_optimized_behavior_does_not_cross_defer_independent_ifs():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition_a", value=True))
+    graph.add_node(BooleanInvocation(id="condition_b", value=False))
+    graph.add_node(PromptTestInvocation(id="true_a", prompt="true a"))
+    graph.add_node(PromptTestInvocation(id="false_a", prompt="false a"))
+    graph.add_node(PromptTestInvocation(id="true_b", prompt="true b"))
+    graph.add_node(PromptTestInvocation(id="false_b", prompt="false b"))
+    graph.add_node(IfInvocation(id="if_a"))
+    graph.add_node(IfInvocation(id="if_b"))
+    graph.add_node(CollectInvocation(id="collect"))
+
+    graph.add_edge(create_edge("condition_a", "value", "if_a", "condition"))
+    graph.add_edge(create_edge("true_a", "prompt", "if_a", "true_input"))
+    graph.add_edge(create_edge("false_a", "prompt", "if_a", "false_input"))
+    graph.add_edge(create_edge("condition_b", "value", "if_b", "condition"))
+    graph.add_edge(create_edge("true_b", "prompt", "if_b", "true_input"))
+    graph.add_edge(create_edge("false_b", "prompt", "if_b", "false_input"))
+    graph.add_edge(create_edge("if_a", "value", "collect", "item"))
+    graph.add_edge(create_edge("if_b", "value", "collect", "item"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    prepared_collect_id = next(iter(g.source_prepared_mapping["collect"]))
+    assert sorted(g.results[prepared_collect_id].collection) == ["false b", "true a"]
+    assert set(executed_source_ids) == {
+        "condition_a",
+        "condition_b",
+        "true_a",
+        "false_b",
+        "if_a",
+        "if_b",
+        "collect",
+    }
+    assert "false_a" not in executed_source_ids
+    assert "true_b" not in executed_source_ids
+
+
+def test_if_graph_optimized_behavior_supports_nested_ifs():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="outer_condition", value=True))
+    graph.add_node(BooleanInvocation(id="inner_condition", value=False))
+    graph.add_node(PromptTestInvocation(id="outer_false", prompt="outer false"))
+    graph.add_node(PromptTestInvocation(id="inner_true", prompt="inner true"))
+    graph.add_node(PromptTestInvocation(id="inner_false", prompt="inner false"))
+    graph.add_node(IfInvocation(id="inner_if"))
+    graph.add_node(IfInvocation(id="outer_if"))
+    graph.add_node(PromptTestInvocation(id="selected_output"))
+
+    graph.add_edge(create_edge("inner_condition", "value", "inner_if", "condition"))
+    graph.add_edge(create_edge("inner_true", "prompt", "inner_if", "true_input"))
+    graph.add_edge(create_edge("inner_false", "prompt", "inner_if", "false_input"))
+    graph.add_edge(create_edge("outer_condition", "value", "outer_if", "condition"))
+    graph.add_edge(create_edge("inner_if", "value", "outer_if", "true_input"))
+    graph.add_edge(create_edge("outer_false", "prompt", "outer_if", "false_input"))
+    graph.add_edge(create_edge("outer_if", "value", "selected_output", "prompt"))
+
+    g = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(g)
+
+    prepared_selected_output_id = next(iter(g.source_prepared_mapping["selected_output"]))
+    assert g.results[prepared_selected_output_id].prompt == "inner false"
+    assert set(executed_source_ids) == {
+        "outer_condition",
+        "inner_condition",
+        "inner_false",
+        "inner_if",
+        "outer_if",
+        "selected_output",
+    }
+    assert "inner_true" not in executed_source_ids
+    assert "outer_false" not in executed_source_ids
 
 
 def test_if_graph_optimized_behavior_prunes_branches_per_iteration():

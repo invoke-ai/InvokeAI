@@ -4,7 +4,7 @@ import copy
 import itertools
 from collections import deque
 from dataclasses import dataclass
-from typing import Any, Deque, Iterable, Optional, Type, TypeVar, Union, get_args, get_origin
+from typing import Any, Deque, Iterable, Literal, Optional, Type, TypeVar, Union, get_args, get_origin
 
 import networkx as nx
 from pydantic import (
@@ -65,13 +65,16 @@ class Edge(BaseModel):
         return f"{self.source.node_id}.{self.source.field} -> {self.destination.node_id}.{self.destination.field}"
 
 
+PreparedExecState = Literal["pending", "ready", "executed", "skipped"]
+
+
 @dataclass
 class _PreparedExecNodeMetadata:
     """Cached metadata for a materialized execution node."""
 
     source_node_id: str
     iteration_path: Optional[tuple[int, ...]] = None
-    state: str = "pending"
+    state: PreparedExecState = "pending"
 
 
 class _PreparedExecRegistry:
@@ -110,11 +113,12 @@ class _PreparedExecRegistry:
     def get_prepared_ids(self, source_node_id: str) -> set[str]:
         return self._source_prepared_mapping.get(source_node_id, set())
 
-    def set_state(self, exec_node_id: str, state: str) -> None:
+    def set_state(self, exec_node_id: str, state: PreparedExecState) -> None:
         self.get_metadata(exec_node_id).state = state
 
     def get_iteration_path(self, exec_node_id: str) -> Optional[tuple[int, ...]]:
-        return self._metadata.get(exec_node_id, _PreparedExecNodeMetadata(source_node_id="")).iteration_path
+        metadata = self._metadata.get(exec_node_id)
+        return metadata.iteration_path if metadata is not None else None
 
     def set_iteration_path(self, exec_node_id: str, iteration_path: tuple[int, ...]) -> None:
         self.get_metadata(exec_node_id).iteration_path = iteration_path
@@ -204,6 +208,8 @@ class _IfBranchScheduler:
         selected_field: str,
         unselected_field: str,
     ) -> None:
+        # This iterates over the stable prepared-source mapping while mutating per-exec runtime state such as ready
+        # queues, execution state, and prepared metadata. Branch resolution never adds or removes prepared exec nodes.
         for prepared_id, prepared_source in self._state.prepared_source_mapping.items():
             if prepared_id in self._state.executed:
                 continue
@@ -255,7 +261,9 @@ class _IfBranchScheduler:
         source_node_id = registry.get_source_node_id(exec_node_id)
         prepared_nodes = registry.get_prepared_ids(source_node_id)
         if all(n in self._state.executed for n in prepared_nodes):
-            self._state.executed.add(source_node_id)
+            if source_node_id not in self._state.executed:
+                self._state.executed.add(source_node_id)
+                self._state.executed_history.append(source_node_id)
 
     def try_resolve_if_node(self, exec_node_id: str) -> None:
         if exec_node_id in self._state._resolved_if_exec_branches:
@@ -614,26 +622,34 @@ class _ExecutionScheduler:
 
     def get_next_node(self) -> Optional[BaseInvocation]:
         """Gets the next ready node: FIFO within class, drain class before switching."""
-        if self._state._active_class:
-            q = self._state._ready_queues.get(self._state._active_class)
-            while q:
-                exec_node_id = q.popleft()
-                if exec_node_id not in self._state.executed:
-                    return self._state.execution_graph.nodes[exec_node_id]
-            self._state._active_class = None
+        while True:
+            if self._state._active_class:
+                q = self._state._ready_queues.get(self._state._active_class)
+                while q:
+                    exec_node_id = q.popleft()
+                    if exec_node_id not in self._state.executed:
+                        return self._state.execution_graph.nodes[exec_node_id]
+                self._state._active_class = None
+                continue
 
-        seen = set(self._state.ready_order)
-        for cls_name in self._state.ready_order:
-            q = self._state._ready_queues.get(cls_name)
-            if q:
-                self._state._active_class = cls_name
-                return self.get_next_node()
-        for cls_name in sorted(k for k in self._state._ready_queues.keys() if k not in seen):
-            q = self._state._ready_queues[cls_name]
-            if q:
-                self._state._active_class = cls_name
-                return self.get_next_node()
-        return None
+            seen = set(self._state.ready_order)
+            next_class = next(
+                (cls_name for cls_name in self._state.ready_order if self._state._ready_queues.get(cls_name)),
+                None,
+            )
+            if next_class is None:
+                next_class = next(
+                    (
+                        cls_name
+                        for cls_name in sorted(k for k in self._state._ready_queues.keys() if k not in seen)
+                        if self._state._ready_queues[cls_name]
+                    ),
+                    None,
+                )
+            if next_class is None:
+                return None
+
+            self._state._active_class = next_class
 
     def complete(self, exec_node_id: str, output: BaseInvocationOutput) -> None:
         if exec_node_id not in self._state.execution_graph.nodes:
@@ -1565,12 +1581,14 @@ class Graph(BaseModel):
             return "Collector collection input must be a collection"
         return None
 
-    def _get_collector_input_root_type_from_resolved_types(self, input_field_types: set[Any]) -> Any | None:
+    def _get_collector_input_root_type_from_resolved_types(
+        self, input_field_types: set[Any]
+    ) -> tuple[bool, Any | None]:
         non_any_input_field_types = {t for t in input_field_types if t != Any}
         root_types = self._get_type_tree_root_types(non_any_input_field_types)
         if len(root_types) > 1:
-            return "multiple"
-        return root_types[0] if len(root_types) == 1 else None
+            return True, None
+        return False, root_types[0] if len(root_types) == 1 else None
 
     def _validate_collector_output_types(
         self, output_field_types: list[Any], input_root_type: Any | None
@@ -1634,8 +1652,10 @@ class Graph(BaseModel):
         input_field_types = self._resolve_item_input_types(item_input_field_types)
         input_field_types.update(self._resolve_collection_input_types(collection_inputs, collection_input_field_types))
 
-        input_root_type = self._get_collector_input_root_type_from_resolved_types(input_field_types)
-        if input_root_type == "multiple":
+        has_multiple_root_types, input_root_type = self._get_collector_input_root_type_from_resolved_types(
+            input_field_types
+        )
+        if has_multiple_root_types:
             return "Collector input collection items must be of a single type"
 
         output_type_error = self._validate_collector_output_types(output_field_types, input_root_type)
@@ -1760,7 +1780,7 @@ class GraphExecutionState(BaseModel):
     def _get_prepared_exec_metadata(self, exec_node_id: str) -> _PreparedExecNodeMetadata:
         return self._prepared_registry().get_metadata(exec_node_id)
 
-    def _set_prepared_exec_state(self, exec_node_id: str, state: str) -> None:
+    def _set_prepared_exec_state(self, exec_node_id: str, state: PreparedExecState) -> None:
         self._prepared_registry().set_state(exec_node_id, state)
 
     def _get_iteration_path(self, exec_node_id: str) -> tuple[int, ...]:
@@ -1769,17 +1789,11 @@ class GraphExecutionState(BaseModel):
     def _queue_for(self, cls_name: str) -> Deque[str]:
         return self._scheduler().queue_for(cls_name)
 
-    def _get_if_branch_exclusive_sources(self, if_node_id: str) -> dict[str, set[str]]:
-        return self._if_scheduler().get_branch_exclusive_sources(if_node_id)
-
     def _is_deferred_by_unresolved_if(self, exec_node_id: str) -> bool:
         return self._if_scheduler().is_deferred_by_unresolved_if(exec_node_id)
 
     def _remove_from_ready_queues(self, exec_node_id: str) -> None:
         self._scheduler().remove_from_ready_queues(exec_node_id)
-
-    def _mark_exec_node_skipped(self, exec_node_id: str) -> None:
-        self._if_scheduler().mark_exec_node_skipped(exec_node_id)
 
     def _try_resolve_if_node(self, exec_node_id: str) -> None:
         self._if_scheduler().try_resolve_if_node(exec_node_id)
