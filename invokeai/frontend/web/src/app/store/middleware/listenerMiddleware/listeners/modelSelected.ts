@@ -251,10 +251,30 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
             modelsUpdatedDisabledOrCleared += 1;
           }
         } else {
-          // Switching to Qwen Image - auto-default component source to first available diffusers model
+          // Switching to Qwen Image - auto-default component source to a matching diffusers model
           if (!qwenImageComponentSource) {
             const availableQwenImageDiffusers = selectQwenImageDiffusersModels(state);
-            const diffusersModel = availableQwenImageDiffusers[0];
+
+            // Look up the new model's variant to match generate vs edit
+            const modelConfigsResult = selectModelConfigsQuery(state);
+            let selectedVariant: string | null = null;
+            if (modelConfigsResult.data) {
+              const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+              if (newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string') {
+                selectedVariant = newModelConfig.variant;
+              }
+            }
+
+            // Find a diffusers model matching the variant; if no variant on denoiser, prefer "generate" then "edit"
+            const variantToMatch = selectedVariant ?? 'generate';
+            const matchingModel = availableQwenImageDiffusers.find(
+              (m) => 'variant' in m && m.variant === variantToMatch
+            );
+            const fallbackModel = availableQwenImageDiffusers.find(
+              (m) => 'variant' in m && m.variant !== variantToMatch
+            );
+            const diffusersModel = matchingModel ?? fallbackModel ?? availableQwenImageDiffusers[0];
+
             if (diffusersModel) {
               dispatch(qwenImageComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
             }
@@ -448,6 +468,32 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                 status: 'info',
               });
             }
+          }
+        }
+      }
+
+      // Handle Qwen Image model changes within the same base (variant may change between generate/edit)
+      // Auto-update the component source diffusers model to match the new variant
+      if (
+        newBase === 'qwen-image' &&
+        state.params.model?.base === 'qwen-image' &&
+        newModel.key !== state.params.model?.key
+      ) {
+        const modelConfigsResult = selectModelConfigsQuery(state);
+        if (modelConfigsResult.data) {
+          const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+          const newVariant =
+            newModelConfig && 'variant' in newModelConfig && typeof newModelConfig.variant === 'string'
+              ? newModelConfig.variant
+              : 'generate';
+
+          const availableQwenImageDiffusers = selectQwenImageDiffusersModels(state);
+          const matchingModel = availableQwenImageDiffusers.find((m) => 'variant' in m && m.variant === newVariant);
+          const fallbackModel = availableQwenImageDiffusers.find((m) => 'variant' in m && m.variant !== newVariant);
+          const diffusersModel = matchingModel ?? fallbackModel ?? availableQwenImageDiffusers[0];
+
+          if (diffusersModel) {
+            dispatch(qwenImageComponentSourceSelected(zModelIdentifierField.parse(diffusersModel)));
           }
         }
       }
