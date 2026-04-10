@@ -249,6 +249,7 @@ def test_migrator_runs_all_migrations_file(logger: Logger) -> None:
         # Must manually close else we get an error on Windows
         db._conn.close()
 
+
 def test_migrator_backs_up_db(logger: Logger) -> None:
     with TemporaryDirectory() as tempdir:
         original_db_path = Path(tempdir) / "invokeai.db"
