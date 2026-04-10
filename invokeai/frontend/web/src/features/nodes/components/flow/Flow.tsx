@@ -95,12 +95,48 @@ type WorkflowContextMenuState =
       kind: 'pane';
       clientX: number;
       clientY: number;
+      pageX: number;
+      pageY: number;
     }
   | {
       kind: 'connector';
       connectorId: string;
+      pageX: number;
+      pageY: number;
     }
   | null;
+
+const getWorkflowContextMenuState = (
+  event: globalThis.MouseEvent,
+  flowWrapper: HTMLDivElement | null
+): WorkflowContextMenuState => {
+  if (event.shiftKey || !(event.target instanceof Element) || !flowWrapper?.contains(event.target)) {
+    return null;
+  }
+
+  const connectorId = event.target.closest<HTMLElement>('[data-connector-node-id]')?.dataset.connectorNodeId;
+  if (connectorId) {
+    return {
+      kind: 'connector',
+      connectorId,
+      pageX: event.pageX,
+      pageY: event.pageY,
+    };
+  }
+
+  const paneTarget = event.target.closest('.react-flow__pane');
+  if (paneTarget && flowWrapper.contains(paneTarget)) {
+    return {
+      kind: 'pane',
+      clientX: event.clientX,
+      clientY: event.clientY,
+      pageX: event.pageX,
+      pageY: event.pageY,
+    };
+  }
+
+  return null;
+};
 
 export const Flow = memo(() => {
   const { t } = useTranslation();
@@ -113,11 +149,10 @@ export const Flow = memo(() => {
   const selectionMode = useAppSelector(selectSelectionMode);
   const { onConnectStart, onConnect, onConnectEnd } = useConnection();
   const flowWrapper = useRef<HTMLDivElement>(null);
-  const contextMenuStateRef = useRef<WorkflowContextMenuState>(null);
   const pendingNodeInternalsUpdateRef = useRef<string[] | null>(null);
   const isValidConnection = useIsValidConnection();
   const updateNodeInternals = useUpdateNodeInternals();
-  const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenuState, setContextMenuState] = useState<WorkflowContextMenuState>(null);
 
   useFocusRegion('workflows', flowWrapper);
 
@@ -159,8 +194,7 @@ export const Flow = memo(() => {
         return;
       }
       onCloseGlobal();
-      contextMenuStateRef.current = null;
-      setContextMenuPosition(null);
+      setContextMenuState(null);
     },
     [onCloseGlobal]
   );
@@ -199,7 +233,6 @@ export const Flow = memo(() => {
   }, [edges, nodes, updateNodeInternals]);
 
   const addConnectorAtPaneMenuPosition = useCallback(() => {
-    const contextMenuState = contextMenuStateRef.current;
     if (contextMenuState?.kind !== 'pane') {
       return;
     }
@@ -214,23 +247,18 @@ export const Flow = memo(() => {
       })
     );
     dispatch(nodesChanged([{ type: 'add', item: connector }]));
-    contextMenuStateRef.current = null;
-    setContextMenuPosition(null);
-  }, [dispatch]);
+    setContextMenuState(null);
+  }, [contextMenuState, dispatch]);
+
+  const connectorSpliceConnections = useMemo(
+    () =>
+      contextMenuState?.kind === 'connector'
+        ? getConnectorDeletionSpliceConnections(contextMenuState.connectorId, nodes, edges, templates, validateConnection)
+        : null,
+    [contextMenuState, edges, nodes, templates]
+  );
 
   const deleteConnectorFromContextMenu = useCallback(() => {
-    const contextMenuState = contextMenuStateRef.current;
-    const connectorSpliceConnections =
-      contextMenuState?.kind === 'connector'
-        ? getConnectorDeletionSpliceConnections(
-            contextMenuState.connectorId,
-            nodes,
-            edges,
-            templates,
-            validateConnection
-          )
-        : null;
-
     if (contextMenuState?.kind !== 'connector' || !connectorSpliceConnections) {
       return;
     }
@@ -248,57 +276,19 @@ export const Flow = memo(() => {
     ];
     dispatch(edgesChanged([...connectorEdgeRemovals, ...spliceEdgeAdditions]));
     dispatch(nodesChanged([{ type: 'remove', id: contextMenuState.connectorId }]));
-    contextMenuStateRef.current = null;
-    setContextMenuPosition(null);
-  }, [dispatch, edges, nodes, templates]);
-
-  const onWorkflowContextMenu = useCallback((event: globalThis.MouseEvent) => {
-    if (event.shiftKey) {
-      contextMenuStateRef.current = null;
-      setContextMenuPosition(null);
-      return;
-    }
-
-    if (!(event.target instanceof Element)) {
-      contextMenuStateRef.current = null;
-      setContextMenuPosition(null);
-      return;
-    }
-
-    event.preventDefault();
-
-    const connectorId = event.target.closest<HTMLElement>('[data-connector-node-id]')?.dataset.connectorNodeId;
-    if (connectorId) {
-      contextMenuStateRef.current = {
-        kind: 'connector',
-        connectorId,
-      };
-      setContextMenuPosition({ x: event.pageX, y: event.pageY });
-      return;
-    }
-
-    contextMenuStateRef.current = {
-      kind: 'pane',
-      clientX: event.clientX,
-      clientY: event.clientY,
-    };
-    setContextMenuPosition({ x: event.pageX, y: event.pageY });
-  }, []);
+    setContextMenuState(null);
+  }, [connectorSpliceConnections, contextMenuState, dispatch, edges]);
 
   useEffect(() => {
     const onWindowContextMenu = (event: globalThis.MouseEvent) => {
-      const wrapper = flowWrapper.current;
-      const target = event.target;
-
-      if (!wrapper || !(target instanceof Node) || !wrapper.contains(target)) {
+      const nextContextMenuState = getWorkflowContextMenuState(event, flowWrapper.current);
+      if (!nextContextMenuState) {
         return;
       }
 
       event.preventDefault();
       event.stopPropagation();
-      event.stopImmediatePropagation();
-
-      onWorkflowContextMenu(event);
+      setContextMenuState(nextContextMenuState);
     };
 
     window.addEventListener('contextmenu', onWindowContextMenu, { capture: true });
@@ -306,11 +296,9 @@ export const Flow = memo(() => {
     return () => {
       window.removeEventListener('contextmenu', onWindowContextMenu, { capture: true });
     };
-  }, [onWorkflowContextMenu]);
+  }, []);
 
   const renderContextMenu = useCallback(() => {
-    const contextMenuState = contextMenuStateRef.current;
-
     if (contextMenuState?.kind === 'pane') {
       return (
         <MenuList visibility="visible">
@@ -322,14 +310,6 @@ export const Flow = memo(() => {
     }
 
     if (contextMenuState?.kind === 'connector') {
-      const connectorSpliceConnections = getConnectorDeletionSpliceConnections(
-        contextMenuState.connectorId,
-        nodes,
-        edges,
-        templates,
-        validateConnection
-      );
-
       return (
         <MenuList visibility="visible">
           <MenuItem
@@ -345,11 +325,10 @@ export const Flow = memo(() => {
     }
 
     return <MenuList visibility="visible" />;
-  }, [addConnectorAtPaneMenuPosition, deleteConnectorFromContextMenu, edges, nodes, t, templates]);
+  }, [addConnectorAtPaneMenuPosition, connectorSpliceConnections, contextMenuState, deleteConnectorFromContextMenu, t]);
 
   const closeContextMenu = useCallback(() => {
-    contextMenuStateRef.current = null;
-    setContextMenuPosition(null);
+    setContextMenuState(null);
   }, []);
 
   const onEdgeDoubleClick = useCallback<NonNullable<ReactFlowProps['onEdgeDoubleClick']>>(
@@ -438,6 +417,7 @@ export const Flow = memo(() => {
   const renderedNodes = useMemo(() => nodes, [nodes]);
 
   const renderedEdges = useMemo(() => edges, [edges]);
+  const contextMenuPosition = contextMenuState ? { x: contextMenuState.pageX, y: contextMenuState.pageY } : null;
   const contextMenuKey = contextMenuPosition ? `${contextMenuPosition.x}-${contextMenuPosition.y}` : 'closed';
 
   return (

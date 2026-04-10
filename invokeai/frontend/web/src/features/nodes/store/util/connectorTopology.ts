@@ -141,6 +141,8 @@ export const getConnectorDeletionSpliceConnections = (
     if (!sourceType) {
       return null;
     }
+    const inputEdgeId = getConnectorInputEdge(connectorId, edges)?.id;
+    const outputEdgeIds = new Set(outputEdges.map((edge) => edge.id));
 
     for (const connection of spliceConnections) {
       const targetNode = nodes.find((node) => node.id === connection.target);
@@ -171,8 +173,8 @@ export const getConnectorDeletionSpliceConnections = (
       const existingTargetConflict = edges.some(
         (edge) =>
           edge.type === 'default' &&
-          edge.id !== getConnectorInputEdge(connectorId, edges)?.id &&
-          edge.id !== outputEdges.find((outputEdge) => outputEdge.id === edge.id)?.id &&
+          edge.id !== inputEdgeId &&
+          !outputEdgeIds.has(edge.id) &&
           edge.target === connection.target &&
           edge.targetHandle === connection.targetHandle
       );
