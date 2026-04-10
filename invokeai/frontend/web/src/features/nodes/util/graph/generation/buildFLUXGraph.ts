@@ -28,6 +28,7 @@ import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'feat
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
+import { selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -141,7 +142,27 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   if (isFlux2) {
     // Flux2 Klein: Use Qwen3-based model loader, text encoder, and dedicated denoise node
-    // VAE and Qwen3 encoder can be extracted from the main Diffusers model or selected separately
+    // VAE and Qwen3 encoder can be extracted from the main Diffusers model or selected separately.
+    // For non-diffusers main models, find a diffusers flux2 model to use as the source for VAE/encoder.
+    let qwen3SourceModel: typeof kleinVaeModel | undefined;
+    if (model.format !== 'diffusers' && (!kleinVaeModel || !kleinQwen3EncoderModel)) {
+      const diffusersModels = selectFlux2DiffusersModels(state);
+      // Prefer a diffusers model with a matching variant (same Qwen3 encoder size).
+      // Fall back to any diffusers model if only the VAE is needed.
+      const modelVariant = 'variant' in model ? model.variant : undefined;
+      const variantMatch = diffusersModels.find((m) => 'variant' in m && m.variant === modelVariant);
+      const sourceModel = variantMatch ?? (kleinQwen3EncoderModel ? diffusersModels[0] : undefined);
+      if (sourceModel) {
+        qwen3SourceModel = {
+          key: sourceModel.key,
+          hash: sourceModel.hash,
+          name: sourceModel.name,
+          base: sourceModel.base,
+          type: sourceModel.type,
+        };
+      }
+    }
+
     modelLoader = g.addNode({
       type: 'flux2_klein_model_loader',
       id: getPrefixedId('flux2_klein_model_loader'),
@@ -149,6 +170,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       // Optional: Use separately selected VAE and Qwen3 encoder models
       vae_model: kleinVaeModel ?? undefined,
       qwen3_encoder_model: kleinQwen3EncoderModel ?? undefined,
+      qwen3_source_model: qwen3SourceModel ?? undefined,
     });
 
     posCond = g.addNode({

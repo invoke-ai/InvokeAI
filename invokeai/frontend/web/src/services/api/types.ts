@@ -337,6 +337,10 @@ export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config
   return config.type === 'main' && config.base === 'z-image' && config.format === 'diffusers';
 };
 
+export const isFlux2DiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'flux2' && config.format === 'diffusers';
+};
+
 export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'embedding';
 };

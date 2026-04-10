@@ -11,7 +11,7 @@ import {
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFlux2VAEModels, useQwen3EncoderModels } from 'services/api/hooks/modelsByType';
+import { useFlux2DiffusersModels, useFlux2VAEModels, useQwen3EncoderModels } from 'services/api/hooks/modelsByType';
 import type { Qwen3EncoderModelConfig, VAEModelConfig } from 'services/api/types';
 
 /**
@@ -22,7 +22,9 @@ const ParamFlux2KleinVaeModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const kleinVaeModel = useAppSelector(selectKleinVaeModel);
+  const mainModelConfig = useAppSelector(selectMainModelConfig);
   const [modelConfigs, { isLoading }] = useFlux2VAEModels();
+  const [diffusersModels] = useFlux2DiffusersModels();
 
   const _onChange = useCallback(
     (model: VAEModelConfig | null) => {
@@ -42,6 +44,11 @@ const ParamFlux2KleinVaeModelSelect = memo(() => {
     isLoading,
   });
 
+  const hasDiffusersSource = mainModelConfig?.format === 'diffusers' || diffusersModels.length > 0;
+  const placeholder = hasDiffusersSource
+    ? t('modelManager.flux2KleinVaePlaceholder')
+    : t('modelManager.flux2KleinVaeNoModelPlaceholder');
+
   return (
     <FormControl minW={0} flexGrow={1} gap={2}>
       <FormLabel m={0}>{t('modelManager.flux2KleinVae')}</FormLabel>
@@ -51,7 +58,7 @@ const ParamFlux2KleinVaeModelSelect = memo(() => {
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}
         isClearable
-        placeholder={t('modelManager.flux2KleinVaePlaceholder')}
+        placeholder={placeholder}
       />
     </FormControl>
   );
@@ -79,6 +86,7 @@ const ParamFlux2KleinQwen3EncoderModelSelect = memo(() => {
   const kleinQwen3EncoderModel = useAppSelector(selectKleinQwen3EncoderModel);
   const mainModelConfig = useAppSelector(selectMainModelConfig);
   const [allModelConfigs, { isLoading }] = useQwen3EncoderModels();
+  const [diffusersModels] = useFlux2DiffusersModels();
 
   // Filter Qwen3 encoders based on the main model's variant
   const modelConfigs = useMemo(() => {
@@ -112,6 +120,16 @@ const ParamFlux2KleinQwen3EncoderModelSelect = memo(() => {
     isLoading,
   });
 
+  // Qwen3 encoder requires a variant-matching diffusers model (Klein 4B needs 4B source, 9B needs 9B source)
+  const hasMatchingDiffusersSource =
+    mainModelConfig?.format === 'diffusers' ||
+    diffusersModels.some(
+      (m) => 'variant' in m && mainModelConfig && 'variant' in mainModelConfig && m.variant === mainModelConfig.variant
+    );
+  const placeholder = hasMatchingDiffusersSource
+    ? t('modelManager.flux2KleinQwen3EncoderPlaceholder')
+    : t('modelManager.flux2KleinQwen3EncoderNoModelPlaceholder');
+
   return (
     <FormControl minW={0} flexGrow={1} gap={2}>
       <FormLabel m={0}>{t('modelManager.flux2KleinQwen3Encoder')}</FormLabel>
@@ -121,7 +139,7 @@ const ParamFlux2KleinQwen3EncoderModelSelect = memo(() => {
         onChange={onChange}
         noOptionsMessage={noOptionsMessage}
         isClearable
-        placeholder={t('modelManager.flux2KleinQwen3EncoderPlaceholder')}
+        placeholder={placeholder}
       />
     </FormControl>
   );
