@@ -22,7 +22,14 @@ type AddImageToImageArg = {
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
   i2l: Invocation<
-    'i2l' | 'flux_vae_encode' | 'flux2_vae_encode' | 'sd3_i2l' | 'cogview4_i2l' | 'qwen_image_i2l' | 'z_image_i2l' | 'anima_i2l'
+    | 'i2l'
+    | 'flux_vae_encode'
+    | 'flux2_vae_encode'
+    | 'sd3_i2l'
+    | 'cogview4_i2l'
+    | 'qwen_image_i2l'
+    | 'z_image_i2l'
+    | 'anima_i2l'
   >;
   noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;

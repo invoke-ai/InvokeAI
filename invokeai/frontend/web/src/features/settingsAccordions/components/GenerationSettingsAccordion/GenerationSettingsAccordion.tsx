@@ -87,7 +87,9 @@ export const GenerationSettingsAccordion = memo(() => {
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && !isQwenImage && !isAnima && <ParamScheduler />}
+              {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && !isQwenImage && !isAnima && (
+                <ParamScheduler />
+              )}
               {isFLUX && <ParamFluxScheduler />}
               {isZImage && <ParamZImageScheduler />}
               {isAnima && <ParamAnimaScheduler />}
