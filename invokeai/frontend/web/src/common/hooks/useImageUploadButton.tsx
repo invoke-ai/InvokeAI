@@ -187,11 +187,12 @@ export const UploadImageIconButton = memo(
     onUpload?: (imageDTO: ImageDTO) => void;
     isError?: boolean;
   } & SetOptional<IconButtonProps, 'aria-label'>) => {
+    const { t } = useTranslation();
     const uploadApi = useImageUploadButton({ isDisabled, allowMultiple: false, onUpload });
     return (
       <>
         <IconButton
-          aria-label="Upload image"
+          aria-label={t('accessibility.uploadImage')}
           variant="outline"
           sx={sx}
           data-error={isError}
@@ -213,12 +214,13 @@ type UploadImageButtonProps = {
 } & ButtonProps;
 
 const UploadImageButton = memo((props: UploadImageButtonProps) => {
+  const { t } = useTranslation();
   const { children, isDisabled = false, onUpload, isError = false, ...rest } = props;
   const uploadApi = useImageUploadButton({ isDisabled, allowMultiple: false, onUpload });
   return (
     <>
       <Button
-        aria-label="Upload image"
+        aria-label={t('accessibility.uploadImage')}
         variant="outline"
         sx={sx}
         data-error={isError}
@@ -244,11 +246,12 @@ export const UploadMultipleImageButton = ({
   onUpload?: (imageDTOs: ImageDTO[]) => void;
   isError?: boolean;
 } & SetOptional<IconButtonProps, 'aria-label'>) => {
+  const { t } = useTranslation();
   const uploadApi = useImageUploadButton({ isDisabled, allowMultiple: true, onUpload });
   return (
     <>
       <IconButton
-        aria-label="Upload image"
+        aria-label={t('accessibility.uploadImage')}
         variant="outline"
         sx={sx}
         data-error={isError}

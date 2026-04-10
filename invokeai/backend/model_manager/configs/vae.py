@@ -175,6 +175,43 @@ class VAE_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError("state dict does not look like a FLUX.2 VAE")
 
 
+def _has_anima_vae_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict looks like an Anima QwenImage VAE (AutoencoderKLQwenImage).
+
+    The Anima VAE has a distinctive structure with:
+    - encoder.downsamples.* (instead of encoder.down_blocks)
+    - decoder.upsamples.* (instead of decoder.up_blocks)
+    - decoder.head.* / decoder.middle.*
+    - Top-level conv1/conv2 weights
+    """
+    required_prefixes = {
+        "encoder.downsamples.",
+        "decoder.upsamples.",
+        "decoder.middle.",
+    }
+    return all(any(str(k).startswith(prefix) for k in state_dict) for prefix in required_prefixes)
+
+
+class VAE_Checkpoint_Anima_Config(Checkpoint_Config_Base, Config_Base):
+    """Model config for Anima QwenImage VAE checkpoint models (AutoencoderKLQwenImage)."""
+
+    type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        if not _has_anima_vae_keys(state_dict):
+            raise NotAMatchError("state dict does not look like an Anima QwenImage VAE")
+
+        return cls(**override_fields)
+
+
 class VAE_Diffusers_Config_Base(Diffusers_Config_Base):
     """Model config for standalone VAE models (diffusers version)."""
 

@@ -862,6 +862,36 @@ z_image_controlnet_tile = StarterModel(
 )
 # endregion
 
+# region Anima
+anima_qwen3_encoder = StarterModel(
+    name="Anima Qwen3 0.6B Text Encoder",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/text_encoders/qwen_3_06b_base.safetensors",
+    description="Qwen3 0.6B text encoder for Anima. ~1.2GB",
+    type=ModelType.Qwen3Encoder,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_vae = StarterModel(
+    name="Anima QwenImage VAE",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors",
+    description="QwenImage VAE for Anima (fine-tuned Wan 2.1 VAE, 16 latent channels). ~200MB",
+    type=ModelType.VAE,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_preview3 = StarterModel(
+    name="Anima Preview 3",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-preview3-base.safetensors",
+    description="Anima Preview 3 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    dependencies=[anima_qwen3_encoder, anima_vae, t5_base_encoder],
+)
+# endregion
+
 # List of starter models, displayed on the frontend.
 # The order/sort of this list is not changed by the frontend - set it how you want it here.
 STARTER_MODELS: list[StarterModel] = [
@@ -957,6 +987,9 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
+    anima_preview3,
+    anima_qwen3_encoder,
+    anima_vae,
 ]
 
 sd1_bundle: list[StarterModel] = [
@@ -1025,12 +1058,20 @@ flux2_klein_bundle: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
 ]
 
+anima_bundle: list[StarterModel] = [
+    anima_preview3,
+    anima_qwen3_encoder,
+    anima_vae,
+    t5_base_encoder,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
     BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
     BaseModelType.Flux2: StarterModelBundle(name="FLUX.2 Klein", models=flux2_klein_bundle),
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
+    BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"
