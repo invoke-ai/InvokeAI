@@ -16,6 +16,7 @@ import type { CropBox } from 'features/cropper/lib/editor';
 import { cropImageModalApi, type CropImageModalState } from 'features/cropper/store';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useUploadImageMutation } from 'services/api/endpoints/images';
 import { objectEntries } from 'tsafe';
 
@@ -39,6 +40,7 @@ const getAspectRatioString = (ratio: number | null): AspectRatioID => {
 };
 
 export const CropImageEditor = memo(({ editor, onApplyCrop, onReady }: Props) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [zoom, setZoom] = useState(100);
   const [cropBox, setCropBox] = useState<CropBox | null>(null);
@@ -154,9 +156,9 @@ export const CropImageEditor = memo(({ editor, onApplyCrop, onReady }: Props) =>
     <Flex w="full" h="full" flexDir="column" gap={4}>
       <Flex gap={2} alignItems="center">
         <FormControl flex={1}>
-          <FormLabel>Aspect Ratio:</FormLabel>
+          <FormLabel>{t('cropper.aspectRatio')}:</FormLabel>
           <Select size="sm" value={aspectRatio} onChange={handleAspectRatioChange} w={32}>
-            <option value="Free">Free</option>
+            <option value="Free">{t('cropper.free')}</option>
             <option value="16:9">16:9</option>
             <option value="3:2">3:2</option>
             <option value="4:3">4:3</option>
@@ -170,19 +172,19 @@ export const CropImageEditor = memo(({ editor, onApplyCrop, onReady }: Props) =>
         <Spacer />
 
         <ButtonGroup size="sm" isAttached={false}>
-          <Button onClick={fitToContainer}>Fit View</Button>
-          <Button onClick={resetView}>Reset View</Button>
-          <Button onClick={zoomIn}>Zoom In</Button>
-          <Button onClick={zoomOut}>Zoom Out</Button>
+          <Button onClick={fitToContainer}>{t('common.fitView')}</Button>
+          <Button onClick={resetView}>{t('common.resetView')}</Button>
+          <Button onClick={zoomIn}>{t('common.zoomIn')}</Button>
+          <Button onClick={zoomOut}>{t('common.zoomOut')}</Button>
         </ButtonGroup>
 
         <Spacer />
 
         <ButtonGroup size="sm" isAttached={false}>
-          <Button onClick={handleApplyCrop}>Apply</Button>
-          <Button onClick={handleResetCrop}>Reset</Button>
-          <Button onClick={handleCancelCrop}>Cancel</Button>
-          <Button onClick={handleExport}>Save to Assets</Button>
+          <Button onClick={handleApplyCrop}>{t('common.apply')}</Button>
+          <Button onClick={handleResetCrop}>{t('common.reset')}</Button>
+          <Button onClick={handleCancelCrop}>{t('common.cancel')}</Button>
+          <Button onClick={handleExport}>{t('common.saveToAssets')}</Button>
         </ButtonGroup>
       </Flex>
 
@@ -191,11 +193,11 @@ export const CropImageEditor = memo(({ editor, onApplyCrop, onReady }: Props) =>
       </Flex>
 
       <Flex gap={2} color="base.300">
-        <Text>Mouse wheel: Zoom</Text>
+        <Text>{t('cropper.mouseWheelZoom')}</Text>
         <Divider orientation="vertical" />
-        <Text>Space + Drag: Pan</Text>
+        <Text>{t('cropper.spaceDragPan')}</Text>
         <Divider orientation="vertical" />
-        <Text>Drag crop box or handles to adjust</Text>
+        <Text>{t('cropper.dragCropBoxToAdjust')}</Text>
         {cropBox && (
           <>
             <Divider orientation="vertical" />

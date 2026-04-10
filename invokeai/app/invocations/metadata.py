@@ -170,6 +170,10 @@ GENERATION_MODES = Literal[
     "qwen_image_img2img",
     "qwen_image_inpaint",
     "qwen_image_outpaint",
+    "anima_txt2img",
+    "anima_img2img",
+    "anima_inpaint",
+    "anima_outpaint",
 ]
 
 

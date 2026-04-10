@@ -12,6 +12,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
 from invokeai.app.invocations.fields import (
+    AnimaConditioningField,
     BoundingBoxField,
     CogView4ConditioningField,
     ColorField,
@@ -483,6 +484,17 @@ class QwenImageConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "QwenImageConditioningOutput":
         return cls(conditioning=QwenImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("anima_conditioning_output")
+class AnimaConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output an Anima text conditioning tensor."""
+
+    conditioning: AnimaConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "AnimaConditioningOutput":
+        return cls(conditioning=AnimaConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("conditioning_output")
