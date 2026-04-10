@@ -768,7 +768,7 @@ class SqliteSessionQueue(SessionQueueBase):
         user_id: Optional[str] = None,
     ) -> ItemIdsResult:
         with self._db.transaction() as cursor_:
-            query = f"""--sql
+            query = """--sql
                 SELECT item_id
                 FROM session_queue
                 WHERE queue_id = ?

@@ -1049,7 +1049,7 @@ export type paths = {
         post?: never;
         /**
          * Clear Intermediates
-         * @description Clears all intermediates
+         * @description Clears all intermediates. Requires admin.
          */
         delete: operations["clear_intermediates"];
         options?: never;
@@ -1103,7 +1103,11 @@ export type paths = {
         };
         /**
          * Get Image Full
-         * @description Gets a full-resolution image file
+         * @description Gets a full-resolution image file.
+         *
+         *     This endpoint is intentionally unauthenticated because browsers load images
+         *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
+         *     providing security through unguessability.
          */
         get: operations["get_image_full"];
         put?: never;
@@ -1112,7 +1116,11 @@ export type paths = {
         options?: never;
         /**
          * Get Image Full
-         * @description Gets a full-resolution image file
+         * @description Gets a full-resolution image file.
+         *
+         *     This endpoint is intentionally unauthenticated because browsers load images
+         *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
+         *     providing security through unguessability.
          */
         head: operations["get_image_full_head"];
         patch?: never;
@@ -1127,7 +1135,11 @@ export type paths = {
         };
         /**
          * Get Image Thumbnail
-         * @description Gets a thumbnail image file
+         * @description Gets a thumbnail image file.
+         *
+         *     This endpoint is intentionally unauthenticated because browsers load images
+         *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
+         *     providing security through unguessability.
          */
         get: operations["get_image_thumbnail"];
         put?: never;
@@ -1187,7 +1199,7 @@ export type paths = {
         post?: never;
         /**
          * Delete Uncategorized Images
-         * @description Deletes all images that are uncategorized
+         * @description Deletes all uncategorized images owned by the current user (or all if admin)
          */
         delete: operations["delete_uncategorized_images"];
         options?: never;
@@ -1727,7 +1739,7 @@ export type paths = {
         };
         /**
          * Get Queue Item Ids
-         * @description Gets all queue item ids that match the given parameters
+         * @description Gets all queue item ids that match the given parameters. Non-admin users only see their own items.
          */
         get: operations["get_queue_item_ids"];
         put?: never;
@@ -2163,7 +2175,11 @@ export type paths = {
         };
         /**
          * Get Workflow Thumbnail
-         * @description Gets a workflow's thumbnail image
+         * @description Gets a workflow's thumbnail image.
+         *
+         *     This endpoint is intentionally unauthenticated because browsers load images
+         *     via <img src> tags which cannot send Bearer tokens. Workflow IDs are UUIDs,
+         *     providing security through unguessability.
          */
         get: operations["get_workflow_thumbnail"];
         /**

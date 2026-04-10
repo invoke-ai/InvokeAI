@@ -576,6 +576,104 @@ class TestImageMutationAuth:
 # ===========================================================================
 
 
+class TestWorkflowListScoping:
+    """Tests that listing workflows in multiuser mode does not filter out default workflows."""
+
+    def test_default_workflows_visible_when_listing_user_and_default(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+    ):
+        """When categories=['user','default'], default workflows must still appear even
+        though user_id_filter is set to the current user (default workflows belong to 'system')."""
+        from invokeai.app.services.workflow_records.workflow_records_common import (
+            Workflow,
+            WorkflowCategory,
+            WorkflowMeta,
+            WorkflowWithoutID,
+        )
+        from invokeai.app.util.misc import uuid_string
+
+        default_wf = WorkflowWithoutID(
+            name="Test Default Workflow",
+            description="A built-in workflow",
+            meta=WorkflowMeta(version="3.0.0", category=WorkflowCategory.Default),
+            nodes=[],
+            edges=[],
+            tags="",
+            author="",
+            contact="",
+            version="1.0.0",
+            notes="",
+            exposedFields=[],
+            form_fields=[],
+        )
+        wf_with_id = Workflow(**default_wf.model_dump(), id=uuid_string())
+        # Insert directly via DB since the create API rejects default workflows
+        with mock_invoker.services.workflow_records._db.transaction() as cursor:
+            cursor.execute(
+                "INSERT INTO workflow_library (workflow_id, workflow, user_id) VALUES (?, ?, ?)",
+                (wf_with_id.id, wf_with_id.model_dump_json(), "system"),
+            )
+
+        # Also create a user workflow via the API
+        _create_workflow(client, user1_token)
+
+        # List with categories=user&categories=default
+        r = client.get(
+            "/api/v1/workflows/?categories=user&categories=default",
+            headers=_auth(user1_token),
+        )
+        assert r.status_code == 200
+        data = r.json()
+        categories_found = {item["category"] for item in data["items"]}
+        assert "default" in categories_found, (
+            f"Default workflows were filtered out. Categories found: {categories_found}"
+        )
+        assert "user" in categories_found
+
+    def test_default_workflows_visible_when_no_category_filter(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+    ):
+        """When no categories filter is given, default workflows should still appear."""
+        from invokeai.app.services.workflow_records.workflow_records_common import (
+            Workflow,
+            WorkflowCategory,
+            WorkflowMeta,
+            WorkflowWithoutID,
+        )
+        from invokeai.app.util.misc import uuid_string
+
+        default_wf = WorkflowWithoutID(
+            name="Another Default Workflow",
+            description="Built-in",
+            meta=WorkflowMeta(version="3.0.0", category=WorkflowCategory.Default),
+            nodes=[],
+            edges=[],
+            tags="",
+            author="",
+            contact="",
+            version="1.0.0",
+            notes="",
+            exposedFields=[],
+            form_fields=[],
+        )
+        wf_with_id = Workflow(**default_wf.model_dump(), id=uuid_string())
+        with mock_invoker.services.workflow_records._db.transaction() as cursor:
+            cursor.execute(
+                "INSERT INTO workflow_library (workflow_id, workflow, user_id) VALUES (?, ?, ?)",
+                (wf_with_id.id, wf_with_id.model_dump_json(), "system"),
+            )
+
+        _create_workflow(client, user1_token)
+
+        r = client.get("/api/v1/workflows/", headers=_auth(user1_token))
+        assert r.status_code == 200
+        data = r.json()
+        categories_found = {item["category"] for item in data["items"]}
+        assert "default" in categories_found, (
+            f"Default workflows were filtered out. Categories found: {categories_found}"
+        )
+
+
 class TestWorkflowMutationAuth:
     """Tests for additional workflow mutation endpoints."""
 

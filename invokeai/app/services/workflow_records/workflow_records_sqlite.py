@@ -209,7 +209,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 params.extend([wildcard_query, wildcard_query, wildcard_query])
 
             if user_id is not None:
-                conditions.append("user_id = ?")
+                # Scope to the given user but always include default workflows
+                conditions.append("(user_id = ? OR category = 'default')")
                 params.append(user_id)
 
             if is_public is True:
@@ -291,7 +292,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 base_conditions.append("opened_at IS NULL")
 
             if user_id is not None:
-                base_conditions.append("user_id = ?")
+                # Scope to the given user but always include default workflows
+                base_conditions.append("(user_id = ? OR category = 'default')")
                 base_params.append(user_id)
 
             if is_public is True:
@@ -350,7 +352,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 base_conditions.append("opened_at IS NULL")
 
             if user_id is not None:
-                base_conditions.append("user_id = ?")
+                # Scope to the given user but always include default workflows
+                base_conditions.append("(user_id = ? OR category = 'default')")
                 base_params.append(user_id)
 
             if is_public is True:
@@ -414,7 +417,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 params.extend([category.value for category in categories])
 
             if user_id is not None:
-                conditions.append("user_id = ?")
+                # Scope to the given user but always include default workflows
+                conditions.append("(user_id = ? OR category = 'default')")
                 params.append(user_id)
 
             if is_public is True:
