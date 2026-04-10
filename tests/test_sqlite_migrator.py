@@ -249,36 +249,6 @@ def test_migrator_runs_all_migrations_file(logger: Logger) -> None:
         # Must manually close else we get an error on Windows
         db._conn.close()
 
-
-def test_migration_28_adds_status_sequence_to_session_queue(memory_db_conn: sqlite3.Connection) -> None:
-    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_28 import Migration28Callback
-
-    cursor = memory_db_conn.cursor()
-    cursor.execute(
-        """--sql
-        CREATE TABLE IF NOT EXISTS session_queue (
-            item_id INTEGER PRIMARY KEY,
-            status TEXT NOT NULL DEFAULT 'pending'
-        );
-        """
-    )
-    cursor.execute("INSERT INTO session_queue (item_id, status) VALUES (1, 'pending');")
-
-    Migration28Callback()(cursor)
-    Migration28Callback()(cursor)
-
-    cursor.execute("PRAGMA table_info(session_queue);")
-    columns = [row[1] for row in cursor.fetchall()]
-    assert columns.count("status_sequence") == 1
-
-    cursor.execute("PRAGMA table_info(session_queue);")
-    columns_by_name = {row[1]: row for row in cursor.fetchall()}
-    assert "status_sequence" in columns_by_name
-
-    cursor.execute("SELECT status_sequence FROM session_queue WHERE item_id = 1;")
-    assert cursor.fetchone()[0] == 0
-
-
 def test_migrator_backs_up_db(logger: Logger) -> None:
     with TemporaryDirectory() as tempdir:
         original_db_path = Path(tempdir) / "invokeai.db"

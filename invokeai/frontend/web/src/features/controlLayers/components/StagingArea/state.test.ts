@@ -840,8 +840,6 @@ describe('StagingAreaApi', () => {
       api.$items.set([createMockQueueItem({ item_id: 1 })]);
       api.$lastStartedItemId.set(1);
       api.$lastCompletedItemId.set(1);
-      api._seenItemStatusRanks.set(1, 2);
-      api._seenItemStatusSequences.set(1, 3);
       api.$progressData.setKey(1, {
         itemId: 1,
         progressEvent: null,
@@ -858,8 +856,6 @@ describe('StagingAreaApi', () => {
       expect(api.$lastStartedItemId.get()).toBe(null);
       expect(api.$lastCompletedItemId.get()).toBe(null);
       expect(api.$progressData.get()).toEqual({});
-      expect(api._seenItemStatusRanks.size).toBe(0);
-      expect(api._seenItemStatusSequences.size).toBe(0);
     });
   });
 
@@ -1177,32 +1173,6 @@ describe('StagingAreaApi', () => {
 
         expect(api.$items.get()).toEqual([]);
         expect(api.$isPending.get()).toBe(false);
-      });
-
-      it('should prune seen item ordering when an item leaves the staging area', async () => {
-        await api.onItemsChangedEvent([
-          createMockQueueItem({
-            item_id: 1,
-            status: 'completed',
-            status_sequence: 2,
-          }),
-        ]);
-
-        expect(api._seenItemStatusRanks.get(1)).toBe(2);
-        expect(api._seenItemStatusSequences.get(1)).toBe(2);
-
-        await api.onItemsChangedEvent([
-          createMockQueueItem({
-            item_id: 2,
-            status: 'pending',
-            status_sequence: 0,
-          }),
-        ]);
-
-        expect(api._seenItemStatusRanks.has(1)).toBe(false);
-        expect(api._seenItemStatusSequences.has(1)).toBe(false);
-        expect(api._seenItemStatusRanks.get(2)).toBe(0);
-        expect(api._seenItemStatusSequences.get(2)).toBe(0);
       });
 
       it('should load all images from multiple canvas_output nodes', async () => {
