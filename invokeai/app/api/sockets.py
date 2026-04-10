@@ -249,6 +249,15 @@ class SocketIO:
                     f"Emitted public queue item event {event_name} to all subscribers in queue {event_data.queue_id}"
                 )
 
+            # RecallParametersUpdatedEvent is private - only emit to owner + admins
+            elif isinstance(event_data, RecallParametersUpdatedEvent):
+                user_room = f"user:{event_data.user_id}"
+                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
+                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+                logger.debug(
+                    f"Emitted private recall_parameters_updated event to user room {user_room} and admin room"
+                )
+
             else:
                 # For other queue events (like QueueClearedEvent, BatchEnqueuedEvent), emit to all subscribers
                 await self._sio.emit(

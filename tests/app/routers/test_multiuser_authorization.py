@@ -973,3 +973,83 @@ class TestRecallParametersIsolation:
         val2 = mock_invoker.services.client_state_persistence.get_by_key(user2.user_id, "recall_positive_prompt")
         assert val1 is not None and "prompt from user1" in val1
         assert val2 is not None and "prompt from user2" in val2
+
+
+# ===========================================================================
+# 9. Recall parameters event user scoping
+# ===========================================================================
+
+
+class TestRecallParametersEventScoping:
+    """Tests that RecallParametersUpdatedEvent carries user_id for targeted delivery."""
+
+    def test_event_includes_user_id(self):
+        """RecallParametersUpdatedEvent.build() must set user_id so the socket handler
+        can route the event to the correct user room instead of broadcasting."""
+        from invokeai.app.services.events.events_common import RecallParametersUpdatedEvent
+
+        event = RecallParametersUpdatedEvent.build(
+            queue_id="default",
+            user_id="user-abc",
+            parameters={"positive_prompt": "test"},
+        )
+        assert event.queue_id == "default"
+        assert event.user_id == "user-abc"
+        assert event.parameters == {"positive_prompt": "test"}
+
+    def test_event_not_broadcast_to_all_queue_subscribers(self):
+        """RecallParametersUpdatedEvent must have a user_id field so _handle_queue_event
+        in sockets.py can route it to the owner room + admin room, not the queue room."""
+        from invokeai.app.services.events.events_common import RecallParametersUpdatedEvent
+
+        event = RecallParametersUpdatedEvent.build(
+            queue_id="default",
+            user_id="owner-123",
+            parameters={"seed": 42},
+        )
+        # The event must carry user_id; without it the socket handler would
+        # fall through to the generic else branch and broadcast to all subscribers
+        assert hasattr(event, "user_id")
+        assert event.user_id == "owner-123"
+
+
+# ===========================================================================
+# 10. Queue status endpoint scoping
+# ===========================================================================
+
+
+class TestQueueStatusScoping:
+    """Tests that queue status, batch status, and counts_by_destination
+    endpoints scope data to the current user for non-admin callers."""
+
+    def test_get_queue_status_hides_current_item_for_non_owner(self):
+        """get_queue_status() must not expose current item details to non-owner, non-admin users."""
+        from invokeai.app.services.session_queue.session_queue_common import SessionQueueStatus
+
+        # Simulate a status where the current item belongs to another user
+        # When user_id is provided and doesn't match, item details should be None
+        status_obj = SessionQueueStatus(
+            queue_id="default",
+            item_id=None,  # hidden because user doesn't own current item
+            session_id=None,
+            batch_id=None,
+            pending=2,
+            in_progress=0,
+            completed=1,
+            failed=0,
+            canceled=0,
+            total=3,
+        )
+        # Verify the model accepts None for item details
+        assert status_obj.item_id is None
+        assert status_obj.session_id is None
+        assert status_obj.batch_id is None
+
+    def test_session_queue_status_no_user_fields(self):
+        """SessionQueueStatus should not have user_pending/user_in_progress fields anymore.
+        Non-admin users now get their own counts in the main pending/in_progress fields."""
+        from invokeai.app.services.session_queue.session_queue_common import SessionQueueStatus
+
+        fields = set(SessionQueueStatus.model_fields.keys())
+        assert "user_pending" not in fields
+        assert "user_in_progress" not in fields

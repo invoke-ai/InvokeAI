@@ -275,10 +275,11 @@ async def clear_intermediates(
 async def get_intermediates_count(
     current_user: CurrentUserOrDefault,
 ) -> int:
-    """Gets the count of intermediate images"""
+    """Gets the count of intermediate images. Non-admin users only see their own intermediates."""
 
     try:
-        return ApiDependencies.invoker.services.images.get_intermediates_count()
+        user_id = None if current_user.is_admin else current_user.user_id
+        return ApiDependencies.invoker.services.images.get_intermediates_count(user_id=user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get intermediates")
 

@@ -436,9 +436,10 @@ async def get_queue_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionQueueAndProcessorStatus:
-    """Gets the status of the session queue"""
+    """Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it."""
     try:
-        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id, user_id=current_user.user_id)
+        user_id = None if current_user.is_admin else current_user.user_id
+        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id, user_id=user_id)
         processor = ApiDependencies.invoker.services.session_processor.get_status()
         return SessionQueueAndProcessorStatus(queue=queue, processor=processor)
     except Exception as e:
@@ -457,9 +458,12 @@ async def get_batch_status(
     queue_id: str = Path(description="The queue id to perform this operation on"),
     batch_id: str = Path(description="The batch to get the status of"),
 ) -> BatchStatus:
-    """Gets the status of the session queue"""
+    """Gets the status of a batch. Non-admin users only see their own batches."""
     try:
-        return ApiDependencies.invoker.services.session_queue.get_batch_status(queue_id=queue_id, batch_id=batch_id)
+        user_id = None if current_user.is_admin else current_user.user_id
+        return ApiDependencies.invoker.services.session_queue.get_batch_status(
+            queue_id=queue_id, batch_id=batch_id, user_id=user_id
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while getting batch status: {e}")
 
@@ -557,10 +561,11 @@ async def counts_by_destination(
     queue_id: str = Path(description="The queue id to query"),
     destination: str = Query(description="The destination to query"),
 ) -> SessionQueueCountsByDestination:
-    """Gets the counts of queue items by destination"""
+    """Gets the counts of queue items by destination. Non-admin users only see their own items."""
     try:
+        user_id = None if current_user.is_admin else current_user.user_id
         return ApiDependencies.invoker.services.session_queue.get_counts_by_destination(
-            queue_id=queue_id, destination=destination
+            queue_id=queue_id, destination=destination, user_id=user_id
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while fetching counts by destination: {e}")

@@ -283,14 +283,14 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             except sqlite3.Error as e:
                 raise ImageRecordDeleteException from e
 
-    def get_intermediates_count(self) -> int:
+    def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT COUNT(*) FROM images
-                WHERE is_intermediate = TRUE;
-                """
-            )
+            query = "SELECT COUNT(*) FROM images WHERE is_intermediate = TRUE"
+            params: list[str] = []
+            if user_id is not None:
+                query += " AND user_id = ?"
+                params.append(user_id)
+            cursor.execute(query, params)
             count = cast(int, cursor.fetchone()[0])
         return count
 

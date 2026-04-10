@@ -671,8 +671,9 @@ class RecallParametersUpdatedEvent(QueueEventBase):
 
     __event_name__ = "recall_parameters_updated"
 
+    user_id: str = Field(description="The ID of the user whose recall parameters were updated")
     parameters: dict[str, Any] = Field(description="The recall parameters that were updated")
 
     @classmethod
-    def build(cls, queue_id: str, parameters: dict[str, Any]) -> "RecallParametersUpdatedEvent":
-        return cls(queue_id=queue_id, parameters=parameters)
+    def build(cls, queue_id: str, user_id: str, parameters: dict[str, Any]) -> "RecallParametersUpdatedEvent":
+        return cls(queue_id=queue_id, user_id=user_id, parameters=parameters)

@@ -112,9 +112,9 @@ class EventServiceBase:
         """Emitted when a queue is cleared"""
         self.dispatch(QueueClearedEvent.build(queue_id))
 
-    def emit_recall_parameters_updated(self, queue_id: str, parameters: dict) -> None:
+    def emit_recall_parameters_updated(self, queue_id: str, user_id: str, parameters: dict) -> None:
         """Emitted when recall parameters are updated"""
-        self.dispatch(RecallParametersUpdatedEvent.build(queue_id, parameters))
+        self.dispatch(RecallParametersUpdatedEvent.build(queue_id, user_id, parameters))
 
     # endregion
 
