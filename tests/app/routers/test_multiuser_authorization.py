@@ -21,6 +21,7 @@ from invokeai.app.api_app import app
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
@@ -691,6 +692,111 @@ class TestSessionQueueAuth:
 
 
 # ===========================================================================
+# 6b. Session queue sanitization (cross-user isolation)
+# ===========================================================================
+
+
+class TestSessionQueueSanitization:
+    """Tests that sanitize_queue_item_for_user strips all sensitive fields
+    from queue items viewed by non-owner, non-admin users."""
+
+    @pytest.fixture
+    def _sample_queue_item(self):
+        from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+
+        return SessionQueueItem(
+            item_id=42,
+            status="pending",
+            priority=10,
+            batch_id="batch-abc",
+            origin="workflows",
+            destination="canvas",
+            session_id="sess-123",
+            session=GraphExecutionState(id="sess-123", graph=Graph()),
+            error_type="RuntimeError",
+            error_message="something broke",
+            error_traceback="Traceback ...",
+            created_at="2026-01-01T00:00:00",
+            updated_at="2026-01-01T01:00:00",
+            started_at="2026-01-01T00:30:00",
+            completed_at=None,
+            queue_id="default",
+            user_id="owner-user",
+            user_display_name="Owner Display",
+            user_email="owner@test.com",
+            field_values=None,
+            workflow=None,
+        )
+
+    def test_owner_sees_all_fields(self, _sample_queue_item: SessionQueueItem):
+        from invokeai.app.api.routers.session_queue import sanitize_queue_item_for_user
+
+        result = sanitize_queue_item_for_user(_sample_queue_item, "owner-user", is_admin=False)
+        assert result.user_id == "owner-user"
+        assert result.user_display_name == "Owner Display"
+        assert result.user_email == "owner@test.com"
+        assert result.batch_id == "batch-abc"
+        assert result.origin == "workflows"
+        assert result.destination == "canvas"
+        assert result.session_id == "sess-123"
+        assert result.priority == 10
+
+    def test_admin_sees_all_fields(self, _sample_queue_item: SessionQueueItem):
+        from invokeai.app.api.routers.session_queue import sanitize_queue_item_for_user
+
+        result = sanitize_queue_item_for_user(_sample_queue_item, "admin-user", is_admin=True)
+        assert result.user_id == "owner-user"
+        assert result.user_display_name == "Owner Display"
+        assert result.user_email == "owner@test.com"
+        assert result.batch_id == "batch-abc"
+
+    def test_non_owner_sees_only_status_timestamps_errors(self, _sample_queue_item: SessionQueueItem):
+        from invokeai.app.api.routers.session_queue import sanitize_queue_item_for_user
+
+        result = sanitize_queue_item_for_user(_sample_queue_item, "other-user", is_admin=False)
+
+        # Preserved: item_id, queue_id, status, timestamps
+        assert result.item_id == 42
+        assert result.queue_id == "default"
+        assert result.status == "pending"
+        assert result.created_at == "2026-01-01T00:00:00"
+        assert result.updated_at == "2026-01-01T01:00:00"
+        assert result.started_at == "2026-01-01T00:30:00"
+        assert result.completed_at is None
+
+        # Stripped: errors (may leak file paths, prompts, model names)
+        assert result.error_type is None
+        assert result.error_message is None
+        assert result.error_traceback is None
+
+        # Stripped: user identity
+        assert result.user_id == "redacted"
+        assert result.user_display_name is None
+        assert result.user_email is None
+
+        # Stripped: generation metadata
+        assert result.batch_id == "redacted"
+        assert result.session_id == "redacted"
+        assert result.origin is None
+        assert result.destination is None
+        assert result.priority == 0
+        assert result.field_values is None
+        assert result.retried_from_item_id is None
+        assert result.workflow is None
+        assert result.session.id == "redacted"
+        assert len(result.session.graph.nodes) == 0
+
+    def test_sanitization_does_not_mutate_original(self, _sample_queue_item: SessionQueueItem):
+        from invokeai.app.api.routers.session_queue import sanitize_queue_item_for_user
+
+        sanitize_queue_item_for_user(_sample_queue_item, "other-user", is_admin=False)
+        # Original should be unchanged
+        assert _sample_queue_item.user_id == "owner-user"
+        assert _sample_queue_item.user_email == "owner@test.com"
+        assert _sample_queue_item.batch_id == "batch-abc"
+
+
+# ===========================================================================
 # 7. Recall parameters authorization
 # ===========================================================================
 
@@ -705,3 +811,67 @@ class TestRecallParametersAuth:
     def test_update_recall_parameters_requires_auth(self, enable_multiuser: Any, client: TestClient):
         r = client.post("/api/v1/recall/default", json={"positive_prompt": "test"})
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+# ===========================================================================
+# 7b. Recall parameters cross-user isolation
+# ===========================================================================
+
+
+class TestRecallParametersIsolation:
+    """Tests that recall parameters are scoped per-user, not globally by queue_id."""
+
+    def test_user1_write_does_not_leak_to_user2(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User1 sets a recall parameter; user2 should not see it in client state."""
+        # user1 writes a recall parameter
+        r = client.post(
+            "/api/v1/recall/default",
+            json={"positive_prompt": "user1 secret prompt"},
+            headers=_auth(user1_token),
+        )
+        assert r.status_code == 200
+
+        # Verify that user1's data is stored under user1's user_id, not the queue_id
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None
+        assert user2 is not None
+
+        # user1 should have the value
+        val = mock_invoker.services.client_state_persistence.get_by_key(user1.user_id, "recall_positive_prompt")
+        assert val is not None
+        assert "user1 secret prompt" in val
+
+        # user2 should NOT have the value
+        val2 = mock_invoker.services.client_state_persistence.get_by_key(user2.user_id, "recall_positive_prompt")
+        assert val2 is None
+
+    def test_two_users_independent_state(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """Both users can write recall params independently without overwriting each other."""
+        r1 = client.post(
+            "/api/v1/recall/default",
+            json={"positive_prompt": "prompt from user1"},
+            headers=_auth(user1_token),
+        )
+        assert r1.status_code == 200
+
+        r2 = client.post(
+            "/api/v1/recall/default",
+            json={"positive_prompt": "prompt from user2"},
+            headers=_auth(user2_token),
+        )
+        assert r2.status_code == 200
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None
+        assert user2 is not None
+
+        val1 = mock_invoker.services.client_state_persistence.get_by_key(user1.user_id, "recall_positive_prompt")
+        val2 = mock_invoker.services.client_state_persistence.get_by_key(user2.user_id, "recall_positive_prompt")
+        assert val1 is not None and "prompt from user1" in val1
+        assert val2 is not None and "prompt from user2" in val2

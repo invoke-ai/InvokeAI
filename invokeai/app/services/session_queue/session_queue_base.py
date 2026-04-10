@@ -172,8 +172,9 @@ class SessionQueueBase(ABC):
         self,
         queue_id: str,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        user_id: Optional[str] = None,
     ) -> ItemIdsResult:
-        """Gets all queue item ids that match the given parameters"""
+        """Gets all queue item ids that match the given parameters. If user_id is provided, only returns items for that user."""
         pass
 
     @abstractmethod

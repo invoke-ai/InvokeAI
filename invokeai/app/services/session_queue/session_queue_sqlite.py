@@ -765,15 +765,21 @@ class SqliteSessionQueue(SessionQueueBase):
         self,
         queue_id: str,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        user_id: Optional[str] = None,
     ) -> ItemIdsResult:
         with self._db.transaction() as cursor_:
             query = f"""--sql
                 SELECT item_id
                 FROM session_queue
                 WHERE queue_id = ?
-                ORDER BY created_at {order_dir.value}
                 """
-            query_params = [queue_id]
+            query_params: list[str] = [queue_id]
+
+            if user_id is not None:
+                query += " AND user_id = ?"
+                query_params.append(user_id)
+
+            query += f" ORDER BY created_at {order_dir.value}"
 
             cursor_.execute(query, query_params)
             result = cast(list[sqlite3.Row], cursor_.fetchall())
