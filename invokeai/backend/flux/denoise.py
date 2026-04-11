@@ -58,7 +58,11 @@ def denoise(
             scheduler.set_timesteps(sigmas=timesteps, device=img.device)
         else:
             # LCM or scheduler doesn't support custom sigmas - use num_inference_steps
-            # The schedule will be computed by the scheduler itself
+            # The schedule will be computed by the scheduler itself.
+            #
+            # Important for img2img callers: if the initial latent/noise blend was
+            # computed from a separate pre-scheduler schedule, that preblend may not
+            # match this scheduler's true first step exactly.
             num_inference_steps = len(timesteps) - 1
             scheduler.set_timesteps(num_inference_steps=num_inference_steps, device=img.device)
 

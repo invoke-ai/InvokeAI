@@ -305,6 +305,14 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Prepare input latent image
         if init_latents is not None:
             if self.add_noise:
+                # Noise the init latents using the first timestep from the clipped
+                # InvokeAI schedule.
+                #
+                # Known limitation: if a scheduler later uses a different first
+                # effective timestep/sigma than this precomputed schedule, the
+                # img2img preblend below may not match that scheduler exactly.
+                # This is an existing pipeline limitation and applies to both
+                # seed-generated noise and externally supplied noise.
                 t_0 = timesteps[0]
                 x = t_0 * noise + (1.0 - t_0) * init_latents
             else:
@@ -376,8 +384,13 @@ class Flux2DenoiseInvocation(BaseInvocation):
         is_inpainting = self.denoise_mask is not None or self.denoising_start > 1e-5
 
         # Create scheduler with FLUX.2 Klein configuration
-        # For inpainting/img2img, use manual Euler stepping to preserve the exact timestep schedule
-        # For txt2img, use the scheduler with dynamic shifting for optimal results
+        # For inpainting/img2img, use manual Euler stepping to preserve the exact
+        # clipped timestep schedule used for the initial latent/noise preblend.
+        # For txt2img, use the scheduler with dynamic shifting for optimal results.
+        #
+        # This split is intentional. Reusing a scheduler for img2img here can
+        # change the first effective timestep/sigma and break parity with the
+        # preblend computed above.
         scheduler = None
         if self.scheduler in FLUX_SCHEDULER_MAP and not is_inpainting:
             # Only use scheduler for txt2img - use manual Euler for inpainting to preserve exact timesteps

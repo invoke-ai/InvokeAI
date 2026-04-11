@@ -307,7 +307,15 @@ class FluxDenoiseInvocation(BaseInvocation):
                 )
 
             if self.add_noise:
-                # Noise the orig_latents by the appropriate amount for the first timestep.
+                # Noise the orig_latents by the appropriate amount for the first
+                # timestep in InvokeAI's clipped schedule.
+                #
+                # Known limitation: if the selected scheduler later replaces this
+                # schedule with its own first effective timestep/sigma (for example
+                # Heun internal expansion or LCM's scheduler-defined schedule), the
+                # img2img preblend below may not match that scheduler's true first
+                # step exactly. This is an existing pipeline limitation and affects
+                # both internally generated noise and externally supplied noise.
                 t_0 = timesteps[0]
                 x = t_0 * noise + (1.0 - t_0) * init_latents
             else:

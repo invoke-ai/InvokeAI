@@ -358,7 +358,14 @@ class ZImageDenoiseInvocation(BaseInvocation):
         # Prepare input latent image
         if init_latents is not None:
             if self.add_noise:
-                # Noise the init_latents by the appropriate amount for the first timestep.
+                # Noise the init latents using the first sigma from the clipped
+                # InvokeAI schedule.
+                #
+                # Known limitation: if the selected scheduler later starts from a
+                # different first effective sigma/timestep than sigmas[0], the
+                # img2img preblend below may not match that scheduler exactly.
+                # This is an existing pipeline limitation and affects both
+                # internally generated noise and externally supplied noise.
                 s_0 = sigmas[0]
                 latents = s_0 * noise + (1.0 - s_0) * init_latents
             else:
@@ -403,7 +410,9 @@ class ZImageDenoiseInvocation(BaseInvocation):
             if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
                 scheduler.set_timesteps(sigmas=sigmas, device=device)
             else:
-                # LCM or scheduler doesn't support custom sigmas - use num_inference_steps
+                # LCM or a scheduler without custom-sigma support computes its own
+                # schedule from num_inference_steps. That can diverge from sigmas[0]
+                # used in the img2img preblend above.
                 scheduler.set_timesteps(num_inference_steps=total_steps, device=device)
 
             # For Heun scheduler, the number of actual steps may differ

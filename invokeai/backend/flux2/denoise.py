@@ -99,6 +99,10 @@ def denoise(
             scheduler.set_timesteps(sigmas=sigmas.tolist(), device=img.device)
         else:
             # Scheduler doesn't support sigmas (e.g., Heun, LCM) - use num_inference_steps
+            #
+            # Important for img2img callers: if the initial latent/noise blend was
+            # computed from a separate pre-scheduler schedule, that preblend may not
+            # match this scheduler's true first step exactly.
             scheduler.set_timesteps(num_inference_steps=len(sigmas), device=img.device)
         num_scheduler_steps = len(scheduler.timesteps)
         is_heun = hasattr(scheduler, "state_in_first_order")
