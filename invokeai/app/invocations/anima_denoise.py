@@ -38,6 +38,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.universal_noise import validate_noise_tensor_shape
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.anima.anima_transformer_patch import patch_anima_for_regional_prompting
 from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
@@ -165,7 +166,7 @@ class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
     title="Denoise - Anima",
     tags=["image", "anima"],
     category="image",
-    version="1.2.0",
+    version="1.3.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseInvocation(BaseInvocation):
@@ -180,6 +181,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
     # If latents is provided, this means we are doing image-to-image.
     latents: Optional[LatentsField] = InputField(
         default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
+    noise: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.noise, input=Input.Connection
     )
     # denoise_mask is used for inpainting. Only the masked region is modified.
     denoise_mask: Optional[DenoiseMaskField] = InputField(
@@ -459,7 +463,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
                 init_latents = init_latents.unsqueeze(2)  # [B, C, H, W] -> [B, C, 1, H, W]
 
         # Generate initial noise (3D latent: [B, C, T, H, W])
-        noise = self._get_noise(self.height, self.width, inference_dtype, device, self.seed)
+        noise = self._prepare_noise_tensor(context, inference_dtype, device)
 
         # Prepare input latents
         if init_latents is not None:
@@ -695,6 +699,16 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         # Remove temporal dimension for output: [B, C, 1, H, W] -> [B, C, H, W]
         return latents.squeeze(2)
+
+    def _prepare_noise_tensor(
+        self, context: InvocationContext, inference_dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        if self.noise is not None:
+            noise = context.tensors.load(self.noise.latents_name).to(device=device, dtype=inference_dtype)
+            validate_noise_tensor_shape(noise, "Anima", self.width, self.height)
+            return noise
+
+        return self._get_noise(self.height, self.width, inference_dtype, device, self.seed)
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:

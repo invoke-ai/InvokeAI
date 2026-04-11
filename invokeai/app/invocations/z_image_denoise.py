@@ -23,6 +23,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.universal_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.z_image_control import ZImageControlField
 from invokeai.app.invocations.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -50,7 +51,7 @@ from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
     category="image",
-    version="1.5.0",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
 class ZImageDenoiseInvocation(BaseInvocation):
@@ -62,6 +63,9 @@ class ZImageDenoiseInvocation(BaseInvocation):
     # If latents is provided, this means we are doing image-to-image.
     latents: Optional[LatentsField] = InputField(
         default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
+    noise: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.noise, input=Input.Connection
     )
     # denoise_mask is used for image-to-image inpainting. Only the masked region is modified.
     denoise_mask: Optional[DenoiseMaskField] = InputField(
@@ -349,16 +353,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
             init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
         # Generate initial noise
-        num_channels_latents = 16  # Z-Image uses 16 latent channels
-        noise = self._get_noise(
-            batch_size=1,
-            num_channels_latents=num_channels_latents,
-            height=self.height,
-            width=self.width,
-            dtype=inference_dtype,
-            device=device,
-            seed=self.seed,
-        )
+        noise = self._prepare_noise_tensor(context, inference_dtype, device)
 
         # Prepare input latent image
         if init_latents is not None:
@@ -761,6 +756,24 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     )
 
         return latents
+
+    def _prepare_noise_tensor(
+        self, context: InvocationContext, inference_dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        if self.noise is not None:
+            noise = context.tensors.load(self.noise.latents_name).to(device=device, dtype=inference_dtype)
+            validate_noise_tensor_shape(noise, "Z-Image", self.width, self.height)
+            return noise
+
+        return self._get_noise(
+            batch_size=1,
+            num_channels_latents=16,
+            height=self.height,
+            width=self.width,
+            dtype=inference_dtype,
+            device=device,
+            seed=self.seed,
+        )
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:

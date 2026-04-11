@@ -23,6 +23,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.universal_noise import validate_noise_tensor_shape
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDULER_MAP, FLUX_SCHEDULER_NAME_VALUES
@@ -54,7 +55,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
     category="image",
-    version="1.4.0",
+    version="1.5.0",
     classification=Classification.Prototype,
 )
 class Flux2DenoiseInvocation(BaseInvocation):
@@ -67,6 +68,11 @@ class Flux2DenoiseInvocation(BaseInvocation):
     latents: Optional[LatentsField] = InputField(
         default=None,
         description=FieldDescriptions.latents,
+        input=Input.Connection,
+    )
+    noise: Optional[LatentsField] = InputField(
+        default=None,
+        description=FieldDescriptions.noise,
         input=Input.Connection,
     )
     denoise_mask: Optional[DenoiseMaskField] = InputField(
@@ -240,14 +246,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
             init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
         # Prepare input noise (FLUX.2 uses 32 channels)
-        noise = get_noise_flux2(
-            num_samples=1,
-            height=self.height,
-            width=self.width,
-            device=device,
-            dtype=inference_dtype,
-            seed=self.seed,
-        )
+        noise = self._prepare_noise_tensor(context, inference_dtype, device)
         b, _c, latent_h, latent_w = noise.shape
         packed_h = latent_h // 2
         packed_w = latent_w // 2
@@ -485,6 +484,23 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         x = unpack_flux2(x.float(), self.height, self.width)
         return x
+
+    def _prepare_noise_tensor(
+        self, context: InvocationContext, inference_dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        if self.noise is not None:
+            noise = context.tensors.load(self.noise.latents_name).to(device=device, dtype=inference_dtype)
+            validate_noise_tensor_shape(noise, "FLUX.2", self.width, self.height)
+            return noise
+
+        return get_noise_flux2(
+            num_samples=1,
+            height=self.height,
+            width=self.width,
+            device=device,
+            dtype=inference_dtype,
+            seed=self.seed,
+        )
 
     def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> Optional[torch.Tensor]:
         """Prepare the inpaint mask."""

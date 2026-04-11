@@ -28,6 +28,7 @@ from invokeai.app.invocations.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.invocations.ip_adapter import IPAdapterField
 from invokeai.app.invocations.model import ControlLoRAField, LoRAField, TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.universal_noise import validate_noise_tensor_shape
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.controlnet.instantx_controlnet_flux import InstantXControlNetFlux
 from invokeai.backend.flux.controlnet.xlabs_controlnet_flux import XLabsControlNetFlux
@@ -71,7 +72,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="image",
-    version="4.5.1",
+    version="4.6.0",
 )
 class FluxDenoiseInvocation(BaseInvocation):
     """Run denoising process with a FLUX transformer model."""
@@ -80,6 +81,11 @@ class FluxDenoiseInvocation(BaseInvocation):
     latents: Optional[LatentsField] = InputField(
         default=None,
         description=FieldDescriptions.latents,
+        input=Input.Connection,
+    )
+    noise: Optional[LatentsField] = InputField(
+        default=None,
+        description=FieldDescriptions.noise,
         input=Input.Connection,
     )
     # denoise_mask is used for image-to-image inpainting. Only the masked region is modified.
@@ -211,21 +217,15 @@ class FluxDenoiseInvocation(BaseInvocation):
         context: InvocationContext,
     ):
         inference_dtype = torch.bfloat16
+        device = TorchDevice.choose_torch_device()
 
         # Load the input latents, if provided.
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
         if init_latents is not None:
-            init_latents = init_latents.to(device=TorchDevice.choose_torch_device(), dtype=inference_dtype)
+            init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
         # Prepare input noise.
-        noise = get_noise(
-            num_samples=1,
-            height=self.height,
-            width=self.width,
-            device=TorchDevice.choose_torch_device(),
-            dtype=inference_dtype,
-            seed=self.seed,
-        )
+        noise = self._prepare_noise_tensor(context, inference_dtype, device)
         b, _c, latent_h, latent_w = noise.shape
         packed_h = latent_h // 2
         packed_w = latent_w // 2
@@ -237,7 +237,7 @@ class FluxDenoiseInvocation(BaseInvocation):
             packed_height=packed_h,
             packed_width=packed_w,
             dtype=inference_dtype,
-            device=TorchDevice.choose_torch_device(),
+            device=device,
         )
         neg_text_conditionings: list[FluxTextConditioning] | None = None
         if self.negative_text_conditioning is not None:
@@ -247,14 +247,14 @@ class FluxDenoiseInvocation(BaseInvocation):
                 packed_height=packed_h,
                 packed_width=packed_w,
                 dtype=inference_dtype,
-                device=TorchDevice.choose_torch_device(),
+                device=device,
             )
         redux_conditionings: list[FluxReduxConditioning] = self._load_redux_conditioning(
             context=context,
             redux_cond_field=self.redux_conditioning,
             packed_height=packed_h,
             packed_width=packed_w,
-            device=TorchDevice.choose_torch_device(),
+            device=device,
             dtype=inference_dtype,
         )
         pos_regional_prompting_extension = RegionalPromptingExtension.from_text_conditioning(
@@ -331,9 +331,7 @@ class FluxDenoiseInvocation(BaseInvocation):
         img_cond: torch.Tensor | None = None
         is_flux_fill = transformer_config.variant is FluxVariantType.DevFill
         if is_flux_fill:
-            img_cond = self._prep_flux_fill_img_cond(
-                context, device=TorchDevice.choose_torch_device(), dtype=inference_dtype
-            )
+            img_cond = self._prep_flux_fill_img_cond(context, device=device, dtype=inference_dtype)
         else:
             if self.fill_conditioning is not None:
                 raise ValueError("fill_conditioning was provided, but the model is not a FLUX Fill model.")
@@ -391,7 +389,7 @@ class FluxDenoiseInvocation(BaseInvocation):
                 if isinstance(self.kontext_conditioning, list)
                 else [self.kontext_conditioning],
                 vae_field=self.controlnet_vae,
-                device=TorchDevice.choose_torch_device(),
+                device=device,
                 dtype=inference_dtype,
             )
 
@@ -507,6 +505,23 @@ class FluxDenoiseInvocation(BaseInvocation):
 
         x = unpack(x.float(), self.height, self.width)
         return x
+
+    def _prepare_noise_tensor(
+        self, context: InvocationContext, inference_dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        if self.noise is not None:
+            noise = context.tensors.load(self.noise.latents_name).to(device=device, dtype=inference_dtype)
+            validate_noise_tensor_shape(noise, "FLUX", self.width, self.height)
+            return noise
+
+        return get_noise(
+            num_samples=1,
+            height=self.height,
+            width=self.width,
+            device=device,
+            dtype=inference_dtype,
+            seed=self.seed,
+        )
 
     def _load_text_conditioning(
         self,

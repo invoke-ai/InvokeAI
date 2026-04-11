@@ -1209,6 +1209,25 @@ export const NewModelSchedulerSelect = () => {
 - [ ] Frontend UI component
 - [ ] State management
 
+**External Noise:**
+- [ ] Add optional `noise: LatentsField` input to the denoise invocation
+- [ ] Validate external noise shape against the architecture's expected
+      latent shape
+- [ ] Preserve existing behavior when `noise` is not connected
+- [ ] Extend `Universal Noise` when the architecture's latent noise contract
+      can be represented there
+- [ ] Add a dedicated architecture-compatible noise invocation only when
+      `Universal Noise` cannot support the architecture cleanly
+
+If your model supports external noise, the denoise invocation should accept
+it as an optional input rather than replacing the existing seed-driven path.
+When possible, wire the architecture into `Universal Noise` instead of
+creating a separate noise node. Only create a dedicated noise invocation if
+the architecture has a noise tensor contract that `Universal Noise` cannot
+express cleanly. When external noise is connected, validate rank, channel
+count, and spatial shape before blending it with init latents or using it as
+the initial latent state.
+
 ---
 
 ## Summary: Minimal Integration
