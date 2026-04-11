@@ -151,7 +151,7 @@ class SqliteSessionQueue(SessionQueueBase):
             priority=priority,
             item_ids=item_ids,
         )
-        self.__invoker.services.events.emit_batch_enqueued(enqueue_result)
+        self.__invoker.services.events.emit_batch_enqueued(enqueue_result, user_id=user_id)
         return enqueue_result
 
     def dequeue(self) -> Optional[SessionQueueItem]:

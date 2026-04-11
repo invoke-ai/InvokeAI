@@ -100,9 +100,9 @@ class EventServiceBase:
         """Emitted when a queue item's status changes"""
         self.dispatch(QueueItemStatusChangedEvent.build(queue_item, batch_status, queue_status))
 
-    def emit_batch_enqueued(self, enqueue_result: "EnqueueBatchResult") -> None:
+    def emit_batch_enqueued(self, enqueue_result: "EnqueueBatchResult", user_id: str = "system") -> None:
         """Emitted when a batch is enqueued"""
-        self.dispatch(BatchEnqueuedEvent.build(enqueue_result))
+        self.dispatch(BatchEnqueuedEvent.build(enqueue_result, user_id))
 
     def emit_queue_items_retried(self, retry_result: "RetryItemsResult") -> None:
         """Emitted when a list of queue items are retried"""

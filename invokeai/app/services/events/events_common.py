@@ -281,9 +281,10 @@ class BatchEnqueuedEvent(QueueEventBase):
     )
     priority: int = Field(description="The priority of the batch")
     origin: str | None = Field(default=None, description="The origin of the batch")
+    user_id: str = Field(default="system", description="The ID of the user who enqueued the batch")
 
     @classmethod
-    def build(cls, enqueue_result: EnqueueBatchResult) -> "BatchEnqueuedEvent":
+    def build(cls, enqueue_result: EnqueueBatchResult, user_id: str = "system") -> "BatchEnqueuedEvent":
         return cls(
             queue_id=enqueue_result.queue_id,
             batch_id=enqueue_result.batch.batch_id,
@@ -291,6 +292,7 @@ class BatchEnqueuedEvent(QueueEventBase):
             enqueued=enqueue_result.enqueued,
             requested=enqueue_result.requested,
             priority=enqueue_result.priority,
+            user_id=user_id,
         )
 
 

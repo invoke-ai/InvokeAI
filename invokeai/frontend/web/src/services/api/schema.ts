@@ -1042,7 +1042,7 @@ export type paths = {
         };
         /**
          * Get Intermediates Count
-         * @description Gets the count of intermediate images
+         * @description Gets the count of intermediate images. Non-admin users only see their own intermediates.
          */
         get: operations["get_intermediates_count"];
         put?: never;
@@ -1999,7 +1999,7 @@ export type paths = {
         };
         /**
          * Get Queue Status
-         * @description Gets the status of the session queue
+         * @description Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it.
          */
         get: operations["get_queue_status"];
         put?: never;
@@ -2019,7 +2019,7 @@ export type paths = {
         };
         /**
          * Get Batch Status
-         * @description Gets the status of the session queue
+         * @description Gets the status of a batch. Non-admin users only see their own batches.
          */
         get: operations["get_batch_status"];
         put?: never;
@@ -2083,7 +2083,7 @@ export type paths = {
         };
         /**
          * Counts By Destination
-         * @description Gets the counts of queue items by destination
+         * @description Gets the counts of queue items by destination. Non-admin users only see their own items.
          */
         get: operations["counts_by_destination"];
         put?: never;
@@ -3433,6 +3433,12 @@ export type components = {
              * @default null
              */
             origin: string | null;
+            /**
+             * User Id
+             * @description The ID of the user who enqueued the batch
+             * @default system
+             */
+            user_id: string;
         };
         /** BatchStatus */
         BatchStatus: {
@@ -23798,6 +23804,11 @@ export type components = {
              */
             queue_id: string;
             /**
+             * User Id
+             * @description The ID of the user whose recall parameters were updated
+             */
+            user_id: string;
+            /**
              * Parameters
              * @description The recall parameters that were updated
              */
@@ -25397,16 +25408,6 @@ export type components = {
              * @description Total number of queue items
              */
             total: number;
-            /**
-             * User Pending
-             * @description Number of queue items with status 'pending' for the current user
-             */
-            user_pending?: number | null;
-            /**
-             * User In Progress
-             * @description Number of queue items with status 'in_progress' for the current user
-             */
-            user_in_progress?: number | null;
         };
         /**
          * SetupRequest

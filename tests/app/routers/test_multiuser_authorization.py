@@ -1053,3 +1053,253 @@ class TestQueueStatusScoping:
         fields = set(SessionQueueStatus.model_fields.keys())
         assert "user_pending" not in fields
         assert "user_in_progress" not in fields
+
+
+# ===========================================================================
+# 11. WebSocket authentication and event scoping
+# ===========================================================================
+
+
+class TestWebSocketAuth:
+    """Tests that anonymous WebSocket clients cannot subscribe to queue rooms
+    in multiuser mode, and that queue item events are scoped to the owner +
+    admin rooms instead of being broadcast to the full queue room."""
+
+    @pytest.fixture
+    def socketio(self, mock_invoker: Invoker, monkeypatch: Any):
+        """Create a SocketIO instance wired to the mock invoker's configuration."""
+        from fastapi import FastAPI
+
+        from invokeai.app.api.sockets import SocketIO
+
+        # The SocketIO connect/sub handlers look up ApiDependencies.invoker.services.configuration.multiuser
+        # at request time. Patch it to point at the mock invoker.
+        mock_deps = MockApiDependencies(mock_invoker)
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", mock_deps)
+
+        fastapi_app = FastAPI()
+        return SocketIO(fastapi_app)
+
+    def test_connect_rejected_without_token_in_multiuser_mode(self, socketio: Any, mock_invoker: Invoker) -> None:
+        """In multiuser mode, _handle_connect must return False when no valid token is provided."""
+        import asyncio
+
+        mock_invoker.services.configuration.multiuser = True
+
+        result = asyncio.run(socketio._handle_connect("sid-anon-1", environ={}, auth=None))
+        assert result is False
+        # The socket must not be recorded in the users dict
+        assert "sid-anon-1" not in socketio._socket_users
+
+    def test_connect_rejected_with_invalid_token_in_multiuser_mode(
+        self, socketio: Any, mock_invoker: Invoker, setup_jwt_secret: None
+    ) -> None:
+        """An invalid/garbage token in multiuser mode must still be rejected."""
+        import asyncio
+
+        mock_invoker.services.configuration.multiuser = True
+
+        result = asyncio.run(socketio._handle_connect("sid-bad-1", environ={}, auth={"token": "not-a-real-token"}))
+        assert result is False
+        assert "sid-bad-1" not in socketio._socket_users
+
+    def test_connect_accepted_without_token_in_single_user_mode(self, socketio: Any, mock_invoker: Invoker) -> None:
+        """In single-user mode, the socket handler should accept unauthenticated connections
+        as the system admin user (matching how the REST API's get_current_user_or_default behaves)."""
+        import asyncio
+
+        mock_invoker.services.configuration.multiuser = False
+
+        result = asyncio.run(socketio._handle_connect("sid-single-1", environ={}, auth=None))
+        assert result is True
+        assert socketio._socket_users["sid-single-1"]["user_id"] == "system"
+        assert socketio._socket_users["sid-single-1"]["is_admin"] is True
+
+    def test_connect_accepted_with_valid_token_in_multiuser_mode(
+        self,
+        socketio: Any,
+        mock_invoker: Invoker,
+        setup_jwt_secret: None,
+    ) -> None:
+        """A valid token in multiuser mode should be accepted with the correct user identity."""
+        import asyncio
+
+        from invokeai.app.services.auth.token_service import TokenData, create_access_token
+
+        mock_invoker.services.configuration.multiuser = True
+        token = create_access_token(TokenData(user_id="real-user", email="real@test.com", is_admin=False))
+
+        result = asyncio.run(socketio._handle_connect("sid-good-1", environ={}, auth={"token": token}))
+        assert result is True
+        assert socketio._socket_users["sid-good-1"]["user_id"] == "real-user"
+        assert socketio._socket_users["sid-good-1"]["is_admin"] is False
+
+    def test_sub_queue_refuses_unknown_socket_in_multiuser_mode(self, socketio: Any, mock_invoker: Invoker) -> None:
+        """If a socket somehow reaches _handle_sub_queue without a recorded identity
+        in multiuser mode (e.g. bug, race), it must be refused rather than falling back
+        to an anonymous system user who could then observe queue item events."""
+        import asyncio
+
+        mock_invoker.services.configuration.multiuser = True
+
+        # Call sub_queue without a corresponding connect — the sid is unknown.
+        asyncio.run(socketio._handle_sub_queue("sid-ghost-1", {"queue_id": "default"}))
+
+        # The ghost socket must not have been added to the internal users dict
+        assert "sid-ghost-1" not in socketio._socket_users
+
+    def test_queue_item_status_changed_has_user_id(self) -> None:
+        """QueueItemStatusChangedEvent must carry user_id so _handle_queue_event can
+        route it to the owner + admin rooms instead of the public queue room. Without
+        this field the event falls through to the generic broadcast branch and any
+        subscriber to the queue can observe cross-user queue activity."""
+        from invokeai.app.services.events.events_common import (
+            InvocationEventBase,
+            QueueItemEventBase,
+            QueueItemStatusChangedEvent,
+        )
+
+        # The event base carries a user_id field
+        assert "user_id" in QueueItemEventBase.model_fields
+        # QueueItemStatusChangedEvent inherits it
+        assert "user_id" in QueueItemStatusChangedEvent.model_fields
+        # It is NOT an InvocationEventBase (so the generic QueueItemEventBase branch
+        # in _handle_queue_event must also handle it privately)
+        assert not issubclass(QueueItemStatusChangedEvent, InvocationEventBase)
+
+    def test_batch_enqueued_event_carries_user_id(self) -> None:
+        """BatchEnqueuedEvent must carry user_id so it can be routed privately to the
+        owner and admin rooms. Otherwise a subscriber on the same queue_id would see
+        every other user's batch_id, origin and enqueued counts."""
+        from invokeai.app.services.events.events_common import BatchEnqueuedEvent
+        from invokeai.app.services.session_queue.session_queue_common import (
+            Batch,
+            EnqueueBatchResult,
+        )
+        from invokeai.app.services.shared.graph import Graph
+
+        enqueue_result = EnqueueBatchResult(
+            queue_id="default",
+            enqueued=3,
+            requested=3,
+            batch=Batch(batch_id="batch-xyz", origin="workflows", graph=Graph()),
+            priority=0,
+            item_ids=[1, 2, 3],
+        )
+        event = BatchEnqueuedEvent.build(enqueue_result, user_id="owner-123")
+        assert event.user_id == "owner-123"
+        assert event.batch_id == "batch-xyz"
+        assert event.queue_id == "default"
+
+    def test_queue_item_status_changed_routed_privately(self, socketio: Any) -> None:
+        """Verify that _handle_queue_event emits QueueItemStatusChangedEvent ONLY to
+        user:{user_id} and admin rooms, never to the queue_id room."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemStatusChangedEvent
+        from invokeai.app.services.session_queue.session_queue_common import (
+            BatchStatus,
+            SessionQueueStatus,
+        )
+
+        event = QueueItemStatusChangedEvent(
+            queue_id="default",
+            item_id=1,
+            batch_id="batch-private",
+            origin="workflows",
+            destination="canvas",
+            user_id="owner-xyz",
+            session_id="sess-private",
+            status="in_progress",
+            created_at="2026-01-01T00:00:00",
+            updated_at="2026-01-01T00:01:00",
+            started_at="2026-01-01T00:00:30",
+            completed_at=None,
+            batch_status=BatchStatus(
+                queue_id="default",
+                batch_id="batch-private",
+                origin="workflows",
+                destination="canvas",
+                pending=0,
+                in_progress=1,
+                completed=0,
+                failed=0,
+                canceled=0,
+                total=1,
+            ),
+            queue_status=SessionQueueStatus(
+                queue_id="default",
+                item_id=1,
+                session_id="sess-private",
+                batch_id="batch-private",
+                pending=0,
+                in_progress=1,
+                completed=0,
+                failed=0,
+                canceled=0,
+                total=1,
+            ),
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_item_status_changed", event)))
+
+        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
+        assert "user:owner-xyz" in rooms_emitted_to
+        assert "admin" in rooms_emitted_to
+        # CRITICAL: must NOT emit to the queue_id room — that would leak to other users
+        assert "default" not in rooms_emitted_to
+
+    def test_batch_enqueued_routed_privately(self, socketio: Any) -> None:
+        """Verify that _handle_queue_event emits BatchEnqueuedEvent ONLY to
+        user:{user_id} and admin rooms, never to the queue_id room."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import BatchEnqueuedEvent
+        from invokeai.app.services.session_queue.session_queue_common import (
+            Batch,
+            EnqueueBatchResult,
+        )
+        from invokeai.app.services.shared.graph import Graph
+
+        enqueue_result = EnqueueBatchResult(
+            queue_id="default",
+            enqueued=5,
+            requested=5,
+            batch=Batch(batch_id="batch-pvt", origin="workflows", graph=Graph()),
+            priority=0,
+            item_ids=[10, 11, 12, 13, 14],
+        )
+        event = BatchEnqueuedEvent.build(enqueue_result, user_id="owner-zzz")
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("batch_enqueued", event)))
+
+        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
+        assert "user:owner-zzz" in rooms_emitted_to
+        assert "admin" in rooms_emitted_to
+        assert "default" not in rooms_emitted_to
+
+    def test_queue_cleared_still_broadcast(self, socketio: Any) -> None:
+        """QueueClearedEvent does not carry user identity and should still be broadcast
+        to all queue subscribers — this is a sanity check that we haven't over-scoped."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueClearedEvent
+
+        event = QueueClearedEvent.build(queue_id="default")
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_cleared", event)))
+
+        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
+        assert "default" in rooms_emitted_to

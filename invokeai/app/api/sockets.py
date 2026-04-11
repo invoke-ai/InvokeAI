@@ -121,6 +121,11 @@ class SocketIO:
 
         Returns True to accept the connection, False to reject it.
         Stores user_id in the internal socket users dict for later use.
+
+        In multiuser mode, connections without a valid token are rejected outright
+        so that anonymous clients cannot subscribe to queue rooms and observe
+        queue activity belonging to other users. In single-user mode, unauthenticated
+        connections are accepted as the system admin user.
         """
         # Extract token from auth data or headers
         token = None
@@ -147,13 +152,36 @@ class SocketIO:
                 )
                 return True
 
-        # If no valid token, store system user for backward compatibility
+        # No valid token provided. In multiuser mode this is not allowed — reject
+        # the connection so anonymous clients cannot subscribe to queue rooms.
+        # In single-user mode, fall through and accept the socket as system admin.
+        if self._is_multiuser_enabled():
+            logger.warning(
+                f"Rejecting socket {sid} connection: multiuser mode is enabled and no valid auth token was provided"
+            )
+            return False
+
         self._socket_users[sid] = {
             "user_id": "system",
-            "is_admin": False,
+            "is_admin": True,
         }
-        logger.debug(f"Socket {sid} connected as system user (no valid token)")
+        logger.debug(f"Socket {sid} connected as system admin (single-user mode)")
         return True
+
+    @staticmethod
+    def _is_multiuser_enabled() -> bool:
+        """Check whether multiuser mode is enabled. Fails closed if configuration
+        is not yet initialized, which should not happen in practice but prevents
+        accidentally opening the socket during startup races."""
+        try:
+            # Imported here to avoid a circular import at module load time.
+            from invokeai.app.api.dependencies import ApiDependencies
+
+            return bool(ApiDependencies.invoker.services.configuration.multiuser)
+        except Exception:
+            # If dependencies are not initialized, fail closed (treat as multiuser)
+            # so we never accidentally admit an anonymous socket.
+            return True
 
     async def _handle_disconnect(self, sid: str) -> None:
         """Handle socket disconnection and cleanup user info."""
@@ -165,15 +193,20 @@ class SocketIO:
         """Handle queue subscription and add socket to both queue and user-specific rooms."""
         queue_id = QueueSubscriptionEvent(**data).queue_id
 
-        # Check if we have user info for this socket
+        # Check if we have user info for this socket. In multiuser mode _handle_connect
+        # will have already rejected any socket without a valid token, so missing user
+        # info here is a bug — refuse the subscription rather than silently falling back
+        # to an anonymous system user who could then receive queue item events.
         if sid not in self._socket_users:
-            logger.warning(
-                f"Socket {sid} subscribing to queue {queue_id} but has no user info - need to authenticate via connect event"
-            )
-            # Store as system user temporarily - real auth should happen in connect
+            if self._is_multiuser_enabled():
+                logger.warning(
+                    f"Refusing queue subscription for socket {sid}: no user info (socket not authenticated via connect event)"
+                )
+                return
+            # Single-user mode: safe to fall back to the system admin user.
             self._socket_users[sid] = {
                 "user_id": "system",
-                "is_admin": False,
+                "is_admin": True,
             }
 
         user_id = self._socket_users[sid]["user_id"]
@@ -206,9 +239,17 @@ class SocketIO:
     async def _handle_queue_event(self, event: FastAPIEvent[QueueEventBase]):
         """Handle queue events with user isolation.
 
-        Invocation events (progress, started, complete) are private - only emit to owner and admins.
-        Queue item status events are public - emit to all users (field values hidden via API).
-        Other queue events emit to all subscribers.
+        All queue item events (invocation events AND QueueItemStatusChangedEvent) are
+        private to the owning user and admins. They carry unsanitized user_id, batch_id,
+        session_id, origin, destination and error metadata, and must never be broadcast
+        to the whole queue room — otherwise any other authenticated subscriber could
+        observe cross-user queue activity.
+
+        RecallParametersUpdatedEvent is also private to the owner + admins.
+
+        BatchEnqueuedEvent carries the enqueuing user's batch_id/origin/counts and
+        is also routed privately. QueueClearedEvent is the only queue event that
+        is still broadcast to the whole queue room.
 
         IMPORTANT: Check InvocationEventBase BEFORE QueueItemEventBase since InvocationEventBase
         inherits from QueueItemEventBase. The order of isinstance checks matters!
@@ -237,17 +278,16 @@ class SocketIO:
 
                 logger.debug(f"Emitted private invocation event {event_name} to user room {user_room} and admin room")
 
-            # Queue item status events are visible to all users (field values masked via API)
-            # This catches QueueItemStatusChangedEvent but NOT InvocationEvents (already handled above)
+            # Other queue item events (QueueItemStatusChangedEvent) carry unsanitized
+            # user_id, batch_id, session_id, origin, destination and error metadata.
+            # They are private to the owning user + admins — never broadcast to the
+            # full queue room.
             elif isinstance(event_data, QueueItemEventBase) and hasattr(event_data, "user_id"):
-                # Emit to all subscribers in the queue
-                await self._sio.emit(
-                    event=event_name, data=event_data.model_dump(mode="json"), room=event_data.queue_id
-                )
+                user_room = f"user:{event_data.user_id}"
+                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
+                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
 
-                logger.info(
-                    f"Emitted public queue item event {event_name} to all subscribers in queue {event_data.queue_id}"
-                )
+                logger.debug(f"Emitted private queue item event {event_name} to user room {user_room} and admin room")
 
             # RecallParametersUpdatedEvent is private - only emit to owner + admins
             elif isinstance(event_data, RecallParametersUpdatedEvent):
@@ -256,12 +296,22 @@ class SocketIO:
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
                 logger.debug(f"Emitted private recall_parameters_updated event to user room {user_room} and admin room")
 
+            # BatchEnqueuedEvent carries the enqueuing user's batch_id, origin, and
+            # enqueued counts. Route it privately to the owner + admins so other
+            # users do not observe cross-user batch activity.
+            elif isinstance(event_data, BatchEnqueuedEvent):
+                user_room = f"user:{event_data.user_id}"
+                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
+                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+                logger.debug(f"Emitted private batch_enqueued event to user room {user_room} and admin room")
+
             else:
-                # For other queue events (like QueueClearedEvent, BatchEnqueuedEvent), emit to all subscribers
+                # For remaining queue events (e.g. QueueClearedEvent) that do not
+                # carry user identity, emit to all subscribers in the queue room.
                 await self._sio.emit(
                     event=event_name, data=event_data.model_dump(mode="json"), room=event_data.queue_id
                 )
-                logger.info(
+                logger.debug(
                     f"Emitted general queue event {event_name} to all subscribers in queue {event_data.queue_id}"
                 )
         except Exception as e:
