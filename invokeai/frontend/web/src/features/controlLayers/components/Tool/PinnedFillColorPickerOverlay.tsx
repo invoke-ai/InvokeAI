@@ -69,16 +69,16 @@ export const PinnedFillColorPickerOverlay = memo(() => {
           </Text>
           <Flex gap={1}>
             <IconButton
-              aria-label={t('controlLayers.fill.switchColors', { defaultValue: 'Switch FG/BG (X)' })}
-              tooltip={t('controlLayers.fill.switchColors', { defaultValue: 'Switch FG/BG (X)' })}
+              aria-label={t('controlLayers.fill.switchColors')}
+              tooltip={t('controlLayers.fill.switchColors')}
               size="sm"
               variant="ghost"
               onClick={onToggleActive}
               icon={<PiArrowsLeftRightBold />}
             />
             <IconButton
-              aria-label={t('common.unpin', { defaultValue: 'Unpin' })}
-              tooltip={t('common.unpin', { defaultValue: 'Unpin' })}
+              aria-label={t('common.unpin')}
+              tooltip={t('common.unpin')}
               size="sm"
               variant="solid"
               onClick={onUnpin}

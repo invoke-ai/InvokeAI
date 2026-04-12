@@ -70,6 +70,16 @@ export const getRegionalGuidanceWarnings = (
       }
     }
 
+    if (model.base === 'anima') {
+      // Reference images (IP Adapters) are not supported for Anima
+      if (entity.referenceImages.length > 0) {
+        warnings.push(WARNINGS.RG_REFERENCE_IMAGES_NOT_SUPPORTED);
+      }
+      if (entity.autoNegative) {
+        warnings.push(WARNINGS.RG_AUTO_NEGATIVE_NOT_SUPPORTED);
+      }
+    }
+
     entity.referenceImages.forEach(({ config }) => {
       if (!config.model) {
         // No model selected
@@ -117,7 +127,7 @@ export const getGlobalReferenceImageWarnings = (
   const warnings: WarningTKey[] = [];
 
   if (model) {
-    if (model.base === 'sd-3' || model.base === 'sd-2') {
+    if (model.base === 'sd-3' || model.base === 'sd-2' || model.base === 'anima') {
       // Unsupported model architecture
       warnings.push(WARNINGS.UNSUPPORTED_MODEL);
       return warnings;
@@ -125,8 +135,8 @@ export const getGlobalReferenceImageWarnings = (
 
     const { config } = entity;
 
-    // FLUX.2 reference images don't require a model - it's built-in
-    if (config.type !== 'flux2_reference_image') {
+    // FLUX.2 and Qwen Image Edit reference images don't require a model - it's built-in
+    if (config.type !== 'flux2_reference_image' && config.type !== 'qwen_image_reference_image') {
       if (!('model' in config) || !config.model) {
         // No model selected
         warnings.push(WARNINGS.IP_ADAPTER_NO_MODEL_SELECTED);
@@ -137,8 +147,10 @@ export const getGlobalReferenceImageWarnings = (
     }
 
     if (!entity.config.image) {
-      // No image selected
-      warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+      // No image selected - for Qwen Image Edit, an image is optional (txt2img works without one)
+      if (config.type !== 'qwen_image_reference_image') {
+        warnings.push(WARNINGS.IP_ADAPTER_NO_IMAGE_SELECTED);
+      }
     }
   }
 
@@ -160,7 +172,7 @@ export const getControlLayerWarnings = (
     // No model selected
     warnings.push(WARNINGS.CONTROL_ADAPTER_NO_MODEL_SELECTED);
   } else if (model) {
-    if (model.base === 'sd-3' || model.base === 'sd-2') {
+    if (model.base === 'sd-3' || model.base === 'sd-2' || model.base === 'anima') {
       // Unsupported model architecture
       warnings.push(WARNINGS.UNSUPPORTED_MODEL);
     } else if (entity.controlAdapter.model.base !== model.base) {

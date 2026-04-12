@@ -1,6 +1,7 @@
 import { Flex, IconButton, Text } from '@invoke-ai/ui-library';
 import type { ChannelName, ChannelPoints } from 'features/controlLayers/store/types';
 import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold } from 'react-icons/pi';
 
 const DEFAULT_POINTS: ChannelPoints = [
@@ -237,6 +238,7 @@ const canvasYToValueY = (c: HTMLCanvasElement, cy: number) => {
 };
 
 export const RasterLayerCurvesAdjustmentsGraph = memo((props: CurveGraphProps) => {
+  const { t } = useTranslation();
   const { title, channel, points, histogram, onChange } = props;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [localPoints, setLocalPoints] = useState<ChannelPoints>(sortPoints(points ?? DEFAULT_POINTS));
@@ -410,7 +412,7 @@ export const RasterLayerCurvesAdjustmentsGraph = memo((props: CurveGraphProps) =
         </Text>
         <IconButton
           icon={<PiArrowCounterClockwiseBold />}
-          aria-label="Reset"
+          aria-label={t('common.reset')}
           size="sm"
           variant="link"
           onClick={resetPoints}

@@ -27,15 +27,16 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowArcLeftBold, PiClockCounterClockwise, PiTrashBold, PiTrashSimpleBold } from 'react-icons/pi';
 
 export const PositivePromptHistoryIconButton = memo(() => {
+  const { t } = useTranslation();
   return (
     <Popover isLazy>
       <PopoverTrigger>
         <IconButton
           size="sm"
           variant="promptOverlay"
-          aria-label="Positive Prompt History"
+          aria-label={t('prompt.promptHistory')}
           icon={<PiClockCounterClockwise />}
-          tooltip="Prompt History"
+          tooltip={t('prompt.promptHistory')}
         />
       </PopoverTrigger>
       <Portal>
@@ -77,12 +78,12 @@ const PromptHistoryContent = memo(() => {
     <Flex flexDir="column" gap={2} w="full" h="full">
       <Flex alignItems="center" gap={2} justifyContent="space-between">
         <Text fontWeight="semibold" color="base.300">
-          Prompt History
+          {t('prompt.promptHistory')}
         </Text>
         <Input
           size="sm"
           variant="outline"
-          placeholder="Search..."
+          placeholder={t('prompt.searchPrompts')}
           value={searchTerm}
           onChange={onChangeSearchTerm}
           width="max-content"
@@ -95,7 +96,7 @@ const PromptHistoryContent = memo(() => {
           onClick={onClickClearHistory}
           isDisabled={positivePromptHistory.length === 0}
         >
-          Clear History
+          {t('prompt.clearHistory')}
         </Button>
       </Flex>
       <Divider />
@@ -131,6 +132,7 @@ const PromptHistoryContent = memo(() => {
 PromptHistoryContent.displayName = 'PromptHistoryContent';
 
 const PromptItem = memo(({ prompt }: { prompt: string }) => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const shiftKey = useShiftModifier();
 
@@ -148,7 +150,7 @@ const PromptItem = memo(({ prompt }: { prompt: string }) => {
         <IconButton
           size="sm"
           variant="ghost"
-          aria-label="Use prompt"
+          aria-label={t('prompt.usePrompt')}
           icon={<PiArrowArcLeftBold />}
           onClick={onClickUse}
         />
@@ -157,7 +159,7 @@ const PromptItem = memo(({ prompt }: { prompt: string }) => {
         <IconButton
           size="sm"
           variant="ghost"
-          aria-label="Delete"
+          aria-label={t('common.delete')}
           icon={<PiTrashBold />}
           onClick={onClickDelete}
           colorScheme="error"

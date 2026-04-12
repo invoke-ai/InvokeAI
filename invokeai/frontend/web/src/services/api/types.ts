@@ -196,6 +196,13 @@ export const isFlux2VAEModelConfig = (config: AnyModelConfig, excludeSubmodels?:
   );
 };
 
+export const isAnimaVAEModelConfig = (config: AnyModelConfig, excludeSubmodels?: boolean): config is VAEModelConfig => {
+  return (
+    (config.type === 'vae' || (!excludeSubmodels && config.type === 'main' && checkSubmodels(['vae'], config))) &&
+    config.base === 'anima'
+  );
+};
+
 export const isControlNetModelConfig = (config: AnyModelConfig): config is ControlNetModelConfig => {
   return config.type === 'controlnet';
 };
@@ -239,7 +246,11 @@ export const isT5EncoderModelConfig = (
 };
 
 export const isQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwen3EncoderModelConfig => {
-  return config.type === 'qwen3_encoder';
+  return config.type === 'qwen3_encoder' && config.variant !== 'qwen3_06b';
+};
+
+export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwen3EncoderModelConfig => {
+  return config.type === 'qwen3_encoder' && config.variant === 'qwen3_06b';
 };
 
 export const isCLIPEmbedModelConfigOrSubmodel = (
@@ -324,6 +335,10 @@ export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config i
 
 export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'z-image' && config.format === 'diffusers';
+};
+
+export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'qwen-image' && config.format === 'diffusers';
 };
 
 export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {

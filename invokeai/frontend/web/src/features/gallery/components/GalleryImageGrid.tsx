@@ -18,6 +18,7 @@ import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { MutableRefObject } from 'react';
 import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type {
   GridComponents,
   GridComputeItemKey,
@@ -346,6 +347,7 @@ type GalleryImageGridContentProps = {
 
 export const GalleryImageGridContent = memo(
   ({ imageNames, navigationImageNames, isLoading, queryArgs, rootRef: rootRefProp }: GalleryImageGridContentProps) => {
+    const { t } = useTranslation();
     const virtuosoRef = useRef<VirtuosoGridHandle>(null);
     const rangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 });
     const internalRootRef = useRef<HTMLDivElement>(null);
@@ -380,7 +382,7 @@ export const GalleryImageGridContent = memo(
       return (
         <Flex w="full" h="full" alignItems="center" justifyContent="center" gap={4}>
           <Spinner size="lg" opacity={0.3} />
-          <Text color="base.300">Loading gallery...</Text>
+          <Text color="base.300">{t('gallery.loadingGallery')}</Text>
         </Flex>
       );
     }
@@ -388,7 +390,7 @@ export const GalleryImageGridContent = memo(
     if (imageNames.length === 0) {
       return (
         <Flex w="full" h="full" alignItems="center" justifyContent="center">
-          <Text color="base.300">No images found</Text>
+          <Text color="base.300">{t('gallery.noImagesFound')}</Text>
         </Flex>
       );
     }

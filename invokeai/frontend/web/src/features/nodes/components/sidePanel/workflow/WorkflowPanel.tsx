@@ -13,7 +13,7 @@ const WorkflowFieldsLinearViewPanel = () => {
       <TabList>
         <Tab>{t('workflows.builder.builder')}</Tab>
         <Tab>{t('common.details')}</Tab>
-        <Tab>JSON</Tab>
+        <Tab>{t('common.json')}</Tab>
         <Spacer />
       </TabList>
 
