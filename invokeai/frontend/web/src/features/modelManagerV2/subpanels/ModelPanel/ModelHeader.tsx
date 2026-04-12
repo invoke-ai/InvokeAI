@@ -6,6 +6,10 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AnyModelConfig } from 'services/api/types';
 
+const isSafeUrl = (url: string): boolean => {
+  return url.startsWith('https://') || url.startsWith('http://');
+};
+
 type Props = PropsWithChildren<{
   modelConfig: AnyModelConfig;
 }>;
@@ -30,7 +34,7 @@ export const ModelHeader = memo(({ modelConfig, children }: Props) => {
             {t('modelManager.source')}: {modelConfig.source}
           </Text>
         )}
-        {modelConfig.source_url && (
+        {'source_url' in modelConfig && modelConfig.source_url && isSafeUrl(modelConfig.source_url) && (
           <Text variant="subtext" noOfLines={1} wordBreak="break-all">
             {t('modelManager.sourceUrl')}:{' '}
             <Link href={modelConfig.source_url} isExternal color="invokeBlue.300">
