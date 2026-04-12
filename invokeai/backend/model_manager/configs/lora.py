@@ -772,6 +772,85 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         raise NotAMatchError("model does not look like a Z-Image LoRA")
 
 
+class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Qwen Image Edit LoRA models in LyCORIS format."""
+
+    base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Qwen Image Edit LoRAs have keys like transformer_blocks.X.attn.to_k.lora_down.weight."""
+        state_dict = mod.load_state_dict()
+
+        has_qwen_ie_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "transformer_blocks.",
+                "transformer.transformer_blocks.",
+                "lora_unet_transformer_blocks_",  # Kohya format
+            },
+        )
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+                "dora_scale",
+                "lokr_w1",
+                "lokr_w2",  # LoKR format
+            },
+        )
+        # Must NOT have diffusion_model.layers (Z-Image) or Flux-style keys.
+        # Flux LoRAs can have transformer.single_transformer_blocks or transformer.transformer_blocks
+        # (with the "transformer." prefix and "single_" variant) which would falsely match our check.
+        # Flux Kohya LoRAs use lora_unet_double_blocks or lora_unet_single_blocks.
+        has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        has_flux_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "double_blocks.",
+                "single_blocks.",
+                "single_transformer_blocks.",
+                "transformer.single_transformer_blocks.",
+                "lora_unet_double_blocks_",
+                "lora_unet_single_blocks_",
+                "lora_unet_single_transformer_blocks_",
+            },
+        )
+
+        if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_flux_keys:
+            return
+
+        raise NotAMatchError("model does not match Qwen Image LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        state_dict = mod.load_state_dict()
+        has_qwen_ie_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {"transformer_blocks.", "transformer.transformer_blocks.", "lora_unet_transformer_blocks_"},
+        )
+        has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        has_flux_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "double_blocks.",
+                "single_blocks.",
+                "single_transformer_blocks.",
+                "transformer.single_transformer_blocks.",
+                "lora_unet_double_blocks_",
+                "lora_unet_single_blocks_",
+                "lora_unet_single_transformer_blocks_",
+            },
+        )
+
+        if has_qwen_ie_keys and not has_z_image_keys and not has_flux_keys:
+            return BaseModelType.QwenImage
+        raise NotAMatchError("model does not look like a Qwen Image Edit LoRA")
+
+
 class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Anima LoRA models in LyCORIS format."""
 
