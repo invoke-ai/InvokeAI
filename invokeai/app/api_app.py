@@ -21,6 +21,7 @@ from invokeai.app.api.routers import (
     board_images,
     boards,
     client_state,
+    custom_nodes,
     download_queue,
     images,
     model_manager,
@@ -184,6 +185,7 @@ app.include_router(workflows.workflows_router, prefix="/api")
 app.include_router(style_presets.style_presets_router, prefix="/api")
 app.include_router(client_state.client_state_router, prefix="/api")
 app.include_router(recall_parameters.recall_parameters_router, prefix="/api")
+app.include_router(custom_nodes.custom_nodes_router, prefix="/api")
 
 app.openapi = get_openapi_func(app)
 

@@ -7,6 +7,7 @@ import { useAppSelector } from 'app/store/storeHooks';
 import Loading from 'common/components/Loading/Loading';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import { CanvasTabAutoLayout } from 'features/ui/layouts/canvas-tab-auto-layout';
+import { CustomNodesTabAutoLayout } from 'features/ui/layouts/customnodes-tab-auto-layout';
 import { GenerateTabAutoLayout } from 'features/ui/layouts/generate-tab-auto-layout';
 import { ModelsTabAutoLayout } from 'features/ui/layouts/models-tab-auto-layout';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -36,6 +37,7 @@ const TabContent = memo(() => {
       {tab === 'upscaling' && <UpscalingTabAutoLayout />}
       {tab === 'workflows' && <WorkflowsTabAutoLayout />}
       {tab === 'models' && <ModelsTabAutoLayout />}
+      {tab === 'customNodes' && <CustomNodesTabAutoLayout />}
       {tab === 'queue' && <QueueTabAutoLayout />}
       <SwitchingTabsLoader />
     </Flex>

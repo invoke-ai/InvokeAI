@@ -8,6 +8,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiBoundingBoxBold,
+  PiCircuitryBold,
   PiCubeBold,
   PiFlowArrowBold,
   PiFrameCornersBold,
@@ -36,6 +37,7 @@ export const VerticalNavBar = memo(() => {
 
       <StatusIndicator />
       <TabButton tab="models" icon={<PiCubeBold />} label={t('ui.tabs.models')} />
+      <TabButton tab="customNodes" icon={<PiCircuitryBold />} label={t('ui.tabs.customNodes')} />
       <TabButton tab="queue" icon={<PiQueueBold />} label={t('ui.tabs.queue')} />
 
       <Divider />
