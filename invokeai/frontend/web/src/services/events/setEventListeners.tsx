@@ -860,15 +860,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
 
     toast({
       id: bulk_download_item_name,
-      title: t('gallery.bulkDownloadReady', 'Download ready'),
+      title: t('gallery.bulkDownloadReady'),
       status: 'success',
-      description: (
-        <ExternalLink
-          label={t('gallery.clickToDownload', 'Click here to download')}
-          href={url}
-          download={bulk_download_item_name}
-        />
-      ),
+      description: <ExternalLink label={t('gallery.clickToDownload')} href={url} download={bulk_download_item_name} />,
       duration: null,
     });
   });

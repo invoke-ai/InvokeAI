@@ -215,7 +215,9 @@ export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNo
     modelLoader.type === 'flux2_klein_model_loader' ||
     modelLoader.type === 'sd3_model_loader' ||
     modelLoader.type === 'cogview4_model_loader' ||
-    modelLoader.type === 'z_image_model_loader'
+    modelLoader.type === 'qwen_image_model_loader' ||
+    modelLoader.type === 'z_image_model_loader' ||
+    modelLoader.type === 'anima_model_loader'
   );
 };
 
@@ -258,9 +260,21 @@ export const getDenoisingStartAndEnd = (state: RootState): { denoising_start: nu
         };
       }
     }
+    case 'anima': {
+      // Anima uses a fixed shift=3.0 which makes the sigma schedule highly non-linear.
+      // Without rescaling, most of the visual 'change' is concentrated in the high denoise
+      // strength range (>0.8). The exponent 0.2 spreads the effective range more evenly,
+      // matching the approach used for FLUX and SD3.
+      const animaExponent = optimizedDenoisingEnabled ? 0.2 : 1;
+      return {
+        denoising_start: 1 - denoisingStrength ** animaExponent,
+        denoising_end: 1,
+      };
+    }
     case 'sd-1':
     case 'sd-2':
     case 'cogview4':
+    case 'qwen-image':
     case 'z-image': {
       return {
         denoising_start: 1 - denoisingStrength,
