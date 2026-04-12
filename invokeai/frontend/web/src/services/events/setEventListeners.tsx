@@ -4,6 +4,7 @@ import { socketConnected } from 'app/store/middleware/listenerMiddleware/listene
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, isNil, round } from 'es-toolkit/compat';
+import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
@@ -843,6 +844,55 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
             }
           });
         }
+      }
+
+      // Handle model-free reference images (FLUX.2 Klein, FLUX Kontext, Qwen Image Edit).
+      // These feed the reference image directly into the main model rather than going
+      // through an IP Adapter, so the backend sends them without a model_key and we
+      // pick the right config type via getDefaultRefImageConfig() based on the main
+      // model that is currently selected in the UI.
+      if (data.parameters.reference_images !== undefined && Array.isArray(data.parameters.reference_images)) {
+        log.debug(`Processing ${data.parameters.reference_images.length} reference image(s)`);
+
+        const referenceImagePromises = data.parameters.reference_images
+          .filter((cfg) => cfg.image?.image_name && typeof cfg.image.image_name === 'string')
+          .map(async (refConfig) => {
+            const imageName = refConfig.image.image_name as string;
+            try {
+              // Pre-fetch the image DTO so ref image validation succeeds.
+              await dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName)).unwrap();
+            } catch (imageError) {
+              log.warn(`Could not pre-fetch reference image ${imageName}, continuing anyway: ${imageError}`);
+            }
+
+            // Pick the config flavor (flux2 / flux_kontext / ip_adapter fallback) that
+            // matches the currently-selected main model.
+            const baseConfig = getDefaultRefImageConfig(getState);
+            const imageData = {
+              original: {
+                image: {
+                  image_name: imageName,
+                  width: typeof refConfig.image.width === 'number' ? refConfig.image.width : 512,
+                  height: typeof refConfig.image.height === 'number' ? refConfig.image.height : 512,
+                },
+              },
+            };
+
+            return getReferenceImageState(`recalled-ref-image-${Date.now()}-${Math.random()}`, {
+              isEnabled: true,
+              config: { ...baseConfig, image: imageData },
+            });
+          });
+
+        // Append reference images to whatever the ip_adapters branch already
+        // dispatched — replace:false so we don't clobber IP adapters.
+        Promise.all(referenceImagePromises).then((refImageStates) => {
+          const validStates = refImageStates.filter((state): state is RefImageState => state !== null);
+          if (validStates.length > 0) {
+            dispatch(refImagesRecalled({ entities: validStates, replace: false }));
+            log.info(`Applied ${validStates.length} model-free reference image(s)`);
+          }
+        });
       }
     }
   });
