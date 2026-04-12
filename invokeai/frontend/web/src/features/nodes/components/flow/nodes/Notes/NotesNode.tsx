@@ -11,8 +11,10 @@ import { NO_DRAG_CLASS, NO_PAN_CLASS } from 'features/nodes/types/constants';
 import type { NotesNodeData } from 'features/nodes/types/invocation';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
+  const { t } = useTranslation();
   const { id: nodeId, data, selected } = props;
   const { notes, isOpen } = data;
   const dispatch = useAppDispatch();
@@ -44,7 +46,7 @@ const NotesNode = (props: NodeProps<Node<NotesNodeData>>) => {
         h={8}
       >
         <NodeCollapseButton nodeId={nodeId} isOpen={isOpen} />
-        <NonInvocationNodeTitle nodeId={nodeId} title="Notes" />
+        <NonInvocationNodeTitle nodeId={nodeId} title={t('nodes.notes')} />
         <Box minW={8} />
       </Flex>
       {isOpen && (
