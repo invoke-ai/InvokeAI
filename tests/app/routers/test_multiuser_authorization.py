@@ -1015,6 +1015,93 @@ class TestRecallParametersAuth:
 
 
 # ===========================================================================
+# 7a2. Recall parameters image access control
+# ===========================================================================
+
+
+class TestRecallImageAccess:
+    """Tests that recall parameter image references are validated for read access."""
+
+    def test_recall_controlnet_with_other_users_image_rejected(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 must not be able to reference user1's private image in a control layer."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "victim-ctrl-img", user1.user_id)
+
+        r = client.post(
+            "/api/v1/recall/default",
+            json={"control_layers": [{"model_name": "some-controlnet", "image_name": "victim-ctrl-img"}]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_recall_ip_adapter_with_other_users_image_rejected(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 must not be able to reference user1's private image in an IP adapter."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "victim-ip-img", user1.user_id)
+
+        r = client.post(
+            "/api/v1/recall/default",
+            json={"ip_adapters": [{"model_name": "some-ip-adapter", "image_name": "victim-ip-img"}]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_recall_own_image_allowed(self, client: TestClient, mock_invoker: Invoker, user1_token: str):
+        """Owner should be able to reference their own image in recall parameters."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "own-ctrl-img", user1.user_id)
+
+        r = client.post(
+            "/api/v1/recall/default",
+            json={"control_layers": [{"model_name": "some-controlnet", "image_name": "own-ctrl-img"}]},
+            headers=_auth(user1_token),
+        )
+        # Should not be 403 (may fail downstream for other reasons, e.g. model not found)
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_recall_shared_board_image_allowed(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """An image on a shared board should be usable in recall by any user."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "shared-recall-img", user1.user_id)
+
+        board_id = _create_board(client, user1_token, "Shared Recall Board")
+        _share_board(client, user1_token, board_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name="shared-recall-img")
+
+        r = client.post(
+            "/api/v1/recall/default",
+            json={"ip_adapters": [{"model_name": "some-ip-adapter", "image_name": "shared-recall-img"}]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_recall_admin_can_reference_any_image(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str, user1_token: str
+    ):
+        """Admin should be able to reference any user's image."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "admin-recall-img", user1.user_id)
+
+        r = client.post(
+            "/api/v1/recall/default",
+            json={"control_layers": [{"model_name": "some-controlnet", "image_name": "admin-recall-img"}]},
+            headers=_auth(admin_token),
+        )
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+
+# ===========================================================================
 # 7b. Recall parameters cross-user isolation
 # ===========================================================================
 
