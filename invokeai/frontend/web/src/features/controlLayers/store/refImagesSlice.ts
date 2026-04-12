@@ -22,6 +22,7 @@ import {
   isFlux2ReferenceImageConfig,
   isFLUXReduxConfig,
   isIPAdapterConfig,
+  isQwenImageReferenceImageConfig,
   zRefImagesState,
 } from './types';
 import { getReferenceImageState, initialFluxKontextReferenceImage, initialFLUXRedux, initialIPAdapter } from './util';
@@ -106,8 +107,8 @@ const slice = createSlice({
         return;
       }
 
-      // FLUX.2 reference images don't have a model field - they use built-in support
-      if (isFlux2ReferenceImageConfig(entity.config)) {
+      // FLUX.2 and Qwen Image Edit reference images don't have a model field - they use built-in support
+      if (isFlux2ReferenceImageConfig(entity.config) || isQwenImageReferenceImageConfig(entity.config)) {
         return;
       }
 
