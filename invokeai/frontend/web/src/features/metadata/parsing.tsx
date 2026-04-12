@@ -16,6 +16,9 @@ import {
   kleinVaeModelSelected,
   negativePromptChanged,
   positivePromptChanged,
+  qwenImageComponentSourceSelected,
+  qwenImageQuantizationChanged,
+  qwenImageShiftChanged,
   refinerModelChanged,
   selectBase,
   setAnimaScheduler,
@@ -687,6 +690,83 @@ const ZImageSeedVarianceRandomizePercent: SingleMetadataHandler<number> = {
 };
 //#endregion ZImageSeedVarianceRandomizePercent
 
+//#region QwenImageComponentSource
+const QwenImageComponentSource: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'QwenImageComponentSource',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'qwen_image_component_source');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(qwenImageComponentSourceSelected(value));
+  },
+  i18nKey: 'modelManager.qwenImageComponentSource',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion QwenImageComponentSource
+
+//#region QwenImageQuantization
+const QwenImageQuantization: SingleMetadataHandler<'none' | 'int8' | 'nf4'> = {
+  [SingleMetadataKey]: true,
+  type: 'QwenImageQuantization',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'qwen_image_quantization');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    const parsed = z.enum(['none', 'int8', 'nf4']).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(qwenImageQuantizationChanged(value));
+  },
+  i18nKey: 'modelManager.qwenImageQuantization',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<'none' | 'int8' | 'nf4'>) => (
+    <MetadataPrimitiveValue value={value} />
+  ),
+};
+//#endregion QwenImageQuantization
+
+//#region QwenImageShift
+const QwenImageShift: SingleMetadataHandler<number | null> = {
+  [SingleMetadataKey]: true,
+  type: 'QwenImageShift',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'qwen_image_shift');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    const parsed = z.number().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(qwenImageShiftChanged(value));
+  },
+  i18nKey: 'modelManager.qwenImageShift',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number | null>) => (
+    <MetadataPrimitiveValue value={value ?? 'Default'} />
+  ),
+};
+//#endregion QwenImageShift
+
 //#region ZImageShift
 const ZImageShift: SingleMetadataHandler<number> = {
   [SingleMetadataKey]: true,
@@ -1333,6 +1413,9 @@ export const ImageMetadataHandlers = {
   ZImageSeedVarianceEnabled,
   ZImageSeedVarianceStrength,
   ZImageSeedVarianceRandomizePercent,
+  QwenImageComponentSource,
+  QwenImageQuantization,
+  QwenImageShift,
   ZImageShift,
   LoRAs,
   CanvasLayers,
