@@ -45,19 +45,25 @@ def _assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> 
     - The user is an admin.
     - The user is the image's direct owner (image_records.user_id).
     - The user owns the board the image sits on.
+    - The image sits on a Public board (public boards grant mutation rights).
     """
+    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
     if current_user.is_admin:
         return
     owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
     if owner is not None and owner == current_user.user_id:
         return
 
-    # Check whether the user owns the board the image belongs to.
+    # Check whether the user owns the board the image belongs to,
+    # or the board is Public (public boards grant mutation rights).
     board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
     if board_id is not None:
         try:
             board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
             if board.user_id == current_user.user_id:
+                return
+            if board.board_visibility == BoardVisibility.Public:
                 return
         except Exception:
             pass
@@ -718,20 +724,21 @@ async def download_images_from_list(
     },
 )
 async def get_bulk_download_item(
+    current_user: CurrentUserOrDefault,
     background_tasks: BackgroundTasks,
     bulk_download_item_name: str = Path(description="The bulk_download_item_name of the bulk download item to get"),
 ) -> FileResponse:
     """Gets a bulk download zip file.
 
-    This endpoint is intentionally unauthenticated because the frontend triggers
-    the download via a browser-navigation ``<a download>`` link, which cannot
-    include an Authorization header.  Access control is enforced at creation
-    time: the POST /download endpoint validates image/board read access, and the
-    UUID-based filename (returned only to the authenticated caller and emitted
-    only to the owner's private socket room) serves as an unguessable capability
-    token.  The file is also deleted immediately after being served once.
+    Requires authentication.  The caller must be the user who initiated the
+    download (tracked by the bulk download service) or an admin.
     """
     try:
+        # Verify the caller owns this download (or is an admin)
+        owner = ApiDependencies.invoker.services.bulk_download.get_owner(bulk_download_item_name)
+        if owner is not None and owner != current_user.user_id and not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Not authorized to access this download")
+
         path = ApiDependencies.invoker.services.bulk_download.get_path(bulk_download_item_name)
 
         response = FileResponse(
@@ -743,6 +750,8 @@ async def get_bulk_download_item(
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         background_tasks.add_task(ApiDependencies.invoker.services.bulk_download.delete, bulk_download_item_name)
         return response
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=404)
 

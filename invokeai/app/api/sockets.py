@@ -347,13 +347,16 @@ class SocketIO:
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
         event_name, event_data = event
-        # Always emit to the bulk_download_id room — this is the room the
-        # frontend subscribes to via subscribe_bulk_download on connect.
-        # Security note: the bulk_download_item_name in the payload is a UUID
-        # that functions as an unguessable capability token. Access control is
-        # enforced at POST /download time (image/board read checks), and the
-        # zip file is deleted after a single fetch. Only authenticated sockets
-        # can subscribe to the bulk_download_id room.
-        await self._sio.emit(
-            event=event_name, data=event_data.model_dump(mode="json"), room=event_data.bulk_download_id
-        )
+        # Route to user-specific + admin rooms so that other authenticated
+        # users cannot learn the bulk_download_item_name (the capability token
+        # needed to fetch the zip from the unauthenticated GET endpoint).
+        # In single-user mode (user_id="system"), fall back to the shared
+        # bulk_download_id room for backward compatibility.
+        if hasattr(event_data, "user_id") and event_data.user_id != "system":
+            user_room = f"user:{event_data.user_id}"
+            await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
+            await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+        else:
+            await self._sio.emit(
+                event=event_name, data=event_data.model_dump(mode="json"), room=event_data.bulk_download_id
+            )

@@ -209,6 +209,11 @@ def _share_board(client: TestClient, token: str, board_id: str) -> None:
     assert r.status_code == status.HTTP_201_CREATED
 
 
+def _set_board_visibility(client: TestClient, token: str, board_id: str, visibility: str) -> None:
+    r = client.patch(f"/api/v1/boards/{board_id}", json={"board_visibility": visibility}, headers=_auth(token))
+    assert r.status_code == status.HTTP_201_CREATED
+
+
 def _create_workflow(client: TestClient, token: str) -> str:
     r = client.post("/api/v1/workflows/", json={"workflow": WORKFLOW_BODY}, headers=_auth(token))
     assert r.status_code == 200
@@ -278,6 +283,24 @@ class TestBoardImageMutationAuth:
             headers=_auth(admin_token),
         )
         assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_non_owner_can_add_own_image_to_public_board(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """Public boards are documented as writable by other authenticated users."""
+        public_board_id = _create_board(client, user1_token, "User1 Public Board")
+        _set_board_visibility(client, user1_token, public_board_id, "public")
+
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        _save_image(mock_invoker, "user2-public-board-img", user2.user_id)
+
+        r = client.post(
+            "/api/v1/board_images/",
+            json={"board_id": public_board_id, "image_name": "user2-public-board-img"},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_201_CREATED
 
     def test_owner_can_add_image_to_own_board(self, client: TestClient, mock_invoker: Invoker, user1_token: str):
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
@@ -633,6 +656,24 @@ class TestImageMutationAuth:
         )
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_non_owner_can_delete_image_from_public_board(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """Public-board semantics promise delete access to images contained in the board."""
+        public_board_id = _create_board(client, user1_token, "User1 Public Delete Board")
+        _set_board_visibility(client, user1_token, public_board_id, "public")
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-public-delete", user1.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(public_board_id, "user1-public-delete")
+
+        r = client.delete(
+            "/api/v1/images/i/user1-public-delete",
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_200_OK
+
     def test_clear_intermediates_non_admin_forbidden(self, client: TestClient, user1_token: str):
         r = client.delete("/api/v1/images/intermediates", headers=_auth(user1_token))
         assert r.status_code == status.HTTP_403_FORBIDDEN
@@ -645,13 +686,30 @@ class TestImageMutationAuth:
         r = client.post("/api/v1/images/download", json={"image_names": ["x"]})
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_get_bulk_download_unauthenticated_returns_404(self, enable_multiuser: Any, client: TestClient):
-        """GET /download/{name} is intentionally unauthenticated (browser <a download>
-        links cannot carry Authorization headers). Access control relies on the
-        UUID filename being unguessable and known only to the authenticated creator.
-        An unknown filename returns 404."""
-        r = client.get("/api/v1/images/download/some-item.zip")
-        assert r.status_code == status.HTTP_404_NOT_FOUND
+    def test_non_owner_cannot_fetch_existing_bulk_download_item(
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        monkeypatch: Any,
+        tmp_path: Any,
+        user1_token: str,
+        user2_token: str,
+    ):
+        """A bulk download zip should be fetchable only by its owner."""
+        from fastapi import BackgroundTasks
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+
+        mock_file = tmp_path / "owned-download.zip"
+        mock_file.write_text("contents")
+
+        monkeypatch.setattr(mock_invoker.services.bulk_download, "get_path", lambda _: str(mock_file))
+        monkeypatch.setattr(mock_invoker.services.bulk_download, "get_owner", lambda _: user1.user_id)
+        monkeypatch.setattr(BackgroundTasks, "add_task", lambda *args, **kwargs: None)
+
+        r = client.get("/api/v1/images/download/owned-download.zip", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
 
     def test_images_by_names_requires_auth(self, enable_multiuser: Any, client: TestClient):
         r = client.post("/api/v1/images/images_by_names", json={"image_names": ["x"]})
@@ -673,6 +731,27 @@ class TestImageMutationAuth:
         assert r.status_code == 200
         # user2 should get an empty list — the image belongs to user1
         assert r.json() == []
+
+    def test_none_board_image_names_only_return_callers_uncategorized_images(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """The uncategorized-images sentinel must not expose other users' image names."""
+        mock_invoker.services.board_images.get_all_board_image_names_for_board.side_effect = (
+            mock_invoker.services.board_image_records.get_all_board_image_names_for_board
+        )
+
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None
+        assert user2 is not None
+
+        _save_image(mock_invoker, "user1-uncategorized-private", user1.user_id)
+        _save_image(mock_invoker, "user2-uncategorized-private", user2.user_id)
+
+        r = client.get("/api/v1/boards/none/image_names", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+        assert "user2-uncategorized-private" in r.json()
+        assert "user1-uncategorized-private" not in r.json()
 
 
 # ===========================================================================
@@ -1396,11 +1475,8 @@ class TestBulkDownloadAccessControl:
         error = BulkDownloadErrorEvent.build("default", "item-3", "item-3.zip", "oops", user_id="owner-abc")
         assert error.user_id == "owner-abc"
 
-    def test_bulk_download_event_emitted_to_download_room(self, mock_invoker: Invoker, monkeypatch: Any):
-        """Verify that _handle_bulk_image_download_event emits to the
-        bulk_download_id room.  Access control for bulk downloads is enforced
-        at POST /download time (image/board read checks), and the zip filename
-        is a UUID capability token deleted after a single fetch."""
+    def test_bulk_download_event_not_emitted_to_shared_default_room(self, mock_invoker: Invoker, monkeypatch: Any):
+        """Bulk download capability tokens must not be broadcast to the shared default room."""
         import asyncio
         from unittest.mock import AsyncMock
 
@@ -1423,7 +1499,8 @@ class TestBulkDownloadAccessControl:
         asyncio.run(socketio._handle_bulk_image_download_event(("bulk_download_complete", event)))
 
         rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
-        assert "default" in rooms_emitted_to
+        assert "default" not in rooms_emitted_to
+        assert "user:owner-xyz" in rooms_emitted_to
 
 
 # ===========================================================================

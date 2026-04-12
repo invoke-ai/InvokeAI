@@ -9,13 +9,26 @@ board_images_router = APIRouter(prefix="/v1/board_images", tags=["boards"])
 
 
 def _assert_board_write_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not mutate the given board."""
+    """Raise 403 if the current user may not mutate the given board.
+
+    Write access is granted when ANY of these hold:
+    - The user is an admin.
+    - The user owns the board.
+    - The board visibility is Public (public boards accept contributions from any user).
+    """
+    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
     try:
         board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
     except Exception:
         raise HTTPException(status_code=404, detail="Board not found")
-    if not current_user.is_admin and board.user_id != current_user.user_id:
-        raise HTTPException(status_code=403, detail="Not authorized to modify this board")
+    if current_user.is_admin:
+        return
+    if board.user_id == current_user.user_id:
+        return
+    if board.board_visibility == BoardVisibility.Public:
+        return
+    raise HTTPException(status_code=403, detail="Not authorized to modify this board")
 
 
 def _assert_image_direct_owner(image_name: str, current_user: CurrentUserOrDefault) -> None:
@@ -55,7 +68,7 @@ async def add_image_to_board(
     try:
         added_images: set[str] = set()
         affected_boards: set[str] = set()
-        old_board_id = ApiDependencies.invoker.services.images.get_dto(image_name).board_id or "none"
+        old_board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name) or "none"
         ApiDependencies.invoker.services.board_images.add_image_to_board(board_id=board_id, image_name=image_name)
         added_images.add(image_name)
         affected_boards.add(board_id)
@@ -126,7 +139,9 @@ async def add_images_to_board(
         for image_name in image_names:
             try:
                 _assert_image_direct_owner(image_name, current_user)
-                old_board_id = ApiDependencies.invoker.services.images.get_dto(image_name).board_id or "none"
+                old_board_id = (
+                    ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name) or "none"
+                )
                 ApiDependencies.invoker.services.board_images.add_image_to_board(
                     board_id=board_id,
                     image_name=image_name,

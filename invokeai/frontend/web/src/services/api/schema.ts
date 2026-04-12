@@ -1269,13 +1269,8 @@ export type paths = {
          * Get Bulk Download Item
          * @description Gets a bulk download zip file.
          *
-         *     This endpoint is intentionally unauthenticated because the frontend triggers
-         *     the download via a browser-navigation ``<a download>`` link, which cannot
-         *     include an Authorization header.  Access control is enforced at creation
-         *     time: the POST /download endpoint validates image/board read access, and the
-         *     UUID-based filename (returned only to the authenticated caller and emitted
-         *     only to the owner's private socket room) serves as an unguessable capability
-         *     token.  The file is also deleted immediately after being served once.
+         *     Requires authentication.  The caller must be the user who initiated the
+         *     download (tracked by the bulk download service) or an admin.
          */
         get: operations["get_bulk_download_item"];
         put?: never;
