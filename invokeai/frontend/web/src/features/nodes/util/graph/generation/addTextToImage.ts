@@ -28,6 +28,7 @@ export const addTextToImage = ({
   | 'flux2_vae_decode'
   | 'sd3_l2i'
   | 'cogview4_l2i'
+  | 'qwen_image_l2i'
   | 'z_image_l2i'
   | 'anima_l2i'
 > => {
@@ -38,6 +39,7 @@ export const addTextToImage = ({
 
   if (
     denoise.type === 'cogview4_denoise' ||
+    denoise.type === 'qwen_image_denoise' ||
     denoise.type === 'flux_denoise' ||
     denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||
