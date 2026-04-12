@@ -57,6 +57,7 @@ export const addOutpaint = async ({
 
   if (
     denoise.type === 'cogview4_denoise' ||
+    denoise.type === 'qwen_image_denoise' ||
     denoise.type === 'flux_denoise' ||
     denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||
