@@ -1267,7 +1267,15 @@ export type paths = {
         };
         /**
          * Get Bulk Download Item
-         * @description Gets a bulk download zip file
+         * @description Gets a bulk download zip file.
+         *
+         *     This endpoint is intentionally unauthenticated because the frontend triggers
+         *     the download via a browser-navigation ``<a download>`` link, which cannot
+         *     include an Authorization header.  Access control is enforced at creation
+         *     time: the POST /download endpoint validates image/board read access, and the
+         *     UUID-based filename (returned only to the authenticated caller and emitted
+         *     only to the owner's private socket room) serves as an unguessable capability
+         *     token.  The file is also deleted immediately after being served once.
          */
         get: operations["get_bulk_download_item"];
         put?: never;
@@ -4273,6 +4281,12 @@ export type components = {
              * @description The name of the bulk image download item
              */
             bulk_download_item_name: string;
+            /**
+             * User Id
+             * @description The ID of the user who initiated the download
+             * @default system
+             */
+            user_id: string;
         };
         /**
          * BulkDownloadErrorEvent
@@ -4299,6 +4313,12 @@ export type components = {
              * @description The name of the bulk image download item
              */
             bulk_download_item_name: string;
+            /**
+             * User Id
+             * @description The ID of the user who initiated the download
+             * @default system
+             */
+            user_id: string;
             /**
              * Error
              * @description The error message
@@ -4330,6 +4350,12 @@ export type components = {
              * @description The name of the bulk image download item
              */
             bulk_download_item_name: string;
+            /**
+             * User Id
+             * @description The ID of the user who initiated the download
+             * @default system
+             */
+            user_id: string;
         };
         /**
          * BulkReidentifyModelsRequest

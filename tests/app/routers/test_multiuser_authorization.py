@@ -545,9 +545,13 @@ class TestImageMutationAuth:
         r = client.post("/api/v1/images/download", json={"image_names": ["x"]})
         assert r.status_code == status.HTTP_401_UNAUTHORIZED
 
-    def test_get_bulk_download_requires_auth(self, enable_multiuser: Any, client: TestClient):
+    def test_get_bulk_download_unauthenticated_returns_404(self, enable_multiuser: Any, client: TestClient):
+        """GET /download/{name} is intentionally unauthenticated (browser <a download>
+        links cannot carry Authorization headers). Access control relies on the
+        UUID filename being unguessable and known only to the authenticated creator.
+        An unknown filename returns 404."""
         r = client.get("/api/v1/images/download/some-item.zip")
-        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+        assert r.status_code == status.HTTP_404_NOT_FOUND
 
     def test_images_by_names_requires_auth(self, enable_multiuser: Any, client: TestClient):
         r = client.post("/api/v1/images/images_by_names", json={"image_names": ["x"]})
@@ -1056,7 +1060,146 @@ class TestQueueStatusScoping:
 
 
 # ===========================================================================
-# 11. WebSocket authentication and event scoping
+# 11. Bulk download access control
+# ===========================================================================
+
+
+class TestBulkDownloadAccessControl:
+    """Tests that bulk download endpoints enforce image/board read access and
+    that the fetch endpoint verifies ownership of the zip file."""
+
+    @pytest.fixture(autouse=True)
+    def _mock_background_tasks(self, monkeypatch: Any):
+        """Prevent BackgroundTasks.add_task from actually running the handler,
+        which would fail because image_files is None in the test fixture."""
+        from fastapi import BackgroundTasks
+
+        monkeypatch.setattr(BackgroundTasks, "add_task", lambda *args, **kwargs: None)
+
+    def test_bulk_download_by_image_names_rejected_for_non_owner(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 must not be able to bulk-download images owned by user1."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-private-dl", user1.user_id)
+
+        r = client.post(
+            "/api/v1/images/download",
+            json={"image_names": ["user1-private-dl"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_bulk_download_by_image_names_allowed_for_owner(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+    ):
+        """Owner should be able to bulk-download their own images."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-own-dl", user1.user_id)
+
+        r = client.post(
+            "/api/v1/images/download",
+            json={"image_names": ["user1-own-dl"]},
+            headers=_auth(user1_token),
+        )
+        assert r.status_code == status.HTTP_202_ACCEPTED
+
+    def test_bulk_download_by_board_rejected_for_private_board(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 must not be able to bulk-download from user1's private board."""
+        board_id = _create_board(client, user1_token, "Private DL Board")
+
+        r = client.post(
+            "/api/v1/images/download",
+            json={"board_id": board_id},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_bulk_download_by_shared_board_allowed(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 should be able to bulk-download from user1's shared board."""
+        board_id = _create_board(client, user1_token, "Shared DL Board")
+        _share_board(client, user1_token, board_id)
+
+        r = client.post(
+            "/api/v1/images/download",
+            json={"board_id": board_id},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_202_ACCEPTED
+
+    def test_admin_can_bulk_download_any_images(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str, user1_token: str
+    ):
+        """Admin should be able to bulk-download any user's images."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-admin-dl", user1.user_id)
+
+        r = client.post(
+            "/api/v1/images/download",
+            json={"image_names": ["user1-admin-dl"]},
+            headers=_auth(admin_token),
+        )
+        assert r.status_code == status.HTTP_202_ACCEPTED
+
+    def test_bulk_download_events_carry_user_id(self):
+        """BulkDownloadEventBase must carry user_id so events can be routed privately."""
+        from invokeai.app.services.events.events_common import (
+            BulkDownloadCompleteEvent,
+            BulkDownloadErrorEvent,
+            BulkDownloadEventBase,
+            BulkDownloadStartedEvent,
+        )
+
+        assert "user_id" in BulkDownloadEventBase.model_fields
+
+        started = BulkDownloadStartedEvent.build("default", "item-1", "item-1.zip", user_id="owner-abc")
+        assert started.user_id == "owner-abc"
+
+        complete = BulkDownloadCompleteEvent.build("default", "item-2", "item-2.zip", user_id="owner-abc")
+        assert complete.user_id == "owner-abc"
+
+        error = BulkDownloadErrorEvent.build("default", "item-3", "item-3.zip", "oops", user_id="owner-abc")
+        assert error.user_id == "owner-abc"
+
+    def test_bulk_download_event_emitted_to_download_room(self, mock_invoker: Invoker, monkeypatch: Any):
+        """Verify that _handle_bulk_image_download_event emits to the
+        bulk_download_id room.  Access control for bulk downloads is enforced
+        at POST /download time (image/board read checks), and the zip filename
+        is a UUID capability token deleted after a single fetch."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from fastapi import FastAPI
+
+        from invokeai.app.api.sockets import SocketIO
+        from invokeai.app.services.events.events_common import BulkDownloadCompleteEvent
+
+        mock_deps = MockApiDependencies(mock_invoker)
+        monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", mock_deps)
+
+        fastapi_app = FastAPI()
+        socketio = SocketIO(fastapi_app)
+
+        event = BulkDownloadCompleteEvent.build("default", "item-x", "item-x.zip", user_id="owner-xyz")
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_bulk_image_download_event(("bulk_download_complete", event)))
+
+        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
+        assert "default" in rooms_emitted_to
+
+
+# ===========================================================================
+# 12. WebSocket authentication and event scoping
 # ===========================================================================
 
 

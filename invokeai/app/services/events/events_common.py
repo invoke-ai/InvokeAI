@@ -611,6 +611,7 @@ class BulkDownloadEventBase(EventBase):
     bulk_download_id: str = Field(description="The ID of the bulk image download")
     bulk_download_item_id: str = Field(description="The ID of the bulk image download item")
     bulk_download_item_name: str = Field(description="The name of the bulk image download item")
+    user_id: str = Field(default="system", description="The ID of the user who initiated the download")
 
 
 @payload_schema.register
@@ -621,12 +622,17 @@ class BulkDownloadStartedEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> "BulkDownloadStartedEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
+            user_id=user_id,
         )
 
 
@@ -638,12 +644,17 @@ class BulkDownloadCompleteEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> "BulkDownloadCompleteEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
+            user_id=user_id,
         )
 
 
@@ -657,13 +668,19 @@ class BulkDownloadErrorEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, error: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        error: str,
+        user_id: str = "system",
     ) -> "BulkDownloadErrorEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
             error=error,
+            user_id=user_id,
         )
 
 

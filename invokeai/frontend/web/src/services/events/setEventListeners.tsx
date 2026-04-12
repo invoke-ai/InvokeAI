@@ -28,7 +28,7 @@ import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
-import { toast } from 'features/toast/toast';
+import { toast, toastApi } from 'features/toast/toast';
 import { t } from 'i18next';
 import { LRUCache } from 'lru-cache';
 import { Trans } from 'react-i18next';
@@ -855,6 +855,11 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug({ data }, 'Bulk gallery download ready');
     const { bulk_download_item_name } = data;
 
+    // Dismiss the "preparing" toast (which uses a prefixed id to avoid the
+    // race condition where this socket event arrives before the Redux
+    // middleware processes the POST response).
+    toastApi.close(`preparing:${bulk_download_item_name}`);
+
     // TODO(psyche): This URL may break in in some environments (e.g. Nvidia workbench) but we need to test it first
     const url = `/api/v1/images/download/${bulk_download_item_name}`;
 
@@ -871,6 +876,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.error({ data }, 'Bulk gallery download error');
 
     const { bulk_download_item_name, error } = data;
+
+    // Dismiss the "preparing" toast
+    toastApi.close(`preparing:${bulk_download_item_name}`);
 
     toast({
       id: bulk_download_item_name,

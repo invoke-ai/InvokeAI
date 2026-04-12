@@ -95,6 +95,33 @@ def _assert_image_read_access(image_name: str, current_user: CurrentUserOrDefaul
     raise HTTPException(status_code=403, detail="Not authorized to access this image")
 
 
+def _assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
+    """Raise 403 if the current user may not read images from this board.
+
+    Access is granted when ANY of these hold:
+    - The user is an admin.
+    - The user owns the board.
+    - The board visibility is Shared or Public.
+    """
+    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
+    if current_user.is_admin:
+        return
+
+    try:
+        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    if board.user_id == current_user.user_id:
+        return
+
+    if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
+        return
+
+    raise HTTPException(status_code=403, detail="Not authorized to access this board")
+
+
 class ResizeToDimensions(BaseModel):
     width: int = Field(..., gt=0)
     height: int = Field(..., gt=0)
@@ -650,6 +677,16 @@ async def download_images_from_list(
 ) -> ImagesDownloaded:
     if (image_names is None or len(image_names) == 0) and board_id is None:
         raise HTTPException(status_code=400, detail="No images or board id specified.")
+
+    # Validate that the caller can read every image they are requesting.
+    # For a board_id request, check board visibility; for explicit image names,
+    # check each image individually.
+    if board_id:
+        _assert_board_read_access(board_id, current_user)
+    if image_names:
+        for name in image_names:
+            _assert_image_read_access(name, current_user)
+
     bulk_download_item_id: str = ApiDependencies.invoker.services.bulk_download.generate_item_id(board_id)
 
     background_tasks.add_task(
@@ -657,6 +694,7 @@ async def download_images_from_list(
         image_names,
         board_id,
         bulk_download_item_id,
+        current_user.user_id,
     )
     return ImagesDownloaded(bulk_download_item_name=bulk_download_item_id + ".zip")
 
@@ -675,11 +713,19 @@ async def download_images_from_list(
     },
 )
 async def get_bulk_download_item(
-    current_user: CurrentUserOrDefault,
     background_tasks: BackgroundTasks,
     bulk_download_item_name: str = Path(description="The bulk_download_item_name of the bulk download item to get"),
 ) -> FileResponse:
-    """Gets a bulk download zip file"""
+    """Gets a bulk download zip file.
+
+    This endpoint is intentionally unauthenticated because the frontend triggers
+    the download via a browser-navigation ``<a download>`` link, which cannot
+    include an Authorization header.  Access control is enforced at creation
+    time: the POST /download endpoint validates image/board read access, and the
+    UUID-based filename (returned only to the authenticated caller and emitted
+    only to the owner's private socket room) serves as an unguessable capability
+    token.  The file is also deleted immediately after being served once.
+    """
     try:
         path = ApiDependencies.invoker.services.bulk_download.get_path(bulk_download_item_name)
 

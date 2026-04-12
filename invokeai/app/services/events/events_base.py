@@ -194,23 +194,42 @@ class EventServiceBase:
     # region Bulk image download
 
     def emit_bulk_download_started(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> None:
         """Emitted when a bulk image download is started"""
-        self.dispatch(BulkDownloadStartedEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name))
+        self.dispatch(
+            BulkDownloadStartedEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id)
+        )
 
     def emit_bulk_download_complete(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> None:
         """Emitted when a bulk image download is complete"""
-        self.dispatch(BulkDownloadCompleteEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name))
+        self.dispatch(
+            BulkDownloadCompleteEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id)
+        )
 
     def emit_bulk_download_error(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, error: str
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        error: str,
+        user_id: str = "system",
     ) -> None:
         """Emitted when a bulk image download has an error"""
         self.dispatch(
-            BulkDownloadErrorEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name, error)
+            BulkDownloadErrorEvent.build(
+                bulk_download_id, bulk_download_item_id, bulk_download_item_name, error, user_id
+            )
         )
 
     # endregion

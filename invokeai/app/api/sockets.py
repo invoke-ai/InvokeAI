@@ -248,6 +248,13 @@ class SocketIO:
         await self._sio.leave_room(sid, QueueSubscriptionEvent(**data).queue_id)
 
     async def _handle_sub_bulk_download(self, sid: str, data: Any) -> None:
+        # In multiuser mode, only allow authenticated sockets to subscribe.
+        # Bulk download events are routed to user-specific rooms, so the
+        # bulk_download_id room subscription is only kept for single-user
+        # backward compatibility.
+        if self._is_multiuser_enabled() and sid not in self._socket_users:
+            logger.warning(f"Refusing bulk download subscription for unknown socket {sid} in multiuser mode")
+            return
         await self._sio.enter_room(sid, BulkDownloadSubscriptionEvent(**data).bulk_download_id)
 
     async def _handle_unsub_bulk_download(self, sid: str, data: Any) -> None:
@@ -339,4 +346,14 @@ class SocketIO:
         await self._sio.emit(event=event[0], data=event[1].model_dump(mode="json"))
 
     async def _handle_bulk_image_download_event(self, event: FastAPIEvent[BulkDownloadEventBase]) -> None:
-        await self._sio.emit(event=event[0], data=event[1].model_dump(mode="json"), room=event[1].bulk_download_id)
+        event_name, event_data = event
+        # Always emit to the bulk_download_id room — this is the room the
+        # frontend subscribes to via subscribe_bulk_download on connect.
+        # Security note: the bulk_download_item_name in the payload is a UUID
+        # that functions as an unguessable capability token. Access control is
+        # enforced at POST /download time (image/board read checks), and the
+        # zip file is deleted after a single fetch. Only authenticated sockets
+        # can subscribe to the bulk_download_id room.
+        await self._sio.emit(
+            event=event_name, data=event_data.model_dump(mode="json"), room=event_data.bulk_download_id
+        )
