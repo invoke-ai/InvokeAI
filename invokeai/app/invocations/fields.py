@@ -171,6 +171,8 @@ class FieldDescriptions:
     sd3_model = "SD3 model (MMDiTX) to load"
     cogview4_model = "CogView4 model (Transformer) to load"
     z_image_model = "Z-Image model (Transformer) to load"
+    qwen_image_model = "Qwen Image Edit model (Transformer) to load"
+    qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -332,6 +334,27 @@ class CogView4ConditioningField(BaseModel):
 
 class ZImageConditioningField(BaseModel):
     """A Z-Image conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+    mask: Optional[TensorField] = Field(
+        default=None,
+        description="The mask associated with this conditioning tensor for regional prompting. "
+        "Excluded regions should be set to False, included regions should be set to True.",
+    )
+
+
+class QwenImageConditioningField(BaseModel):
+    """A Qwen Image Edit conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class AnimaConditioningField(BaseModel):
+    """An Anima conditioning tensor primitive value.
+
+    Anima conditioning contains Qwen3 0.6B hidden states and T5-XXL token IDs,
+    which are combined by the LLM Adapter inside the transformer.
+    """
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
     mask: Optional[TensorField] = Field(
