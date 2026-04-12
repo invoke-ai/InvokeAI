@@ -49,4 +49,4 @@ def test_qwen_gguf_config_sets_a_variant_for_imported_models(is_edit_model: bool
     if is_edit_model:
         assert config.variant == "edit"
     else:
-        assert config.variant is None
+        assert config.variant == "generate"
