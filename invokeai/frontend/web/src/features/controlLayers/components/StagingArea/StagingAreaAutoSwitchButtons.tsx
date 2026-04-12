@@ -7,9 +7,11 @@ import {
   settingsStagingAreaAutoSwitchChanged,
 } from 'features/controlLayers/store/canvasSettingsSlice';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCaretLineRightBold, PiCaretRightBold, PiMoonBold } from 'react-icons/pi';
 
 export const StagingAreaAutoSwitchButtons = memo(() => {
+  const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const shouldShowStagedImage = useStore(canvasManager.stagingArea.$shouldShowStagedImage);
 
@@ -29,24 +31,24 @@ export const StagingAreaAutoSwitchButtons = memo(() => {
   return (
     <>
       <IconButton
-        aria-label="Do not auto-switch"
-        tooltip="Do not auto-switch"
+        aria-label={t('controlLayers.autoSwitch.doNotAutoSwitch')}
+        tooltip={t('controlLayers.autoSwitch.doNotAutoSwitch')}
         icon={<PiMoonBold />}
         colorScheme={autoSwitch === 'off' ? 'invokeBlue' : 'base'}
         onClick={onClickOff}
         isDisabled={!shouldShowStagedImage}
       />
       <IconButton
-        aria-label="Switch on start"
-        tooltip="Switch on start"
+        aria-label={t('controlLayers.autoSwitch.switchOnStartDesc')}
+        tooltip={t('controlLayers.autoSwitch.switchOnStartDesc')}
         icon={<PiCaretRightBold />}
         colorScheme={autoSwitch === 'switch_on_start' ? 'invokeBlue' : 'base'}
         onClick={onClickSwitchOnStart}
         isDisabled={!shouldShowStagedImage}
       />
       <IconButton
-        aria-label="Switch on finish"
-        tooltip="Switch on finish"
+        aria-label={t('controlLayers.autoSwitch.switchOnFinishDesc')}
+        tooltip={t('controlLayers.autoSwitch.switchOnFinishDesc')}
         icon={<PiCaretLineRightBold />}
         colorScheme={autoSwitch === 'switch_on_finish' ? 'invokeBlue' : 'base'}
         onClick={onClickSwitchOnFinished}
