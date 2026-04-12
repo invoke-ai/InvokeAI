@@ -42,28 +42,36 @@ vi.mock('./graphBuilderUtils', () => ({
 
 import { buildFluxMultidiffusionUpscaleGraph } from './buildFluxMultidiffusionUpscaleGraph';
 
-const makeState = (overrides?: { tileControlnetModel?: typeof tileControlnetModel | null }) =>
+const defaultUpscale = {
+  upscaleModel,
+  upscaleInitialImage,
+  structure: 0,
+  creativity: 5,
+  tileControlnetModel,
+  scale: 2,
+  tileSize: 512,
+  tileOverlap: 128,
+};
+
+const defaultParams = {
+  model: fluxModel,
+  steps: 20,
+  guidance: 3.5,
+  fluxScheduler: 'euler',
+  t5EncoderModel,
+  clipEmbedModel,
+  fluxVAE,
+};
+
+type NullablePartial<T> = { [K in keyof T]?: T[K] | null };
+
+const makeState = (overrides?: {
+  params?: NullablePartial<typeof defaultParams>;
+  upscale?: NullablePartial<typeof defaultUpscale>;
+}) =>
   ({
-    params: {
-      model: fluxModel,
-      steps: 20,
-      guidance: 3.5,
-      fluxScheduler: 'euler',
-      t5EncoderModel,
-      clipEmbedModel,
-      fluxVAE,
-    },
-    upscale: {
-      upscaleModel,
-      upscaleInitialImage,
-      structure: 0,
-      creativity: 5,
-      tileControlnetModel:
-        overrides?.tileControlnetModel !== undefined ? overrides.tileControlnetModel : tileControlnetModel,
-      scale: 2,
-      tileSize: 512,
-      tileOverlap: 128,
-    },
+    params: { ...defaultParams, ...overrides?.params },
+    upscale: { ...defaultUpscale, ...overrides?.upscale },
     gallery: { autoAddBoardId: 'none' },
   }) as never;
 
@@ -96,7 +104,7 @@ describe('buildFluxMultidiffusionUpscaleGraph', () => {
     });
 
     it('omits controlnet nodes when tileControlnetModel is null', async () => {
-      const { g } = await buildFluxMultidiffusionUpscaleGraph(makeState({ tileControlnetModel: null }));
+      const { g } = await buildFluxMultidiffusionUpscaleGraph(makeState({ upscale: { tileControlnetModel: null } }));
       const graph = g.getGraph();
       const types = Object.values(graph.nodes).map((n) => n.type);
 
@@ -126,21 +134,19 @@ describe('buildFluxMultidiffusionUpscaleGraph', () => {
 
   describe('assertions', () => {
     it('throws when model is missing', async () => {
-      const state = makeState();
-      (state as never as Record<string, Record<string, unknown>>).params.model = null;
-      await expect(buildFluxMultidiffusionUpscaleGraph(state)).rejects.toThrow();
+      await expect(buildFluxMultidiffusionUpscaleGraph(makeState({ params: { model: null } }))).rejects.toThrow();
     });
 
     it('throws when upscaleModel is missing', async () => {
-      const state = makeState();
-      (state as never as Record<string, Record<string, unknown>>).upscale.upscaleModel = null;
-      await expect(buildFluxMultidiffusionUpscaleGraph(state)).rejects.toThrow();
+      await expect(
+        buildFluxMultidiffusionUpscaleGraph(makeState({ upscale: { upscaleModel: null } }))
+      ).rejects.toThrow();
     });
 
     it('throws when t5EncoderModel is missing', async () => {
-      const state = makeState();
-      (state as never as Record<string, Record<string, unknown>>).params.t5EncoderModel = null;
-      await expect(buildFluxMultidiffusionUpscaleGraph(state)).rejects.toThrow();
+      await expect(
+        buildFluxMultidiffusionUpscaleGraph(makeState({ params: { t5EncoderModel: null } }))
+      ).rejects.toThrow();
     });
   });
 });

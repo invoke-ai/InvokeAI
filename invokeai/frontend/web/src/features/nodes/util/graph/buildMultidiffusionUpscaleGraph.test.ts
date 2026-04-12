@@ -48,26 +48,35 @@ vi.mock('./graphBuilderUtils', () => ({
 
 import { buildMultidiffusionUpscaleGraph } from './buildMultidiffusionUpscaleGraph';
 
-const makeState = (model = sdxlModel) =>
+const defaultParams = {
+  model: sdxlModel,
+  upscaleCfgScale: 7,
+  upscaleScheduler: 'euler',
+  steps: 20,
+  vaePrecision: 'fp16',
+  vae: null,
+};
+
+const defaultUpscale = {
+  upscaleModel,
+  upscaleInitialImage,
+  structure: 0,
+  creativity: 5,
+  tileControlnetModel,
+  scale: 2,
+  tileSize: 512,
+  tileOverlap: 128,
+};
+
+type NullablePartial<T> = { [K in keyof T]?: T[K] | null };
+
+const makeState = (overrides?: {
+  params?: NullablePartial<typeof defaultParams>;
+  upscale?: NullablePartial<typeof defaultUpscale>;
+}) =>
   ({
-    params: {
-      model,
-      upscaleCfgScale: 7,
-      upscaleScheduler: 'euler',
-      steps: 20,
-      vaePrecision: 'fp16',
-      vae: null,
-    },
-    upscale: {
-      upscaleModel,
-      upscaleInitialImage,
-      structure: 0,
-      creativity: 5,
-      tileControlnetModel,
-      scale: 2,
-      tileSize: 512,
-      tileOverlap: 128,
-    },
+    params: { ...defaultParams, ...overrides?.params },
+    upscale: { ...defaultUpscale, ...overrides?.upscale },
     gallery: { autoAddBoardId: 'none' },
   }) as never;
 
@@ -78,7 +87,7 @@ describe('buildMultidiffusionUpscaleGraph', () => {
 
   describe('SDXL graph structure', () => {
     it('includes the expected core nodes', async () => {
-      const { g } = await buildMultidiffusionUpscaleGraph(makeState(sdxlModel));
+      const { g } = await buildMultidiffusionUpscaleGraph(makeState());
       const graph = g.getGraph();
       const types = Object.values(graph.nodes).map((n) => n.type);
 
@@ -93,7 +102,7 @@ describe('buildMultidiffusionUpscaleGraph', () => {
     });
 
     it('sets the l2i node as non-intermediate (final output)', async () => {
-      const { g } = await buildMultidiffusionUpscaleGraph(makeState(sdxlModel));
+      const { g } = await buildMultidiffusionUpscaleGraph(makeState());
       const graph = g.getGraph();
       const l2i = Object.values(graph.nodes).find((n) => n.type === 'l2i');
 
@@ -101,7 +110,7 @@ describe('buildMultidiffusionUpscaleGraph', () => {
     });
 
     it('includes two controlnet nodes for tile guidance', async () => {
-      const { g } = await buildMultidiffusionUpscaleGraph(makeState(sdxlModel));
+      const { g } = await buildMultidiffusionUpscaleGraph(makeState());
       const graph = g.getGraph();
       const cnNodes = Object.values(graph.nodes).filter((n) => n.type === 'controlnet');
 
@@ -111,7 +120,7 @@ describe('buildMultidiffusionUpscaleGraph', () => {
 
   describe('SD1.5 graph structure', () => {
     it('uses main_model_loader and clip_skip for SD1.5', async () => {
-      const { g } = await buildMultidiffusionUpscaleGraph(makeState(sd1Model));
+      const { g } = await buildMultidiffusionUpscaleGraph(makeState({ params: { model: sd1Model } }));
       const graph = g.getGraph();
       const types = Object.values(graph.nodes).map((n) => n.type);
 
@@ -124,21 +133,19 @@ describe('buildMultidiffusionUpscaleGraph', () => {
 
   describe('assertions', () => {
     it('throws when model is missing', async () => {
-      const state = makeState();
-      (state as never as Record<string, Record<string, unknown>>).params.model = null;
-      await expect(buildMultidiffusionUpscaleGraph(state)).rejects.toThrow();
+      await expect(buildMultidiffusionUpscaleGraph(makeState({ params: { model: null } }))).rejects.toThrow();
     });
 
     it('throws when tileControlnetModel is missing', async () => {
-      const state = makeState();
-      (state as never as Record<string, Record<string, unknown>>).upscale.tileControlnetModel = null;
-      await expect(buildMultidiffusionUpscaleGraph(state)).rejects.toThrow();
+      await expect(
+        buildMultidiffusionUpscaleGraph(makeState({ upscale: { tileControlnetModel: null } }))
+      ).rejects.toThrow();
     });
 
     it('throws when upscaleInitialImage is missing', async () => {
-      const state = makeState();
-      (state as never as Record<string, Record<string, unknown>>).upscale.upscaleInitialImage = null;
-      await expect(buildMultidiffusionUpscaleGraph(state)).rejects.toThrow();
+      await expect(
+        buildMultidiffusionUpscaleGraph(makeState({ upscale: { upscaleInitialImage: null } }))
+      ).rejects.toThrow();
     });
   });
 });

@@ -1,3 +1,4 @@
+import { assert } from 'tsafe';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 let nextId = 0;
@@ -41,27 +42,35 @@ vi.mock('./graphBuilderUtils', () => ({
 
 import { buildZImageMultidiffusionUpscaleGraph } from './buildZImageMultidiffusionUpscaleGraph';
 
-const makeState = (overrides?: { tileControlnetModel?: typeof tileControlnetModel | null }) =>
+const defaultParams = {
+  model: zImageModel,
+  steps: 20,
+  zImageScheduler: 'euler',
+  zImageVaeModel,
+  zImageQwen3EncoderModel,
+  zImageQwen3SourceModel: null,
+};
+
+const defaultUpscale = {
+  upscaleModel,
+  upscaleInitialImage,
+  structure: 0,
+  creativity: 5,
+  tileControlnetModel,
+  scale: 2,
+  tileSize: 512,
+  tileOverlap: 128,
+};
+
+type NullablePartial<T> = { [K in keyof T]?: T[K] | null };
+
+const makeState = (overrides?: {
+  params?: NullablePartial<typeof defaultParams>;
+  upscale?: NullablePartial<typeof defaultUpscale>;
+}) =>
   ({
-    params: {
-      model: zImageModel,
-      steps: 20,
-      zImageScheduler: 'euler',
-      zImageVaeModel,
-      zImageQwen3EncoderModel,
-      zImageQwen3SourceModel: null,
-    },
-    upscale: {
-      upscaleModel,
-      upscaleInitialImage,
-      structure: 0,
-      creativity: 5,
-      tileControlnetModel:
-        overrides?.tileControlnetModel !== undefined ? overrides.tileControlnetModel : tileControlnetModel,
-      scale: 2,
-      tileSize: 512,
-      tileOverlap: 128,
-    },
+    params: { ...defaultParams, ...overrides?.params },
+    upscale: { ...defaultUpscale, ...overrides?.upscale },
     gallery: { autoAddBoardId: 'none' },
   }) as never;
 
@@ -94,7 +103,7 @@ describe('buildZImageMultidiffusionUpscaleGraph', () => {
     });
 
     it('omits controlnet node when tileControlnetModel is null', async () => {
-      const { g } = await buildZImageMultidiffusionUpscaleGraph(makeState({ tileControlnetModel: null }));
+      const { g } = await buildZImageMultidiffusionUpscaleGraph(makeState({ upscale: { tileControlnetModel: null } }));
       const graph = g.getGraph();
       const types = Object.values(graph.nodes).map((n) => n.type);
 
@@ -106,7 +115,8 @@ describe('buildZImageMultidiffusionUpscaleGraph', () => {
       const graph = g.getGraph();
       const denoise = Object.values(graph.nodes).find((n) => n.type === 'tiled_z_image_denoise');
 
-      expect((denoise as never as Record<string, unknown>).guidance_scale).toBe(1.0);
+      assert(denoise && 'guidance_scale' in denoise);
+      expect(denoise.guidance_scale).toBe(1.0);
     });
 
     it('sets the l2i node as non-intermediate (final output)', async () => {
@@ -120,21 +130,19 @@ describe('buildZImageMultidiffusionUpscaleGraph', () => {
 
   describe('assertions', () => {
     it('throws when model is missing', async () => {
-      const state = makeState();
-      (state as never as Record<string, Record<string, unknown>>).params.model = null;
-      await expect(buildZImageMultidiffusionUpscaleGraph(state)).rejects.toThrow();
+      await expect(buildZImageMultidiffusionUpscaleGraph(makeState({ params: { model: null } }))).rejects.toThrow();
     });
 
     it('throws when upscaleModel is missing', async () => {
-      const state = makeState();
-      (state as never as Record<string, Record<string, unknown>>).upscale.upscaleModel = null;
-      await expect(buildZImageMultidiffusionUpscaleGraph(state)).rejects.toThrow();
+      await expect(
+        buildZImageMultidiffusionUpscaleGraph(makeState({ upscale: { upscaleModel: null } }))
+      ).rejects.toThrow();
     });
 
     it('throws when upscaleInitialImage is missing', async () => {
-      const state = makeState();
-      (state as never as Record<string, Record<string, unknown>>).upscale.upscaleInitialImage = null;
-      await expect(buildZImageMultidiffusionUpscaleGraph(state)).rejects.toThrow();
+      await expect(
+        buildZImageMultidiffusionUpscaleGraph(makeState({ upscale: { upscaleInitialImage: null } }))
+      ).rejects.toThrow();
     });
   });
 });
