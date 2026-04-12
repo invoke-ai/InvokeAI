@@ -11292,7 +11292,10 @@ export type components = {
              */
             type: "gradient_mask_output";
         };
-        /** Graph */
+        /**
+         * Graph
+         * @description A validated invocation graph made of nodes and typed edges.
+         */
         Graph: {
             /**
              * Id
@@ -11314,7 +11317,7 @@ export type components = {
         };
         /**
          * GraphExecutionState
-         * @description Tracks the state of a graph execution
+         * @description Tracks source-graph expansion, execution progress, and runtime results.
          */
         GraphExecutionState: {
             /**
@@ -29070,6 +29073,12 @@ export type components = {
              */
             vae?: components["schemas"]["VAEField"] | null;
             /**
+             * Shift
+             * @description Override the timestep shift (mu) for the sigma schedule. Leave blank to auto-calculate based on image dimensions (recommended). Lower values (~0.5) produce less noise shifting, higher values (~1.15) produce more.
+             * @default null
+             */
+            shift?: number | null;
+            /**
              * Scheduler
              * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended. Heun is 2nd-order (better quality, 2x slower). LCM works with Turbo only (not Base).
              * @default euler
@@ -29196,6 +29205,12 @@ export type components = {
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
+            /**
+             * Shift
+             * @description Override the timestep shift (mu) for the sigma schedule. Leave blank to auto-calculate based on image dimensions (recommended). Lower values (~0.5) produce less noise shifting, higher values (~1.15) produce more.
+             * @default null
+             */
+            shift?: number | null;
             /**
              * Scheduler
              * @description Scheduler (sampler) for the denoising process. Euler is the default and recommended. Heun is 2nd-order (better quality, 2x slower). LCM works with Turbo only (not Base).

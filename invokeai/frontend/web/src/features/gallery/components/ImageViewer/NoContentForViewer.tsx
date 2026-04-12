@@ -48,9 +48,19 @@ export const NoContentForViewer = memo(() => {
 NoContentForViewer.displayName = 'NoContentForViewer';
 
 const LoadingSpinner = () => {
+  const { t } = useTranslation();
   return (
     <Flex position="relative" width="full" height="full" alignItems="center" justifyContent="center">
-      <Spinner label="Loading" color="grey" position="absolute" size="sm" width={8} height={8} right={4} bottom={4} />
+      <Spinner
+        label={t('common.loading')}
+        color="grey"
+        position="absolute"
+        size="sm"
+        width={8}
+        height={8}
+        right={4}
+        bottom={4}
+      />
     </Flex>
   );
 };
