@@ -278,9 +278,7 @@ class TestBoardImageMutationAuth:
         )
         assert r.status_code != status.HTTP_403_FORBIDDEN
 
-    def test_owner_can_add_image_to_own_board(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str
-    ):
+    def test_owner_can_add_image_to_own_board(self, client: TestClient, mock_invoker: Invoker, user1_token: str):
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
         assert user1 is not None
         _save_image(mock_invoker, "user1-own-board-img", user1.user_id)
