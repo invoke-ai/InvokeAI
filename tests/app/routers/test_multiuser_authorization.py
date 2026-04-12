@@ -1125,14 +1125,64 @@ class TestWebSocketAuth:
         import asyncio
 
         from invokeai.app.services.auth.token_service import TokenData, create_access_token
+        from invokeai.app.services.users.users_common import UserCreateRequest
 
         mock_invoker.services.configuration.multiuser = True
-        token = create_access_token(TokenData(user_id="real-user", email="real@test.com", is_admin=False))
+
+        # Create the user in the database so the active-user check passes
+        user = mock_invoker.services.users.create(
+            UserCreateRequest(email="real@test.com", display_name="Real User", password="Test1234!@#$")
+        )
+        token = create_access_token(TokenData(user_id=user.user_id, email=user.email, is_admin=False))
 
         result = asyncio.run(socketio._handle_connect("sid-good-1", environ={}, auth={"token": token}))
         assert result is True
-        assert socketio._socket_users["sid-good-1"]["user_id"] == "real-user"
+        assert socketio._socket_users["sid-good-1"]["user_id"] == user.user_id
         assert socketio._socket_users["sid-good-1"]["is_admin"] is False
+
+    def test_connect_rejected_for_deleted_user_in_multiuser_mode(
+        self, socketio: Any, mock_invoker: Invoker, setup_jwt_secret: None
+    ) -> None:
+        """A structurally valid JWT for a user that no longer exists in the database
+        must be rejected.  This mirrors the REST auth check in auth_dependencies.py:53-58."""
+        import asyncio
+
+        from invokeai.app.services.auth.token_service import TokenData, create_access_token
+
+        mock_invoker.services.configuration.multiuser = True
+        # Create a token for a user_id that was never created in the user service
+        token = create_access_token(TokenData(user_id="deleted-user-999", email="gone@test.com", is_admin=False))
+
+        result = asyncio.run(socketio._handle_connect("sid-deleted-1", environ={}, auth={"token": token}))
+        assert result is False
+        assert "sid-deleted-1" not in socketio._socket_users
+
+    def test_connect_rejected_for_inactive_user_in_multiuser_mode(
+        self, socketio: Any, mock_invoker: Invoker, setup_jwt_secret: None
+    ) -> None:
+        """A structurally valid JWT for a deactivated user must be rejected even though
+        the token itself has not expired."""
+        import asyncio
+
+        from invokeai.app.services.auth.token_service import TokenData, create_access_token
+        from invokeai.app.services.users.users_common import UserCreateRequest
+
+        mock_invoker.services.configuration.multiuser = True
+
+        # Create a real user, then deactivate them
+        user = mock_invoker.services.users.create(
+            UserCreateRequest(email="inactive@test.com", display_name="Inactive", password="Test1234!@#$")
+        )
+        token = create_access_token(TokenData(user_id=user.user_id, email=user.email, is_admin=False))
+
+        # Deactivate the user
+        from invokeai.app.services.users.users_common import UserUpdateRequest
+
+        mock_invoker.services.users.update(user.user_id, UserUpdateRequest(is_active=False))
+
+        result = asyncio.run(socketio._handle_connect("sid-inactive-1", environ={}, auth={"token": token}))
+        assert result is False
+        assert "sid-inactive-1" not in socketio._socket_users
 
     def test_sub_queue_refuses_unknown_socket_in_multiuser_mode(self, socketio: Any, mock_invoker: Invoker) -> None:
         """If a socket somehow reaches _handle_sub_queue without a recorded identity

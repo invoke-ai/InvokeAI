@@ -142,6 +142,23 @@ class SocketIO:
         if token:
             token_data = verify_token(token)
             if token_data:
+                # In multiuser mode, also verify the backing user record still
+                # exists and is active — mirrors the REST auth check in
+                # auth_dependencies.py.  A deleted or deactivated user whose
+                # JWT has not yet expired must not be allowed to open a socket.
+                if self._is_multiuser_enabled():
+                    try:
+                        from invokeai.app.api.dependencies import ApiDependencies
+
+                        user = ApiDependencies.invoker.services.users.get(token_data.user_id)
+                        if user is None or not user.is_active:
+                            logger.warning(f"Rejecting socket {sid}: user {token_data.user_id} not found or inactive")
+                            return False
+                    except Exception:
+                        # If user service is unavailable, fail closed
+                        logger.warning(f"Rejecting socket {sid}: unable to verify user record")
+                        return False
+
                 # Store user_id and is_admin in socket users dict
                 self._socket_users[sid] = {
                     "user_id": token_data.user_id,
