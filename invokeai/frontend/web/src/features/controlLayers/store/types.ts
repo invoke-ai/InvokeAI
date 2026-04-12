@@ -370,6 +370,13 @@ const zFlux2ReferenceImageConfig = z.object({
 });
 export type Flux2ReferenceImageConfig = z.infer<typeof zFlux2ReferenceImageConfig>;
 
+// Qwen Image Edit has built-in reference image support - no separate model needed
+const zQwenImageReferenceImageConfig = z.object({
+  type: z.literal('qwen_image_reference_image'),
+  image: zCroppableImageWithDims.nullable(),
+});
+export type QwenImageReferenceImageConfig = z.infer<typeof zQwenImageReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -385,6 +392,7 @@ export const zRefImageState = z.object({
     zFLUXReduxConfig,
     zFluxKontextReferenceImageConfig,
     zFlux2ReferenceImageConfig,
+    zQwenImageReferenceImageConfig,
   ]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
@@ -401,6 +409,10 @@ export const isFluxKontextReferenceImageConfig = (
 
 export const isFlux2ReferenceImageConfig = (config: RefImageState['config']): config is Flux2ReferenceImageConfig =>
   config.type === 'flux2_reference_image';
+
+export const isQwenImageReferenceImageConfig = (
+  config: RefImageState['config']
+): config is QwenImageReferenceImageConfig => config.type === 'qwen_image_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -717,6 +729,7 @@ export const zParamsState = z.object({
   fluxDypeScale: zParameterFluxDypeScale,
   fluxDypeExponent: zParameterFluxDypeExponent,
   zImageScheduler: zParameterZImageScheduler,
+  zImageShift: z.number().min(0).max(3).nullable(),
   upscaleScheduler: zParameterScheduler,
   upscaleCfgScale: zParameterCFGScale,
   seed: zParameterSeed,
@@ -750,9 +763,18 @@ export const zParamsState = z.object({
   zImageVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX VAE
   zImageQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder
   zImageQwen3SourceModel: zParameterModel.nullable(), // Diffusers Z-Image model (fallback for VAE/Encoder)
+  // Anima model components - uses Qwen3 0.6B + T5-XXL tokenizer + QwenImage VAE
+  animaVaeModel: zParameterVAEModel.nullable(), // Optional: Separate QwenImage/FLUX VAE for Anima
+  animaQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 0.6B Encoder for Anima
+  animaT5EncoderModel: zModelIdentifierField.nullable(), // T5-XXL tokenizer for Anima LLM Adapter
+  animaScheduler: z.enum(['euler', 'heun', 'lcm']).default('euler'),
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
+  // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
+  qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
+  qwenImageQuantization: z.enum(['none', 'int8', 'nf4']), // BitsAndBytes quantization for Qwen VL encoder
+  qwenImageShift: z.number().nullable(), // Sigma schedule shift override (e.g. 3.0 for Lightning LoRAs)
   // Z-Image Seed Variance Enhancer settings
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
@@ -783,6 +805,7 @@ export const getInitialParamsState = (): ParamsState => ({
   fluxDypeScale: 2.0,
   fluxDypeExponent: 2.0,
   zImageScheduler: 'euler',
+  zImageShift: null,
   upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,
   seed: 0,
@@ -815,8 +838,15 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageVaeModel: null,
   zImageQwen3EncoderModel: null,
   zImageQwen3SourceModel: null,
+  animaVaeModel: null,
+  animaQwen3EncoderModel: null,
+  animaT5EncoderModel: null,
+  animaScheduler: 'euler',
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
+  qwenImageComponentSource: null,
+  qwenImageQuantization: 'none' as const,
+  qwenImageShift: null,
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,
