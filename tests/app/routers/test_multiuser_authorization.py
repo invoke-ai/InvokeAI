@@ -372,6 +372,64 @@ class TestImageReadAuth:
         r = client.get("/api/v1/images/i/user1-meta-blocked/metadata", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
+    def test_list_images_private_board_rejected_for_non_owner(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 must not be able to enumerate images on user1's private board
+        via GET /api/v1/images?board_id=..."""
+        board_id = _create_board(client, user1_token, "Private Enum Board")
+
+        r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_list_images_shared_board_allowed_for_non_owner(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 should be able to list images on user1's shared board."""
+        board_id = _create_board(client, user1_token, "Shared Enum Board")
+        _share_board(client, user1_token, board_id)
+
+        r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+
+    def test_get_image_names_private_board_rejected_for_non_owner(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 must not be able to enumerate image names on user1's private board
+        via GET /api/v1/images/names?board_id=..."""
+        board_id = _create_board(client, user1_token, "Private Names Board")
+
+        r = client.get(f"/api/v1/images/names?board_id={board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_get_image_names_shared_board_allowed_for_non_owner(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 should be able to list image names on user1's shared board."""
+        board_id = _create_board(client, user1_token, "Shared Names Board")
+        _share_board(client, user1_token, board_id)
+
+        r = client.get(f"/api/v1/images/names?board_id={board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+
+    def test_list_images_own_private_board_allowed(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+    ):
+        """Owner should be able to list images on their own private board."""
+        board_id = _create_board(client, user1_token, "Own Private Board")
+
+        r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_200_OK
+
+    def test_admin_can_list_images_on_any_board(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str, user1_token: str
+    ):
+        """Admin should be able to list images on any board."""
+        board_id = _create_board(client, user1_token, "Admin Enum Board")
+
+        r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(admin_token))
+        assert r.status_code == status.HTTP_200_OK
+
 
 # ===========================================================================
 # 2b. Image mutation authorization

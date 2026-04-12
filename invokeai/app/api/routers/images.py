@@ -511,6 +511,11 @@ async def list_image_dtos(
 ) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of image DTOs for the current user"""
 
+    # Validate that the caller can read from this board before listing its images.
+    # "none" is a sentinel for uncategorized images and is handled by the SQL layer.
+    if board_id is not None and board_id != "none":
+        _assert_board_read_access(board_id, current_user)
+
     image_dtos = ApiDependencies.invoker.services.images.get_many(
         offset,
         limit,
@@ -757,6 +762,10 @@ async def get_image_names(
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
 ) -> ImageNamesResult:
     """Gets ordered list of image names with metadata for optimistic updates"""
+
+    # Validate that the caller can read from this board before listing its images.
+    if board_id is not None and board_id != "none":
+        _assert_board_read_access(board_id, current_user)
 
     try:
         result = ApiDependencies.invoker.services.images.get_image_names(
