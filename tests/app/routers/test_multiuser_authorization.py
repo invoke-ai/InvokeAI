@@ -176,6 +176,7 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
     monkeypatch.setattr("invokeai.app.api.routers.workflows.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.session_queue.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.recall_parameters.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", mock_deps)
     yield
 
 
@@ -1243,6 +1244,47 @@ class TestQueueStatusScoping:
         fields = set(SessionQueueStatus.model_fields.keys())
         assert "user_pending" not in fields
         assert "user_in_progress" not in fields
+
+
+# ===========================================================================
+# 10b. Model install job authorization
+# ===========================================================================
+
+
+class TestModelInstallAuth:
+    """Tests that model install job endpoints require admin authentication."""
+
+    def test_list_model_installs_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v2/models/install")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_get_model_install_job_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.get("/api/v2/models/install/1")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_pause_model_install_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v2/models/install/1/pause")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_resume_model_install_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v2/models/install/1/resume")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_restart_failed_model_install_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v2/models/install/1/restart_failed")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_restart_model_install_file_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.post("/api/v2/models/install/1/restart_file", json="https://example.com/model.safetensors")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_non_admin_cannot_list_model_installs(self, enable_multiuser: Any, client: TestClient, user1_token: str):
+        r = client.get("/api/v2/models/install", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_non_admin_cannot_pause_model_install(self, enable_multiuser: Any, client: TestClient, user1_token: str):
+        r = client.post("/api/v2/models/install/1/pause", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
 
 
 # ===========================================================================
