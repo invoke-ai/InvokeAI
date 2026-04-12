@@ -74,7 +74,9 @@ async def update_workflow(
             raise HTTPException(status_code=404, detail="Workflow not found")
         if not current_user.is_admin and existing.user_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
-    return ApiDependencies.invoker.services.workflow_records.update(workflow=workflow)
+    # Pass user_id for defense-in-depth SQL scoping; admins pass None to allow any.
+    user_id = None if current_user.is_admin else current_user.user_id
+    return ApiDependencies.invoker.services.workflow_records.update(workflow=workflow, user_id=user_id)
 
 
 @workflows_router.delete(
@@ -99,7 +101,8 @@ async def delete_workflow(
     except WorkflowThumbnailFileNotFoundException:
         # It's OK if the workflow has no thumbnail file. We can still delete the workflow.
         pass
-    ApiDependencies.invoker.services.workflow_records.delete(workflow_id)
+    user_id = None if current_user.is_admin else current_user.user_id
+    ApiDependencies.invoker.services.workflow_records.delete(workflow_id, user_id=user_id)
 
 
 @workflows_router.post(
@@ -302,8 +305,9 @@ async def update_workflow_is_public(
     if config.multiuser and not current_user.is_admin and existing.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
 
+    user_id = None if current_user.is_admin else current_user.user_id
     return ApiDependencies.invoker.services.workflow_records.update_is_public(
-        workflow_id=workflow_id, is_public=is_public
+        workflow_id=workflow_id, is_public=is_public, user_id=user_id
     )
 
 
@@ -385,4 +389,5 @@ async def update_opened_at(
     if config.multiuser and not current_user.is_admin and existing.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
 
-    ApiDependencies.invoker.services.workflow_records.update_opened_at(workflow_id)
+    user_id = None if current_user.is_admin else current_user.user_id
+    ApiDependencies.invoker.services.workflow_records.update_opened_at(workflow_id, user_id=user_id)
