@@ -7,7 +7,13 @@ vi.mock('features/controlLayers/konva/util', () => ({
 
 const sdxlModel = { key: 'sdxl-model', hash: 'h', name: 'SDXL', base: 'sdxl', type: 'main' };
 const sd1Model = { key: 'sd1-model', hash: 'h', name: 'SD1.5', base: 'sd-1', type: 'main' };
-const upscaleModel = { key: 'spandrel-key', hash: 'h', name: 'RealESRGAN', base: 'any', type: 'spandrel_image_to_image' };
+const upscaleModel = {
+  key: 'spandrel-key',
+  hash: 'h',
+  name: 'RealESRGAN',
+  base: 'any',
+  type: 'spandrel_image_to_image',
+};
 const tileControlnetModel = { key: 'tile-cn-key', name: 'Tile CN', base: 'sdxl', type: 'controlnet' };
 const upscaleInitialImage = { image_name: 'test.png', width: 512, height: 512 };
 
@@ -119,19 +125,19 @@ describe('buildMultidiffusionUpscaleGraph', () => {
   describe('assertions', () => {
     it('throws when model is missing', async () => {
       const state = makeState();
-      (state as any).params.model = null;
+      (state as never as Record<string, Record<string, unknown>>).params.model = null;
       await expect(buildMultidiffusionUpscaleGraph(state)).rejects.toThrow();
     });
 
     it('throws when tileControlnetModel is missing', async () => {
       const state = makeState();
-      (state as any).upscale.tileControlnetModel = null;
+      (state as never as Record<string, Record<string, unknown>>).upscale.tileControlnetModel = null;
       await expect(buildMultidiffusionUpscaleGraph(state)).rejects.toThrow();
     });
 
     it('throws when upscaleInitialImage is missing', async () => {
       const state = makeState();
-      (state as any).upscale.upscaleInitialImage = null;
+      (state as never as Record<string, Record<string, unknown>>).upscale.upscaleInitialImage = null;
       await expect(buildMultidiffusionUpscaleGraph(state)).rejects.toThrow();
     });
   });

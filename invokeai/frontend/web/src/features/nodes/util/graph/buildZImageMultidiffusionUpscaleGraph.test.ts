@@ -6,7 +6,13 @@ vi.mock('features/controlLayers/konva/util', () => ({
 }));
 
 const zImageModel = { key: 'z-image-model', hash: 'h', name: 'Z-Image', base: 'z-image', type: 'main' };
-const upscaleModel = { key: 'spandrel-key', hash: 'h', name: 'RealESRGAN', base: 'any', type: 'spandrel_image_to_image' };
+const upscaleModel = {
+  key: 'spandrel-key',
+  hash: 'h',
+  name: 'RealESRGAN',
+  base: 'any',
+  type: 'spandrel_image_to_image',
+};
 const zImageVaeModel = { key: 'vae-key', name: 'FLUX VAE', base: 'any', type: 'vae' };
 const zImageQwen3EncoderModel = { key: 'qwen3-key', name: 'Qwen3 Encoder', base: 'any', type: 'qwen3_encoder' };
 const tileControlnetModel = { key: 'tile-cn-key', name: 'Z-Image Tile CN', base: 'z-image', type: 'controlnet' };
@@ -50,7 +56,8 @@ const makeState = (overrides?: { tileControlnetModel?: typeof tileControlnetMode
       upscaleInitialImage,
       structure: 0,
       creativity: 5,
-      tileControlnetModel: overrides?.tileControlnetModel !== undefined ? overrides.tileControlnetModel : tileControlnetModel,
+      tileControlnetModel:
+        overrides?.tileControlnetModel !== undefined ? overrides.tileControlnetModel : tileControlnetModel,
       scale: 2,
       tileSize: 512,
       tileOverlap: 128,
@@ -99,7 +106,7 @@ describe('buildZImageMultidiffusionUpscaleGraph', () => {
       const graph = g.getGraph();
       const denoise = Object.values(graph.nodes).find((n) => n.type === 'tiled_z_image_denoise');
 
-      expect((denoise as any).guidance_scale).toBe(1.0);
+      expect((denoise as never as Record<string, unknown>).guidance_scale).toBe(1.0);
     });
 
     it('sets the l2i node as non-intermediate (final output)', async () => {
@@ -114,19 +121,19 @@ describe('buildZImageMultidiffusionUpscaleGraph', () => {
   describe('assertions', () => {
     it('throws when model is missing', async () => {
       const state = makeState();
-      (state as any).params.model = null;
+      (state as never as Record<string, Record<string, unknown>>).params.model = null;
       await expect(buildZImageMultidiffusionUpscaleGraph(state)).rejects.toThrow();
     });
 
     it('throws when upscaleModel is missing', async () => {
       const state = makeState();
-      (state as any).upscale.upscaleModel = null;
+      (state as never as Record<string, Record<string, unknown>>).upscale.upscaleModel = null;
       await expect(buildZImageMultidiffusionUpscaleGraph(state)).rejects.toThrow();
     });
 
     it('throws when upscaleInitialImage is missing', async () => {
       const state = makeState();
-      (state as any).upscale.upscaleInitialImage = null;
+      (state as never as Record<string, Record<string, unknown>>).upscale.upscaleInitialImage = null;
       await expect(buildZImageMultidiffusionUpscaleGraph(state)).rejects.toThrow();
     });
   });

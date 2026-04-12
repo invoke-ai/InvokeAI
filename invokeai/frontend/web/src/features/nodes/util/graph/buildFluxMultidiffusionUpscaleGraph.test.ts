@@ -6,7 +6,13 @@ vi.mock('features/controlLayers/konva/util', () => ({
 }));
 
 const fluxModel = { key: 'flux-model', hash: 'h', name: 'FLUX Dev', base: 'flux', type: 'main' };
-const upscaleModel = { key: 'spandrel-key', hash: 'h', name: 'RealESRGAN', base: 'any', type: 'spandrel_image_to_image' };
+const upscaleModel = {
+  key: 'spandrel-key',
+  hash: 'h',
+  name: 'RealESRGAN',
+  base: 'any',
+  type: 'spandrel_image_to_image',
+};
 const t5EncoderModel = { key: 't5-key', name: 'T5-XXL', base: 'any', type: 't5_encoder' };
 const clipEmbedModel = { key: 'clip-key', name: 'CLIP Embed', base: 'any', type: 'clip_embed' };
 const fluxVAE = { key: 'flux-vae-key', name: 'FLUX VAE', base: 'any', type: 'vae' };
@@ -52,7 +58,8 @@ const makeState = (overrides?: { tileControlnetModel?: typeof tileControlnetMode
       upscaleInitialImage,
       structure: 0,
       creativity: 5,
-      tileControlnetModel: overrides?.tileControlnetModel !== undefined ? overrides.tileControlnetModel : tileControlnetModel,
+      tileControlnetModel:
+        overrides?.tileControlnetModel !== undefined ? overrides.tileControlnetModel : tileControlnetModel,
       scale: 2,
       tileSize: 512,
       tileOverlap: 128,
@@ -120,19 +127,19 @@ describe('buildFluxMultidiffusionUpscaleGraph', () => {
   describe('assertions', () => {
     it('throws when model is missing', async () => {
       const state = makeState();
-      (state as any).params.model = null;
+      (state as never as Record<string, Record<string, unknown>>).params.model = null;
       await expect(buildFluxMultidiffusionUpscaleGraph(state)).rejects.toThrow();
     });
 
     it('throws when upscaleModel is missing', async () => {
       const state = makeState();
-      (state as any).upscale.upscaleModel = null;
+      (state as never as Record<string, Record<string, unknown>>).upscale.upscaleModel = null;
       await expect(buildFluxMultidiffusionUpscaleGraph(state)).rejects.toThrow();
     });
 
     it('throws when t5EncoderModel is missing', async () => {
       const state = makeState();
-      (state as any).params.t5EncoderModel = null;
+      (state as never as Record<string, Record<string, unknown>>).params.t5EncoderModel = null;
       await expect(buildFluxMultidiffusionUpscaleGraph(state)).rejects.toThrow();
     });
   });
