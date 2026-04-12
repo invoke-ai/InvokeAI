@@ -262,27 +262,72 @@ class TestBoardImageMutationAuth:
         )
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
-    def test_admin_can_add_image_to_any_board(self, client: TestClient, admin_token: str, user1_token: str):
+    def test_admin_can_add_image_to_any_board(
+        self, client: TestClient, mock_invoker: Invoker, admin_token: str, user1_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-admin-board-img", user1.user_id)
         board_id = _create_board(client, user1_token, "User1 Board For Admin")
 
-        # This may 500 because the image doesn't exist in the DB, but it should NOT be 403
+        # Admin can add any image to any board — should not be 403
         r = client.post(
             "/api/v1/board_images/",
-            json={"board_id": board_id, "image_name": "some-image"},
+            json={"board_id": board_id, "image_name": "user1-admin-board-img"},
             headers=_auth(admin_token),
         )
         assert r.status_code != status.HTTP_403_FORBIDDEN
 
-    def test_owner_can_add_image_to_own_board(self, client: TestClient, user1_token: str):
+    def test_owner_can_add_image_to_own_board(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+    ):
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "user1-own-board-img", user1.user_id)
         board_id = _create_board(client, user1_token, "User1 Own Board")
 
-        # May 500 (no real image) but should not be 403
         r = client.post(
             "/api/v1/board_images/",
-            json={"board_id": board_id, "image_name": "some-image"},
+            json={"board_id": board_id, "image_name": "user1-own-board-img"},
             headers=_auth(user1_token),
         )
         assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_non_owner_cannot_add_other_users_image_to_own_board(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """Attacker creates their own board, then tries to add victim's image to it.
+        This must be rejected — otherwise the attacker gains mutation rights via
+        the board-ownership fallback in _assert_image_owner."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "victim-image", user1.user_id)
+
+        attacker_board = _create_board(client, user2_token, "Attacker Board")
+
+        r = client.post(
+            "/api/v1/board_images/",
+            json={"board_id": attacker_board, "image_name": "victim-image"},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_non_owner_cannot_batch_add_other_users_images_to_own_board(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """Same attack via the batch endpoint."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        assert user1 is not None
+        _save_image(mock_invoker, "victim-batch-img", user1.user_id)
+
+        attacker_board = _create_board(client, user2_token, "Attacker Batch Board")
+
+        r = client.post(
+            "/api/v1/board_images/batch",
+            json={"board_id": attacker_board, "image_names": ["victim-batch-img"]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
 
 
 # ===========================================================================
