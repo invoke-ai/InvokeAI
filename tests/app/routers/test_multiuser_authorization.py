@@ -412,9 +412,7 @@ class TestImageReadAuth:
         r = client.get(f"/api/v1/images/names?board_id={board_id}", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_200_OK
 
-    def test_list_images_own_private_board_allowed(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str
-    ):
+    def test_list_images_own_private_board_allowed(self, client: TestClient, mock_invoker: Invoker, user1_token: str):
         """Owner should be able to list images on their own private board."""
         board_id = _create_board(client, user1_token, "Own Private Board")
 
