@@ -154,51 +154,6 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             raise ValueError(f"Invalid CFG scale type: {type(self.cfg_scale)}")
         return cfg_scale
 
-    def _compute_sigmas(self, image_seq_len: int, num_steps: int, shift_override: float | None = None) -> list[float]:
-        """Compute sigmas matching the diffusers FlowMatchEulerDiscreteScheduler.
-
-        When shift_override is None, reproduces the full base-model pipeline:
-        linspace → dynamic exponential time_shift → stretch_shift_to_terminal → append 0.
-
-        When shift_override is set (e.g. 3.0 for Lightning LoRAs), uses a fixed mu = log(shift)
-        with no shift_terminal stretching.
-        """
-        import math
-
-        import numpy as np
-
-        # 1. Initial sigmas: N values from 1.0 to 1/N (same as diffusers pipeline)
-        sigmas = np.linspace(1.0, 1.0 / num_steps, num_steps).astype(np.float64)
-
-        if shift_override is not None:
-            # Fixed shift (e.g. Lightning LoRA): mu = log(shift), no terminal stretching
-            mu = math.log(shift_override)
-        else:
-            # Dynamic shift from scheduler config
-            base_shift = 0.5
-            max_shift = 0.9
-            base_image_seq_len = 256
-            max_image_seq_len = 8192
-
-            m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
-            b = base_shift - m * base_image_seq_len
-            mu = image_seq_len * m + b
-
-        # 2. Exponential time shift
-        sigmas = np.array([math.exp(mu) / (math.exp(mu) + (1.0 / s - 1.0)) for s in sigmas])
-
-        # 3. Stretch shift to terminal (only for base model schedule)
-        if shift_override is None:
-            shift_terminal = 0.02
-            one_minus = 1.0 - sigmas
-            scale_factor = one_minus[-1] / (1.0 - shift_terminal)
-            sigmas = 1.0 - (one_minus / scale_factor)
-
-        # 4. Append terminal 0
-        sigmas = np.append(sigmas, 0.0)
-
-        return sigmas.tolist()
-
     @staticmethod
     def _pack_latents(
         latents: torch.Tensor, batch_size: int, num_channels: int, height: int, width: int

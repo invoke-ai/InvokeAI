@@ -1340,14 +1340,21 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         if not _has_ggml_tensors(sd):
             raise NotAMatchError("state dict does not look like GGUF quantized")
 
-        # Infer variant from filename if not explicitly provided.
-        # GGUF files have no metadata to distinguish edit from generate models,
-        # but filenames containing "edit" (case-insensitive) are a strong heuristic.
+        # Infer variant from the state dict if not explicitly provided.
+        # The Edit variant includes an extra tensor `__index_timestep_zero__` (used by the
+        # `zero_cond_t` dual-modulation path in diffusers' QwenImageTransformer2DModel).
+        # If the marker tensor is missing, fall back to the filename heuristic since older
+        # or alternate GGUF converters may not emit it.
         explicit_variant = override_fields.pop("variant", None)
         if explicit_variant is None:
-            filename = mod.path.stem.lower()
-            if "edit" in filename:
+            if "__index_timestep_zero__" in sd:
                 explicit_variant = QwenImageVariantType.Edit
+            else:
+                filename = mod.path.stem.lower()
+                if "edit" in filename:
+                    explicit_variant = QwenImageVariantType.Edit
+                else:
+                    explicit_variant = QwenImageVariantType.Generate
 
         return cls(**override_fields, variant=explicit_variant)
 

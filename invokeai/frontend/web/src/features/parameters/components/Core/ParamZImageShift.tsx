@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectZImageShift, setZImageShift } from 'features/controlLayers/store/paramsSlice';
 import type React from 'react';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiXBold } from 'react-icons/pi';
 
 const CONSTRAINTS = {
@@ -18,6 +19,7 @@ const CONSTRAINTS = {
 const MARKS = [1, 2, 3, 4, 5, 6, 7];
 
 const ParamZImageShift = () => {
+  const { t } = useTranslation();
   const shift = useAppSelector(selectZImageShift);
   const dispatch = useAppDispatch();
 
@@ -36,14 +38,14 @@ const ParamZImageShift = () => {
   return (
     <FormControl>
       <FormLabel>
-        Shift{' '}
+        {t('parameters.shift')}{' '}
         {shift !== null ? (
           <Text as="span" cursor="pointer" onClick={onReset} display="inline-flex" verticalAlign="middle">
             <PiXBold />
           </Text>
         ) : (
           <Text as="span" opacity={0.5} fontWeight="normal" fontSize="xs">
-            (auto)
+            ({t('common.auto').toLowerCase()})
           </Text>
         )}
       </FormLabel>
