@@ -547,6 +547,7 @@ export abstract class CanvasEntityAdapterBase<T extends CanvasEntityState, U ext
       this.renderer.updateCompositingRectSize();
       this.renderer.updateCompositingRectPosition();
       this.renderer.updateCompositingRectFill();
+      this.renderer.updateOpacity();
       // Restore correct z-order after re-attaching
       this.manager.entityRenderer.arrangeEntities(this.manager.stateApi.runSelector(selectCanvasSlice), null);
     } else {

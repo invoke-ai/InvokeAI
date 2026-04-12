@@ -13,8 +13,8 @@ import {
   Text,
   VStack,
 } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { setCredentials } from 'features/auth/store/authSlice';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectSessionExpired, setCredentials } from 'features/auth/store/authSlice';
 import type { ChangeEvent, FormEvent } from 'react';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +29,7 @@ export const LoginPage = memo(() => {
   const [rememberMe, setRememberMe] = useState(true);
   const [login, { isLoading, error }] = useLoginMutation();
   const dispatch = useAppDispatch();
+  const sessionExpired = useAppSelector(selectSessionExpired);
   const { data: setupStatus, isLoading: isLoadingSetup } = useGetSetupStatusQuery();
 
   // Redirect to app if multiuser mode is disabled
@@ -113,6 +114,12 @@ export const LoginPage = memo(() => {
             <Heading size="lg" textAlign="center">
               {t('auth.login.title')}
             </Heading>
+
+            {sessionExpired && (
+              <Flex p={3} borderRadius="md" bg="warning.600" color="white" fontSize="sm" justifyContent="center">
+                <Text fontWeight="semibold">{t('auth.login.sessionExpired')}</Text>
+              </Flex>
+            )}
 
             <FormControl isRequired isInvalid={!!errorMessage}>
               <FormLabel>{t('auth.login.email')}</FormLabel>

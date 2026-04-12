@@ -8,6 +8,7 @@ import {
   selectZImageSeedVarianceEnabled,
   selectZImageSeedVarianceRandomizePercent,
   selectZImageSeedVarianceStrength,
+  selectZImageShift,
   selectZImageVaeModel,
 } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
@@ -57,6 +58,9 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
   // Z-Image-Turbo uses guidance_scale (stored as cfgScale), defaults to 1.0 for no CFG
   // (1.0 means no CFG effect, matching FLUX convention)
   const { cfgScale: guidance_scale, steps, zImageScheduler } = params;
+
+  // Shift override (null = auto-calculate from image dimensions)
+  const zImageShift = selectZImageShift(state);
 
   // Seed Variance Enhancer settings
   const seedVarianceEnabled = selectZImageSeedVarianceEnabled(state);
@@ -122,6 +126,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     guidance_scale,
     steps,
     scheduler: zImageScheduler,
+    shift: zImageShift ?? undefined,
   });
   const l2i = g.addNode({
     type: 'z_image_l2i',
@@ -216,6 +221,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     z_image_seed_variance_enabled: seedVarianceEnabled,
     z_image_seed_variance_strength: seedVarianceStrength,
     z_image_seed_variance_randomize_percent: seedVarianceRandomizePercent,
+    z_image_shift: zImageShift ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');

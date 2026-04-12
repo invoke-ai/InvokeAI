@@ -194,8 +194,24 @@ const HFUnauthorizedToastDescription = () => {
 };
 
 export const DiscordLink = () => {
-  return <ExternalLink fontWeight="semibold" href={discordLink} display="inline-flex" label="Discord" />;
+  const { t: tFunc } = useTranslation();
+  return (
+    <ExternalLink
+      fontWeight="semibold"
+      href={discordLink}
+      display="inline-flex"
+      label={tFunc('supportVideos.discord')}
+    />
+  );
 };
 export const GitHubIssuesLink = () => {
-  return <ExternalLink fontWeight="semibold" href={githubIssuesLink} display="inline-flex" label="GitHub" />;
+  const { t: tFunc } = useTranslation();
+  return (
+    <ExternalLink
+      fontWeight="semibold"
+      href={githubIssuesLink}
+      display="inline-flex"
+      label={tFunc('supportVideos.github')}
+    />
+  );
 };
