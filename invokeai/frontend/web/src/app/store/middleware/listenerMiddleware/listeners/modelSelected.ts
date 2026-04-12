@@ -4,10 +4,10 @@ import { bboxSyncedToOptimalDimension, rgRefImageModelChanged } from 'features/c
 import { buildSelectIsStaging, selectCanvasSessionId } from 'features/controlLayers/store/canvasStagingAreaSlice';
 import { loraIsEnabledChanged } from 'features/controlLayers/store/lorasSlice';
 import {
-  aspectRatioIdChanged,
   animaQwen3EncoderModelSelected,
   animaT5EncoderModelSelected,
   animaVaeModelSelected,
+  aspectRatioIdChanged,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
   modelChanged,

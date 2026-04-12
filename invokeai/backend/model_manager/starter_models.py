@@ -1108,6 +1108,7 @@ openai_dall_e_2 = StarterModel(
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
 # region Anima
 anima_qwen3_encoder = StarterModel(
     name="Anima Qwen3 0.6B Text Encoder",

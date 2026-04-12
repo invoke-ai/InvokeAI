@@ -207,7 +207,7 @@ describe('StagingAreaApi Utility Functions', () => {
         },
       } as unknown as S['SessionQueueItem'];
 
-      expect(getOutputImageName(queueItem)).toBe('first.png');
+      expect(getOutputImageNames(queueItem)).toEqual(['first.png', 'second.png']);
     });
 
     it('should handle empty session mapping', () => {

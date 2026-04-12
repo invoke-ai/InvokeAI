@@ -4,8 +4,8 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
-  selectIsExternal,
   selectIsAnima,
+  selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
   selectIsSD3,

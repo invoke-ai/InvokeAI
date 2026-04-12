@@ -32,9 +32,11 @@ export const getOutputImageNames = (item: S['SessionQueueItem']): string[] => {
       if (isImageField(value)) {
         imageNames.push(value.image_name);
       }
-    }
-    if (isImageFieldCollection(value)) {
-      return value[0]?.image_name ?? null;
+      if (isImageFieldCollection(value)) {
+        for (const img of value) {
+          imageNames.push(img.image_name);
+        }
+      }
     }
   }
 
