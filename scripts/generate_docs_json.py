@@ -9,10 +9,8 @@ from typing import Any, Literal, cast, get_args, get_origin, get_type_hints
 
 from pydantic.fields import FieldInfo
 
-from invokeai.app.api_app import app  # pyright: ignore[reportUnknownVariableType]
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.shared import invocation_context as invocation_context_module
-from invokeai.app.util.custom_openapi import get_openapi_func  # pyright: ignore[reportUnknownVariableType]
 
 OUTPUT_DIR = Path("docs-new/src/generated")
 EXCLUDED_SETTINGS = {"schema_version", "legacy_models_yaml_path"}
@@ -30,14 +28,9 @@ INTERFACE_NAMES = (
 
 def build_docs_bundle() -> dict[str, Any]:
     return {
-        "openapi": build_openapi_export(),
         "invocation_context": build_invocation_context_export(),
         "settings": build_settings_export(),
     }
-
-
-def build_openapi_export() -> dict[str, Any]:
-    return get_openapi_func(app)()  # type: ignore[arg-type]
 
 
 def _simplify_signature(sig: str) -> str:
@@ -220,7 +213,6 @@ def write_docs_bundle(bundle: dict[str, Any], output_dir: Path = OUTPUT_DIR) -> 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     files = {
-        "openapi.json": bundle["openapi"],
         "invocation-context.json": bundle["invocation_context"],
         "settings.json": bundle["settings"],
     }

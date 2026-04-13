@@ -19,7 +19,7 @@ def test_docs_json_export_bundle_structure():
 
     bundle = module.build_docs_bundle()
 
-    assert set(bundle.keys()) == {"openapi", "invocation_context", "settings"}
+    assert set(bundle.keys()) == {"invocation_context", "settings"}
 
 
 def test_docs_json_export_includes_images_interface_and_host_setting():
@@ -62,13 +62,13 @@ def test_docs_json_export_writes_expected_files(tmp_path: Path):
     bundle = module.build_docs_bundle()
     module.write_docs_bundle(bundle, tmp_path)
 
-    openapi_path = tmp_path / "openapi.json"
     invocation_context_path = tmp_path / "invocation-context.json"
     settings_path = tmp_path / "settings.json"
 
-    assert openapi_path.exists()
-    assert invocation_context_path.exists()
-    assert settings_path.exists()
+    assert sorted(path.name for path in tmp_path.iterdir()) == [
+        "invocation-context.json",
+        "settings.json",
+    ]
 
     settings_payload = json.loads(settings_path.read_text())
     assert "settings" in settings_payload
