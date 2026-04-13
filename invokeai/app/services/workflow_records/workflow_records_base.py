@@ -28,13 +28,13 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def update(self, workflow: Workflow) -> WorkflowRecordDTO:
-        """Updates a workflow."""
+    def update(self, workflow: Workflow, user_id: Optional[str] = None) -> WorkflowRecordDTO:
+        """Updates a workflow. When user_id is provided, the UPDATE is scoped to that user."""
         pass
 
     @abstractmethod
-    def delete(self, workflow_id: str) -> None:
-        """Deletes a workflow."""
+    def delete(self, workflow_id: str, user_id: Optional[str] = None) -> None:
+        """Deletes a workflow. When user_id is provided, the DELETE is scoped to that user."""
         pass
 
     @abstractmethod
@@ -78,8 +78,8 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def update_opened_at(self, workflow_id: str) -> None:
-        """Open a workflow."""
+    def update_opened_at(self, workflow_id: str, user_id: Optional[str] = None) -> None:
+        """Open a workflow. When user_id is provided, the UPDATE is scoped to that user."""
         pass
 
     @abstractmethod
@@ -93,6 +93,6 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def update_is_public(self, workflow_id: str, is_public: bool) -> WorkflowRecordDTO:
-        """Updates the is_public field of a workflow."""
+    def update_is_public(self, workflow_id: str, is_public: bool, user_id: Optional[str] = None) -> WorkflowRecordDTO:
+        """Updates the is_public field of a workflow. When user_id is provided, the UPDATE is scoped to that user."""
         pass

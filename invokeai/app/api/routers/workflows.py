@@ -75,7 +75,8 @@ async def update_workflow(
     if config.multiuser:
         if not current_user.is_admin and existing.user_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
-    updated = ApiDependencies.invoker.services.workflow_records.update(workflow=workflow)
+    user_id = None if current_user.is_admin else current_user.user_id
+    updated = ApiDependencies.invoker.services.workflow_records.update(workflow=workflow, user_id=user_id)
     ApiDependencies.invoker.services.events.emit_workflow_updated(
         workflow_id=updated.workflow_id,
         user_id=updated.user_id,
@@ -108,7 +109,8 @@ async def delete_workflow(
     except WorkflowThumbnailFileNotFoundException:
         # It's OK if the workflow has no thumbnail file. We can still delete the workflow.
         pass
-    ApiDependencies.invoker.services.workflow_records.delete(workflow_id)
+    user_id = None if current_user.is_admin else current_user.user_id
+    ApiDependencies.invoker.services.workflow_records.delete(workflow_id, user_id=user_id)
     ApiDependencies.invoker.services.events.emit_workflow_deleted(
         workflow_id=existing.workflow_id,
         user_id=existing.user_id,
@@ -322,7 +324,10 @@ async def update_workflow_is_public(
     if config.multiuser and not current_user.is_admin and existing.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
 
-    updated = ApiDependencies.invoker.services.workflow_records.update_is_public(workflow_id=workflow_id, is_public=is_public)
+    user_id = None if current_user.is_admin else current_user.user_id
+    updated = ApiDependencies.invoker.services.workflow_records.update_is_public(
+        workflow_id=workflow_id, is_public=is_public, user_id=user_id
+    )
     ApiDependencies.invoker.services.events.emit_workflow_updated(
         workflow_id=updated.workflow_id,
         user_id=updated.user_id,
@@ -410,4 +415,5 @@ async def update_opened_at(
     if config.multiuser and not current_user.is_admin and existing.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
 
-    ApiDependencies.invoker.services.workflow_records.update_opened_at(workflow_id)
+    user_id = None if current_user.is_admin else current_user.user_id
+    ApiDependencies.invoker.services.workflow_records.update_opened_at(workflow_id, user_id=user_id)

@@ -78,13 +78,15 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def get_counts_by_destination(self, queue_id: str, destination: str) -> SessionQueueCountsByDestination:
-        """Gets the counts of queue items by destination"""
+    def get_counts_by_destination(
+        self, queue_id: str, destination: str, user_id: Optional[str] = None
+    ) -> SessionQueueCountsByDestination:
+        """Gets the counts of queue items by destination. If user_id is provided, only counts that user's items."""
         pass
 
     @abstractmethod
-    def get_batch_status(self, queue_id: str, batch_id: str) -> BatchStatus:
-        """Gets the status of a batch"""
+    def get_batch_status(self, queue_id: str, batch_id: str, user_id: Optional[str] = None) -> BatchStatus:
+        """Gets the status of a batch. If user_id is provided, only counts that user's items."""
         pass
 
     @abstractmethod

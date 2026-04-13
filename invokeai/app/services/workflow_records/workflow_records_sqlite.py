@@ -67,36 +67,55 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             )
         return self.get(workflow_with_id.id)
 
-    def update(self, workflow: Workflow) -> WorkflowRecordDTO:
+    def update(self, workflow: Workflow, user_id: Optional[str] = None) -> WorkflowRecordDTO:
         if workflow.meta.category is WorkflowCategory.Default:
             raise ValueError("Default workflows cannot be updated")
 
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                UPDATE workflow_library
-                SET workflow = ?
-                WHERE workflow_id = ? AND category = 'user';
-                """,
-                (workflow.model_dump_json(), workflow.id),
-            )
+            if user_id is not None:
+                cursor.execute(
+                    """--sql
+                    UPDATE workflow_library
+                    SET workflow = ?
+                    WHERE workflow_id = ? AND category = 'user' AND user_id = ?;
+                    """,
+                    (workflow.model_dump_json(), workflow.id, user_id),
+                )
+            else:
+                cursor.execute(
+                    """--sql
+                    UPDATE workflow_library
+                    SET workflow = ?
+                    WHERE workflow_id = ? AND category = 'user';
+                    """,
+                    (workflow.model_dump_json(), workflow.id),
+                )
         return self.get(workflow.id)
 
-    def delete(self, workflow_id: str) -> None:
+    def delete(self, workflow_id: str, user_id: Optional[str] = None) -> None:
         if self.get(workflow_id).workflow.meta.category is WorkflowCategory.Default:
             raise ValueError("Default workflows cannot be deleted")
 
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                DELETE from workflow_library
-                WHERE workflow_id = ? AND category = 'user';
-                """,
-                (workflow_id,),
-            )
+            if user_id is not None:
+                cursor.execute(
+                    """--sql
+                    DELETE from workflow_library
+                    WHERE workflow_id = ? AND category = 'user' AND user_id = ?;
+                    """,
+                    (workflow_id, user_id),
+                )
+            else:
+                cursor.execute(
+                    """--sql
+                    DELETE from workflow_library
+                    WHERE workflow_id = ? AND category = 'user';
+                    """,
+                    (workflow_id,),
+                )
         return None
 
-    def update_is_public(self, workflow_id: str, is_public: bool) -> WorkflowRecordDTO:
+    def update_is_public(self, workflow_id: str, is_public: bool, user_id: Optional[str] = None) -> WorkflowRecordDTO:
         """Updates the is_public field of a workflow and manages the 'shared' tag automatically."""
         record = self.get(workflow_id)
         workflow = record.workflow
@@ -111,14 +130,24 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         updated_workflow = workflow.model_copy(update={"tags": updated_tags})
 
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                UPDATE workflow_library
-                SET workflow = ?, is_public = ?
-                WHERE workflow_id = ? AND category = 'user';
-                """,
-                (updated_workflow.model_dump_json(), is_public, workflow_id),
-            )
+            if user_id is not None:
+                cursor.execute(
+                    """--sql
+                    UPDATE workflow_library
+                    SET workflow = ?, is_public = ?
+                    WHERE workflow_id = ? AND category = 'user' AND user_id = ?;
+                    """,
+                    (updated_workflow.model_dump_json(), is_public, workflow_id, user_id),
+                )
+            else:
+                cursor.execute(
+                    """--sql
+                    UPDATE workflow_library
+                    SET workflow = ?, is_public = ?
+                    WHERE workflow_id = ? AND category = 'user';
+                    """,
+                    (updated_workflow.model_dump_json(), is_public, workflow_id),
+                )
         return self.get(workflow_id)
 
     def get_many(
@@ -386,16 +415,26 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
         return result
 
-    def update_opened_at(self, workflow_id: str) -> None:
+    def update_opened_at(self, workflow_id: str, user_id: Optional[str] = None) -> None:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                f"""--sql
-                UPDATE workflow_library
-                SET opened_at = STRFTIME('{SQL_TIME_FORMAT}', 'NOW')
-                WHERE workflow_id = ?;
-                """,
-                (workflow_id,),
-            )
+            if user_id is not None:
+                cursor.execute(
+                    f"""--sql
+                    UPDATE workflow_library
+                    SET opened_at = STRFTIME('{SQL_TIME_FORMAT}', 'NOW')
+                    WHERE workflow_id = ? AND user_id = ?;
+                    """,
+                    (workflow_id, user_id),
+                )
+            else:
+                cursor.execute(
+                    f"""--sql
+                    UPDATE workflow_library
+                    SET opened_at = STRFTIME('{SQL_TIME_FORMAT}', 'NOW')
+                    WHERE workflow_id = ?;
+                    """,
+                    (workflow_id,),
+                )
 
     def get_all_tags(
         self,

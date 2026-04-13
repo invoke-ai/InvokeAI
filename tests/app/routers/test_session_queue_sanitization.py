@@ -100,11 +100,21 @@ def test_sanitize_queue_item_for_different_user(sample_session_queue_item):
     # Non-admin viewing another user's item should have sanitized data
     assert result.field_values is None
     assert result.workflow is None
-    # Session should be replaced with empty graph
+    # Session should be replaced with empty/redacted graph
     assert result.session.graph.nodes is not None
     assert len(result.session.graph.nodes) == 0
-    # Session ID should be preserved
-    assert result.session.id == "test_session"
+    assert result.session.id == "redacted"
+    # Identity and batch fields should be redacted
+    assert result.user_id == "redacted"
+    assert result.batch_id == "redacted"
+    assert result.session_id == "redacted"
+    assert result.user_display_name is None
+    assert result.user_email is None
+    assert result.origin is None
+    assert result.destination is None
+    assert result.error_type is None
+    assert result.error_message is None
+    assert result.error_traceback is None
 
 
 def test_sanitize_preserves_non_sensitive_fields(sample_session_queue_item):
@@ -115,15 +125,18 @@ def test_sanitize_preserves_non_sensitive_fields(sample_session_queue_item):
         is_admin=False,
     )
 
-    # These fields should be preserved
+    # Non-sensitive fields should be preserved
     assert result.item_id == 1
     assert result.status == "pending"
-    assert result.batch_id == "batch_123"
-    assert result.session_id == "session_123"
     assert result.queue_id == "default"
-    assert result.user_id == "user_123"
-    assert result.user_display_name == "Test User"
-    assert result.user_email == "test@example.com"
+    assert result.created_at is not None
+    assert result.updated_at is not None
+    # Sensitive fields should be redacted for non-owner non-admin
+    assert result.batch_id == "redacted"
+    assert result.session_id == "redacted"
+    assert result.user_id == "redacted"
+    assert result.user_display_name is None
+    assert result.user_email is None
 
 
 def test_sanitize_system_user_item_for_non_admin(sample_session_queue_item):

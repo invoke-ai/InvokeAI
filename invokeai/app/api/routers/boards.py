@@ -207,4 +207,15 @@ async def list_all_board_image_names(
         categories,
         is_intermediate,
     )
+
+    # For uncategorized images (board_id="none"), filter to only the caller's
+    # images so that one user cannot enumerate another's uncategorized images.
+    # Admin users can see all uncategorized images.
+    if board_id == "none" and not current_user.is_admin:
+        image_names = [
+            name
+            for name in image_names
+            if ApiDependencies.invoker.services.image_records.get_user_id(name) == current_user.user_id
+        ]
+
     return image_names

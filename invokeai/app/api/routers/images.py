@@ -45,19 +45,25 @@ def _assert_image_owner(image_name: str, current_user: CurrentUserOrDefault) -> 
     - The user is an admin.
     - The user is the image's direct owner (image_records.user_id).
     - The user owns the board the image sits on.
+    - The image sits on a Public board (public boards grant mutation rights).
     """
+    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
     if current_user.is_admin:
         return
     owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
     if owner is not None and owner == current_user.user_id:
         return
 
-    # Check whether the user owns the board the image belongs to.
+    # Check whether the user owns the board the image belongs to,
+    # or the board is Public (public boards grant mutation rights).
     board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
     if board_id is not None:
         try:
             board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
             if board.user_id == current_user.user_id:
+                return
+            if board.board_visibility == BoardVisibility.Public:
                 return
         except Exception:
             pass
@@ -93,6 +99,33 @@ def _assert_image_read_access(image_name: str, current_user: CurrentUserOrDefaul
             pass
 
     raise HTTPException(status_code=403, detail="Not authorized to access this image")
+
+
+def _assert_board_read_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
+    """Raise 403 if the current user may not read images from this board.
+
+    Access is granted when ANY of these hold:
+    - The user is an admin.
+    - The user owns the board.
+    - The board visibility is Shared or Public.
+    """
+    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
+    if current_user.is_admin:
+        return
+
+    try:
+        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Board not found")
+
+    if board.user_id == current_user.user_id:
+        return
+
+    if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
+        return
+
+    raise HTTPException(status_code=403, detail="Not authorized to access this board")
 
 
 class ResizeToDimensions(BaseModel):
@@ -140,13 +173,20 @@ async def upload_image(
     ),
 ) -> ImageDTO:
     """Uploads an image for the current user"""
-    # If uploading into a board, verify the user owns it
+    # If uploading into a board, verify the user has write access.
+    # Public boards allow uploads from any authenticated user.
     if board_id is not None:
+        from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
         try:
             board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
         except Exception:
             raise HTTPException(status_code=404, detail="Board not found")
-        if not current_user.is_admin and board.user_id != current_user.user_id:
+        if (
+            not current_user.is_admin
+            and board.user_id != current_user.user_id
+            and board.board_visibility != BoardVisibility.Public
+        ):
             raise HTTPException(status_code=403, detail="Not authorized to upload to this board")
 
     if not file.content_type or not file.content_type.startswith("image"):
@@ -275,10 +315,11 @@ async def clear_intermediates(
 async def get_intermediates_count(
     current_user: CurrentUserOrDefault,
 ) -> int:
-    """Gets the count of intermediate images"""
+    """Gets the count of intermediate images. Non-admin users only see their own intermediates."""
 
     try:
-        return ApiDependencies.invoker.services.images.get_intermediates_count()
+        user_id = None if current_user.is_admin else current_user.user_id
+        return ApiDependencies.invoker.services.images.get_intermediates_count(user_id=user_id)
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get intermediates")
 
@@ -483,6 +524,11 @@ async def list_image_dtos(
 ) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of image DTOs for the current user"""
 
+    # Validate that the caller can read from this board before listing its images.
+    # "none" is a sentinel for uncategorized images and is handled by the SQL layer.
+    if board_id is not None and board_id != "none":
+        _assert_board_read_access(board_id, current_user)
+
     image_dtos = ApiDependencies.invoker.services.images.get_many(
         offset,
         limit,
@@ -649,6 +695,16 @@ async def download_images_from_list(
 ) -> ImagesDownloaded:
     if (image_names is None or len(image_names) == 0) and board_id is None:
         raise HTTPException(status_code=400, detail="No images or board id specified.")
+
+    # Validate that the caller can read every image they are requesting.
+    # For a board_id request, check board visibility; for explicit image names,
+    # check each image individually.
+    if board_id:
+        _assert_board_read_access(board_id, current_user)
+    if image_names:
+        for name in image_names:
+            _assert_image_read_access(name, current_user)
+
     bulk_download_item_id: str = ApiDependencies.invoker.services.bulk_download.generate_item_id(board_id)
 
     background_tasks.add_task(
@@ -656,6 +712,7 @@ async def download_images_from_list(
         image_names,
         board_id,
         bulk_download_item_id,
+        current_user.user_id,
     )
     return ImagesDownloaded(bulk_download_item_name=bulk_download_item_id + ".zip")
 
@@ -678,8 +735,17 @@ async def get_bulk_download_item(
     background_tasks: BackgroundTasks,
     bulk_download_item_name: str = Path(description="The bulk_download_item_name of the bulk download item to get"),
 ) -> FileResponse:
-    """Gets a bulk download zip file"""
+    """Gets a bulk download zip file.
+
+    Requires authentication.  The caller must be the user who initiated the
+    download (tracked by the bulk download service) or an admin.
+    """
     try:
+        # Verify the caller owns this download (or is an admin)
+        owner = ApiDependencies.invoker.services.bulk_download.get_owner(bulk_download_item_name)
+        if owner is not None and owner != current_user.user_id and not current_user.is_admin:
+            raise HTTPException(status_code=403, detail="Not authorized to access this download")
+
         path = ApiDependencies.invoker.services.bulk_download.get_path(bulk_download_item_name)
 
         response = FileResponse(
@@ -691,6 +757,8 @@ async def get_bulk_download_item(
         response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
         background_tasks.add_task(ApiDependencies.invoker.services.bulk_download.delete, bulk_download_item_name)
         return response
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(status_code=404)
 
@@ -710,6 +778,10 @@ async def get_image_names(
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
 ) -> ImageNamesResult:
     """Gets ordered list of image names with metadata for optimistic updates"""
+
+    # Validate that the caller can read from this board before listing its images.
+    if board_id is not None and board_id != "none":
+        _assert_board_read_access(board_id, current_user)
 
     try:
         result = ApiDependencies.invoker.services.images.get_image_names(

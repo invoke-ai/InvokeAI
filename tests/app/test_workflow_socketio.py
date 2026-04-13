@@ -7,15 +7,26 @@ from fastapi import FastAPI
 from invokeai.app.api.sockets import SocketIO
 
 
+def _patch_multiuser_context(monkeypatch: pytest.MonkeyPatch, *, user_id: str, is_admin: bool) -> None:
+    user = SimpleNamespace(user_id=user_id, is_active=True)
+    invoker = SimpleNamespace(
+        services=SimpleNamespace(
+            configuration=SimpleNamespace(multiuser=True),
+            users=SimpleNamespace(get=lambda candidate_user_id: user if candidate_user_id == user_id else None),
+        )
+    )
+    monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
+    monkeypatch.setattr(
+        "invokeai.app.api.sockets.verify_token",
+        lambda token: SimpleNamespace(user_id=user_id, is_admin=is_admin) if token == "valid-token" else None,
+    )
+
+
 @pytest.mark.anyio
 async def test_authenticated_user_joins_workflow_rooms_on_connect(monkeypatch: pytest.MonkeyPatch) -> None:
     socketio = SocketIO(FastAPI())
     socketio._sio.enter_room = AsyncMock()
-
-    monkeypatch.setattr(
-        "invokeai.app.api.sockets.verify_token",
-        lambda token: SimpleNamespace(user_id="user-1", is_admin=False) if token == "valid-token" else None,
-    )
+    _patch_multiuser_context(monkeypatch, user_id="user-1", is_admin=False)
 
     accepted = await socketio._handle_connect("sid-1", {}, {"token": "valid-token"})
 
@@ -28,11 +39,7 @@ async def test_authenticated_user_joins_workflow_rooms_on_connect(monkeypatch: p
 async def test_admin_joins_admin_room_on_connect(monkeypatch: pytest.MonkeyPatch) -> None:
     socketio = SocketIO(FastAPI())
     socketio._sio.enter_room = AsyncMock()
-
-    monkeypatch.setattr(
-        "invokeai.app.api.sockets.verify_token",
-        lambda token: SimpleNamespace(user_id="admin-1", is_admin=True) if token == "valid-token" else None,
-    )
+    _patch_multiuser_context(monkeypatch, user_id="admin-1", is_admin=True)
 
     accepted = await socketio._handle_connect("sid-1", {}, {"token": "valid-token"})
 
