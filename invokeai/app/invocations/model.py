@@ -72,6 +72,13 @@ class GlmEncoderField(BaseModel):
     text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
 
 
+class QwenVLEncoderField(BaseModel):
+    """Field for Qwen2.5-VL encoder used by Qwen Image Edit models."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
 class Qwen3EncoderField(BaseModel):
     """Field for Qwen3 text encoder used by Z-Image models."""
 

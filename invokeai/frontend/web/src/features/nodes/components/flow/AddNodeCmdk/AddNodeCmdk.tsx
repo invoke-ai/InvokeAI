@@ -231,7 +231,7 @@ export const AddNodeCmdk = memo(() => {
                       bottom={0}
                       left={0}
                       icon={null}
-                      label="No matching items"
+                      label={t('common.noMatchingItems')}
                     />
                   </CommandEmpty>
                   <CommandList>

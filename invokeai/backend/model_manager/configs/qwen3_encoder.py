@@ -47,9 +47,10 @@ def _has_ggml_tensors(state_dict: dict[str | int, Any]) -> bool:
 
 
 def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Optional[Qwen3VariantType]:
-    """Determine Qwen3 variant (4B vs 8B) from state dict based on hidden_size.
+    """Determine Qwen3 variant (0.6B, 4B, or 8B) from state dict based on hidden_size.
 
     The hidden_size can be determined from the embed_tokens.weight tensor shape:
+    - Qwen3 0.6B: hidden_size = 1024
     - Qwen3 4B: hidden_size = 2560
     - Qwen3 8B: hidden_size = 4096
 
@@ -57,6 +58,7 @@ def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Opti
     For PyTorch format, the key is 'model.embed_tokens.weight'.
     """
     # Hidden size thresholds
+    QWEN3_06B_HIDDEN_SIZE = 1024
     QWEN3_4B_HIDDEN_SIZE = 2560
     QWEN3_8B_HIDDEN_SIZE = 4096
 
@@ -91,7 +93,9 @@ def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Opti
         return None
 
     # Determine variant based on hidden_size
-    if hidden_size == QWEN3_4B_HIDDEN_SIZE:
+    if hidden_size == QWEN3_06B_HIDDEN_SIZE:
+        return Qwen3VariantType.Qwen3_06B
+    elif hidden_size == QWEN3_4B_HIDDEN_SIZE:
         return Qwen3VariantType.Qwen3_4B
     elif hidden_size == QWEN3_8B_HIDDEN_SIZE:
         return Qwen3VariantType.Qwen3_8B
@@ -206,6 +210,7 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
     @classmethod
     def _get_variant_from_config(cls, config_path) -> Qwen3VariantType:
         """Get variant from config.json based on hidden_size."""
+        QWEN3_06B_HIDDEN_SIZE = 1024
         QWEN3_4B_HIDDEN_SIZE = 2560
         QWEN3_8B_HIDDEN_SIZE = 4096
 
@@ -217,6 +222,8 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
                 return Qwen3VariantType.Qwen3_8B
             elif hidden_size == QWEN3_4B_HIDDEN_SIZE:
                 return Qwen3VariantType.Qwen3_4B
+            elif hidden_size == QWEN3_06B_HIDDEN_SIZE:
+                return Qwen3VariantType.Qwen3_06B
             else:
                 # Default to 4B for unknown sizes
                 return Qwen3VariantType.Qwen3_4B
