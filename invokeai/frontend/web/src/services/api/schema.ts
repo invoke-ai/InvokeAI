@@ -24562,6 +24562,11 @@ export type components = {
              * @description List of IP Adapters with their settings
              */
             ip_adapters?: components["schemas"]["IPAdapterRecallParameter"][] | null;
+            /**
+             * Reference Images
+             * @description List of model-free reference images for architectures that consume reference images directly (FLUX.2 Klein, FLUX Kontext, Qwen Image Edit). The frontend picks the correct config type based on the currently-selected main model.
+             */
+            reference_images?: components["schemas"]["ReferenceImageRecallParameter"][] | null;
         };
         /**
          * RecallParametersUpdatedEvent
@@ -24660,6 +24665,24 @@ export type components = {
              * @constant
              */
             type: "rectangle_mask";
+        };
+        /**
+         * ReferenceImageRecallParameter
+         * @description Global reference-image configuration for recall.
+         *
+         *     Used for reference images that feed directly into the main model rather
+         *     than through a separate IP-Adapter / ControlNet model — for example
+         *     FLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend
+         *     picks the correct config type (``flux2_reference_image`` /
+         *     ``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based
+         *     on the currently-selected main model.
+         */
+        ReferenceImageRecallParameter: {
+            /**
+             * Image Name
+             * @description The filename of the reference image in outputs/images
+             */
+            image_name: string;
         };
         /**
          * RemoteModelFile
