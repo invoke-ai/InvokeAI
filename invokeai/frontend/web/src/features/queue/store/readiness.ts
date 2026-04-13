@@ -257,6 +257,12 @@ const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
 
   // FLUX.2 (Klein) extracts Qwen3 encoder and VAE from main model - no separate selections needed
 
+  if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
+    if (!params.qwenImageComponentSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noQwenImageComponentSourceSelected') });
+    }
+  }
+
   if (model?.base === 'z-image') {
     // Check if VAE source is available (either separate VAE or Qwen3 Source)
     const hasVaeSource = params.zImageVaeModel !== null || params.zImageQwen3SourceModel !== null;
@@ -644,6 +650,57 @@ const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
           }),
         });
       }
+    }
+  }
+
+  if (model?.base === 'qwen-image') {
+    const { bbox } = canvas;
+    const gridSize = getGridSize('qwen-image');
+
+    if (bbox.scaleMethod === 'none') {
+      if (bbox.rect.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxWidth', {
+            model: 'Qwen Image Edit',
+            width: bbox.rect.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.rect.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleBboxHeight', {
+            model: 'Qwen Image Edit',
+            height: bbox.rect.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    } else {
+      if (bbox.scaledSize.width % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxWidth', {
+            model: 'Qwen Image Edit',
+            width: bbox.scaledSize.width,
+            multiple: gridSize,
+          }),
+        });
+      }
+      if (bbox.scaledSize.height % gridSize !== 0) {
+        reasons.push({
+          content: i18n.t('parameters.invoke.modelIncompatibleScaledBboxHeight', {
+            model: 'Qwen Image Edit',
+            height: bbox.scaledSize.height,
+            multiple: gridSize,
+          }),
+        });
+      }
+    }
+  }
+
+  if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
+    if (!params.qwenImageComponentSource) {
+      reasons.push({ content: i18n.t('parameters.invoke.noQwenImageComponentSourceSelected') });
     }
   }
 

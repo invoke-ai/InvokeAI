@@ -22,7 +22,14 @@ type AddImageToImageArg = {
   manager: CanvasManager;
   l2i: Invocation<LatentToImageNodes>;
   i2l: Invocation<
-    'i2l' | 'flux_vae_encode' | 'flux2_vae_encode' | 'sd3_i2l' | 'cogview4_i2l' | 'z_image_i2l' | 'anima_i2l'
+    | 'i2l'
+    | 'flux_vae_encode'
+    | 'flux2_vae_encode'
+    | 'sd3_i2l'
+    | 'cogview4_i2l'
+    | 'qwen_image_i2l'
+    | 'z_image_i2l'
+    | 'anima_i2l'
   >;
   noise?: Invocation<'noise'>;
   denoise: Invocation<DenoiseLatentsNodes>;
@@ -46,6 +53,7 @@ export const addImageToImage = async ({
     | 'flux2_vae_decode'
     | 'sd3_l2i'
     | 'cogview4_l2i'
+    | 'qwen_image_l2i'
     | 'z_image_l2i'
     | 'anima_l2i'
   >
@@ -58,6 +66,7 @@ export const addImageToImage = async ({
 
   if (
     denoise.type === 'cogview4_denoise' ||
+    denoise.type === 'qwen_image_denoise' ||
     denoise.type === 'flux_denoise' ||
     denoise.type === 'flux2_denoise' ||
     denoise.type === 'sd3_denoise' ||

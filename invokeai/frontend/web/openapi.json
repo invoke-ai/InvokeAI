@@ -682,6 +682,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
@@ -716,6 +719,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -791,6 +797,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -976,6 +985,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
@@ -1010,6 +1022,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -1085,6 +1100,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -1270,6 +1288,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
@@ -1304,6 +1325,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -1379,6 +1403,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -1614,6 +1641,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
@@ -1648,6 +1678,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -1723,6 +1756,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -1982,6 +2018,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
@@ -2016,6 +2055,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -2091,6 +2133,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -2694,6 +2739,11 @@
         "summary": "List Model Installs",
         "description": "Return the list of model install jobs.\n\nInstall jobs have a numeric `id`, a `status`, and other fields that provide information on\nthe nature of the job and its progress. The `status` is one of:\n\n* \"waiting\" -- Job is waiting in the queue to run\n* \"downloading\" -- Model file(s) are downloading\n* \"running\" -- Model has downloaded and the model probing and registration process is running\n* \"paused\" -- Job is paused and can be resumed\n* \"completed\" -- Installation completed successfully\n* \"error\" -- An error occurred. Details will be in the \"error_type\" and \"error\" fields.\n* \"cancelled\" -- Job was cancelled before completion.\n\nOnce completed, information about the model such as its size, base\nmodel and type can be retrieved from the `config_out` field. For multi-file models such as diffusers,\ninformation on individual files can be retrieved from `download_parts`.\n\nSee the example and schema below for more information.",
         "operationId": "list_model_installs",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2799,6 +2849,11 @@
         "summary": "Get Model Install Job",
         "description": "Return model install job corresponding to the given source. See the documentation for 'List Model Install Jobs'\nfor information on the format of the return value.",
         "operationId": "get_model_install_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -2892,6 +2947,11 @@
         "summary": "Pause Model Install Job",
         "description": "Pause the model install job corresponding to the given job ID.",
         "operationId": "pause_model_install_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -2938,6 +2998,11 @@
         "summary": "Resume Model Install Job",
         "description": "Resume a paused model install job corresponding to the given job ID.",
         "operationId": "resume_model_install_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -2984,6 +3049,11 @@
         "summary": "Restart Failed Model Install Job",
         "description": "Restart failed or non-resumable file downloads for the given job.",
         "operationId": "restart_failed_model_install_job",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -3030,6 +3100,11 @@
         "summary": "Restart Model Install File",
         "description": "Restart a specific file download for the given job.",
         "operationId": "restart_model_install_file",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "id",
@@ -3140,6 +3215,9 @@
                       "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                     },
                     {
@@ -3174,6 +3252,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -3249,6 +3330,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -3584,7 +3668,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "delete": {
         "tags": ["model_manager"],
@@ -3622,7 +3711,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/download_queue/": {
@@ -4170,6 +4264,11 @@
         "summary": "Delete Image",
         "description": "Deletes an image",
         "operationId": "delete_image",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "image_name",
@@ -4211,6 +4310,11 @@
         "summary": "Update Image",
         "description": "Updates an image",
         "operationId": "update_image",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "image_name",
@@ -4263,6 +4367,11 @@
         "summary": "Get Image Dto",
         "description": "Gets an image's DTO",
         "operationId": "get_image_dto",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "image_name",
@@ -4304,7 +4413,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Intermediates Count",
-        "description": "Gets the count of intermediate images",
+        "description": "Gets the count of intermediate images. Non-admin users only see their own intermediates.",
         "operationId": "get_intermediates_count",
         "responses": {
           "200": {
@@ -4318,12 +4427,17 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "delete": {
         "tags": ["images"],
         "summary": "Clear Intermediates",
-        "description": "Clears all intermediates",
+        "description": "Clears all intermediates. Requires admin.",
         "operationId": "clear_intermediates",
         "responses": {
           "200": {
@@ -4337,7 +4451,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/images/i/{image_name}/metadata": {
@@ -4346,6 +4465,11 @@
         "summary": "Get Image Metadata",
         "description": "Gets an image's metadata",
         "operationId": "get_image_metadata",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "image_name",
@@ -4396,6 +4520,11 @@
         "tags": ["images"],
         "summary": "Get Image Workflow",
         "operationId": "get_image_workflow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "image_name",
@@ -4437,7 +4566,7 @@
       "head": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file",
+        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
         "operationId": "get_image_full_head",
         "parameters": [
           {
@@ -4477,7 +4606,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Full",
-        "description": "Gets a full-resolution image file",
+        "description": "Gets a full-resolution image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
         "operationId": "get_image_full",
         "parameters": [
           {
@@ -4519,7 +4648,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Image Thumbnail",
-        "description": "Gets a thumbnail image file",
+        "description": "Gets a thumbnail image file.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Image names are UUIDs,\nproviding security through unguessability.",
         "operationId": "get_image_thumbnail",
         "parameters": [
           {
@@ -4563,6 +4692,11 @@
         "summary": "Get Image Urls",
         "description": "Gets an image and thumbnail URL",
         "operationId": "get_image_urls",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "image_name",
@@ -4636,14 +4770,19 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/images/uncategorized": {
       "delete": {
         "tags": ["images"],
         "summary": "Delete Uncategorized Images",
-        "description": "Deletes all images that are uncategorized",
+        "description": "Deletes all uncategorized images owned by the current user (or all if admin)",
         "operationId": "delete_uncategorized_images",
         "responses": {
           "200": {
@@ -4656,7 +4795,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/images/star": {
@@ -4695,7 +4839,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/images/unstar": {
@@ -4734,7 +4883,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/images/download": {
@@ -4772,15 +4926,25 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/images/download/{bulk_download_item_name}": {
       "get": {
         "tags": ["images"],
         "summary": "Get Bulk Download Item",
-        "description": "Gets a bulk download zip file",
+        "description": "Gets a bulk download zip file.\n\nRequires authentication.  The caller must be the user who initiated the\ndownload (tracked by the bulk download service) or an admin.",
         "operationId": "get_bulk_download_item",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "bulk_download_item_name",
@@ -5011,7 +5175,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/boards/": {
@@ -5495,7 +5664,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       },
       "delete": {
         "tags": ["boards"],
@@ -5533,7 +5707,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/board_images/batch": {
@@ -5573,7 +5752,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/board_images/batch/delete": {
@@ -5613,7 +5797,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/model_relationships/i/{model_key}": {
@@ -6140,8 +6329,13 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Item Ids",
-        "description": "Gets all queue item ids that match the given parameters",
+        "description": "Gets all queue item ids that match the given parameters. Non-admin users only see their own items.",
         "operationId": "get_queue_item_ids",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "queue_id",
@@ -6726,6 +6920,11 @@
         "summary": "Get Current Queue Item",
         "description": "Gets the currently execution queue item",
         "operationId": "get_current_queue_item",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "queue_id",
@@ -6783,6 +6982,11 @@
         "summary": "Get Next Queue Item",
         "description": "Gets the next queue item, without executing it",
         "operationId": "get_next_queue_item",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "queue_id",
@@ -6838,7 +7042,7 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Queue Status",
-        "description": "Gets the status of the session queue",
+        "description": "Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it.",
         "operationId": "get_queue_status",
         "security": [
           {
@@ -6886,8 +7090,13 @@
       "get": {
         "tags": ["queue"],
         "summary": "Get Batch Status",
-        "description": "Gets the status of the session queue",
+        "description": "Gets the status of a batch. Non-admin users only see their own batches.",
         "operationId": "get_batch_status",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "queue_id",
@@ -7113,8 +7322,13 @@
       "get": {
         "tags": ["queue"],
         "summary": "Counts By Destination",
-        "description": "Gets the counts of queue items by destination",
+        "description": "Gets the counts of queue items by destination. Non-admin users only see their own items.",
         "operationId": "counts_by_destination",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "queue_id",
@@ -7228,6 +7442,11 @@
         "summary": "Get Workflow",
         "description": "Gets a workflow",
         "operationId": "get_workflow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "workflow_id",
@@ -7269,6 +7488,11 @@
         "summary": "Update Workflow",
         "description": "Updates a workflow",
         "operationId": "update_workflow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -7307,6 +7531,11 @@
         "summary": "Delete Workflow",
         "description": "Deletes a workflow",
         "operationId": "delete_workflow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "workflow_id",
@@ -7348,6 +7577,11 @@
         "summary": "Create Workflow",
         "description": "Creates a workflow",
         "operationId": "create_workflow",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -7386,6 +7620,11 @@
         "summary": "List Workflows",
         "description": "Gets a page of workflows",
         "operationId": "list_workflows",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "page",
@@ -7516,6 +7755,24 @@
               "title": "Has Been Opened"
             },
             "description": "Whether to include/exclude recent workflows"
+          },
+          {
+            "name": "is_public",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by public/shared status",
+              "title": "Is Public"
+            },
+            "description": "Filter by public/shared status"
           }
         ],
         "responses": {
@@ -7548,6 +7805,11 @@
         "summary": "Set Workflow Thumbnail",
         "description": "Sets a workflow's thumbnail image",
         "operationId": "set_workflow_thumbnail",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "workflow_id",
@@ -7599,6 +7861,11 @@
         "summary": "Delete Workflow Thumbnail",
         "description": "Removes a workflow's thumbnail image",
         "operationId": "delete_workflow_thumbnail",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "workflow_id",
@@ -7638,7 +7905,7 @@
       "get": {
         "tags": ["workflows"],
         "summary": "Get Workflow Thumbnail",
-        "description": "Gets a workflow's thumbnail image",
+        "description": "Gets a workflow's thumbnail image.\n\nThis endpoint is intentionally unauthenticated because browsers load images\nvia <img src> tags which cannot send Bearer tokens. Workflow IDs are UUIDs,\nproviding security through unguessability.",
         "operationId": "get_workflow_thumbnail",
         "parameters": [
           {
@@ -7681,12 +7948,75 @@
         }
       }
     },
+    "/api/v1/workflows/i/{workflow_id}/is_public": {
+      "patch": {
+        "tags": ["workflows"],
+        "summary": "Update Workflow Is Public",
+        "description": "Updates whether a workflow is shared publicly",
+        "operationId": "update_workflow_is_public",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The workflow to update",
+              "title": "Workflow Id"
+            },
+            "description": "The workflow to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_update_workflow_is_public"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowRecordDTO"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/workflows/tags": {
       "get": {
         "tags": ["workflows"],
         "summary": "Get All Tags",
         "description": "Gets all unique tags from workflows",
         "operationId": "get_all_tags",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "categories",
@@ -7708,6 +8038,24 @@
               "title": "Categories"
             },
             "description": "The categories to include"
+          },
+          {
+            "name": "is_public",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by public/shared status",
+              "title": "Is Public"
+            },
+            "description": "Filter by public/shared status"
           }
         ],
         "responses": {
@@ -7744,6 +8092,11 @@
         "summary": "Get Counts By Tag",
         "description": "Counts workflows by tag",
         "operationId": "get_counts_by_tag",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "tags",
@@ -7797,6 +8150,24 @@
               "title": "Has Been Opened"
             },
             "description": "Whether to include/exclude recent workflows"
+          },
+          {
+            "name": "is_public",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by public/shared status",
+              "title": "Is Public"
+            },
+            "description": "Filter by public/shared status"
           }
         ],
         "responses": {
@@ -7833,6 +8204,11 @@
         "summary": "Counts By Category",
         "description": "Counts workflows by category",
         "operationId": "counts_by_category",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "categories",
@@ -7865,6 +8241,24 @@
               "title": "Has Been Opened"
             },
             "description": "Whether to include/exclude recent workflows"
+          },
+          {
+            "name": "is_public",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by public/shared status",
+              "title": "Is Public"
+            },
+            "description": "Filter by public/shared status"
           }
         ],
         "responses": {
@@ -7901,6 +8295,11 @@
         "summary": "Update Opened At",
         "description": "Updates the opened_at field of a workflow",
         "operationId": "update_opened_at",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "workflow_id",
@@ -8427,6 +8826,11 @@
         "summary": "Update Recall Parameters",
         "description": "Update recallable parameters that can be recalled on the frontend.\n\nThis endpoint allows updating parameters such as prompt, model, steps, and other\ngeneration settings. These parameters are stored in client state and can be\naccessed by the frontend to populate UI elements.\n\nArgs:\n    queue_id: The queue ID to associate these parameters with\n    parameters: The RecallParameter object containing the parameters to update\n\nReturns:\n    A dictionary containing the updated parameters and status\n\nExample:\n    POST /api/v1/recall/{queue_id}\n    {\n        \"positive_prompt\": \"a beautiful landscape\",\n        \"model\": \"sd-1.5\",\n        \"steps\": 20,\n        \"cfg_scale\": 7.5,\n        \"width\": 512,\n        \"height\": 512,\n        \"seed\": 12345\n    }",
         "operationId": "update_recall_parameters",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "queue_id",
@@ -8481,6 +8885,11 @@
         "summary": "Get Recall Parameters",
         "description": "Retrieve all stored recall parameters for a given queue.\n\nReturns a dictionary of all recall parameters that have been set for the queue.\n\nArgs:\n    queue_id: The queue ID to retrieve parameters for\n\nReturns:\n    A dictionary containing all stored recall parameters",
         "operationId": "get_recall_parameters",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "queue_id",
@@ -9820,6 +10229,9 @@
             "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
           },
           {
+            "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+          },
+          {
             "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
           },
           {
@@ -9854,6 +10266,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -9929,6 +10344,9 @@
           },
           {
             "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+          },
+          {
+            "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
           },
           {
             "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -10331,6 +10749,7 @@
           "flux2",
           "cogview4",
           "z-image",
+          "qwen-image",
           "anima",
           "unknown"
         ],
@@ -10496,9 +10915,15 @@
             "default": null,
             "description": "The origin of the batch",
             "title": "Origin"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "The ID of the user who enqueued the batch",
+            "title": "User Id",
+            "type": "string"
           }
         },
-        "required": ["timestamp", "queue_id", "batch_id", "enqueued", "requested", "priority", "origin"],
+        "required": ["timestamp", "queue_id", "batch_id", "enqueued", "requested", "priority", "origin", "user_id"],
         "title": "BatchEnqueuedEvent",
         "type": "object"
       },
@@ -10857,6 +11282,17 @@
             ],
             "title": "Archived",
             "description": "Whether or not the board is archived"
+          },
+          "board_visibility": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardVisibility"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The visibility of the board."
           }
         },
         "additionalProperties": false,
@@ -10939,6 +11375,11 @@
             "title": "Archived",
             "description": "Whether or not the board is archived."
           },
+          "board_visibility": {
+            "$ref": "#/components/schemas/BoardVisibility",
+            "description": "The visibility of the board.",
+            "default": "private"
+          },
           "image_count": {
             "type": "integer",
             "title": "Image Count",
@@ -10995,6 +11436,12 @@
         "enum": ["created_at", "board_name"],
         "title": "BoardRecordOrderBy",
         "description": "The order by options for board records"
+      },
+      "BoardVisibility": {
+        "type": "string",
+        "enum": ["private", "shared", "public"],
+        "title": "BoardVisibility",
+        "description": "The visibility options for a board."
       },
       "Body_add_image_to_board": {
         "properties": {
@@ -11425,6 +11872,18 @@
         "type": "object",
         "required": ["workflow"],
         "title": "Body_update_workflow"
+      },
+      "Body_update_workflow_is_public": {
+        "properties": {
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether the workflow should be shared publicly"
+          }
+        },
+        "type": "object",
+        "required": ["is_public"],
+        "title": "Body_update_workflow_is_public"
       },
       "Body_upload_image": {
         "properties": {
@@ -11873,9 +12332,15 @@
             "description": "The name of the bulk image download item",
             "title": "Bulk Download Item Name",
             "type": "string"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "The ID of the user who initiated the download",
+            "title": "User Id",
+            "type": "string"
           }
         },
-        "required": ["timestamp", "bulk_download_id", "bulk_download_item_id", "bulk_download_item_name"],
+        "required": ["timestamp", "bulk_download_id", "bulk_download_item_id", "bulk_download_item_name", "user_id"],
         "title": "BulkDownloadCompleteEvent",
         "type": "object"
       },
@@ -11902,13 +12367,26 @@
             "title": "Bulk Download Item Name",
             "type": "string"
           },
+          "user_id": {
+            "default": "system",
+            "description": "The ID of the user who initiated the download",
+            "title": "User Id",
+            "type": "string"
+          },
           "error": {
             "description": "The error message",
             "title": "Error",
             "type": "string"
           }
         },
-        "required": ["timestamp", "bulk_download_id", "bulk_download_item_id", "bulk_download_item_name", "error"],
+        "required": [
+          "timestamp",
+          "bulk_download_id",
+          "bulk_download_item_id",
+          "bulk_download_item_name",
+          "user_id",
+          "error"
+        ],
         "title": "BulkDownloadErrorEvent",
         "type": "object"
       },
@@ -11934,9 +12412,15 @@
             "description": "The name of the bulk image download item",
             "title": "Bulk Download Item Name",
             "type": "string"
+          },
+          "user_id": {
+            "default": "system",
+            "description": "The ID of the user who initiated the download",
+            "title": "User Id",
+            "type": "string"
           }
         },
-        "required": ["timestamp", "bulk_download_id", "bulk_download_item_id", "bulk_download_item_name"],
+        "required": ["timestamp", "bulk_download_id", "bulk_download_item_id", "bulk_download_item_name", "user_id"],
         "title": "BulkDownloadStartedEvent",
         "type": "object"
       },
@@ -16974,6 +17458,10 @@
                   "z_image_img2img",
                   "z_image_inpaint",
                   "z_image_outpaint",
+                  "qwen_image_txt2img",
+                  "qwen_image_img2img",
+                  "qwen_image_inpaint",
+                  "qwen_image_outpaint",
                   "anima_txt2img",
                   "anima_img2img",
                   "anima_inpaint",
@@ -26245,6 +26733,27 @@
                   "$ref": "#/components/schemas/PromptsFromFileInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImageImageToLatentsInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImageLatentsToImageInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImageLoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImageLoRALoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImageModelLoaderInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImageTextEncoderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/RandomFloatInvocation"
                 },
                 {
@@ -26654,6 +27163,15 @@
                 },
                 {
                   "$ref": "#/components/schemas/PromptTemplateOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImageConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/QwenImageModelLoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/SD3ConditioningOutput"
@@ -33463,6 +33981,27 @@
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
               },
               {
+                "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageTextEncoderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/RandomFloatInvocation"
               },
               {
@@ -33829,6 +34368,15 @@
               },
               {
                 "$ref": "#/components/schemas/PromptTemplateOutput"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageConditioningOutput"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageModelLoaderOutput"
               },
               {
                 "$ref": "#/components/schemas/SD3ConditioningOutput"
@@ -34536,6 +35084,27 @@
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageTextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/RandomFloatInvocation"
@@ -35302,6 +35871,27 @@
           "prompt_template": {
             "$ref": "#/components/schemas/PromptTemplateOutput"
           },
+          "qwen_image_denoise": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "qwen_image_i2l": {
+            "$ref": "#/components/schemas/LatentsOutput"
+          },
+          "qwen_image_l2i": {
+            "$ref": "#/components/schemas/ImageOutput"
+          },
+          "qwen_image_lora_collection_loader": {
+            "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
+          },
+          "qwen_image_lora_loader": {
+            "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
+          },
+          "qwen_image_model_loader": {
+            "$ref": "#/components/schemas/QwenImageModelLoaderOutput"
+          },
+          "qwen_image_text_encoder": {
+            "$ref": "#/components/schemas/QwenImageConditioningOutput"
+          },
           "rand_float": {
             "$ref": "#/components/schemas/FloatOutput"
           },
@@ -35460,246 +36050,253 @@
           }
         },
         "required": [
-          "crop_latents",
-          "z_image_denoise",
-          "sdxl_model_loader",
-          "img_scale",
-          "string_join",
-          "if",
-          "flux_kontext_image_prep",
-          "cv_inpaint",
-          "face_mask_detection",
-          "float_generator",
-          "sdxl_refiner_compel_prompt",
-          "lresize",
-          "invokeai_img_val_thresholds",
-          "flux_lora_collection_loader",
-          "img_nsfw",
-          "flux2_denoise",
-          "ip_adapter",
-          "anima_l2i",
-          "bounding_box",
-          "metadata_to_string_collection",
-          "anima_text_encoder",
-          "flux2_klein_model_loader",
-          "ideal_size",
-          "lineart_anime_edge_detection",
-          "z_image_lora_loader",
-          "iterate",
-          "sdxl_lora_collection_loader",
-          "tiled_multi_diffusion_denoise_latents",
+          "boolean_collection",
+          "flux_lora_loader",
           "metadata",
-          "invert_tensor_mask",
-          "lineart_edge_detection",
-          "string_replace",
-          "anima_denoise",
-          "latents_collection",
-          "vae_loader",
-          "dw_openpose_detection",
-          "metadata_to_integer",
-          "img_paste",
-          "mediapipe_face_detection",
-          "invokeai_img_hue_adjust_plus",
-          "z_image_seed_variance_enhancer",
-          "l2i",
-          "metadata_to_float",
-          "invokeai_img_blend",
-          "metadata_to_float_collection",
-          "rand_int",
-          "sd3_denoise",
           "get_image_mask_bounding_box",
-          "flux2_klein_lora_collection_loader",
-          "flux_model_loader",
-          "add",
-          "metadata_from_image",
-          "flux2_vae_decode",
-          "metadata_to_sdlx_loras",
-          "spandrel_image_to_image_autoscale",
-          "random_range",
-          "color",
-          "integer",
+          "pidi_edge_detection",
+          "img_conv",
+          "infill_lama",
           "sdxl_lora_loader",
-          "metadata_to_vae",
-          "tomask",
-          "unsharp_mask",
-          "collect",
-          "flux_text_encoder",
+          "img_paste",
+          "mask_edge",
+          "noise",
+          "lora_loader",
+          "boolean",
+          "string_join",
+          "heuristic_resize",
+          "rectangle_mask",
+          "image_generator",
+          "controlnet",
+          "infill_tile",
+          "metadata_to_float",
+          "qwen_image_l2i",
+          "merge_tiles_to_image",
+          "z_image_denoise",
+          "img_channel_multiply",
+          "prompt_template",
           "cogview4_i2l",
-          "sd3_text_encoder",
-          "flux_kontext",
-          "flux_redux",
+          "mul",
+          "metadata_to_lora_collection",
+          "float_collection",
+          "integer_batch",
+          "add",
+          "lscale",
+          "segment_anything",
+          "scheduler",
+          "flux2_klein_lora_loader",
+          "lblend",
+          "save_image",
+          "sdxl_compel_prompt",
+          "metadata_to_loras",
+          "string_split_neg",
+          "show_image",
+          "ip_adapter",
+          "face_off",
+          "image_collection",
+          "denoise_latents_meta",
+          "float_range",
+          "anima_lora_collection_loader",
+          "cogview4_denoise",
+          "lineart_anime_edge_detection",
+          "infill_cv2",
+          "sd3_i2l",
+          "flux_text_encoder",
+          "z_image_lora_collection_loader",
+          "canny_edge_detection",
+          "pair_tile_image",
+          "lresize",
+          "sd3_denoise",
+          "img_watermark",
+          "metadata_to_ip_adapters",
+          "infill_rgba",
+          "integer",
+          "metadata_to_t2i_adapters",
+          "rand_int",
+          "canvas_v2_mask_and_crop",
+          "flux2_vae_encode",
+          "sdxl_refiner_model_loader",
+          "merge_metadata",
+          "string_generator",
+          "paste_image_into_bounding_box",
           "z_image_denoise_meta",
-          "img_ilerp",
-          "conditioning",
-          "calculate_image_tiles_min_overlap",
-          "invokeai_img_dilate_erode",
+          "model_identifier",
+          "tile_to_properties",
+          "float_batch",
+          "content_shuffle",
+          "sd3_model_loader",
+          "metadata_from_image",
+          "flux_kontext",
+          "div",
+          "if",
+          "apply_mask_to_image",
+          "compel",
+          "anima_denoise",
+          "ideal_size",
+          "apply_tensor_mask_to_image",
+          "iterate",
+          "string_replace",
+          "img_nsfw",
+          "crop_image_to_bounding_box",
+          "qwen_image_lora_loader",
+          "img_hue_adjust",
+          "metadata_item",
+          "invokeai_img_composite",
+          "cogview4_text_encoder",
+          "flux_model_loader",
+          "color",
+          "t2i_adapter",
+          "z_image_text_encoder",
+          "prompt_from_file",
+          "anima_model_loader",
+          "float_to_int",
+          "latents_collection",
+          "flux_fill",
+          "sub",
+          "image_batch",
+          "lora_selector",
+          "invokeai_img_blend",
+          "img_scale",
+          "random_range",
+          "anima_l2i",
+          "flux_ip_adapter",
+          "integer_collection",
+          "core_metadata",
+          "spandrel_image_to_image",
+          "image_mask_to_tensor",
+          "float",
+          "qwen_image_denoise",
+          "qwen_image_text_encoder",
+          "string_split",
+          "image",
           "range",
-          "img_mul",
+          "crop_latents",
+          "img_resize",
+          "cogview4_l2i",
+          "qwen_image_lora_collection_loader",
+          "z_image_model_loader",
+          "flux2_klein_lora_collection_loader",
+          "color_map",
+          "z_image_seed_variance_enhancer",
+          "string",
+          "canvas_output",
+          "spandrel_image_to_image_autoscale",
+          "z_image_l2i",
+          "metadata_to_integer_collection",
+          "cogview4_model_loader",
+          "string_join_three",
+          "sdxl_lora_collection_loader",
+          "invokeai_img_dilate_erode",
+          "invokeai_img_hue_adjust_plus",
+          "seamless",
+          "bounding_box",
+          "dynamic_prompt",
+          "metadata_to_model",
+          "conditioning_collection",
+          "blank_image",
+          "pbr_maps",
+          "mask_from_id",
+          "invert_tensor_mask",
+          "infill_patchmatch",
+          "img_lerp",
+          "invokeai_img_val_thresholds",
+          "qwen_image_model_loader",
+          "z_image_control",
+          "cv_inpaint",
+          "img_ilerp",
+          "flux_redux",
+          "mask_combine",
           "esrgan",
           "invokeai_ealightness",
-          "string_batch",
-          "denoise_latents",
-          "grounding_dino",
-          "lora_selector",
-          "img_crop",
-          "freeu",
-          "calculate_image_tiles_even_split",
-          "infill_cv2",
-          "dynamic_prompt",
-          "sub",
-          "anima_lora_collection_loader",
-          "latents",
-          "sd3_model_loader",
-          "boolean",
-          "metadata_to_sdxl_model",
-          "infill_rgba",
-          "seamless",
-          "calculate_image_tiles",
-          "z_image_l2i",
-          "flux_vae_encode",
-          "face_identifier",
-          "model_identifier",
-          "metadata_to_model",
-          "pair_tile_image",
-          "metadata_to_controlnets",
-          "merge_metadata",
-          "img_lerp",
-          "decode_watermark",
-          "noise",
-          "infill_tile",
-          "anima_i2l",
-          "string_split",
-          "mask_combine",
-          "flux_denoise_meta",
-          "sdxl_compel_prompt",
-          "flux2_vae_encode",
-          "z_image_model_loader",
-          "z_image_lora_collection_loader",
-          "cogview4_denoise",
-          "img_noise",
-          "mask_from_id",
-          "canvas_paste_back",
-          "sdxl_refiner_model_loader",
-          "integer_collection",
-          "image_mask_to_tensor",
-          "rectangle_mask",
-          "lora_collection_loader",
-          "flux_fill",
-          "apply_mask_to_image",
-          "image_generator",
-          "mul",
-          "canvas_v2_mask_and_crop",
-          "float_batch",
-          "face_off",
-          "i2l",
-          "float_collection",
-          "invokeai_img_composite",
-          "img_conv",
-          "controlnet",
-          "z_image_control",
-          "segment_anything",
-          "anima_lora_loader",
-          "float",
-          "canvas_output",
-          "img_chan",
-          "string",
-          "anima_model_loader",
-          "image_panel_layout",
-          "integer_batch",
-          "paste_image_into_bounding_box",
-          "scheduler",
-          "metadata_to_bool_collection",
-          "cogview4_l2i",
-          "metadata_item",
-          "alpha_mask_to_tensor",
-          "img_watermark",
-          "metadata_to_loras",
-          "metadata_to_t2i_adapters",
-          "metadata_item_linked",
-          "denoise_latents_meta",
           "metadata_to_bool",
-          "flux_lora_loader",
-          "metadata_to_ip_adapters",
-          "metadata_to_lora_collection",
-          "cogview4_text_encoder",
-          "pbr_maps",
-          "mask_edge",
-          "core_metadata",
-          "div",
-          "image_collection",
-          "img_channel_offset",
-          "metadata_to_string",
-          "t2i_adapter",
-          "flux_controlnet",
-          "metadata_to_integer_collection",
-          "sd3_i2l",
-          "compel",
-          "heuristic_resize",
-          "metadata_to_scheduler",
-          "canny_edge_detection",
-          "float_to_int",
-          "depth_anything_depth_estimation",
-          "color_map",
-          "pidi_edge_detection",
-          "img_resize",
-          "color_correct",
-          "float_range",
-          "img_pad_crop",
-          "tile_to_properties",
-          "flux2_klein_text_encoder",
-          "z_image_text_encoder",
-          "range_of_size",
-          "flux2_klein_lora_loader",
-          "image",
-          "prompt_from_file",
-          "string_generator",
-          "create_denoise_mask",
+          "sd3_text_encoder",
+          "freeu",
+          "metadata_item_linked",
+          "metadata_to_vae",
           "rand_float",
-          "invokeai_img_enhance",
-          "crop_image_to_bounding_box",
-          "boolean_collection",
-          "cogview4_model_loader",
-          "lblend",
-          "normal_map",
-          "expand_mask_with_fade",
-          "mlsd_detection",
+          "img_chan",
+          "sdxl_model_loader",
+          "i2l",
+          "range_of_size",
+          "face_identifier",
+          "grounding_dino",
+          "metadata_to_bool_collection",
+          "mediapipe_face_detection",
+          "z_image_lora_loader",
+          "metadata_to_string",
           "float_math",
-          "show_image",
-          "llava_onevision_vllm",
-          "flux_control_lora_loader",
-          "sd3_l2i",
-          "img_hue_adjust",
-          "img_blur",
-          "flux_ip_adapter",
-          "image_batch",
-          "clip_skip",
-          "hed_edge_detection",
-          "prompt_template",
-          "img_channel_multiply",
-          "metadata_field_extractor",
-          "spandrel_image_to_image",
-          "integer_generator",
-          "flux_vae_decode",
-          "string_collection",
-          "flux_denoise",
-          "integer_math",
-          "main_model_loader",
-          "apply_tensor_mask_to_image",
+          "unsharp_mask",
+          "flux_denoise_meta",
+          "expand_mask_with_fade",
+          "flux_kontext_image_prep",
+          "anima_i2l",
+          "decode_watermark",
+          "normal_map",
+          "vae_loader",
+          "canvas_paste_back",
+          "img_crop",
           "tensor_mask_to_image",
-          "blank_image",
-          "conditioning_collection",
-          "string_split_neg",
+          "sdxl_refiner_compel_prompt",
+          "latents",
+          "dw_openpose_detection",
+          "integer_math",
+          "alpha_mask_to_tensor",
+          "flux2_klein_model_loader",
+          "calculate_image_tiles_even_split",
+          "flux_controlnet",
+          "calculate_image_tiles",
+          "metadata_to_float_collection",
+          "create_denoise_mask",
+          "face_mask_detection",
+          "sd3_l2i",
+          "color_correct",
+          "metadata_to_integer",
+          "anima_text_encoder",
+          "metadata_to_sdlx_loras",
+          "llava_onevision_vllm",
+          "flux2_vae_decode",
+          "tiled_multi_diffusion_denoise_latents",
+          "tomask",
+          "metadata_field_extractor",
+          "flux_denoise",
+          "clip_skip",
           "z_image_i2l",
-          "string_join_three",
+          "integer_generator",
+          "metadata_to_string_collection",
+          "main_model_loader",
+          "flux_lora_collection_loader",
+          "flux_control_lora_loader",
+          "anima_lora_loader",
+          "hed_edge_detection",
+          "img_blur",
+          "string_batch",
+          "img_noise",
           "round_float",
-          "save_image",
-          "infill_patchmatch",
+          "img_channel_offset",
+          "flux_vae_encode",
+          "collect",
+          "calculate_image_tiles_min_overlap",
+          "img_mul",
+          "metadata_to_sdxl_model",
+          "flux2_klein_text_encoder",
+          "string_collection",
+          "lora_collection_loader",
+          "lineart_edge_detection",
+          "metadata_to_scheduler",
+          "mlsd_detection",
+          "float_generator",
+          "metadata_to_controlnets",
+          "invokeai_img_enhance",
+          "image_panel_layout",
+          "conditioning",
           "create_gradient_mask",
-          "content_shuffle",
-          "lora_loader",
-          "lscale",
-          "infill_lama",
-          "merge_tiles_to_image"
+          "flux2_denoise",
+          "depth_anything_depth_estimation",
+          "flux_vae_decode",
+          "l2i",
+          "denoise_latents",
+          "img_pad_crop",
+          "qwen_image_i2l"
         ]
       },
       "InvocationProgressEvent": {
@@ -36328,6 +36925,27 @@
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageTextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/RandomFloatInvocation"
@@ -37170,6 +37788,27 @@
               },
               {
                 "$ref": "#/components/schemas/PromptsFromFileInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageDenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageImageToLatentsInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLatentsToImageInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageLoRALoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageModelLoaderInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageTextEncoderInvocation"
               },
               {
                 "$ref": "#/components/schemas/RandomFloatInvocation"
@@ -41707,6 +42346,145 @@
         "title": "LoRA_LyCORIS_Flux2_Config",
         "description": "Model config for FLUX.2 (Klein) LoRA models in LyCORIS format."
       },
+      "LoRA_LyCORIS_QwenImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image",
+            "title": "Base",
+            "default": "qwen-image"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_LyCORIS_QwenImage_Config",
+        "description": "Model config for Qwen Image Edit LoRA models in LyCORIS format."
+      },
       "LoRA_LyCORIS_SD1_Config": {
         "properties": {
           "key": {
@@ -44977,6 +45755,161 @@
         "title": "Main_Diffusers_Flux2_Config",
         "description": "Model config for FLUX.2 models in diffusers format (e.g. FLUX.2 Klein)."
       },
+      "Main_Diffusers_QwenImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image",
+            "title": "Base",
+            "default": "qwen-image"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenImageVariantType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "repo_variant",
+          "base",
+          "variant"
+        ],
+        "title": "Main_Diffusers_QwenImage_Config",
+        "description": "Model config for Qwen Image diffusers models (both txt2img and edit)."
+      },
       "Main_Diffusers_SD1_Config": {
         "properties": {
           "key": {
@@ -46202,6 +47135,169 @@
         ],
         "title": "Main_GGUF_Flux2_Config",
         "description": "Model config for GGUF-quantized FLUX.2 checkpoint models (e.g. Klein)."
+      },
+      "Main_GGUF_QwenImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "qwen-image",
+            "title": "Base",
+            "default": "qwen-image"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenImageVariantType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format",
+          "variant"
+        ],
+        "title": "Main_GGUF_QwenImage_Config",
+        "description": "Model config for GGUF-quantized Qwen Image transformer models."
       },
       "Main_GGUF_ZImage_Config": {
         "properties": {
@@ -50127,6 +51223,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
@@ -50161,6 +51260,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -50236,6 +51338,9 @@
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -50656,6 +51761,9 @@
                     "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                   },
                   {
@@ -50690,6 +51798,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -50765,6 +51876,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                   },
                   {
                     "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -51078,6 +52192,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
@@ -51112,6 +52229,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -51187,6 +52307,9 @@
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -51358,6 +52481,9 @@
                 "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
               },
               {
@@ -51392,6 +52518,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -51467,6 +52596,9 @@
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
               },
               {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -51846,6 +52978,9 @@
                 "$ref": "#/components/schemas/ZImageVariantType"
               },
               {
+                "$ref": "#/components/schemas/QwenImageVariantType"
+              },
+              {
                 "$ref": "#/components/schemas/Qwen3VariantType"
               },
               {
@@ -52025,6 +53160,9 @@
                   "$ref": "#/components/schemas/Main_Diffusers_CogView4_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/Main_Diffusers_QwenImage_Config"
+                },
+                {
                   "$ref": "#/components/schemas/Main_Diffusers_ZImage_Config"
                 },
                 {
@@ -52059,6 +53197,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_GGUF_QwenImage_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_ZImage_Config"
@@ -52134,6 +53275,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_ZImage_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage_Config"
                 },
                 {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_Anima_Config"
@@ -54199,6 +55343,1028 @@
         "title": "Qwen3VariantType",
         "description": "Qwen3 text encoder variants based on model size."
       },
+      "QwenImageConditioningField": {
+        "description": "A Qwen Image Edit conditioning tensor primitive value",
+        "properties": {
+          "conditioning_name": {
+            "description": "The name of conditioning tensor",
+            "title": "Conditioning Name",
+            "type": "string"
+          }
+        },
+        "required": ["conditioning_name"],
+        "title": "QwenImageConditioningField",
+        "type": "object"
+      },
+      "QwenImageConditioningOutput": {
+        "class": "output",
+        "description": "Base class for nodes that output a Qwen Image Edit conditioning tensor.",
+        "properties": {
+          "conditioning": {
+            "$ref": "#/components/schemas/QwenImageConditioningField",
+            "description": "Conditioning tensor",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "qwen_image_conditioning_output",
+            "default": "qwen_image_conditioning_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "conditioning", "type", "type"],
+        "title": "QwenImageConditioningOutput",
+        "type": "object"
+      },
+      "QwenImageDenoiseInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Run the denoising process with a Qwen Image model.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "reference_latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Reference image latents to guide generation. Encoded through the VAE.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoise_mask": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DenoiseMaskField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "A mask of the region to apply the denoising process to. Values of 0.0 represent the regions to be fully denoised, and 1.0 represent the regions to be preserved.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "denoising_start": {
+            "default": 0.0,
+            "description": "When to start denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 0.0,
+            "orig_required": false,
+            "title": "Denoising Start",
+            "type": "number"
+          },
+          "denoising_end": {
+            "default": 1.0,
+            "description": "When to stop denoising, expressed a percentage of total steps",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 1,
+            "minimum": 0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Denoising End",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen Image Edit model (Transformer) to load",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Transformer"
+          },
+          "positive_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenImageConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Positive conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "negative_conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenImageConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Negative conditioning tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false
+          },
+          "cfg_scale": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              }
+            ],
+            "default": 4.0,
+            "description": "Classifier-Free Guidance scale",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 4.0,
+            "orig_required": false,
+            "title": "CFG Scale"
+          },
+          "width": {
+            "default": 1024,
+            "description": "Width of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "default": 1024,
+            "description": "Height of the generated image.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 16,
+            "orig_default": 1024,
+            "orig_required": false,
+            "title": "Height",
+            "type": "integer"
+          },
+          "steps": {
+            "default": 40,
+            "description": "Number of steps to run",
+            "exclusiveMinimum": 0,
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 40,
+            "orig_required": false,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "description": "Randomness seed for reproducibility.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Seed",
+            "type": "integer"
+          },
+          "shift": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Override the sigma schedule shift. When set, uses a fixed shift (e.g. 3.0 for Lightning LoRAs) instead of the default dynamic shifting. Leave unset for the base model's default schedule.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Shift"
+          },
+          "type": {
+            "const": "qwen_image_denoise",
+            "default": "qwen_image_denoise",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "qwen_image"],
+        "title": "Denoise - Qwen Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "QwenImageImageToLatentsInvocation": {
+        "category": "image",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Generates latents from an image using the Qwen Image VAE.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The image to encode.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resize the image to this width before encoding. If not set, encodes at the image's original size.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Width"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resize the image to this height before encoding. If not set, encodes at the image's original size.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Height"
+          },
+          "type": {
+            "const": "qwen_image_i2l",
+            "default": "qwen_image_i2l",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["image", "latents", "vae", "i2l", "qwen_image"],
+        "title": "Image to Latents - Qwen Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LatentsOutput"
+        }
+      },
+      "QwenImageLatentsToImageInvocation": {
+        "category": "latents",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Generates an image from latents using the Qwen Image VAE.",
+        "node_pack": "invokeai",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoardField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The board to save the image to",
+            "field_kind": "internal",
+            "input": "direct",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "latents": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LatentsField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Latents tensor",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VAEField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "VAE",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true
+          },
+          "type": {
+            "const": "qwen_image_l2i",
+            "default": "qwen_image_l2i",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["latents", "image", "vae", "l2i", "qwen_image"],
+        "title": "Latents to Image - Qwen Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/ImageOutput"
+        }
+      },
+      "QwenImageLoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Applies a collection of LoRAs to a Qwen Image transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA models and weights. May be a single LoRA or collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "qwen_image_lora_collection_loader",
+            "default": "qwen_image_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "qwen_image"],
+        "title": "Apply LoRA Collection - Qwen Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
+        }
+      },
+      "QwenImageLoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a LoRA model to a Qwen Image transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["qwen-image"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "The weight at which the LoRA is applied to each model",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "qwen_image_lora_loader",
+            "default": "qwen_image_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "qwen_image"],
+        "title": "Apply LoRA - Qwen Image",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/QwenImageLoRALoaderOutput"
+        }
+      },
+      "QwenImageLoRALoaderOutput": {
+        "class": "output",
+        "description": "Qwen Image LoRA Loader Output",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "qwen_image_lora_loader_output",
+            "default": "qwen_image_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "type", "type"],
+        "title": "QwenImageLoRALoaderOutput",
+        "type": "object"
+      },
+      "QwenImageModelLoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Loads a Qwen Image model, outputting its submodels.\n\nThe transformer is always loaded from the main model (Diffusers or GGUF).\n\nFor GGUF quantized models, the VAE and Qwen VL encoder must come from a\nseparate Diffusers model specified in the \"Component Source\" field.\n\nFor Diffusers models, all components are extracted from the main model\nautomatically. The \"Component Source\" field is ignored.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "model": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Qwen Image Edit model (Transformer) to load",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Transformer",
+            "ui_model_base": ["qwen-image"],
+            "ui_model_type": ["main"]
+          },
+          "component_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Diffusers Qwen Image model to extract the VAE and Qwen VL encoder from. Required when using a GGUF quantized transformer. Ignored when the main model is already in Diffusers format.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Component Source (Diffusers)",
+            "ui_model_base": ["qwen-image"],
+            "ui_model_format": ["diffusers"],
+            "ui_model_type": ["main"]
+          },
+          "type": {
+            "const": "qwen_image_model_loader",
+            "default": "qwen_image_model_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["model", "type", "id"],
+        "tags": ["model", "qwen_image"],
+        "title": "Main Model - Qwen Image",
+        "type": "object",
+        "version": "1.1.0",
+        "output": {
+          "$ref": "#/components/schemas/QwenImageModelLoaderOutput"
+        }
+      },
+      "QwenImageModelLoaderOutput": {
+        "class": "output",
+        "description": "Qwen Image model loader output.",
+        "properties": {
+          "transformer": {
+            "$ref": "#/components/schemas/TransformerField",
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "qwen_vl_encoder": {
+            "$ref": "#/components/schemas/QwenVLEncoderField",
+            "description": "Qwen2.5-VL tokenizer, processor and text/vision encoder",
+            "field_kind": "output",
+            "title": "Qwen VL Encoder",
+            "ui_hidden": false
+          },
+          "vae": {
+            "$ref": "#/components/schemas/VAEField",
+            "description": "VAE",
+            "field_kind": "output",
+            "title": "VAE",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "qwen_image_model_loader_output",
+            "default": "qwen_image_model_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "qwen_vl_encoder", "vae", "type", "type"],
+        "title": "QwenImageModelLoaderOutput",
+        "type": "object"
+      },
+      "QwenImageTextEncoderInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Encodes text and reference images for Qwen Image using Qwen2.5-VL.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Text prompt describing the desired edit.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Prompt",
+            "ui_component": "textarea"
+          },
+          "reference_images": {
+            "default": [],
+            "description": "Reference images to guide the edit. The model can use multiple reference images.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/ImageField"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Reference Images",
+            "type": "array"
+          },
+          "qwen_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QwenVLEncoderField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Qwen2.5-VL tokenizer, processor and text/vision encoder",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Qwen VL Encoder"
+          },
+          "quantization": {
+            "default": "none",
+            "description": "Quantize the Qwen VL encoder to reduce VRAM usage. 'nf4' (4-bit) saves the most memory, 'int8' (8-bit) is a middle ground.",
+            "enum": ["none", "int8", "nf4"],
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "none",
+            "orig_required": false,
+            "title": "Quantization",
+            "type": "string"
+          },
+          "type": {
+            "const": "qwen_image_text_encoder",
+            "default": "qwen_image_text_encoder",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "conditioning", "qwen_image"],
+        "title": "Prompt - Qwen Image",
+        "type": "object",
+        "version": "1.2.0",
+        "output": {
+          "$ref": "#/components/schemas/QwenImageConditioningOutput"
+        }
+      },
+      "QwenImageVariantType": {
+        "type": "string",
+        "enum": ["generate", "edit"],
+        "title": "QwenImageVariantType",
+        "description": "Qwen Image model variants."
+      },
+      "QwenVLEncoderField": {
+        "description": "Field for Qwen2.5-VL encoder used by Qwen Image Edit models.",
+        "properties": {
+          "tokenizer": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load tokenizer submodel"
+          },
+          "text_encoder": {
+            "$ref": "#/components/schemas/ModelIdentifierField",
+            "description": "Info to load text_encoder submodel"
+          }
+        },
+        "required": ["tokenizer", "text_encoder"],
+        "title": "QwenVLEncoderField",
+        "type": "object"
+      },
       "RandomFloatInvocation": {
         "category": "math",
         "class": "invocation",
@@ -54912,21 +57078,6 @@
             ],
             "title": "Ip Adapters",
             "description": "List of IP Adapters with their settings"
-          },
-          "reference_images": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ReferenceImageRecallParameter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference Images",
-            "description": "List of model-free reference images for architectures that consume reference images directly (FLUX.2 Klein, FLUX Kontext, Qwen Image Edit). The frontend picks the correct config type based on the currently-selected main model."
           }
         },
         "additionalProperties": false,
@@ -54947,6 +57098,11 @@
             "title": "Queue Id",
             "type": "string"
           },
+          "user_id": {
+            "description": "The ID of the user whose recall parameters were updated",
+            "title": "User Id",
+            "type": "string"
+          },
           "parameters": {
             "additionalProperties": true,
             "description": "The recall parameters that were updated",
@@ -54954,7 +57110,7 @@
             "type": "object"
           }
         },
-        "required": ["timestamp", "queue_id", "parameters"],
+        "required": ["timestamp", "queue_id", "user_id", "parameters"],
         "title": "RecallParametersUpdatedEvent",
         "type": "object"
       },
@@ -55117,19 +57273,6 @@
         "output": {
           "$ref": "#/components/schemas/MaskOutput"
         }
-      },
-      "ReferenceImageRecallParameter": {
-        "properties": {
-          "image_name": {
-            "type": "string",
-            "title": "Image Name",
-            "description": "The filename of the reference image in outputs/images"
-          }
-        },
-        "type": "object",
-        "required": ["image_name"],
-        "title": "ReferenceImageRecallParameter",
-        "description": "Global reference-image configuration for recall.\n\nUsed for reference images that feed directly into the main model rather\nthan through a separate IP-Adapter / ControlNet model \u2014 for example\nFLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend\npicks the correct config type (``flux2_reference_image`` /\n``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based\non the currently-selected main model."
       },
       "RemoteModelFile": {
         "properties": {
@@ -58117,30 +60260,6 @@
             "type": "integer",
             "title": "Total",
             "description": "Total number of queue items"
-          },
-          "user_pending": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User Pending",
-            "description": "Number of queue items with status 'pending' for the current user"
-          },
-          "user_in_progress": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "User In Progress",
-            "description": "Number of queue items with status 'in_progress' for the current user"
           }
         },
         "type": "object",
@@ -58221,6 +60340,18 @@
             "type": "boolean",
             "title": "Strict Password Checking",
             "description": "Whether strict password requirements are enforced"
+          },
+          "admin_email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admin Email",
+            "description": "Email of the first active admin user, if any"
           }
         },
         "type": "object",
@@ -58848,6 +60979,35 @@
               }
             ]
           },
+          "variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/ClipVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/FluxVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/ZImageVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VariantType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant"
+          },
           "is_installed": {
             "type": "boolean",
             "title": "Is Installed",
@@ -58948,6 +61108,35 @@
                 "type": "null"
               }
             ]
+          },
+          "variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/ClipVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/FluxVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Flux2VariantType"
+              },
+              {
+                "$ref": "#/components/schemas/ZImageVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/Qwen3VariantType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variant"
           },
           "is_installed": {
             "type": "boolean",
@@ -59827,6 +62016,9 @@
               },
               {
                 "$ref": "#/components/schemas/ZImageVariantType"
+              },
+              {
+                "$ref": "#/components/schemas/QwenImageVariantType"
               },
               {
                 "$ref": "#/components/schemas/Qwen3VariantType"
@@ -63956,13 +66148,23 @@
             "title": "Opened At",
             "description": "The opened timestamp of the workflow."
           },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The id of the user who owns this workflow."
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether this workflow is shared with all users."
+          },
           "workflow": {
             "$ref": "#/components/schemas/Workflow",
             "description": "The workflow."
           }
         },
         "type": "object",
-        "required": ["workflow_id", "name", "created_at", "updated_at", "workflow"],
+        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "workflow"],
         "title": "WorkflowRecordDTO"
       },
       "WorkflowRecordListItemWithThumbnailDTO": {
@@ -64019,6 +66221,16 @@
             "title": "Opened At",
             "description": "The opened timestamp of the workflow."
           },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The id of the user who owns this workflow."
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether this workflow is shared with all users."
+          },
           "description": {
             "type": "string",
             "title": "Description",
@@ -64047,12 +66259,22 @@
           }
         },
         "type": "object",
-        "required": ["workflow_id", "name", "created_at", "updated_at", "description", "category", "tags"],
+        "required": [
+          "workflow_id",
+          "name",
+          "created_at",
+          "updated_at",
+          "user_id",
+          "is_public",
+          "description",
+          "category",
+          "tags"
+        ],
         "title": "WorkflowRecordListItemWithThumbnailDTO"
       },
       "WorkflowRecordOrderBy": {
         "type": "string",
-        "enum": ["created_at", "updated_at", "opened_at", "name"],
+        "enum": ["created_at", "updated_at", "opened_at", "name", "is_public"],
         "title": "WorkflowRecordOrderBy",
         "description": "The order by options for workflow records"
       },
@@ -64110,6 +66332,16 @@
             "title": "Opened At",
             "description": "The opened timestamp of the workflow."
           },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The id of the user who owns this workflow."
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether this workflow is shared with all users."
+          },
           "workflow": {
             "$ref": "#/components/schemas/Workflow",
             "description": "The workflow."
@@ -64128,7 +66360,7 @@
           }
         },
         "type": "object",
-        "required": ["workflow_id", "name", "created_at", "updated_at", "workflow"],
+        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "workflow"],
         "title": "WorkflowRecordWithThumbnailDTO"
       },
       "WorkflowWithoutID": {

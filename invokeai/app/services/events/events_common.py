@@ -281,9 +281,10 @@ class BatchEnqueuedEvent(QueueEventBase):
     )
     priority: int = Field(description="The priority of the batch")
     origin: str | None = Field(default=None, description="The origin of the batch")
+    user_id: str = Field(default="system", description="The ID of the user who enqueued the batch")
 
     @classmethod
-    def build(cls, enqueue_result: EnqueueBatchResult) -> "BatchEnqueuedEvent":
+    def build(cls, enqueue_result: EnqueueBatchResult, user_id: str = "system") -> "BatchEnqueuedEvent":
         return cls(
             queue_id=enqueue_result.queue_id,
             batch_id=enqueue_result.batch.batch_id,
@@ -291,6 +292,7 @@ class BatchEnqueuedEvent(QueueEventBase):
             enqueued=enqueue_result.enqueued,
             requested=enqueue_result.requested,
             priority=enqueue_result.priority,
+            user_id=user_id,
         )
 
 
@@ -609,6 +611,7 @@ class BulkDownloadEventBase(EventBase):
     bulk_download_id: str = Field(description="The ID of the bulk image download")
     bulk_download_item_id: str = Field(description="The ID of the bulk image download item")
     bulk_download_item_name: str = Field(description="The name of the bulk image download item")
+    user_id: str = Field(default="system", description="The ID of the user who initiated the download")
 
 
 @payload_schema.register
@@ -619,12 +622,17 @@ class BulkDownloadStartedEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> "BulkDownloadStartedEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
+            user_id=user_id,
         )
 
 
@@ -636,12 +644,17 @@ class BulkDownloadCompleteEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> "BulkDownloadCompleteEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
+            user_id=user_id,
         )
 
 
@@ -655,13 +668,19 @@ class BulkDownloadErrorEvent(BulkDownloadEventBase):
 
     @classmethod
     def build(
-        cls, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, error: str
+        cls,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        error: str,
+        user_id: str = "system",
     ) -> "BulkDownloadErrorEvent":
         return cls(
             bulk_download_id=bulk_download_id,
             bulk_download_item_id=bulk_download_item_id,
             bulk_download_item_name=bulk_download_item_name,
             error=error,
+            user_id=user_id,
         )
 
 
@@ -671,8 +690,9 @@ class RecallParametersUpdatedEvent(QueueEventBase):
 
     __event_name__ = "recall_parameters_updated"
 
+    user_id: str = Field(description="The ID of the user whose recall parameters were updated")
     parameters: dict[str, Any] = Field(description="The recall parameters that were updated")
 
     @classmethod
-    def build(cls, queue_id: str, parameters: dict[str, Any]) -> "RecallParametersUpdatedEvent":
-        return cls(queue_id=queue_id, parameters=parameters)
+    def build(cls, queue_id: str, user_id: str, parameters: dict[str, Any]) -> "RecallParametersUpdatedEvent":
+        return cls(queue_id=queue_id, user_id=user_id, parameters=parameters)
