@@ -93,6 +93,29 @@ COGVIEW4_LATENT_RGB_FACTORS = [
     [-0.00955853, -0.00980067, -0.00977842],
 ]
 
+# Qwen Image uses the same VAE as Wan 2.1 (16-channel).
+# Factors from ComfyUI: https://github.com/comfyanonymous/ComfyUI/blob/master/comfy/latent_formats.py
+QWEN_IMAGE_LATENT_RGB_FACTORS = [
+    [-0.1299, -0.1692, 0.2932],
+    [0.0671, 0.0406, 0.0442],
+    [0.3568, 0.2548, 0.1747],
+    [0.0372, 0.2344, 0.1420],
+    [0.0313, 0.0189, -0.0328],
+    [0.0296, -0.0956, -0.0665],
+    [-0.3477, -0.4059, -0.2925],
+    [0.0166, 0.1902, 0.1975],
+    [-0.0412, 0.0267, -0.1364],
+    [-0.1293, 0.0740, 0.1636],
+    [0.0680, 0.3019, 0.1128],
+    [0.0032, 0.0581, 0.0639],
+    [-0.1251, 0.0927, 0.1699],
+    [0.0060, -0.0633, 0.0005],
+    [0.3477, 0.2275, 0.2950],
+    [0.1984, 0.0913, 0.1861],
+]
+
+QWEN_IMAGE_LATENT_RGB_BIAS = [-0.1835, -0.0868, -0.3360]
+
 # FLUX.2 uses 32 latent channels.
 # Factors from ComfyUI: https://github.com/Comfy-Org/ComfyUI/blob/main/comfy/latent_formats.py
 FLUX2_LATENT_RGB_FACTORS = [
@@ -232,6 +255,9 @@ def diffusion_step_callback(
         latent_rgb_factors = SD3_5_LATENT_RGB_FACTORS
     elif base_model == BaseModelType.CogView4:
         latent_rgb_factors = COGVIEW4_LATENT_RGB_FACTORS
+    elif base_model == BaseModelType.QwenImage:
+        latent_rgb_factors = QWEN_IMAGE_LATENT_RGB_FACTORS
+        latent_rgb_bias = QWEN_IMAGE_LATENT_RGB_BIAS
     elif base_model == BaseModelType.Flux:
         latent_rgb_factors = FLUX_LATENT_RGB_FACTORS
     elif base_model == BaseModelType.Flux2:
