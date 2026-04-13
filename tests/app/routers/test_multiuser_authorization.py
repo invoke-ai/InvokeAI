@@ -535,6 +535,22 @@ class TestImageUploadAuth:
         # Should not be 403 (may fail for other reasons in test env)
         assert r.status_code != status.HTTP_403_FORBIDDEN
 
+    def test_non_owner_can_upload_to_public_board(self, client: TestClient, user1_token: str, user2_token: str):
+        """Public boards allow any authenticated user to upload images."""
+        board_id = _create_board(client, user1_token, "User1 Public Upload Board")
+        _set_board_visibility(client, user1_token, board_id, "public")
+
+        import io
+
+        fake_image = io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 100)
+        r = client.post(
+            f"/api/v1/images/upload?image_category=general&is_intermediate=false&board_id={board_id}",
+            files={"file": ("test.png", fake_image, "image/png")},
+            headers=_auth(user2_token),
+        )
+        # Should not be 403 (may fail downstream for other reasons in test env)
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
 
 class TestImageMutationAuth:
     """Tests that image mutation endpoints enforce ownership."""

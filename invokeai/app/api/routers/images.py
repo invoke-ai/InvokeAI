@@ -173,13 +173,20 @@ async def upload_image(
     ),
 ) -> ImageDTO:
     """Uploads an image for the current user"""
-    # If uploading into a board, verify the user owns it
+    # If uploading into a board, verify the user has write access.
+    # Public boards allow uploads from any authenticated user.
     if board_id is not None:
+        from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
         try:
             board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
         except Exception:
             raise HTTPException(status_code=404, detail="Board not found")
-        if not current_user.is_admin and board.user_id != current_user.user_id:
+        if (
+            not current_user.is_admin
+            and board.user_id != current_user.user_id
+            and board.board_visibility != BoardVisibility.Public
+        ):
             raise HTTPException(status_code=403, detail="Not authorized to upload to this board")
 
     if not file.content_type or not file.content_type.startswith("image"):
