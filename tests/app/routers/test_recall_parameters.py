@@ -47,6 +47,7 @@ def patched_dependencies(monkeypatch: Any, mock_invoker: Invoker) -> MockApiDepe
     """
     dependencies = MockApiDependencies(mock_invoker)
     monkeypatch.setattr("invokeai.app.api.routers.recall_parameters.ApiDependencies", dependencies)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", dependencies)
     monkeypatch.setattr(
         mock_invoker.services.client_state_persistence,
         "set_by_key",
