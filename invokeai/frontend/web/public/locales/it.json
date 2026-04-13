@@ -884,7 +884,11 @@
         "queueEmpty": "La coda di installazione è vuota.",
         "animaVaePlaceholder": "Seleziona VAE compatibile con Anima",
         "animaQwen3EncoderPlaceholder": "Seleziona l'encoder Qwen3 0.6B",
-        "animaT5EncoderPlaceholder": "Seleziona l'encoder T5-XXL"
+        "animaT5EncoderPlaceholder": "Seleziona l'encoder T5-XXL",
+        "qwenImageComponentSourcePlaceholder": "Necessario per i modelli GGUF",
+        "qwenImageComponentSource": "VAE/Sorgente Encoder (Diffusori)",
+        "qwenImageQuantization": "Quantizzazione dell'encoder",
+        "qwenImageQuantizationNone": "Nessuna (bf16)"
     },
     "parameters": {
         "images": "Immagini",
@@ -978,7 +982,8 @@
             "noQwen3EncoderModelSelected": "Nessun modello di encoder Qwen3 selezionato per la generazione Klein di FLUX2",
             "noAnimaVaeModelSelected": "Nessun modello VAE Anima selezionato",
             "noAnimaQwen3EncoderModelSelected": "Nessun modello di encoder Anima Qwen3 selezionato",
-            "noAnimaT5EncoderModelSelected": "Nessun modello di encoder Anima T5 selezionato"
+            "noAnimaT5EncoderModelSelected": "Nessun modello di encoder Anima T5 selezionato",
+            "noQwenImageComponentSourceSelected": "I modelli GGUF Qwen Image richiedono una sorgente componente diffusori per VAE/encoder"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
