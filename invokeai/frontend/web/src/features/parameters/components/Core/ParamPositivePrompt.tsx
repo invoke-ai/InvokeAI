@@ -228,7 +228,7 @@ export const ParamPositivePrompt = memo(() => {
               {modelSupportsNegativePrompt && <NegativePromptToggleButton />}
             </Flex>
           </PromptOverlayButtonWrapper>
-          <PromptLabel label="Prompt" />
+          <PromptLabel label={t('controlLayers.prompt')} />
           {viewMode && (
             <ViewModePrompt
               prompt={prompt}

@@ -33,10 +33,20 @@ type AddRegionsArg = {
   bbox: Rect;
   model: MainModelConfig;
   posCond: Invocation<
-    'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'flux2_klein_text_encoder' | 'z_image_text_encoder'
+    | 'compel'
+    | 'sdxl_compel_prompt'
+    | 'flux_text_encoder'
+    | 'flux2_klein_text_encoder'
+    | 'z_image_text_encoder'
+    | 'anima_text_encoder'
   >;
   negCond: Invocation<
-    'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'flux2_klein_text_encoder' | 'z_image_text_encoder'
+    | 'compel'
+    | 'sdxl_compel_prompt'
+    | 'flux_text_encoder'
+    | 'flux2_klein_text_encoder'
+    | 'z_image_text_encoder'
+    | 'anima_text_encoder'
   > | null;
   posCondCollect: Invocation<'collect'>;
   negCondCollect: Invocation<'collect'> | null;
@@ -76,6 +86,7 @@ export const addRegions = async ({
   const isSDXL = model.base === 'sdxl';
   const isFLUX = model.base === 'flux';
   const isZImage = model.base === 'z-image';
+  const isAnima = model.base === 'anima';
 
   const validRegions = regions
     .filter((entity) => entity.isEnabled)
@@ -116,7 +127,9 @@ export const addRegions = async ({
     if (region.positivePrompt) {
       // The main positive conditioning node
       result.addedPositivePrompt = true;
-      let regionalPosCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder'>;
+      let regionalPosCond: Invocation<
+        'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder' | 'anima_text_encoder'
+      >;
       if (isSDXL) {
         regionalPosCond = g.addNode({
           type: 'sdxl_compel_prompt',
@@ -133,6 +146,12 @@ export const addRegions = async ({
       } else if (isZImage) {
         regionalPosCond = g.addNode({
           type: 'z_image_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond'),
+          prompt: region.positivePrompt,
+        });
+      } else if (isAnima) {
+        regionalPosCond = g.addNode({
+          type: 'anima_text_encoder',
           id: getPrefixedId('prompt_region_positive_cond'),
           prompt: region.positivePrompt,
         });
@@ -172,6 +191,12 @@ export const addRegions = async ({
           clone.destination.node_id = regionalPosCond.id;
           g.addEdgeFromObj(clone);
         }
+      } else if (posCond.type === 'anima_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 't5_encoder', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCond.id;
+          g.addEdgeFromObj(clone);
+        }
       } else {
         assert(false, 'Unsupported positive conditioning node type.');
       }
@@ -183,7 +208,9 @@ export const addRegions = async ({
 
       // The main negative conditioning node
       result.addedNegativePrompt = true;
-      let regionalNegCond: Invocation<'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder'>;
+      let regionalNegCond: Invocation<
+        'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder' | 'anima_text_encoder'
+      >;
       if (isSDXL) {
         regionalNegCond = g.addNode({
           type: 'sdxl_compel_prompt',
@@ -200,6 +227,12 @@ export const addRegions = async ({
       } else if (isZImage) {
         regionalNegCond = g.addNode({
           type: 'z_image_text_encoder',
+          id: getPrefixedId('prompt_region_negative_cond'),
+          prompt: region.negativePrompt,
+        });
+      } else if (isAnima) {
+        regionalNegCond = g.addNode({
+          type: 'anima_text_encoder',
           id: getPrefixedId('prompt_region_negative_cond'),
           prompt: region.negativePrompt,
         });
@@ -240,6 +273,12 @@ export const addRegions = async ({
           clone.destination.node_id = regionalNegCond.id;
           g.addEdgeFromObj(clone);
         }
+      } else if (negCond.type === 'anima_text_encoder') {
+        for (const edge of g.getEdgesTo(negCond, ['qwen3_encoder', 't5_encoder', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalNegCond.id;
+          g.addEdgeFromObj(clone);
+        }
       } else {
         assert(false, 'Unsupported negative conditioning node type.');
       }
@@ -259,7 +298,7 @@ export const addRegions = async ({
       g.addEdge(maskToTensor, 'mask', invertTensorMask, 'mask');
       // Create the conditioning node. It's going to be connected to the negative cond collector, but it uses the positive prompt
       let regionalPosCondInverted: Invocation<
-        'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder'
+        'compel' | 'sdxl_compel_prompt' | 'flux_text_encoder' | 'z_image_text_encoder' | 'anima_text_encoder'
       >;
       if (isSDXL) {
         regionalPosCondInverted = g.addNode({
@@ -277,6 +316,12 @@ export const addRegions = async ({
       } else if (isZImage) {
         regionalPosCondInverted = g.addNode({
           type: 'z_image_text_encoder',
+          id: getPrefixedId('prompt_region_positive_cond_inverted'),
+          prompt: region.positivePrompt,
+        });
+      } else if (isAnima) {
+        regionalPosCondInverted = g.addNode({
+          type: 'anima_text_encoder',
           id: getPrefixedId('prompt_region_positive_cond_inverted'),
           prompt: region.positivePrompt,
         });
@@ -312,6 +357,12 @@ export const addRegions = async ({
         }
       } else if (posCond.type === 'z_image_text_encoder') {
         for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 'mask'])) {
+          const clone = deepClone(edge);
+          clone.destination.node_id = regionalPosCondInverted.id;
+          g.addEdgeFromObj(clone);
+        }
+      } else if (posCond.type === 'anima_text_encoder') {
+        for (const edge of g.getEdgesTo(posCond, ['qwen3_encoder', 't5_encoder', 'mask'])) {
           const clone = deepClone(edge);
           clone.destination.node_id = regionalPosCondInverted.id;
           g.addEdgeFromObj(clone);
