@@ -1,7 +1,9 @@
-"""Migration 28: Add per-item queue status sequencing.
+"""Migration 28: Add per-user workflow isolation columns to workflow_library.
 
-This migration adds a `status_sequence` column to `session_queue` so queue item
-status updates can be ordered across asynchronous event and snapshot channels.
+This migration adds the database columns required for multiuser workflow isolation
+to the workflow_library table:
+- user_id: the owner of the workflow (defaults to 'system' for existing workflows)
+- is_public: whether the workflow is shared with all users
 """
 
 import sqlite3
@@ -10,22 +12,32 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 
 
 class Migration28Callback:
-    """Add a per-queue-item status sequence for cross-channel ordering."""
+    """Migration to add user_id and is_public to the workflow_library table."""
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='session_queue';")
-        if cursor.fetchone() is None:
-            return
+        self._update_workflow_library_table(cursor)
 
-        cursor.execute("PRAGMA table_info(session_queue);")
+    def _update_workflow_library_table(self, cursor: sqlite3.Cursor) -> None:
+        """Add user_id and is_public columns to workflow_library table."""
+        cursor.execute("PRAGMA table_info(workflow_library);")
         columns = [row[1] for row in cursor.fetchall()]
 
-        if "status_sequence" not in columns:
-            cursor.execute("ALTER TABLE session_queue ADD COLUMN status_sequence INTEGER DEFAULT 0;")
-            cursor.execute("UPDATE session_queue SET status_sequence = 0 WHERE status_sequence IS NULL;")
+        if "user_id" not in columns:
+            cursor.execute("ALTER TABLE workflow_library ADD COLUMN user_id TEXT DEFAULT 'system';")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_workflow_library_user_id ON workflow_library(user_id);")
+
+        if "is_public" not in columns:
+            cursor.execute("ALTER TABLE workflow_library ADD COLUMN is_public BOOLEAN NOT NULL DEFAULT FALSE;")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_workflow_library_is_public ON workflow_library(is_public);")
 
 
 def build_migration_28() -> Migration:
+    """Builds the migration object for migrating from version 27 to version 28.
+
+    This migration adds per-user workflow isolation to the workflow_library table:
+    - user_id column: identifies the owner of each workflow
+    - is_public column: controls whether a workflow is shared with all users
+    """
     return Migration(
         from_version=27,
         to_version=28,
