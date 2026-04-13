@@ -11,6 +11,7 @@ import {
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsQwenImage,
   selectIsSD3,
   selectIsZImage,
   selectModelSupportsGuidance,
@@ -25,6 +26,7 @@ import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDy
 import ParamFluxDypeScale from 'features/parameters/components/Core/ParamFluxDypeScale';
 import ParamFluxScheduler from 'features/parameters/components/Core/ParamFluxScheduler';
 import ParamGuidance from 'features/parameters/components/Core/ParamGuidance';
+import ParamQwenImageShift from 'features/parameters/components/Core/ParamQwenImageShift';
 import ParamScheduler from 'features/parameters/components/Core/ParamScheduler';
 import ParamSteps from 'features/parameters/components/Core/ParamSteps';
 import ParamZImageScheduler from 'features/parameters/components/Core/ParamZImageScheduler';
@@ -51,6 +53,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
   const isExternal = useAppSelector(selectIsExternal);
+  const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
   const modelSupportsGuidance = useAppSelector(selectModelSupportsGuidance);
@@ -94,7 +97,7 @@ export const GenerationSettingsAccordion = memo(() => {
           <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
             <Flex gap={4} flexDir="column" pb={4}>
               <FormControlGroup formLabelProps={formLabelProps}>
-                {!isExternal && !isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && !isAnima && (
+                {!isExternal && !isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && !isQwenImage && !isAnima && (
                   <ParamScheduler />
                 )}
                 {!isExternal && isFLUX && <ParamFluxScheduler />}
@@ -107,6 +110,7 @@ export const GenerationSettingsAccordion = memo(() => {
                 )}
                 {!isExternal && !isFLUX && !isFlux2 && <ParamCFGScale />}
                 {!isExternal && isZImage && <ParamZImageShift />}
+                {!isExternal && isQwenImage && <ParamQwenImageShift />}
                 {!isExternal && isFLUX && <ParamFluxDypePreset />}
                 {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeScale />}
                 {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
