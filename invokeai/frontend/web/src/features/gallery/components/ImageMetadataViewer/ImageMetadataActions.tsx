@@ -15,6 +15,7 @@ import {
   useUnrecallableMetadataDatum,
 } from 'features/metadata/parsing';
 import { memo, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiArrowBendUpLeftBold } from 'react-icons/pi';
 
 type Props = {
@@ -57,6 +58,9 @@ export const ImageMetadataActions = memo((props: Props) => {
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerScheduler} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerDenoisingStart} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerSteps} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageComponentSource} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageQuantization} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageShift} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CanvasLayers} />
       <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefImages} />
       <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.LoRAs} />
@@ -112,6 +116,7 @@ SingleMetadataDatum.displayName = 'SingleMetadataDatum';
 
 const SingleMetadataParsed = typedMemo(
   <T,>({ data, handler }: { data: ParsedSuccessData<T>; handler: SingleMetadataHandler<T> }) => {
+    const { t } = useTranslation();
     const store = useAppStore();
 
     const { LabelComponent, ValueComponent } = handler;
@@ -123,7 +128,7 @@ const SingleMetadataParsed = typedMemo(
     return (
       <Flex gap={2}>
         <IconButton
-          aria-label="Recall Parameter"
+          aria-label={t('metadata.recallParameters')}
           icon={<PiArrowBendUpLeftBold />}
           size="xs"
           variant="ghost"
@@ -162,6 +167,7 @@ CollectionMetadataDatum.displayName = 'CollectionMetadataDatum';
 
 const CollectionMetadataParsed = typedMemo(
   <T extends any[]>({ value, handler }: { value: T[number]; handler: CollectionMetadataHandler<T> }) => {
+    const { t } = useTranslation();
     const store = useAppStore();
 
     const { LabelComponent, ValueComponent } = handler;
@@ -173,7 +179,7 @@ const CollectionMetadataParsed = typedMemo(
     return (
       <Flex gap={2}>
         <IconButton
-          aria-label="Recall Parameter"
+          aria-label={t('metadata.recallParameters')}
           icon={<PiArrowBendUpLeftBold />}
           size="xs"
           variant="ghost"
