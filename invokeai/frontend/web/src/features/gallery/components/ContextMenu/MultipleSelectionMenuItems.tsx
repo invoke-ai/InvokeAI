@@ -10,12 +10,16 @@ import {
   useStarImagesMutation,
   useUnstarImagesMutation,
 } from 'services/api/endpoints/images';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
+import { useSelectedBoard } from 'services/api/hooks/useSelectedBoard';
 
 const MultipleSelectionMenuItems = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selection = useAppSelector((s) => s.gallery.selection);
   const deleteImageModal = useDeleteImageModalApi();
+  const selectedBoard = useSelectedBoard();
+  const { canWriteImages } = useBoardAccess(selectedBoard);
 
   const [starImages] = useStarImagesMutation();
   const [unstarImages] = useUnstarImagesMutation();
@@ -53,11 +57,16 @@ const MultipleSelectionMenuItems = () => {
       <MenuItem icon={<PiDownloadSimpleBold />} onClickCapture={handleBulkDownload}>
         {t('gallery.downloadSelection')}
       </MenuItem>
-      <MenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard}>
+      <MenuItem icon={<PiFoldersBold />} onClickCapture={handleChangeBoard} isDisabled={!canWriteImages}>
         {t('boards.changeBoard')}
       </MenuItem>
       <MenuDivider />
-      <MenuItem color="error.300" icon={<PiTrashSimpleBold />} onClickCapture={handleDeleteSelection}>
+      <MenuItem
+        color="error.300"
+        icon={<PiTrashSimpleBold />}
+        onClickCapture={handleDeleteSelection}
+        isDisabled={!canWriteImages}
+      >
         {t('gallery.deleteSelection')}
       </MenuItem>
     </>

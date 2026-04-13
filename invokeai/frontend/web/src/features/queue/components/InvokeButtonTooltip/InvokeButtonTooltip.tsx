@@ -17,6 +17,8 @@ import type { PropsWithChildren } from 'react';
 import { memo, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { enqueueMutationFixedCacheKeyOptions, useEnqueueBatchMutation } from 'services/api/endpoints/queue';
+import { useAutoAddBoard } from 'services/api/hooks/useAutoAddBoard';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 type Props = TooltipProps & {
@@ -53,19 +55,25 @@ TooltipContent.displayName = 'TooltipContent';
 const CanvasTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const isReady = useStore($isReadyToEnqueue);
   const reasons = useStore($reasonsWhyCannotEnqueue);
+  const autoAddBoard = useAutoAddBoard();
+  const { canWriteImages } = useBoardAccess(autoAddBoard);
 
   return (
     <Flex flexDir="column" gap={1}>
-      <IsReadyText isReady={isReady} prepend={prepend} />
+      <IsReadyText isReady={isReady && canWriteImages} prepend={prepend} />
       <QueueCountPredictionCanvasOrUpscaleTab />
-      {reasons.length > 0 && (
+      {(reasons.length > 0 || !canWriteImages) && (
         <>
           <StyledDivider />
-          <ReasonsList reasons={reasons} />
+          <ReasonsList reasons={reasons} canWriteImages={canWriteImages} />
         </>
       )}
-      <StyledDivider />
-      <AddingToText />
+      {canWriteImages && (
+        <>
+          <StyledDivider />
+          <AddingToText />
+        </>
+      )}
     </Flex>
   );
 });
@@ -74,15 +82,17 @@ CanvasTabTooltipContent.displayName = 'CanvasTabTooltipContent';
 const UpscaleTabTooltipContent = memo(({ prepend = false }: { prepend?: boolean }) => {
   const isReady = useStore($isReadyToEnqueue);
   const reasons = useStore($reasonsWhyCannotEnqueue);
+  const autoAddBoard = useAutoAddBoard();
+  const { canWriteImages } = useBoardAccess(autoAddBoard);
 
   return (
     <Flex flexDir="column" gap={1}>
-      <IsReadyText isReady={isReady} prepend={prepend} />
+      <IsReadyText isReady={isReady && canWriteImages} prepend={prepend} />
       <QueueCountPredictionCanvasOrUpscaleTab />
-      {reasons.length > 0 && (
+      {(reasons.length > 0 || !canWriteImages) && (
         <>
           <StyledDivider />
-          <ReasonsList reasons={reasons} />
+          <ReasonsList reasons={reasons} canWriteImages={canWriteImages} />
         </>
       )}
     </Flex>
@@ -195,12 +205,23 @@ const IsReadyText = memo(({ isReady, prepend }: { isReady: boolean; prepend: boo
 });
 IsReadyText.displayName = 'IsReadyText';
 
-const ReasonsList = memo(({ reasons }: { reasons: Reason[] }) => {
+const ReasonsList = memo(({ reasons, canWriteImages = true }: { reasons: Reason[]; canWriteImages?: boolean }) => {
+  const { t } = useTranslation();
+  const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
+  const autoAddBoardName = useBoardName(autoAddBoardId);
+
   return (
     <UnorderedList>
       {reasons.map((reason, i) => (
         <ReasonListItem key={`${reason.content}.${i}`} reason={reason} />
       ))}
+      {!canWriteImages && (
+        <ListItem>
+          <Text as="span">
+            {t('parameters.invoke.boardNotWritable', { boardName: autoAddBoardName || autoAddBoardId })}
+          </Text>
+        </ListItem>
+      )}
     </UnorderedList>
   );
 });

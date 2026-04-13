@@ -80,6 +80,7 @@ class SetupStatusResponse(BaseModel):
     setup_required: bool = Field(description="Whether initial setup is required")
     multiuser_enabled: bool = Field(description="Whether multiuser mode is enabled")
     strict_password_checking: bool = Field(description="Whether strict password requirements are enforced")
+    admin_email: str | None = Field(default=None, description="Email of the first active admin user, if any")
 
 
 @auth_router.get("/status", response_model=SetupStatusResponse)
@@ -94,15 +95,25 @@ async def get_setup_status() -> SetupStatusResponse:
     # If multiuser is disabled, setup is never required
     if not config.multiuser:
         return SetupStatusResponse(
-            setup_required=False, multiuser_enabled=False, strict_password_checking=config.strict_password_checking
+            setup_required=False,
+            multiuser_enabled=False,
+            strict_password_checking=config.strict_password_checking,
+            admin_email=None,
         )
 
     # In multiuser mode, check if an admin exists
     user_service = ApiDependencies.invoker.services.users
     setup_required = not user_service.has_admin()
 
+    # Only expose admin_email during initial setup to avoid leaking
+    # administrator identity on public deployments.
+    admin_email = user_service.get_admin_email() if setup_required else None
+
     return SetupStatusResponse(
-        setup_required=setup_required, multiuser_enabled=True, strict_password_checking=config.strict_password_checking
+        setup_required=setup_required,
+        multiuser_enabled=True,
+        strict_password_checking=config.strict_password_checking,
+        admin_email=admin_email,
     )
 
 
