@@ -70,5 +70,8 @@ def test_docs_json_export_writes_expected_files(tmp_path: Path):
         "settings.json",
     ]
 
+    invocation_context_payload = json.loads(invocation_context_path.read_text())
     settings_payload = json.loads(settings_path.read_text())
-    assert "settings" in settings_payload
+
+    assert invocation_context_payload == bundle["invocation_context"]
+    assert settings_payload == bundle["settings"]
