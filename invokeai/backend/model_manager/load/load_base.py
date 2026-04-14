@@ -58,7 +58,12 @@ class LoadedModelWithoutConfig:
 
     def __enter__(self) -> AnyModel:
         self._cache.lock(self._cache_record, None)
-        return self.model
+        try:
+            self.repair_required_tensors_on_device()
+            return self.model
+        except Exception:
+            self._cache.unlock(self._cache_record)
+            raise
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:
         self._cache.unlock(self._cache_record)
@@ -74,6 +79,7 @@ class LoadedModelWithoutConfig:
         """
         self._cache.lock(self._cache_record, working_mem_bytes)
         try:
+            self.repair_required_tensors_on_device()
             yield (self._cache_record.cached_model.get_cpu_state_dict(), self._cache_record.cached_model.model)
         finally:
             self._cache.unlock(self._cache_record)

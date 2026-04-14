@@ -1,6 +1,7 @@
 import { parseify } from 'common/util/serialize';
 import { addElement, getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import type { Templates } from 'features/nodes/store/types';
+import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import {
   isBoardFieldInputInstance,
   isImageFieldCollectionInputInstance,
@@ -149,8 +150,7 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
     }
   }
 
-  // Stash invalid edges here to be deleted later
-  const edgesToDelete = new Set<string>();
+  const validEdges = [];
 
   for (const edge of edges) {
     // Validate each edge. If the edge is invalid, we must remove it to prevent runtime errors with reactflow.
@@ -169,7 +169,7 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
       );
     }
 
-    if (!sourceTemplate) {
+    if (sourceNode?.type === 'invocation' && !sourceTemplate) {
       // The edge's source/output node template does not exist
       issues.push(
         t('nodes.missingTemplate', {
@@ -198,7 +198,7 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
       );
     }
 
-    if (!targetTemplate) {
+    if (targetNode?.type === 'invocation' && !targetTemplate) {
       // The edge's target/input node template does not exist
       issues.push(
         t('nodes.missingTemplate', {
@@ -218,8 +218,14 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
       );
     }
 
+    if (!issues.length && edge.type === 'default') {
+      const connectionError = validateConnection(edge, nodes, validEdges, templates, null, true);
+      if (connectionError) {
+        issues.push(connectionError);
+      }
+    }
+
     if (issues.length) {
-      edgesToDelete.add(edge.id);
       const source = edge.type === 'default' ? `${edge.source}.${edge.sourceHandle}` : edge.source;
       const target = edge.type === 'default' ? `${edge.source}.${edge.targetHandle}` : edge.target;
       warnings.push({
@@ -227,11 +233,13 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
         issues,
         data: edge,
       });
+    } else {
+      validEdges.push(edge);
     }
   }
 
   // Remove invalid edges
-  _workflow.edges = edges.filter(({ id }) => !edgesToDelete.has(id));
+  _workflow.edges = validEdges;
 
   // Migrated exposed fields to form elements if they exist and the form does not
   // Note: If the form is invalid per its zod schema, it will be reset to a default, empty form!

@@ -11,7 +11,7 @@ from invokeai.backend.image_util.lineart import Generator, LineartEdgeDetector
     "lineart_edge_detection",
     title="Lineart Edge Detection",
     tags=["controlnet", "lineart"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.0.0",
 )
 class LineartEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
