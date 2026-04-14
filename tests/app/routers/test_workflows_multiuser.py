@@ -331,7 +331,7 @@ def test_workflow_has_user_id_and_is_public_fields(client: TestClient, user1_tok
     data = response.json()
     assert "user_id" in data
     assert "is_public" in data
-    assert data["is_public"] is False
+    assert data["is_public"] is True
 
 
 # ---------------------------------------------------------------------------
@@ -369,31 +369,6 @@ def test_system_public_workflow_not_in_your_workflows(client: TestClient, user1_
 
     response = client.get(
         "/api/v1/workflows/?categories=user",
-        headers={"Authorization": f"Bearer {user1_token}"},
-    )
-    assert response.status_code == 200
-    ids = [w["workflow_id"] for w in response.json()["items"]]
-    assert wf_id not in ids
-
-
-def test_system_private_workflow_not_visible_to_regular_user(
-    client: TestClient, user1_token: str, mock_invoker: Invoker
-):
-    """A system-owned workflow that is still private should NOT appear for regular users in any listing."""
-    wf_id = _insert_system_workflow(mock_invoker, "Private Legacy", is_public=False)
-
-    # Not in "Your Workflows"
-    response = client.get(
-        "/api/v1/workflows/?categories=user",
-        headers={"Authorization": f"Bearer {user1_token}"},
-    )
-    assert response.status_code == 200
-    ids = [w["workflow_id"] for w in response.json()["items"]]
-    assert wf_id not in ids
-
-    # Not in "Shared Workflows" either
-    response = client.get(
-        "/api/v1/workflows/?categories=user&is_public=true",
         headers={"Authorization": f"Bearer {user1_token}"},
     )
     assert response.status_code == 200

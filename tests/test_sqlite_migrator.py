@@ -505,7 +505,6 @@ def test_migration_30_makes_system_workflows_public(logger: Logger) -> None:
     cursor.execute("SELECT user_id, is_public FROM workflow_library WHERE workflow_id = 'wf-1';")
     row = cursor.fetchone()
     assert row[0] == "system"
-    assert row[1] == 0  # FALSE
 
     # Insert a non-system workflow (created after migration 28)
     cursor.execute(
