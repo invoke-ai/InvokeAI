@@ -24,16 +24,16 @@ import {
 
 type OrderBy = 'default' | 'name' | 'type' | 'base' | 'size' | 'created_at' | 'updated_at' | 'path' | 'format';
 
-const ORDER_BY_OPTIONS: OrderBy[] = [
-  'default',
-  'name',
-  'base',
-  'size',
-  'created_at',
-  'updated_at',
-  'path',
-  'type',
-  'format',
+const ORDER_BY_OPTIONS: { key: OrderBy; i18nKey: string }[] = [
+  { key: 'default', i18nKey: 'modelManager.sortDefault' },
+  { key: 'name', i18nKey: 'modelManager.sortByName' },
+  { key: 'base', i18nKey: 'modelManager.sortByBase' },
+  { key: 'size', i18nKey: 'modelManager.sortBySize' },
+  { key: 'created_at', i18nKey: 'modelManager.sortByDateAdded' },
+  { key: 'updated_at', i18nKey: 'modelManager.sortByDateModified' },
+  { key: 'path', i18nKey: 'modelManager.sortByPath' },
+  { key: 'type', i18nKey: 'modelManager.sortByType' },
+  { key: 'format', i18nKey: 'modelManager.sortByFormat' },
 ];
 
 const SortByMenuItem = memo(({ option, label }: { option: OrderBy; label: string }) => {
@@ -60,30 +60,23 @@ const SortBySubMenu = memo(() => {
   const subMenu = useSubMenu();
   const orderBy = useAppSelector(selectOrderBy);
 
-  const ORDER_BY_LABELS = useMemo(
-    () => ({
-      default: t('modelManager.sortDefault'),
-      name: t('modelManager.sortByName'),
-      base: t('modelManager.sortByBase'),
-      size: t('modelManager.sortBySize'),
-      created_at: t('modelManager.sortByDateAdded'),
-      updated_at: t('modelManager.sortByDateModified'),
-      path: t('modelManager.sortByPath'),
-      type: t('modelManager.sortByType'),
-      format: t('modelManager.sortByFormat'),
-    }),
-    [t]
-  );
+  const currentSortLabel = useMemo(() => {
+    const option = ORDER_BY_OPTIONS.find((o) => o.key === orderBy);
+    if (!option) {
+      return '';
+    }
+    return t(option.i18nKey);
+  }, [orderBy, t]);
 
   return (
     <MenuItem {...subMenu.parentMenuItemProps} icon={<PiListBold />}>
       <Menu {...subMenu.menuProps}>
         <MenuButton {...subMenu.menuButtonProps}>
-          <SubMenuButtonContent label={t('modelManager.sortBy', 'Sort By')} value={ORDER_BY_LABELS[orderBy]} />
+          <SubMenuButtonContent label={t('modelManager.sortBy', 'Sort By')} value={currentSortLabel} />
         </MenuButton>
         <MenuList {...subMenu.menuListProps}>
-          {ORDER_BY_OPTIONS.map((option) => (
-            <SortByMenuItem key={option} option={option} label={ORDER_BY_LABELS[option]} />
+          {ORDER_BY_OPTIONS.map(({ key, i18nKey }) => (
+            <SortByMenuItem key={key} option={key} label={t(i18nKey)} />
           ))}
         </MenuList>
       </Menu>
