@@ -1449,6 +1449,8 @@
         "notes": "Notes",
         "description": "Description",
         "notesDescription": "Add notes about your workflow",
+        "addConnector": "Add Connector",
+        "deleteConnector": "Delete Connector",
         "problemSettingTitle": "Problem Setting Title",
         "resetToDefaultValue": "Reset to default value",
         "reloadNodeTemplates": "Reload Node Templates",
