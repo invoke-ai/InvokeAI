@@ -11,9 +11,7 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.misc import SEED_MAX
 
 
-@invocation(
-    "range", title="Integer Range", tags=["collection", "integer", "range"], category="collections", version="1.0.0"
-)
+@invocation("range", title="Integer Range", tags=["collection", "integer", "range"], category="batch", version="1.0.0")
 class RangeInvocation(BaseInvocation):
     """Creates a range of numbers from start to stop with step"""
 
@@ -35,7 +33,7 @@ class RangeInvocation(BaseInvocation):
     "range_of_size",
     title="Integer Range of Size",
     tags=["collection", "integer", "size", "range"],
-    category="collections",
+    category="batch",
     version="1.0.0",
 )
 class RangeOfSizeInvocation(BaseInvocation):
@@ -55,7 +53,7 @@ class RangeOfSizeInvocation(BaseInvocation):
     "random_range",
     title="Random Range",
     tags=["range", "integer", "random", "collection"],
-    category="collections",
+    category="batch",
     version="1.0.1",
     use_cache=False,
 )

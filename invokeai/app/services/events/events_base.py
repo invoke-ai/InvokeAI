@@ -100,9 +100,9 @@ class EventServiceBase:
         """Emitted when a queue item's status changes"""
         self.dispatch(QueueItemStatusChangedEvent.build(queue_item, batch_status, queue_status))
 
-    def emit_batch_enqueued(self, enqueue_result: "EnqueueBatchResult") -> None:
+    def emit_batch_enqueued(self, enqueue_result: "EnqueueBatchResult", user_id: str = "system") -> None:
         """Emitted when a batch is enqueued"""
-        self.dispatch(BatchEnqueuedEvent.build(enqueue_result))
+        self.dispatch(BatchEnqueuedEvent.build(enqueue_result, user_id))
 
     def emit_queue_items_retried(self, retry_result: "RetryItemsResult") -> None:
         """Emitted when a list of queue items are retried"""
@@ -112,9 +112,9 @@ class EventServiceBase:
         """Emitted when a queue is cleared"""
         self.dispatch(QueueClearedEvent.build(queue_id))
 
-    def emit_recall_parameters_updated(self, queue_id: str, parameters: dict) -> None:
+    def emit_recall_parameters_updated(self, queue_id: str, user_id: str, parameters: dict) -> None:
         """Emitted when recall parameters are updated"""
-        self.dispatch(RecallParametersUpdatedEvent.build(queue_id, parameters))
+        self.dispatch(RecallParametersUpdatedEvent.build(queue_id, user_id, parameters))
 
     # endregion
 
@@ -194,23 +194,42 @@ class EventServiceBase:
     # region Bulk image download
 
     def emit_bulk_download_started(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> None:
         """Emitted when a bulk image download is started"""
-        self.dispatch(BulkDownloadStartedEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name))
+        self.dispatch(
+            BulkDownloadStartedEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id)
+        )
 
     def emit_bulk_download_complete(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        user_id: str = "system",
     ) -> None:
         """Emitted when a bulk image download is complete"""
-        self.dispatch(BulkDownloadCompleteEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name))
+        self.dispatch(
+            BulkDownloadCompleteEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name, user_id)
+        )
 
     def emit_bulk_download_error(
-        self, bulk_download_id: str, bulk_download_item_id: str, bulk_download_item_name: str, error: str
+        self,
+        bulk_download_id: str,
+        bulk_download_item_id: str,
+        bulk_download_item_name: str,
+        error: str,
+        user_id: str = "system",
     ) -> None:
         """Emitted when a bulk image download has an error"""
         self.dispatch(
-            BulkDownloadErrorEvent.build(bulk_download_id, bulk_download_item_id, bulk_download_item_name, error)
+            BulkDownloadErrorEvent.build(
+                bulk_download_id, bulk_download_item_id, bulk_download_item_name, error, user_id
+            )
         )
 
     # endregion
