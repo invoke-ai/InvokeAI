@@ -12,9 +12,15 @@ import {
   edgesChanged,
 } from 'features/nodes/store/nodesSlice';
 import { selectNodes, selectNodesSlice } from 'features/nodes/store/selectors';
+import {
+  CONNECTOR_INPUT_HANDLE,
+  CONNECTOR_OUTPUT_HANDLE,
+  resolveConnectorSourceFieldType,
+} from 'features/nodes/store/util/connectorTopology';
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import type { AnyEdge } from 'features/nodes/types/invocation';
+import { isConnectorNode } from 'features/nodes/types/invocation';
 import { useCallback, useMemo } from 'react';
 import { assert } from 'tsafe';
 
@@ -30,6 +36,47 @@ export const useConnection = () => {
 
       const node = nodes.find((n) => n.id === nodeId);
       if (!node) {
+        return;
+      }
+
+      if (isConnectorNode(node)) {
+        if (handleType === 'source' && handleId !== CONNECTOR_OUTPUT_HANDLE) {
+          return;
+        }
+        if (handleType === 'target' && handleId !== CONNECTOR_INPUT_HANDLE) {
+          return;
+        }
+
+        const resolvedSourceType =
+          handleType === 'source'
+            ? resolveConnectorSourceFieldType(nodeId, nodes, selectNodesSlice(store.getState()).edges, templates)
+            : null;
+        $pendingConnection.set({
+          nodeId,
+          handleId,
+          handleType,
+          fieldTemplate:
+            handleType === 'source'
+              ? {
+                  name: CONNECTOR_OUTPUT_HANDLE,
+                  title: 'Connector Output',
+                  description: '',
+                  fieldKind: 'output',
+                  ui_hidden: false,
+                  type: resolvedSourceType ?? { name: 'AnyField', cardinality: 'SINGLE', batch: false },
+                }
+              : {
+                  name: CONNECTOR_INPUT_HANDLE,
+                  title: 'Connector Input',
+                  description: '',
+                  fieldKind: 'input',
+                  input: 'connection',
+                  required: false,
+                  default: undefined,
+                  ui_hidden: false,
+                  type: { name: 'AnyField', cardinality: 'SINGLE', batch: false },
+                },
+        });
         return;
       }
 
