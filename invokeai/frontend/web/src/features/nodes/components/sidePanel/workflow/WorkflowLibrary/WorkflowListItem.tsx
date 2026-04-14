@@ -9,6 +9,7 @@ import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { type ChangeEvent, memo, type MouseEvent, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImage } from 'react-icons/pi';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 import { useUpdateWorkflowIsPublicMutation } from 'services/api/endpoints/workflows';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
@@ -36,6 +37,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
   const dispatch = useAppDispatch();
   const workflowId = useAppSelector(selectWorkflowId);
   const currentUser = useAppSelector(selectCurrentUser);
+  const { data: setupStatus } = useGetSetupStatusQuery();
   const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
 
   const isActive = useMemo(() => {
@@ -47,8 +49,12 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
   }, [currentUser, workflow.user_id]);
 
   const canEditOrDelete = useMemo(() => {
+    // In single-user (legacy) mode, all workflows are editable — no concept of ownership.
+    if (!setupStatus?.multiuser_enabled) {
+      return true;
+    }
     return isOwner || (currentUser?.is_admin ?? false);
-  }, [isOwner, currentUser]);
+  }, [setupStatus?.multiuser_enabled, isOwner, currentUser]);
 
   const tags = useMemo(() => {
     if (!workflow.tags) {
@@ -113,7 +119,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   {t('workflows.opened')}
                 </Badge>
               )}
-              {workflow.is_public && workflow.category !== 'default' && (
+              {setupStatus?.multiuser_enabled && workflow.is_public && workflow.category !== 'default' && (
                 <Badge
                   color="invokeGreen.400"
                   borderColor="invokeGreen.700"
@@ -160,7 +166,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
             </Text>
           )}
           <Spacer />
-          {isOwner && <ShareWorkflowToggle workflow={workflow} />}
+          {setupStatus?.multiuser_enabled && canEditOrDelete && <ShareWorkflowToggle workflow={workflow} />}
           {workflow.category === 'default' && <ViewWorkflow workflowId={workflow.workflow_id} />}
           {workflow.category !== 'default' && (
             <>
