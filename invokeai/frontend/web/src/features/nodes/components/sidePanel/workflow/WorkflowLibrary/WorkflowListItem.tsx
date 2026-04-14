@@ -160,7 +160,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
             </Text>
           )}
           <Spacer />
-          {isOwner && <ShareWorkflowToggle workflow={workflow} />}
+          {canEditOrDelete && <ShareWorkflowToggle workflow={workflow} />}
           {workflow.category === 'default' && <ViewWorkflow workflowId={workflow.workflow_id} />}
           {workflow.category !== 'default' && (
             <>
