@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import {
   Box,
+  Button,
   Flex,
   Icon,
   Input,
@@ -17,6 +18,7 @@ import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { CommandEmpty, CommandItem, CommandList, CommandRoot } from 'cmdk';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import { capitalize } from 'es-toolkit';
 import { memoize } from 'es-toolkit/compat';
 import { useBuildNode } from 'features/nodes/hooks/useBuildNode';
 import {
@@ -33,16 +35,24 @@ import { findUnoccupiedPosition } from 'features/nodes/store/util/findUnoccupied
 import { getFirstValidConnection } from 'features/nodes/store/util/getFirstValidConnection';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
+import { selectShouldGroupNodesByCategory } from 'features/nodes/store/workflowSettingsSlice';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { toast } from 'features/toast/toast';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { computed } from 'nanostores';
-import type { ChangeEvent } from 'react';
+import type { ChangeEvent, Dispatch, SetStateAction } from 'react';
 import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiCircuitryBold, PiFlaskBold, PiHammerBold, PiLightningFill } from 'react-icons/pi';
+import {
+  PiCaretDownBold,
+  PiCaretRightBold,
+  PiCircuitryBold,
+  PiFlaskBold,
+  PiHammerBold,
+  PiLightningFill,
+} from 'react-icons/pi';
 import type { S } from 'services/api/types';
 import { objectEntries } from 'tsafe';
 import { useDebounce } from 'use-debounce';
@@ -171,15 +181,36 @@ export const AddNodeCmdk = memo(() => {
   const onClose = useCallback(() => {
     close();
     setSearchTerm('');
+    setExpandedCategories(new Set());
     $pendingConnection.set(null);
   }, [close]);
 
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+  const toggleCategory = useCallback((category: string) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  }, []);
+
   const onSelect = useCallback(
     (value: string) => {
+      // Category headers have a special prefix
+      if (value.startsWith('__category__:')) {
+        const category = value.slice('__category__:'.length);
+        toggleCategory(category);
+        return;
+      }
       addNode(value);
       onClose();
     },
-    [addNode, onClose]
+    [addNode, onClose, toggleCategory]
   );
 
   return (
@@ -204,7 +235,12 @@ export const AddNodeCmdk = memo(() => {
                     />
                   </CommandEmpty>
                   <CommandList>
-                    <NodeCommandList searchTerm={debouncedSearchTerm} onSelect={onSelect} />
+                    <NodeCommandList
+                      searchTerm={debouncedSearchTerm}
+                      onSelect={onSelect}
+                      expandedCategories={expandedCategories}
+                      setExpandedCategories={setExpandedCategories}
+                    />
                   </CommandList>
                 </ScrollableContent>
               </Box>
@@ -230,6 +266,7 @@ type NodeCommandItemData = {
   description: string;
   classification: S['Classification'];
   nodePack: string;
+  category: string;
 };
 
 /**
@@ -260,6 +297,7 @@ type FilterableItem = {
   tags: string[];
   classification: S['Classification'];
   nodePack: string;
+  category: string;
 };
 
 const filter = memoize(
@@ -290,6 +328,10 @@ const filter = memoize(
       return true;
     }
 
+    if (item.category.includes(searchTerm) || regex.test(item.category)) {
+      return true;
+    }
+
     for (const tag of item.tags) {
       if (tag.includes(searchTerm) || regex.test(tag)) {
         return true;
@@ -301,112 +343,253 @@ const filter = memoize(
   (item: FilterableItem, searchTerm: string) => `${item.type}-${searchTerm}`
 );
 
-const NodeCommandList = memo(({ searchTerm, onSelect }: { searchTerm: string; onSelect: (value: string) => void }) => {
-  const { t } = useTranslation();
-  const templatesArray = useStore($templatesArray);
-  const pendingConnection = useStore($pendingConnection);
-  const currentImageFilterItem = useMemo<FilterableItem>(
-    () => ({
-      type: 'current_image',
-      title: t('nodes.currentImage'),
-      description: t('nodes.currentImageDescription'),
-      tags: ['progress', 'image', 'current'],
-      classification: 'stable',
-      nodePack: 'invokeai',
-    }),
-    [t]
-  );
-  const notesFilterItem = useMemo<FilterableItem>(
-    () => ({
-      type: 'notes',
-      title: t('nodes.notes'),
-      description: t('nodes.notesDescription'),
-      tags: ['notes'],
-      classification: 'stable',
-      nodePack: 'invokeai',
-    }),
-    [t]
-  );
+const categoryItemSx: SystemStyleObject = {
+  cursor: 'pointer',
+  userSelect: 'none',
+  '&[data-selected="true"]': {
+    bg: 'base.750',
+  },
+};
 
-  const items = useMemo<NodeCommandItemData[]>(() => {
-    // If we have a connection in progress, we need to filter the node choices
-    const _items: NodeCommandItemData[] = [];
+const NodeCommandItem = memo(
+  ({
+    item,
+    onSelect,
+    isGrouped,
+  }: {
+    item: NodeCommandItemData;
+    onSelect: (value: string) => void;
+    isGrouped?: boolean;
+  }) => (
+    <CommandItem value={item.value} onSelect={onSelect} asChild>
+      <Flex role="button" flexDir="column" sx={cmdkItemSx} py={1} px={2} ps={isGrouped ? 6 : 2} borderRadius="base">
+        <Flex alignItems="center" gap={2}>
+          {item.classification === 'beta' && <Icon boxSize={4} color="invokeYellow.300" as={PiHammerBold} />}
+          {item.classification === 'prototype' && <Icon boxSize={4} color="invokeRed.300" as={PiFlaskBold} />}
+          {item.classification === 'internal' && <Icon boxSize={4} color="invokePurple.300" as={PiCircuitryBold} />}
+          {item.classification === 'special' && <Icon boxSize={4} color="invokeGreen.300" as={PiLightningFill} />}
+          <Text fontWeight="semibold">{item.label}</Text>
+          <Spacer />
+          <Text variant="subtext" fontWeight="semibold">
+            {item.nodePack}
+          </Text>
+        </Flex>
+        {item.description && <Text color="base.200">{item.description}</Text>}
+      </Flex>
+    </CommandItem>
+  )
+);
 
-    if (!pendingConnection) {
-      for (const template of templatesArray) {
-        if (filter(template, searchTerm)) {
-          _items.push({
-            label: template.title,
-            value: template.type,
-            description: template.description,
-            classification: template.classification,
-            nodePack: template.nodePack,
-          });
+NodeCommandItem.displayName = 'NodeCommandItem';
+
+const NodeCommandList = memo(
+  ({
+    searchTerm,
+    onSelect,
+    expandedCategories,
+    setExpandedCategories,
+  }: {
+    searchTerm: string;
+    onSelect: (value: string) => void;
+    expandedCategories: Set<string>;
+    setExpandedCategories: Dispatch<SetStateAction<Set<string>>>;
+  }) => {
+    const { t } = useTranslation();
+    const templatesArray = useStore($templatesArray);
+    const pendingConnection = useStore($pendingConnection);
+    const shouldGroupNodesByCategory = useAppSelector(selectShouldGroupNodesByCategory);
+    const currentImageFilterItem = useMemo<FilterableItem>(
+      () => ({
+        type: 'current_image',
+        title: t('nodes.currentImage'),
+        description: t('nodes.currentImageDescription'),
+        tags: ['progress', 'image', 'current'],
+        classification: 'stable',
+        nodePack: 'invokeai',
+        category: 'image',
+      }),
+      [t]
+    );
+    const notesFilterItem = useMemo<FilterableItem>(
+      () => ({
+        type: 'notes',
+        title: t('nodes.notes'),
+        description: t('nodes.notesDescription'),
+        tags: ['notes'],
+        classification: 'stable',
+        nodePack: 'invokeai',
+        category: 'other',
+      }),
+      [t]
+    );
+
+    const items = useMemo<NodeCommandItemData[]>(() => {
+      // If we have a connection in progress, we need to filter the node choices
+      const _items: NodeCommandItemData[] = [];
+
+      if (!pendingConnection) {
+        for (const template of templatesArray) {
+          if (filter(template, searchTerm)) {
+            _items.push({
+              label: template.title,
+              value: template.type,
+              description: template.description,
+              classification: template.classification,
+              nodePack: template.nodePack,
+              category: template.category,
+            });
+          }
         }
-      }
 
-      for (const item of [currentImageFilterItem, notesFilterItem]) {
-        if (filter(item, searchTerm)) {
-          _items.push({
-            label: item.title,
-            value: item.type,
-            description: item.description,
-            classification: item.classification,
-            nodePack: item.nodePack,
-          });
+        for (const item of [currentImageFilterItem, notesFilterItem]) {
+          if (filter(item, searchTerm)) {
+            _items.push({
+              label: item.title,
+              value: item.type,
+              description: item.description,
+              classification: item.classification,
+              nodePack: item.nodePack,
+              category: item.category,
+            });
+          }
         }
-      }
-    } else {
-      for (const template of templatesArray) {
-        if (filter(template, searchTerm)) {
-          const candidateFields = pendingConnection.handleType === 'source' ? template.inputs : template.outputs;
+      } else {
+        for (const template of templatesArray) {
+          if (filter(template, searchTerm)) {
+            const candidateFields = pendingConnection.handleType === 'source' ? template.inputs : template.outputs;
 
-          for (const [_fieldName, fieldTemplate] of objectEntries(candidateFields)) {
-            const sourceType =
-              pendingConnection.handleType === 'source' ? pendingConnection.fieldTemplate.type : fieldTemplate.type;
-            const targetType =
-              pendingConnection.handleType === 'target' ? pendingConnection.fieldTemplate.type : fieldTemplate.type;
+            for (const [_fieldName, fieldTemplate] of objectEntries(candidateFields)) {
+              const sourceType =
+                pendingConnection.handleType === 'source' ? pendingConnection.fieldTemplate.type : fieldTemplate.type;
+              const targetType =
+                pendingConnection.handleType === 'target' ? pendingConnection.fieldTemplate.type : fieldTemplate.type;
 
-            if (validateConnectionTypes(sourceType, targetType)) {
-              _items.push({
-                label: template.title,
-                value: template.type,
-                description: template.description,
-                classification: template.classification,
-                nodePack: template.nodePack,
-              });
-              break;
+              if (validateConnectionTypes(sourceType, targetType)) {
+                _items.push({
+                  label: template.title,
+                  value: template.type,
+                  description: template.description,
+                  classification: template.classification,
+                  nodePack: template.nodePack,
+                  category: template.category,
+                });
+                break;
+              }
             }
           }
         }
       }
+
+      // Sort exact title matches to the top when searching
+      if (searchTerm) {
+        const lowerSearch = searchTerm.toLowerCase();
+        _items.sort((a, b) => {
+          const aExact = a.label.toLowerCase() === lowerSearch;
+          const bExact = b.label.toLowerCase() === lowerSearch;
+          if (aExact && !bExact) {
+            return -1;
+          }
+          if (!aExact && bExact) {
+            return 1;
+          }
+          return 0;
+        });
+      }
+
+      return _items;
+    }, [pendingConnection, templatesArray, searchTerm, currentImageFilterItem, notesFilterItem]);
+
+    const groupedItems = useMemo(() => {
+      const groups: Record<string, NodeCommandItemData[]> = {};
+      for (const item of items) {
+        const cat = item.category;
+        if (!groups[cat]) {
+          groups[cat] = [];
+        }
+        groups[cat].push(item);
+      }
+      // Sort categories alphabetically, but put "other" last.
+      // When searching, prioritize categories that contain an exact title match.
+      const lowerSearch = searchTerm.toLowerCase();
+      return Object.entries(groups).sort(([a, aItems], [b, bItems]) => {
+        if (searchTerm) {
+          const aHasExact = aItems.some((item) => item.label.toLowerCase() === lowerSearch);
+          const bHasExact = bItems.some((item) => item.label.toLowerCase() === lowerSearch);
+          if (aHasExact && !bHasExact) {
+            return -1;
+          }
+          if (!aHasExact && bHasExact) {
+            return 1;
+          }
+        }
+        if (a === 'other') {
+          return 1;
+        }
+        if (b === 'other') {
+          return -1;
+        }
+        return a.localeCompare(b);
+      });
+    }, [items, searchTerm]);
+
+    // When searching, auto-expand all categories; when not searching, use manual state
+    const isSearching = searchTerm.length > 0;
+
+    const expandAll = useCallback(() => {
+      setExpandedCategories(new Set(groupedItems.map(([cat]) => cat)));
+    }, [groupedItems, setExpandedCategories]);
+
+    const collapseAll = useCallback(() => {
+      setExpandedCategories(new Set());
+    }, [setExpandedCategories]);
+
+    if (!shouldGroupNodesByCategory) {
+      return (
+        <>
+          {items.map((item) => (
+            <NodeCommandItem key={item.value} item={item} onSelect={onSelect} />
+          ))}
+        </>
+      );
     }
 
-    return _items;
-  }, [pendingConnection, templatesArray, searchTerm, currentImageFilterItem, notesFilterItem]);
-
-  return (
-    <>
-      {items.map((item) => (
-        <CommandItem key={item.value} value={item.value} onSelect={onSelect} asChild>
-          <Flex role="button" flexDir="column" sx={cmdkItemSx} py={1} px={2} borderRadius="base">
-            <Flex alignItems="center" gap={2}>
-              {item.classification === 'beta' && <Icon boxSize={4} color="invokeYellow.300" as={PiHammerBold} />}
-              {item.classification === 'prototype' && <Icon boxSize={4} color="invokeRed.300" as={PiFlaskBold} />}
-              {item.classification === 'internal' && <Icon boxSize={4} color="invokePurple.300" as={PiCircuitryBold} />}
-              {item.classification === 'special' && <Icon boxSize={4} color="invokeGreen.300" as={PiLightningFill} />}
-              <Text fontWeight="semibold">{item.label}</Text>
-              <Spacer />
-              <Text variant="subtext" fontWeight="semibold">
-                {item.nodePack}
-              </Text>
-            </Flex>
-            {item.description && <Text color="base.200">{item.description}</Text>}
+    return (
+      <>
+        {!isSearching && (
+          <Flex gap={1} px={2} pb={1}>
+            <Button size="sm" variant="ghost" onClick={expandAll}>
+              {t('common.expandAll')}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={collapseAll}>
+              {t('common.collapseAll')}
+            </Button>
           </Flex>
-        </CommandItem>
-      ))}
-    </>
-  );
-});
+        )}
+        {groupedItems.map(([category, categoryItems]) => {
+          const isExpanded = isSearching || expandedCategories.has(category);
+          return (
+            <Box key={category}>
+              <CommandItem value={`__category__:${category}`} onSelect={onSelect} asChild>
+                <Flex role="button" alignItems="center" gap={2} px={2} py={1.5} borderRadius="base" sx={categoryItemSx}>
+                  <Icon boxSize={3} as={isExpanded ? PiCaretDownBold : PiCaretRightBold} color="base.400" />
+                  <Text fontSize="sm" fontWeight="bold" color="base.400">
+                    {capitalize(category)}
+                  </Text>
+                  <Text fontSize="xs" color="base.500">
+                    ({categoryItems.length})
+                  </Text>
+                </Flex>
+              </CommandItem>
+              {isExpanded &&
+                categoryItems.map((item) => (
+                  <NodeCommandItem key={item.value} item={item} onSelect={onSelect} isGrouped />
+                ))}
+            </Box>
+          );
+        })}
+      </>
+    );
+  }
+);
 
 NodeCommandList.displayName = 'CommandListItems';
