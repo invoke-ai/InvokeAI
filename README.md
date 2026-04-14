@@ -64,6 +64,7 @@ Invoke features an organized gallery system for easily storing, accessing, and r
 - SDXL
 - SD 3.5 Medium
 - SD 3.5 Large
+- CogView 4
 - Flux.1 Dev
 - Flux.1 Schnell
 - Flux.1 Kontext
@@ -79,7 +80,7 @@ Invoke features an organized gallery system for easily storing, accessing, and r
 - Qwen Image Edit
 - Nano Banana (API Only)
 - GPT Image (API Only)
-- And more!
+- Wan (API Only)
 
 ### Other features
 
