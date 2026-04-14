@@ -197,7 +197,7 @@ class ImagePasteInvocation(BaseInvocation, WithMetadata, WithBoard):
     "tomask",
     title="Mask from Alpha",
     tags=["image", "mask"],
-    category="image",
+    category="mask",
     version="1.2.2",
 )
 class MaskFromAlphaInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -604,7 +604,7 @@ class DecodeInvisibleWatermarkInvocation(BaseInvocation):
     "mask_edge",
     title="Mask Edge",
     tags=["image", "mask", "inpaint"],
-    category="image",
+    category="mask",
     version="1.2.2",
 )
 class MaskEdgeInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -643,7 +643,7 @@ class MaskEdgeInvocation(BaseInvocation, WithMetadata, WithBoard):
     "mask_combine",
     title="Combine Masks",
     tags=["image", "mask", "multiply"],
-    category="image",
+    category="mask",
     version="1.2.2",
 )
 class MaskCombineInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -974,7 +974,7 @@ class ImageChannelMultiplyInvocation(BaseInvocation, WithMetadata, WithBoard):
     "save_image",
     title="Save Image",
     tags=["primitives", "image"],
-    category="primitives",
+    category="image",
     version="1.2.2",
     use_cache=False,
 )
@@ -995,7 +995,7 @@ class SaveImageInvocation(BaseInvocation, WithMetadata, WithBoard):
     "canvas_paste_back",
     title="Canvas Paste Back",
     tags=["image", "combine"],
-    category="image",
+    category="canvas",
     version="1.0.1",
 )
 class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -1032,7 +1032,7 @@ class CanvasPasteBackInvocation(BaseInvocation, WithMetadata, WithBoard):
     "mask_from_id",
     title="Mask from Segmented Image",
     tags=["image", "mask", "id"],
-    category="image",
+    category="mask",
     version="1.0.1",
 )
 class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -1069,7 +1069,7 @@ class MaskFromIDInvocation(BaseInvocation, WithMetadata, WithBoard):
     "canvas_v2_mask_and_crop",
     title="Canvas V2 Mask and Crop",
     tags=["image", "mask", "id"],
-    category="image",
+    category="canvas",
     version="1.0.0",
     classification=Classification.Deprecated,
 )
@@ -1110,7 +1110,7 @@ class CanvasV2MaskAndCropInvocation(BaseInvocation, WithMetadata, WithBoard):
 
 
 @invocation(
-    "expand_mask_with_fade", title="Expand Mask with Fade", tags=["image", "mask"], category="image", version="1.0.1"
+    "expand_mask_with_fade", title="Expand Mask with Fade", tags=["image", "mask"], category="mask", version="1.0.1"
 )
 class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Expands a mask with a fade effect. The mask uses black to indicate areas to keep from the generated image and white for areas to discard.
@@ -1199,7 +1199,7 @@ class ExpandMaskWithFadeInvocation(BaseInvocation, WithMetadata, WithBoard):
     "apply_mask_to_image",
     title="Apply Mask to Image",
     tags=["image", "mask", "blend"],
-    category="image",
+    category="mask",
     version="1.0.0",
 )
 class ApplyMaskToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -1374,7 +1374,7 @@ class PasteImageIntoBoundingBoxInvocation(BaseInvocation, WithMetadata, WithBoar
     "flux_kontext_image_prep",
     title="FLUX Kontext Image Prep",
     tags=["image", "concatenate", "flux", "kontext"],
-    category="image",
+    category="conditioning",
     version="1.0.0",
 )
 class FluxKontextConcatenateImagesInvocation(BaseInvocation, WithMetadata, WithBoard):

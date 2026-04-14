@@ -16,6 +16,7 @@ const ifTemplate: InvocationTemplate = {
   type: 'if',
   version: '1.0.0',
   tags: [],
+  category: 'math',
   description: 'Selects between two inputs based on a boolean condition',
   outputType: 'if_output',
   inputs: {
@@ -93,6 +94,7 @@ const floatOutputTemplate: InvocationTemplate = {
   type: 'float_output',
   version: '1.0.0',
   tags: [],
+  category: 'primitives',
   description: 'Outputs a float',
   outputType: 'float_output',
   inputs: {},
@@ -121,6 +123,7 @@ const integerCollectionOutputTemplate: InvocationTemplate = {
   type: 'integer_collection_output',
   version: '1.0.0',
   tags: [],
+  category: 'primitives',
   description: 'Outputs an integer collection',
   outputType: 'integer_collection_output',
   inputs: {},
