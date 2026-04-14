@@ -12,7 +12,7 @@ class IfInvocationOutput(BaseInvocationOutput):
     )
 
 
-@invocation("if", title="If", tags=["logic", "conditional"], category="logic", version="1.0.0")
+@invocation("if", title="If", tags=["logic", "conditional"], category="math", version="1.0.0")
 class IfInvocation(BaseInvocation):
     """Selects between two optional inputs based on a boolean condition."""
 

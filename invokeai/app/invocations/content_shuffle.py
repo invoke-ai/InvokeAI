@@ -9,7 +9,7 @@ from invokeai.backend.image_util.content_shuffle import content_shuffle
     "content_shuffle",
     title="Content Shuffle",
     tags=["controlnet", "normal"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.0.0",
 )
 class ContentShuffleInvocation(BaseInvocation, WithMetadata, WithBoard):
