@@ -1270,9 +1270,7 @@ SEEDREAM_1K_SIZES = {
     "3:2": ExternalImageSize(width=1248, height=832),
     "21:9": ExternalImageSize(width=1568, height=672),
 }
-SEEDREAM_PANEL_SCHEMA = ExternalModelPanelSchema(
-    prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]
-)
+SEEDREAM_PANEL_SCHEMA = ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}])
 seedream_5_0_lite = StarterModel(
     name="Seedream 5.0 Lite",
     base=BaseModelType.External,

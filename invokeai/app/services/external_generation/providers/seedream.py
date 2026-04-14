@@ -6,7 +6,10 @@ import uuid
 import requests
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.services.external_generation.errors import ExternalProviderRateLimitError, ExternalProviderRequestError
+from invokeai.app.services.external_generation.errors import (
+    ExternalProviderRateLimitError,
+    ExternalProviderRequestError,
+)
 from invokeai.app.services.external_generation.external_generation_base import ExternalProvider
 from invokeai.app.services.external_generation.external_generation_common import (
     ExternalGeneratedImage,
@@ -15,7 +18,14 @@ from invokeai.app.services.external_generation.external_generation_common import
 )
 from invokeai.app.services.external_generation.image_utils import decode_image_base64, encode_image_base64
 
-_SEEDREAM_BATCH_PREFIXES = ("seedream-5", "seedream-4.5", "seedream-4.0", "seedream-4-5", "seedream-4-0", "seedream-5-0")
+_SEEDREAM_BATCH_PREFIXES = (
+    "seedream-5",
+    "seedream-4.5",
+    "seedream-4.0",
+    "seedream-4-5",
+    "seedream-4-0",
+    "seedream-5-0",
+)
 
 
 class SeedreamProvider(ExternalProvider):
@@ -29,7 +39,9 @@ class SeedreamProvider(ExternalProvider):
         if not api_key:
             raise ExternalProviderRequestError("Seedream API key is not configured")
 
-        base_url = (self._app_config.external_seedream_base_url or "https://ark.ap-southeast.bytepluses.com").rstrip("/")
+        base_url = (self._app_config.external_seedream_base_url or "https://ark.ap-southeast.bytepluses.com").rstrip(
+            "/"
+        )
         endpoint = f"{base_url}/api/v3/images/generations"
         headers = {"Authorization": f"Bearer {api_key}"}
 
