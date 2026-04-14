@@ -140,13 +140,13 @@ As a regular user, you can:
 - ✅ View your own generation queue
 - ✅ Customize your UI preferences (theme, hotkeys, etc.)
 - ✅ View available models (read-only access to Model Manager)
-- ✅ Access shared boards (based on permissions granted to you) (FUTURE FEATURE)
-- ✅ Access workflows marked as public (FUTURE FEATURE)
+- ✅ View shared and public boards created by other users
+- ✅ View and use workflows marked as shared by other users
 
 You cannot:
 
 - ❌ Add, delete, or modify models
-- ❌ View or modify other users' boards, images, or workflows
+- ❌ View or modify other users' private boards, images, or workflows
 - ❌ Manage user accounts
 - ❌ Access system configuration
 - ❌ View or cancel other users' generation tasks
@@ -173,7 +173,7 @@ Administrators have all regular user capabilities, plus:
 - ✅ Full model management (add, delete, configure models)
 - ✅ Create and manage user accounts
 - ✅ View and manage all users' generation queues
-- ✅ Create and manage shared boards (FUTURE FEATURE)
+- ✅ View and manage all users' boards, images, and workflows (including system-owned legacy content)
 - ✅ Access system configuration
 - ✅ Grant or revoke admin privileges
 
@@ -183,23 +183,30 @@ Administrators have all regular user capabilities, plus:
 
 ### Image Boards
 
-In multi-user model, Image Boards work as before. Each user can create an unlimited number of boards and organize their images and assets as they see fit. Boards are private: you cannot see a board owned by a different user.
+In multi-user mode, each user can create an unlimited number of boards and organize their images and assets as they see fit. Boards have three visibility levels:
 
-!!! tip "Shared Boards"
-    InvokeAI 6.13 will add support for creating public boards that are accessible to all users.
+- **Private** (default): Only you (and administrators) can see and modify the board.
+- **Shared**: All users can view the board and its contents, but only you (and administrators) can modify it (rename, archive, delete, or add/remove images).
+- **Public**: All users can view the board. Only you (and administrators) can modify the board's structure (rename, archive, delete).
 
-The Administrator can see all users Image Boards and their contents.
+To change a board's visibility, right-click on the board and select the desired visibility option.
 
-### Going From Multi-User to Single-User mode
+Administrators can see and manage all users' image boards and their contents regardless of visibility settings.
+
+### Going From Multi-User to Single-User Mode
 
 If an InvokeAI instance was in multiuser mode and then restarted in single user mode (by setting `multiuser: false` in the configuration file), all users' boards will be consolidated in one place. Any images that were in  "Uncategorized" will be merged together into a single Uncategorized board. If, at a later date, the server is restarted in multi-user mode, the boards and images will be separated and restored to their owners.
 
 ### Workflows
 
-In the current released version (6.12) workflows are always shared among users. Any workflow that you create will be visible to other users and vice-versa, and there is no protection against one user modifying another user's workflow.
+Each user has their own private workflow library. Workflows you create are visible only to you by default.
 
-!!! tip "Private and Shared Workflows"
-    InvokeAI 6.13 will provide the ability to create private and shared workflows. A private workflow can only be viewed by the user who created it. At any time, however, the user can designate the workflow *shared*, in which case it can be opened on a read-only basis by all logged-in users.
+You can share a workflow with other users by marking it as **shared** (public). Shared workflows appear in all users' workflow libraries and can be opened by anyone, but only the owner (or an administrator) can modify or delete them.
+
+To share a workflow, open it and use the sharing controls to toggle its public/shared status.
+
+!!! warning "Preexisting workflows after enabling multi-user mode"
+    When you enable multi-user mode for the first time on an existing InvokeAI installation, all workflows that were created before multi-user mode was activated will appear in the **shared workflows** section. These preexisting workflows are owned by the internal "system" account and are visible to all users. Administrators can edit or delete these shared legacy workflows. Regular users can view and use them but cannot modify them.
 
 
 ### The Generation Queue
@@ -330,11 +337,11 @@ These settings are stored per-user and won't affect other users.
 
 ### Can other users see my images?
 
-No, unless you add them to a shared board (FUTURE FEATURE). All your personal boards and images are private.
+Not unless you change your board's visibility to "shared" or "public". All personal boards and images are private by default.
 
 ### Can I share my workflows with others?
 
-Not directly. Ask your administrator to mark workflows as public if you want to share them.
+Yes. You can mark any workflow as shared (public), which makes it visible to all users. Other users can view and use shared workflows, but only you or an administrator can modify or delete them.
 
 ### How long do sessions last?
 
