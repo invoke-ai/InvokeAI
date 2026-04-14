@@ -108,6 +108,25 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     if (!element) {
       return;
     }
+
+    const monitorBinding = monitorForElements({
+      // This is a "global" drag start event, meaning that it is called for all drag events.
+      onDragStart: ({ source }) => {
+        // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
+        // selection. This is called for all drag events.
+        if (
+          multipleImageDndSource.typeGuard(source.data) &&
+          source.data.payload.image_names.includes(imageDTO.image_name)
+        ) {
+          setIsDragging(true);
+        }
+      },
+      onDrop: () => {
+        // Always set the dragging state to false when a drop event occurs.
+        setIsDragging(false);
+      },
+    });
+
     return combine(
       firefoxDndFix(element),
       draggable({
@@ -153,23 +172,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           }
         },
       }),
-      monitorForElements({
-        // This is a "global" drag start event, meaning that it is called for all drag events.
-        onDragStart: ({ source }) => {
-          // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
-          // selection. This is called for all drag events.
-          if (
-            multipleImageDndSource.typeGuard(source.data) &&
-            source.data.payload.image_names.includes(imageDTO.image_name)
-          ) {
-            setIsDragging(true);
-          }
-        },
-        onDrop: () => {
-          // Always set the dragging state to false when a drop event occurs.
-          setIsDragging(false);
-        },
-      })
+      monitorBinding
     );
   }, [imageDTO, store]);
 

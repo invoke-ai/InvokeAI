@@ -6463,6 +6463,23 @@
               "title": "Has Been Opened"
             },
             "description": "Whether to include/exclude recent workflows"
+          },
+          {
+            "name": "is_public",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Public"
+            },
+            "description": "Filter by public/shared status"
           }
         ],
         "responses": {
@@ -6655,6 +6672,23 @@
               "title": "Categories"
             },
             "description": "The categories to include"
+          },
+          {
+            "name": "is_public",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Public"
+            },
+            "description": "Filter by public/shared status"
           }
         ],
         "responses": {
@@ -6744,6 +6778,23 @@
               "title": "Has Been Opened"
             },
             "description": "Whether to include/exclude recent workflows"
+          },
+          {
+            "name": "is_public",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Public"
+            },
+            "description": "Filter by public/shared status"
           }
         ],
         "responses": {
@@ -6812,6 +6863,23 @@
               "title": "Has Been Opened"
             },
             "description": "Whether to include/exclude recent workflows"
+          },
+          {
+            "name": "is_public",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Is Public"
+            },
+            "description": "Filter by public/shared status"
           }
         ],
         "responses": {
@@ -7339,6 +7407,67 @@
           },
           "204": {
             "description": "Client state deleted"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/workflows/i/{workflow_id}/is_public": {
+      "patch": {
+        "tags": ["workflows"],
+        "summary": "Update Workflow Is Public",
+        "description": "Updates whether a workflow is shared publicly",
+        "operationId": "update_workflow_is_public",
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Workflow Id"
+            },
+            "description": "The workflow to update"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "is_public": {
+                    "type": "boolean",
+                    "title": "Is Public",
+                    "description": "Whether the workflow should be shared publicly"
+                  }
+                },
+                "type": "object",
+                "required": ["is_public"],
+                "title": "Body_update_workflow_is_public"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowRecordDTO"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -59137,10 +59266,20 @@
           "workflow": {
             "$ref": "#/components/schemas/Workflow",
             "description": "The workflow."
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The id of the user who owns this workflow."
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether this workflow is shared with all users."
           }
         },
         "type": "object",
-        "required": ["workflow_id", "name", "created_at", "updated_at", "workflow"],
+        "required": ["workflow_id", "name", "created_at", "updated_at", "workflow", "user_id", "is_public"],
         "title": "WorkflowRecordDTO"
       },
       "WorkflowRecordListItemWithThumbnailDTO": {
@@ -59222,15 +59361,35 @@
             ],
             "title": "Thumbnail Url",
             "description": "The URL of the workflow thumbnail."
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The id of the user who owns this workflow."
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether this workflow is shared with all users."
           }
         },
         "type": "object",
-        "required": ["workflow_id", "name", "created_at", "updated_at", "description", "category", "tags"],
+        "required": [
+          "workflow_id",
+          "name",
+          "created_at",
+          "updated_at",
+          "description",
+          "category",
+          "tags",
+          "user_id",
+          "is_public"
+        ],
         "title": "WorkflowRecordListItemWithThumbnailDTO"
       },
       "WorkflowRecordOrderBy": {
         "type": "string",
-        "enum": ["created_at", "updated_at", "opened_at", "name"],
+        "enum": ["created_at", "updated_at", "opened_at", "name", "is_public"],
         "title": "WorkflowRecordOrderBy",
         "description": "The order by options for workflow records"
       },
@@ -59303,10 +59462,20 @@
             ],
             "title": "Thumbnail Url",
             "description": "The URL of the workflow thumbnail."
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id",
+            "description": "The id of the user who owns this workflow."
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether this workflow is shared with all users."
           }
         },
         "type": "object",
-        "required": ["workflow_id", "name", "created_at", "updated_at", "workflow"],
+        "required": ["workflow_id", "name", "created_at", "updated_at", "workflow", "user_id", "is_public"],
         "title": "WorkflowRecordWithThumbnailDTO"
       },
       "WorkflowWithoutID": {
