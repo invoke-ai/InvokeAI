@@ -5,6 +5,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   Button,
+  Checkbox,
   Flex,
   FormControl,
   FormLabel,
@@ -19,6 +20,7 @@ import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
 import type { ChangeEvent, RefObject } from 'react';
 import { memo, useCallback, useRef, useState } from 'react';
+import { useUpdateWorkflowIsPublicMutation } from 'services/api/endpoints/workflows';
 import { assert } from 'tsafe';
 
 /**
@@ -87,13 +89,19 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
     }
     return '';
   });
+  const [isPublic, setIsPublic] = useState(false);
 
   const { createNewWorkflow } = useCreateLibraryWorkflow();
+  const [updateIsPublic] = useUpdateWorkflowIsPublicMutation();
 
   const inputRef = useRef<HTMLInputElement>(null);
 
   const onChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
+  }, []);
+
+  const onChangeIsPublic = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    setIsPublic(e.target.checked);
   }, []);
 
   const onClose = useCallback(() => {
@@ -110,10 +118,19 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
 
     await createNewWorkflow({
       workflow,
-      onSuccess: onClose,
+      onSuccess: async (workflowId?: string) => {
+        if (isPublic && workflowId) {
+          try {
+            await updateIsPublic({ workflow_id: workflowId, is_public: true }).unwrap();
+          } catch {
+            // Sharing failed silently - workflow was saved, just not shared
+          }
+        }
+        onClose();
+      },
       onError: onClose,
     });
-  }, [workflow, name, createNewWorkflow, onClose]);
+  }, [workflow, name, isPublic, createNewWorkflow, updateIsPublic, onClose]);
 
   return (
     <AlertDialogContent>
@@ -126,6 +143,10 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
           <FormLabel mt="2">{t('workflows.workflowName')}</FormLabel>
           <Flex flexDir="column" width="full" gap="2">
             <Input ref={inputRef} value={name} onChange={onChange} placeholder={t('workflows.workflowName')} />
+            <Flex alignItems="center" gap={2}>
+              <Checkbox isChecked={isPublic} onChange={onChangeIsPublic} />
+              <FormLabel mb={0}>{t('workflows.shareWorkflow')}</FormLabel>
+            </Flex>
           </Flex>
         </FormControl>
       </AlertDialogBody>
