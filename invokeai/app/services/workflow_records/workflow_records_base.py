@@ -23,7 +23,12 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def create(self, workflow: WorkflowWithoutID, user_id: str = WORKFLOW_LIBRARY_DEFAULT_USER_ID) -> WorkflowRecordDTO:
+    def create(
+        self,
+        workflow: WorkflowWithoutID,
+        user_id: str = WORKFLOW_LIBRARY_DEFAULT_USER_ID,
+        is_public: bool = False,
+    ) -> WorkflowRecordDTO:
         """Creates a workflow."""
         pass
 
