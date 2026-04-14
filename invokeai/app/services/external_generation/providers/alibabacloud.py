@@ -60,9 +60,9 @@ class AlibabaCloudProvider(ExternalProvider):
         if not api_key:
             raise ExternalProviderRequestError("Alibaba Cloud DashScope API key is not configured")
 
-        base_url = (
-            self._app_config.external_alibabacloud_base_url or "https://dashscope-intl.aliyuncs.com"
-        ).rstrip("/")
+        base_url = (self._app_config.external_alibabacloud_base_url or "https://dashscope-intl.aliyuncs.com").rstrip(
+            "/"
+        )
         model_id = request.model.provider_model_id
         headers = {
             "Content-Type": "application/json",
@@ -198,9 +198,7 @@ class AlibabaCloudProvider(ExternalProvider):
         while True:
             elapsed = time.monotonic() - start_time
             if elapsed > _TASK_POLL_TIMEOUT:
-                raise ExternalProviderRequestError(
-                    f"DashScope task {task_id} timed out after {_TASK_POLL_TIMEOUT}s"
-                )
+                raise ExternalProviderRequestError(f"DashScope task {task_id} timed out after {_TASK_POLL_TIMEOUT}s")
 
             time.sleep(_TASK_POLL_INTERVAL)
 
