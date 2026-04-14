@@ -7,6 +7,7 @@ from fastapi import Body, HTTPException, Path
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
 
+from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.backend.image_util.controlnet_processor import process_controlnet_image
 from invokeai.backend.model_manager.taxonomy import ModelType
@@ -291,12 +292,58 @@ def resolve_ip_adapter_models(ip_adapters: list[IPAdapterRecallParameter]) -> li
     return resolved_adapters
 
 
+def _assert_recall_image_access(parameters: "RecallParameter", current_user: CurrentUserOrDefault) -> None:
+    """Validate that the caller can read every image referenced in the recall parameters.
+
+    Control layers and IP adapters may reference image_name fields.  Without this
+    check an attacker who knows another user's image UUID could use the recall
+    endpoint to extract image dimensions and — for ControlNet preprocessors — mint
+    a derived processed image they can then fetch.
+    """
+    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+
+    image_names: list[str] = []
+    if parameters.control_layers:
+        for layer in parameters.control_layers:
+            if layer.image_name is not None:
+                image_names.append(layer.image_name)
+    if parameters.ip_adapters:
+        for adapter in parameters.ip_adapters:
+            if adapter.image_name is not None:
+                image_names.append(adapter.image_name)
+
+    if not image_names:
+        return
+
+    # Admin can access all images
+    if current_user.is_admin:
+        return
+
+    for image_name in image_names:
+        owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
+        if owner is not None and owner == current_user.user_id:
+            continue
+
+        # Check board visibility
+        board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
+        if board_id is not None:
+            try:
+                board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
+                if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
+                    continue
+            except Exception:
+                pass
+
+        raise HTTPException(status_code=403, detail=f"Not authorized to access image {image_name}")
+
+
 @recall_parameters_router.post(
     "/{queue_id}",
     operation_id="update_recall_parameters",
     response_model=dict[str, Any],
 )
 async def update_recall_parameters(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(..., description="The queue id to perform this operation on"),
     parameters: RecallParameter = Body(..., description="Recall parameters to update"),
 ) -> dict[str, Any]:
@@ -328,6 +375,10 @@ async def update_recall_parameters(
     """
     logger = ApiDependencies.invoker.services.logger
 
+    # Validate image access before processing — prevents information leakage
+    # (dimensions) and derived-image minting via ControlNet preprocessors.
+    _assert_recall_image_access(parameters, current_user)
+
     try:
         # Get only the parameters that were actually provided (non-None values)
         provided_params = {k: v for k, v in parameters.model_dump().items() if v is not None}
@@ -335,14 +386,14 @@ async def update_recall_parameters(
         if not provided_params:
             return {"status": "no_parameters_provided", "updated_count": 0}
 
-        # Store each parameter in client state using a consistent key format
+        # Store each parameter in client state scoped to the current user
         updated_count = 0
         for param_key, param_value in provided_params.items():
             # Convert parameter values to JSON strings for storage
             value_str = json.dumps(param_value)
             try:
                 ApiDependencies.invoker.services.client_state_persistence.set_by_key(
-                    queue_id, f"recall_{param_key}", value_str
+                    current_user.user_id, f"recall_{param_key}", value_str
                 )
                 updated_count += 1
             except Exception as e:
@@ -396,7 +447,9 @@ async def update_recall_parameters(
             logger.info(
                 f"Emitting recall_parameters_updated event for queue {queue_id} with {len(provided_params)} parameters"
             )
-            ApiDependencies.invoker.services.events.emit_recall_parameters_updated(queue_id, provided_params)
+            ApiDependencies.invoker.services.events.emit_recall_parameters_updated(
+                queue_id, current_user.user_id, provided_params
+            )
             logger.info("Successfully emitted recall_parameters_updated event")
         except Exception as e:
             logger.error(f"Error emitting recall parameters event: {e}", exc_info=True)
@@ -425,6 +478,7 @@ async def update_recall_parameters(
     response_model=dict[str, Any],
 )
 async def get_recall_parameters(
+    current_user: CurrentUserOrDefault,
     queue_id: str = Path(..., description="The queue id to retrieve parameters for"),
 ) -> dict[str, Any]:
     """

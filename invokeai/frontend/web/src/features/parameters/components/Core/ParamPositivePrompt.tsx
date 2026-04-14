@@ -16,6 +16,7 @@ import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/compone
 import { NegativePromptToggleButton } from 'features/parameters/components/Core/NegativePromptToggleButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
+import { PromptResizeHandle } from 'features/parameters/components/Prompts/PromptResizeHandle';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { ExpandPromptButton } from 'features/prompt/ExpandPromptButton';
@@ -44,6 +45,8 @@ const persistOptions: Parameters<typeof usePersistedTextAreaSize>[2] = {
   trackHeight: true,
   initialHeight: 120,
 };
+
+const POSITIVE_PROMPT_MIN_HEIGHT = 32;
 
 const usePromptHistory = () => {
   const store = useAppStore();
@@ -289,10 +292,11 @@ export const ParamPositivePrompt = memo(() => {
             paddingInlineStart={3}
             paddingTop={0}
             paddingBottom={3}
-            resize="vertical"
-            minH={32}
+            resize="none"
+            minH={POSITIVE_PROMPT_MIN_HEIGHT}
             fontFamily="mono"
             fontSize="0.82rem"
+            sx={{ '&::-webkit-resizer': { display: 'none' } }}
           />
           <PromptOverlayButtonWrapper>
             <Flex flexDir="column" gap={2} justifyContent="flex-start" alignItems="center">
@@ -312,6 +316,7 @@ export const ParamPositivePrompt = memo(() => {
               label={`${t('parameters.positivePromptPlaceholder')} (${t('stylePresets.preview')})`}
             />
           )}
+          <PromptResizeHandle textareaRef={textareaRef} minHeight={POSITIVE_PROMPT_MIN_HEIGHT} />
         </Box>
       </PromptPopover>
       {hasLlavaModels && <DndDropOverlay dndState={dndState} label={t('prompt.imageToPrompt')} />}
