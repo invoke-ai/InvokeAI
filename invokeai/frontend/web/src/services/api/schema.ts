@@ -1042,14 +1042,14 @@ export type paths = {
         };
         /**
          * Get Intermediates Count
-         * @description Gets the count of intermediate images
+         * @description Gets the count of intermediate images. Non-admin users only see their own intermediates.
          */
         get: operations["get_intermediates_count"];
         put?: never;
         post?: never;
         /**
          * Clear Intermediates
-         * @description Clears all intermediates
+         * @description Clears all intermediates. Requires admin.
          */
         delete: operations["clear_intermediates"];
         options?: never;
@@ -1103,7 +1103,11 @@ export type paths = {
         };
         /**
          * Get Image Full
-         * @description Gets a full-resolution image file
+         * @description Gets a full-resolution image file.
+         *
+         *     This endpoint is intentionally unauthenticated because browsers load images
+         *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
+         *     providing security through unguessability.
          */
         get: operations["get_image_full"];
         put?: never;
@@ -1112,7 +1116,11 @@ export type paths = {
         options?: never;
         /**
          * Get Image Full
-         * @description Gets a full-resolution image file
+         * @description Gets a full-resolution image file.
+         *
+         *     This endpoint is intentionally unauthenticated because browsers load images
+         *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
+         *     providing security through unguessability.
          */
         head: operations["get_image_full_head"];
         patch?: never;
@@ -1127,7 +1135,11 @@ export type paths = {
         };
         /**
          * Get Image Thumbnail
-         * @description Gets a thumbnail image file
+         * @description Gets a thumbnail image file.
+         *
+         *     This endpoint is intentionally unauthenticated because browsers load images
+         *     via <img src> tags which cannot send Bearer tokens. Image names are UUIDs,
+         *     providing security through unguessability.
          */
         get: operations["get_image_thumbnail"];
         put?: never;
@@ -1187,7 +1199,7 @@ export type paths = {
         post?: never;
         /**
          * Delete Uncategorized Images
-         * @description Deletes all images that are uncategorized
+         * @description Deletes all uncategorized images owned by the current user (or all if admin)
          */
         delete: operations["delete_uncategorized_images"];
         options?: never;
@@ -1255,7 +1267,10 @@ export type paths = {
         };
         /**
          * Get Bulk Download Item
-         * @description Gets a bulk download zip file
+         * @description Gets a bulk download zip file.
+         *
+         *     Requires authentication.  The caller must be the user who initiated the
+         *     download (tracked by the bulk download service) or an admin.
          */
         get: operations["get_bulk_download_item"];
         put?: never;
@@ -1571,7 +1586,8 @@ export type paths = {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Runtime Config */
+        patch: operations["update_runtime_config"];
         trace?: never;
     };
     "/api/v1/app/logging": {
@@ -1727,7 +1743,7 @@ export type paths = {
         };
         /**
          * Get Queue Item Ids
-         * @description Gets all queue item ids that match the given parameters
+         * @description Gets all queue item ids that match the given parameters. Non-admin users only see their own items.
          */
         get: operations["get_queue_item_ids"];
         put?: never;
@@ -1987,7 +2003,7 @@ export type paths = {
         };
         /**
          * Get Queue Status
-         * @description Gets the status of the session queue
+         * @description Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it.
          */
         get: operations["get_queue_status"];
         put?: never;
@@ -2007,7 +2023,7 @@ export type paths = {
         };
         /**
          * Get Batch Status
-         * @description Gets the status of the session queue
+         * @description Gets the status of a batch. Non-admin users only see their own batches.
          */
         get: operations["get_batch_status"];
         put?: never;
@@ -2071,7 +2087,7 @@ export type paths = {
         };
         /**
          * Counts By Destination
-         * @description Gets the counts of queue items by destination
+         * @description Gets the counts of queue items by destination. Non-admin users only see their own items.
          */
         get: operations["counts_by_destination"];
         put?: never;
@@ -2163,7 +2179,11 @@ export type paths = {
         };
         /**
          * Get Workflow Thumbnail
-         * @description Gets a workflow's thumbnail image
+         * @description Gets a workflow's thumbnail image.
+         *
+         *     This endpoint is intentionally unauthenticated because browsers load images
+         *     via <img src> tags which cannot send Bearer tokens. Workflow IDs are UUIDs,
+         *     providing security through unguessability.
          */
         get: operations["get_workflow_thumbnail"];
         /**
@@ -2180,6 +2200,26 @@ export type paths = {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workflows/i/{workflow_id}/is_public": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Workflow Is Public
+         * @description Updates whether a workflow is shared publicly
+         */
+        patch: operations["update_workflow_is_public"];
         trace?: never;
     };
     "/api/v1/workflows/tags": {
@@ -3483,6 +3523,12 @@ export type components = {
              * @default null
              */
             origin: string | null;
+            /**
+             * User Id
+             * @description The ID of the user who enqueued the batch
+             * @default system
+             */
+            user_id: string;
         };
         /** BatchStatus */
         BatchStatus: {
@@ -3673,6 +3719,8 @@ export type components = {
              * @description Whether or not the board is archived
              */
             archived?: boolean | null;
+            /** @description The visibility of the board. */
+            board_visibility?: components["schemas"]["BoardVisibility"] | null;
         };
         /**
          * BoardDTO
@@ -3720,6 +3768,11 @@ export type components = {
              */
             archived: boolean;
             /**
+             * @description The visibility of the board.
+             * @default private
+             */
+            board_visibility?: components["schemas"]["BoardVisibility"];
+            /**
              * Image Count
              * @description The number of images in the board.
              */
@@ -3752,6 +3805,12 @@ export type components = {
          * @enum {string}
          */
         BoardRecordOrderBy: "created_at" | "board_name";
+        /**
+         * BoardVisibility
+         * @description The visibility options for a board.
+         * @enum {string}
+         */
+        BoardVisibility: "private" | "shared" | "public";
         /** Body_add_image_to_board */
         Body_add_image_to_board: {
             /**
@@ -4003,6 +4062,14 @@ export type components = {
         Body_update_workflow: {
             /** @description The updated workflow */
             workflow: components["schemas"]["Workflow"];
+        };
+        /** Body_update_workflow_is_public */
+        Body_update_workflow_is_public: {
+            /**
+             * Is Public
+             * @description Whether the workflow should be shared publicly
+             */
+            is_public: boolean;
         };
         /** Body_upload_image */
         Body_upload_image: {
@@ -4296,6 +4363,12 @@ export type components = {
              * @description The name of the bulk image download item
              */
             bulk_download_item_name: string;
+            /**
+             * User Id
+             * @description The ID of the user who initiated the download
+             * @default system
+             */
+            user_id: string;
         };
         /**
          * BulkDownloadErrorEvent
@@ -4322,6 +4395,12 @@ export type components = {
              * @description The name of the bulk image download item
              */
             bulk_download_item_name: string;
+            /**
+             * User Id
+             * @description The ID of the user who initiated the download
+             * @default system
+             */
+            user_id: string;
             /**
              * Error
              * @description The error message
@@ -4353,6 +4432,12 @@ export type components = {
              * @description The name of the bulk image download item
              */
             bulk_download_item_name: string;
+            /**
+             * User Id
+             * @description The ID of the user who initiated the download
+             * @default system
+             */
+            user_id: string;
         };
         /**
          * BulkReidentifyModelsRequest
@@ -15239,7 +15324,8 @@ export type components = {
          *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
          *         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
          *         max_queue_size: Maximum number of items in the session queue.
-         *         clear_queue_on_startup: Empties session queue on startup.
+         *         clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.
+         *         max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
          *         allow_nodes: List of nodes to allow. Omit to allow all.
          *         deny_nodes: List of nodes to deny. Omit to deny none.
          *         node_cache_size: How many cached nodes to keep in memory.
@@ -15567,10 +15653,15 @@ export type components = {
             max_queue_size?: number;
             /**
              * Clear Queue On Startup
-             * @description Empties session queue on startup.
+             * @description Empties session queue on startup. If true, disables `max_queue_history`.
              * @default false
              */
             clear_queue_on_startup?: boolean;
+            /**
+             * Max Queue History
+             * @description Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
+             */
+            max_queue_history?: number | null;
             /**
              * Allow Nodes
              * @description List of nodes to allow. Omit to allow all.
@@ -24656,6 +24747,11 @@ export type components = {
              */
             queue_id: string;
             /**
+             * User Id
+             * @description The ID of the user whose recall parameters were updated
+             */
+            user_id: string;
+            /**
              * Parameters
              * @description The recall parameters that were updated
              */
@@ -26255,16 +26351,6 @@ export type components = {
              * @description Total number of queue items
              */
             total: number;
-            /**
-             * User Pending
-             * @description Number of queue items with status 'pending' for the current user
-             */
-            user_pending?: number | null;
-            /**
-             * User In Progress
-             * @description Number of queue items with status 'in_progress' for the current user
-             */
-            user_in_progress?: number | null;
         };
         /**
          * SetupRequest
@@ -26320,6 +26406,11 @@ export type components = {
              * @description Whether strict password requirements are enforced
              */
             strict_password_checking: boolean;
+            /**
+             * Admin Email
+             * @description Email of the first active admin user, if any
+             */
+            admin_email?: string | null;
         };
         /**
          * Show Image
@@ -28684,6 +28775,17 @@ export type components = {
             unstarred_images: string[];
         };
         /**
+         * UpdateAppGenerationSettingsRequest
+         * @description Writable generation-related app settings.
+         */
+        UpdateAppGenerationSettingsRequest: {
+            /**
+             * Max Queue History
+             * @description Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.
+             */
+            max_queue_history?: number | null;
+        };
+        /**
          * UserDTO
          * @description User data transfer object.
          */
@@ -29608,6 +29710,16 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * User Id
+             * @description The id of the user who owns this workflow.
+             */
+            user_id: string;
+            /**
+             * Is Public
+             * @description Whether this workflow is shared with all users.
+             */
+            is_public: boolean;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
         };
@@ -29639,6 +29751,16 @@ export type components = {
              */
             opened_at?: string | null;
             /**
+             * User Id
+             * @description The id of the user who owns this workflow.
+             */
+            user_id: string;
+            /**
+             * Is Public
+             * @description Whether this workflow is shared with all users.
+             */
+            is_public: boolean;
+            /**
              * Description
              * @description The description of the workflow.
              */
@@ -29661,7 +29783,7 @@ export type components = {
          * @description The order by options for workflow records
          * @enum {string}
          */
-        WorkflowRecordOrderBy: "created_at" | "updated_at" | "opened_at" | "name";
+        WorkflowRecordOrderBy: "created_at" | "updated_at" | "opened_at" | "name" | "is_public";
         /** WorkflowRecordWithThumbnailDTO */
         WorkflowRecordWithThumbnailDTO: {
             /**
@@ -29689,6 +29811,16 @@ export type components = {
              * @description The opened timestamp of the workflow.
              */
             opened_at?: string | null;
+            /**
+             * User Id
+             * @description The id of the user who owns this workflow.
+             */
+            user_id: string;
+            /**
+             * Is Public
+             * @description Whether this workflow is shared with all users.
+             */
+            is_public: boolean;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
             /**
@@ -33819,6 +33951,39 @@ export interface operations {
             };
         };
     };
+    update_runtime_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAppGenerationSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvokeAIAppConfigWithSetFields"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_log_level: {
         parameters: {
             query?: never;
@@ -34819,6 +34984,8 @@ export interface operations {
                 query?: string | null;
                 /** @description Whether to include/exclude recent workflows */
                 has_been_opened?: boolean | null;
+                /** @description Filter by public/shared status */
+                is_public?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -34993,11 +35160,49 @@ export interface operations {
             };
         };
     };
+    update_workflow_is_public: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workflow to update */
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Body_update_workflow_is_public"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowRecordDTO"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_all_tags: {
         parameters: {
             query?: {
                 /** @description The categories to include */
                 categories?: components["schemas"]["WorkflowCategory"][] | null;
+                /** @description Filter by public/shared status */
+                is_public?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -35034,6 +35239,8 @@ export interface operations {
                 categories?: components["schemas"]["WorkflowCategory"][] | null;
                 /** @description Whether to include/exclude recent workflows */
                 has_been_opened?: boolean | null;
+                /** @description Filter by public/shared status */
+                is_public?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -35070,6 +35277,8 @@ export interface operations {
                 categories: components["schemas"]["WorkflowCategory"][];
                 /** @description Whether to include/exclude recent workflows */
                 has_been_opened?: boolean | null;
+                /** @description Filter by public/shared status */
+                is_public?: boolean | null;
             };
             header?: never;
             path?: never;

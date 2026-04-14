@@ -66,6 +66,7 @@ import type {
   EntityEraserLineAddedPayload,
   EntityGradientAddedPayload,
   EntityIdentifierPayload,
+  EntityLassoAddedPayload,
   EntityMovedToPayload,
   EntityRasterizedPayload,
   EntityRectAddedPayload,
@@ -98,6 +99,12 @@ import {
   initialZImageControl,
   makeDefaultRasterLayerAdjustments,
 } from './util';
+
+const resetInpaintMasksHiddenIfEmpty = (state: CanvasState) => {
+  if (state.inpaintMasks.entities.length === 0) {
+    state.inpaintMasks.isHidden = false;
+  }
+};
 
 const slice = createSlice({
   name: 'canvas',
@@ -1061,6 +1068,7 @@ const slice = createSlice({
             (entity) => !mergedEntitiesToDelete.includes(entity.id)
           );
         }
+        resetInpaintMasksHiddenIfEmpty(state);
         const entityIdentifier = getEntityIdentifier(entityState);
 
         if (isSelected || mergedEntitiesToDelete.length > 0) {
@@ -1132,6 +1140,7 @@ const slice = createSlice({
         if (replace) {
           // Remove the inpaint mask
           state.inpaintMasks.entities = state.inpaintMasks.entities.filter((layer) => layer.id !== entityIdentifier.id);
+          resetInpaintMasksHiddenIfEmpty(state);
         }
 
         // Add the new regional guidance
@@ -1548,6 +1557,17 @@ const slice = createSlice({
       // re-render it (reference equality check). I don't like this behaviour.
       entity.objects.push({ ...rect });
     },
+    entityLassoAdded: (state, action: PayloadAction<EntityLassoAddedPayload>) => {
+      const { entityIdentifier, lasso } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity) {
+        return;
+      }
+
+      // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
+      // re-render it (reference equality check). I don't like this behaviour.
+      entity.objects.push({ ...lasso });
+    },
     entityGradientAdded: (state, action: PayloadAction<EntityGradientAddedPayload>) => {
       const { entityIdentifier, gradient } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
@@ -1590,6 +1610,7 @@ const slice = createSlice({
           break;
       }
 
+      resetInpaintMasksHiddenIfEmpty(state);
       state.selectedEntityIdentifier = selectedEntityIdentifier;
     },
     entityArrangedForwardOne: (state, action: PayloadAction<EntityIdentifierPayload>) => {
@@ -1678,6 +1699,7 @@ const slice = createSlice({
           break;
         case 'inpaint_mask':
           state.inpaintMasks.isHidden = !state.inpaintMasks.isHidden;
+          resetInpaintMasksHiddenIfEmpty(state);
           break;
         case 'regional_guidance':
           state.regionalGuidance.isHidden = !state.regionalGuidance.isHidden;
@@ -1686,13 +1708,16 @@ const slice = createSlice({
     },
     allNonRasterLayersIsHiddenToggled: (state) => {
       const hasVisibleNonRasterLayers =
-        !state.controlLayers.isHidden || !state.inpaintMasks.isHidden || !state.regionalGuidance.isHidden;
+        (state.controlLayers.entities.length > 0 && !state.controlLayers.isHidden) ||
+        (state.inpaintMasks.entities.length > 0 && !state.inpaintMasks.isHidden) ||
+        (state.regionalGuidance.entities.length > 0 && !state.regionalGuidance.isHidden);
 
       const shouldHide = hasVisibleNonRasterLayers;
 
       state.controlLayers.isHidden = shouldHide;
       state.inpaintMasks.isHidden = shouldHide;
       state.regionalGuidance.isHidden = shouldHide;
+      resetInpaintMasksHiddenIfEmpty(state);
     },
     allEntitiesDeleted: (state) => {
       // Deleting all entities is equivalent to resetting the state for each entity type
@@ -1708,6 +1733,37 @@ const slice = createSlice({
       state.inpaintMasks.entities = inpaintMasks;
       state.rasterLayers.entities = rasterLayers;
       state.regionalGuidance.entities = regionalGuidance;
+      resetInpaintMasksHiddenIfEmpty(state);
+      return state;
+    },
+    canvasProjectRecalled: (
+      state,
+      action: PayloadAction<{
+        rasterLayers: CanvasRasterLayerState[];
+        controlLayers: CanvasControlLayerState[];
+        inpaintMasks: CanvasInpaintMaskState[];
+        regionalGuidance: CanvasRegionalGuidanceState[];
+        bbox: CanvasState['bbox'];
+        selectedEntityIdentifier: CanvasState['selectedEntityIdentifier'];
+        bookmarkedEntityIdentifier: CanvasState['bookmarkedEntityIdentifier'];
+      }>
+    ) => {
+      const {
+        rasterLayers,
+        controlLayers,
+        inpaintMasks,
+        regionalGuidance,
+        bbox,
+        selectedEntityIdentifier,
+        bookmarkedEntityIdentifier,
+      } = action.payload;
+      state.rasterLayers.entities = rasterLayers;
+      state.controlLayers.entities = controlLayers;
+      state.inpaintMasks.entities = inpaintMasks;
+      state.regionalGuidance.entities = regionalGuidance;
+      state.bbox = bbox;
+      state.selectedEntityIdentifier = selectedEntityIdentifier;
+      state.bookmarkedEntityIdentifier = bookmarkedEntityIdentifier;
       return state;
     },
     canvasUndo: () => {},
@@ -1768,6 +1824,7 @@ const resetState = (state: CanvasState) => {
 
 export const {
   canvasMetadataRecalled,
+  canvasProjectRecalled,
   canvasUndo,
   canvasRedo,
   canvasClearHistory,
@@ -1787,6 +1844,7 @@ export const {
   entityBrushLineAdded,
   entityEraserLineAdded,
   entityRectAdded,
+  entityLassoAdded,
   entityGradientAdded,
   // Raster layer adjustments
   rasterLayerAdjustmentsSet,
@@ -1913,7 +1971,13 @@ export const canvasSliceConfig: SliceConfig<typeof slice> = {
   },
 };
 
-const doNotGroupMatcher = isAnyOf(entityBrushLineAdded, entityEraserLineAdded, entityRectAdded, entityGradientAdded);
+const doNotGroupMatcher = isAnyOf(
+  entityBrushLineAdded,
+  entityEraserLineAdded,
+  entityRectAdded,
+  entityLassoAdded,
+  entityGradientAdded
+);
 
 // Store rapid actions of the same type at most once every x time.
 // See: https://github.com/omnidan/redux-undo/blob/master/examples/throttled-drag/util/undoFilter.js
