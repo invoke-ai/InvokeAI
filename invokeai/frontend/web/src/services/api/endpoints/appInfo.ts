@@ -51,6 +51,26 @@ export const appInfoApi = api.injectEndpoints({
         url: buildAppInfoUrl('runtime_config'),
         method: 'GET',
       }),
+      providesTags: ['AppConfig'],
+    }),
+    updateRuntimeConfig: build.mutation<
+      paths['/api/v1/app/runtime_config']['patch']['responses']['200']['content']['application/json'],
+      paths['/api/v1/app/runtime_config']['patch']['requestBody']['content']['application/json']
+    >({
+      query: (body) => ({
+        url: buildAppInfoUrl('runtime_config'),
+        method: 'PATCH',
+        body,
+      }),
+      async onQueryStarted(_, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          dispatch(appInfoApi.util.upsertQueryData('getRuntimeConfig', undefined, data));
+        } catch {
+          // no-op
+        }
+      },
+      invalidatesTags: ['AppConfig'],
     }),
     getInvocationCacheStatus: build.query<
       paths['/api/v1/app/invocation_cache/status']['get']['responses']['200']['content']['application/json'],
@@ -95,6 +115,7 @@ export const {
   useGetAppDepsQuery,
   useGetPatchmatchStatusQuery,
   useGetRuntimeConfigQuery,
+  useUpdateRuntimeConfigMutation,
   useClearInvocationCacheMutation,
   useDisableInvocationCacheMutation,
   useEnableInvocationCacheMutation,

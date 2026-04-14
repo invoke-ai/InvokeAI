@@ -19,7 +19,7 @@ from invokeai.backend.util.devices import TorchDevice
     "llava_onevision_vllm",
     title="LLaVA OneVision VLLM",
     tags=["vllm"],
-    category="vllm",
+    category="multimodal",
     version="1.0.0",
     classification=Classification.Beta,
 )

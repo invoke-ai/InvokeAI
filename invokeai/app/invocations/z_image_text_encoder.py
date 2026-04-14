@@ -34,7 +34,7 @@ Z_IMAGE_MAX_SEQ_LEN = 512
     "z_image_text_encoder",
     title="Prompt - Z-Image",
     tags=["prompt", "conditioning", "z-image"],
-    category="conditioning",
+    category="prompt",
     version="1.1.0",
     classification=Classification.Prototype,
 )

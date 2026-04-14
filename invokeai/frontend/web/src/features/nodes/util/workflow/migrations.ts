@@ -70,9 +70,11 @@ const migrateV1toV2 = (workflowToMigrate: WorkflowV1): WorkflowV2 => {
 };
 
 const migrateV2toV3 = (workflowToMigrate: WorkflowV2): WorkflowV3 => {
-  // Bump version
-  (workflowToMigrate as unknown as WorkflowV3).meta.version = '3.0.0';
-  // Parsing strips out any extra properties not in the latest version
+  return migrateV3toV4(workflowToMigrate as unknown as WorkflowV3);
+};
+
+const migrateV3toV4 = (workflowToMigrate: WorkflowV3): WorkflowV3 => {
+  workflowToMigrate.meta.version = '4.0.0';
   return zWorkflowV3.parse(workflowToMigrate);
 };
 
@@ -98,6 +100,10 @@ export const parseAndMigrateWorkflow = (data: unknown): WorkflowV3 => {
   if (get(workflow, 'meta.version') === '2.0.0') {
     const v2 = zWorkflowV2.parse(workflow);
     workflow = migrateV2toV3(v2);
+  }
+
+  if (get(workflow, 'meta.version') === '3.0.0') {
+    workflow = migrateV3toV4(workflow as WorkflowV3);
   }
 
   // We should now have a V3 workflow

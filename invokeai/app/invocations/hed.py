@@ -11,7 +11,7 @@ from invokeai.backend.image_util.hed import ControlNetHED_Apache2, HEDEdgeDetect
     "hed_edge_detection",
     title="HED Edge Detection",
     tags=["controlnet", "hed", "softedge"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.0.0",
 )
 class HEDEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):
