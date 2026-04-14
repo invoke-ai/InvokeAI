@@ -6,6 +6,9 @@ from typing import ClassVar, Literal, Optional
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
+from PIL import Image
+from pydantic import BaseModel, Field, model_validator
+
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
@@ -27,8 +30,6 @@ from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.controlnet_utils import heuristic_resize_fast
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
-from PIL import Image
-from pydantic import BaseModel, Field, model_validator
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
