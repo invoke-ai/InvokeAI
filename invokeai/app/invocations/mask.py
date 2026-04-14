@@ -24,7 +24,7 @@ from invokeai.backend.image_util.util import pil_to_np
     "rectangle_mask",
     title="Create Rectangle Mask",
     tags=["conditioning"],
-    category="conditioning",
+    category="mask",
     version="1.0.1",
 )
 class RectangleMaskInvocation(BaseInvocation, WithMetadata):
@@ -55,7 +55,7 @@ class RectangleMaskInvocation(BaseInvocation, WithMetadata):
     "alpha_mask_to_tensor",
     title="Alpha Mask to Tensor",
     tags=["conditioning"],
-    category="conditioning",
+    category="mask",
     version="1.0.0",
 )
 class AlphaMaskToTensorInvocation(BaseInvocation):
@@ -83,7 +83,7 @@ class AlphaMaskToTensorInvocation(BaseInvocation):
     "invert_tensor_mask",
     title="Invert Tensor Mask",
     tags=["conditioning"],
-    category="conditioning",
+    category="mask",
     version="1.1.0",
 )
 class InvertTensorMaskInvocation(BaseInvocation):
@@ -115,7 +115,7 @@ class InvertTensorMaskInvocation(BaseInvocation):
     "image_mask_to_tensor",
     title="Image Mask to Tensor",
     tags=["conditioning"],
-    category="conditioning",
+    category="mask",
     version="1.0.0",
 )
 class ImageMaskToTensorInvocation(BaseInvocation, WithMetadata):

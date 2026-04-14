@@ -212,6 +212,7 @@
         "copy": "Copy",
         "copyError": "$t(gallery.copy) Error",
         "clipboard": "Clipboard",
+        "collapseAll": "Collapse All",
         "crop": "Crop",
         "on": "On",
         "off": "Off",
@@ -239,6 +240,7 @@
         "error": "Error",
         "error_withCount_one": "{{count}} error",
         "error_withCount_other": "{{count}} errors",
+        "expandAll": "Expand All",
         "model_withCount_one": "{{count}} model",
         "model_withCount_other": "{{count}} models",
         "file": "File",
@@ -714,6 +716,10 @@
             "selectRectTool": {
                 "title": "Rect Tool",
                 "desc": "Select the rect tool."
+            },
+            "selectLassoTool": {
+                "title": "Lasso Tool",
+                "desc": "Select the lasso tool."
             },
             "selectViewTool": {
                 "title": "View Tool",
@@ -1411,6 +1417,8 @@
         "fullyContainNodesHelp": "Nodes must be fully inside the selection box to be selected",
         "showEdgeLabels": "Show Edge Labels",
         "showEdgeLabelsHelp": "Show labels on edges, indicating the connected nodes",
+        "groupNodesByCategory": "Group Nodes by Category",
+        "groupNodesByCategoryHelp": "Group nodes by category in the add node dialog",
         "hideLegendNodes": "Hide Field Type Legend",
         "hideMinimapnodes": "Hide MiniMap",
         "inputMayOnlyHaveOneConnection": "Input may only have one connection",
@@ -1741,6 +1749,8 @@
         "enableNSFWChecker": "Enable NSFW Checker",
         "general": "General",
         "generation": "Generation",
+        "maxQueueHistory": "Max Queue History",
+        "maxQueueHistorySaveFailed": "Failed to save Max Queue History",
         "models": "Models",
         "preferAttentionStyleNumeric": "Prefer Numeric Attention Style",
         "prompt": "Prompt",
@@ -2798,10 +2808,16 @@
             "radial": "Radial",
             "clip": "Clip Gradient"
         },
+        "lasso": {
+            "freehand": "Freehand",
+            "polygon": "Polygon",
+            "polygonHint": "Click to add points, click the first point to close."
+        },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
             "rectangle": "Rectangle",
+            "lasso": "Lasso",
             "gradient": "Gradient",
             "bbox": "Bbox",
             "move": "Move",
@@ -3040,6 +3056,19 @@
             "copyToClipboard": "Copy to Clipboard",
             "copyCanvasToClipboard": "Copy Canvas to Clipboard",
             "copyBboxToClipboard": "Copy Bbox to Clipboard"
+        },
+        "canvasProject": {
+            "project": "Project",
+            "saveProject": "Save Canvas Project",
+            "loadProject": "Load Canvas Project",
+            "saveSuccess": "Project Saved",
+            "saveSuccessDesc": "Saved project with {{count}} images",
+            "saveError": "Failed to Save Project",
+            "loadSuccess": "Project Loaded",
+            "loadSuccessDesc": "Canvas state restored from project file",
+            "loadError": "Failed to Load Project",
+            "loadWarning": "Loading a project will replace your current canvas, including all layers, masks, reference images, and generation parameters. This action cannot be undone.",
+            "projectName": "Project Name"
         },
         "stagingArea": {
             "accept": "Accept",

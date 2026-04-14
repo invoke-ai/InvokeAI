@@ -519,6 +519,9 @@ const slice = createSlice({
       state.dimensions.aspectRatio.isLocked = true;
     },
     paramsReset: (state) => resetState(state),
+    paramsRecalled: (_state, action: PayloadAction<ParamsState>) => {
+      return action.payload;
+    },
   },
   extraReducers(builder) {
     // Reset params state on logout to prevent user data leakage when switching users
@@ -666,6 +669,7 @@ export const {
   openaiInputFidelityChanged,
   geminiTemperatureChanged,
   geminiThinkingLevelChanged,
+  paramsRecalled,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
   animaT5EncoderModelSelected,

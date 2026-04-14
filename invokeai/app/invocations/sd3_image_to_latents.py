@@ -24,7 +24,7 @@ from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory
     "sd3_i2l",
     title="Image to Latents - SD3",
     tags=["image", "latents", "vae", "i2l", "sd3"],
-    category="image",
+    category="latents",
     version="1.0.1",
 )
 class SD3ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
