@@ -1586,7 +1586,8 @@ export type paths = {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Update Runtime Config */
+        patch: operations["update_runtime_config"];
         trace?: never;
     };
     "/api/v1/app/logging": {
@@ -15236,7 +15237,8 @@ export type components = {
          *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
          *         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
          *         max_queue_size: Maximum number of items in the session queue.
-         *         clear_queue_on_startup: Empties session queue on startup.
+         *         clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.
+         *         max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
          *         allow_nodes: List of nodes to allow. Omit to allow all.
          *         deny_nodes: List of nodes to deny. Omit to deny none.
          *         node_cache_size: How many cached nodes to keep in memory.
@@ -15564,10 +15566,15 @@ export type components = {
             max_queue_size?: number;
             /**
              * Clear Queue On Startup
-             * @description Empties session queue on startup.
+             * @description Empties session queue on startup. If true, disables `max_queue_history`.
              * @default false
              */
             clear_queue_on_startup?: boolean;
+            /**
+             * Max Queue History
+             * @description Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
+             */
+            max_queue_history?: number | null;
             /**
              * Allow Nodes
              * @description List of nodes to allow. Omit to allow all.
@@ -28623,6 +28630,17 @@ export type components = {
             unstarred_images: string[];
         };
         /**
+         * UpdateAppGenerationSettingsRequest
+         * @description Writable generation-related app settings.
+         */
+        UpdateAppGenerationSettingsRequest: {
+            /**
+             * Max Queue History
+             * @description Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.
+             */
+            max_queue_history?: number | null;
+        };
+        /**
          * UserDTO
          * @description User data transfer object.
          */
@@ -33919,6 +33937,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InvokeAIAppConfigWithSetFields"];
+                };
+            };
+        };
+    };
+    update_runtime_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAppGenerationSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvokeAIAppConfigWithSetFields"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
