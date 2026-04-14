@@ -48,7 +48,12 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             raise WorkflowNotFoundError(f"Workflow with id {workflow_id} not found")
         return WorkflowRecordDTO.from_dict(dict(row))
 
-    def create(self, workflow: WorkflowWithoutID, user_id: str = WORKFLOW_LIBRARY_DEFAULT_USER_ID) -> WorkflowRecordDTO:
+    def create(
+        self,
+        workflow: WorkflowWithoutID,
+        user_id: str = WORKFLOW_LIBRARY_DEFAULT_USER_ID,
+        is_public: bool = False,
+    ) -> WorkflowRecordDTO:
         if workflow.meta.category is WorkflowCategory.Default:
             raise ValueError("Default workflows cannot be created via this method")
 
@@ -59,11 +64,12 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 INSERT OR IGNORE INTO workflow_library (
                     workflow_id,
                     workflow,
-                    user_id
+                    user_id,
+                    is_public
                 )
-                VALUES (?, ?, ?);
+                VALUES (?, ?, ?, ?);
                 """,
-                (workflow_with_id.id, workflow_with_id.model_dump_json(), user_id),
+                (workflow_with_id.id, workflow_with_id.model_dump_json(), user_id, is_public),
             )
         return self.get(workflow_with_id.id)
 
