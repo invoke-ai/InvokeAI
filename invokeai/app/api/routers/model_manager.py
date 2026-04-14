@@ -873,7 +873,7 @@ async def install_hugging_face_model(
     "/install",
     operation_id="list_model_installs",
 )
-async def list_model_installs() -> List[ModelInstallJob]:
+async def list_model_installs(current_admin: AdminUserOrDefault) -> List[ModelInstallJob]:
     """Return the list of model install jobs.
 
     Install jobs have a numeric `id`, a `status`, and other fields that provide information on
@@ -905,7 +905,9 @@ async def list_model_installs() -> List[ModelInstallJob]:
         404: {"description": "No such job"},
     },
 )
-async def get_model_install_job(id: int = Path(description="Model install id")) -> ModelInstallJob:
+async def get_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install id")
+) -> ModelInstallJob:
     """
     Return model install job corresponding to the given source. See the documentation for 'List Model Install Jobs'
     for information on the format of the return value.
@@ -948,7 +950,9 @@ async def cancel_model_install_job(
     },
     status_code=201,
 )
-async def pause_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+async def pause_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
+) -> ModelInstallJob:
     """Pause the model install job corresponding to the given job ID."""
     installer = ApiDependencies.invoker.services.model_manager.install
     try:
@@ -968,7 +972,9 @@ async def pause_model_install_job(id: int = Path(description="Model install job 
     },
     status_code=201,
 )
-async def resume_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+async def resume_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
+) -> ModelInstallJob:
     """Resume a paused model install job corresponding to the given job ID."""
     installer = ApiDependencies.invoker.services.model_manager.install
     try:
@@ -988,7 +994,9 @@ async def resume_model_install_job(id: int = Path(description="Model install job
     },
     status_code=201,
 )
-async def restart_failed_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+async def restart_failed_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
+) -> ModelInstallJob:
     """Restart failed or non-resumable file downloads for the given job."""
     installer = ApiDependencies.invoker.services.model_manager.install
     try:
@@ -1009,6 +1017,7 @@ async def restart_failed_model_install_job(id: int = Path(description="Model ins
     status_code=201,
 )
 async def restart_model_install_file(
+    current_admin: AdminUserOrDefault,
     id: int = Path(description="Model install job ID"),
     file_source: AnyHttpUrl = Body(description="File download URL to restart"),
 ) -> ModelInstallJob:
@@ -1320,7 +1329,7 @@ class DeleteOrphanedModelsResponse(BaseModel):
     operation_id="get_orphaned_models",
     response_model=list[OrphanedModelInfo],
 )
-async def get_orphaned_models() -> list[OrphanedModelInfo]:
+async def get_orphaned_models(_: AdminUserOrDefault) -> list[OrphanedModelInfo]:
     """Find orphaned model directories.
 
     Orphaned models are directories in the models folder that contain model files
@@ -1347,7 +1356,9 @@ async def get_orphaned_models() -> list[OrphanedModelInfo]:
     operation_id="delete_orphaned_models",
     response_model=DeleteOrphanedModelsResponse,
 )
-async def delete_orphaned_models(request: DeleteOrphanedModelsRequest) -> DeleteOrphanedModelsResponse:
+async def delete_orphaned_models(
+    request: DeleteOrphanedModelsRequest, _: AdminUserOrDefault
+) -> DeleteOrphanedModelsResponse:
     """Delete specified orphaned model directories.
 
     Args:

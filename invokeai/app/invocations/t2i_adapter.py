@@ -49,7 +49,7 @@ class T2IAdapterOutput(BaseInvocationOutput):
     "t2i_adapter",
     title="T2I-Adapter - SD1.5, SDXL",
     tags=["t2i_adapter", "control"],
-    category="t2i_adapter",
+    category="conditioning",
     version="1.0.4",
 )
 class T2IAdapterInvocation(BaseInvocation):
