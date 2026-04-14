@@ -715,6 +715,10 @@
                 "title": "Rect Tool",
                 "desc": "Select the rect tool."
             },
+            "selectLassoTool": {
+                "title": "Lasso Tool",
+                "desc": "Select the lasso tool."
+            },
             "selectViewTool": {
                 "title": "View Tool",
                 "desc": "Select the view tool."
@@ -1421,6 +1425,8 @@
         "notes": "Notes",
         "description": "Description",
         "notesDescription": "Add notes about your workflow",
+        "addConnector": "Add Connector",
+        "deleteConnector": "Delete Connector",
         "problemSettingTitle": "Problem Setting Title",
         "resetToDefaultValue": "Reset to default value",
         "reloadNodeTemplates": "Reload Node Templates",
@@ -1709,6 +1715,8 @@
         "enableNSFWChecker": "Enable NSFW Checker",
         "general": "General",
         "generation": "Generation",
+        "maxQueueHistory": "Max Queue History",
+        "maxQueueHistorySaveFailed": "Failed to save Max Queue History",
         "models": "Models",
         "preferAttentionStyleNumeric": "Prefer Numeric Attention Style",
         "prompt": "Prompt",
@@ -2762,10 +2770,16 @@
             "radial": "Radial",
             "clip": "Clip Gradient"
         },
+        "lasso": {
+            "freehand": "Freehand",
+            "polygon": "Polygon",
+            "polygonHint": "Click to add points, click the first point to close."
+        },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
             "rectangle": "Rectangle",
+            "lasso": "Lasso",
             "gradient": "Gradient",
             "bbox": "Bbox",
             "move": "Move",
