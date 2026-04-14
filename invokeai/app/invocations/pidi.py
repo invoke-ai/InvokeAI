@@ -10,7 +10,7 @@ from invokeai.backend.image_util.pidi.model import PiDiNet
     "pidi_edge_detection",
     title="PiDiNet Edge Detection",
     tags=["controlnet", "edge"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.0.0",
 )
 class PiDiNetEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):

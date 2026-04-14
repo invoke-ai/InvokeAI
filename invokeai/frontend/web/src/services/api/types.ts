@@ -337,6 +337,10 @@ export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config
   return config.type === 'main' && config.base === 'z-image' && config.format === 'diffusers';
 };
 
+export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'qwen-image' && config.format === 'diffusers';
+};
+
 export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'embedding';
 };
@@ -348,7 +352,7 @@ export type ModelInstallStatus = S['InstallStatus'];
 export type Graph = S['Graph'];
 export type NonNullableGraph = SetRequired<Graph, 'nodes' | 'edges'>;
 export type Batch = S['Batch'];
-export const zWorkflowRecordOrderBy = z.enum(['name', 'created_at', 'updated_at', 'opened_at']);
+export const zWorkflowRecordOrderBy = z.enum(['name', 'created_at', 'updated_at', 'opened_at', 'is_public']);
 export type WorkflowRecordOrderBy = z.infer<typeof zWorkflowRecordOrderBy>;
 assert<Equals<S['WorkflowRecordOrderBy'], WorkflowRecordOrderBy>>();
 

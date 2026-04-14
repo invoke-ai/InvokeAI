@@ -29,7 +29,7 @@ export const isDraftWorkflow = (workflow: WorkflowV3): workflow is DraftWorkflow
 
 type CreateLibraryWorkflowArg = {
   workflow: DraftWorkflow;
-  onSuccess?: () => void;
+  onSuccess?: (workflowId?: string) => void;
   onError?: () => void;
 };
 
@@ -70,7 +70,7 @@ export const useCreateLibraryWorkflow = (): CreateLibraryWorkflowReturn => {
         // When a workflow is saved, the form field initial values are updated to the current form field values
         dispatch(formFieldInitialValuesChanged({ formFieldInitialValues: getFormFieldInitialValues() }));
         updateOpenedAt({ workflow_id: id });
-        onSuccess?.();
+        onSuccess?.(id);
         toast.update(toastRef.current, {
           title: t('workflows.workflowSaved'),
           status: 'success',

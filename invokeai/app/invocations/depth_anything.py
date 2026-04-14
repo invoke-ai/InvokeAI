@@ -20,7 +20,7 @@ DEPTH_ANYTHING_MODELS = {
     "depth_anything_depth_estimation",
     title="Depth Anything Depth Estimation",
     tags=["controlnet", "depth", "depth anything"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.0.0",
 )
 class DepthAnythingDepthEstimationInvocation(BaseInvocation, WithMetadata, WithBoard):
