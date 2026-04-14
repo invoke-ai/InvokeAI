@@ -117,7 +117,13 @@ async def create_workflow(
     workflow: WorkflowWithoutID = Body(description="The workflow to create", embed=True),
 ) -> WorkflowRecordDTO:
     """Creates a workflow"""
-    return ApiDependencies.invoker.services.workflow_records.create(workflow=workflow, user_id=current_user.user_id)
+    # In single-user mode, workflows are owned by 'system' and shared by default so all legacy/single-user
+    # workflows remain visible. In multiuser mode, workflows are private to the creator by default.
+    config = ApiDependencies.invoker.services.configuration
+    is_public = not config.multiuser
+    return ApiDependencies.invoker.services.workflow_records.create(
+        workflow=workflow, user_id=current_user.user_id, is_public=is_public
+    )
 
 
 @workflows_router.get(
@@ -144,10 +150,10 @@ async def list_workflows(
     """Gets a page of workflows"""
     config = ApiDependencies.invoker.services.configuration
 
-    # In multiuser mode, scope user-category workflows to the current user unless fetching shared workflows
+    # In multiuser mode, scope user-category workflows to the current user unless fetching shared workflows.
+    # Admins skip the user_id filter so they can see and manage all workflows including system-owned ones.
     user_id_filter: Optional[str] = None
-    if config.multiuser:
-        # Only filter 'user' category results by user_id when not explicitly listing public workflows
+    if config.multiuser and not current_user.is_admin:
         has_user_category = not categories or WorkflowCategory.User in categories
         if has_user_category and is_public is not True:
             user_id_filter = current_user.user_id
@@ -320,7 +326,7 @@ async def get_all_tags(
     """Gets all unique tags from workflows"""
     config = ApiDependencies.invoker.services.configuration
     user_id_filter: Optional[str] = None
-    if config.multiuser:
+    if config.multiuser and not current_user.is_admin:
         has_user_category = not categories or WorkflowCategory.User in categories
         if has_user_category and is_public is not True:
             user_id_filter = current_user.user_id
@@ -341,7 +347,7 @@ async def get_counts_by_tag(
     """Counts workflows by tag"""
     config = ApiDependencies.invoker.services.configuration
     user_id_filter: Optional[str] = None
-    if config.multiuser:
+    if config.multiuser and not current_user.is_admin:
         has_user_category = not categories or WorkflowCategory.User in categories
         if has_user_category and is_public is not True:
             user_id_filter = current_user.user_id
@@ -361,7 +367,7 @@ async def counts_by_category(
     """Counts workflows by category"""
     config = ApiDependencies.invoker.services.configuration
     user_id_filter: Optional[str] = None
-    if config.multiuser:
+    if config.multiuser and not current_user.is_admin:
         has_user_category = WorkflowCategory.User in categories
         if has_user_category and is_public is not True:
             user_id_filter = current_user.user_id
