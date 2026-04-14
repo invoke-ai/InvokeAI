@@ -31,16 +31,22 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiStarFill } from 'react-icons/pi';
 import { useDispatch } from 'react-redux';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 import { useGetAllTagsQuery, useGetCountsByTagQuery } from 'services/api/endpoints/workflows';
 
 export const WorkflowLibrarySideNav = () => {
   const { t } = useTranslation();
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const multiuserEnabled = setupStatus?.multiuser_enabled ?? false;
 
   return (
     <Flex h="full" minH={0} overflow="hidden" flexDir="column" w={64} gap={0}>
       <Flex flexDir="column" w="full" pb={2} gap={2}>
         <WorkflowLibraryViewButton view="recent">{t('workflows.recentlyOpened')}</WorkflowLibraryViewButton>
         <YourWorkflowsButton />
+        {multiuserEnabled && (
+          <WorkflowLibraryViewButton view="shared">{t('workflows.sharedWorkflows')}</WorkflowLibraryViewButton>
+        )}
       </Flex>
       <Flex h="full" minH={0} overflow="hidden" flexDir="column">
         <BrowseWorkflowsButton />

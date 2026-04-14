@@ -42,7 +42,7 @@ import type {
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
-import { hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
+import { getExternalPanelControl, hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
 import type { AnyModelConfigWithExternal } from 'services/api/types';
@@ -88,6 +88,9 @@ const slice = createSlice({
     },
     setZImageScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
       state.zImageScheduler = action.payload;
+    },
+    setZImageShift: (state, action: PayloadAction<number | null>) => {
+      state.zImageShift = action.payload;
     },
     setZImageSeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
       state.zImageSeedVarianceEnabled = action.payload;
@@ -214,6 +217,33 @@ const slice = createSlice({
       }
       state.zImageQwen3SourceModel = result.data;
     },
+    animaVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.animaVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaVaeModel = result.data;
+    },
+    animaQwen3EncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.animaQwen3EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaQwen3EncoderModel = result.data;
+    },
+    animaT5EncoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+      const result = zParamsState.shape.animaT5EncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.animaT5EncoderModel = result.data;
+    },
+    setAnimaScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
+      state.animaScheduler = action.payload;
+    },
     kleinVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
       const result = zParamsState.shape.kleinVaeModel.safeParse(action.payload);
       if (!result.success) {
@@ -230,6 +260,19 @@ const slice = createSlice({
         return;
       }
       state.kleinQwen3EncoderModel = result.data;
+    },
+    qwenImageComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.qwenImageComponentSource.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageComponentSource = result.data;
+    },
+    qwenImageQuantizationChanged: (state, action: PayloadAction<'none' | 'int8' | 'nf4'>) => {
+      state.qwenImageQuantization = action.payload;
+    },
+    qwenImageShiftChanged: (state, action: PayloadAction<number | null>) => {
+      state.qwenImageShift = action.payload;
     },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
@@ -366,21 +409,30 @@ const slice = createSlice({
     aspectRatioLockToggled: (state) => {
       state.dimensions.aspectRatio.isLocked = !state.dimensions.aspectRatio.isLocked;
     },
-    aspectRatioIdChanged: (state, action: PayloadAction<{ id: AspectRatioID }>) => {
-      const { id } = action.payload;
+    aspectRatioIdChanged: (
+      state,
+      action: PayloadAction<{ id: AspectRatioID; fixedSize?: { width: number; height: number } }>
+    ) => {
+      const { id, fixedSize } = action.payload;
       state.dimensions.aspectRatio.id = id;
       if (id === 'Free') {
         state.dimensions.aspectRatio.isLocked = false;
       } else {
         state.dimensions.aspectRatio.isLocked = true;
-        state.dimensions.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
-        const { width, height } = calculateNewSize(
-          state.dimensions.aspectRatio.value,
-          state.dimensions.width * state.dimensions.height,
-          state.model?.base as BaseModelType | undefined
-        );
-        state.dimensions.width = width;
-        state.dimensions.height = height;
+        if (fixedSize) {
+          state.dimensions.aspectRatio.value = fixedSize.width / fixedSize.height;
+          state.dimensions.width = fixedSize.width;
+          state.dimensions.height = fixedSize.height;
+        } else {
+          state.dimensions.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
+          const { width, height } = calculateNewSize(
+            state.dimensions.aspectRatio.value,
+            state.dimensions.width * state.dimensions.height,
+            state.model?.base as BaseModelType | undefined
+          );
+          state.dimensions.width = width;
+          state.dimensions.height = height;
+        }
       }
     },
     dimensionsSwapped: (state) => {
@@ -436,7 +488,40 @@ const slice = createSlice({
         state.dimensions.height = bboxDims.height;
       }
     },
+    imageSizeChanged: (state, action: PayloadAction<string | null>) => {
+      state.imageSize = action.payload;
+    },
+    openaiQualityChanged: (state, action: PayloadAction<'auto' | 'high' | 'medium' | 'low'>) => {
+      state.openaiQuality = action.payload;
+    },
+    openaiBackgroundChanged: (state, action: PayloadAction<'auto' | 'transparent' | 'opaque'>) => {
+      state.openaiBackground = action.payload;
+    },
+    openaiInputFidelityChanged: (state, action: PayloadAction<'low' | 'high' | null>) => {
+      state.openaiInputFidelity = action.payload;
+    },
+    geminiTemperatureChanged: (state, action: PayloadAction<number | null>) => {
+      state.geminiTemperature = action.payload;
+    },
+    geminiThinkingLevelChanged: (state, action: PayloadAction<'minimal' | 'high' | null>) => {
+      state.geminiThinkingLevel = action.payload;
+    },
+    resolutionPresetSelected: (
+      state,
+      action: PayloadAction<{ imageSize: string; aspectRatio: string; width: number; height: number }>
+    ) => {
+      const { imageSize, aspectRatio, width, height } = action.payload;
+      state.imageSize = imageSize;
+      state.dimensions.width = width;
+      state.dimensions.height = height;
+      state.dimensions.aspectRatio.id = aspectRatio as AspectRatioID;
+      state.dimensions.aspectRatio.value = width / height;
+      state.dimensions.aspectRatio.isLocked = true;
+    },
     paramsReset: (state) => resetState(state),
+    paramsRecalled: (_state, action: PayloadAction<ParamsState>) => {
+      return action.payload;
+    },
   },
   extraReducers(builder) {
     // Reset params state on logout to prevent user data leakage when switching users
@@ -492,8 +577,14 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.zImageVaeModel = oldState.zImageVaeModel;
   newState.zImageQwen3EncoderModel = oldState.zImageQwen3EncoderModel;
   newState.zImageQwen3SourceModel = oldState.zImageQwen3SourceModel;
+  newState.animaVaeModel = oldState.animaVaeModel;
+  newState.animaQwen3EncoderModel = oldState.animaQwen3EncoderModel;
+  newState.animaT5EncoderModel = oldState.animaT5EncoderModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
+  newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
+  newState.qwenImageQuantization = oldState.qwenImageQuantization;
+  newState.qwenImageShift = oldState.qwenImageShift;
   return newState;
 };
 
@@ -517,6 +608,7 @@ export const {
   setFluxDypeScale,
   setFluxDypeExponent,
   setZImageScheduler,
+  setZImageShift,
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
   setZImageSeedVarianceRandomizePercent,
@@ -540,6 +632,9 @@ export const {
   zImageQwen3SourceModelSelected,
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
+  qwenImageComponentSourceSelected,
+  qwenImageQuantizationChanged,
+  qwenImageShiftChanged,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   setColorCompensation,
@@ -567,7 +662,18 @@ export const {
   sizeOptimized,
   syncedToOptimalDimension,
 
+  resolutionPresetSelected,
   paramsReset,
+  openaiQualityChanged,
+  openaiBackgroundChanged,
+  openaiInputFidelityChanged,
+  geminiTemperatureChanged,
+  geminiThinkingLevelChanged,
+  paramsRecalled,
+  animaVaeModelSelected,
+  animaQwen3EncoderModelSelected,
+  animaT5EncoderModelSelected,
+  setAnimaScheduler,
 } = slice.actions;
 
 export const paramsSliceConfig: SliceConfig<typeof slice> = {
@@ -605,8 +711,10 @@ export const selectIsFLUX = createParamsSelector((params) => params.model?.base 
 export const selectIsSD3 = createParamsSelector((params) => params.model?.base === 'sd-3');
 export const selectIsCogView4 = createParamsSelector((params) => params.model?.base === 'cogview4');
 export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
+export const selectIsAnima = createParamsSelector((params) => params.model?.base === 'anima');
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
 export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
+export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -627,8 +735,15 @@ export const selectCLIPGEmbedModel = createParamsSelector((params) => params.cli
 export const selectZImageVaeModel = createParamsSelector((params) => params.zImageVaeModel);
 export const selectZImageQwen3EncoderModel = createParamsSelector((params) => params.zImageQwen3EncoderModel);
 export const selectZImageQwen3SourceModel = createParamsSelector((params) => params.zImageQwen3SourceModel);
+export const selectAnimaVaeModel = createParamsSelector((params) => params.animaVaeModel);
+export const selectAnimaQwen3EncoderModel = createParamsSelector((params) => params.animaQwen3EncoderModel);
+export const selectAnimaT5EncoderModel = createParamsSelector((params) => params.animaT5EncoderModel);
+export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
+export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
+export const selectQwenImageQuantization = createParamsSelector((params) => params.qwenImageQuantization);
+export const selectQwenImageShift = createParamsSelector((params) => params.qwenImageShift);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);
@@ -669,22 +784,15 @@ export const selectModelConfig = createSelector(
   }
 );
 export const selectHasNegativePrompt = createParamsSelector((params) => params.negativePrompt !== null);
-export const selectModelSupportsNegativePrompt = createSelector(
-  selectModel,
-  selectModelConfig,
-  (model, modelConfig) => {
-    if (!model) {
-      return false;
-    }
-    if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-      return hasExternalPanelControl(modelConfig, 'prompts', 'negative_prompt');
-    }
-    if (model.base === 'external') {
-      return false;
-    }
-    return SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base);
+export const selectModelSupportsNegativePrompt = createSelector(selectModel, (model) => {
+  if (!model) {
+    return false;
   }
-);
+  if (model.base === 'external') {
+    return false;
+  }
+  return SUPPORTS_NEGATIVE_PROMPT_BASE_MODELS.includes(model.base);
+});
 export const selectModelSupportsRefImages = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
   if (!model) {
     return false;
@@ -701,12 +809,12 @@ export const selectModelSupportsOptimizedDenoising = createSelector(
   selectModel,
   (model) => !!model && model.base !== 'external' && SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS.includes(model.base)
 );
-export const selectModelSupportsGuidance = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+export const selectModelSupportsGuidance = createSelector(selectModel, (model) => {
   if (!model) {
     return false;
   }
-  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-    return hasExternalPanelControl(modelConfig, 'generation', 'guidance');
+  if (model.base === 'external') {
+    return false;
   }
   return true;
 });
@@ -719,12 +827,12 @@ export const selectModelSupportsSeed = createSelector(selectModel, selectModelCo
   }
   return true;
 });
-export const selectModelSupportsSteps = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
+export const selectModelSupportsSteps = createSelector(selectModel, (model) => {
   if (!model) {
     return false;
   }
-  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
-    return hasExternalPanelControl(modelConfig, 'generation', 'steps');
+  if (model.base === 'external') {
+    return false;
   }
   return true;
 });
@@ -737,12 +845,19 @@ export const selectModelSupportsDimensions = createSelector(selectModel, selectM
   }
   return true;
 });
+export const selectSeedControl = createSelector(selectModelConfig, (modelConfig) => {
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return getExternalPanelControl(modelConfig, 'image', 'seed');
+  }
+  return null;
+});
 export const selectScheduler = createParamsSelector((params) => params.scheduler);
 export const selectFluxScheduler = createParamsSelector((params) => params.fluxScheduler);
 export const selectFluxDypePreset = createParamsSelector((params) => params.fluxDypePreset);
 export const selectFluxDypeScale = createParamsSelector((params) => params.fluxDypeScale);
 export const selectFluxDypeExponent = createParamsSelector((params) => params.fluxDypeExponent);
 export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
+export const selectZImageShift = createParamsSelector((params) => params.zImageShift);
 export const selectZImageSeedVarianceEnabled = createParamsSelector((params) => params.zImageSeedVarianceEnabled);
 export const selectZImageSeedVarianceStrength = createParamsSelector((params) => params.zImageSeedVarianceStrength);
 export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(
@@ -785,6 +900,35 @@ export const selectAllowedAspectRatioIDs = createSelector(selectModelConfig, (mo
   }
   const allowed = modelConfig.capabilities.allowed_aspect_ratios;
   return allowed?.length ? allowed : null;
+});
+export const selectAspectRatioSizes = createSelector(selectModelConfig, (modelConfig) => {
+  if (!modelConfig || !isExternalApiModelConfig(modelConfig)) {
+    return null;
+  }
+  return modelConfig.capabilities.aspect_ratio_sizes ?? null;
+});
+export const selectResolutionPresets = createSelector(selectModelConfig, (modelConfig) => {
+  if (!modelConfig || !isExternalApiModelConfig(modelConfig)) {
+    return null;
+  }
+  return modelConfig.capabilities.resolution_presets ?? null;
+});
+export const selectHasFixedDimensionSizes = createSelector(
+  selectAspectRatioSizes,
+  selectResolutionPresets,
+  (sizes, presets) => sizes !== null || (presets !== null && presets.length > 0)
+);
+export const selectImageSize = createParamsSelector((params) => params.imageSize);
+export const selectOpenaiQuality = createParamsSelector((params) => params.openaiQuality);
+export const selectOpenaiBackground = createParamsSelector((params) => params.openaiBackground);
+export const selectOpenaiInputFidelity = createParamsSelector((params) => params.openaiInputFidelity);
+export const selectGeminiTemperature = createParamsSelector((params) => params.geminiTemperature);
+export const selectGeminiThinkingLevel = createParamsSelector((params) => params.geminiThinkingLevel);
+export const selectExternalProviderId = createSelector(selectModelConfig, (modelConfig) => {
+  if (modelConfig && isExternalApiModelConfig(modelConfig)) {
+    return modelConfig.provider_id;
+  }
+  return null;
 });
 
 export const selectMainModelConfig = createSelector(selectModelConfig, (modelConfig) => {

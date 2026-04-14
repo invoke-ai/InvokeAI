@@ -40,10 +40,8 @@ def _build_model(provider_id: str, provider_model_id: str) -> ExternalApiModelCo
         provider_model_id=provider_model_id,
         capabilities=ExternalModelCapabilities(
             modes=["txt2img", "img2img", "inpaint"],
-            supports_negative_prompt=True,
             supports_reference_images=True,
             supports_seed=True,
-            supports_guidance=True,
         ),
     )
 
@@ -59,13 +57,11 @@ def _build_request(
         model=model,
         mode=mode,  # type: ignore[arg-type]
         prompt="A test prompt",
-        negative_prompt="",
         seed=123,
         num_images=1,
         width=256,
         height=256,
-        steps=20,
-        guidance=5.5,
+        image_size=None,
         init_image=init_image,
         mask_image=mask_image,
         reference_images=reference_images or [],
@@ -83,7 +79,7 @@ def test_gemini_generate_success(monkeypatch: pytest.MonkeyPatch) -> None:
     request = _build_request(
         model,
         init_image=init_image,
-        reference_images=[ExternalReferenceImage(image=ref_image, weight=0.6)],
+        reference_images=[ExternalReferenceImage(image=ref_image)],
     )
     encoded = encode_image_base64(_make_image("green"))
     captured: dict[str, object] = {}

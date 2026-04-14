@@ -11,8 +11,6 @@ from invokeai.backend.model_manager.configs.external_api import ExternalApiModel
 @dataclass(frozen=True)
 class ExternalReferenceImage:
     image: PILImageType
-    weight: float | None = None
-    mode: str | None = None
 
 
 @dataclass(frozen=True)
@@ -20,17 +18,16 @@ class ExternalGenerationRequest:
     model: ExternalApiModelConfig
     mode: ExternalGenerationMode
     prompt: str
-    negative_prompt: str | None
     seed: int | None
     num_images: int
     width: int
     height: int
-    steps: int | None
-    guidance: float | None
+    image_size: str | None
     init_image: PILImageType | None
     mask_image: PILImageType | None
     reference_images: list[ExternalReferenceImage]
     metadata: dict[str, Any] | None
+    provider_options: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

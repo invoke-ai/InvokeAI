@@ -70,7 +70,7 @@ from invokeai.backend.util.devices import TorchDevice
     "flux_denoise",
     title="FLUX Denoise",
     tags=["image", "flux"],
-    category="image",
+    category="latents",
     version="4.5.1",
 )
 class FluxDenoiseInvocation(BaseInvocation):

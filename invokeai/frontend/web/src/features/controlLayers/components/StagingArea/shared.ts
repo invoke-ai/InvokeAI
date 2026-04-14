@@ -14,25 +14,31 @@ export const getProgressMessage = (data?: S['InvocationProgressEvent'] | null) =
 export const DROP_SHADOW = 'drop-shadow(0px 0px 4px rgb(0, 0, 0)) drop-shadow(0px 0px 4px rgba(0, 0, 0, 0.3))';
 
 export const getQueueItemElementId = (index: number) => `queue-item-preview-${index}`;
+export const STAGING_AREA_THUMBNAIL_STRIP_HEIGHT = '72px';
 
-export const getOutputImageName = (item: S['SessionQueueItem']) => {
-  const nodeId = Object.entries(item.session.source_prepared_mapping).find(([nodeId]) =>
-    isCanvasOutputNodeId(nodeId)
-  )?.[1][0];
-  const output = nodeId ? item.session.results[nodeId] : undefined;
+export const getOutputImageNames = (item: S['SessionQueueItem']): string[] => {
+  const imageNames: string[] = [];
 
-  if (!output) {
-    return null;
+  for (const [sourceNodeId, preparedNodeIds] of Object.entries(item.session.source_prepared_mapping)) {
+    if (!isCanvasOutputNodeId(sourceNodeId)) {
+      continue;
+    }
+    const nodeId = preparedNodeIds[0];
+    const output = nodeId ? item.session.results[nodeId] : undefined;
+    if (!output) {
+      continue;
+    }
+    for (const [_name, value] of objectEntries(output)) {
+      if (isImageField(value)) {
+        imageNames.push(value.image_name);
+      }
+      if (isImageFieldCollection(value)) {
+        for (const img of value) {
+          imageNames.push(img.image_name);
+        }
+      }
+    }
   }
 
-  for (const [_name, value] of objectEntries(output)) {
-    if (isImageField(value)) {
-      return value.image_name;
-    }
-    if (isImageFieldCollection(value)) {
-      return value[0]?.image_name ?? null;
-    }
-  }
-
-  return null;
+  return imageNames;
 };

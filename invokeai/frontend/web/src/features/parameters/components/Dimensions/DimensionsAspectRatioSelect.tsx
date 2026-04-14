@@ -5,6 +5,7 @@ import {
   aspectRatioIdChanged,
   selectAllowedAspectRatioIDs,
   selectAspectRatioID,
+  selectAspectRatioSizes,
 } from 'features/controlLayers/store/paramsSlice';
 import { isAspectRatioID, zAspectRatioID } from 'features/controlLayers/store/types';
 import type { ChangeEventHandler } from 'react';
@@ -17,6 +18,7 @@ export const DimensionsAspectRatioSelect = memo(() => {
   const dispatch = useAppDispatch();
   const id = useAppSelector(selectAspectRatioID);
   const allowedAspectRatios = useAppSelector(selectAllowedAspectRatioIDs);
+  const aspectRatioSizes = useAppSelector(selectAspectRatioSizes);
   const options = allowedAspectRatios ?? zAspectRatioID.options;
 
   const onChange = useCallback<ChangeEventHandler<HTMLSelectElement>>(
@@ -24,9 +26,10 @@ export const DimensionsAspectRatioSelect = memo(() => {
       if (!isAspectRatioID(e.target.value)) {
         return;
       }
-      dispatch(aspectRatioIdChanged({ id: e.target.value }));
+      const fixedSize = aspectRatioSizes?.[e.target.value] ?? undefined;
+      dispatch(aspectRatioIdChanged({ id: e.target.value, fixedSize }));
     },
-    [dispatch]
+    [dispatch, aspectRatioSizes]
   );
 
   return (

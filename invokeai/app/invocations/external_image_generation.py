@@ -1,4 +1,4 @@
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import (
@@ -34,18 +34,18 @@ class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBo
     )
     mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode")
     prompt: str = InputField(description="Prompt")
-    negative_prompt: str | None = InputField(default=None, description="Negative prompt")
     seed: int | None = InputField(default=None, description=FieldDescriptions.seed)
     num_images: int = InputField(default=1, gt=0, description="Number of images to generate")
     width: int = InputField(default=1024, gt=0, description=FieldDescriptions.width)
     height: int = InputField(default=1024, gt=0, description=FieldDescriptions.height)
-    steps: int | None = InputField(default=None, gt=0, description=FieldDescriptions.steps)
-    guidance: float | None = InputField(default=None, ge=0, description="Guidance strength")
+    image_size: str | None = InputField(default=None, description="Image size preset (e.g. 1K, 2K, 4K)")
     init_image: ImageField | None = InputField(default=None, description="Init image for img2img/inpaint")
     mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint")
     reference_images: list[ImageField] = InputField(default=[], description="Reference images")
-    reference_image_weights: list[float] | None = InputField(default=None, description="Reference image weights")
-    reference_image_modes: list[str] | None = InputField(default=None, description="Reference image modes")
+
+    def _build_provider_options(self) -> dict[str, Any] | None:
+        """Override in provider-specific subclasses to pass extra options."""
+        return None
 
     def invoke(self, context: InvocationContext) -> ImageCollectionOutput:
         model_config = context.models.get_config(self.model)
@@ -65,38 +65,25 @@ class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBo
         if self.mask_image is not None:
             mask_image = context.images.get_pil(self.mask_image.image_name, mode="L")
 
-        if self.reference_image_weights is not None and len(self.reference_image_weights) != len(self.reference_images):
-            raise ValueError("reference_image_weights must match reference_images length")
-
-        if self.reference_image_modes is not None and len(self.reference_image_modes) != len(self.reference_images):
-            raise ValueError("reference_image_modes must match reference_images length")
-
         reference_images: list[ExternalReferenceImage] = []
-        for index, image_field in enumerate(self.reference_images):
+        for image_field in self.reference_images:
             reference_image = context.images.get_pil(image_field.image_name, mode="RGB")
-            weight = None
-            mode = None
-            if self.reference_image_weights is not None:
-                weight = self.reference_image_weights[index]
-            if self.reference_image_modes is not None:
-                mode = self.reference_image_modes[index]
-            reference_images.append(ExternalReferenceImage(image=reference_image, weight=weight, mode=mode))
+            reference_images.append(ExternalReferenceImage(image=reference_image))
 
         request = ExternalGenerationRequest(
             model=model_config,
             mode=self.mode,
             prompt=self.prompt,
-            negative_prompt=self.negative_prompt,
             seed=self.seed,
             num_images=self.num_images,
             width=self.width,
             height=self.height,
-            steps=self.steps,
-            guidance=self.guidance,
+            image_size=self.image_size,
             init_image=init_image,
             mask_image=mask_image,
             reference_images=reference_images,
             metadata=self._build_request_metadata(),
+            provider_options=self._build_provider_options(),
         )
 
         result = context._services.external_generation.generate(request)
@@ -172,6 +159,23 @@ class OpenAIImageGenerationInvocation(BaseExternalImageGenerationInvocation):
 
     provider_id = "openai"
 
+    quality: Literal["auto", "high", "medium", "low"] = InputField(default="auto", description="Output image quality")
+    background: Literal["auto", "transparent", "opaque"] = InputField(
+        default="auto", description="Background transparency handling"
+    )
+    input_fidelity: Literal["low", "high"] | None = InputField(
+        default=None, description="Fidelity to source images (edits only)"
+    )
+
+    def _build_provider_options(self) -> dict[str, Any]:
+        options: dict[str, Any] = {
+            "quality": self.quality,
+            "background": self.background,
+        }
+        if self.input_fidelity is not None:
+            options["input_fidelity"] = self.input_fidelity
+        return options
+
 
 @invocation(
     "gemini_image_generation",
@@ -184,3 +188,16 @@ class GeminiImageGenerationInvocation(BaseExternalImageGenerationInvocation):
     """Generate images using a Gemini-hosted external model."""
 
     provider_id = "gemini"
+
+    temperature: float | None = InputField(default=None, ge=0.0, le=2.0, description="Sampling temperature")
+    thinking_level: Literal["minimal", "high"] | None = InputField(
+        default=None, description="Thinking level for image generation"
+    )
+
+    def _build_provider_options(self) -> dict[str, Any] | None:
+        options: dict[str, Any] = {}
+        if self.temperature is not None:
+            options["temperature"] = self.temperature
+        if self.thinking_level is not None:
+            options["thinking_level"] = self.thinking_level
+        return options or None

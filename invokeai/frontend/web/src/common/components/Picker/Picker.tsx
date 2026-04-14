@@ -867,7 +867,7 @@ const GroupToggleButtons = typedMemo(<T extends object>() => {
   }
 
   return (
-    <Flex gap={2} alignItems="center">
+    <Flex gap={2} alignItems="center" flexWrap="wrap">
       {groups.map((group) => (
         <GroupToggleButton key={group.id} group={group} />
       ))}
@@ -927,6 +927,7 @@ const GroupToggleButton = typedMemo(<T extends object>({ group }: { group: Group
       size="xs"
       variant="solid"
       userSelect="none"
+      flexShrink={0}
       bg={bg}
       color={color}
       borderColor={groupColor}

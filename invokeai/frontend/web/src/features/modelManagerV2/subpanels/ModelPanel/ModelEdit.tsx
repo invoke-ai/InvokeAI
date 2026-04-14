@@ -242,20 +242,12 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
                     </Flex>
                   </FormControl>
                   <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                    <FormLabel>{t('modelManager.supportsNegativePrompt')}</FormLabel>
-                    <Checkbox {...form.register('capabilities.supports_negative_prompt')} />
-                  </FormControl>
-                  <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                     <FormLabel>{t('modelManager.supportsReferenceImages')}</FormLabel>
                     <Checkbox {...form.register('capabilities.supports_reference_images')} />
                   </FormControl>
                   <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                     <FormLabel>{t('modelManager.supportsSeed')}</FormLabel>
                     <Checkbox {...form.register('capabilities.supports_seed')} />
-                  </FormControl>
-                  <FormControl flexDir="column" alignItems="flex-start" gap={1}>
-                    <FormLabel>{t('modelManager.supportsGuidance')}</FormLabel>
-                    <Checkbox {...form.register('capabilities.supports_guidance')} />
                   </FormControl>
                   <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                     <FormLabel>{t('modelManager.maxImagesPerRequest')}</FormLabel>

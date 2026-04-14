@@ -22,9 +22,7 @@ const createExternalModel = (overrides: Partial<ExternalApiModelConfig> = {}): E
   capabilities: {
     modes: ['txt2img'],
     supports_reference_images: false,
-    supports_negative_prompt: true,
     supports_seed: true,
-    supports_guidance: true,
     max_images_per_request: 1,
     max_image_size: null,
     allowed_aspect_ratios: ['1:1', '16:9'],

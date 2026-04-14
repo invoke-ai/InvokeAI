@@ -83,9 +83,9 @@ def test_model_manager_external_config_preserves_custom_panel_schema(
         name="External Custom Schema",
         provider_id="custom",
         provider_model_id="custom-model",
-        capabilities=ExternalModelCapabilities(modes=["txt2img"], supports_negative_prompt=True),
+        capabilities=ExternalModelCapabilities(modes=["txt2img"]),
         panel_schema=ExternalModelPanelSchema(
-            prompts=[{"name": "negative_prompt"}],
+            prompts=[{"name": "reference_images"}],
             image=[{"name": "dimensions"}],
         ),
         source="external://custom/custom-model",
@@ -104,7 +104,7 @@ def test_model_manager_external_config_preserves_custom_panel_schema(
 
     assert response.status_code == 200
     payload = response.json()
-    assert [control["name"] for control in payload["panel_schema"]["prompts"]] == ["negative_prompt"]
+    assert [control["name"] for control in payload["panel_schema"]["prompts"]] == ["reference_images"]
     assert [control["name"] for control in payload["panel_schema"]["image"]] == ["dimensions"]
 
 
@@ -118,10 +118,7 @@ def test_model_manager_external_starter_model_applies_panel_schema_overrides(
         provider_model_id="gpt-image-1",
         capabilities=ExternalModelCapabilities(
             modes=["txt2img"],
-            supports_negative_prompt=True,
             supports_reference_images=False,
-            supports_guidance=True,
-            supports_steps=True,
         ),
     )
     mm2_model_manager.store.add_model(config)

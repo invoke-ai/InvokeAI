@@ -3,19 +3,19 @@ import logging
 import pytest
 from PIL import Image
 
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.external_generation.errors import (
     ExternalProviderCapabilityError,
     ExternalProviderNotConfiguredError,
     ExternalProviderNotFoundError,
 )
+from invokeai.app.services.external_generation.external_generation_base import ExternalProvider
 from invokeai.app.services.external_generation.external_generation_common import (
     ExternalGeneratedImage,
     ExternalGenerationRequest,
     ExternalGenerationResult,
     ExternalReferenceImage,
 )
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.external_generation.external_generation_base import ExternalProvider
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
@@ -55,10 +55,8 @@ def _build_request(
     *,
     model: ExternalApiModelConfig,
     mode: str = "txt2img",
-    negative_prompt: str | None = None,
     seed: int | None = None,
     num_images: int = 1,
-    guidance: float | None = None,
     width: int = 64,
     height: int = 64,
     init_image: Image.Image | None = None,
@@ -69,13 +67,11 @@ def _build_request(
         model=model,
         mode=mode,  # type: ignore[arg-type]
         prompt="A test prompt",
-        negative_prompt=negative_prompt,
         seed=seed,
         num_images=num_images,
         width=width,
         height=height,
-        steps=10,
-        guidance=guidance,
+        image_size=None,
         init_image=init_image,
         mask_image=mask_image,
         reference_images=reference_images or [],
@@ -116,16 +112,6 @@ def test_generate_validates_mode_support() -> None:
         service.generate(request)
 
 
-def test_generate_validates_negative_prompt_support() -> None:
-    model = _build_model(ExternalModelCapabilities(modes=["txt2img"], supports_negative_prompt=False))
-    request = _build_request(model=model, negative_prompt="bad")
-    provider = DummyProvider("openai", configured=True, result=ExternalGenerationResult(images=[]))
-    service = ExternalGenerationService({"openai": provider}, logging.getLogger("test"))
-
-    with pytest.raises(ExternalProviderCapabilityError, match="Negative prompts"):
-        service.generate(request)
-
-
 def test_generate_requires_init_image_for_img2img() -> None:
     model = _build_model(ExternalModelCapabilities(modes=["img2img"]))
     request = _build_request(model=model, mode="img2img")
@@ -150,7 +136,7 @@ def test_generate_validates_reference_images() -> None:
     model = _build_model(ExternalModelCapabilities(modes=["txt2img"], supports_reference_images=False))
     request = _build_request(
         model=model,
-        reference_images=[ExternalReferenceImage(image=_make_image(), weight=0.8)],
+        reference_images=[ExternalReferenceImage(image=_make_image())],
     )
     provider = DummyProvider("openai", configured=True, result=ExternalGenerationResult(images=[]))
     service = ExternalGenerationService({"openai": provider}, logging.getLogger("test"))
@@ -229,10 +215,8 @@ def test_generate_validates_allowed_aspect_ratios_with_bucket_sizes() -> None:
 
 
 def test_generate_happy_path() -> None:
-    model = _build_model(
-        ExternalModelCapabilities(modes=["txt2img"], supports_negative_prompt=True, supports_seed=True)
-    )
-    request = _build_request(model=model, negative_prompt="", seed=42)
+    model = _build_model(ExternalModelCapabilities(modes=["txt2img"], supports_seed=True))
+    request = _build_request(model=model, seed=42)
     result = ExternalGenerationResult(images=[ExternalGeneratedImage(image=_make_image(), seed=42)])
     provider = DummyProvider("openai", configured=True, result=result)
     service = ExternalGenerationService({"openai": provider}, logging.getLogger("test"))

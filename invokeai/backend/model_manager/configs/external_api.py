@@ -9,10 +9,20 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, 
 
 ExternalGenerationMode = Literal["txt2img", "img2img", "inpaint"]
 ExternalMaskFormat = Literal["alpha", "binary", "none"]
-ExternalPanelControlName = Literal["negative_prompt", "reference_images", "dimensions", "seed", "steps", "guidance"]
+ExternalPanelControlName = Literal["reference_images", "dimensions", "seed"]
 
 
 class ExternalImageSize(BaseModel):
+    width: int = Field(gt=0)
+    height: int = Field(gt=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExternalResolutionPreset(BaseModel):
+    label: str = Field(min_length=1, description="Display label, e.g. '1:1 (1K)'")
+    aspect_ratio: str = Field(min_length=1, description="Aspect ratio string, e.g. '1:1'")
+    image_size: str = Field(min_length=1, description="Image size preset, e.g. '1K'")
     width: int = Field(gt=0)
     height: int = Field(gt=0)
 
@@ -30,6 +40,7 @@ class ExternalModelCapabilities(BaseModel):
     max_image_size: ExternalImageSize | None = Field(default=None)
     allowed_aspect_ratios: list[str] | None = Field(default=None)
     aspect_ratio_sizes: dict[str, ExternalImageSize] | None = Field(default=None)
+    resolution_presets: list[ExternalResolutionPreset] | None = Field(default=None)
     max_reference_images: int | None = Field(default=None, gt=0)
     mask_format: ExternalMaskFormat = Field(default="none")
     input_image_required_for: list[ExternalGenerationMode] | None = Field(default=None)
@@ -40,8 +51,6 @@ class ExternalModelCapabilities(BaseModel):
 class ExternalApiModelDefaultSettings(BaseModel):
     width: int | None = Field(default=None, gt=0)
     height: int | None = Field(default=None, gt=0)
-    steps: int | None = Field(default=None, gt=0)
-    guidance: float | None = Field(default=None, gt=0)
     num_images: int | None = Field(default=None, gt=0)
 
     model_config = ConfigDict(extra="forbid")

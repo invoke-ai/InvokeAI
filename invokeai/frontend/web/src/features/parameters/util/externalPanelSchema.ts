@@ -11,21 +11,15 @@ type ExternalPanelName = keyof ExternalModelPanelSchema;
 const buildExternalPanelSchemaFromCapabilities = (
   capabilities: ExternalModelCapabilities
 ): ExternalModelPanelSchema => ({
-  prompts: [
-    ...(capabilities.supports_negative_prompt ? [{ name: 'negative_prompt' as const }] : []),
-    ...(capabilities.supports_reference_images ? [{ name: 'reference_images' as const }] : []),
-  ],
+  prompts: [...(capabilities.supports_reference_images ? [{ name: 'reference_images' as const }] : [])],
   image: [{ name: 'dimensions' }, ...(capabilities.supports_seed ? [{ name: 'seed' as const }] : [])],
-  generation: [
-    ...(capabilities.supports_steps ? [{ name: 'steps' as const }] : []),
-    ...(capabilities.supports_guidance ? [{ name: 'guidance' as const }] : []),
-  ],
+  generation: [],
 });
 
 const getExternalPanelSchema = (modelConfig: ExternalApiModelConfig): ExternalModelPanelSchema =>
   modelConfig.panel_schema ?? buildExternalPanelSchemaFromCapabilities(modelConfig.capabilities);
 
-const getExternalPanelControl = (
+export const getExternalPanelControl = (
   modelConfig: ExternalApiModelConfig,
   panel: ExternalPanelName,
   controlName: ExternalPanelControlName

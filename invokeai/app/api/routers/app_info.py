@@ -10,14 +10,15 @@ from fastapi import Body, HTTPException, Path
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
+from invokeai.app.api.auth_dependencies import AdminUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.config.config_default import (
-    DefaultInvokeAIAppConfig,
     EXTERNAL_PROVIDER_CONFIG_FIELDS,
+    DefaultInvokeAIAppConfig,
     InvokeAIAppConfig,
     get_config,
-    load_external_api_keys,
     load_and_migrate_config,
+    load_external_api_keys,
 )
 from invokeai.app.services.external_generation.external_generation_common import ExternalProviderStatus
 from invokeai.app.services.invocation_cache.invocation_cache_common import InvocationCacheStatus
@@ -103,11 +104,45 @@ EXTERNAL_PROVIDER_FIELDS: dict[str, tuple[str, str]] = {
 _EXTERNAL_PROVIDER_CONFIG_LOCK = Lock()
 
 
+class UpdateAppGenerationSettingsRequest(BaseModel):
+    """Writable generation-related app settings."""
+
+    max_queue_history: int | None = Field(
+        default=None,
+        ge=0,
+        description="Keep the last N completed, failed, and canceled queue items on startup. Set to 0 to prune all terminal items.",
+    )
+
+
 @app_router.get(
     "/runtime_config", operation_id="get_runtime_config", status_code=200, response_model=InvokeAIAppConfigWithSetFields
 )
 async def get_runtime_config() -> InvokeAIAppConfigWithSetFields:
     config = get_config()
+    return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=config)
+
+
+@app_router.patch(
+    "/runtime_config",
+    operation_id="update_runtime_config",
+    status_code=200,
+    response_model=InvokeAIAppConfigWithSetFields,
+)
+async def update_runtime_config(
+    _: AdminUserOrDefault,
+    changes: UpdateAppGenerationSettingsRequest = Body(description="Writable runtime configuration changes"),
+) -> InvokeAIAppConfigWithSetFields:
+    config = get_config()
+    update_dict = changes.model_dump(exclude_unset=True)
+    config.update_config(update_dict)
+
+    if config.config_file_path.exists():
+        persisted_config = load_and_migrate_config(config.config_file_path)
+    else:
+        persisted_config = DefaultInvokeAIAppConfig()
+
+    persisted_config.update_config(update_dict)
+    persisted_config.write_file(config.config_file_path)
     return InvokeAIAppConfigWithSetFields(set_fields=config.model_fields_set, config=config)
 
 

@@ -105,7 +105,7 @@ const zIPMethodV2 = z.enum(['full', 'style', 'composition', 'style_strong', 'sty
 export type IPMethodV2 = z.infer<typeof zIPMethodV2>;
 export const isIPMethodV2 = (v: unknown): v is IPMethodV2 => zIPMethodV2.safeParse(v).success;
 
-const _zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'gradient', 'view', 'bbox', 'colorPicker', 'text']);
+const _zTool = z.enum(['brush', 'eraser', 'move', 'rect', 'lasso', 'gradient', 'view', 'bbox', 'colorPicker', 'text']);
 export type Tool = z.infer<typeof _zTool>;
 
 const zPoints = z.array(z.number()).refine((points) => points.length % 2 === 0, {
@@ -260,6 +260,20 @@ const zCanvasRectState = z.object({
 });
 export type CanvasRectState = z.infer<typeof zCanvasRectState>;
 
+const zCanvasLassoCompositeOperation = z.enum(['source-over', 'destination-out']);
+
+const zCanvasLassoState = z.object({
+  id: zId,
+  type: z.literal('lasso'),
+  /**
+   * Points in the format [x1, y1, x2, y2, ...].
+   * The lasso tool always commits a closed contour.
+   */
+  points: zPoints,
+  compositeOperation: zCanvasLassoCompositeOperation.default('source-over'),
+});
+export type CanvasLassoState = z.infer<typeof zCanvasLassoState>;
+
 // Gradient state includes clip metadata so the tool can optionally clip to drag gesture.
 const zCanvasLinearGradientState = z.object({
   id: zId,
@@ -309,6 +323,7 @@ const zCanvasObjectState = z.union([
   zCanvasBrushLineState,
   zCanvasEraserLineState,
   zCanvasRectState,
+  zCanvasLassoState,
   zCanvasBrushLineWithPressureState,
   zCanvasEraserLineWithPressureState,
   zCanvasGradientState,
@@ -370,6 +385,13 @@ const zFlux2ReferenceImageConfig = z.object({
 });
 export type Flux2ReferenceImageConfig = z.infer<typeof zFlux2ReferenceImageConfig>;
 
+// Qwen Image Edit has built-in reference image support - no separate model needed
+const zQwenImageReferenceImageConfig = z.object({
+  type: z.literal('qwen_image_reference_image'),
+  image: zCroppableImageWithDims.nullable(),
+});
+export type QwenImageReferenceImageConfig = z.infer<typeof zQwenImageReferenceImageConfig>;
+
 const zCanvasEntityBase = z.object({
   id: zId,
   name: zName,
@@ -385,6 +407,7 @@ export const zRefImageState = z.object({
     zFLUXReduxConfig,
     zFluxKontextReferenceImageConfig,
     zFlux2ReferenceImageConfig,
+    zQwenImageReferenceImageConfig,
   ]),
 });
 export type RefImageState = z.infer<typeof zRefImageState>;
@@ -401,6 +424,10 @@ export const isFluxKontextReferenceImageConfig = (
 
 export const isFlux2ReferenceImageConfig = (config: RefImageState['config']): config is Flux2ReferenceImageConfig =>
   config.type === 'flux2_reference_image';
+
+export const isQwenImageReferenceImageConfig = (
+  config: RefImageState['config']
+): config is QwenImageReferenceImageConfig => config.type === 'qwen_image_reference_image';
 
 const zFillStyle = z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']);
 export type FillStyle = z.infer<typeof zFillStyle>;
@@ -636,19 +663,42 @@ export const zLoRA = z.object({
 });
 export type LoRA = z.infer<typeof zLoRA>;
 
-export const zAspectRatioID = z.enum(['Free', '21:9', '16:9', '3:2', '4:3', '1:1', '3:4', '2:3', '9:16', '9:21']);
+export const zAspectRatioID = z.enum([
+  'Free',
+  '8:1',
+  '4:1',
+  '21:9',
+  '16:9',
+  '3:2',
+  '5:4',
+  '4:3',
+  '1:1',
+  '3:4',
+  '4:5',
+  '2:3',
+  '9:16',
+  '1:4',
+  '9:21',
+  '1:8',
+]);
 export type AspectRatioID = z.infer<typeof zAspectRatioID>;
 export const isAspectRatioID = (v: unknown): v is AspectRatioID => zAspectRatioID.safeParse(v).success;
 export const ASPECT_RATIO_MAP: Record<Exclude<AspectRatioID, 'Free'>, { ratio: number; inverseID: AspectRatioID }> = {
+  '8:1': { ratio: 8 / 1, inverseID: '1:8' },
+  '4:1': { ratio: 4 / 1, inverseID: '1:4' },
   '21:9': { ratio: 21 / 9, inverseID: '9:21' },
   '16:9': { ratio: 16 / 9, inverseID: '9:16' },
   '3:2': { ratio: 3 / 2, inverseID: '2:3' },
+  '5:4': { ratio: 5 / 4, inverseID: '4:5' },
   '4:3': { ratio: 4 / 3, inverseID: '4:3' },
   '1:1': { ratio: 1, inverseID: '1:1' },
   '3:4': { ratio: 3 / 4, inverseID: '4:3' },
+  '4:5': { ratio: 4 / 5, inverseID: '5:4' },
   '2:3': { ratio: 2 / 3, inverseID: '3:2' },
   '9:16': { ratio: 9 / 16, inverseID: '16:9' },
+  '1:4': { ratio: 1 / 4, inverseID: '4:1' },
   '9:21': { ratio: 9 / 21, inverseID: '21:9' },
+  '1:8': { ratio: 1 / 8, inverseID: '8:1' },
 };
 
 const zAspectRatioConfig = z.object({
@@ -717,6 +767,7 @@ export const zParamsState = z.object({
   fluxDypeScale: zParameterFluxDypeScale,
   fluxDypeExponent: zParameterFluxDypeExponent,
   zImageScheduler: zParameterZImageScheduler,
+  zImageShift: z.number().min(0).max(3).nullable(),
   upscaleScheduler: zParameterScheduler,
   upscaleCfgScale: zParameterCFGScale,
   seed: zParameterSeed,
@@ -750,13 +801,30 @@ export const zParamsState = z.object({
   zImageVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX VAE
   zImageQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder
   zImageQwen3SourceModel: zParameterModel.nullable(), // Diffusers Z-Image model (fallback for VAE/Encoder)
+  // Anima model components - uses Qwen3 0.6B + T5-XXL tokenizer + QwenImage VAE
+  animaVaeModel: zParameterVAEModel.nullable(), // Optional: Separate QwenImage/FLUX VAE for Anima
+  animaQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 0.6B Encoder for Anima
+  animaT5EncoderModel: zModelIdentifierField.nullable(), // T5-XXL tokenizer for Anima LLM Adapter
+  animaScheduler: z.enum(['euler', 'heun', 'lcm']).default('euler'),
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
+  // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
+  qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
+  qwenImageQuantization: z.enum(['none', 'int8', 'nf4']), // BitsAndBytes quantization for Qwen VL encoder
+  qwenImageShift: z.number().nullable(), // Sigma schedule shift override (e.g. 3.0 for Lightning LoRAs)
   // Z-Image Seed Variance Enhancer settings
   zImageSeedVarianceEnabled: z.boolean(),
   zImageSeedVarianceStrength: z.number().min(0).max(2),
   zImageSeedVarianceRandomizePercent: z.number().min(1).max(100),
+  imageSize: z.string().nullable().default(null),
+  // OpenAI-specific external options
+  openaiQuality: z.enum(['auto', 'high', 'medium', 'low']).default('auto'),
+  openaiBackground: z.enum(['auto', 'transparent', 'opaque']).default('auto'),
+  openaiInputFidelity: z.enum(['low', 'high']).nullable().default(null),
+  // Gemini-specific external options
+  geminiTemperature: z.number().min(0).max(2).nullable().default(null),
+  geminiThinkingLevel: z.enum(['minimal', 'high']).nullable().default(null),
   dimensions: zDimensionsState,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
@@ -783,6 +851,7 @@ export const getInitialParamsState = (): ParamsState => ({
   fluxDypeScale: 2.0,
   fluxDypeExponent: 2.0,
   zImageScheduler: 'euler',
+  zImageShift: null,
   upscaleScheduler: 'kdpm_2',
   upscaleCfgScale: 2,
   seed: 0,
@@ -815,11 +884,24 @@ export const getInitialParamsState = (): ParamsState => ({
   zImageVaeModel: null,
   zImageQwen3EncoderModel: null,
   zImageQwen3SourceModel: null,
+  animaVaeModel: null,
+  animaQwen3EncoderModel: null,
+  animaT5EncoderModel: null,
+  animaScheduler: 'euler',
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
+  qwenImageComponentSource: null,
+  qwenImageQuantization: 'none' as const,
+  qwenImageShift: null,
   zImageSeedVarianceEnabled: false,
   zImageSeedVarianceStrength: 0.1,
   zImageSeedVarianceRandomizePercent: 50,
+  imageSize: null,
+  openaiQuality: 'auto',
+  openaiBackground: 'auto',
+  openaiInputFidelity: null,
+  geminiTemperature: null,
+  geminiThinkingLevel: null,
   dimensions: {
     width: 512,
     height: 512,
@@ -925,6 +1007,7 @@ export type EntityEraserLineAddedPayload = EntityIdentifierPayload<{
   eraserLine: CanvasEraserLineState | CanvasEraserLineWithPressureState;
 }>;
 export type EntityRectAddedPayload = EntityIdentifierPayload<{ rect: CanvasRectState }>;
+export type EntityLassoAddedPayload = EntityIdentifierPayload<{ lasso: CanvasLassoState }>;
 export type EntityGradientAddedPayload = EntityIdentifierPayload<{ gradient: CanvasGradientState }>;
 export type EntityRasterizedPayload = EntityIdentifierPayload<{
   imageObject: CanvasImageState;

@@ -547,6 +547,19 @@ class BulkDeleteModelsResponse(BaseModel):
     failed: List[dict] = Field(description="List of failed deletions with error messages")
 
 
+class BulkReidentifyModelsRequest(BaseModel):
+    """Request body for bulk model reidentification."""
+
+    keys: List[str] = Field(description="List of model keys to reidentify")
+
+
+class BulkReidentifyModelsResponse(BaseModel):
+    """Response body for bulk model reidentification."""
+
+    succeeded: List[str] = Field(description="List of successfully reidentified model keys")
+    failed: List[dict] = Field(description="List of failed reidentifications with error messages")
+
+
 @model_manager_router.post(
     "/i/bulk_delete",
     operation_id="bulk_delete_models",
@@ -586,6 +599,67 @@ async def bulk_delete_models(
 
     logger.info(f"Bulk delete completed: {len(deleted)} deleted, {len(failed)} failed")
     return BulkDeleteModelsResponse(deleted=deleted, failed=failed)
+
+
+@model_manager_router.post(
+    "/i/bulk_reidentify",
+    operation_id="bulk_reidentify_models",
+    responses={
+        200: {"description": "Models reidentified (possibly with some failures)"},
+    },
+    status_code=200,
+)
+async def bulk_reidentify_models(
+    current_admin: AdminUserOrDefault,
+    request: BulkReidentifyModelsRequest = Body(description="List of model keys to reidentify"),
+) -> BulkReidentifyModelsResponse:
+    """
+    Reidentify multiple models by re-probing their weights files.
+
+    Returns a list of successfully reidentified keys and failed reidentifications with error messages.
+    """
+    logger = ApiDependencies.invoker.services.logger
+    store = ApiDependencies.invoker.services.model_manager.store
+    models_path = ApiDependencies.invoker.services.configuration.models_path
+
+    succeeded = []
+    failed = []
+
+    for key in request.keys:
+        try:
+            config = store.get_model(key)
+            if pathlib.Path(config.path).is_relative_to(models_path):
+                model_path = pathlib.Path(config.path)
+            else:
+                model_path = models_path / config.path
+            mod = ModelOnDisk(model_path)
+            result = ModelConfigFactory.from_model_on_disk(mod)
+            if result.config is None:
+                raise InvalidModelException("Unable to identify model format")
+
+            # Retain user-editable fields from the original config
+            result.config.path = config.path
+            result.config.key = config.key
+            result.config.name = config.name
+            result.config.description = config.description
+            result.config.cover_image = config.cover_image
+            if hasattr(config, "trigger_phrases") and hasattr(result.config, "trigger_phrases"):
+                result.config.trigger_phrases = config.trigger_phrases
+            result.config.source = config.source
+            result.config.source_type = config.source_type
+
+            store.replace_model(config.key, result.config)
+            succeeded.append(key)
+            logger.info(f"Reidentified model: {key}")
+        except UnknownModelException as e:
+            logger.error(f"Failed to reidentify model {key}: {str(e)}")
+            failed.append({"key": key, "error": str(e)})
+        except Exception as e:
+            logger.error(f"Failed to reidentify model {key}: {str(e)}")
+            failed.append({"key": key, "error": str(e)})
+
+    logger.info(f"Bulk reidentify completed: {len(succeeded)} succeeded, {len(failed)} failed")
+    return BulkReidentifyModelsResponse(succeeded=succeeded, failed=failed)
 
 
 @model_manager_router.delete(
@@ -815,7 +889,7 @@ async def install_hugging_face_model(
     "/install",
     operation_id="list_model_installs",
 )
-async def list_model_installs() -> List[ModelInstallJob]:
+async def list_model_installs(current_admin: AdminUserOrDefault) -> List[ModelInstallJob]:
     """Return the list of model install jobs.
 
     Install jobs have a numeric `id`, a `status`, and other fields that provide information on
@@ -847,7 +921,9 @@ async def list_model_installs() -> List[ModelInstallJob]:
         404: {"description": "No such job"},
     },
 )
-async def get_model_install_job(id: int = Path(description="Model install id")) -> ModelInstallJob:
+async def get_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install id")
+) -> ModelInstallJob:
     """
     Return model install job corresponding to the given source. See the documentation for 'List Model Install Jobs'
     for information on the format of the return value.
@@ -890,7 +966,9 @@ async def cancel_model_install_job(
     },
     status_code=201,
 )
-async def pause_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+async def pause_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
+) -> ModelInstallJob:
     """Pause the model install job corresponding to the given job ID."""
     installer = ApiDependencies.invoker.services.model_manager.install
     try:
@@ -910,7 +988,9 @@ async def pause_model_install_job(id: int = Path(description="Model install job 
     },
     status_code=201,
 )
-async def resume_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+async def resume_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
+) -> ModelInstallJob:
     """Resume a paused model install job corresponding to the given job ID."""
     installer = ApiDependencies.invoker.services.model_manager.install
     try:
@@ -930,7 +1010,9 @@ async def resume_model_install_job(id: int = Path(description="Model install job
     },
     status_code=201,
 )
-async def restart_failed_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+async def restart_failed_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
+) -> ModelInstallJob:
     """Restart failed or non-resumable file downloads for the given job."""
     installer = ApiDependencies.invoker.services.model_manager.install
     try:
@@ -951,6 +1033,7 @@ async def restart_failed_model_install_job(id: int = Path(description="Model ins
     status_code=201,
 )
 async def restart_model_install_file(
+    current_admin: AdminUserOrDefault,
     id: int = Path(description="Model install job ID"),
     file_source: AnyHttpUrl = Body(description="File download URL to restart"),
 ) -> ModelInstallJob:
@@ -1262,7 +1345,7 @@ class DeleteOrphanedModelsResponse(BaseModel):
     operation_id="get_orphaned_models",
     response_model=list[OrphanedModelInfo],
 )
-async def get_orphaned_models() -> list[OrphanedModelInfo]:
+async def get_orphaned_models(_: AdminUserOrDefault) -> list[OrphanedModelInfo]:
     """Find orphaned model directories.
 
     Orphaned models are directories in the models folder that contain model files
@@ -1289,7 +1372,9 @@ async def get_orphaned_models() -> list[OrphanedModelInfo]:
     operation_id="delete_orphaned_models",
     response_model=DeleteOrphanedModelsResponse,
 )
-async def delete_orphaned_models(request: DeleteOrphanedModelsRequest) -> DeleteOrphanedModelsResponse:
+async def delete_orphaned_models(
+    request: DeleteOrphanedModelsRequest, _: AdminUserOrDefault
+) -> DeleteOrphanedModelsResponse:
     """Delete specified orphaned model directories.
 
     Args:

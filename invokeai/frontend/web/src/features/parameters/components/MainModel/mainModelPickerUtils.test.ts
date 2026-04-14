@@ -30,7 +30,6 @@ const createExternalConfig = (modes: ExternalModelCapabilities['modes']): Extern
     provider_model_id: 'gpt-image-1',
     capabilities: {
       modes,
-      supports_negative_prompt: true,
       supports_reference_images: false,
       max_image_size: maxImageSize,
     },

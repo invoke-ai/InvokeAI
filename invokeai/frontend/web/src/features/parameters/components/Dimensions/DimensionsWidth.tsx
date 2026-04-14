@@ -1,7 +1,7 @@
 import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
-import { selectWidth, widthChanged } from 'features/controlLayers/store/paramsSlice';
+import { selectHasFixedDimensionSizes, selectWidth, widthChanged } from 'features/controlLayers/store/paramsSlice';
 import { selectGridSize, selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -22,6 +22,7 @@ export const DimensionsWidth = memo(() => {
   const width = useAppSelector(selectWidth);
   const optimalDimension = useAppSelector(selectOptimalDimension);
   const gridSize = useAppSelector(selectGridSize);
+  const hasFixedSizes = useAppSelector(selectHasFixedDimensionSizes);
 
   const onChange = useCallback(
     (v: number) => {
@@ -33,7 +34,7 @@ export const DimensionsWidth = memo(() => {
   const marks = useMemo(() => [CONSTRAINTS.sliderMin, optimalDimension, CONSTRAINTS.sliderMax], [optimalDimension]);
 
   return (
-    <FormControl>
+    <FormControl isDisabled={hasFixedSizes}>
       <InformationalPopover feature="paramWidth">
         <FormLabel>{t('parameters.width')}</FormLabel>
       </InformationalPopover>

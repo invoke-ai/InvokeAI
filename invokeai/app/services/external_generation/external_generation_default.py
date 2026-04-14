@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from logging import Logger
 from typing import TYPE_CHECKING
 
@@ -10,6 +11,7 @@ from invokeai.app.services.external_generation.errors import (
     ExternalProviderCapabilityError,
     ExternalProviderNotConfiguredError,
     ExternalProviderNotFoundError,
+    ExternalProviderRateLimitError,
 )
 from invokeai.app.services.external_generation.external_generation_base import (
     ExternalGenerationServiceBase,
@@ -52,13 +54,37 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
         request = self._bucket_request(request)
 
         self._validate_request(request)
-        result = provider.generate(request)
+        result = self._generate_with_retry(provider, request)
 
         if resize_to_original_inpaint_size is None:
             return result
 
         width, height = resize_to_original_inpaint_size
         return _resize_result_images(result, width, height)
+
+    _MAX_RETRIES = 3
+    _DEFAULT_RETRY_DELAY = 10.0
+    _MAX_RETRY_DELAY = 60.0
+
+    def _generate_with_retry(
+        self, provider: ExternalProvider, request: ExternalGenerationRequest
+    ) -> ExternalGenerationResult:
+        for attempt in range(self._MAX_RETRIES):
+            try:
+                return provider.generate(request)
+            except ExternalProviderRateLimitError as exc:
+                if attempt == self._MAX_RETRIES - 1:
+                    raise
+                delay = min(exc.retry_after or self._DEFAULT_RETRY_DELAY, self._MAX_RETRY_DELAY)
+                self._logger.warning(
+                    "Rate limited by %s (attempt %d/%d), retrying in %.0fs",
+                    request.model.provider_id,
+                    attempt + 1,
+                    self._MAX_RETRIES,
+                    delay,
+                )
+                time.sleep(delay)
+        raise ExternalProviderRateLimitError("Rate limit exceeded after all retries")
 
     def get_provider_statuses(self) -> dict[str, ExternalProviderStatus]:
         return {provider_id: provider.get_status() for provider_id, provider in self._providers.items()}
@@ -77,14 +103,8 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
         if request.mode not in capabilities.modes:
             raise ExternalProviderCapabilityError(f"Mode '{request.mode}' is not supported by {request.model.name}")
 
-        if request.negative_prompt and not capabilities.supports_negative_prompt:
-            raise ExternalProviderCapabilityError(f"Negative prompts are not supported by {request.model.name}")
-
         if request.seed is not None and not capabilities.supports_seed:
             raise ExternalProviderCapabilityError(f"Seed control is not supported by {request.model.name}")
-
-        if request.guidance is not None and not capabilities.supports_guidance:
-            raise ExternalProviderCapabilityError(f"Guidance is not supported by {request.model.name}")
 
         if request.reference_images and not capabilities.supports_reference_images:
             raise ExternalProviderCapabilityError(f"Reference images are not supported by {request.model.name}")
@@ -159,17 +179,16 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
             model=record,
             mode=request.mode,
             prompt=request.prompt,
-            negative_prompt=request.negative_prompt,
             seed=request.seed,
             num_images=request.num_images,
             width=request.width,
             height=request.height,
-            steps=request.steps,
-            guidance=request.guidance,
+            image_size=request.image_size,
             init_image=request.init_image,
             mask_image=request.mask_image,
             reference_images=request.reference_images,
             metadata=request.metadata,
+            provider_options=request.provider_options,
         )
 
     def _bucket_request(self, request: ExternalGenerationRequest) -> ExternalGenerationRequest:
@@ -229,17 +248,16 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
             model=request.model,
             mode=request.mode,
             prompt=request.prompt,
-            negative_prompt=request.negative_prompt,
             seed=request.seed,
             num_images=request.num_images,
             width=width,
             height=height,
-            steps=request.steps,
-            guidance=request.guidance,
+            image_size=request.image_size,
             init_image=_resize_image(request.init_image, width, height, "RGB"),
             mask_image=_resize_image(request.mask_image, width, height, "L"),
             reference_images=request.reference_images,
             metadata=request.metadata,
+            provider_options=request.provider_options,
         )
 
 
