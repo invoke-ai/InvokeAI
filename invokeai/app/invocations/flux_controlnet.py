@@ -50,7 +50,7 @@ class FluxControlNetOutput(BaseInvocationOutput):
     "flux_controlnet",
     title="FLUX ControlNet",
     tags=["controlnet", "flux"],
-    category="controlnet",
+    category="conditioning",
     version="1.0.0",
 )
 class FluxControlNetInvocation(BaseInvocation):
