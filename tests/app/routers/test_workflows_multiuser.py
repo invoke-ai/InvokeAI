@@ -331,7 +331,7 @@ def test_workflow_has_user_id_and_is_public_fields(client: TestClient, user1_tok
     data = response.json()
     assert "user_id" in data
     assert "is_public" in data
-    assert data["is_public"] is True
+    assert data["is_public"] is False
 
 
 # ---------------------------------------------------------------------------
