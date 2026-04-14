@@ -1707,6 +1707,8 @@
         "enableNSFWChecker": "Enable NSFW Checker",
         "general": "General",
         "generation": "Generation",
+        "maxQueueHistory": "Max Queue History",
+        "maxQueueHistorySaveFailed": "Failed to save Max Queue History",
         "models": "Models",
         "preferAttentionStyleNumeric": "Prefer Numeric Attention Style",
         "prompt": "Prompt",
