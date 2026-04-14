@@ -577,12 +577,23 @@
     {
       "category": "GENERATION",
       "default": false,
-      "description": "Empties session queue on startup.",
+      "description": "Empties session queue on startup. If true, disables `max_queue_history`.",
       "env_var": "INVOKEAI_CLEAR_QUEUE_ON_STARTUP",
       "literal_values": [],
       "name": "clear_queue_on_startup",
       "required": false,
       "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": null,
+      "description": "Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.",
+      "env_var": "INVOKEAI_MAX_QUEUE_HISTORY",
+      "literal_values": [],
+      "name": "max_queue_history",
+      "required": false,
+      "type": "typing.Optional[int]",
       "validation": {}
     },
     {
