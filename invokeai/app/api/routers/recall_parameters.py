@@ -3,7 +3,7 @@
 import json
 from typing import Any, Literal, Optional
 
-from fastapi import Body, HTTPException, Path
+from fastapi import Body, HTTPException, Path, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -404,6 +404,10 @@ async def update_recall_parameters(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(..., description="The queue id to perform this operation on"),
     parameters: RecallParameter = Body(..., description="Recall parameters to update"),
+    strict: bool = Query(
+        default=False,
+        description="When true, parameters not included in the request are reset to their defaults (cleared).",
+    ),
 ) -> dict[str, Any]:
     """
     Update recallable parameters that can be recalled on the frontend.
@@ -415,21 +419,23 @@ async def update_recall_parameters(
     Args:
         queue_id: The queue ID to associate these parameters with
         parameters: The RecallParameter object containing the parameters to update
+        strict: When true, parameters not included in the request body are reset
+            to their defaults (cleared on the frontend).  Defaults to false,
+            which preserves the existing behaviour of only updating the
+            parameters that are explicitly provided.
 
     Returns:
         A dictionary containing the updated parameters and status
 
     Example:
-        POST /api/v1/recall/{queue_id}
+        POST /api/v1/recall/{queue_id}?strict=true
         {
             "positive_prompt": "a beautiful landscape",
             "model": "sd-1.5",
-            "steps": 20,
-            "cfg_scale": 7.5,
-            "width": 512,
-            "height": 512,
-            "seed": 12345
+            "steps": 20
         }
+        # In strict mode, all other parameters (reference_images, loras, etc.)
+        # are cleared.  In non-strict mode (default) they would be left as-is.
     """
     logger = ApiDependencies.invoker.services.logger
 
@@ -438,8 +444,18 @@ async def update_recall_parameters(
     _assert_recall_image_access(parameters, current_user)
 
     try:
-        # Get only the parameters that were actually provided (non-None values)
-        provided_params = {k: v for k, v in parameters.model_dump().items() if v is not None}
+        # In strict mode, include all parameters so the frontend clears anything
+        # not explicitly provided.  List-typed fields use [] instead of None so
+        # the frontend sees an empty collection rather than a null it might skip.
+        if strict:
+            _list_fields = {
+                name for name, field in RecallParameter.model_fields.items() if "list" in str(field.annotation).lower()
+            }
+            provided_params = {
+                k: ([] if v is None and k in _list_fields else v) for k, v in parameters.model_dump().items()
+            }
+        else:
+            provided_params = {k: v for k, v in parameters.model_dump().items() if v is not None}
 
         if not provided_params:
             return {"status": "no_parameters_provided", "updated_count": 0}

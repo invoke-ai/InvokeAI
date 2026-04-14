@@ -630,3 +630,64 @@ class TestCombinedRecall:
         params = response.json()["parameters"]
         assert params["positive_prompt"] == "x"
         assert "model" not in params
+
+
+class TestStrictMode:
+    """Regression tests for the ``strict`` query parameter.
+
+    When ``strict=True``, parameters not included in the request body must
+    be reset — list-typed fields to ``[]`` and scalar fields to ``None``.
+    """
+
+    def test_strict_clears_list_fields(
+        self, monkeypatch: Any, patched_dependencies: MockApiDependencies, client: TestClient
+    ) -> None:
+        """List fields (loras, control_layers, ip_adapters, reference_images) are
+        sent as empty lists when omitted in strict mode."""
+        monkeypatch.setattr(recall_module, "resolve_model_name_to_key", make_name_to_key_stub({}))
+
+        response = client.post(
+            "/api/v1/recall/default?strict=true",
+            json={"positive_prompt": "hello"},
+        )
+        assert response.status_code == 200
+        params = response.json()["parameters"]
+        assert params["positive_prompt"] == "hello"
+        assert params["loras"] == []
+        assert params["control_layers"] == []
+        assert params["ip_adapters"] == []
+        assert params["reference_images"] == []
+
+    def test_strict_clears_scalar_fields(
+        self, monkeypatch: Any, patched_dependencies: MockApiDependencies, client: TestClient
+    ) -> None:
+        """Scalar fields not in the request are sent as None in strict mode."""
+        monkeypatch.setattr(recall_module, "resolve_model_name_to_key", make_name_to_key_stub({}))
+
+        response = client.post(
+            "/api/v1/recall/default?strict=true",
+            json={"steps": 20},
+        )
+        assert response.status_code == 200
+        params = response.json()["parameters"]
+        assert params["steps"] == 20
+        assert params["positive_prompt"] is None
+        assert params["seed"] is None
+        assert params["loras"] == []
+
+    def test_non_strict_omits_unset_fields(
+        self, monkeypatch: Any, patched_dependencies: MockApiDependencies, client: TestClient
+    ) -> None:
+        """Default (non-strict) behaviour: unset fields are absent from the response."""
+        monkeypatch.setattr(recall_module, "resolve_model_name_to_key", make_name_to_key_stub({}))
+
+        response = client.post(
+            "/api/v1/recall/default",
+            json={"positive_prompt": "hello"},
+        )
+        assert response.status_code == 200
+        params = response.json()["parameters"]
+        assert params["positive_prompt"] == "hello"
+        assert "loras" not in params
+        assert "reference_images" not in params
+        assert "seed" not in params

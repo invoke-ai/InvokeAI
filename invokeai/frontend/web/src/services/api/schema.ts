@@ -2499,21 +2499,23 @@ export type paths = {
          *     Args:
          *         queue_id: The queue ID to associate these parameters with
          *         parameters: The RecallParameter object containing the parameters to update
+         *         strict: When true, parameters not included in the request body are reset
+         *             to their defaults (cleared on the frontend).  Defaults to false,
+         *             which preserves the existing behaviour of only updating the
+         *             parameters that are explicitly provided.
          *
          *     Returns:
          *         A dictionary containing the updated parameters and status
          *
          *     Example:
-         *         POST /api/v1/recall/{queue_id}
+         *         POST /api/v1/recall/{queue_id}?strict=true
          *         {
          *             "positive_prompt": "a beautiful landscape",
          *             "model": "sd-1.5",
-         *             "steps": 20,
-         *             "cfg_scale": 7.5,
-         *             "width": 512,
-         *             "height": 512,
-         *             "seed": 12345
+         *             "steps": 20
          *         }
+         *         # In strict mode, all other parameters (reference_images, loras, etc.)
+         *         # are cleared.  In non-strict mode (default) they would be left as-is.
          */
         post: operations["update_recall_parameters"];
         delete?: never;
@@ -35532,7 +35534,10 @@ export interface operations {
     };
     update_recall_parameters: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description When true, parameters not included in the request are reset to their defaults (cleared). */
+                strict?: boolean;
+            };
             header?: never;
             path: {
                 /** @description The queue id to perform this operation on */
