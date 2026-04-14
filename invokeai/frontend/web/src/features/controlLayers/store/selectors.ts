@@ -361,5 +361,9 @@ export const selectCanvasMetadata = createSelector(
  * This is used to determine the state of the toggle button that shows/hides all non-raster layers.
  */
 export const selectNonRasterLayersIsHidden = createSelector(selectCanvasSlice, (canvas) => {
-  return canvas.controlLayers.isHidden && canvas.inpaintMasks.isHidden && canvas.regionalGuidance.isHidden;
+  const areControlLayersEffectivelyHidden = canvas.controlLayers.entities.length === 0 || canvas.controlLayers.isHidden;
+  const areInpaintMasksEffectivelyHidden = canvas.inpaintMasks.entities.length === 0 || canvas.inpaintMasks.isHidden;
+  const areRegionalGuidanceEffectivelyHidden =
+    canvas.regionalGuidance.entities.length === 0 || canvas.regionalGuidance.isHidden;
+  return areControlLayersEffectivelyHidden && areInpaintMasksEffectivelyHidden && areRegionalGuidanceEffectivelyHidden;
 });

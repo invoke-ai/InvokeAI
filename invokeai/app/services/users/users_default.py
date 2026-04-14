@@ -256,6 +256,20 @@ class UserService(UserServiceBase):
             for row in rows
         ]
 
+    def get_admin_email(self) -> str | None:
+        """Get the email address of the first active admin user."""
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """
+                SELECT email FROM users
+                WHERE is_admin = TRUE AND is_active = TRUE
+                ORDER BY created_at ASC
+                LIMIT 1
+                """,
+            )
+            row = cursor.fetchone()
+        return row[0] if row else None
+
     def count_admins(self) -> int:
         """Count active admin users."""
         with self._db.transaction() as cursor:

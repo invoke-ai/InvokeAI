@@ -584,7 +584,7 @@ class SeamlessModeInvocation(BaseInvocation):
         return SeamlessModeOutput(unet=unet, vae=vae)
 
 
-@invocation("freeu", title="Apply FreeU - SD1.5, SDXL", tags=["freeu"], category="unet", version="1.0.2")
+@invocation("freeu", title="Apply FreeU - SD1.5, SDXL", tags=["freeu"], category="model", version="1.0.2")
 class FreeUInvocation(BaseInvocation):
     """
     Applies FreeU to the UNet. Suggested values (b1/b2/s1/s2):
