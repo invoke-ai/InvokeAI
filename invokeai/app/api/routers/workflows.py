@@ -117,7 +117,13 @@ async def create_workflow(
     workflow: WorkflowWithoutID = Body(description="The workflow to create", embed=True),
 ) -> WorkflowRecordDTO:
     """Creates a workflow"""
-    return ApiDependencies.invoker.services.workflow_records.create(workflow=workflow, user_id=current_user.user_id)
+    # In single-user mode, workflows are owned by 'system' and shared by default so all legacy/single-user
+    # workflows remain visible. In multiuser mode, workflows are private to the creator by default.
+    config = ApiDependencies.invoker.services.configuration
+    is_public = not config.multiuser
+    return ApiDependencies.invoker.services.workflow_records.create(
+        workflow=workflow, user_id=current_user.user_id, is_public=is_public
+    )
 
 
 @workflows_router.get(

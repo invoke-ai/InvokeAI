@@ -451,3 +451,45 @@ def test_regular_user_cannot_delete_system_workflow(client: TestClient, user1_to
         headers={"Authorization": f"Bearer {user1_token}"},
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+# ---------------------------------------------------------------------------
+# Single-user mode: default ownership + sharing on create
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def single_user_mode(monkeypatch: Any, mock_invoker: Invoker):
+    """Configure the app for single-user (legacy) mode."""
+    mock_invoker.services.configuration.multiuser = False
+    mock_workflow_thumbnails = MagicMock()
+    mock_workflow_thumbnails.get_url.return_value = None
+    mock_invoker.services.workflow_thumbnails = mock_workflow_thumbnails
+
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.workflows.ApiDependencies", mock_deps)
+    yield
+
+
+def test_single_user_create_workflow_owned_by_system_and_public(single_user_mode: Any, client: TestClient):
+    """In single-user mode, newly created workflows should be owned by 'system' and shared (is_public=True)."""
+    response = client.post("/api/v1/workflows/", json={"workflow": WORKFLOW_BODY})
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["user_id"] == "system"
+    assert payload["is_public"] is True
+
+
+def test_multiuser_create_workflow_owned_by_user_and_private(client: TestClient, user1_token: str):
+    """In multiuser mode, newly created workflows should be owned by the creator and private (is_public=False)."""
+    response = client.post(
+        "/api/v1/workflows/",
+        json={"workflow": WORKFLOW_BODY},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["user_id"] != "system"
+    assert payload["is_public"] is False
