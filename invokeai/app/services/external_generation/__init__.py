@@ -3,9 +3,9 @@ from invokeai.app.services.external_generation.external_generation_base import (
     ExternalProvider,
 )
 from invokeai.app.services.external_generation.external_generation_common import (
+    ExternalGeneratedImage,
     ExternalGenerationRequest,
     ExternalGenerationResult,
-    ExternalGeneratedImage,
     ExternalProviderStatus,
     ExternalReferenceImage,
 )

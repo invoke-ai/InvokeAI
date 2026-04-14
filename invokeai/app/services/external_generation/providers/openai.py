@@ -5,7 +5,10 @@ import io
 import requests
 from PIL.Image import Image as PILImageType
 
-from invokeai.app.services.external_generation.errors import ExternalProviderRateLimitError, ExternalProviderRequestError
+from invokeai.app.services.external_generation.errors import (
+    ExternalProviderRateLimitError,
+    ExternalProviderRequestError,
+)
 from invokeai.app.services.external_generation.external_generation_base import ExternalProvider
 from invokeai.app.services.external_generation.external_generation_common import (
     ExternalGeneratedImage,

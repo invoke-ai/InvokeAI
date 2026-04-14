@@ -18,12 +18,14 @@ import { serializeError } from 'serialize-error';
 import {
   modelConfigsAdapterSelectors,
   useBulkDeleteModelsMutation,
+  useBulkReidentifyModelsMutation,
   useGetMissingModelsQuery,
   useGetModelConfigsQuery,
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig } from 'services/api/types';
 
 import { BulkDeleteModelsModal } from './BulkDeleteModelsModal';
+import { BulkReidentifyModelsModal } from './BulkReidentifyModelsModal';
 import { FetchingModelsLoader } from './FetchingModelsLoader';
 import { MissingModelsProvider } from './MissingModelsContext';
 import { ModelListWrapper } from './ModelListWrapper';
@@ -31,6 +33,7 @@ import { ModelListWrapper } from './ModelListWrapper';
 const log = logger('models');
 
 export const [useBulkDeleteModal] = buildUseDisclosure(false);
+export const [useBulkReidentifyModal] = buildUseDisclosure(false);
 
 const ModelList = () => {
   const dispatch = useAppDispatch();
@@ -40,11 +43,14 @@ const ModelList = () => {
   const { t } = useTranslation();
   const toast = useToast();
   const { isOpen, close } = useBulkDeleteModal();
+  const { isOpen: isReidentifyOpen, close: closeReidentify } = useBulkReidentifyModal();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isReidentifying, setIsReidentifying] = useState(false);
 
   const { data: allModelsData, isLoading: isLoadingAll } = useGetModelConfigsQuery();
   const { data: missingModelsData, isLoading: isLoadingMissing } = useGetMissingModelsQuery();
   const [bulkDeleteModels] = useBulkDeleteModelsMutation();
+  const [bulkReidentifyModels] = useBulkReidentifyModelsMutation();
 
   const data = filteredModelType === 'missing' ? missingModelsData : allModelsData;
   const isLoading = filteredModelType === 'missing' ? isLoadingMissing : isLoadingAll;
@@ -101,19 +107,15 @@ const ModelList = () => {
           id: 'BULK_DELETE_SUCCESS',
           title: t('modelManager.modelsDeleted', {
             count: result.deleted.length,
-            defaultValue: `Successfully deleted ${result.deleted.length} model(s)`,
           }),
           status: 'success',
         });
       } else if (result.deleted.length === 0) {
         toast({
           id: 'BULK_DELETE_FAILED',
-          title: t('modelManager.modelsDeleteFailed', {
-            defaultValue: 'Failed to delete models',
-          }),
+          title: t('modelManager.modelsDeleteFailed'),
           description: t('modelManager.someModelsFailedToDelete', {
             count: result.failed.length,
-            defaultValue: `${result.failed.length} model(s) could not be deleted`,
           }),
           status: 'error',
         });
@@ -121,13 +123,10 @@ const ModelList = () => {
         // Partial success
         toast({
           id: 'BULK_DELETE_PARTIAL',
-          title: t('modelManager.modelsDeletedPartial', {
-            defaultValue: 'Partially completed',
-          }),
+          title: t('modelManager.modelsDeletedPartial'),
           description: t('modelManager.someModelsDeleted', {
             deleted: result.deleted.length,
             failed: result.failed.length,
-            defaultValue: `${result.deleted.length} deleted, ${result.failed.length} failed`,
           }),
           status: 'warning',
         });
@@ -138,15 +137,74 @@ const ModelList = () => {
       log.error({ error: serializeError(err as Error) }, 'Bulk delete error');
       toast({
         id: 'BULK_DELETE_ERROR',
-        title: t('modelManager.modelsDeleteError', {
-          defaultValue: 'Error deleting models',
-        }),
+        title: t('modelManager.modelsDeleteError'),
         status: 'error',
       });
     } finally {
       setIsDeleting(false);
     }
   }, [bulkDeleteModels, selectedModelKeys, dispatch, close, toast, t]);
+
+  const handleConfirmBulkReidentify = useCallback(async () => {
+    setIsReidentifying(true);
+    try {
+      const result = await bulkReidentifyModels({ keys: selectedModelKeys }).unwrap();
+
+      // Clear selection and close modal
+      dispatch(clearModelSelection());
+      dispatch(setSelectedModelKey(null));
+      closeReidentify();
+
+      if (result.failed.length === 0) {
+        toast({
+          id: 'BULK_REIDENTIFY_SUCCESS',
+          title: t('modelManager.modelsReidentified', {
+            count: result.succeeded.length,
+            defaultValue: `Successfully reidentified ${result.succeeded.length} model(s)`,
+          }),
+          status: 'success',
+        });
+      } else if (result.succeeded.length === 0) {
+        toast({
+          id: 'BULK_REIDENTIFY_FAILED',
+          title: t('modelManager.modelsReidentifyFailed', {
+            defaultValue: 'Failed to reidentify models',
+          }),
+          description: t('modelManager.someModelsFailedToReidentify', {
+            count: result.failed.length,
+            defaultValue: `${result.failed.length} model(s) could not be reidentified`,
+          }),
+          status: 'error',
+        });
+      } else {
+        toast({
+          id: 'BULK_REIDENTIFY_PARTIAL',
+          title: t('modelManager.modelsReidentifiedPartial', {
+            defaultValue: 'Partially completed',
+          }),
+          description: t('modelManager.someModelsReidentified', {
+            succeeded: result.succeeded.length,
+            failed: result.failed.length,
+            defaultValue: `${result.succeeded.length} reidentified, ${result.failed.length} failed`,
+          }),
+          status: 'warning',
+        });
+      }
+
+      log.info(`Bulk reidentify completed: ${result.succeeded.length} succeeded, ${result.failed.length} failed`);
+    } catch (err) {
+      log.error({ error: serializeError(err as Error) }, 'Bulk reidentify error');
+      toast({
+        id: 'BULK_REIDENTIFY_ERROR',
+        title: t('modelManager.modelsReidentifyError', {
+          defaultValue: 'Error reidentifying models',
+        }),
+        status: 'error',
+      });
+    } finally {
+      setIsReidentifying(false);
+    }
+  }, [bulkReidentifyModels, selectedModelKeys, dispatch, closeReidentify, toast, t]);
 
   return (
     <MissingModelsProvider>
@@ -172,6 +230,13 @@ const ModelList = () => {
         onConfirm={handleConfirmBulkDelete}
         modelCount={selectedModelKeys.length}
         isDeleting={isDeleting}
+      />
+      <BulkReidentifyModelsModal
+        isOpen={isReidentifyOpen}
+        onClose={closeReidentify}
+        onConfirm={handleConfirmBulkReidentify}
+        modelCount={selectedModelKeys.length}
+        isReidentifying={isReidentifying}
       />
     </MissingModelsProvider>
   );

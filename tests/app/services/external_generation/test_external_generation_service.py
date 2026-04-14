@@ -3,19 +3,19 @@ import logging
 import pytest
 from PIL import Image
 
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.external_generation.errors import (
     ExternalProviderCapabilityError,
     ExternalProviderNotConfiguredError,
     ExternalProviderNotFoundError,
 )
+from invokeai.app.services.external_generation.external_generation_base import ExternalProvider
 from invokeai.app.services.external_generation.external_generation_common import (
     ExternalGeneratedImage,
     ExternalGenerationRequest,
     ExternalGenerationResult,
     ExternalReferenceImage,
 )
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.external_generation.external_generation_base import ExternalProvider
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
@@ -215,9 +215,7 @@ def test_generate_validates_allowed_aspect_ratios_with_bucket_sizes() -> None:
 
 
 def test_generate_happy_path() -> None:
-    model = _build_model(
-        ExternalModelCapabilities(modes=["txt2img"], supports_seed=True)
-    )
+    model = _build_model(ExternalModelCapabilities(modes=["txt2img"], supports_seed=True))
     request = _build_request(model=model, seed=42)
     result = ExternalGenerationResult(images=[ExternalGeneratedImage(image=_make_image(), seed=42)])
     provider = DummyProvider("openai", configured=True, result=result)
