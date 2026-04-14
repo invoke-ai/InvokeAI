@@ -58,15 +58,39 @@ Invoke offers a fully featured workflow management solution, enabling users to c
 
 Invoke features an organized gallery system for easily storing, accessing, and remixing your content in the Invoke workspace. Images can be dragged/dropped onto any Image-base UI element in the application, and rich metadata within the Image allows for easy recall of key prompts or settings used in your workflow.
 
+### Model Support
+- SD 1.5 
+- SD 2.0
+- SDXL
+- SD 3.5 Medium
+- SD 3.5 Large
+- CogView 4
+- Flux.1 Dev
+- Flux.1 Schnell
+- Flux.1 Kontext
+- Flux.1 Krea
+- Flux Redux
+- Flux Fill
+- Flux.2 Klein 4B
+- Flux.2 Klein 9B
+- Z-Image Turbo
+- Z-Image Base
+- Anima
+- Qwen Image
+- Qwen Image Edit
+- Nano Banana (API Only)
+- GPT Image (API Only)
+- Wan (API Only)
+
 ### Other features
 
-- Support for both ckpt and diffusers models
-- SD1.5, SD2.0, SDXL, and FLUX support
+- Support for ckpt, diffusers, and some gguf models
 - Upscaling Tools
 - Embedding Manager & Support
 - Model Manager & Support
 - Workflow creation & management
 - Node-Based Architecture
+- Object Segmentation & Selection Models (SAM / SAM2)
 
 ## Contributing
 
