@@ -333,3 +333,164 @@ def test_workflow_has_user_id_and_is_public_fields(client: TestClient, user1_tok
     assert "user_id" in data
     assert "is_public" in data
     assert data["is_public"] is False
+
+
+# ---------------------------------------------------------------------------
+# System-owned workflow visibility (regression tests for migration 30 fix)
+# ---------------------------------------------------------------------------
+
+
+def _insert_system_workflow(mock_invoker: Invoker, name: str = "Legacy Workflow", is_public: bool = True) -> str:
+    """Insert a workflow owned by 'system' directly via the service layer, then set is_public."""
+    from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
+
+    wf = WorkflowWithoutID(**{**WORKFLOW_BODY, "name": name})
+    record = mock_invoker.services.workflow_records.create(workflow=wf, user_id="system")
+    if is_public:
+        mock_invoker.services.workflow_records.update_is_public(workflow_id=record.workflow_id, is_public=True)
+    return record.workflow_id
+
+
+def test_system_public_workflow_visible_in_shared_listing(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """After migration 30, system-owned public workflows should appear in the shared workflows listing."""
+    wf_id = _insert_system_workflow(mock_invoker, "Legacy Workflow")
+
+    response = client.get(
+        "/api/v1/workflows/?categories=user&is_public=true",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == 200
+    ids = [w["workflow_id"] for w in response.json()["items"]]
+    assert wf_id in ids
+
+
+def test_system_public_workflow_not_in_your_workflows(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """System-owned public workflows should NOT appear in 'Your Workflows' listing."""
+    wf_id = _insert_system_workflow(mock_invoker, "Legacy Workflow")
+
+    response = client.get(
+        "/api/v1/workflows/?categories=user",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == 200
+    ids = [w["workflow_id"] for w in response.json()["items"]]
+    assert wf_id not in ids
+
+
+def test_admin_can_list_system_workflows(client: TestClient, admin_token: str, mock_invoker: Invoker):
+    """Admins should see system-owned workflows in their listing."""
+    wf_id = _insert_system_workflow(mock_invoker, "Admin Visible Workflow")
+
+    response = client.get(
+        "/api/v1/workflows/?categories=user",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+    ids = [w["workflow_id"] for w in response.json()["items"]]
+    assert wf_id in ids
+
+
+def test_admin_can_update_system_workflow(client: TestClient, admin_token: str, mock_invoker: Invoker):
+    """Admins should be able to update a system-owned workflow."""
+    wf_id = _insert_system_workflow(mock_invoker, "Editable Legacy")
+
+    # Get the full workflow to update it
+    get_resp = client.get(
+        f"/api/v1/workflows/i/{wf_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert get_resp.status_code == 200
+    workflow_data = get_resp.json()["workflow"]
+    workflow_data["name"] = "Updated by Admin"
+
+    update_resp = client.patch(
+        f"/api/v1/workflows/i/{wf_id}",
+        json={"workflow": workflow_data},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert update_resp.status_code == 200
+    assert update_resp.json()["workflow"]["name"] == "Updated by Admin"
+
+
+def test_admin_can_delete_system_workflow(client: TestClient, admin_token: str, mock_invoker: Invoker):
+    """Admins should be able to delete a system-owned workflow."""
+    wf_id = _insert_system_workflow(mock_invoker, "Deletable Legacy")
+
+    response = client.delete(
+        f"/api/v1/workflows/i/{wf_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert response.status_code == 200
+
+
+def test_regular_user_cannot_update_system_workflow(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """Regular users should NOT be able to update a system-owned workflow."""
+    wf_id = _insert_system_workflow(mock_invoker, "Protected Legacy")
+
+    get_resp = client.get(
+        f"/api/v1/workflows/i/{wf_id}",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert get_resp.status_code == 200
+    workflow_data = get_resp.json()["workflow"]
+    workflow_data["name"] = "Hijacked"
+
+    update_resp = client.patch(
+        f"/api/v1/workflows/i/{wf_id}",
+        json={"workflow": workflow_data},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert update_resp.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_regular_user_cannot_delete_system_workflow(client: TestClient, user1_token: str, mock_invoker: Invoker):
+    """Regular users should NOT be able to delete a system-owned workflow."""
+    wf_id = _insert_system_workflow(mock_invoker, "Undeletable Legacy")
+
+    response = client.delete(
+        f"/api/v1/workflows/i/{wf_id}",
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+# ---------------------------------------------------------------------------
+# Single-user mode: default ownership + sharing on create
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def single_user_mode(monkeypatch: Any, mock_invoker: Invoker):
+    """Configure the app for single-user (legacy) mode."""
+    mock_invoker.services.configuration.multiuser = False
+    mock_workflow_thumbnails = MagicMock()
+    mock_workflow_thumbnails.get_url.return_value = None
+    mock_invoker.services.workflow_thumbnails = mock_workflow_thumbnails
+
+    mock_deps = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.workflows.ApiDependencies", mock_deps)
+    yield
+
+
+def test_single_user_create_workflow_owned_by_system_and_public(single_user_mode: Any, client: TestClient):
+    """In single-user mode, newly created workflows should be owned by 'system' and shared (is_public=True)."""
+    response = client.post("/api/v1/workflows/", json={"workflow": WORKFLOW_BODY})
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["user_id"] == "system"
+    assert payload["is_public"] is True
+
+
+def test_multiuser_create_workflow_owned_by_user_and_private(client: TestClient, user1_token: str):
+    """In multiuser mode, newly created workflows should be owned by the creator and private (is_public=False)."""
+    response = client.post(
+        "/api/v1/workflows/",
+        json={"workflow": WORKFLOW_BODY},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["user_id"] != "system"
+    assert payload["is_public"] is False
