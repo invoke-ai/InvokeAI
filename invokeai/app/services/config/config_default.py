@@ -124,6 +124,8 @@ class InvokeAIAppConfig(BaseSettings):
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
         external_openai_base_url: Base URL override for OpenAI image generation.
+        external_seedream_api_key: API key for Seedream image generation.
+        external_seedream_base_url: Base URL override for Seedream image generation.
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
