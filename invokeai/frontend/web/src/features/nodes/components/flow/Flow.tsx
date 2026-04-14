@@ -1,4 +1,4 @@
-import { useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
+import { Menu, MenuButton, MenuItem, MenuList, Portal, useGlobalMenuClose, useToken } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import type {
   EdgeChange,
@@ -32,7 +32,9 @@ import {
   $edgePendingUpdate,
   $lastEdgeUpdateMouseEvent,
   $pendingConnection,
+  $templates,
   $viewport,
+  connectorInserted,
   edgesChanged,
   nodesChanged,
   redo,
@@ -46,18 +48,24 @@ import {
   selectNodes,
   selectNodesSlice,
 } from 'features/nodes/store/selectors';
+import { getConnectorDeletionSpliceConnections } from 'features/nodes/store/util/connectorTopology';
 import { connectionToEdge } from 'features/nodes/store/util/reactFlowUtil';
+import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import { selectSelectionMode, selectShouldSnapToGrid } from 'features/nodes/store/workflowSettingsSlice';
 import { NO_DRAG_CLASS, NO_PAN_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
+import { buildConnectorNode } from 'features/nodes/util/node/buildConnectorNode';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import type { CSSProperties, MouseEvent, RefObject } from 'react';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
+import { useTranslation } from 'react-i18next';
+import { PiPlugsConnectedBold, PiTrashBold } from 'react-icons/pi';
 
 import CustomConnectionLine from './connectionLines/CustomConnectionLine';
 import InvocationCollapsedEdge from './edges/InvocationCollapsedEdge';
 import InvocationDefaultEdge from './edges/InvocationDefaultEdge';
+import ConnectorNode from './nodes/Connector/ConnectorNode';
 import CurrentImageNode from './nodes/CurrentImage/CurrentImageNode';
 import InvocationNodeWrapper from './nodes/Invocation/InvocationNodeWrapper';
 import NotesNode from './nodes/Notes/NotesNode';
@@ -70,6 +78,7 @@ const edgeTypes = {
 
 const nodeTypes = {
   invocation: InvocationNodeWrapper,
+  connector: ConnectorNode,
   current_image: CurrentImageNode,
   notes: NotesNode,
 } as const;
@@ -81,17 +90,69 @@ const snapGrid: [number, number] = [25, 25];
 
 const selectCancelConnection = (state: ReactFlowState) => state.cancelConnection;
 
+type WorkflowContextMenuState =
+  | {
+      kind: 'pane';
+      clientX: number;
+      clientY: number;
+      pageX: number;
+      pageY: number;
+    }
+  | {
+      kind: 'connector';
+      connectorId: string;
+      pageX: number;
+      pageY: number;
+    }
+  | null;
+
+const getWorkflowContextMenuState = (
+  event: globalThis.MouseEvent,
+  flowWrapper: HTMLDivElement | null
+): WorkflowContextMenuState => {
+  if (event.shiftKey || !(event.target instanceof Element) || !flowWrapper?.contains(event.target)) {
+    return null;
+  }
+
+  const connectorId = event.target.closest<HTMLElement>('[data-connector-node-id]')?.dataset.connectorNodeId;
+  if (connectorId) {
+    return {
+      kind: 'connector',
+      connectorId,
+      pageX: event.pageX,
+      pageY: event.pageY,
+    };
+  }
+
+  const paneTarget = event.target.closest('.react-flow__pane');
+  if (paneTarget && flowWrapper.contains(paneTarget)) {
+    return {
+      kind: 'pane',
+      clientX: event.clientX,
+      clientY: event.clientY,
+      pageX: event.pageX,
+      pageY: event.pageY,
+    };
+  }
+
+  return null;
+};
+
 export const Flow = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const nodes = useAppSelector(selectNodes);
   const edges = useAppSelector(selectEdges);
+  const templates = useStore($templates);
   const viewport = useStore($viewport);
   const shouldSnapToGrid = useAppSelector(selectShouldSnapToGrid);
   const selectionMode = useAppSelector(selectSelectionMode);
   const { onConnectStart, onConnect, onConnectEnd } = useConnection();
   const flowWrapper = useRef<HTMLDivElement>(null);
+  const pendingNodeInternalsUpdateRef = useRef<string[] | null>(null);
   const isValidConnection = useIsValidConnection();
   const updateNodeInternals = useUpdateNodeInternals();
+  const [contextMenuState, setContextMenuState] = useState<WorkflowContextMenuState>(null);
 
   useFocusRegion('workflows', flowWrapper);
 
@@ -127,9 +188,16 @@ export const Flow = memo(() => {
   }, []);
 
   const { onCloseGlobal } = useGlobalMenuClose();
-  const handlePaneClick = useCallback(() => {
-    onCloseGlobal();
-  }, [onCloseGlobal]);
+  const handlePaneClick: NonNullable<ReactFlowProps<AnyNode, AnyEdge>['onPaneClick']> = useCallback(
+    (event) => {
+      if ('button' in event && event.button !== 0) {
+        return;
+      }
+      onCloseGlobal();
+      setContextMenuState(null);
+    },
+    [onCloseGlobal]
+  );
 
   const onInit: OnInit<AnyNode, AnyEdge> = useCallback((flow) => {
     $flow.set(flow);
@@ -146,6 +214,149 @@ export const Flow = memo(() => {
       );
     }
   }, []);
+
+  useEffect(() => {
+    const pendingNodeIds = pendingNodeInternalsUpdateRef.current;
+    if (!pendingNodeIds) {
+      return;
+    }
+
+    pendingNodeInternalsUpdateRef.current = null;
+
+    const frameId = requestAnimationFrame(() => {
+      updateNodeInternals([...new Set(pendingNodeIds)]);
+    });
+
+    return () => {
+      cancelAnimationFrame(frameId);
+    };
+  }, [edges, nodes, updateNodeInternals]);
+
+  const addConnectorAtPaneMenuPosition = useCallback(() => {
+    if (contextMenuState?.kind !== 'pane') {
+      return;
+    }
+    const flow = $flow.get();
+    if (!flow) {
+      return;
+    }
+    const connector = buildConnectorNode(
+      flow.screenToFlowPosition({
+        x: contextMenuState.clientX,
+        y: contextMenuState.clientY,
+      })
+    );
+    dispatch(nodesChanged([{ type: 'add', item: connector }]));
+    setContextMenuState(null);
+  }, [contextMenuState, dispatch]);
+
+  const connectorSpliceConnections = useMemo(
+    () =>
+      contextMenuState?.kind === 'connector'
+        ? getConnectorDeletionSpliceConnections(
+            contextMenuState.connectorId,
+            nodes,
+            edges,
+            templates,
+            validateConnection
+          )
+        : null,
+    [contextMenuState, edges, nodes, templates]
+  );
+
+  const deleteConnectorFromContextMenu = useCallback(() => {
+    if (contextMenuState?.kind !== 'connector' || !connectorSpliceConnections) {
+      return;
+    }
+    const connectorEdgeRemovals: EdgeChange<AnyEdge>[] = edges
+      .filter((edge) => edge.source === contextMenuState.connectorId || edge.target === contextMenuState.connectorId)
+      .map((edge) => ({ type: 'remove', id: edge.id }));
+    const spliceEdgeAdditions: EdgeChange<AnyEdge>[] = connectorSpliceConnections.map((connection) => ({
+      type: 'add',
+      item: connectionToEdge(connection),
+    }));
+
+    pendingNodeInternalsUpdateRef.current = [
+      contextMenuState.connectorId,
+      ...connectorSpliceConnections.flatMap((connection) => [connection.source, connection.target]),
+    ];
+    dispatch(edgesChanged([...connectorEdgeRemovals, ...spliceEdgeAdditions]));
+    dispatch(nodesChanged([{ type: 'remove', id: contextMenuState.connectorId }]));
+    setContextMenuState(null);
+  }, [connectorSpliceConnections, contextMenuState, dispatch, edges]);
+
+  useEffect(() => {
+    const onWindowContextMenu = (event: globalThis.MouseEvent) => {
+      const nextContextMenuState = getWorkflowContextMenuState(event, flowWrapper.current);
+      if (!nextContextMenuState) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      setContextMenuState(nextContextMenuState);
+    };
+
+    window.addEventListener('contextmenu', onWindowContextMenu, { capture: true });
+
+    return () => {
+      window.removeEventListener('contextmenu', onWindowContextMenu, { capture: true });
+    };
+  }, []);
+
+  const renderContextMenu = useCallback(() => {
+    if (contextMenuState?.kind === 'pane') {
+      return (
+        <MenuList visibility="visible">
+          <MenuItem icon={<PiPlugsConnectedBold />} onClick={addConnectorAtPaneMenuPosition}>
+            {t('nodes.addConnector')}
+          </MenuItem>
+        </MenuList>
+      );
+    }
+
+    if (contextMenuState?.kind === 'connector') {
+      return (
+        <MenuList visibility="visible">
+          <MenuItem
+            icon={<PiTrashBold />}
+            onClick={deleteConnectorFromContextMenu}
+            isDisabled={!connectorSpliceConnections}
+            isDestructive
+          >
+            {t('nodes.deleteConnector')}
+          </MenuItem>
+        </MenuList>
+      );
+    }
+
+    return <MenuList visibility="visible" />;
+  }, [addConnectorAtPaneMenuPosition, connectorSpliceConnections, contextMenuState, deleteConnectorFromContextMenu, t]);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenuState(null);
+  }, []);
+
+  const onEdgeDoubleClick = useCallback<NonNullable<ReactFlowProps['onEdgeDoubleClick']>>(
+    (event, edge) => {
+      if (edge.type !== 'default' || edge.hidden) {
+        return;
+      }
+      const flow = $flow.get();
+      if (!flow) {
+        return;
+      }
+      const connector = buildConnectorNode(
+        flow.screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY,
+        })
+      );
+      dispatch(connectorInserted({ edgeId: edge.id, connector }));
+      updateNodeInternals([edge.source, edge.target, connector.id]);
+    },
+    [dispatch, updateNodeInternals]
+  );
 
   // #region Updatable Edges
 
@@ -209,16 +420,130 @@ export const Flow = memo(() => {
 
   // #endregion
 
+  const renderedNodes = useMemo(() => nodes, [nodes]);
+
+  const renderedEdges = useMemo(() => edges, [edges]);
+  const contextMenuPosition = contextMenuState ? { x: contextMenuState.pageX, y: contextMenuState.pageY } : null;
+  const contextMenuKey = contextMenuPosition ? `${contextMenuPosition.x}-${contextMenuPosition.y}` : 'closed';
+
   return (
     <>
+      <FlowSurface
+        flowWrapper={flowWrapper}
+        viewport={viewport}
+        renderedNodes={renderedNodes}
+        renderedEdges={renderedEdges}
+        onInit={onInit}
+        onMouseMove={onMouseMove}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onReconnect={onReconnect}
+        onReconnectStart={onReconnectStart}
+        onReconnectEnd={onReconnectEnd}
+        onConnectStart={onConnectStart}
+        onConnect={onConnect}
+        onConnectEnd={onConnectEnd}
+        handleMoveEnd={handleMoveEnd}
+        onEdgeDoubleClick={onEdgeDoubleClick}
+        isValidConnection={isValidConnection}
+        shouldSnapToGrid={shouldSnapToGrid}
+        flowStyles={flowStyles}
+        handlePaneClick={handlePaneClick}
+        selectionMode={selectionMode}
+      />
+      <Portal>
+        <Menu
+          key={contextMenuKey}
+          isOpen={contextMenuPosition !== null}
+          onClose={closeContextMenu}
+          placement="auto-start"
+          gutter={0}
+        >
+          <MenuButton
+            aria-hidden
+            position="absolute"
+            left={contextMenuPosition?.x ?? -9999}
+            top={contextMenuPosition?.y ?? -9999}
+            w={1}
+            h={1}
+            pointerEvents="none"
+            bg="transparent"
+          />
+          {renderContextMenu()}
+        </Menu>
+      </Portal>
+      <HotkeyIsolator flowWrapper={flowWrapper} />
+    </>
+  );
+});
+
+Flow.displayName = 'Flow';
+
+type FlowSurfaceProps = {
+  flowWrapper: { current: HTMLDivElement | null };
+  viewport: ReactFlowProps<AnyNode, AnyEdge>['defaultViewport'];
+  renderedNodes: AnyNode[];
+  renderedEdges: AnyEdge[];
+  onInit: OnInit<AnyNode, AnyEdge>;
+  onMouseMove: (event: MouseEvent<HTMLDivElement>) => void;
+  onNodesChange: OnNodesChange<AnyNode>;
+  onEdgesChange: OnEdgesChange<AnyEdge>;
+  onReconnect: OnReconnect;
+  onReconnectStart: NonNullable<ReactFlowProps<AnyNode, AnyEdge>['onReconnectStart']>;
+  onReconnectEnd: NonNullable<ReactFlowProps<AnyNode, AnyEdge>['onReconnectEnd']>;
+  onConnectStart: NonNullable<ReactFlowProps<AnyNode, AnyEdge>['onConnectStart']>;
+  onConnect: NonNullable<ReactFlowProps<AnyNode, AnyEdge>['onConnect']>;
+  onConnectEnd: NonNullable<ReactFlowProps<AnyNode, AnyEdge>['onConnectEnd']>;
+  handleMoveEnd: OnMoveEnd;
+  onEdgeDoubleClick: NonNullable<ReactFlowProps<AnyNode, AnyEdge>['onEdgeDoubleClick']>;
+  isValidConnection: NonNullable<ReactFlowProps<AnyNode, AnyEdge>['isValidConnection']>;
+  shouldSnapToGrid: boolean;
+  flowStyles: CSSProperties;
+  handlePaneClick: NonNullable<ReactFlowProps<AnyNode, AnyEdge>['onPaneClick']>;
+  selectionMode: ReturnType<typeof selectSelectionMode>;
+};
+
+const FlowSurface = memo((props: FlowSurfaceProps) => {
+  const {
+    flowWrapper,
+    viewport,
+    renderedNodes,
+    renderedEdges,
+    onInit,
+    onMouseMove,
+    onNodesChange,
+    onEdgesChange,
+    onReconnect,
+    onReconnectStart,
+    onReconnectEnd,
+    onConnectStart,
+    onConnect,
+    onConnectEnd,
+    handleMoveEnd,
+    onEdgeDoubleClick,
+    isValidConnection,
+    shouldSnapToGrid,
+    flowStyles,
+    handlePaneClick,
+    selectionMode,
+  } = props;
+
+  const setFlowWrapperElement = useCallback(
+    (el: HTMLDivElement | null) => {
+      flowWrapper.current = el;
+    },
+    [flowWrapper]
+  );
+
+  return (
+    <div ref={setFlowWrapperElement} style={{ width: '100%', height: '100%' }}>
       <ReactFlow<AnyNode, AnyEdge>
         id="workflow-editor"
-        ref={flowWrapper}
         defaultViewport={viewport}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        nodes={nodes}
-        edges={edges}
+        nodes={renderedNodes}
+        edges={renderedEdges}
         onInit={onInit}
         onMouseMove={onMouseMove}
         onNodesChange={onNodesChange}
@@ -230,6 +555,7 @@ export const Flow = memo(() => {
         onConnect={onConnect}
         onConnectEnd={onConnectEnd}
         onMoveEnd={handleMoveEnd}
+        onEdgeDoubleClick={onEdgeDoubleClick}
         connectionLineComponent={CustomConnectionLine}
         isValidConnection={isValidConnection}
         minZoom={0.1}
@@ -249,12 +575,11 @@ export const Flow = memo(() => {
       >
         <Background gap={snapGrid} offset={snapGrid} />
       </ReactFlow>
-      <HotkeyIsolator flowWrapper={flowWrapper} />
-    </>
+    </div>
   );
 });
 
-Flow.displayName = 'Flow';
+FlowSurface.displayName = 'FlowSurface';
 
 const HotkeyIsolator = memo(({ flowWrapper }: { flowWrapper: RefObject<HTMLDivElement> }) => {
   const mayUndo = useAppSelector(selectMayUndo);

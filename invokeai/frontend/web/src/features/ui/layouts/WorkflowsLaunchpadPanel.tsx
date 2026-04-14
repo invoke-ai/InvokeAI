@@ -6,6 +6,7 @@ import { memo, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useTranslation } from 'react-i18next';
 import { PiFilePlusBold, PiFolderOpenBold, PiUploadBold } from 'react-icons/pi';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 
 import { LaunchpadButton } from './LaunchpadButton';
 import { LaunchpadContainer } from './LaunchpadContainer';
@@ -14,6 +15,9 @@ export const WorkflowsLaunchpadPanel = memo(() => {
   const { t } = useTranslation();
   const workflowLibraryModal = useWorkflowLibraryModal();
   const newWorkflow = useNewWorkflow();
+  const { data: setupStatus } = useGetSetupStatusQuery();
+
+  const isMultiuser = setupStatus?.multiuser_enabled ?? false;
 
   const handleBrowseTemplates = useCallback(() => {
     workflowLibraryModal.open();
@@ -45,11 +49,15 @@ export const WorkflowsLaunchpadPanel = memo(() => {
     multiple: false,
   });
 
+  const descriptionKey = isMultiuser
+    ? 'ui.launchpad.workflows.descriptionMultiuser'
+    : 'ui.launchpad.workflows.description';
+
   return (
     <LaunchpadContainer heading={t('ui.launchpad.workflowsTitle')}>
       {/* Description */}
       <Text variant="subtext" fontSize="md" lineHeight="1.6">
-        {t('ui.launchpad.workflows.description')}
+        {t(descriptionKey)}
       </Text>
 
       <Text>
