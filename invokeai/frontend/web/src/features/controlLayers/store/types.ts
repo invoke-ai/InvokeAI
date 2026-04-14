@@ -994,7 +994,6 @@ export type EntityEraserLineAddedPayload = EntityIdentifierPayload<{
 }>;
 export type EntityLassoAddedPayload = EntityIdentifierPayload<{ lasso: CanvasLassoState }>;
 export type EntityShapeAddedPayload = EntityIdentifierPayload<{ shape: CanvasShapeState }>;
-export type EntityLassoAddedPayload = EntityIdentifierPayload<{ lasso: CanvasLassoState }>;
 export type EntityGradientAddedPayload = EntityIdentifierPayload<{ gradient: CanvasGradientState }>;
 export type EntityRasterizedPayload = EntityIdentifierPayload<{
   imageObject: CanvasImageState;
