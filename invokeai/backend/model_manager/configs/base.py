@@ -84,11 +84,14 @@ class Config_Base(ABC, BaseModel):
 
     @field_validator("source_url", mode="before")
     @classmethod
-    def validate_source_url(cls, v: str | None) -> str | None:
-        if v is not None and v != "":
-            if not v.startswith(("https://", "http://")):
-                raise ValueError("source_url must be an http or https URL")
-        return v or None
+    def validate_source_url(cls, v: Any) -> str | None:
+        if v is None or v == "":
+            return None
+        if not isinstance(v, str):
+            raise ValueError("source_url must be a string")
+        if not v.startswith(("https://", "http://")):
+            raise ValueError("source_url must be an http or https URL")
+        return v
 
     cover_image: str | None = Field(
         default=None,

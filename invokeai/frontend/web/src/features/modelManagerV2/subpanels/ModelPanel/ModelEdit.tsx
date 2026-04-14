@@ -127,7 +127,7 @@ export const ModelEdit = memo(({ modelConfig }: Props) => {
             <Flex gap="4" alignItems="center">
               <FormControl flexDir="column" alignItems="flex-start" gap={1}>
                 <FormLabel>{t('modelManager.sourceUrl')}</FormLabel>
-                <Input {...form.register('source_url')} size="md" placeholder="https://" />
+                <Input {...form.register('source_url')} type="url" size="md" placeholder="https://" />
               </FormControl>
             </Flex>
             <Heading as="h3" fontSize="md" mt="4">
