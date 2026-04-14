@@ -43,7 +43,7 @@ from invokeai.backend.util.devices import TorchDevice
     "compel",
     title="Prompt - SD1.5",
     tags=["prompt", "compel"],
-    category="conditioning",
+    category="prompt",
     version="1.2.1",
 )
 class CompelInvocation(BaseInvocation):
@@ -248,7 +248,7 @@ class SDXLPromptInvocationBase:
     "sdxl_compel_prompt",
     title="Prompt - SDXL",
     tags=["sdxl", "compel", "prompt"],
-    category="conditioning",
+    category="prompt",
     version="1.2.1",
 )
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
@@ -342,7 +342,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     "sdxl_refiner_compel_prompt",
     title="Prompt - SDXL Refiner",
     tags=["sdxl", "compel", "prompt"],
-    category="conditioning",
+    category="prompt",
     version="1.1.2",
 )
 class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
@@ -391,7 +391,7 @@ class CLIPSkipInvocationOutput(BaseInvocationOutput):
     "clip_skip",
     title="Apply CLIP Skip - SD1.5, SDXL",
     tags=["clipskip", "clip", "skip"],
-    category="conditioning",
+    category="prompt",
     version="1.1.1",
 )
 class CLIPSkipInvocation(BaseInvocation):
