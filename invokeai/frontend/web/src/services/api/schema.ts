@@ -16147,6 +16147,16 @@ export type components = {
              */
             strict_password_checking?: boolean;
             /**
+             * External Alibabacloud Api Key
+             * @description API key for Alibaba Cloud DashScope image generation.
+             */
+            external_alibabacloud_api_key?: string | null;
+            /**
+             * External Alibabacloud Base Url
+             * @description Base URL override for Alibaba Cloud DashScope image generation.
+             */
+            external_alibabacloud_base_url?: string | null;
+            /**
              * External Gemini Api Key
              * @description API key for Gemini image generation.
              */
