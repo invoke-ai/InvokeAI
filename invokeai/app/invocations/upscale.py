@@ -30,7 +30,7 @@ ESRGAN_MODEL_URLS: dict[str, str] = {
 }
 
 
-@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="esrgan", version="1.3.2")
+@invocation("esrgan", title="Upscale (RealESRGAN)", tags=["esrgan", "upscale"], category="upscale", version="1.3.2")
 class ESRGANInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Upscales an image using RealESRGAN."""
 
