@@ -468,4 +468,3 @@ def test_migration_27_without_client_state_data_column(logger: Logger) -> None:
     assert cursor.fetchone()[0] == 0
 
     db._conn.close()
-
