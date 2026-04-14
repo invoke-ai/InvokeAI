@@ -35,7 +35,7 @@ from invokeai.backend.util.devices import TorchDevice
     "sd3_denoise",
     title="Denoise - SD3",
     tags=["image", "sd3"],
-    category="image",
+    category="latents",
     version="1.2.0",
 )
 class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):

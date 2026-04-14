@@ -50,7 +50,7 @@ from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer
     "z_image_denoise",
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
-    category="image",
+    category="latents",
     version="1.6.0",
     classification=Classification.Prototype,
 )

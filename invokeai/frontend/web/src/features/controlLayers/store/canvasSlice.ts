@@ -1736,6 +1736,36 @@ const slice = createSlice({
       resetInpaintMasksHiddenIfEmpty(state);
       return state;
     },
+    canvasProjectRecalled: (
+      state,
+      action: PayloadAction<{
+        rasterLayers: CanvasRasterLayerState[];
+        controlLayers: CanvasControlLayerState[];
+        inpaintMasks: CanvasInpaintMaskState[];
+        regionalGuidance: CanvasRegionalGuidanceState[];
+        bbox: CanvasState['bbox'];
+        selectedEntityIdentifier: CanvasState['selectedEntityIdentifier'];
+        bookmarkedEntityIdentifier: CanvasState['bookmarkedEntityIdentifier'];
+      }>
+    ) => {
+      const {
+        rasterLayers,
+        controlLayers,
+        inpaintMasks,
+        regionalGuidance,
+        bbox,
+        selectedEntityIdentifier,
+        bookmarkedEntityIdentifier,
+      } = action.payload;
+      state.rasterLayers.entities = rasterLayers;
+      state.controlLayers.entities = controlLayers;
+      state.inpaintMasks.entities = inpaintMasks;
+      state.regionalGuidance.entities = regionalGuidance;
+      state.bbox = bbox;
+      state.selectedEntityIdentifier = selectedEntityIdentifier;
+      state.bookmarkedEntityIdentifier = bookmarkedEntityIdentifier;
+      return state;
+    },
     canvasUndo: () => {},
     canvasRedo: () => {},
     canvasClearHistory: () => {},
@@ -1794,6 +1824,7 @@ const resetState = (state: CanvasState) => {
 
 export const {
   canvasMetadataRecalled,
+  canvasProjectRecalled,
   canvasUndo,
   canvasRedo,
   canvasClearHistory,
