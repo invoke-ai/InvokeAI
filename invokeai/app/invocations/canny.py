@@ -11,7 +11,7 @@ from invokeai.backend.image_util.util import cv2_to_pil, pil_to_cv2
     "canny_edge_detection",
     title="Canny Edge Detection",
     tags=["controlnet", "canny"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.0.0",
 )
 class CannyEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):

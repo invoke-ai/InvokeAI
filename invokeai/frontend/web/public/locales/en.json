@@ -161,7 +161,17 @@
         "imagesWithCount_other": "{{count}} images",
         "assetsWithCount_one": "{{count}} asset",
         "assetsWithCount_other": "{{count}} assets",
-        "updateBoardError": "Error updating board"
+        "updateBoardError": "Error updating board",
+        "setBoardVisibility": "Set Board Visibility",
+        "setVisibilityPrivate": "Set Private",
+        "setVisibilityShared": "Set Shared",
+        "setVisibilityPublic": "Set Public",
+        "visibilityPrivate": "Private",
+        "visibilityShared": "Shared",
+        "visibilityPublic": "Public",
+        "visibilityBadgeShared": "Shared board",
+        "visibilityBadgePublic": "Public board",
+        "updateBoardVisibilityError": "Error updating board visibility"
     },
     "accordions": {
         "generation": {
@@ -202,6 +212,7 @@
         "copy": "Copy",
         "copyError": "$t(gallery.copy) Error",
         "clipboard": "Clipboard",
+        "collapseAll": "Collapse All",
         "crop": "Crop",
         "on": "On",
         "off": "Off",
@@ -229,6 +240,7 @@
         "error": "Error",
         "error_withCount_one": "{{count}} error",
         "error_withCount_other": "{{count}} errors",
+        "expandAll": "Expand All",
         "model_withCount_one": "{{count}} model",
         "model_withCount_other": "{{count}} models",
         "file": "File",
@@ -705,6 +717,10 @@
                 "title": "Rect Tool",
                 "desc": "Select the rect tool."
             },
+            "selectLassoTool": {
+                "title": "Lasso Tool",
+                "desc": "Select the lasso tool."
+            },
             "selectViewTool": {
                 "title": "View Tool",
                 "desc": "Select the view tool."
@@ -1168,7 +1184,9 @@
         "name": "Name",
         "modelPickerFallbackNoModelsInstalled": "No models installed.",
         "modelPickerFallbackNoModelsInstalled2": "Visit the <LinkComponent>Model Manager</LinkComponent> to install models.",
+        "modelPickerFallbackNoModelsInstalledNonAdmin": "No models installed. Ask your InvokeAI administrator (<AdminEmailLink />) to install some models.",
         "noModelsInstalledDesc1": "Install models with the",
+        "noModelsInstalledAskAdmin": "Ask your administrator to install some.",
         "noModelSelected": "No Model Selected",
         "noMatchingModels": "No matching models",
         "noModelsInstalled": "No models installed",
@@ -1263,6 +1281,12 @@
         "flux2KleinVaePlaceholder": "From main model",
         "flux2KleinQwen3Encoder": "Qwen3 Encoder (optional)",
         "flux2KleinQwen3EncoderPlaceholder": "From main model",
+        "qwenImageComponentSource": "VAE/Encoder Source (Diffusers)",
+        "qwenImageComponentSourcePlaceholder": "Required for GGUF models",
+        "qwenImageQuantization": "Encoder Quantization",
+        "qwenImageQuantizationNone": "None (bf16)",
+        "qwenImageQuantizationInt8": "8-bit (int8)",
+        "qwenImageQuantizationNf4": "4-bit (nf4)",
         "upcastAttention": "Upcast Attention",
         "uploadImage": "Upload Image",
         "urlOrLocalPath": "URL or Local Path",
@@ -1361,6 +1385,8 @@
         "fullyContainNodesHelp": "Nodes must be fully inside the selection box to be selected",
         "showEdgeLabels": "Show Edge Labels",
         "showEdgeLabelsHelp": "Show labels on edges, indicating the connected nodes",
+        "groupNodesByCategory": "Group Nodes by Category",
+        "groupNodesByCategoryHelp": "Group nodes by category in the add node dialog",
         "hideLegendNodes": "Hide Field Type Legend",
         "hideMinimapnodes": "Hide MiniMap",
         "inputMayOnlyHaveOneConnection": "Input may only have one connection",
@@ -1399,6 +1425,8 @@
         "notes": "Notes",
         "description": "Description",
         "notesDescription": "Add notes about your workflow",
+        "addConnector": "Add Connector",
+        "deleteConnector": "Delete Connector",
         "problemSettingTitle": "Problem Setting Title",
         "resetToDefaultValue": "Reset to default value",
         "reloadNodeTemplates": "Reload Node Templates",
@@ -1529,6 +1557,7 @@
         "info": "Info",
         "invoke": {
             "addingImagesTo": "Adding images to",
+            "boardNotWritable": "You do not have write access to board \"{{boardName}}\". Select a board you own or switch to Uncategorized.",
             "modelDisabledForTrial": "Generating with {{modelName}} is not available on trial accounts. Visit your account settings to upgrade.",
             "invoke": "Invoke",
             "missingFieldTemplate": "Missing field template",
@@ -1555,6 +1584,7 @@
             "noFLUXVAEModelSelected": "No VAE model selected for FLUX generation",
             "noCLIPEmbedModelSelected": "No CLIP Embed model selected for FLUX generation",
             "noQwen3EncoderModelSelected": "No Qwen3 Encoder model selected for FLUX2 Klein generation",
+            "noQwenImageComponentSourceSelected": "GGUF Qwen Image models require a Diffusers Component Source for VAE/encoder",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
             "noAnimaVaeModelSelected": "No Anima VAE model selected",
@@ -1608,6 +1638,7 @@
         "sendToCanvas": "Send To Canvas",
         "sendToUpscale": "Send To Upscale",
         "showOptionsPanel": "Show Side Panel (O or T)",
+        "shift": "Shift",
         "shuffle": "Shuffle Seed",
         "steps": "Steps",
         "strength": "Strength",
@@ -1684,6 +1715,8 @@
         "enableNSFWChecker": "Enable NSFW Checker",
         "general": "General",
         "generation": "Generation",
+        "maxQueueHistory": "Max Queue History",
+        "maxQueueHistorySaveFailed": "Failed to save Max Queue History",
         "models": "Models",
         "preferAttentionStyleNumeric": "Prefer Numeric Attention Style",
         "prompt": "Prompt",
@@ -2279,6 +2312,8 @@
         "tags": "Tags",
         "yourWorkflows": "Your Workflows",
         "recentlyOpened": "Recently Opened",
+        "sharedWorkflows": "Shared Workflows",
+        "shareWorkflow": "Shared workflow",
         "noRecentWorkflows": "No Recent Workflows",
         "private": "Private",
         "shared": "Shared",
@@ -2735,10 +2770,16 @@
             "radial": "Radial",
             "clip": "Clip Gradient"
         },
+        "lasso": {
+            "freehand": "Freehand",
+            "polygon": "Polygon",
+            "polygonHint": "Click to add points, click the first point to close."
+        },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
             "rectangle": "Rectangle",
+            "lasso": "Lasso",
             "gradient": "Gradient",
             "bbox": "Bbox",
             "move": "Move",
@@ -2978,6 +3019,19 @@
             "copyCanvasToClipboard": "Copy Canvas to Clipboard",
             "copyBboxToClipboard": "Copy Bbox to Clipboard"
         },
+        "canvasProject": {
+            "project": "Project",
+            "saveProject": "Save Canvas Project",
+            "loadProject": "Load Canvas Project",
+            "saveSuccess": "Project Saved",
+            "saveSuccessDesc": "Saved project with {{count}} images",
+            "saveError": "Failed to Save Project",
+            "loadSuccess": "Project Loaded",
+            "loadSuccessDesc": "Canvas state restored from project file",
+            "loadError": "Failed to Load Project",
+            "loadWarning": "Loading a project will replace your current canvas, including all layers, masks, reference images, and generation parameters. This action cannot be undone.",
+            "projectName": "Project Name"
+        },
         "stagingArea": {
             "accept": "Accept",
             "discardAll": "Discard All",
@@ -3013,6 +3067,7 @@
         "tileOverlap": "Tile Overlap",
         "postProcessingMissingModelWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install a post-processing (image to image) model.",
         "missingModelsWarning": "Visit the <LinkComponent>Model Manager</LinkComponent> to install the required models:",
+        "missingModelsWarningNonAdmin": "Ask your InvokeAI administrator (<AdminEmailLink />) to install the required models:",
         "mainModelDesc": "Main model (SD1.5 or SDXL architecture)",
         "tileControlNetModelDesc": "Tile ControlNet model for the chosen main model architecture",
         "upscaleModelDesc": "Upscale (image to image) model",
@@ -3121,6 +3176,7 @@
             },
             "workflows": {
                 "description": "Workflows are reusable templates that automate image generation tasks, allowing you to quickly perform complex operations and get consistent results.",
+                "descriptionMultiuser": "Workflows are reusable templates that automate image generation tasks, allowing you to quickly perform complex operations and get consistent results. You may share your workflows with other users of the system by selecting 'Shared workflow' when you create or edit it.",
                 "learnMoreLink": "Learn more about creating workflows",
                 "browseTemplates": {
                     "title": "Browse Workflow Templates",
@@ -3199,9 +3255,11 @@
         "toGetStartedLocal": "To get started, make sure to download or import models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "toGetStarted": "To get started, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "toGetStartedWorkflow": "To get started, fill in the fields on the left and press <StrongComponent>Invoke</StrongComponent> to generate your image. Want to explore more workflows? Click the <StrongComponent>folder icon</StrongComponent> next to the workflow title to see a list of other templates you can try.",
+        "toGetStartedNonAdmin": "To get started, ask your InvokeAI administrator (<AdminEmailLink />) to install the AI models needed to run Invoke. Then, enter a prompt in the box and click <StrongComponent>Invoke</StrongComponent> to generate your first image. Select a prompt template to improve results. You can choose to save your images directly to the <StrongComponent>Gallery</StrongComponent> or edit them to the <StrongComponent>Canvas</StrongComponent>.",
         "gettingStartedSeries": "Want more guidance? Check out our <LinkComponent>Getting Started Series</LinkComponent> for tips on unlocking the full potential of the Invoke Studio.",
         "lowVRAMMode": "For best performance, follow our <LinkComponent>Low VRAM guide</LinkComponent>.",
-        "noModelsInstalled": "It looks like you don't have any models installed! You can <DownloadStarterModelsButton>download a starter model bundle</DownloadStarterModelsButton> or <ImportModelsButton>import models</ImportModelsButton>."
+        "noModelsInstalled": "It looks like you don't have any models installed! You can <DownloadStarterModelsButton>download a starter model bundle</DownloadStarterModelsButton> or <ImportModelsButton>import models</ImportModelsButton>.",
+        "noModelsInstalledAskAdmin": "Ask your administrator to install some."
     },
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
