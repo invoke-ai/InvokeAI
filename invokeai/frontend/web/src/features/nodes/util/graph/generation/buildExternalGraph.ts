@@ -2,7 +2,7 @@ import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectCanvasSettingsSlice } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
-import { type ModelIdentifierField, zImageField } from 'features/nodes/types/common';
+import { type ModelIdentifierField, zImageField, zModelIdentifierField } from 'features/nodes/types/common';
 import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import {
   getOriginalAndScaledSizesForOtherModes,
@@ -149,7 +149,7 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
   g.updateNode(externalNode as AnyInvocation, selectCanvasOutputFields(state));
 
   g.upsertMetadata({
-    model: Graph.getModelMetadataField(model),
+    model: zModelIdentifierField.parse(model),
     width: externalNode.width as number,
     height: externalNode.height as number,
   });
