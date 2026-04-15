@@ -11,7 +11,10 @@ import {
   animaQwen3EncoderModelSelected,
   animaT5EncoderModelSelected,
   animaVaeModelSelected,
+  geminiTemperatureChanged,
+  geminiThinkingLevelChanged,
   heightChanged,
+  imageSizeChanged,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
   negativePromptChanged,
@@ -1373,6 +1376,61 @@ const RefImages: CollectionMetadataHandler<RefImageState[]> = {
 };
 //#endregion RefImages
 
+//#region External Image Size
+const ImageSize: SingleMetadataHandler<string> = {
+  [SingleMetadataKey]: true,
+  type: 'ImageSize',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'image_size');
+    const parsed = z.string().min(1).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(imageSizeChanged(value));
+  },
+  i18nKey: 'metadata.imageSize',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion External Image Size
+
+//#region Gemini Temperature
+const GeminiTemperature: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'GeminiTemperature',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'gemini_temperature');
+    const parsed = z.number().min(0).max(2).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(geminiTemperatureChanged(value));
+  },
+  i18nKey: 'metadata.geminiTemperature',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Gemini Temperature
+
+//#region Gemini Thinking Level
+const zGeminiThinkingLevel = z.enum(['minimal', 'high']);
+const GeminiThinkingLevel: SingleMetadataHandler<'minimal' | 'high'> = {
+  [SingleMetadataKey]: true,
+  type: 'GeminiThinkingLevel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'gemini_thinking_level');
+    const parsed = zGeminiThinkingLevel.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(geminiThinkingLevelChanged(value));
+  },
+  i18nKey: 'metadata.geminiThinkingLevel',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<'minimal' | 'high'>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Gemini Thinking Level
+
 export const ImageMetadataHandlers = {
   CreatedBy,
   GenerationMode,
@@ -1421,6 +1479,9 @@ export const ImageMetadataHandlers = {
   LoRAs,
   CanvasLayers,
   RefImages,
+  ImageSize,
+  GeminiTemperature,
+  GeminiThinkingLevel,
   // TODO: These had parsers in the prev implementation, but they were never actually used?
   // controlNet: parseControlNet,
   // controlNets: parseAllControlNets,

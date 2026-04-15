@@ -1,6 +1,6 @@
 from typing import Any, ClassVar, Literal
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -32,7 +32,10 @@ class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBo
         ui_model_type=[ModelType.ExternalImageGenerator],
         ui_model_format=[ModelFormat.ExternalApi],
     )
-    mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode")
+    mode: ExternalGenerationMode = InputField(
+        default="txt2img",
+        description="Generation mode. Not all modes are supported by every model; unsupported modes raise at runtime.",
+    )
     prompt: str = InputField(description="Prompt")
     seed: int | None = InputField(default=None, description=FieldDescriptions.seed)
     num_images: int = InputField(default=1, gt=0, description="Number of images to generate")
@@ -119,6 +122,9 @@ class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBo
             }
         )
 
+        if self.image_size is not None:
+            metadata["image_size"] = self.image_size
+
         provider_request_id = getattr(result, "provider_request_id", None)
         if provider_request_id:
             metadata["external_request_id"] = provider_request_id
@@ -130,21 +136,15 @@ class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBo
         if image_seed is not None:
             metadata["external_seed"] = image_seed
 
+        metadata.update(self._build_output_provider_metadata())
+
         if not metadata:
             return None
         return MetadataField(root=metadata)
 
-
-@invocation(
-    "external_image_generation",
-    title="External Image Generation (Legacy)",
-    tags=["external", "generation"],
-    category="image",
-    version="1.1.0",
-    classification=Classification.Internal,
-)
-class ExternalImageGenerationInvocation(BaseExternalImageGenerationInvocation):
-    """Legacy external image generation node kept for backward compatibility."""
+    def _build_output_provider_metadata(self) -> dict[str, Any]:
+        """Override in provider-specific subclasses to add recall-relevant fields to the image metadata."""
+        return {}
 
 
 @invocation(
@@ -158,6 +158,14 @@ class OpenAIImageGenerationInvocation(BaseExternalImageGenerationInvocation):
     """Generate images using an OpenAI-hosted external model."""
 
     provider_id = "openai"
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.External],
+        ui_model_type=[ModelType.ExternalImageGenerator],
+        ui_model_format=[ModelFormat.ExternalApi],
+        ui_model_provider_id=["openai"],
+    )
 
     quality: Literal["auto", "high", "medium", "low"] = InputField(default="auto", description="Output image quality")
     background: Literal["auto", "transparent", "opaque"] = InputField(
@@ -176,6 +184,15 @@ class OpenAIImageGenerationInvocation(BaseExternalImageGenerationInvocation):
             options["input_fidelity"] = self.input_fidelity
         return options
 
+    def _build_output_provider_metadata(self) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            "openai_quality": self.quality,
+            "openai_background": self.background,
+        }
+        if self.input_fidelity is not None:
+            metadata["openai_input_fidelity"] = self.input_fidelity
+        return metadata
+
 
 @invocation(
     "gemini_image_generation",
@@ -188,6 +205,14 @@ class GeminiImageGenerationInvocation(BaseExternalImageGenerationInvocation):
     """Generate images using a Gemini-hosted external model."""
 
     provider_id = "gemini"
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.External],
+        ui_model_type=[ModelType.ExternalImageGenerator],
+        ui_model_format=[ModelFormat.ExternalApi],
+        ui_model_provider_id=["gemini"],
+    )
 
     temperature: float | None = InputField(default=None, ge=0.0, le=2.0, description="Sampling temperature")
     thinking_level: Literal["minimal", "high"] | None = InputField(
@@ -202,6 +227,14 @@ class GeminiImageGenerationInvocation(BaseExternalImageGenerationInvocation):
             options["thinking_level"] = self.thinking_level
         return options or None
 
+    def _build_output_provider_metadata(self) -> dict[str, Any]:
+        metadata: dict[str, Any] = {}
+        if self.temperature is not None:
+            metadata["gemini_temperature"] = self.temperature
+        if self.thinking_level is not None:
+            metadata["gemini_thinking_level"] = self.thinking_level
+        return metadata
+
 
 @invocation(
     "seedream_image_generation",
@@ -215,6 +248,14 @@ class SeedreamImageGenerationInvocation(BaseExternalImageGenerationInvocation):
 
     provider_id = "seedream"
 
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.External],
+        ui_model_type=[ModelType.ExternalImageGenerator],
+        ui_model_format=[ModelFormat.ExternalApi],
+        ui_model_provider_id=["seedream"],
+    )
+
     watermark: bool = InputField(default=False, description="Add watermark to generated images")
     optimize_prompt: bool = InputField(default=False, description="Let the model optimize the prompt before generation")
 
@@ -222,4 +263,10 @@ class SeedreamImageGenerationInvocation(BaseExternalImageGenerationInvocation):
         return {
             "watermark": self.watermark,
             "optimize_prompt": self.optimize_prompt,
+        }
+
+    def _build_output_provider_metadata(self) -> dict[str, Any]:
+        return {
+            "seedream_watermark": self.watermark,
+            "seedream_optimize_prompt": self.optimize_prompt,
         }
