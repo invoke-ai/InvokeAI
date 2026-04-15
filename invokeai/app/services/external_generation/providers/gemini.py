@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import json
-import uuid
-
 import requests
-from PIL.Image import Image as PILImageType
 
 from invokeai.app.services.external_generation.errors import (
     ExternalProviderRateLimitError,
@@ -107,8 +103,6 @@ class GeminiProvider(ExternalProvider):
         if "thinking_level" in opts:
             payload["thinkingConfig"] = {"thinkingLevel": opts["thinking_level"].upper()}
 
-        self._dump_debug_payload("request", payload)
-
         response = requests.post(
             endpoint,
             params={"key": api_key},
@@ -128,7 +122,6 @@ class GeminiProvider(ExternalProvider):
             )
 
         data = response.json()
-        self._dump_debug_payload("response", data)
         if not isinstance(data, dict):
             raise ExternalProviderRequestError("Gemini response payload was not a JSON object")
         images: list[ExternalGeneratedImage] = []
@@ -153,7 +146,6 @@ class GeminiProvider(ExternalProvider):
                     if encoded:
                         image = decode_image_base64(encoded)
                         images.append(ExternalGeneratedImage(image=image, seed=request.seed))
-                        self._dump_debug_image(image)
                         continue
                 file_data = part.get("fileData") or part.get("file_data")
                 if isinstance(file_data, dict):
@@ -184,32 +176,6 @@ class GeminiProvider(ExternalProvider):
             seed_used=request.seed,
             provider_metadata={"model": request.model.provider_model_id},
         )
-
-    def _dump_debug_payload(self, label: str, payload: object) -> None:
-        """TODO: remove debug payload dump once Gemini is stable."""
-        try:
-            outputs_path = self._app_config.outputs_path
-            if outputs_path is None:
-                return
-            debug_dir = outputs_path / "external_debug" / "gemini"
-            debug_dir.mkdir(parents=True, exist_ok=True)
-            path = debug_dir / f"{label}_{uuid.uuid4().hex}.json"
-            path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
-        except Exception as exc:
-            self._logger.debug("Failed to write Gemini debug payload: %s", exc)
-
-    def _dump_debug_image(self, image: "PILImageType") -> None:
-        """TODO: remove debug image dump once Gemini is stable."""
-        try:
-            outputs_path = self._app_config.outputs_path
-            if outputs_path is None:
-                return
-            debug_dir = outputs_path / "external_debug" / "gemini"
-            debug_dir.mkdir(parents=True, exist_ok=True)
-            path = debug_dir / f"decoded_{uuid.uuid4().hex}.png"
-            image.save(path, format="PNG")
-        except Exception as exc:
-            self._logger.debug("Failed to write Gemini debug image: %s", exc)
 
 
 def _iter_response_parts(candidate: dict[str, object]) -> list[dict[str, object]]:

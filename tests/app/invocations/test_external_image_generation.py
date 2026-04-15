@@ -4,10 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
-from invokeai.app.invocations.external_image_generation import (
-    ExternalImageGenerationInvocation,
-    OpenAIImageGenerationInvocation,
-)
+from invokeai.app.invocations.external_image_generation import OpenAIImageGenerationInvocation
 from invokeai.app.invocations.fields import ImageField
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.external_generation.external_generation_common import (
@@ -51,7 +48,7 @@ def test_external_invocation_builds_request_and_outputs() -> None:
     generated_image = Image.new("RGB", (16, 16), color="black")
     context = _build_context(model_config, generated_image)
 
-    invocation = ExternalImageGenerationInvocation(
+    invocation = OpenAIImageGenerationInvocation(
         id="external_node",
         model=model_field,
         mode="txt2img",
@@ -95,7 +92,7 @@ def test_external_graph_execution_state_runs_node() -> None:
     generated_image = Image.new("RGB", (16, 16), color="black")
     context = _build_context(model_config, generated_image)
 
-    invocation = ExternalImageGenerationInvocation(
+    invocation = OpenAIImageGenerationInvocation(
         id="external_node",
         model=model_field,
         mode="txt2img",

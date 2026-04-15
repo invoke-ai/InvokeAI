@@ -35,7 +35,10 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
   assert(isExternalApiModelConfig(modelConfig), 'Selected model is not an external API model');
   const model = modelConfig;
 
-  const requestedMode = generationMode === 'outpaint' ? 'inpaint' : generationMode;
+  if (generationMode === 'outpaint') {
+    throw new UnsupportedGenerationModeError('Outpainting is not supported for external API models.');
+  }
+  const requestedMode = generationMode;
   if (!model.capabilities.modes.includes(requestedMode)) {
     throw new UnsupportedGenerationModeError(`${model.name} does not support ${requestedMode} mode`);
   }
@@ -60,9 +63,10 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
   });
 
   const externalNodeType = EXTERNAL_PROVIDER_NODE_TYPES[model.provider_id as keyof typeof EXTERNAL_PROVIDER_NODE_TYPES];
+  assert(externalNodeType, `No invocation node registered for external provider '${model.provider_id}'`);
   const externalNode: Record<string, unknown> = {
-    id: getPrefixedId('external_image_generation'),
-    type: externalNodeType ?? 'external_image_generation',
+    id: getPrefixedId(externalNodeType),
+    type: externalNodeType,
     model: model as unknown as ModelIdentifierField,
     mode: requestedMode,
     image_size: params.imageSize ?? null,
@@ -84,7 +88,7 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
       externalNode.thinking_level = params.geminiThinkingLevel;
     }
   }
-  g.addNode(externalNode as AnyInvocation);
+  const externalInvocation = g.addNode(externalNode as AnyInvocation);
 
   if (seed) {
     g.addEdgeFromObj({
@@ -126,7 +130,7 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
     });
     externalNode.init_image = { image_name: initImage.image_name };
 
-    if (generationMode === 'inpaint' || generationMode === 'outpaint') {
+    if (generationMode === 'inpaint') {
       const inpaintMaskAdapters = manager.compositor.getVisibleAdaptersOfType('inpaint_mask');
       const maskImage = await manager.compositor.getGrayscaleMaskCompositeImageDTO(
         inpaintMaskAdapters,
@@ -143,6 +147,18 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
   }
 
   g.updateNode(externalNode as AnyInvocation, selectCanvasOutputFields(state));
+
+  g.upsertMetadata({
+    model: Graph.getModelMetadataField(model),
+    width: externalNode.width as number,
+    height: externalNode.height as number,
+  });
+  g.addEdgeToMetadata(positivePrompt as Invocation<'string'>, 'value', 'positive_prompt');
+  if (seed) {
+    g.addEdgeToMetadata(seed, 'value', 'seed');
+  }
+
+  g.setMetadataReceivingNode(externalInvocation);
 
   return {
     g,
