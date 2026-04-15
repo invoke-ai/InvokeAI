@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import json
-import uuid
-
 import requests
-from PIL.Image import Image as PILImageType
 
 from invokeai.app.services.external_generation.errors import (
     ExternalProviderRateLimitError,
@@ -85,8 +81,6 @@ class SeedreamProvider(ExternalProvider):
         if images_b64:
             payload["image"] = images_b64 if len(images_b64) > 1 else images_b64[0]
 
-        self._dump_debug_payload("request", payload)
-
         response = requests.post(endpoint, headers=headers, json=payload, timeout=120)
 
         if not response.ok:
@@ -101,7 +95,6 @@ class SeedreamProvider(ExternalProvider):
             )
 
         body = response.json()
-        self._dump_debug_payload("response", body)
         if not isinstance(body, dict):
             raise ExternalProviderRequestError("Seedream response payload was not a JSON object")
 
@@ -120,7 +113,6 @@ class SeedreamProvider(ExternalProvider):
             if not encoded:
                 continue
             image = decode_image_base64(encoded)
-            self._dump_debug_image(image)
             generated_images.append(ExternalGeneratedImage(image=image, seed=request.seed))
 
         if not generated_images:
@@ -131,32 +123,6 @@ class SeedreamProvider(ExternalProvider):
             seed_used=request.seed,
             provider_metadata={"model": model_id},
         )
-
-    def _dump_debug_payload(self, label: str, payload: object) -> None:
-        """TODO: remove debug payload dump once Seedream is stable."""
-        try:
-            outputs_path = self._app_config.outputs_path
-            if outputs_path is None:
-                return
-            debug_dir = outputs_path / "external_debug" / "seedream"
-            debug_dir.mkdir(parents=True, exist_ok=True)
-            path = debug_dir / f"{label}_{uuid.uuid4().hex}.json"
-            path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
-        except Exception as exc:
-            self._logger.debug("Failed to write Seedream debug payload: %s", exc)
-
-    def _dump_debug_image(self, image: PILImageType) -> None:
-        """TODO: remove debug image dump once Seedream is stable."""
-        try:
-            outputs_path = self._app_config.outputs_path
-            if outputs_path is None:
-                return
-            debug_dir = outputs_path / "external_debug" / "seedream"
-            debug_dir.mkdir(parents=True, exist_ok=True)
-            path = debug_dir / f"decoded_{uuid.uuid4().hex}.png"
-            image.save(path, format="PNG")
-        except Exception as exc:
-            self._logger.debug("Failed to write Seedream debug image: %s", exc)
 
 
 def _parse_retry_after(value: str | None) -> float | None:

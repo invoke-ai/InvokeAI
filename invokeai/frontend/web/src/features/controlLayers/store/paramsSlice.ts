@@ -669,6 +669,7 @@ export const {
   syncedToOptimalDimension,
 
   resolutionPresetSelected,
+  imageSizeChanged,
   paramsReset,
   openaiQualityChanged,
   openaiBackgroundChanged,
