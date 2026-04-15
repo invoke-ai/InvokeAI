@@ -23,6 +23,7 @@ import {
 import { assert } from 'tsafe';
 
 const EXTERNAL_PROVIDER_NODE_TYPES = {
+  alibabacloud: 'alibabacloud_image_generation',
   gemini: 'gemini_image_generation',
   openai: 'openai_image_generation',
 } as const;

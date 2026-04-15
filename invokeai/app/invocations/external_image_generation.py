@@ -234,3 +234,24 @@ class GeminiImageGenerationInvocation(BaseExternalImageGenerationInvocation):
         if self.thinking_level is not None:
             metadata["gemini_thinking_level"] = self.thinking_level
         return metadata
+
+
+@invocation(
+    "alibabacloud_image_generation",
+    title="Alibaba Cloud DashScope Image Generation",
+    tags=["external", "generation", "alibabacloud", "dashscope"],
+    category="image",
+    version="1.0.0",
+)
+class AlibabaCloudImageGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Generate images using an Alibaba Cloud DashScope external model."""
+
+    provider_id = "alibabacloud"
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.External],
+        ui_model_type=[ModelType.ExternalImageGenerator],
+        ui_model_format=[ModelFormat.ExternalApi],
+        ui_model_provider_id=["alibabacloud"],
+    )
