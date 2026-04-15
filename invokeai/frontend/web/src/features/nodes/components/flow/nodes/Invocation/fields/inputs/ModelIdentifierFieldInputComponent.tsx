@@ -36,11 +36,7 @@ const ModelIdentifierFieldInputComponent = (props: Props) => {
       return EMPTY_ARRAY;
     }
 
-    if (
-      !fieldTemplate.ui_model_base &&
-      !fieldTemplate.ui_model_type &&
-      !fieldTemplate.ui_model_provider_id
-    ) {
+    if (!fieldTemplate.ui_model_base && !fieldTemplate.ui_model_type && !fieldTemplate.ui_model_provider_id) {
       return modelConfigsAdapterSelectors.selectAll(data);
     }
 
