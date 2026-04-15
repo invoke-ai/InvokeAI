@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import time
 from logging import Logger
 from typing import TYPE_CHECKING
@@ -52,6 +53,7 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
         request = self._refresh_model_capabilities(request)
         resize_to_original_inpaint_size = _get_resize_target_for_inpaint(request)
         request = self._bucket_request(request)
+        request = self._drop_unsupported_capabilities(request)
 
         self._validate_request(request)
         result = self._generate_with_retry(provider, request)
@@ -103,9 +105,6 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
         if request.mode not in capabilities.modes:
             raise ExternalProviderCapabilityError(f"Mode '{request.mode}' is not supported by {request.model.name}")
 
-        if request.seed is not None and not capabilities.supports_seed:
-            raise ExternalProviderCapabilityError(f"Seed control is not supported by {request.model.name}")
-
         if request.reference_images and not capabilities.supports_reference_images:
             raise ExternalProviderCapabilityError(f"Reference images are not supported by {request.model.name}")
 
@@ -148,6 +147,23 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
             raise ExternalProviderCapabilityError(
                 f"Mode '{request.mode}' requires a mask image for {request.model.name}"
             )
+
+    def _drop_unsupported_capabilities(self, request: ExternalGenerationRequest) -> ExternalGenerationRequest:
+        """Silently drop request fields the selected model does not support so workflow-editor runs don't fail
+        when users wire them in regardless."""
+        capabilities = request.model.capabilities
+        updates: dict[str, object] = {}
+
+        if request.seed is not None and not capabilities.supports_seed:
+            self._logger.debug(
+                "Dropping seed for %s: model does not support seed control",
+                request.model.name,
+            )
+            updates["seed"] = None
+
+        if updates:
+            return dataclasses.replace(request, **updates)
+        return request
 
     def _refresh_model_capabilities(self, request: ExternalGenerationRequest) -> ExternalGenerationRequest:
         if self._record_store is None:
