@@ -20,7 +20,7 @@ COGVIEW4_GLM_MAX_SEQ_LEN = 1024
     "cogview4_text_encoder",
     title="Prompt - CogView4",
     tags=["prompt", "conditioning", "cogview4"],
-    category="conditioning",
+    category="prompt",
     version="1.0.0",
     classification=Classification.Prototype,
 )

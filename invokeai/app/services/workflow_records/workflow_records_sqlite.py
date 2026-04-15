@@ -7,6 +7,7 @@ from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
 from invokeai.app.services.workflow_records.workflow_records_common import (
+    WORKFLOW_LIBRARY_DEFAULT_USER_ID,
     Workflow,
     WorkflowCategory,
     WorkflowNotFoundError,
@@ -36,7 +37,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                SELECT workflow_id, workflow, name, created_at, updated_at, opened_at
+                SELECT workflow_id, workflow, name, created_at, updated_at, opened_at, user_id, is_public
                 FROM workflow_library
                 WHERE workflow_id = ?;
                 """,
@@ -47,7 +48,12 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
             raise WorkflowNotFoundError(f"Workflow with id {workflow_id} not found")
         return WorkflowRecordDTO.from_dict(dict(row))
 
-    def create(self, workflow: WorkflowWithoutID) -> WorkflowRecordDTO:
+    def create(
+        self,
+        workflow: WorkflowWithoutID,
+        user_id: str = WORKFLOW_LIBRARY_DEFAULT_USER_ID,
+        is_public: bool = False,
+    ) -> WorkflowRecordDTO:
         if workflow.meta.category is WorkflowCategory.Default:
             raise ValueError("Default workflows cannot be created via this method")
 
@@ -57,42 +63,98 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 """--sql
                 INSERT OR IGNORE INTO workflow_library (
                     workflow_id,
-                    workflow
+                    workflow,
+                    user_id,
+                    is_public
                 )
-                VALUES (?, ?);
+                VALUES (?, ?, ?, ?);
                 """,
-                (workflow_with_id.id, workflow_with_id.model_dump_json()),
+                (workflow_with_id.id, workflow_with_id.model_dump_json(), user_id, is_public),
             )
         return self.get(workflow_with_id.id)
 
-    def update(self, workflow: Workflow) -> WorkflowRecordDTO:
+    def update(self, workflow: Workflow, user_id: Optional[str] = None) -> WorkflowRecordDTO:
         if workflow.meta.category is WorkflowCategory.Default:
             raise ValueError("Default workflows cannot be updated")
 
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                UPDATE workflow_library
-                SET workflow = ?
-                WHERE workflow_id = ? AND category = 'user';
-                """,
-                (workflow.model_dump_json(), workflow.id),
-            )
+            if user_id is not None:
+                cursor.execute(
+                    """--sql
+                    UPDATE workflow_library
+                    SET workflow = ?
+                    WHERE workflow_id = ? AND category = 'user' AND user_id = ?;
+                    """,
+                    (workflow.model_dump_json(), workflow.id, user_id),
+                )
+            else:
+                cursor.execute(
+                    """--sql
+                    UPDATE workflow_library
+                    SET workflow = ?
+                    WHERE workflow_id = ? AND category = 'user';
+                    """,
+                    (workflow.model_dump_json(), workflow.id),
+                )
         return self.get(workflow.id)
 
-    def delete(self, workflow_id: str) -> None:
+    def delete(self, workflow_id: str, user_id: Optional[str] = None) -> None:
         if self.get(workflow_id).workflow.meta.category is WorkflowCategory.Default:
             raise ValueError("Default workflows cannot be deleted")
 
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                DELETE from workflow_library
-                WHERE workflow_id = ? AND category = 'user';
-                """,
-                (workflow_id,),
-            )
+            if user_id is not None:
+                cursor.execute(
+                    """--sql
+                    DELETE from workflow_library
+                    WHERE workflow_id = ? AND category = 'user' AND user_id = ?;
+                    """,
+                    (workflow_id, user_id),
+                )
+            else:
+                cursor.execute(
+                    """--sql
+                    DELETE from workflow_library
+                    WHERE workflow_id = ? AND category = 'user';
+                    """,
+                    (workflow_id,),
+                )
         return None
+
+    def update_is_public(self, workflow_id: str, is_public: bool, user_id: Optional[str] = None) -> WorkflowRecordDTO:
+        """Updates the is_public field of a workflow and manages the 'shared' tag automatically."""
+        record = self.get(workflow_id)
+        workflow = record.workflow
+
+        # Manage "shared" tag: add when public, remove when private
+        tags_list = [t.strip() for t in workflow.tags.split(",") if t.strip()] if workflow.tags else []
+        if is_public and "shared" not in tags_list:
+            tags_list.append("shared")
+        elif not is_public and "shared" in tags_list:
+            tags_list.remove("shared")
+        updated_tags = ", ".join(tags_list)
+        updated_workflow = workflow.model_copy(update={"tags": updated_tags})
+
+        with self._db.transaction() as cursor:
+            if user_id is not None:
+                cursor.execute(
+                    """--sql
+                    UPDATE workflow_library
+                    SET workflow = ?, is_public = ?
+                    WHERE workflow_id = ? AND category = 'user' AND user_id = ?;
+                    """,
+                    (updated_workflow.model_dump_json(), is_public, workflow_id, user_id),
+                )
+            else:
+                cursor.execute(
+                    """--sql
+                    UPDATE workflow_library
+                    SET workflow = ?, is_public = ?
+                    WHERE workflow_id = ? AND category = 'user';
+                    """,
+                    (updated_workflow.model_dump_json(), is_public, workflow_id),
+                )
+        return self.get(workflow_id)
 
     def get_many(
         self,
@@ -104,6 +166,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         query: Optional[str] = None,
         tags: Optional[list[str]] = None,
         has_been_opened: Optional[bool] = None,
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         with self._db.transaction() as cursor:
             # sanitize!
@@ -122,7 +186,9 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                         created_at,
                         updated_at,
                         opened_at,
-                        tags
+                        tags,
+                        user_id,
+                        is_public
                     FROM workflow_library
                     """
             count_query = "SELECT COUNT(*) FROM workflow_library"
@@ -177,6 +243,16 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 conditions.append(query_condition)
                 params.extend([wildcard_query, wildcard_query, wildcard_query])
 
+            if user_id is not None:
+                # Scope to the given user but always include default workflows
+                conditions.append("(user_id = ? OR category = 'default')")
+                params.append(user_id)
+
+            if is_public is True:
+                conditions.append("is_public = TRUE")
+            elif is_public is False:
+                conditions.append("is_public = FALSE")
+
             if conditions:
                 # If there are conditions, add a WHERE clause and then join the conditions
                 main_query += " WHERE "
@@ -226,6 +302,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         tags: list[str],
         categories: Optional[list[WorkflowCategory]] = None,
         has_been_opened: Optional[bool] = None,
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> dict[str, int]:
         if not tags:
             return {}
@@ -247,6 +325,16 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 base_conditions.append("opened_at IS NOT NULL")
             elif has_been_opened is False:
                 base_conditions.append("opened_at IS NULL")
+
+            if user_id is not None:
+                # Scope to the given user but always include default workflows
+                base_conditions.append("(user_id = ? OR category = 'default')")
+                base_params.append(user_id)
+
+            if is_public is True:
+                base_conditions.append("is_public = TRUE")
+            elif is_public is False:
+                base_conditions.append("is_public = FALSE")
 
             # For each tag to count, run a separate query
             for tag in tags:
@@ -277,6 +365,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         self,
         categories: list[WorkflowCategory],
         has_been_opened: Optional[bool] = None,
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> dict[str, int]:
         with self._db.transaction() as cursor:
             result: dict[str, int] = {}
@@ -295,6 +385,16 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 base_conditions.append("opened_at IS NOT NULL")
             elif has_been_opened is False:
                 base_conditions.append("opened_at IS NULL")
+
+            if user_id is not None:
+                # Scope to the given user but always include default workflows
+                base_conditions.append("(user_id = ? OR category = 'default')")
+                base_params.append(user_id)
+
+            if is_public is True:
+                base_conditions.append("is_public = TRUE")
+            elif is_public is False:
+                base_conditions.append("is_public = FALSE")
 
             # For each category to count, run a separate query
             for category in categories:
@@ -321,20 +421,32 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
         return result
 
-    def update_opened_at(self, workflow_id: str) -> None:
+    def update_opened_at(self, workflow_id: str, user_id: Optional[str] = None) -> None:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                f"""--sql
-                UPDATE workflow_library
-                SET opened_at = STRFTIME('{SQL_TIME_FORMAT}', 'NOW')
-                WHERE workflow_id = ?;
-                """,
-                (workflow_id,),
-            )
+            if user_id is not None:
+                cursor.execute(
+                    f"""--sql
+                    UPDATE workflow_library
+                    SET opened_at = STRFTIME('{SQL_TIME_FORMAT}', 'NOW')
+                    WHERE workflow_id = ? AND user_id = ?;
+                    """,
+                    (workflow_id, user_id),
+                )
+            else:
+                cursor.execute(
+                    f"""--sql
+                    UPDATE workflow_library
+                    SET opened_at = STRFTIME('{SQL_TIME_FORMAT}', 'NOW')
+                    WHERE workflow_id = ?;
+                    """,
+                    (workflow_id,),
+                )
 
     def get_all_tags(
         self,
         categories: Optional[list[WorkflowCategory]] = None,
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> list[str]:
         with self._db.transaction() as cursor:
             conditions: list[str] = []
@@ -348,6 +460,16 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 placeholders = ", ".join("?" for _ in categories)
                 conditions.append(f"category IN ({placeholders})")
                 params.extend([category.value for category in categories])
+
+            if user_id is not None:
+                # Scope to the given user but always include default workflows
+                conditions.append("(user_id = ? OR category = 'default')")
+                params.append(user_id)
+
+            if is_public is True:
+                conditions.append("is_public = TRUE")
+            elif is_public is False:
+                conditions.append("is_public = FALSE")
 
             stmt = """--sql
                 SELECT DISTINCT tags

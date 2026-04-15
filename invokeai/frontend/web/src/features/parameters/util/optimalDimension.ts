@@ -3,7 +3,7 @@ import type { BaseModelType } from 'features/nodes/types/common';
 /**
  * Gets the optimal dimension for a given base model:
  * - sd-1, sd-2: 512
- * - sdxl, flux, sd-3, cogview4, z-image, anima: 1024
+ * - sdxl, flux, sd-3, cogview4, qwen-image, z-image, anima: 1024
  * - default: 1024
  * @param base The base model
  * @returns The optimal dimension for the model, defaulting to 1024
@@ -18,6 +18,7 @@ export const getOptimalDimension = (base?: BaseModelType | null): number => {
     case 'flux2':
     case 'sd-3':
     case 'cogview4':
+    case 'qwen-image':
     case 'z-image':
     case 'anima':
     default:
@@ -62,7 +63,7 @@ export const isInSDXLTrainingDimensions = (width: number, height: number): boole
 /**
  * Gets the grid size for a given base model. For Flux, the grid size is 16, otherwise it is 8.
  * - sd-1, sd-2, sdxl, anima: 8
- * - flux, sd-3, z-image: 16
+ * - flux, sd-3, qwen-image, z-image: 16
  * - cogview4: 32
  * - default: 8
  * @param base The base model
@@ -75,6 +76,7 @@ export const getGridSize = (base?: BaseModelType | null): number => {
     case 'flux':
     case 'flux2':
     case 'sd-3':
+    case 'qwen-image':
     case 'z-image':
       return 16;
     case 'sd-1':

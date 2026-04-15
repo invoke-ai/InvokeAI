@@ -23,7 +23,7 @@ class ImagePanelCoordinateOutput(BaseInvocationOutput):
     "image_panel_layout",
     title="Image Panel Layout",
     tags=["image", "panel", "layout"],
-    category="image",
+    category="canvas",
     version="1.0.0",
     classification=Classification.Prototype,
 )

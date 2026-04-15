@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy
+from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecordOrderBy, BoardVisibility
 from invokeai.app.services.boards.boards_common import BoardDTO
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
@@ -56,7 +56,14 @@ async def get_board(
     except Exception:
         raise HTTPException(status_code=404, detail="Board not found")
 
-    if not current_user.is_admin and result.user_id != current_user.user_id:
+    # Admins can access any board.
+    # Owners can access their own boards.
+    # Shared and public boards are visible to all authenticated users.
+    if (
+        not current_user.is_admin
+        and result.user_id != current_user.user_id
+        and result.board_visibility == BoardVisibility.Private
+    ):
         raise HTTPException(status_code=403, detail="Not authorized to access this board")
 
     return result
@@ -188,7 +195,11 @@ async def list_all_board_image_names(
         except Exception:
             raise HTTPException(status_code=404, detail="Board not found")
 
-        if not current_user.is_admin and board.user_id != current_user.user_id:
+        if (
+            not current_user.is_admin
+            and board.user_id != current_user.user_id
+            and board.board_visibility == BoardVisibility.Private
+        ):
             raise HTTPException(status_code=403, detail="Not authorized to access this board")
 
     image_names = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
@@ -196,4 +207,15 @@ async def list_all_board_image_names(
         categories,
         is_intermediate,
     )
+
+    # For uncategorized images (board_id="none"), filter to only the caller's
+    # images so that one user cannot enumerate another's uncategorized images.
+    # Admin users can see all uncategorized images.
+    if board_id == "none" and not current_user.is_admin:
+        image_names = [
+            name
+            for name in image_names
+            if ApiDependencies.invoker.services.image_records.get_user_id(name) == current_user.user_id
+        ]
+
     return image_names

@@ -58,6 +58,9 @@ export const ImageMetadataActions = memo((props: Props) => {
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerScheduler} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerDenoisingStart} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerSteps} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageComponentSource} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageQuantization} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.QwenImageShift} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.CanvasLayers} />
       <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefImages} />
       <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.LoRAs} />
