@@ -2,8 +2,8 @@ import { logger } from 'app/logging/logger';
 import { useAppDispatch, useAppStore } from 'app/store/storeHooks';
 import { canvasSnapshotRestored } from 'features/controlLayers/store/canvasSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
-import type { CanvasState } from 'features/controlLayers/store/types';
 import { zCanvasState } from 'features/controlLayers/store/types';
+import { collectImageNames } from 'features/controlLayers/util/canvasProjectFile';
 import { useCallback, useMemo } from 'react';
 import { serializeError } from 'serialize-error';
 import { appInfoApi } from 'services/api/endpoints/appInfo';
@@ -20,35 +20,6 @@ import { z } from 'zod';
 const log = logger('canvas');
 
 const SNAPSHOT_PREFIX = 'canvas_snapshot:';
-
-/**
- * Collect all unique image_name references from a canvas state.
- */
-const collectImageNames = (state: CanvasState): string[] => {
-  const names = new Set<string>();
-
-  const entityGroups = [state.rasterLayers, state.controlLayers, state.inpaintMasks, state.regionalGuidance];
-  for (const group of entityGroups) {
-    for (const entity of group.entities) {
-      for (const obj of entity.objects) {
-        if (obj.type === 'image' && 'image_name' in obj.image) {
-          names.add(obj.image.image_name);
-        }
-      }
-    }
-  }
-
-  // Regional guidance reference images (IP Adapter / FLUX Redux)
-  for (const entity of state.regionalGuidance.entities) {
-    for (const ref of entity.referenceImages) {
-      if (ref.config.image && 'image_name' in ref.config.image) {
-        names.add(ref.config.image.image_name);
-      }
-    }
-  }
-
-  return [...names];
-};
 
 /**
  * Quick health check to determine if the backend is reachable.
@@ -146,12 +117,26 @@ export const useCanvasSnapshots = () => {
         const canvasState = zCanvasState.parse(parsed);
 
         // Check for missing images before restoring
-        const imageNames = collectImageNames(canvasState);
-        const missingImages = imageNames.length > 0 ? await findMissingImages(imageNames, dispatch) : [];
+        // Reuse the shared collectImageNames from canvasProjectFile — snapshots only
+        // contain canvas entities (no global ref images), so we pass an empty array.
+        const imageNames = collectImageNames(
+          {
+            rasterLayers: canvasState.rasterLayers.entities,
+            controlLayers: canvasState.controlLayers.entities,
+            inpaintMasks: canvasState.inpaintMasks.entities,
+            regionalGuidance: canvasState.regionalGuidance.entities,
+            bbox: canvasState.bbox,
+            selectedEntityIdentifier: canvasState.selectedEntityIdentifier,
+            bookmarkedEntityIdentifier: canvasState.bookmarkedEntityIdentifier,
+          },
+          []
+        );
+        const imageNamesList = [...imageNames];
+        const missingImages = imageNamesList.length > 0 ? await findMissingImages(imageNamesList, dispatch) : [];
 
         if (missingImages.length > 0) {
           log.warn(
-            { missingCount: missingImages.length, total: imageNames.length } as unknown as JsonObject,
+            { missingCount: missingImages.length, total: imageNamesList.length } as unknown as JsonObject,
             'Snapshot references images that no longer exist'
           );
         }
