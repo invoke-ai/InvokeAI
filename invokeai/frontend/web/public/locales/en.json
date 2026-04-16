@@ -3326,10 +3326,11 @@
         "scanFolderDescription": "Node packs placed in the nodes directory are automatically detected at startup. Use the Reload button to detect newly added packs without restarting.",
         "nodesDirectory": "Nodes directory",
         "installQueue": "Install Log",
-        "clearLog": "Clear",
         "queueEmpty": "No recent install activity.",
         "name": "Name",
-        "status": "Status",
-        "message": "Message"
+        "message": "Message",
+        "nodeCount_one": "{{count}} node",
+        "nodeCount_other": "{{count}} nodes",
+        "uninstalled": "Uninstalled"
     }
 }

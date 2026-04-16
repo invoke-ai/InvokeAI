@@ -13,6 +13,7 @@ from fastapi import Body
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
+from invokeai.app.api.auth_dependencies import AdminUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.invocations.baseinvocation import InvocationRegistry
 from invokeai.app.services.config.config_default import get_config
@@ -136,6 +137,7 @@ async def list_custom_node_packs() -> NodePackListResponse:
     response_model=InstallNodePackResponse,
 )
 async def install_custom_node_pack(
+    current_admin: AdminUserOrDefault,
     request: InstallNodePackRequest = Body(description="The source URL to install from."),
 ) -> InstallNodePackResponse:
     """Installs a custom node pack from a git URL by cloning it into the nodes directory."""
@@ -200,8 +202,8 @@ async def install_custom_node_pack(
         # Load the node pack at runtime
         _load_node_pack(pack_name, target_dir)
 
-        # Import any workflows found in the pack
-        workflows_imported = _import_workflows_from_pack(target_dir, pack_name)
+        # Import any workflows found in the pack, owned by the installing admin and shared with all users
+        workflows_imported = _import_workflows_from_pack(target_dir, pack_name, owner_user_id=current_admin.user_id)
         workflow_msg = f" Imported {workflows_imported} workflow(s)." if workflows_imported > 0 else ""
         dependency_msg = (
             f" This pack includes a {dependency_file} — install its dependencies manually following the pack's documentation."
@@ -243,7 +245,10 @@ async def install_custom_node_pack(
     operation_id="uninstall_custom_node_pack",
     response_model=UninstallNodePackResponse,
 )
-async def uninstall_custom_node_pack(pack_name: str) -> UninstallNodePackResponse:
+async def uninstall_custom_node_pack(
+    current_admin: AdminUserOrDefault,
+    pack_name: str,
+) -> UninstallNodePackResponse:
     """Uninstalls a custom node pack by removing its directory.
 
     Note: A restart is required for the node removal to take full effect.
@@ -300,7 +305,7 @@ async def uninstall_custom_node_pack(pack_name: str) -> UninstallNodePackRespons
     "/reload",
     operation_id="reload_custom_nodes",
 )
-async def reload_custom_nodes() -> dict[str, str]:
+async def reload_custom_nodes(current_admin: AdminUserOrDefault) -> dict[str, str]:
     """Triggers a reload of all custom nodes.
 
     This re-scans the nodes directory and loads any new node packs.
@@ -352,11 +357,12 @@ def _load_node_pack(pack_name: str, pack_dir: Path) -> None:
     logger.info(f"Successfully loaded node pack {pack_name}")
 
 
-def _import_workflows_from_pack(pack_dir: Path, pack_name: str) -> int:
+def _import_workflows_from_pack(pack_dir: Path, pack_name: str, owner_user_id: str) -> int:
     """Scans a node pack directory for workflow JSON files and imports them into the workflow library.
 
     A JSON file is considered a workflow if it contains 'nodes' and 'edges' keys at the top level.
-    Workflows are imported as user workflows with the node pack name added to the tags.
+    Workflows are imported as user workflows owned by the installing admin and marked public so all
+    users can see them — a pack is an admin-installed shared resource, not a private asset.
 
     Returns the number of workflows successfully imported.
     """
@@ -391,7 +397,9 @@ def _import_workflows_from_pack(pack_dir: Path, pack_name: str) -> int:
 
             # Validate and import the workflow
             workflow = WorkflowWithoutIDValidator.validate_python(data)
-            ApiDependencies.invoker.services.workflow_records.create(workflow=workflow)
+            ApiDependencies.invoker.services.workflow_records.create(
+                workflow=workflow, user_id=owner_user_id, is_public=True
+            )
             logger.info(f"Imported workflow '{workflow.name}' from node pack '{pack_name}'")
             imported_count += 1
 

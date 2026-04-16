@@ -43,9 +43,7 @@ const NodePackItem = memo(({ pack }: { pack: NodePackInfo }) => {
         </Button>
       </Flex>
       <Flex gap={2} alignItems="center" flexWrap="wrap">
-        <Badge colorScheme="invokeBlue">
-          {pack.node_count} {pack.node_count === 1 ? 'node' : 'nodes'}
-        </Badge>
+        <Badge colorScheme="invokeBlue">{t('customNodes.nodeCount', { count: pack.node_count })}</Badge>
         {pack.node_types.map((nodeType) => (
           <Badge key={nodeType} variant="subtle">
             {nodeType}

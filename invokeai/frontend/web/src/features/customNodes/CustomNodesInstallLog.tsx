@@ -1,6 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Badge, Box, Button, Flex, Heading, Table, Tbody, Td, Text, Th, Thead, Tr } from '@invoke-ai/ui-library';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
+import type { TFunction } from 'i18next';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiBroomBold } from 'react-icons/pi';
@@ -54,6 +55,21 @@ const getStatusColor = (status: InstallLogEntry['status']) => {
   }
 };
 
+const getStatusLabel = (status: InstallLogEntry['status'], t: TFunction) => {
+  switch (status) {
+    case 'installing':
+      return t('customNodes.installing');
+    case 'completed':
+      return t('queue.completed');
+    case 'error':
+      return t('common.error');
+    case 'uninstalled':
+      return t('customNodes.uninstalled');
+    default:
+      return status;
+  }
+};
+
 export const CustomNodesInstallLog = memo(() => {
   const { t } = useTranslation();
   const { log, clearLog } = useCustomNodesInstallLog();
@@ -63,7 +79,7 @@ export const CustomNodesInstallLog = memo(() => {
       <Flex justifyContent="space-between" alignItems="center">
         <Heading size="md">{t('customNodes.installQueue')}</Heading>
         <Button leftIcon={<PiBroomBold />} size="sm" isDisabled={log.length === 0} onClick={clearLog} variant="outline">
-          {t('customNodes.clearLog')}
+          {t('common.clear')}
         </Button>
       </Flex>
 
@@ -73,7 +89,7 @@ export const CustomNodesInstallLog = memo(() => {
             <Thead>
               <Tr>
                 <Th width="50%">{t('customNodes.name')}</Th>
-                <Th width="25%">{t('customNodes.status')}</Th>
+                <Th width="25%">{t('queue.status')}</Th>
                 <Th width="25%">{t('customNodes.message')}</Th>
               </Tr>
             </Thead>
@@ -93,7 +109,7 @@ export const CustomNodesInstallLog = memo(() => {
                       </Text>
                     </Td>
                     <Td>
-                      <Badge colorScheme={getStatusColor(entry.status)}>{entry.status}</Badge>
+                      <Badge colorScheme={getStatusColor(entry.status)}>{getStatusLabel(entry.status, t)}</Badge>
                     </Td>
                     <Td>
                       <Text fontSize="xs" color="base.400" noOfLines={2}>
