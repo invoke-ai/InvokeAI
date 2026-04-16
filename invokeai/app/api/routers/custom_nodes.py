@@ -184,9 +184,7 @@ async def install_custom_node_pack(
         for candidate in ("requirements.txt", "pyproject.toml"):
             if (target_dir / candidate).exists():
                 dependency_file = candidate
-                logger.info(
-                    f"Node pack '{pack_name}' ships a {candidate}; user must install dependencies manually."
-                )
+                logger.info(f"Node pack '{pack_name}' ships a {candidate}; user must install dependencies manually.")
                 break
 
         # Check for __init__.py
