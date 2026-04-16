@@ -16,11 +16,16 @@ Click the **Nodes** tab (circuit icon) in the left sidebar, between Models and Q
 The installer will:
 
 - Clone the repository into your `nodes` directory
-- Install Python dependencies from `requirements.txt` (if present)
 - Load the nodes immediately — no restart needed
 - Import any workflow `.json` files found in the repository into your workflow library (tagged with `node-pack:<name>` for easy filtering)
 
 The install progress and results are shown in the **Install Log** at the bottom of the panel.
+
+### Installing Python Dependencies
+
+The installer does **not** automatically run `pip install` for `requirements.txt` or `pyproject.toml`. Auto-installing dependencies into the running InvokeAI environment can pull in incompatible package versions and break the application.
+
+If a node pack ships a `requirements.txt` or `pyproject.toml`, you'll see a warning toast after installation. Install the dependencies yourself by following the instructions in the node pack's documentation (typically `pip install -r requirements.txt` from inside an activated InvokeAI environment, but check the pack's README first). After installing, click the **Reload** button so the new dependencies take effect.
 
 ### Security Warning
 

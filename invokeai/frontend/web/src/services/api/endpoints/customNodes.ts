@@ -16,6 +16,8 @@ type InstallNodePackResponse = {
   success: boolean;
   message: string;
   workflows_imported: number;
+  requires_dependencies: boolean;
+  dependency_file: string | null;
 };
 
 type UninstallNodePackResponse = {

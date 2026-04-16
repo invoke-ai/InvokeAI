@@ -22,7 +22,7 @@ The `__init__.py` at the root is **mandatory**. Without it, the pack will not be
 ```
 my-node-pack/
 ├── __init__.py          # Imports all node classes
-├── requirements.txt     # Python dependencies (auto-installed)
+├── requirements.txt     # Python dependencies (user-installed)
 ├── README.md            # Description, usage, examples
 ├── node_one.py          # Node implementation
 ├── node_two.py          # Node implementation
@@ -48,16 +48,16 @@ from .nodes.image_tools import CropInvocation, ResizeInvocation
 from .nodes.text_tools import ConcatInvocation
 ```
 
-## Dependencies (`requirements.txt`)
+## Dependencies (`requirements.txt` or `pyproject.toml`)
 
-If your nodes require additional Python packages, list them in a `requirements.txt` at the repository root:
+If your nodes require additional Python packages, list them in a `requirements.txt` (or `pyproject.toml`) at the repository root:
 
 ```
 numpy>=1.24
 opencv-python>=4.8
 ```
 
-The Custom Node Manager will automatically run `pip install -r requirements.txt` during installation.
+The Custom Node Manager **does not** install these dependencies automatically — auto-installing into the running InvokeAI environment risks pulling in incompatible versions and breaking the application. After install, the UI shows the user a toast telling them that manual installation is required, and your README should document the exact install command (e.g. `pip install -r requirements.txt` from inside an activated InvokeAI environment).
 
 **Important:** Avoid pinning versions too tightly. InvokeAI has its own dependencies, and version conflicts can cause issues. Use minimum version constraints (`>=`) where possible.
 

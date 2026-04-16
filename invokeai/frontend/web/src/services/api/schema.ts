@@ -14435,6 +14435,17 @@ export type components = {
              * @default 0
              */
             workflows_imported?: number;
+            /**
+             * Requires Dependencies
+             * @description Whether the pack ships a dependency manifest (requirements.txt or pyproject.toml) that the user must install manually following the pack's documentation.
+             * @default false
+             */
+            requires_dependencies?: boolean;
+            /**
+             * Dependency File
+             * @description Name of the detected dependency manifest file, if any.
+             */
+            dependency_file?: string | null;
         };
         /**
          * InstallStatus

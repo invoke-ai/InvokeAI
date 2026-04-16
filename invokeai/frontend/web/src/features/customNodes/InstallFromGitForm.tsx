@@ -9,6 +9,7 @@ import {
   FormLabel,
   Input,
 } from '@invoke-ai/ui-library';
+import { toast } from 'features/toast/toast';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { memo, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -35,6 +36,19 @@ export const InstallFromGitForm = memo(() => {
       if (result.success) {
         addLogEntry({ name: result.name, status: 'completed', message: result.message });
         setSource('');
+        if (result.requires_dependencies) {
+          toast({
+            id: `custom-nodes-deps-${result.name}`,
+            title: t('customNodes.dependenciesRequiredTitle'),
+            description: t('customNodes.dependenciesRequiredDescription', {
+              name: result.name,
+              file: result.dependency_file ?? 'requirements.txt',
+            }),
+            status: 'warning',
+            duration: null,
+            isClosable: true,
+          });
+        }
       } else {
         addLogEntry({ name: result.name, status: 'error', message: result.message });
       }

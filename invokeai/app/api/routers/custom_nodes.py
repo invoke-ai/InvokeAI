@@ -7,6 +7,7 @@ import sys
 import traceback
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from typing import Optional
 
 from fastapi import Body
 from fastapi.routing import APIRouter
@@ -51,6 +52,15 @@ class InstallNodePackResponse(BaseModel):
     success: bool = Field(description="Whether the installation was successful.")
     message: str = Field(description="Status message.")
     workflows_imported: int = Field(default=0, description="Number of workflows imported from the pack.")
+    requires_dependencies: bool = Field(
+        default=False,
+        description="Whether the pack ships a dependency manifest (requirements.txt or pyproject.toml) "
+        "that the user must install manually following the pack's documentation.",
+    )
+    dependency_file: Optional[str] = Field(
+        default=None,
+        description="Name of the detected dependency manifest file, if any.",
+    )
 
 
 class UninstallNodePackResponse(BaseModel):
@@ -167,17 +177,17 @@ async def install_custom_node_pack(
                 message=f"Git clone failed: {result.stderr.strip()}",
             )
 
-        # Check if there's a requirements.txt and install dependencies
-        requirements_file = target_dir / "requirements.txt"
-        if requirements_file.exists():
-            pip_result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)],
-                capture_output=True,
-                text=True,
-                timeout=300,
-            )
-            if pip_result.returncode != 0:
-                logger.warning(f"Failed to install requirements for {pack_name}: {pip_result.stderr.strip()}")
+        # Detect dependency manifests but do NOT install them automatically.
+        # The user is responsible for installing dependencies per the pack's documentation,
+        # since arbitrary pip installs can break the InvokeAI environment.
+        dependency_file: Optional[str] = None
+        for candidate in ("requirements.txt", "pyproject.toml"):
+            if (target_dir / candidate).exists():
+                dependency_file = candidate
+                logger.info(
+                    f"Node pack '{pack_name}' ships a {candidate}; user must install dependencies manually."
+                )
+                break
 
         # Check for __init__.py
         init_file = target_dir / "__init__.py"
@@ -195,12 +205,19 @@ async def install_custom_node_pack(
         # Import any workflows found in the pack
         workflows_imported = _import_workflows_from_pack(target_dir, pack_name)
         workflow_msg = f" Imported {workflows_imported} workflow(s)." if workflows_imported > 0 else ""
+        dependency_msg = (
+            f" This pack includes a {dependency_file} — install its dependencies manually following the pack's documentation."
+            if dependency_file
+            else ""
+        )
 
         return InstallNodePackResponse(
             name=pack_name,
             success=True,
-            message=f"Successfully installed node pack '{pack_name}'.{workflow_msg}",
+            message=f"Successfully installed node pack '{pack_name}'.{workflow_msg}{dependency_msg}",
             workflows_imported=workflows_imported,
+            requires_dependencies=dependency_file is not None,
+            dependency_file=dependency_file,
         )
 
     except subprocess.TimeoutExpired:
