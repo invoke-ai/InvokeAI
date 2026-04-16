@@ -5,9 +5,12 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from invokeai.app.api.routers.custom_nodes import (
+    PACK_MANIFEST_FILENAME,
     _get_installed_packs,
     _import_workflows_from_pack,
-    _remove_workflows_for_pack,
+    _read_pack_manifest,
+    _remove_workflows_by_ids,
+    _write_pack_manifest,
 )
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
@@ -74,20 +77,27 @@ class TestGetInstalledPacks:
 class TestImportWorkflowsFromPack:
     """Tests for _import_workflows_from_pack()."""
 
+    @staticmethod
+    def _mock_service_with_id(workflow_id: str = "new-id") -> MagicMock:
+        """Returns a mock workflow_records service whose create() yields a DTO with the given id."""
+        mock_service = MagicMock()
+        mock_service.create.return_value = MagicMock(workflow_id=workflow_id)
+        return mock_service
+
     def test_no_json_files(self, tmp_path: Path) -> None:
         (tmp_path / "__init__.py").touch()
         (tmp_path / "node.py").write_text("# node code")
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies"):
-            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
-        assert count == 0
+            ids = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
+        assert ids == []
 
     def test_skips_non_workflow_json(self, tmp_path: Path) -> None:
         # JSON without nodes/edges should be skipped
         config = {"setting": "value"}
         (tmp_path / "config.json").write_text(json.dumps(config))
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies"):
-            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
-        assert count == 0
+            ids = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
+        assert ids == []
 
     def test_imports_valid_workflow(self, tmp_path: Path) -> None:
         workflow = {
@@ -107,12 +117,12 @@ class TestImportWorkflowsFromPack:
         workflows_dir.mkdir()
         (workflows_dir / "test_workflow.json").write_text(json.dumps(workflow))
 
-        mock_service = MagicMock()
+        mock_service = self._mock_service_with_id("wf-new-1")
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
+            ids = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
 
-        assert count == 1
+        assert ids == ["wf-new-1"]
         mock_service.create.assert_called_once()
         # Verify the workflow was tagged
         create_kwargs = mock_service.create.call_args.kwargs
@@ -136,12 +146,12 @@ class TestImportWorkflowsFromPack:
         }
         (tmp_path / "workflow.json").write_text(json.dumps(workflow))
 
-        mock_service = MagicMock()
+        mock_service = self._mock_service_with_id()
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _import_workflows_from_pack(tmp_path, "my_pack", owner_user_id="admin")
+            ids = _import_workflows_from_pack(tmp_path, "my_pack", owner_user_id="admin")
 
-        assert count == 1
+        assert len(ids) == 1
         created_workflow = mock_service.create.call_args.kwargs["workflow"]
         assert "existing, tags" in created_workflow.tags
         assert "node-pack:my_pack" in created_workflow.tags
@@ -163,12 +173,12 @@ class TestImportWorkflowsFromPack:
         }
         (tmp_path / "workflow.json").write_text(json.dumps(workflow))
 
-        mock_service = MagicMock()
+        mock_service = self._mock_service_with_id()
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
+            ids = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
 
-        assert count == 1
+        assert len(ids) == 1
 
     def test_sets_category_to_user(self, tmp_path: Path) -> None:
         workflow = {
@@ -186,20 +196,20 @@ class TestImportWorkflowsFromPack:
         }
         (tmp_path / "workflow.json").write_text(json.dumps(workflow))
 
-        mock_service = MagicMock()
+        mock_service = self._mock_service_with_id()
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
+            ids = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
 
-        assert count == 1
+        assert len(ids) == 1
         created_workflow = mock_service.create.call_args.kwargs["workflow"]
         assert created_workflow.meta.category.value == "user"
 
     def test_skips_invalid_json(self, tmp_path: Path) -> None:
         (tmp_path / "broken.json").write_text("{invalid json")
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies"):
-            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
-        assert count == 0
+            ids = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
+        assert ids == []
 
     def test_finds_workflows_recursively(self, tmp_path: Path) -> None:
         workflow = {
@@ -219,65 +229,107 @@ class TestImportWorkflowsFromPack:
         nested.mkdir(parents=True)
         (nested / "deep_workflow.json").write_text(json.dumps(workflow))
 
+        mock_service = self._mock_service_with_id()
+        with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
+            mock_deps.invoker.services.workflow_records = mock_service
+            ids = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
+
+        assert len(ids) == 1
+
+    def test_skips_manifest_file(self, tmp_path: Path) -> None:
+        # A manifest inside the pack must not be mistaken for a workflow during import
+        (tmp_path / PACK_MANIFEST_FILENAME).write_text(json.dumps({"workflow_ids": ["wf-old"]}))
+        with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies"):
+            ids = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
+        assert ids == []
+
+
+class TestPackManifest:
+    """Tests for _write_pack_manifest() and _read_pack_manifest()."""
+
+    def test_write_then_read_roundtrip(self, tmp_path: Path) -> None:
+        _write_pack_manifest(tmp_path, ["wf-1", "wf-2"])
+        assert _read_pack_manifest(tmp_path) == ["wf-1", "wf-2"]
+
+    def test_read_returns_empty_when_manifest_missing(self, tmp_path: Path) -> None:
+        assert _read_pack_manifest(tmp_path) == []
+
+    def test_read_returns_empty_when_manifest_malformed(self, tmp_path: Path) -> None:
+        (tmp_path / PACK_MANIFEST_FILENAME).write_text("{not valid json")
+        assert _read_pack_manifest(tmp_path) == []
+
+    def test_read_returns_empty_when_workflow_ids_not_a_list(self, tmp_path: Path) -> None:
+        (tmp_path / PACK_MANIFEST_FILENAME).write_text(json.dumps({"workflow_ids": "oops"}))
+        assert _read_pack_manifest(tmp_path) == []
+
+
+class TestRemoveWorkflowsByIds:
+    """Tests for _remove_workflows_by_ids()."""
+
+    def test_deletes_only_given_ids(self) -> None:
         mock_service = MagicMock()
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
-
-        assert count == 1
-
-
-class TestRemoveWorkflowsForPack:
-    """Tests for _remove_workflows_for_pack()."""
-
-    def test_removes_matching_workflows(self) -> None:
-        mock_item_1 = MagicMock()
-        mock_item_1.workflow_id = "wf-1"
-        mock_item_1.name = "Workflow 1"
-        mock_item_2 = MagicMock()
-        mock_item_2.workflow_id = "wf-2"
-        mock_item_2.name = "Workflow 2"
-
-        mock_result = MagicMock()
-        mock_result.items = [mock_item_1, mock_item_2]
-
-        mock_service = MagicMock()
-        mock_service.get_many.return_value = mock_result
-
-        with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
-            mock_deps.invoker.services.workflow_records = mock_service
-            count = _remove_workflows_for_pack("test_pack")
+            count = _remove_workflows_by_ids(["wf-1", "wf-2"], "test_pack")
 
         assert count == 2
         assert mock_service.delete.call_count == 2
         deleted_ids = [
             call.args[0] if call.args else call.kwargs.get("workflow_id") for call in mock_service.delete.call_args_list
         ]
-        assert "wf-1" in deleted_ids
-        assert "wf-2" in deleted_ids
+        assert deleted_ids == ["wf-1", "wf-2"]
 
-    def test_returns_zero_when_no_workflows(self) -> None:
-        mock_result = MagicMock()
-        mock_result.items = []
-
+    def test_returns_zero_when_no_ids(self) -> None:
         mock_service = MagicMock()
-        mock_service.get_many.return_value = mock_result
+        with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
+            mock_deps.invoker.services.workflow_records = mock_service
+            count = _remove_workflows_by_ids([], "empty_pack")
+
+        assert count == 0
+        mock_service.delete.assert_not_called()
+
+    def test_continues_on_individual_delete_error(self) -> None:
+        # One workflow is already gone; the helper still removes the others
+        mock_service = MagicMock()
+        mock_service.delete.side_effect = [Exception("not found"), None]
 
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _remove_workflows_for_pack("empty_pack")
+            count = _remove_workflows_by_ids(["wf-gone", "wf-still-here"], "test_pack")
 
-        assert count == 0
+        assert count == 1
 
-    def test_handles_query_error(self) -> None:
+    def test_preserves_user_workflow_with_colliding_tag(self, tmp_path: Path) -> None:
+        # Regression test for the data-destruction risk the reviewer raised:
+        # If a user-authored workflow reuses the 'node-pack:<name>' tag, uninstall
+        # must NOT delete it. The full flow is exercised here: a manifest records
+        # only the pack's own workflow IDs, and _remove_workflows_by_ids operates
+        # only on those — so the user's workflow (whose id is NOT in the manifest)
+        # is never touched.
+        pack_wf_id = "pack-wf-1"
+        user_wf_id = "user-owned-wf-with-same-tag"
+
+        _write_pack_manifest(tmp_path, [pack_wf_id])
+        manifest_ids = _read_pack_manifest(tmp_path)
+
         mock_service = MagicMock()
-        mock_service.get_many.side_effect = Exception("DB error")
-
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _remove_workflows_for_pack("error_pack")
+            _remove_workflows_by_ids(manifest_ids, "test_pack")
 
-        assert count == 0
+        assert mock_service.delete.call_count == 1
+        deleted_id = (
+            mock_service.delete.call_args.args[0]
+            if mock_service.delete.call_args.args
+            else mock_service.delete.call_args.kwargs.get("workflow_id")
+        )
+        assert deleted_id == pack_wf_id
+        # The user-owned workflow id is never passed to delete()
+        all_delete_args = [
+            (call.args[0] if call.args else call.kwargs.get("workflow_id"))
+            for call in mock_service.delete.call_args_list
+        ]
+        assert user_wf_id not in all_delete_args
 
 
 class TestUnregisterPack:

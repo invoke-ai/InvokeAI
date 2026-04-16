@@ -24,6 +24,11 @@ custom_nodes_router = APIRouter(prefix="/v2/custom_nodes", tags=["custom_nodes"]
 
 logger = InvokeAILogger.get_logger()
 
+# Name of the manifest file written inside a pack directory to track which workflows
+# were imported by that pack. Used on uninstall to delete only pack-imported workflows
+# — deleting by tag alone is unsafe because users can edit tags on their own workflows.
+PACK_MANIFEST_FILENAME = ".invokeai_pack_manifest.json"
+
 
 class NodePackInfo(BaseModel):
     """Information about an installed node pack."""
@@ -125,8 +130,12 @@ def _get_installed_packs() -> list[NodePackInfo]:
     operation_id="list_custom_node_packs",
     response_model=NodePackListResponse,
 )
-async def list_custom_node_packs() -> NodePackListResponse:
-    """Lists all installed custom node packs."""
+async def list_custom_node_packs(current_admin: AdminUserOrDefault) -> NodePackListResponse:
+    """Lists all installed custom node packs.
+
+    Admin-only: the response includes absolute filesystem paths, and non-admins have no
+    legitimate use for pack management data (install/uninstall/reload are also admin-only).
+    """
     packs = _get_installed_packs()
     return NodePackListResponse(node_packs=packs)
 
@@ -203,7 +212,9 @@ async def install_custom_node_pack(
         _load_node_pack(pack_name, target_dir)
 
         # Import any workflows found in the pack, owned by the installing admin and shared with all users
-        workflows_imported = _import_workflows_from_pack(target_dir, pack_name, owner_user_id=current_admin.user_id)
+        imported_workflow_ids = _import_workflows_from_pack(target_dir, pack_name, owner_user_id=current_admin.user_id)
+        _write_pack_manifest(target_dir, imported_workflow_ids)
+        workflows_imported = len(imported_workflow_ids)
         workflow_msg = f" Imported {workflows_imported} workflow(s)." if workflows_imported > 0 else ""
         dependency_msg = (
             f" This pack includes a {dependency_file} — install its dependencies manually following the pack's documentation."
@@ -265,6 +276,11 @@ async def uninstall_custom_node_pack(
         )
 
     try:
+        # Read the manifest BEFORE removing the directory — it records exactly which
+        # workflow IDs this pack imported, so uninstall doesn't accidentally delete
+        # user workflows that happen to share the pack tag.
+        imported_workflow_ids = _read_pack_manifest(target_dir)
+
         shutil.rmtree(target_dir)
 
         # Unregister the nodes from the registry so they disappear immediately
@@ -282,8 +298,8 @@ async def uninstall_custom_node_pack(
         if pack_name in sys.modules:
             del sys.modules[pack_name]
 
-        # Remove workflows that were imported from this node pack
-        workflows_removed = _remove_workflows_for_pack(pack_name)
+        # Remove only workflows this pack imported, using the manifest-recorded IDs
+        workflows_removed = _remove_workflows_by_ids(imported_workflow_ids, pack_name)
         workflow_msg = f" Removed {workflows_removed} workflow(s)." if workflows_removed > 0 else ""
 
         return UninstallNodePackResponse(
@@ -357,19 +373,22 @@ def _load_node_pack(pack_name: str, pack_dir: Path) -> None:
     logger.info(f"Successfully loaded node pack {pack_name}")
 
 
-def _import_workflows_from_pack(pack_dir: Path, pack_name: str, owner_user_id: str) -> int:
+def _import_workflows_from_pack(pack_dir: Path, pack_name: str, owner_user_id: str) -> list[str]:
     """Scans a node pack directory for workflow JSON files and imports them into the workflow library.
 
     A JSON file is considered a workflow if it contains 'nodes' and 'edges' keys at the top level.
     Workflows are imported as user workflows owned by the installing admin and marked public so all
     users can see them — a pack is an admin-installed shared resource, not a private asset.
 
-    Returns the number of workflows successfully imported.
+    Returns the list of workflow IDs successfully created, in import order.
     """
-    imported_count = 0
+    imported_ids: list[str] = []
 
     # Search for .json files recursively
     for json_file in pack_dir.rglob("*.json"):
+        # Skip our own manifest file
+        if json_file.name == PACK_MANIFEST_FILENAME:
+            continue
         try:
             with open(json_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -386,7 +405,8 @@ def _import_workflows_from_pack(pack_dir: Path, pack_name: str, owner_user_id: s
             else:
                 data["meta"]["category"] = "user"
 
-            # Add the node pack name to tags for discoverability
+            # Add the node pack name to tags for discoverability (display only — uninstall
+            # does not rely on this tag, since users can edit tags on their own workflows).
             existing_tags = data.get("tags", "")
             pack_tag = f"node-pack:{pack_name}"
             if pack_tag not in existing_tags:
@@ -397,56 +417,68 @@ def _import_workflows_from_pack(pack_dir: Path, pack_name: str, owner_user_id: s
 
             # Validate and import the workflow
             workflow = WorkflowWithoutIDValidator.validate_python(data)
-            ApiDependencies.invoker.services.workflow_records.create(
+            created = ApiDependencies.invoker.services.workflow_records.create(
                 workflow=workflow, user_id=owner_user_id, is_public=True
             )
+            imported_ids.append(created.workflow_id)
             logger.info(f"Imported workflow '{workflow.name}' from node pack '{pack_name}'")
-            imported_count += 1
 
         except Exception:
             logger.warning(f"Skipped non-workflow or invalid JSON file: {json_file}")
             continue
 
-    if imported_count > 0:
-        logger.info(f"Imported {imported_count} workflow(s) from node pack '{pack_name}'")
+    if imported_ids:
+        logger.info(f"Imported {len(imported_ids)} workflow(s) from node pack '{pack_name}'")
 
-    return imported_count
+    return imported_ids
 
 
-def _remove_workflows_for_pack(pack_name: str) -> int:
-    """Removes all workflows that were imported from a node pack.
-
-    Finds workflows tagged with 'node-pack:<pack_name>' and deletes them.
-    Returns the number of workflows removed.
-    """
-    from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-    from invokeai.app.services.workflow_records.workflow_records_common import (
-        WorkflowCategory,
-        WorkflowRecordOrderBy,
-    )
-
-    pack_tag = f"node-pack:{pack_name}"
-    removed_count = 0
-
+def _write_pack_manifest(pack_dir: Path, workflow_ids: list[str]) -> None:
+    """Writes the pack manifest recording which workflow IDs were imported from the pack."""
+    manifest_path = pack_dir / PACK_MANIFEST_FILENAME
     try:
-        # Find all workflows with this pack's tag
-        result = ApiDependencies.invoker.services.workflow_records.get_many(
-            order_by=WorkflowRecordOrderBy.Name,
-            direction=SQLiteDirection.Ascending,
-            categories=[WorkflowCategory.User],
-            tags=[pack_tag],
-        )
-
-        for workflow_item in result.items:
-            try:
-                ApiDependencies.invoker.services.workflow_records.delete(workflow_item.workflow_id)
-                logger.info(f"Removed workflow '{workflow_item.name}' (from node pack '{pack_name}')")
-                removed_count += 1
-            except Exception:
-                logger.warning(f"Failed to remove workflow '{workflow_item.name}'")
-
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump({"workflow_ids": workflow_ids}, f)
     except Exception:
-        logger.warning(f"Failed to query workflows for node pack '{pack_name}'")
+        logger.warning(f"Failed to write pack manifest at {manifest_path}")
+
+
+def _read_pack_manifest(pack_dir: Path) -> list[str]:
+    """Reads workflow IDs that this pack's install recorded in its manifest.
+
+    Returns an empty list if the manifest is missing or malformed. We deliberately do NOT
+    fall back to tag-based lookup: workflow tags are user-editable and could collide with
+    unrelated workflows, so we only delete what we recorded ourselves at install time.
+    """
+    manifest_path = pack_dir / PACK_MANIFEST_FILENAME
+    if not manifest_path.exists():
+        return []
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        ids = data.get("workflow_ids", [])
+        if not isinstance(ids, list):
+            return []
+        return [str(x) for x in ids if isinstance(x, str)]
+    except Exception:
+        logger.warning(f"Failed to read pack manifest at {manifest_path}")
+        return []
+
+
+def _remove_workflows_by_ids(workflow_ids: list[str], pack_name: str) -> int:
+    """Deletes the given workflow IDs. Used during uninstall to remove only the workflows
+    this pack's install recorded in its manifest.
+    """
+    if not workflow_ids:
+        return 0
+
+    removed_count = 0
+    for workflow_id in workflow_ids:
+        try:
+            ApiDependencies.invoker.services.workflow_records.delete(workflow_id)
+            removed_count += 1
+        except Exception:
+            logger.warning(f"Failed to remove workflow '{workflow_id}' (from node pack '{pack_name}')")
 
     if removed_count > 0:
         logger.info(f"Removed {removed_count} workflow(s) from node pack '{pack_name}'")

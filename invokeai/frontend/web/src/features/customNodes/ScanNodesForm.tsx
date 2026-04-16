@@ -3,13 +3,14 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListCustomNodePacksQuery } from 'services/api/endpoints/customNodes';
 
+import { getParentDirectory } from './getParentDirectory';
+
 export const ScanNodesForm = memo(() => {
   const { t } = useTranslation();
   const { data } = useListCustomNodePacksQuery();
 
   const nodesPath = data?.node_packs?.[0]?.path;
-  // Extract parent directory from a pack path, or show a placeholder
-  const nodesDir = nodesPath ? nodesPath.substring(0, nodesPath.lastIndexOf('/')) : null;
+  const nodesDir = nodesPath ? getParentDirectory(nodesPath) : null;
 
   return (
     <Flex flexDir="column" gap={4} pt={4}>
