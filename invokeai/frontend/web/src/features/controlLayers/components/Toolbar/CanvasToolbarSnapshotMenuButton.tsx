@@ -1,4 +1,5 @@
 import {
+  ConfirmationAlertDialog,
   Flex,
   IconButton,
   Input,
@@ -9,6 +10,7 @@ import {
   MenuItem,
   MenuList,
   Text,
+  useDisclosure,
 } from '@invoke-ai/ui-library';
 import type { SnapshotInfo } from 'features/controlLayers/hooks/useCanvasSnapshots';
 import { useCanvasSnapshots } from 'features/controlLayers/hooks/useCanvasSnapshots';
@@ -72,7 +74,7 @@ const getDefaultSnapshotName = (): string => {
   const d = String(now.getDate()).padStart(2, '0');
   const h = String(now.getHours()).padStart(2, '0');
   const mi = String(now.getMinutes()).padStart(2, '0');
-  return `${y}/${mo}/${d} ${h}:${mi}`;
+  return `${y}-${mo}-${d} ${h}-${mi}`;
 };
 
 export const CanvasToolbarSnapshotMenuButton = memo(() => {
@@ -80,21 +82,47 @@ export const CanvasToolbarSnapshotMenuButton = memo(() => {
   const { snapshots, saveSnapshot, restoreSnapshot, deleteSnapshot } = useCanvasSnapshots();
   const isStaging = useCanvasIsStaging();
   const [snapshotName, setSnapshotName] = useState('');
+  const overwriteDialog = useDisclosure();
+  const [pendingOverwriteName, setPendingOverwriteName] = useState<string | null>(null);
 
   const onNameChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setSnapshotName(e.target.value);
   }, []);
 
+  const doSave = useCallback(
+    async (name: string) => {
+      const success = await saveSnapshot(name);
+      if (success) {
+        toast({ title: t('controlLayers.snapshot.snapshotSaved', { name }), status: 'info' });
+        setSnapshotName('');
+      } else {
+        toast({ title: t('controlLayers.snapshot.snapshotSaveFailed'), status: 'error' });
+      }
+    },
+    [saveSnapshot, t]
+  );
+
   const onSave = useCallback(async () => {
     const name = snapshotName.trim() || getDefaultSnapshotName();
-    const success = await saveSnapshot(name);
-    if (success) {
-      toast({ title: t('controlLayers.snapshot.snapshotSaved', { name }), status: 'info' });
-      setSnapshotName('');
-    } else {
-      toast({ title: t('controlLayers.snapshot.snapshotSaveFailed'), status: 'error' });
+    if (snapshots.some((s) => s.name === name)) {
+      setPendingOverwriteName(name);
+      overwriteDialog.onOpen();
+      return;
     }
-  }, [snapshotName, saveSnapshot, t]);
+    await doSave(name);
+  }, [snapshotName, snapshots, doSave, overwriteDialog]);
+
+  const onConfirmOverwrite = useCallback(() => {
+    if (pendingOverwriteName) {
+      doSave(pendingOverwriteName);
+      setPendingOverwriteName(null);
+    }
+  }, [pendingOverwriteName, doSave]);
+
+  const onCloseOverwriteDialog = useCallback(() => {
+    setPendingOverwriteName(null);
+    overwriteDialog.onClose();
+  }, [overwriteDialog]);
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
@@ -147,51 +175,63 @@ export const CanvasToolbarSnapshotMenuButton = memo(() => {
   );
 
   return (
-    <Menu placement="bottom-end" closeOnSelect={false}>
-      <MenuButton
-        as={IconButton}
-        aria-label={t('controlLayers.snapshot.snapshots')}
-        tooltip={t('controlLayers.snapshot.snapshots')}
-        icon={<PiCameraBold />}
-        variant="link"
-        alignSelf="stretch"
-      />
-      <MenuList maxH="60vh" overflowY="auto">
-        <MenuGroup title={t('controlLayers.snapshot.saveSnapshot')}>
-          <Flex px={3} pb={2} gap={2} alignItems="center">
-            <Input
-              size="sm"
-              placeholder={t('controlLayers.snapshot.snapshotNamePlaceholder')}
-              value={snapshotName}
-              onChange={onNameChange}
-              onKeyDown={onKeyDown}
-            />
-            <IconButton
-              aria-label={t('controlLayers.snapshot.save')}
-              icon={<PiFloppyDiskBold />}
-              size="sm"
-              onClick={onSave}
-            />
-          </Flex>
-        </MenuGroup>
-        {snapshots.length > 0 && (
-          <>
-            <MenuDivider />
-            <MenuGroup title={t('controlLayers.snapshot.restoreSnapshot')}>
-              {snapshots.map((snapshot) => (
-                <SnapshotItem
-                  key={snapshot.key}
-                  snapshot={snapshot}
-                  onRestore={onRestore}
-                  onDelete={onDelete}
-                  isRestoreDisabled={isStaging}
-                />
-              ))}
-            </MenuGroup>
-          </>
-        )}
-      </MenuList>
-    </Menu>
+    <>
+      <Menu placement="bottom-end" closeOnSelect={false}>
+        <MenuButton
+          as={IconButton}
+          aria-label={t('controlLayers.snapshot.snapshots')}
+          tooltip={t('controlLayers.snapshot.snapshots')}
+          icon={<PiCameraBold />}
+          variant="link"
+          alignSelf="stretch"
+        />
+        <MenuList maxH="60vh" overflowY="auto">
+          <MenuGroup title={t('controlLayers.snapshot.saveSnapshot')}>
+            <Flex px={3} pb={2} gap={2} alignItems="center">
+              <Input
+                size="sm"
+                placeholder={t('controlLayers.snapshot.snapshotNamePlaceholder')}
+                value={snapshotName}
+                onChange={onNameChange}
+                onKeyDown={onKeyDown}
+              />
+              <IconButton
+                aria-label={t('controlLayers.snapshot.save')}
+                icon={<PiFloppyDiskBold />}
+                size="sm"
+                onClick={onSave}
+              />
+            </Flex>
+          </MenuGroup>
+          {snapshots.length > 0 && (
+            <>
+              <MenuDivider />
+              <MenuGroup title={t('controlLayers.snapshot.restoreSnapshot')}>
+                {snapshots.map((snapshot) => (
+                  <SnapshotItem
+                    key={snapshot.key}
+                    snapshot={snapshot}
+                    onRestore={onRestore}
+                    onDelete={onDelete}
+                    isRestoreDisabled={isStaging}
+                  />
+                ))}
+              </MenuGroup>
+            </>
+          )}
+        </MenuList>
+      </Menu>
+      <ConfirmationAlertDialog
+        isOpen={overwriteDialog.isOpen}
+        onClose={onCloseOverwriteDialog}
+        title={t('controlLayers.snapshot.overwriteSnapshotTitle')}
+        acceptCallback={onConfirmOverwrite}
+        acceptButtonText={t('controlLayers.snapshot.overwrite')}
+        useInert={false}
+      >
+        <Text>{t('controlLayers.snapshot.overwriteSnapshotMessage', { name: pendingOverwriteName ?? '' })}</Text>
+      </ConfirmationAlertDialog>
+    </>
   );
 });
 

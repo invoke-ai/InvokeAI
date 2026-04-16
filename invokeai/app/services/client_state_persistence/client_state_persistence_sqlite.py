@@ -45,14 +45,17 @@ class ClientStatePersistenceSqlite(ClientStatePersistenceABC):
             return row[0]
 
     def get_keys_by_prefix(self, user_id: str, prefix: str) -> list[str]:
+        # Escape LIKE wildcards (%, _) and the escape char itself so callers can pass
+        # arbitrary strings as a literal prefix without accidental pattern matching.
+        escaped_prefix = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         with self._db.transaction() as cursor:
             cursor.execute(
                 """
                 SELECT key FROM client_state
-                WHERE user_id = ? AND key LIKE ?
+                WHERE user_id = ? AND key LIKE ? ESCAPE '\\'
                 ORDER BY updated_at DESC
                 """,
-                (user_id, f"{prefix}%"),
+                (user_id, f"{escaped_prefix}%"),
             )
             return [row[0] for row in cursor.fetchall()]
 
