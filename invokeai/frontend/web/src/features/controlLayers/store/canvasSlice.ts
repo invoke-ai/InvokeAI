@@ -1761,7 +1761,12 @@ const slice = createSlice({
       state.controlLayers.entities = controlLayers;
       state.inpaintMasks.entities = inpaintMasks;
       state.regionalGuidance.entities = regionalGuidance;
+      // Preserve the current modelBase to avoid desync with the currently selected model
+      // (same pattern as canvasSnapshotRestored and resetState).
+      const currentModelBase = state.bbox.modelBase;
       state.bbox = bbox;
+      state.bbox.modelBase = currentModelBase;
+      syncScaledSize(state);
       state.selectedEntityIdentifier = selectedEntityIdentifier;
       state.bookmarkedEntityIdentifier = bookmarkedEntityIdentifier;
       return state;
@@ -1968,8 +1973,8 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
     if (!action.type.startsWith(slice.name)) {
       return false;
     }
-    // Snapshot restore replaces the canvas state and should not be undoable
-    if (action.type === canvasSnapshotRestored.type) {
+    // Snapshot restore and project load replace the canvas state and should not be undoable
+    if (action.type === canvasSnapshotRestored.type || action.type === canvasProjectRecalled.type) {
       return false;
     }
     // Throttle rapid actions of the same type
