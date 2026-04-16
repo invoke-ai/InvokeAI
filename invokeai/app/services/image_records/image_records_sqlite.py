@@ -46,6 +46,20 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
 
         return deserialize_image_record(dict(result))
 
+    def get_user_id(self, image_name: str) -> Optional[str]:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT user_id FROM images
+                WHERE image_name = ?;
+                """,
+                (image_name,),
+            )
+            result = cast(Optional[sqlite3.Row], cursor.fetchone())
+            if not result:
+                return None
+            return cast(Optional[str], dict(result).get("user_id"))
+
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         with self._db.transaction() as cursor:
             try:
@@ -269,14 +283,14 @@ class SqliteImageRecordStorage(ImageRecordStorageBase):
             except sqlite3.Error as e:
                 raise ImageRecordDeleteException from e
 
-    def get_intermediates_count(self) -> int:
+    def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT COUNT(*) FROM images
-                WHERE is_intermediate = TRUE;
-                """
-            )
+            query = "SELECT COUNT(*) FROM images WHERE is_intermediate = TRUE"
+            params: list[str] = []
+            if user_id is not None:
+                query += " AND user_id = ?"
+                params.append(user_id)
+            cursor.execute(query, params)
             count = cast(int, cursor.fetchone()[0])
         return count
 

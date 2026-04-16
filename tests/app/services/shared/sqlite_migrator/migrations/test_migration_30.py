@@ -1,12 +1,12 @@
-"""Tests for migration 28: Add image_subfolder column to images table (Point 4)."""
+"""Tests for migration 30: Add image_subfolder column to images table (Point 4)."""
 
 import sqlite3
 
 import pytest
 
-from invokeai.app.services.shared.sqlite_migrator.migrations.migration_28 import (
-    Migration28Callback,
-    build_migration_28,
+from invokeai.app.services.shared.sqlite_migrator.migrations.migration_30 import (
+    Migration30Callback,
+    build_migration_30,
 )
 
 
@@ -37,10 +37,10 @@ def db() -> sqlite3.Connection:
     return conn
 
 
-class TestMigration28:
+class TestMigration30:
     def test_adds_image_subfolder_column(self, db: sqlite3.Connection):
         """Migration adds image_subfolder column to existing images table."""
-        callback = Migration28Callback()
+        callback = Migration30Callback()
         cursor = db.cursor()
         callback(cursor)
 
@@ -56,7 +56,7 @@ class TestMigration28:
         )
         db.commit()
 
-        callback = Migration28Callback()
+        callback = Migration30Callback()
         callback(db.cursor())
         db.commit()
 
@@ -66,7 +66,7 @@ class TestMigration28:
 
     def test_idempotent_migration(self, db: sqlite3.Connection):
         """Running migration twice should not fail (column already exists)."""
-        callback = Migration28Callback()
+        callback = Migration30Callback()
         cursor = db.cursor()
         callback(cursor)
         # Running again should be safe
@@ -79,13 +79,13 @@ class TestMigration28:
     def test_no_images_table_is_noop(self):
         """If images table doesn't exist, migration is a no-op."""
         conn = sqlite3.connect(":memory:")
-        callback = Migration28Callback()
+        callback = Migration30Callback()
         cursor = conn.cursor()
         # Should not raise
         callback(cursor)
 
-    def test_build_migration_28_version_numbers(self):
-        """build_migration_28 returns correct version range."""
-        migration = build_migration_28()
-        assert migration.from_version == 27
-        assert migration.to_version == 28
+    def test_build_migration_30_version_numbers(self):
+        """build_migration_30 returns correct version range."""
+        migration = build_migration_30()
+        assert migration.from_version == 29
+        assert migration.to_version == 30

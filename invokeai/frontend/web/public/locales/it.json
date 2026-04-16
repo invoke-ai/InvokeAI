@@ -132,7 +132,21 @@
         "prevPage": "Pagina precedente",
         "nextPage": "Pagina successiva",
         "resetToDefaults": "Ripristina impostazioni predefinite",
-        "crop": "Ritaglia"
+        "crop": "Ritaglia",
+        "editName": "Modifica nome",
+        "fitView": "Adatta la vista",
+        "minimize": "Minimizza",
+        "next": "Prossimo",
+        "noMatchingItems": "Nessun articolo corrispondente",
+        "notifications": "Notifiche",
+        "previous": "Precedente",
+        "removeFromCollection": "Rimuovi dalla raccolta",
+        "resetView": "Ripristina la vista",
+        "saveToAssets": "Salva nelle risorse",
+        "settings": "Impostazioni",
+        "toggleRgbHex": "Attiva/disattiva RGB/HEX",
+        "unpin": "Sblocca",
+        "openSlider": "Apri il cursore"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -203,7 +217,12 @@
         "selectAnImageToCompare": "Seleziona un'immagine da confrontare",
         "openViewer": "Apri Visualizzatore",
         "closeViewer": "Chiudi Visualizzatore",
-        "usePagedGalleryView": "Utilizza la visualizzazione Galleria a pagine"
+        "usePagedGalleryView": "Utilizza la visualizzazione Galleria a pagine",
+        "loadingGallery": "Caricamento galleria in corso...",
+        "loadingMetadata": "Caricamento dei metadati in corso...",
+        "noImagesFound": "Nessuna immagine trovata",
+        "bulkDownloadReady": "Download pronto",
+        "clickToDownload": "Clicca qui per scaricare"
     },
     "hotkeys": {
         "searchHotkeys": "Cerca tasti di scelta rapida",
@@ -853,7 +872,23 @@
         "someModelsFailedToReidentify": "Non è stato possibile re-identificare {{count}} modello(i)",
         "modelsReidentifiedPartial": "Completato parzialmente",
         "someModelsReidentified": "{{succeeded}} re-identificato(i), {{failed}} fallito(i)",
-        "modelsReidentifyError": "Errore nella re-identificazione dei modelli"
+        "modelsReidentifyError": "Errore nella re-identificazione dei modelli",
+        "deleteModelsConfirm": "Sei sicuro di voler eliminare {{count}} modello(i)? Questa azione non può essere annullata.",
+        "deleteWarning": "I modelli presenti nella cartella dei modelli di Invoke verranno eliminati definitivamente dal disco.",
+        "modelsDeleted": "{{count}} modello(i) eliminato(i) con successo",
+        "modelsDeleteFailed": "Impossibile eliminare i modelli",
+        "someModelsFailedToDelete": "Non è stato possibile eliminare {{count}} modello(i)",
+        "modelsDeletedPartial": "Parzialmente completato",
+        "someModelsDeleted": "{{deleted}} eliminato(i), {{failed}} fallito(i)",
+        "modelsDeleteError": "Errore durante l'eliminazione dei modelli",
+        "queueEmpty": "La coda di installazione è vuota.",
+        "animaVaePlaceholder": "Seleziona VAE compatibile con Anima",
+        "animaQwen3EncoderPlaceholder": "Seleziona l'encoder Qwen3 0.6B",
+        "animaT5EncoderPlaceholder": "Seleziona l'encoder T5-XXL",
+        "qwenImageComponentSourcePlaceholder": "Necessario per i modelli GGUF",
+        "qwenImageComponentSource": "VAE/Sorgente Encoder (Diffusori)",
+        "qwenImageQuantization": "Quantizzazione dell'encoder",
+        "qwenImageQuantizationNone": "Nessuna (bf16)"
     },
     "parameters": {
         "images": "Immagini",
@@ -944,7 +979,11 @@
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16), l'altezza ridimensionata del riquadro è {{height}}",
             "noZImageQwen3EncoderSourceSelected": "Nessuna sorgente Qwen3 Encoder: seleziona il modello Qwen3 Encoder o Qwen3 Source",
             "noZImageVaeSourceSelected": "Nessuna sorgente VAE: selezionare il modello di sorgente VAE (FLUX) o Qwen3",
-            "noQwen3EncoderModelSelected": "Nessun modello di encoder Qwen3 selezionato per la generazione Klein di FLUX2"
+            "noQwen3EncoderModelSelected": "Nessun modello di encoder Qwen3 selezionato per la generazione Klein di FLUX2",
+            "noAnimaVaeModelSelected": "Nessun modello VAE Anima selezionato",
+            "noAnimaQwen3EncoderModelSelected": "Nessun modello di encoder Anima Qwen3 selezionato",
+            "noAnimaT5EncoderModelSelected": "Nessun modello di encoder Anima T5 selezionato",
+            "noQwenImageComponentSourceSelected": "I modelli GGUF Qwen Image richiedono una sorgente componente diffusori per VAE/encoder"
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -1345,7 +1384,9 @@
         "versionUnknown": " Versione sconosciuta",
         "generateValues": "Genera valori",
         "floatRangeGenerator": "Generatore di intervallo di numeri decimali",
-        "integerRangeGenerator": "Generatore di intervallo di numeri interi"
+        "integerRangeGenerator": "Generatore di intervallo di numeri interi",
+        "noWorkflowToSave": "Nessun flusso di lavoro da salvare",
+        "nodeData": "Dati del nodo"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1498,7 +1539,9 @@
         "clearFailedAccessDenied": "Problema durante la cancellazione della coda: accesso negato",
         "user": "Utente",
         "cannotViewDetails": "Non hai l'autorizzazione per visualizzare i dettagli di questo elemento della coda",
-        "fieldValuesHidden": "<Nascosto>"
+        "fieldValuesHidden": "<Nascosto>",
+        "queueActionsMenu": "Menu azioni in coda",
+        "queueItem": "Elemento della coda"
     },
     "models": {
         "noMatchingModels": "Nessun modello corrispondente",
@@ -1544,7 +1587,8 @@
         "promptsPreview": "Anteprima dei prompt",
         "showDynamicPrompts": "Mostra prompt dinamici",
         "loading": "Generazione prompt dinamici...",
-        "promptsToGenerate": "Prompt da generare"
+        "promptsToGenerate": "Prompt da generare",
+        "problemGeneratingPrompts": "Problema nella generazione dei prompt"
     },
     "popovers": {
         "paramScheduler": {
@@ -2278,7 +2322,11 @@
         "insert": "Inserisci",
         "noPromptHistory": "Nessuna cronologia di prompt registrata.",
         "noMatchingPrompts": "Nessun prompt corrispondente nella cronologia.",
-        "toSwitchBetweenPrompts": "per passare da un prompt all'altro."
+        "toSwitchBetweenPrompts": "per passare da un prompt all'altro.",
+        "promptHistory": "Cronologia dei prompt",
+        "clearHistory": "Cancella cronologia",
+        "usePrompt": "Utilizza il prompt",
+        "searchPrompts": "Ricerca..."
     },
     "controlLayers": {
         "addLayer": "Aggiungi Livello",
@@ -2533,7 +2581,8 @@
             "horizontal": "Orizzontale",
             "diagonal": "Diagonale",
             "bgFillColor": "Colore di sfondo",
-            "fgFillColor": "Colore di primo piano"
+            "fgFillColor": "Colore di primo piano",
+            "switchColors": "Commuta FG/BG (X)"
         },
         "locked": "Bloccato",
         "hidingType": "Nascondere {{type}}",
@@ -2730,7 +2779,10 @@
         "autoSwitch": {
             "off": "Spento",
             "switchOnStart": "All'inizio",
-            "switchOnFinish": "Alla fine"
+            "switchOnFinish": "Alla fine",
+            "doNotAutoSwitch": "Non commutare automaticamente",
+            "switchOnStartDesc": "Attiva all'avvio",
+            "switchOnFinishDesc": "Attiva al termine"
         },
         "invertMask": "Inverti maschera",
         "fitBboxToMasks": "Adatta il riquadro di delimitazione alle maschere",
@@ -2836,7 +2888,11 @@
             "strikethrough": "Barrato",
             "alignLeft": "Allinea a sinistra",
             "alignCenter": "Allinea al centro",
-            "alignRight": "Allinea a destra"
+            "alignRight": "Allinea a destra",
+            "lineHeight": "Spaziatura",
+            "lineHeightDense": "Densa",
+            "lineHeightNormal": "Normale",
+            "lineHeightSpacious": "Spaziosa"
         },
         "workflowIntegration": {
             "title": "Eseguire il flusso di lavoro sula Tela",
@@ -2858,7 +2914,13 @@
             "executionStarted": "L'esecuzione del flusso di lavoro è stata avviata",
             "executionStartedDescription": "Il risultato apparirà nell'area di lavoro una volta completata l'operazione.",
             "executionFailed": "Impossibile eseguire il flusso di lavoro"
-        }
+        },
+        "disableReferenceImage": "Disabilita l'immagine di riferimento",
+        "enableReferenceImage": "Abilita l'immagine di riferimento",
+        "invertRegion": "Inverti la regione",
+        "invalidReferenceImage": "Immagine di riferimento non valida:",
+        "removeImageFromCollection": "Rimuovi l'immagine dalla raccolta",
+        "selectRefImage": "Seleziona l'immagine di riferimento"
     },
     "ui": {
         "tabs": {
@@ -3088,7 +3150,9 @@
                 "title": "Sessioni in studio",
                 "description": "Sessioni approfondite che esplorano le funzionalità avanzate di Invoke, i flussi di lavoro creativi e le discussioni della community."
             }
-        }
+        },
+        "gettingStartedPlaylist": "Playlist per iniziare",
+        "studioSessionsPlaylist": "Playlist delle sessioni in studio"
     },
     "modelCache": {
         "clear": "Cancella la cache del modello",
@@ -3096,7 +3160,8 @@
         "clearFailed": "Problema durante la cancellazione della cache del modello"
     },
     "lora": {
-        "weight": "Peso"
+        "weight": "Peso",
+        "removeLoRA": "Rimuovi LoRA"
     },
     "auth": {
         "login": {
@@ -3179,5 +3244,13 @@
             "moderate": "Password moderata",
             "strong": "Password forte"
         }
+    },
+    "cropper": {
+        "cropImage": "Ritaglia l'immagine",
+        "aspectRatio": "Rapporto d'aspetto",
+        "free": "Libera",
+        "mouseWheelZoom": "Rotellina del mouse: Zoom",
+        "spaceDragPan": "Spazio + trascina: Panoramica",
+        "dragCropBoxToAdjust": "Trascina il riquadro di ritaglio o le maniglie per regolare"
     }
 }
