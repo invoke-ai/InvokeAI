@@ -18,8 +18,9 @@ import {
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { PiArchiveBold, PiImageSquare } from 'react-icons/pi';
+import { PiArchiveBold, PiGlobeBold, PiImageSquare, PiShareNetworkBold } from 'react-icons/pi';
 import { useGetImageDTOQuery } from 'services/api/endpoints/images';
+import { useBoardAccess } from 'services/api/hooks/useBoardAccess';
 import type { BoardDTO } from 'services/api/types';
 
 const _hover: SystemStyleObject = {
@@ -62,6 +63,8 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
 
   const showOwner = currentUser?.is_admin && board.owner_username;
 
+  const { canWriteImages } = useBoardAccess(board);
+
   return (
     <Box position="relative" w="full" h={12}>
       <BoardContextMenu board={board}>
@@ -99,6 +102,20 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
               </Flex>
               {autoAddBoardId === board.board_id && <AutoAddBadge />}
               {board.archived && <Icon as={PiArchiveBold} fill="base.300" />}
+              {board.board_visibility === 'shared' && (
+                <Tooltip label={t('boards.visibilityBadgeShared')}>
+                  <span>
+                    <Icon as={PiShareNetworkBold} fill="blue.300" />
+                  </span>
+                </Tooltip>
+              )}
+              {board.board_visibility === 'public' && (
+                <Tooltip label={t('boards.visibilityBadgePublic')}>
+                  <span>
+                    <Icon as={PiGlobeBold} fill="green.300" />
+                  </span>
+                </Tooltip>
+              )}
               <Flex justifyContent="flex-end">
                 <Text variant="subtext">
                   {board.image_count} | {board.asset_count}
@@ -108,7 +125,12 @@ const GalleryBoard = ({ board, isSelected }: GalleryBoardProps) => {
           </Tooltip>
         )}
       </BoardContextMenu>
-      <DndDropTarget dndTarget={addImageToBoardDndTarget} dndTargetData={dndTargetData} label={t('gallery.move')} />
+      <DndDropTarget
+        dndTarget={addImageToBoardDndTarget}
+        dndTargetData={dndTargetData}
+        label={t('gallery.move')}
+        isDisabled={!canWriteImages}
+      />
     </Box>
   );
 };
