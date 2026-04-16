@@ -78,7 +78,7 @@ class TestImportWorkflowsFromPack:
         (tmp_path / "__init__.py").touch()
         (tmp_path / "node.py").write_text("# node code")
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies"):
-            count = _import_workflows_from_pack(tmp_path, "test_pack")
+            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
         assert count == 0
 
     def test_skips_non_workflow_json(self, tmp_path: Path) -> None:
@@ -86,7 +86,7 @@ class TestImportWorkflowsFromPack:
         config = {"setting": "value"}
         (tmp_path / "config.json").write_text(json.dumps(config))
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies"):
-            count = _import_workflows_from_pack(tmp_path, "test_pack")
+            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
         assert count == 0
 
     def test_imports_valid_workflow(self, tmp_path: Path) -> None:
@@ -110,13 +110,15 @@ class TestImportWorkflowsFromPack:
         mock_service = MagicMock()
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _import_workflows_from_pack(tmp_path, "test_pack")
+            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
 
         assert count == 1
         mock_service.create.assert_called_once()
         # Verify the workflow was tagged
-        created_workflow = mock_service.create.call_args.kwargs["workflow"]
-        assert "node-pack:test_pack" in created_workflow.tags
+        create_kwargs = mock_service.create.call_args.kwargs
+        assert "node-pack:test_pack" in create_kwargs["workflow"].tags
+        assert create_kwargs["user_id"] == "admin"
+        assert create_kwargs["is_public"] is True
 
     def test_adds_pack_tag_to_existing_tags(self, tmp_path: Path) -> None:
         workflow = {
@@ -137,7 +139,7 @@ class TestImportWorkflowsFromPack:
         mock_service = MagicMock()
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _import_workflows_from_pack(tmp_path, "my_pack")
+            count = _import_workflows_from_pack(tmp_path, "my_pack", owner_user_id="admin")
 
         assert count == 1
         created_workflow = mock_service.create.call_args.kwargs["workflow"]
@@ -164,7 +166,7 @@ class TestImportWorkflowsFromPack:
         mock_service = MagicMock()
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _import_workflows_from_pack(tmp_path, "test_pack")
+            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
 
         assert count == 1
 
@@ -187,7 +189,7 @@ class TestImportWorkflowsFromPack:
         mock_service = MagicMock()
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _import_workflows_from_pack(tmp_path, "test_pack")
+            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
 
         assert count == 1
         created_workflow = mock_service.create.call_args.kwargs["workflow"]
@@ -196,7 +198,7 @@ class TestImportWorkflowsFromPack:
     def test_skips_invalid_json(self, tmp_path: Path) -> None:
         (tmp_path / "broken.json").write_text("{invalid json")
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies"):
-            count = _import_workflows_from_pack(tmp_path, "test_pack")
+            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
         assert count == 0
 
     def test_finds_workflows_recursively(self, tmp_path: Path) -> None:
@@ -220,7 +222,7 @@ class TestImportWorkflowsFromPack:
         mock_service = MagicMock()
         with patch("invokeai.app.api.routers.custom_nodes.ApiDependencies") as mock_deps:
             mock_deps.invoker.services.workflow_records = mock_service
-            count = _import_workflows_from_pack(tmp_path, "test_pack")
+            count = _import_workflows_from_pack(tmp_path, "test_pack", owner_user_id="admin")
 
         assert count == 1
 
