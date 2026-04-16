@@ -2533,6 +2533,9 @@ export type paths = {
         /**
          * List Custom Node Packs
          * @description Lists all installed custom node packs.
+         *
+         *     Admin-only: the response includes absolute filesystem paths, and non-admins have no
+         *     legitimate use for pack management data (install/uninstall/reload are also admin-only).
          */
         get: operations["list_custom_node_packs"];
         put?: never;
