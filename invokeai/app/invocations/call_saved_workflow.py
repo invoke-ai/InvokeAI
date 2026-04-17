@@ -23,7 +23,7 @@ class CallSavedWorkflowInvocation(BaseInvocation):
         ui_type=UIType.SavedWorkflow,
     )
 
-    def invoke(self, context: InvocationContext) -> IntegerOutput:
+    def validate_selected_workflow(self, context: InvocationContext):
         if not self.workflow_id:
             raise ValueError("A saved workflow must be selected before executing call_saved_workflow.")
 
@@ -41,5 +41,10 @@ class CallSavedWorkflowInvocation(BaseInvocation):
             is_default = workflow_record.workflow.meta.category is WorkflowCategory.Default
             if not (is_default or is_owner or workflow_record.is_public or is_admin):
                 raise ValueError(f"The selected saved workflow '{self.workflow_id}' is not accessible to this user.")
+
+        return workflow_record
+
+    def invoke(self, context: InvocationContext) -> IntegerOutput:
+        self.validate_selected_workflow(context)
 
         return IntegerOutput(value=0)

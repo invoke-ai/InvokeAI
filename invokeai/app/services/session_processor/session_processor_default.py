@@ -6,6 +6,7 @@ from threading import Event as ThreadEvent
 from typing import Optional
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
+from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     FastAPIEvent,
@@ -125,6 +126,12 @@ class DefaultSessionRunner(SessionRunnerBase):
                     services=self._services,
                     is_canceled=self._is_canceled,
                 )
+
+                if isinstance(invocation, CallSavedWorkflowInvocation):
+                    invocation.validate_selected_workflow(context)
+                    call_frame = queue_item.session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
+                    queue_item.session.begin_waiting_on_workflow_call(call_frame)
+                    return
 
                 # Invoke the node
                 output = invocation.invoke_internal(context=context, services=self._services)
