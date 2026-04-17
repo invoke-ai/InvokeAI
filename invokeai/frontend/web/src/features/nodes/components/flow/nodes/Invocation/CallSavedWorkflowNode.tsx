@@ -15,6 +15,7 @@ import { $templates, callSavedWorkflowDynamicFieldsChanged } from 'features/node
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import type { SavedWorkflowFieldInputInstance } from 'features/nodes/types/field';
 import { memo, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 
 import { getSavedWorkflowDynamicEdgeIdsToRemove, getSavedWorkflowDynamicFields } from './callSavedWorkflowFormUtils';
@@ -45,6 +46,7 @@ type Props = {
 
 const CallSavedWorkflowNode = ({ nodeId, isOpen }: Props) => {
   const withFooter = useWithFooter();
+  const { t } = useTranslation();
   const workflowIdField = useInputFieldInstance<SavedWorkflowFieldInputInstance>('workflow_id');
   const templates = useStore($templates);
   const dispatch = useAppDispatch();
@@ -95,7 +97,11 @@ const CallSavedWorkflowNode = ({ nodeId, isOpen }: Props) => {
                 </GridItem>
                 <OutputFields nodeId={nodeId} />
               </Grid>
-              <DynamicFieldsSection nodeId={nodeId} fields={dynamicFields} />
+              <DynamicFieldsSection
+                nodeId={nodeId}
+                fields={dynamicFields}
+                emptyMessage={t('nodes.savedWorkflowSelectExposedFields')}
+              />
             </Flex>
           </Flex>
           {withFooter && <InvocationNodeFooter nodeId={nodeId} />}
@@ -108,11 +114,19 @@ const CallSavedWorkflowNode = ({ nodeId, isOpen }: Props) => {
 export default memo(CallSavedWorkflowNode);
 
 const DynamicFieldsSection = memo(
-  ({ nodeId, fields }: { nodeId: string; fields: ReturnType<typeof getSavedWorkflowDynamicFields> }) => {
+  ({
+    nodeId,
+    fields,
+    emptyMessage,
+  }: {
+    nodeId: string;
+    fields: ReturnType<typeof getSavedWorkflowDynamicFields>;
+    emptyMessage: string;
+  }) => {
     if (fields.length === 0) {
       return (
         <Badge variant="subtle" alignSelf="flex-start">
-          Select a workflow with exposed form fields
+          {emptyMessage}
         </Badge>
       );
     }

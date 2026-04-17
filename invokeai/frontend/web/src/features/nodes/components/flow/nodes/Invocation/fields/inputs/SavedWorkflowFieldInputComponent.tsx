@@ -11,10 +11,9 @@ import { useListWorkflowsInfiniteInfiniteQuery } from 'services/api/endpoints/wo
 
 import {
   buildSavedWorkflowOptions,
-  EMPTY_SELECTION_LABEL,
   getSavedWorkflowSelectionOption,
   getSavedWorkflowSelectionState,
-  getSavedWorkflowSelectionStatusLabel,
+  MISSING_WORKFLOW_OPTION_VALUE,
 } from './savedWorkflowFieldUtils';
 import type { FieldComponentProps } from './types';
 
@@ -47,8 +46,22 @@ const SavedWorkflowFieldInputComponent = (
 
   const options = useMemo<ComboboxOption[]>(() => buildSavedWorkflowOptions(items), [items]);
   const selectionState = useMemo(() => getSavedWorkflowSelectionState(items, field.value), [field.value, items]);
-  const value = useMemo<ComboboxOption | null>(() => getSavedWorkflowSelectionOption(selectionState), [selectionState]);
-  const statusLabel = useMemo(() => getSavedWorkflowSelectionStatusLabel(selectionState), [selectionState]);
+  const value = useMemo<ComboboxOption | null>(() => {
+    const option = getSavedWorkflowSelectionOption(selectionState);
+    if (option?.value === MISSING_WORKFLOW_OPTION_VALUE) {
+      return {
+        ...option,
+        label: t('nodes.savedWorkflowMissing'),
+      };
+    }
+    return option;
+  }, [selectionState, t]);
+  const statusLabel = useMemo(() => {
+    if (selectionState.status === 'selected') {
+      return null;
+    }
+    return selectionState.status === 'missing' ? t('nodes.savedWorkflowMissing') : t('nodes.savedWorkflowChoose');
+  }, [selectionState.status, t]);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
@@ -81,17 +94,19 @@ const SavedWorkflowFieldInputComponent = (
           <Text fontSize="xs" variant="subtext" noOfLines={1}>
             {selectionState.workflow.name}
           </Text>
-          {selectionState.workflow.category === 'default' && <Badge variant="subtle">Default</Badge>}
+          {selectionState.workflow.category === 'default' && (
+            <Badge variant="subtle">{t('nodes.savedWorkflowDefaultBadge')}</Badge>
+          )}
           {selectionState.workflow.is_public && selectionState.workflow.category !== 'default' && (
-            <Badge variant="subtle">Shared</Badge>
+            <Badge variant="subtle">{t('workflows.shared')}</Badge>
           )}
         </Flex>
       ) : (
-        <Badge variant="subtle">{statusLabel ?? EMPTY_SELECTION_LABEL}</Badge>
+        <Badge variant="subtle">{statusLabel ?? t('nodes.savedWorkflowChoose')}</Badge>
       )}
       {isFetching && (
         <Text variant="subtext" fontSize="xs">
-          Updating...
+          {t('nodes.savedWorkflowUpdating')}
         </Text>
       )}
     </Flex>

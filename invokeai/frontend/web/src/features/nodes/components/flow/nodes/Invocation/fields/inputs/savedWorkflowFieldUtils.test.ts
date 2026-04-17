@@ -3,11 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildSavedWorkflowOptions,
-  EMPTY_SELECTION_LABEL,
   getSavedWorkflowSelectionOption,
   getSavedWorkflowSelectionState,
-  getSavedWorkflowSelectionStatusLabel,
-  MISSING_SELECTION_LABEL,
   MISSING_WORKFLOW_OPTION_VALUE,
 } from './savedWorkflowFieldUtils';
 
@@ -52,7 +49,6 @@ describe('savedWorkflowFieldUtils', () => {
     const selectionState = getSavedWorkflowSelectionState(workflows, '');
     expect(selectionState).toEqual({ status: 'unselected' });
     expect(getSavedWorkflowSelectionOption(selectionState)).toBeNull();
-    expect(getSavedWorkflowSelectionStatusLabel(selectionState)).toBe(EMPTY_SELECTION_LABEL);
   });
 
   it('returns a selected state for a valid workflow id', () => {
@@ -62,16 +58,14 @@ describe('savedWorkflowFieldUtils', () => {
       label: 'Beta Workflow',
       value: 'workflow-b',
     });
-    expect(getSavedWorkflowSelectionStatusLabel(selectionState)).toBeNull();
   });
 
   it('returns a missing state for a stale or inaccessible workflow id', () => {
     const selectionState = getSavedWorkflowSelectionState(workflows, 'missing-workflow');
     expect(selectionState).toEqual({ status: 'missing', workflowId: 'missing-workflow' });
     expect(getSavedWorkflowSelectionOption(selectionState)).toEqual({
-      label: MISSING_SELECTION_LABEL,
+      label: MISSING_WORKFLOW_OPTION_VALUE,
       value: MISSING_WORKFLOW_OPTION_VALUE,
     });
-    expect(getSavedWorkflowSelectionStatusLabel(selectionState)).toBe(MISSING_SELECTION_LABEL);
   });
 });

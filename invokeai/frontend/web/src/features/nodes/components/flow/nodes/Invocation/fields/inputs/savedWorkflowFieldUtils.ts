@@ -2,10 +2,8 @@ import type { ComboboxOption } from '@invoke-ai/ui-library';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 export const MISSING_WORKFLOW_OPTION_VALUE = '__missing_workflow__';
-export const MISSING_SELECTION_LABEL = 'Missing or inaccessible workflow';
-export const EMPTY_SELECTION_LABEL = 'Choose a workflow';
 
-type SavedWorkflowSelectionState =
+export type SavedWorkflowSelectionState =
   | { status: 'unselected' }
   | { status: 'selected'; workflow: WorkflowRecordListItemWithThumbnailDTO }
   | { status: 'missing'; workflowId: string };
@@ -46,15 +44,7 @@ export const getSavedWorkflowSelectionOption = (selectionState: SavedWorkflowSel
   }
 
   return {
-    label: MISSING_SELECTION_LABEL,
+    label: MISSING_WORKFLOW_OPTION_VALUE,
     value: MISSING_WORKFLOW_OPTION_VALUE,
   };
-};
-
-export const getSavedWorkflowSelectionStatusLabel = (selectionState: SavedWorkflowSelectionState): string | null => {
-  if (selectionState.status === 'selected') {
-    return null;
-  }
-
-  return selectionState.status === 'missing' ? MISSING_SELECTION_LABEL : EMPTY_SELECTION_LABEL;
 };
