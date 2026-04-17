@@ -110,7 +110,9 @@ def get_exposed_workflow_input_names(workflow: Mapping[str, Any]) -> set[str]:
     return fallback_inputs
 
 
-def apply_workflow_inputs_to_graph(graph: Graph, workflow: Mapping[str, Any], workflow_inputs: Mapping[str, Any]) -> None:
+def apply_workflow_inputs_to_graph(
+    graph: Graph, workflow: Mapping[str, Any], workflow_inputs: Mapping[str, Any]
+) -> None:
     if not workflow_inputs:
         return
 
