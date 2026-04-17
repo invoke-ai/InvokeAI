@@ -771,6 +771,14 @@ class Flux2CheckpointModel(ModelLoader):
                 for k, v in sd.items()
             }
 
+        # Filter out non-transformer keys from bundled checkpoints.
+        # Combined checkpoints may include text encoder (text_encoders.*) and VAE (vae.*) weights
+        # alongside the transformer weights. Remove them before loading.
+        non_transformer_prefixes = ("text_encoders.", "vae.")
+        keys_to_remove = [k for k in sd if isinstance(k, str) and k.startswith(non_transformer_prefixes)]
+        for k in keys_to_remove:
+            del sd[k]
+
         # Convert BFL format state dict to diffusers format
         converted_sd = self._convert_flux2_bfl_to_diffusers(sd)
 
@@ -1120,6 +1128,12 @@ class Flux2GGUFCheckpointModel(ModelLoader):
                 (k[len(prefix_to_strip) :] if isinstance(k, str) and k.startswith(prefix_to_strip) else k): v
                 for k, v in sd.items()
             }
+
+        # Filter out non-transformer keys from bundled checkpoints.
+        non_transformer_prefixes = ("text_encoders.", "vae.")
+        keys_to_remove = [k for k in sd if isinstance(k, str) and k.startswith(non_transformer_prefixes)]
+        for k in keys_to_remove:
+            del sd[k]
 
         # Convert BFL format state dict to diffusers format
         converted_sd = self._convert_flux2_bfl_to_diffusers(sd)
