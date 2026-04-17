@@ -5016,6 +5016,14 @@ export type components = {
              */
             workflow_id?: string;
             /**
+             * Workflow Inputs
+             * @description Literal values for the selected workflow's exposed inputs, managed by the workflow editor UI.
+             * @default {}
+             */
+            workflow_inputs?: {
+                [key: string]: unknown;
+            };
+            /**
              * type
              * @default call_saved_workflow
              * @constant
@@ -11473,6 +11481,21 @@ export type components = {
             errors: {
                 [key: string]: string;
             };
+            /**
+             * Workflow Call Stack
+             * @description The nested workflow call stack inherited by this execution state.
+             */
+            workflow_call_stack: components["schemas"]["WorkflowCallFrame"][];
+            /** @description The child workflow call this execution state is currently waiting on, if any. */
+            waiting_workflow_call?: components["schemas"]["WorkflowCallFrame"] | null;
+            /** @description The child workflow execution state spawned by the current waiting workflow call, if any. */
+            waiting_workflow_call_child_session?: components["schemas"]["GraphExecutionState"] | null;
+            /**
+             * Max Workflow Call Depth
+             * @description The maximum permitted workflow call depth for nested workflow execution.
+             * @default 4
+             */
+            max_workflow_call_depth?: number;
             /**
              * Prepared Source Mapping
              * @description The map of prepared nodes to original graph nodes
@@ -29522,6 +29545,32 @@ export type components = {
              * @description The graph used to generate the image, as stringified JSON
              */
             graph: string | null;
+        };
+        /**
+         * WorkflowCallFrame
+         * @description Represents one workflow-call frame in a nested call chain.
+         */
+        WorkflowCallFrame: {
+            /**
+             * Prepared Call Node Id
+             * @description The prepared exec node id for the call site.
+             */
+            prepared_call_node_id: string;
+            /**
+             * Source Call Node Id
+             * @description The source graph node id for the call site.
+             */
+            source_call_node_id: string;
+            /**
+             * Workflow Id
+             * @description The saved workflow being called.
+             */
+            workflow_id: string;
+            /**
+             * Depth
+             * @description The 1-based depth of this call frame.
+             */
+            depth: number;
         };
         /**
          * WorkflowCategory

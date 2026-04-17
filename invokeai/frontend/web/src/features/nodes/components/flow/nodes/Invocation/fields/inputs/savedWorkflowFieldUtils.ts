@@ -3,7 +3,7 @@ import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types'
 
 export const MISSING_WORKFLOW_OPTION_VALUE = '__missing_workflow__';
 
-export type SavedWorkflowSelectionState =
+type SavedWorkflowSelectionState =
   | { status: 'unselected' }
   | { status: 'selected'; workflow: WorkflowRecordListItemWithThumbnailDTO }
   | { status: 'missing'; workflowId: string };

@@ -43,7 +43,7 @@ class CallSavedWorkflowInvocation(BaseInvocation):
         ui_type=UIType.SavedWorkflow,
     )
     workflow_inputs: dict[str, Any] = InputField(
-        default_factory=dict,
+        default={},
         description="Literal values for the selected workflow's exposed inputs, managed by the workflow editor UI.",
         ui_hidden=True,
     )
