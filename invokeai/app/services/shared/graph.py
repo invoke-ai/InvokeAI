@@ -1731,6 +1731,10 @@ class GraphExecutionState(BaseModel):
         default=None,
         description="The child workflow call this execution state is currently waiting on, if any.",
     )
+    waiting_workflow_call_child_session: Optional["GraphExecutionState"] = Field(
+        default=None,
+        description="The child workflow execution state spawned by the current waiting workflow call, if any.",
+    )
     max_workflow_call_depth: int = Field(
         default=4,
         ge=1,
@@ -1938,8 +1942,14 @@ class GraphExecutionState(BaseModel):
             raise ValueError("Execution state is already waiting on a workflow call")
         self.waiting_workflow_call = frame
 
+    def attach_waiting_workflow_call_child_session(self, child_session: "GraphExecutionState") -> None:
+        if self.waiting_workflow_call is None:
+            raise ValueError("Execution state must be waiting on a workflow call before attaching a child session")
+        self.waiting_workflow_call_child_session = child_session
+
     def end_waiting_on_workflow_call(self) -> None:
         self.waiting_workflow_call = None
+        self.waiting_workflow_call_child_session = None
 
     def create_child_workflow_execution_state(self, graph: Graph, frame: WorkflowCallFrame) -> "GraphExecutionState":
         return GraphExecutionState(

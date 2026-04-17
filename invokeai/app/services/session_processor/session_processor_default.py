@@ -31,6 +31,7 @@ from invokeai.app.services.session_processor.session_processor_common import Can
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemNotFoundError
 from invokeai.app.services.shared.graph import NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
+from invokeai.app.services.shared.workflow_graph_builder import build_graph_from_workflow
 from invokeai.app.util.profiler import Profiler
 
 
@@ -128,9 +129,12 @@ class DefaultSessionRunner(SessionRunnerBase):
                 )
 
                 if isinstance(invocation, CallSavedWorkflowInvocation):
-                    invocation.validate_selected_workflow(context)
+                    workflow_record = invocation.validate_selected_workflow(context)
                     call_frame = queue_item.session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
+                    child_graph = build_graph_from_workflow(workflow_record.workflow.model_dump())
+                    child_session = queue_item.session.create_child_workflow_execution_state(child_graph, call_frame)
                     queue_item.session.begin_waiting_on_workflow_call(call_frame)
+                    queue_item.session.attach_waiting_workflow_call_child_session(child_session)
                     return
 
                 # Invoke the node
