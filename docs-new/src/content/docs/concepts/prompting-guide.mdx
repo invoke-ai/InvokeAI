@@ -1,0 +1,180 @@
+---
+title: Prompting Guide
+lastUpdated: 2026-03-30
+sidebar:
+  order: 2
+---
+
+import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <LinkCard
+    title="Prompting Syntax"
+    href="/concepts/prompt-syntax"
+    description="Learn how to weight prompt terms, blend concepts, and use prompt conjunctions for more control."
+  />
+
+  <LinkCard
+    title="Dynamic Prompting"
+    href="/concepts/dynamic-prompting"
+    description="Learn how to create many prompt variations from a single template."
+  />
+</CardGrid>
+
+Prompting in InvokeAI works best when you describe the image clearly, then refine only the parts that matter. This page focuses on practical prompt-writing habits.
+
+<CardGrid>
+  <Card title="Subject" icon="seti:image">
+    Start with the main thing you want to see: a character, object, scene, or action.
+  </Card>
+  <Card title="Style or Medium" icon="pencil">
+    Add the visual language: photograph, watercolor, oil painting, 3D render, anime illustration, and so on.
+  </Card>
+  <Card title="Lighting and Composition" icon="setting">
+    Describe the camera angle, framing, lighting, environment, color palette, or mood that will shape the image.
+  </Card>
+  <Card title="Detail and Finish" icon="star">
+    Add a few high-value quality cues such as fabric texture, shallow depth of field, natural skin texture, or painterly brushwork.
+  </Card>
+</CardGrid>
+
+A simple pattern that works well is:
+
+`subject, style or medium, lighting or composition, a few important details`
+
+Not every prompt needs every category. Start simple, then add detail only when the model needs more direction.
+
+## Positive and negative prompts
+
+<CardGrid>
+  <Card title="Positive Prompt" icon="seti:default">
+    Use the positive prompt to describe what you want the model to create. Put the most important idea early and keep the wording concrete.
+  </Card>
+  <Card title="Negative Prompt" icon="document">
+    Use the negative prompt to remove recurring problems or unwanted traits. Keep it short and targeted instead of pasting a giant list into every generation.
+  </Card>
+</CardGrid>
+
+Good negative prompts usually name specific failure modes: `blurry`, `distorted hands`, `low detail`, `extra limbs`.
+
+:::tip[Negative prompts are strong]
+  A negative term can suppress nearby concepts too. If you negate something broad like `green` or `moss`, you may also weaken grass, foliage, or other related ideas.
+:::
+
+## A practical prompting workflow
+
+<Steps>
+  1. Start with the core image
+
+      Write the clearest version of the image you want before adding stylistic extras.
+
+  2. Add style and composition
+
+      Once the subject is right, add medium, lens, lighting, mood, background, or framing details.
+
+  3. Test with a fixed seed
+
+      When you are learning what a prompt change does, keep the seed stable so you can compare results directly.
+
+  4. Change one thing at a time
+
+      If you add five new terms at once, you will not know which one helped.
+
+  5. Escalate only when needed
+
+      If the result is close but one element is too weak or too strong, move to [Prompting Syntax](/concepts/prompt-syntax) for weighting. If you want lots of variations, use [Dynamic Prompting](/concepts/dynamic-prompting).
+</Steps>
+
+Here is the same idea refined in stages:
+
+```text
+portrait of a woman
+
+portrait of a woman, studio photograph, soft key light
+
+portrait of a woman, studio photograph, soft key light, 85mm lens, shallow depth of field, natural skin texture
+```
+
+## Write for the model you are using
+
+The same prompt can behave very differently across models.
+
+- Photo-oriented models respond well to camera, lens, lighting, and texture language.
+- Illustration models often respond better to medium, art direction, and shape language.
+- Specialty models may expect specific trigger words, subjects, or styles from their own model card.
+- If a prompt works beautifully on one model and poorly on another, that does not always mean the prompt is bad. The model may just speak a different visual language.
+
+## When advanced syntax helps
+
+Reach for advanced syntax when a normal comma-separated prompt is almost right, but you need more control.
+
+- Use [Prompting Syntax](/concepts/prompt-syntax) when one term needs more or less influence.
+- Use `.blend()` when you want to mix concepts or styles deliberately.
+- Use `.and()` when you want separate prompt clauses encoded individually.
+- Use [Dynamic Prompting](/concepts/dynamic-prompting) when you want many prompt variations from one template.
+
+## Common mistakes
+
+- Packing too many unrelated ideas into one prompt.
+- Using long generic quality-word lists before you know the base prompt works.
+- Treating the negative prompt as a trash can for every bad outcome.
+- Expecting identical behavior across models, schedulers, and workflows.
+- Changing prompt, model, seed, and settings all at once while troubleshooting.
+
+## Example prompts
+
+### Photographic portrait
+
+**Positive prompt**
+
+```text
+editorial portrait of a woman in a charcoal coat, studio photograph, soft key light, subtle rim light, 85mm lens, shallow depth of field, natural skin texture
+```
+
+**Negative prompt**
+
+```text
+blurry, low detail, waxy skin, extra fingers
+```
+
+### Environment concept art
+
+**Positive prompt**
+
+```text
+ancient stone temple built into a cliffside, fantasy concept art, misty sunrise, towering scale, moss-covered stairs, cinematic atmosphere
+```
+
+**Negative prompt**
+
+```text
+flat lighting, low contrast, muddy details
+```
+
+### Product-style render
+
+**Positive prompt**
+
+```text
+sleek ceramic teapot on a matte stone surface, product photography, clean studio lighting, soft shadow, high detail, minimal background
+```
+
+**Negative prompt**
+
+```text
+cluttered background, distortion, duplicate objects
+```
+
+### Stylized illustration
+
+**Positive prompt**
+
+```text
+fox courier crossing a rainy city street, storybook illustration, bold shapes, glowing shop signs, reflective pavement, warm and cool color contrast
+```
+
+**Negative prompt**
+
+```text
+photorealistic, dull colors, low detail
+```
