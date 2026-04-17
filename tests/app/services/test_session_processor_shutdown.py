@@ -1,6 +1,7 @@
 from contextlib import contextmanager
 from threading import Event
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -72,69 +73,68 @@ class _DummyWorkflowRecords:
         self.return_batch_special_workflow = False
         self.exposed_field_name = "a"
 
+    @staticmethod
+    def _invocation_node(node_id: str, invocation_type: str, inputs: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "id": node_id,
+            "type": "invocation",
+            "position": {"x": 0, "y": 0},
+            "data": {
+                "id": node_id,
+                "type": invocation_type,
+                "version": "1.0.0",
+                "nodePack": "invokeai",
+                "label": "",
+                "notes": "",
+                "isOpen": True,
+                "isIntermediate": False,
+                "useCache": True,
+                "dynamicInputTemplates": {},
+                "inputs": inputs,
+            },
+        }
+
+    @classmethod
+    def _workflow_dump(
+        cls,
+        *,
+        nodes: list[dict[str, Any]],
+        edges: list[dict[str, Any]],
+        exposed_fields: list[dict[str, str]] | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "name": "Child Workflow",
+            "author": "Tester",
+            "description": "",
+            "version": "1.0.0",
+            "contact": "",
+            "tags": "",
+            "notes": "",
+            "exposedFields": exposed_fields or [],
+            "meta": {"category": WorkflowCategory.User, "version": "1.0.0"},
+            "nodes": nodes,
+            "edges": edges,
+            "form": None,
+        }
+
     def get(self, workflow_id: str):
-        workflow = SimpleNamespace(
-            name="Child Workflow",
-            author="Tester",
-            description="",
-            version="1.0.0",
-            contact="",
-            tags="",
-            notes="",
-            exposedFields=[{"nodeId": "child-add", "fieldName": self.exposed_field_name}],
-            meta=SimpleNamespace(category=WorkflowCategory.User),
-            form=None,
+        workflow_dump = self._workflow_dump(
             nodes=[
-                {
-                    "id": "child-add",
-                    "type": "invocation",
-                    "position": {"x": 0, "y": 0},
-                    "data": {
-                        "id": "child-add",
-                        "type": "add",
-                        "version": "1.0.0",
-                        "nodePack": "invokeai",
-                        "label": "",
-                        "notes": "",
-                        "isOpen": True,
-                        "isIntermediate": False,
-                        "useCache": True,
-                        "dynamicInputTemplates": {},
-                        "inputs": {
-                            "a": {"value": 1},
-                            "b": {"value": 2},
-                        },
+                self._invocation_node(
+                    "child-add",
+                    "add",
+                    {
+                        "a": {"value": 1},
+                        "b": {"value": 2},
                     },
-                }
+                )
             ],
             edges=[],
+            exposed_fields=[{"nodeId": "child-add", "fieldName": self.exposed_field_name}],
         )
-        workflow.model_dump = lambda: {
-            "name": workflow.name,
-            "author": workflow.author,
-            "description": workflow.description,
-            "version": workflow.version,
-            "contact": workflow.contact,
-            "tags": workflow.tags,
-            "notes": workflow.notes,
-            "exposedFields": workflow.exposedFields,
-            "meta": {"category": workflow.meta.category, "version": "1.0.0"},
-            "nodes": workflow.nodes,
-            "edges": workflow.edges,
-            "form": workflow.form,
-        }
         if self.return_invalid_workflow:
-            workflow.model_dump = lambda: {
-                "name": workflow.name,
-                "author": workflow.author,
-                "description": workflow.description,
-                "version": workflow.version,
-                "contact": workflow.contact,
-                "tags": workflow.tags,
-                "notes": workflow.notes,
-                "exposedFields": workflow.exposedFields,
-                "meta": {"category": workflow.meta.category, "version": "1.0.0"},
-                "nodes": workflow.nodes,
+            workflow_dump = {
+                **workflow_dump,
                 "edges": [
                     {
                         "id": "edge-invalid",
@@ -145,44 +145,119 @@ class _DummyWorkflowRecords:
                         "targetHandle": "missing_input",
                     }
                 ],
-                "form": workflow.form,
             }
         if self.return_batch_special_workflow:
-            workflow.model_dump = lambda: {
-                "name": workflow.name,
-                "author": workflow.author,
-                "description": workflow.description,
-                "version": workflow.version,
-                "contact": workflow.contact,
-                "tags": workflow.tags,
-                "notes": workflow.notes,
-                "exposedFields": workflow.exposedFields,
-                "meta": {"category": workflow.meta.category, "version": "1.0.0"},
+            workflow_dump = {
+                **workflow_dump,
                 "nodes": [
-                    {
-                        "id": "child-image-batch",
-                        "type": "invocation",
-                        "position": {"x": 0, "y": 0},
-                        "data": {
-                            "id": "child-image-batch",
-                            "type": "image_batch",
-                            "version": "1.0.0",
-                            "nodePack": "invokeai",
-                            "label": "",
-                            "notes": "",
-                            "isOpen": True,
-                            "isIntermediate": False,
-                            "useCache": True,
-                            "dynamicInputTemplates": {},
-                            "inputs": {
-                                "images": {"value": []},
-                            },
+                    self._invocation_node(
+                        "child-image-batch",
+                        "image_batch",
+                        {
+                            "images": {"value": []},
                         },
-                    }
+                    )
                 ],
                 "edges": [],
-                "form": workflow.form,
             }
+        if workflow_id == "workflow-dependent":
+            workflow_dump = self._workflow_dump(
+                nodes=[
+                    self._invocation_node("child-add-1", "add", {"a": {"value": 1}, "b": {"value": 2}}),
+                    self._invocation_node("child-add-2", "add", {"a": {"value": 0}, "b": {"value": 4}}),
+                ],
+                edges=[
+                    {
+                        "id": "edge-dependent",
+                        "type": "default",
+                        "source": "child-add-1",
+                        "sourceHandle": "value",
+                        "target": "child-add-2",
+                        "targetHandle": "a",
+                    }
+                ],
+            )
+        elif workflow_id == "workflow-if":
+            workflow_dump = self._workflow_dump(
+                nodes=[
+                    self._invocation_node("child-bool", "boolean", {"value": {"value": True}}),
+                    self._invocation_node("child-add", "add", {"a": {"value": 2}, "b": {"value": 3}}),
+                    self._invocation_node(
+                        "child-if",
+                        "if",
+                        {
+                            "condition": {"value": False},
+                            "true_input": {"value": None},
+                            "false_input": {"value": 11},
+                        },
+                    ),
+                ],
+                edges=[
+                    {
+                        "id": "edge-if-condition",
+                        "type": "default",
+                        "source": "child-bool",
+                        "sourceHandle": "value",
+                        "target": "child-if",
+                        "targetHandle": "condition",
+                    },
+                    {
+                        "id": "edge-if-true",
+                        "type": "default",
+                        "source": "child-add",
+                        "sourceHandle": "value",
+                        "target": "child-if",
+                        "targetHandle": "true_input",
+                    },
+                ],
+            )
+        elif workflow_id == "workflow-nested":
+            workflow_dump = self._workflow_dump(
+                nodes=[
+                    self._invocation_node(
+                        "nested-call",
+                        "call_saved_workflow",
+                        {
+                            "workflow_id": {"value": "workflow-leaf"},
+                            "workflow_inputs": {"value": {}},
+                        },
+                    ),
+                    self._invocation_node("nested-add", "add", {"a": {"value": 0}, "b": {"value": 4}}),
+                ],
+                edges=[
+                    {
+                        "id": "edge-nested-downstream",
+                        "type": "default",
+                        "source": "nested-call",
+                        "sourceHandle": "value",
+                        "target": "nested-add",
+                        "targetHandle": "a",
+                    }
+                ],
+            )
+        elif workflow_id == "workflow-leaf":
+            workflow_dump = self._workflow_dump(
+                nodes=[
+                    self._invocation_node("leaf-add", "add", {"a": {"value": 5}, "b": {"value": 6}}),
+                ],
+                edges=[],
+            )
+
+        workflow = SimpleNamespace(
+            name="Child Workflow",
+            author="Tester",
+            description="",
+            version="1.0.0",
+            contact="",
+            tags="",
+            notes="",
+            exposedFields=workflow_dump["exposedFields"],
+            meta=SimpleNamespace(category=WorkflowCategory.User),
+            form=workflow_dump["form"],
+            nodes=workflow_dump["nodes"],
+            edges=workflow_dump["edges"],
+        )
+        workflow.model_dump = lambda: workflow_dump
         return SimpleNamespace(
             user_id="user-1",
             is_public=False,
@@ -704,6 +779,128 @@ def test_run_executes_child_workflow_and_completes_parent_queue_item(monkeypatch
     ]
     assert len(parent_outputs) == 1
     assert parent_outputs[0].value == 0
+    assert events.errors == []
+
+
+def test_run_respects_child_dependency_readiness(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-dependent"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+        },
+    )()
+
+    runner.run(queue_item=queue_item)
+
+    child_completions = [
+        (child_queue_item.session.prepared_source_mapping[invocation.id], output)
+        for invocation, child_queue_item, output in events.completed
+        if child_queue_item.session is not session and invocation.get_type() == "add"
+    ]
+    assert [source_id for source_id, _output in child_completions] == ["child-add-1", "child-add-2"]
+    assert child_completions[0][1].value == 3
+    assert child_completions[1][1].value == 7
+    assert session_queue.completed_item_ids == [1]
+    assert events.errors == []
+
+
+def test_run_respects_child_if_branching(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-if"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+        },
+    )()
+
+    runner.run(queue_item=queue_item)
+
+    child_if_outputs = [
+        output
+        for invocation, child_queue_item, output in events.completed
+        if child_queue_item.session is not session and invocation.get_type() == "if"
+    ]
+    assert len(child_if_outputs) == 1
+    assert child_if_outputs[0].value == 5
+    assert session_queue.completed_item_ids == [1]
+    assert events.errors == []
+
+
+def test_run_supports_nested_call_saved_workflow_execution(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-nested"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+        },
+    )()
+
+    runner.run(queue_item=queue_item)
+
+    call_started = [
+        queue_item.session.prepared_source_mapping[invocation.id]
+        for queue_item, invocation in events.started
+        if invocation.get_type() == "call_saved_workflow"
+    ]
+    call_completed = [
+        queue_item.session.prepared_source_mapping[invocation.id]
+        for invocation, queue_item, _output in events.completed
+        if invocation.get_type() == "call_saved_workflow"
+    ]
+    nested_add_outputs = [
+        output
+        for invocation, child_queue_item, output in events.completed
+        if child_queue_item.session is not session
+        and child_queue_item.session.prepared_source_mapping[invocation.id] == "nested-add"
+    ]
+    leaf_add_outputs = [
+        output
+        for invocation, child_queue_item, output in events.completed
+        if child_queue_item.session is not session
+        and child_queue_item.session.prepared_source_mapping[invocation.id] == "leaf-add"
+    ]
+
+    assert call_started == ["call-node", "nested-call"]
+    assert call_completed == ["nested-call", "call-node"]
+    assert len(leaf_add_outputs) == 1
+    assert leaf_add_outputs[0].value == 11
+    assert len(nested_add_outputs) == 1
+    assert nested_add_outputs[0].value == 4
+    assert session_queue.completed_item_ids == [1]
     assert events.errors == []
 
 

@@ -196,6 +196,10 @@ Current limitation:
   clear unsupported-feature error
 - the current child execution path runs inline inside `DefaultSessionRunner`, so child execution is not yet a
   first-class queue/session entity
+- the current inline runner path is an intentionally temporary implementation step used to keep the feature testable
+  while the durable parent-child execution architecture is being built
+- the plan is to replace the inline runner path with a first-class parent-child execution mechanism once return-value
+  propagation and child-session lifecycle handling are implemented cleanly
 
 ### 5. Return Values
 
@@ -273,8 +277,8 @@ Current insertion points already used:
 
 Next runtime work still needed:
 
-- decide whether the inline child-session execution should remain temporarily or move to a more explicit parent-child
-  runtime boundary
+- move child execution off the temporary inline runner path and onto the intended first-class parent-child runtime
+  boundary once return propagation is in place
 - persist and/or formalize parent-child identifiers beyond the in-memory attached child session
 - define how the child completion or failure is delivered back to the suspended parent
 - complete the call node from child results
