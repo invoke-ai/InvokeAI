@@ -1,0 +1,30 @@
+# Crowdin Configuration
+# https://developer.crowdin.com/configuration-file/
+
+project_id_env: CROWDIN_PROJECT_ID
+api_token_env: CROWDIN_PERSONAL_TOKEN
+
+preserve_hierarchy: true
+
+# Map Crowdin's zh-TW to zh-Hant to match the existing file convention
+languages_mapping:
+  locale:
+    zh-TW: zh-Hant
+
+files:
+  # Web App UI Translations
+  - source: /invokeai/frontend/web/public/locales/en.json
+    translation: /invokeai/frontend/web/public/locales/%locale%.json
+
+  # Documentation - Starlight UI Strings
+  - source: /docs/src/content/i18n/en.json
+    translation: /docs/src/content/i18n/%locale%.json
+
+  # Documentation - Content Pages (MD and MDX)
+  - source: /docs/src/content/docs/**/*.{md,mdx}
+    translation: /docs/src/content/docs/%locale%/**/%original_file_name%
+    # Exclude translations directory to avoid re-uploading them as source files
+    ignore:
+      - /docs/src/content/docs/%locale%/**/*
+    # Translate full paragraphs rather than splitting into sentences
+    content_segmentation: 0
