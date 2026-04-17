@@ -503,9 +503,6 @@ const slice = createSlice({
     geminiTemperatureChanged: (state, action: PayloadAction<number | null>) => {
       state.geminiTemperature = action.payload;
     },
-    geminiThinkingLevelChanged: (state, action: PayloadAction<'minimal' | 'high' | null>) => {
-      state.geminiThinkingLevel = action.payload;
-    },
     resolutionPresetSelected: (
       state,
       action: PayloadAction<{ imageSize: string; aspectRatio: string; width: number; height: number }>
@@ -669,7 +666,6 @@ export const {
   openaiBackgroundChanged,
   openaiInputFidelityChanged,
   geminiTemperatureChanged,
-  geminiThinkingLevelChanged,
   paramsRecalled,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
@@ -924,7 +920,6 @@ export const selectOpenaiQuality = createParamsSelector((params) => params.opena
 export const selectOpenaiBackground = createParamsSelector((params) => params.openaiBackground);
 export const selectOpenaiInputFidelity = createParamsSelector((params) => params.openaiInputFidelity);
 export const selectGeminiTemperature = createParamsSelector((params) => params.geminiTemperature);
-export const selectGeminiThinkingLevel = createParamsSelector((params) => params.geminiThinkingLevel);
 export const selectExternalProviderId = createSelector(selectModelConfig, (modelConfig) => {
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
     return modelConfig.provider_id;

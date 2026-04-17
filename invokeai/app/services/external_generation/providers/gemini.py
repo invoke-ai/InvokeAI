@@ -100,8 +100,6 @@ class GeminiProvider(ExternalProvider):
             "contents": [{"role": "user", "parts": request_parts}],
             "generationConfig": generation_config,
         }
-        if "thinking_level" in opts:
-            payload["thinkingConfig"] = {"thinkingLevel": opts["thinking_level"].upper()}
 
         response = requests.post(
             endpoint,

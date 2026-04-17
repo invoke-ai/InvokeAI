@@ -84,9 +84,6 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
     if (params.geminiTemperature !== null) {
       externalNode.temperature = params.geminiTemperature;
     }
-    if (params.geminiThinkingLevel) {
-      externalNode.thinking_level = params.geminiThinkingLevel;
-    }
   }
   const externalInvocation = g.addNode(externalNode as AnyInvocation);
 
