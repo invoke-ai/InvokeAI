@@ -93,7 +93,7 @@ def get_openapi_func(
         openapi_schema["components"]["schemas"]["InvocationOutputMap"] = {
             "type": "object",
             "properties": dict(sorted(invocation_output_map_properties.items())),
-            "required": invocation_output_map_required,
+            "required": sorted(invocation_output_map_required),
         }
 
         # Some models don't end up in the schemas as standalone definitions because they aren't used directly in the API.
