@@ -201,7 +201,7 @@ class DefaultSessionRunner(SessionRunnerBase):
 
             # The queue item may have been canceled or failed while the session was running. We should only complete it
             # if it is not already canceled or failed.
-            if queue_item.status not in ["canceled", "failed"]:
+            if queue_item.status not in ["canceled", "failed"] and queue_item.session.is_complete():
                 queue_item = self._services.session_queue.complete_queue_item(queue_item.item_id)
 
             # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor

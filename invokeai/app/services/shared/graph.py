@@ -68,6 +68,15 @@ class Edge(BaseModel):
 PreparedExecState = Literal["pending", "ready", "executed", "skipped"]
 
 
+class WorkflowCallFrame(BaseModel):
+    """Represents one workflow-call frame in a nested call chain."""
+
+    prepared_call_node_id: str = Field(description="The prepared exec node id for the call site.")
+    source_call_node_id: str = Field(description="The source graph node id for the call site.")
+    workflow_id: str = Field(description="The saved workflow being called.")
+    depth: int = Field(description="The 1-based depth of this call frame.", ge=1)
+
+
 @dataclass
 class _PreparedExecNodeMetadata:
     """Cached metadata for a materialized execution node."""
@@ -1714,6 +1723,20 @@ class GraphExecutionState(BaseModel):
     # Errors raised when executing nodes
     errors: dict[str, str] = Field(description="Errors raised when executing nodes", default_factory=dict)
 
+    workflow_call_stack: list[WorkflowCallFrame] = Field(
+        description="The nested workflow call stack inherited by this execution state.",
+        default_factory=list,
+    )
+    waiting_workflow_call: Optional[WorkflowCallFrame] = Field(
+        default=None,
+        description="The child workflow call this execution state is currently waiting on, if any.",
+    )
+    max_workflow_call_depth: int = Field(
+        default=4,
+        ge=1,
+        description="The maximum permitted workflow call depth for nested workflow execution.",
+    )
+
     # Map of prepared/executed nodes to their original nodes
     prepared_source_mapping: dict[str, str] = Field(
         description="The map of prepared nodes to original graph nodes",
@@ -1829,6 +1852,7 @@ class GraphExecutionState(BaseModel):
                 "executed_history",
                 "results",
                 "errors",
+                "workflow_call_stack",
                 "prepared_source_mapping",
                 "source_prepared_mapping",
             ]
@@ -1846,6 +1870,9 @@ class GraphExecutionState(BaseModel):
 
         # TODO: enable multiple nodes to execute simultaneously by tracking currently executing nodes
         #       possibly with a timeout?
+
+        if self.is_waiting_on_workflow_call():
+            return None
 
         # If there are no prepared nodes, prepare some nodes
         next_node = self._get_next_node()
@@ -1872,12 +1899,54 @@ class GraphExecutionState(BaseModel):
 
     def is_complete(self) -> bool:
         """Returns true if the graph is complete"""
+        if self.is_waiting_on_workflow_call():
+            return False
         node_ids = set(self.graph.nx_graph_flat().nodes)
         return self.has_error() or all((k in self.executed for k in node_ids))
 
     def has_error(self) -> bool:
         """Returns true if the graph has any errors"""
         return len(self.errors) > 0
+
+    def get_workflow_call_depth(self) -> int:
+        return len(self.workflow_call_stack)
+
+    def is_waiting_on_workflow_call(self) -> bool:
+        return self.waiting_workflow_call is not None
+
+    def build_workflow_call_frame(self, exec_node_id: str, workflow_id: str) -> WorkflowCallFrame:
+        if exec_node_id not in self.execution_graph.nodes:
+            raise NodeNotFoundError(f"Node {exec_node_id} not found in execution graph")
+        if exec_node_id not in self.prepared_source_mapping:
+            raise ValueError(f"Node {exec_node_id} is not a prepared execution node")
+
+        next_depth = self.get_workflow_call_depth() + 1
+        if next_depth > self.max_workflow_call_depth:
+            raise ValueError(
+                f"Maximum workflow call depth exceeded ({self.max_workflow_call_depth}) for workflow '{workflow_id}'"
+            )
+
+        return WorkflowCallFrame(
+            prepared_call_node_id=exec_node_id,
+            source_call_node_id=self.prepared_source_mapping[exec_node_id],
+            workflow_id=workflow_id,
+            depth=next_depth,
+        )
+
+    def begin_waiting_on_workflow_call(self, frame: WorkflowCallFrame) -> None:
+        if self.waiting_workflow_call is not None:
+            raise ValueError("Execution state is already waiting on a workflow call")
+        self.waiting_workflow_call = frame
+
+    def end_waiting_on_workflow_call(self) -> None:
+        self.waiting_workflow_call = None
+
+    def create_child_workflow_execution_state(self, graph: Graph, frame: WorkflowCallFrame) -> "GraphExecutionState":
+        return GraphExecutionState(
+            graph=graph,
+            workflow_call_stack=[*self.workflow_call_stack, frame],
+            max_workflow_call_depth=self.max_workflow_call_depth,
+        )
 
     def _create_execution_node(self, node_id: str, iteration_node_map: list[tuple[str, str]]) -> list[str]:
         return self._materializer().create_execution_node(node_id, iteration_node_map)

@@ -5,6 +5,7 @@ import pytest
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.services.session_processor.session_processor_default import DefaultSessionRunner
+from invokeai.app.services.shared.graph import WorkflowCallFrame
 from tests.dangerously_run_function_in_subprocess import dangerously_run_function_in_subprocess
 
 
@@ -23,6 +24,12 @@ class _DummyStats:
     @contextmanager
     def collect_stats(self, invocation: BaseInvocation, graph_execution_state_id: str):
         yield
+
+    def log_stats(self, graph_execution_state_id: str) -> None:
+        pass
+
+    def reset_stats(self, graph_execution_state_id: str) -> None:
+        pass
 
 
 class _DummyEvents:
@@ -81,6 +88,40 @@ def _build_queue_item(invocation: BaseInvocation):
             "session": type("Session", (), {"prepared_source_mapping": {invocation.id: invocation.id}})(),
         },
     )()
+
+
+class _DummySessionQueue:
+    def __init__(self) -> None:
+        self.completed_item_ids: list[int] = []
+        self.session_updates: list[tuple[int, object]] = []
+
+    def set_queue_item_session(self, item_id: int, session):
+        self.session_updates.append((item_id, session))
+        return type("QueueItem", (), {"item_id": item_id, "status": "in_progress", "session": session})()
+
+    def complete_queue_item(self, item_id: int):
+        self.completed_item_ids.append(item_id)
+        return type("QueueItem", (), {"item_id": item_id, "status": "completed"})()
+
+
+class _WaitingSession:
+    def __init__(self) -> None:
+        self.id = "session-id"
+        self.prepared_source_mapping = {}
+        self._next_calls = 0
+        self.waiting_workflow_call = WorkflowCallFrame(
+            prepared_call_node_id="prepared-call",
+            source_call_node_id="source-call",
+            workflow_id="workflow-a",
+            depth=1,
+        )
+
+    def next(self):
+        self._next_calls += 1
+        return None
+
+    def is_complete(self) -> bool:
+        return False
 
 
 def test_run_node_propagates_keyboard_interrupt(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -183,3 +224,77 @@ def test_run_node_does_not_swallow_sigint_in_subprocess() -> None:
 
     assert stdout.strip() == ""
     assert returncode != 0, stderr
+
+
+def test_on_after_run_session_does_not_complete_incomplete_session(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+
+    runner = DefaultSessionRunner()
+    runner.start(
+        services=type(
+            "Services",
+            (),
+            {
+                "performance_statistics": _DummyStats(),
+                "events": _DummyEvents(),
+                "logger": _DummyLogger(),
+                "configuration": _DummyConfig(),
+                "session_queue": session_queue,
+            },
+        )(),
+        cancel_event=Event(),
+    )
+
+    session = type("Session", (), {"id": "session-id", "is_complete": lambda self: False})()
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+        },
+    )()
+
+    runner._on_after_run_session(queue_item=queue_item)
+
+    assert session_queue.session_updates == [(1, session)]
+    assert session_queue.completed_item_ids == []
+
+
+def test_run_persists_waiting_session_without_completing_queue_item(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner = DefaultSessionRunner()
+    runner.start(
+        services=type(
+            "Services",
+            (),
+            {
+                "performance_statistics": _DummyStats(),
+                "events": _DummyEvents(),
+                "logger": _DummyLogger(),
+                "configuration": _DummyConfig(),
+                "session_queue": session_queue,
+            },
+        )(),
+        cancel_event=Event(),
+    )
+
+    session = _WaitingSession()
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+        },
+    )()
+
+    runner.run(queue_item=queue_item)
+
+    assert session._next_calls == 1
+    assert session_queue.session_updates == [(1, session)]
+    assert session_queue.completed_item_ids == []

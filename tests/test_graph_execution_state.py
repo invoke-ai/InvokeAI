@@ -13,6 +13,7 @@ from invokeai.app.services.shared.graph import (
     Graph,
     GraphExecutionState,
     IterateInvocation,
+    WorkflowCallFrame,
 )
 
 # This import must happen before other invoke imports or test in other files(!!) break
@@ -88,6 +89,182 @@ def test_graph_is_not_complete(simple_graph: Graph):
     _ = g.next()
 
     assert not g.is_complete()
+
+
+def test_graph_waiting_on_workflow_call_blocks_other_ready_nodes():
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="prompt_a", prompt="a"))
+    graph.add_node(PromptTestInvocation(id="prompt_b", prompt="b"))
+
+    g = GraphExecutionState(graph=graph)
+
+    first = g.next()
+    assert first is not None
+
+    waiting_frame = g.build_workflow_call_frame(exec_node_id=first.id, workflow_id="workflow-a")
+    g.begin_waiting_on_workflow_call(waiting_frame)
+
+    assert g.next() is None
+    assert not g.is_complete()
+    assert g.is_waiting_on_workflow_call()
+
+
+def test_graph_build_workflow_call_frame_uses_prepared_and_source_ids():
+    g = GraphExecutionState(graph=Graph())
+    g.execution_graph.add_node(PromptTestInvocation(id="prepared-call", prompt="a"))
+    g.prepared_source_mapping["prepared-call"] = "source-call"
+
+    frame = g.build_workflow_call_frame(exec_node_id="prepared-call", workflow_id="workflow-a")
+
+    assert frame.prepared_call_node_id == "prepared-call"
+    assert frame.source_call_node_id == "source-call"
+    assert frame.workflow_id == "workflow-a"
+    assert frame.depth == 1
+
+
+def test_graph_build_workflow_call_frame_rejects_depth_over_limit():
+    g = GraphExecutionState(
+        graph=Graph(),
+        workflow_call_stack=[
+            WorkflowCallFrame(
+                prepared_call_node_id=f"prepared-{i}",
+                source_call_node_id=f"source-{i}",
+                workflow_id=f"workflow-{i}",
+                depth=i + 1,
+            )
+            for i in range(4)
+        ],
+    )
+    g.execution_graph.add_node(PromptTestInvocation(id="prepared-call", prompt="a"))
+    g.prepared_source_mapping["prepared-call"] = "source-call"
+
+    with pytest.raises(ValueError, match="Maximum workflow call depth"):
+        g.build_workflow_call_frame(exec_node_id="prepared-call", workflow_id="workflow-a")
+
+
+def test_graph_execution_state_serializes_workflow_call_state():
+    g = GraphExecutionState(graph=Graph())
+    g.execution_graph.add_node(PromptTestInvocation(id="prepared-call", prompt="a"))
+    g.prepared_source_mapping["prepared-call"] = "source-call"
+
+    frame = g.build_workflow_call_frame(exec_node_id="prepared-call", workflow_id="workflow-a")
+    g.workflow_call_stack.append(frame)
+    g.begin_waiting_on_workflow_call(frame)
+
+    restored = GraphExecutionState.model_validate(g.model_dump(warnings=False))
+
+    assert restored.workflow_call_stack == [frame]
+    assert restored.waiting_workflow_call == frame
+    assert restored.max_workflow_call_depth == 4
+
+
+def test_graph_waiting_on_workflow_call_blocks_until_suspended_node_is_completed():
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="prompt_a", prompt="a"))
+    graph.add_node(PromptTestInvocation(id="prompt_b", prompt="b"))
+
+    g = GraphExecutionState(graph=graph)
+
+    first = g.next()
+    assert first is not None
+
+    waiting_frame = g.build_workflow_call_frame(exec_node_id=first.id, workflow_id="workflow-a")
+    g.begin_waiting_on_workflow_call(waiting_frame)
+    assert g.next() is None
+
+    g.end_waiting_on_workflow_call()
+    g.complete(first.id, first.invoke(Mock(InvocationContext)))
+
+    resumed = g.next()
+    assert resumed is not None
+    assert resumed.id != first.id
+    assert g.prepared_source_mapping[resumed.id] == "prompt_b"
+
+
+def test_graph_begin_waiting_on_workflow_call_rejects_double_entry():
+    g = GraphExecutionState(graph=Graph())
+    g.execution_graph.add_node(PromptTestInvocation(id="prepared-call", prompt="a"))
+    g.prepared_source_mapping["prepared-call"] = "source-call"
+
+    first_frame = g.build_workflow_call_frame(exec_node_id="prepared-call", workflow_id="workflow-a")
+    g.begin_waiting_on_workflow_call(first_frame)
+
+    with pytest.raises(ValueError, match="already waiting"):
+        g.begin_waiting_on_workflow_call(first_frame)
+
+
+def test_graph_build_workflow_call_frame_rejects_missing_execution_node():
+    g = GraphExecutionState(graph=Graph())
+
+    with pytest.raises(Exception, match="not found in execution graph"):
+        g.build_workflow_call_frame(exec_node_id="missing-node", workflow_id="workflow-a")
+
+
+def test_graph_build_workflow_call_frame_rejects_unprepared_execution_node():
+    g = GraphExecutionState(graph=Graph())
+    g.execution_graph.add_node(PromptTestInvocation(id="prepared-call", prompt="a"))
+
+    with pytest.raises(ValueError, match="not a prepared execution node"):
+        g.build_workflow_call_frame(exec_node_id="prepared-call", workflow_id="workflow-a")
+
+
+def test_graph_child_workflow_execution_state_inherits_stack_and_isolates_runtime_state():
+    parent_graph = Graph()
+    child_graph = Graph()
+
+    parent = GraphExecutionState(graph=parent_graph)
+    parent.execution_graph.add_node(PromptTestInvocation(id="prepared-parent", prompt="a"))
+    parent.prepared_source_mapping["prepared-parent"] = "source-parent"
+    parent.results["prepared-parent"] = PromptTestInvocation(id="result-node", prompt="existing").invoke(
+        Mock(InvocationContext)
+    )
+    parent.executed.add("prepared-parent")
+
+    root_frame = parent.build_workflow_call_frame(exec_node_id="prepared-parent", workflow_id="workflow-a")
+    parent.workflow_call_stack.append(root_frame)
+
+    parent.execution_graph.add_node(PromptTestInvocation(id="prepared-child", prompt="b"))
+    parent.prepared_source_mapping["prepared-child"] = "source-child"
+    child_frame = parent.build_workflow_call_frame(exec_node_id="prepared-child", workflow_id="workflow-b")
+
+    child_state = parent.create_child_workflow_execution_state(graph=child_graph, frame=child_frame)
+
+    assert child_state.graph == child_graph
+    assert child_state.workflow_call_stack == [root_frame, child_frame]
+    assert child_state.max_workflow_call_depth == parent.max_workflow_call_depth
+    assert child_state.waiting_workflow_call is None
+    assert child_state.results == {}
+    assert child_state.executed == set()
+
+
+def test_graph_execution_state_serializes_recursive_workflow_call_stack():
+    g = GraphExecutionState(
+        graph=Graph(),
+        workflow_call_stack=[
+            WorkflowCallFrame(
+                prepared_call_node_id="prepared-a",
+                source_call_node_id="source-a",
+                workflow_id="workflow-a",
+                depth=1,
+            ),
+            WorkflowCallFrame(
+                prepared_call_node_id="prepared-b",
+                source_call_node_id="source-b",
+                workflow_id="workflow-b",
+                depth=2,
+            ),
+            WorkflowCallFrame(
+                prepared_call_node_id="prepared-a-2",
+                source_call_node_id="source-a-2",
+                workflow_id="workflow-a",
+                depth=3,
+            ),
+        ],
+    )
+
+    restored = GraphExecutionState.model_validate(g.model_dump(warnings=False))
+
+    assert restored.workflow_call_stack == g.workflow_call_stack
 
 
 # TODO: test completion with iterators/subgraphs
