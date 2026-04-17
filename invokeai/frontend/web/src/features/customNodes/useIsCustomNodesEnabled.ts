@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 
 /**
- * Hook to determine if custom node management should be enabled for the current user.
+ * Pure decision function: determines whether custom node management is enabled.
  *
  * Returns true if:
  * - Multiuser mode is disabled (single-user mode = always admin)
@@ -13,15 +13,22 @@ import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
  * Returns false if:
  * - Multiuser mode is enabled AND user is not an admin
  */
+export const getIsCustomNodesEnabled = (multiuserEnabled: boolean, isAdmin: boolean | undefined): boolean => {
+  if (!multiuserEnabled) {
+    return true;
+  }
+  return isAdmin ?? false;
+};
+
+/**
+ * Hook wrapper around getIsCustomNodesEnabled that reads from Redux + RTK Query.
+ */
 export const useIsCustomNodesEnabled = (): boolean => {
   const user = useAppSelector(selectCurrentUser);
   const { data: setupStatus } = useGetSetupStatusQuery();
 
-  return useMemo(() => {
-    if (setupStatus && !setupStatus.multiuser_enabled) {
-      return true;
-    }
-
-    return user?.is_admin ?? false;
-  }, [setupStatus, user]);
+  return useMemo(
+    () => getIsCustomNodesEnabled(setupStatus ? setupStatus.multiuser_enabled : true, user?.is_admin),
+    [setupStatus, user]
+  );
 };
