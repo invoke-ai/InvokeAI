@@ -10,7 +10,17 @@ import {
   CONNECTOR_OUTPUT_HANDLE,
   getConnectorDeletionSpliceConnections,
 } from './connectorTopology';
-import { add, buildEdge, buildNode, call_saved_workflow, collect, img_resize, main_model_loader, sub, templates } from './testUtils';
+import {
+  add,
+  buildEdge,
+  buildNode,
+  call_saved_workflow,
+  collect,
+  img_resize,
+  main_model_loader,
+  sub,
+  templates,
+} from './testUtils';
 import { validateConnection } from './validateConnection';
 
 const ifTemplate: InvocationTemplate = {

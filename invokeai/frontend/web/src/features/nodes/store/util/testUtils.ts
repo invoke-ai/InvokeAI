@@ -79,6 +79,7 @@ export const call_saved_workflow: InvocationTemplate = {
   version: '1.0.0',
   tags: ['workflow', 'saved', 'library'],
   description: 'Displays and later executes against a selected saved workflow.',
+  category: 'workflow',
   outputType: 'integer_output',
   inputs: {
     workflow_id: {
@@ -128,6 +129,7 @@ export const workflow_return: InvocationTemplate = {
   version: '1.0.0',
   tags: ['workflow', 'return', 'output'],
   description: 'Defines the explicit collection result returned by a callable workflow.',
+  category: 'workflow',
   outputType: 'workflow_return_output',
   inputs: {
     collection: {
