@@ -1,0 +1,9 @@
+---
+import PageFrame from '@astrojs/starlight/components/PageFrame.astro';
+---
+
+<PageFrame {...Astro.props}>
+  <slot name="header" slot="header" />
+  <slot name="sidebar" slot="sidebar" />
+  <slot />
+</PageFrame>
