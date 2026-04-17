@@ -102,6 +102,11 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
 - `prepared_source_mapping: dict[str, str]` - exec id -> source id.
 - `source_prepared_mapping: dict[str, set[str]]` - source id -> exec ids.
 - `indegree: dict[str, int]` - unmet inputs per exec node.
+- Workflow-call runtime state:
+  - `workflow_call_stack` - active parent call frames.
+  - `waiting_workflow_call` - the call frame currently suspending this execution state, if any.
+  - `waiting_workflow_call_child_session` - attached child execution state for the waiting workflow call, if any.
+  - `max_workflow_call_depth` - runtime guardrail for nested or recursive workflow calls.
 - Prepared exec metadata caches:
   - source node id
   - iteration path
@@ -112,7 +117,8 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
 ### 4.2 Core methods
 
 - `next()` Returns the next ready exec node. If none are ready, it asks the materializer to expand more source nodes and
-  then retries. Before returning a node, the runtime helper deep-copies inbound values into the node fields.
+  then retries. If the execution state is paused on a workflow call boundary, it returns `None` without scheduling more
+  work. Before returning a node, the runtime helper deep-copies inbound values into the node fields.
 - `complete(node_id, output)` Records the result, marks the exec node executed, marks the source node executed once all
   of its prepared exec copies are done, then decrements downstream indegrees and enqueues newly ready nodes.
 
@@ -208,7 +214,7 @@ This behavior is implemented in the runtime scheduler, not in the invocation bod
    - Execute node externally -> `output`.
    - `state.complete(node.id, output)` -> updates indegrees, `If` state, and ready queues.
 
-1. Finish when `next()` returns `None`.
+1. Finish when `next()` returns `None` and the execution state is not paused waiting on a workflow call boundary.
 
 In normal execution, all runtime expansion occurs in `execution_graph` with traceability back to source nodes.
 
@@ -229,6 +235,8 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
   complexity.
 - **Dynamic behaviors** (future): can be added in `GraphExecutionState` by creating exec nodes and edges at `complete()`
   time, as long as the DAG invariant holds.
+- **Workflow call boundaries**: `GraphExecutionState` can suspend a parent execution state on a workflow call, attach a
+  child execution state, and later resume the parent without mutating the source graph.
 
 ## 8) Error Model (selected)
 

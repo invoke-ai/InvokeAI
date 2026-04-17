@@ -2,17 +2,20 @@
 
 ## Goal
 
-`CallSavedWorkflowInvocation` should become an engine-native workflow call boundary, not a frontend-only dynamic node and not a compile-time graph inliner.
+`CallSavedWorkflowInvocation` should become an engine-native workflow call boundary, not a frontend-only dynamic node
+and not a compile-time graph inliner.
 
 The long-term feature goal is:
 
 - A parent workflow can call a saved workflow selected by ID.
 - The call node redraws in the editor based on the selected workflow's exposed form fields.
 - Parent values and inbound connections bind to those exposed fields as call arguments.
-- Execution suspends at the call node, runs the selected workflow as a dependent workflow execution, captures explicit return values, and then resumes the parent workflow.
+- Execution suspends at the call node, runs the selected workflow as a dependent workflow execution, captures explicit
+  return values, and then resumes the parent workflow.
 - The architecture must work for Invoke frontend graphs and for externally submitted graphs that use the same node type.
 
-This document records the current state, the target architecture, and the execution contract needed to continue development later.
+This document records the current state, the target architecture, and the execution contract needed to continue
+development later.
 
 ## Implementation Priority
 
@@ -24,30 +27,67 @@ The work may still proceed incrementally, but each increment should satisfy all 
 - compatible with the long-term architecture described here
 - non-breaking to existing code and existing workflow execution behavior
 
-Speed is not the primary goal for this phase. The primary goal is to move toward the durable design without introducing throwaway execution semantics that would need to be unwound later.
+Speed is not the primary goal for this phase. The primary goal is to move toward the durable design without introducing
+throwaway execution semantics that would need to be unwound later.
 
 ## Current State
 
-Implemented already:
+Implemented already in the branch:
 
 - A real invocation exists: `call_saved_workflow`.
+- A real return node exists: `workflow_return`.
+- `workflow_return` accepts a `list[Any]` collection input and returns that collection through a dedicated output.
+- Only one `workflow_return` node is allowed per workflow, enforced in both frontend validation and Python validation.
 - The frontend provides a saved-workflow picker using a reusable `SavedWorkflowField` UI type.
 - The node redraws dynamically based on the selected saved workflow's exposed form fields.
 - Dynamic field values persist with the parent workflow.
-- Compatible inbound edges are preserved when switching between workflows with matching exposed field identities and compatible types.
+- Compatible inbound edges are preserved when switching between workflows with matching exposed field identities and
+  compatible types.
 - Incompatible or no-longer-exposed inbound edges are removed in the editor.
 - Backend validation exists for `workflow_id` existence and access rights.
 
-Important limitation:
+Implemented runtime scaffolding:
 
-- The backend invocation class only has a static `workflow_id` input.
-- Dynamic exposed fields currently exist only in frontend/editor state.
-- Fresh connections to dynamic handles fail at invoke time because backend graph validation checks destination fields against real Python model fields.
+- `GraphExecutionState` now persists workflow-call runtime state:
+  - `workflow_call_stack`
+  - `waiting_workflow_call`
+  - `waiting_workflow_call_child_session`
+  - `max_workflow_call_depth`
+- Nested and recursive calls are represented by the stack, with a runtime depth cap of 4.
+- `GraphExecutionState.next()` returns no runnable node while the parent session is waiting on a child workflow call.
+- `GraphExecutionState.is_complete()` stays false while waiting.
+- `DefaultSessionRunner.run_node()` now treats `call_saved_workflow` as a call boundary instead of a normal executable
+  node.
+- On boundary entry, the runner:
+  - validates the selected workflow
+  - builds a workflow call frame
+  - converts the saved workflow JSON into a backend `Graph`
+  - creates a child `GraphExecutionState`
+  - attaches that child session to the waiting parent session
+- `_on_after_run_session()` no longer completes queue items whose sessions are incomplete but waiting.
+
+Implemented conversion helper:
+
+- `workflow_graph_builder.py` converts saved workflow JSON into an executable backend `Graph`.
+- It currently supports the invocation-node subset needed for this feature.
+- It flattens connector nodes and omits explicit destination field values when a connection exists, matching frontend
+  graph-build semantics.
+
+What is still not implemented:
+
+- the child workflow is not executed yet
+- the child workflow is not persisted as its own queue item
+- parent-child queue/session identifiers are not yet formalized beyond the attached child `GraphExecutionState`
+- `workflow_return` is not yet captured and propagated back to the parent
+- the suspended parent `call_saved_workflow` node is not yet resumed/completed from child results
+- dynamic connected inputs are still not executable end-to-end because child argument injection and child execution have
+  not been wired yet
 
 Conclusion:
 
-- More frontend work alone will not make the node executable.
-- The next phase must be Python-side runtime architecture.
+- the editor contract is largely in place
+- the parent-side runtime call boundary is in place
+- child execution and return propagation are the remaining major runtime steps
 
 ## Architectural Direction
 
@@ -91,8 +131,8 @@ Fallback source for older workflows:
 
 - `workflow.exposedFields`
 
-Only fields exposed by the child workflow form are callable inputs.
-Internal child inputs that exist in the workflow graph but are not exposed by the form are not part of the public call interface.
+Only fields exposed by the child workflow form are callable inputs. Internal child inputs that exist in the workflow
+graph but are not exposed by the form are not part of the public call interface.
 
 ### 2. Input Arguments
 
@@ -105,7 +145,8 @@ Each dynamic input must have:
 - a default value if defined by the child workflow
 - a user-facing label and description when available
 
-Current fast-path identity is based on child `nodeId + fieldName`. That is acceptable short-term in the editor, but a longer-term stable interface ID would be better if child workflows are frequently duplicated or refactored.
+Current fast-path identity is based on child `nodeId + fieldName`. That is acceptable short-term in the editor, but a
+longer-term stable interface ID would be better if child workflows are frequently duplicated or refactored.
 
 ### 3. Input Binding At Runtime
 
@@ -148,11 +189,10 @@ Recommended model:
 - when the workflow is run via `call_saved_workflow`, that collection becomes the return value of the call
 - `call_saved_workflow` should expose that collection as its return value in the first runtime version
 
-Only one workflow return node may exist per workflow.
-That rule should be enforced in both the frontend editor and in Python validation/runtime code.
+Only one workflow return node may exist per workflow. That rule should be enforced in both the frontend editor and in
+Python validation/runtime code.
 
-Do not infer child outputs from arbitrary terminal nodes.
-That is too ambiguous and too brittle.
+Do not infer child outputs from arbitrary terminal nodes. That is too ambiguous and too brittle.
 
 ### 6. Error Propagation
 
@@ -182,12 +222,13 @@ Initial implementation should enforce:
 - maximum workflow call depth is capped at 4 call frames
 - the depth cap is enforced at runtime, based on the active call stack, not by static validation alone
 
-This allows legitimate recursive or conditionally terminating workflow structures while still preventing unbounded call growth.
+This allows legitimate recursive or conditionally terminating workflow structures while still preventing unbounded call
+growth.
 
 ## Where The Runtime Work Belongs
 
-The goal is to support externally submitted graphs, not only frontend-authored graphs.
-Therefore the authoritative execution logic must live in Python.
+The goal is to support externally submitted graphs, not only frontend-authored graphs. Therefore the authoritative
+execution logic must live in Python.
 
 Recommended high-level design:
 
@@ -202,22 +243,23 @@ Relevant existing path:
 - session queue stores session state
 - runtime executes through `GraphExecutionState`
 
-The next phase should identify the best Python insertion point for:
+Current insertion points already used:
 
-- detecting when the next executable node is `call_saved_workflow`
-- suspending parent execution
-- launching a dependent child execution
-- collecting child return values
-- resuming the parent graph
+- `DefaultSessionRunner.run_node()` detects `call_saved_workflow` and enters boundary state
+- `GraphExecutionState` stores the waiting/call-stack state and attached child session
 
-At a minimum, expect changes in Python runtime/session code rather than only in queue submission code.
+Next runtime work still needed:
+
+- decide where the attached child session actually runs
+- persist and/or formalize parent-child identifiers beyond the in-memory attached child session
+- define how the child completion or failure is delivered back to the suspended parent
+- complete the call node from child results
 
 ## Suggested Runtime Components
 
 ### CallSavedWorkflowRuntime
 
-A dedicated runtime helper for this node type should be introduced.
-Responsibilities:
+A dedicated runtime helper for this node type should be introduced. Responsibilities:
 
 - load and validate the selected child workflow record
 - validate runtime access rights
@@ -229,8 +271,7 @@ Responsibilities:
 
 ### Workflow Return Node
 
-A dedicated child-workflow return node should be introduced.
-Responsibilities:
+A dedicated child-workflow return node should be introduced. Responsibilities:
 
 - define the return interface of the called workflow
 - accept a `list[Any]` collection input representing the workflow result
@@ -252,23 +293,18 @@ Session/runtime state will likely need to record:
 
 ### Workflow Return Value Flow
 
-The workflow return value should not be persisted back into the saved workflow record and should not be derived from frontend state.
+The workflow return value should not be persisted back into the saved workflow record and should not be derived from
+frontend state.
 
 The intended runtime flow is:
 
 1. The child workflow computes the `workflow_return` node's collection input like any other node input.
-2. When the child reaches `workflow_return`, runtime captures the resolved collection value as the child workflow result.
-3. That result is stored in child execution state, or equivalent parent-child call-frame state, until the child finishes.
-4. When the child finishes successfully, the captured collection is passed back to the suspended parent call site.
-5. `call_saved_workflow` completes using that collection as its output value.
-6. The parent workflow resumes execution.
-
-Consequences of this model:
-
-- `workflow_return` is a normal invocation node in the child workflow
-- only one workflow return result may exist, because only one return node is allowed per workflow
-- the child result should live in runtime/session state, not in workflow persistence
-- return propagation should be explicit and deterministic
+1. When the child reaches `workflow_return`, runtime captures the resolved collection value as the child workflow
+   result.
+1. The child workflow result is stored in child execution state.
+1. That result is handed back to the suspended parent call frame.
+1. The parent `call_saved_workflow` node is completed with that returned collection.
+1. The parent graph resumes.
 
 ## Frontend Responsibilities In The Long-Term Design
 
@@ -278,56 +314,47 @@ The frontend remains responsible for editor-time behavior:
 - redrawing dynamic inputs based on the child workflow callable interface
 - persisting those dynamic fields and their values
 - preserving compatible inbound edges when workflow selection changes
-- removing no-longer-valid inbound edges when the callable interface changes
-- eventually redrawing outputs if and when explicit workflow returns are added
+- clearing incompatible edges and invalid selections in a predictable way
 
-The frontend should not be the authoritative implementation of execution semantics.
+Potential future optimization:
 
-## Questions To Resolve Before Coding The Runtime
+- add a backend endpoint that returns a normalized callable workflow interface
+- this would let the frontend avoid re-parsing full saved workflow payloads to redraw the node
+- it would also give the frontend a backend-authoritative interface hash for drift detection
 
-1. Where exactly does parent execution pause and child execution resume in the current runtime stack?
-2. What is the narrowest first implementation of parent-child session state?
-3. The first runtime version should use the explicit workflow return node with a single collection-valued return, rather than inputs-only or ad hoc fixed outputs.
-4. Should child execution inherit all parent execution context, or only selected parts?
-5. What cancellation semantics apply if the parent session is cancelled while a child workflow is running?
-6. What metadata should be stored on queue items or sessions to represent call relationships and the captured child return value?
-7. Do dynamic input identities need a more stable external interface ID before runtime work begins?
+## Tests Needed Going Forward
 
-## Recommended Next Steps
+Already covered:
 
-1. Design the explicit workflow return mechanism.
-2. Trace the Python runtime path needed to suspend and resume execution around a call node.
-3. Define a minimal parent-child session relationship model.
-4. Prototype runtime input passing for `call_saved_workflow` without nested calls.
-5. Add the workflow return node with frontend and Python enforcement that only one return node may exist per workflow.
-6. Add runtime call-stack tracking and maximum-depth enforcement.
-7. Add end-to-end tests for successful child call execution, missing child workflow, unauthorized child workflow, duplicate return nodes, maximum-depth failures, and child failure propagation.
+- workflow-call stack and waiting state on `GraphExecutionState`
+- depth-limit enforcement
+- waiting blocks scheduling
+- parent sessions are not completed while waiting
+- runner boundary entry for `call_saved_workflow`
+- validation failures and depth-limit failures still follow normal node-error behavior
+- child workflow JSON conversion to backend `Graph`
+- child graph build failure does not leave the parent in a partial waiting state
+- child `GraphExecutionState` is attached to the waiting parent session
 
-## Minimum Test Matrix For The Next Phase
+Still needed in later increments:
 
-Positive tests:
+- actual child execution lifecycle
+- parent-child resume behavior
+- child failure propagation into parent failure
+- `workflow_return` capture and propagation
+- nested runtime execution beyond a single attached child state
+- eventual queue/session persistence rules if child executions become first-class queue items
 
-- parent workflow calls child workflow successfully with literal arguments
-- parent workflow calls child workflow successfully with connected arguments
-- child workflow returns its explicit `list[Any]` collection value to the parent
-- runtime enforces child defaults when parent does not override them
+## Recommended Immediate Next Step
 
-Negative tests:
+The next incremental step should be:
 
-- missing selected workflow fails cleanly
-- unauthorized selected workflow fails cleanly
-- child workflow missing return definition fails cleanly if returns are required
-- duplicate workflow return nodes are rejected
-- recursive calls that exceed the maximum depth are rejected
-- nested calls that exceed the maximum depth are rejected
-- child workflow failure propagates to the parent
-- cancellation while child is running produces a deterministic failure state
+- decide and implement where the attached child `GraphExecutionState` actually runs
+- keep that step test-first
+- still defer `workflow_return` propagation until the child execution path exists and is stable
 
-## Summary
+The current branch is at the point where:
 
-The project is past the frontend proof-of-concept stage.
-
-What remains is a real engine-level workflow call mechanism.
-The architecture most likely to be kept is a runtime call boundary with dependent child execution and explicit returns, not compile-time graph inlining.
-
-That should be the basis for the next phase of work.
+- parent call-boundary state exists
+- child execution state can be created from the selected saved workflow
+- but no child execution or parent resume path exists yet
