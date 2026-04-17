@@ -1,0 +1,728 @@
+{
+  "settings": [
+    {
+      "category": "WEB",
+      "default": "127.0.0.1",
+      "description": "IP address to bind to. Use `0.0.0.0` to serve to your local network.",
+      "env_var": "INVOKEAI_HOST",
+      "literal_values": [],
+      "name": "host",
+      "required": false,
+      "type": "<class 'str'>",
+      "validation": {}
+    },
+    {
+      "category": "WEB",
+      "default": 9090,
+      "description": "Port to bind to.",
+      "env_var": "INVOKEAI_PORT",
+      "literal_values": [],
+      "name": "port",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "WEB",
+      "default": [],
+      "description": "Allowed CORS origins.",
+      "env_var": "INVOKEAI_ALLOW_ORIGINS",
+      "literal_values": [],
+      "name": "allow_origins",
+      "required": false,
+      "type": "list[str]",
+      "validation": {}
+    },
+    {
+      "category": "WEB",
+      "default": true,
+      "description": "Allow CORS credentials.",
+      "env_var": "INVOKEAI_ALLOW_CREDENTIALS",
+      "literal_values": [],
+      "name": "allow_credentials",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "WEB",
+      "default": [
+        "*"
+      ],
+      "description": "Methods allowed for CORS.",
+      "env_var": "INVOKEAI_ALLOW_METHODS",
+      "literal_values": [],
+      "name": "allow_methods",
+      "required": false,
+      "type": "list[str]",
+      "validation": {}
+    },
+    {
+      "category": "WEB",
+      "default": [
+        "*"
+      ],
+      "description": "Headers allowed for CORS.",
+      "env_var": "INVOKEAI_ALLOW_HEADERS",
+      "literal_values": [],
+      "name": "allow_headers",
+      "required": false,
+      "type": "list[str]",
+      "validation": {}
+    },
+    {
+      "category": "WEB",
+      "default": null,
+      "description": "SSL certificate file for HTTPS. See https://www.uvicorn.org/settings/#https.",
+      "env_var": "INVOKEAI_SSL_CERTFILE",
+      "literal_values": [],
+      "name": "ssl_certfile",
+      "required": false,
+      "type": "typing.Optional[pathlib.Path]",
+      "validation": {}
+    },
+    {
+      "category": "WEB",
+      "default": null,
+      "description": "SSL key file for HTTPS. See https://www.uvicorn.org/settings/#https.",
+      "env_var": "INVOKEAI_SSL_KEYFILE",
+      "literal_values": [],
+      "name": "ssl_keyfile",
+      "required": false,
+      "type": "typing.Optional[pathlib.Path]",
+      "validation": {}
+    },
+    {
+      "category": "MISC FEATURES",
+      "default": false,
+      "description": "Enable logging of parsed prompt tokens.",
+      "env_var": "INVOKEAI_LOG_TOKENIZATION",
+      "literal_values": [],
+      "name": "log_tokenization",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "MISC FEATURES",
+      "default": true,
+      "description": "Enable patchmatch inpaint code.",
+      "env_var": "INVOKEAI_PATCHMATCH",
+      "literal_values": [],
+      "name": "patchmatch",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "models",
+      "description": "Path to the models directory.",
+      "env_var": "INVOKEAI_MODELS_DIR",
+      "literal_values": [],
+      "name": "models_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "models/.convert_cache",
+      "description": "Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).",
+      "env_var": "INVOKEAI_CONVERT_CACHE_DIR",
+      "literal_values": [],
+      "name": "convert_cache_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "models/.download_cache",
+      "description": "Path to the directory that contains dynamically downloaded models.",
+      "env_var": "INVOKEAI_DOWNLOAD_CACHE_DIR",
+      "literal_values": [],
+      "name": "download_cache_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "configs",
+      "description": "Path to directory of legacy checkpoint config files.",
+      "env_var": "INVOKEAI_LEGACY_CONF_DIR",
+      "literal_values": [],
+      "name": "legacy_conf_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "databases",
+      "description": "Path to InvokeAI databases directory.",
+      "env_var": "INVOKEAI_DB_DIR",
+      "literal_values": [],
+      "name": "db_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "outputs",
+      "description": "Path to directory for outputs.",
+      "env_var": "INVOKEAI_OUTPUTS_DIR",
+      "literal_values": [],
+      "name": "outputs_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "nodes",
+      "description": "Path to directory for custom nodes.",
+      "env_var": "INVOKEAI_CUSTOM_NODES_DIR",
+      "literal_values": [],
+      "name": "custom_nodes_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "style_presets",
+      "description": "Path to directory for style presets.",
+      "env_var": "INVOKEAI_STYLE_PRESETS_DIR",
+      "literal_values": [],
+      "name": "style_presets_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "workflow_thumbnails",
+      "description": "Path to directory for workflow thumbnails.",
+      "env_var": "INVOKEAI_WORKFLOW_THUMBNAILS_DIR",
+      "literal_values": [],
+      "name": "workflow_thumbnails_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "LOGGING",
+      "default": [
+        "console"
+      ],
+      "description": "Log handler. Valid options are \"console\", \"file=<path>\", \"syslog=path|address:host:port\", \"http=<url>\".",
+      "env_var": "INVOKEAI_LOG_HANDLERS",
+      "literal_values": [],
+      "name": "log_handlers",
+      "required": false,
+      "type": "list[str]",
+      "validation": {}
+    },
+    {
+      "category": "LOGGING",
+      "default": "color",
+      "description": "Log format. Use \"plain\" for text-only, \"color\" for colorized output, \"legacy\" for 2.3-style logging and \"syslog\" for syslog-style.",
+      "env_var": "INVOKEAI_LOG_FORMAT",
+      "literal_values": [
+        "plain",
+        "color",
+        "syslog",
+        "legacy"
+      ],
+      "name": "log_format",
+      "required": false,
+      "type": "typing.Literal['plain', 'color', 'syslog', 'legacy']",
+      "validation": {}
+    },
+    {
+      "category": "LOGGING",
+      "default": "info",
+      "description": "Emit logging messages at this level or higher.",
+      "env_var": "INVOKEAI_LOG_LEVEL",
+      "literal_values": [
+        "debug",
+        "info",
+        "warning",
+        "error",
+        "critical"
+      ],
+      "name": "log_level",
+      "required": false,
+      "type": "typing.Literal['debug', 'info', 'warning', 'error', 'critical']",
+      "validation": {}
+    },
+    {
+      "category": "LOGGING",
+      "default": false,
+      "description": "Log SQL queries. `log_level` must be `debug` for this to do anything. Extremely verbose.",
+      "env_var": "INVOKEAI_LOG_SQL",
+      "literal_values": [],
+      "name": "log_sql",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "LOGGING",
+      "default": "warning",
+      "description": "Log level for network-related messages. 'info' and 'debug' are very verbose.",
+      "env_var": "INVOKEAI_LOG_LEVEL_NETWORK",
+      "literal_values": [
+        "debug",
+        "info",
+        "warning",
+        "error",
+        "critical"
+      ],
+      "name": "log_level_network",
+      "required": false,
+      "type": "typing.Literal['debug', 'info', 'warning', 'error', 'critical']",
+      "validation": {}
+    },
+    {
+      "category": "LOGGING",
+      "default": false,
+      "description": "Use in-memory database. Useful for development.",
+      "env_var": "INVOKEAI_USE_MEMORY_DB",
+      "literal_values": [],
+      "name": "use_memory_db",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "LOGGING",
+      "default": false,
+      "description": "Automatically reload when Python sources are changed. Does not reload node definitions.",
+      "env_var": "INVOKEAI_DEV_RELOAD",
+      "literal_values": [],
+      "name": "dev_reload",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "LOGGING",
+      "default": false,
+      "description": "Enable graph profiling using `cProfile`.",
+      "env_var": "INVOKEAI_PROFILE_GRAPHS",
+      "literal_values": [],
+      "name": "profile_graphs",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "LOGGING",
+      "default": null,
+      "description": "An optional prefix for profile output files.",
+      "env_var": "INVOKEAI_PROFILE_PREFIX",
+      "literal_values": [],
+      "name": "profile_prefix",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "LOGGING",
+      "default": "profiles",
+      "description": "Path to profiles output directory.",
+      "env_var": "INVOKEAI_PROFILES_DIR",
+      "literal_values": [],
+      "name": "profiles_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": null,
+      "description": "The maximum amount of CPU RAM to use for model caching in GB. If unset, the limit will be configured based on the available RAM. In most cases, it is recommended to leave this unset.",
+      "env_var": "INVOKEAI_MAX_CACHE_RAM_GB",
+      "literal_values": [],
+      "name": "max_cache_ram_gb",
+      "required": false,
+      "type": "typing.Optional[float]",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": null,
+      "description": "The amount of VRAM to use for model caching in GB. If unset, the limit will be configured based on the available VRAM and the device_working_mem_gb. In most cases, it is recommended to leave this unset.",
+      "env_var": "INVOKEAI_MAX_CACHE_VRAM_GB",
+      "literal_values": [],
+      "name": "max_cache_vram_gb",
+      "required": false,
+      "type": "typing.Optional[float]",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": false,
+      "description": "If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.",
+      "env_var": "INVOKEAI_LOG_MEMORY_USAGE",
+      "literal_values": [],
+      "name": "log_memory_usage",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": 0,
+      "description": "How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.",
+      "env_var": "INVOKEAI_MODEL_CACHE_KEEP_ALIVE_MIN",
+      "literal_values": [],
+      "name": "model_cache_keep_alive_min",
+      "required": false,
+      "type": "<class 'float'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": 3,
+      "description": "The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.",
+      "env_var": "INVOKEAI_DEVICE_WORKING_MEM_GB",
+      "literal_values": [],
+      "name": "device_working_mem_gb",
+      "required": false,
+      "type": "<class 'float'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": false,
+      "description": "Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.",
+      "env_var": "INVOKEAI_ENABLE_PARTIAL_LOADING",
+      "literal_values": [],
+      "name": "enable_partial_loading",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": true,
+      "description": "Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.",
+      "env_var": "INVOKEAI_KEEP_RAM_COPY_OF_WEIGHTS",
+      "literal_values": [],
+      "name": "keep_ram_copy_of_weights",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": null,
+      "description": "DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.",
+      "env_var": "INVOKEAI_RAM",
+      "literal_values": [],
+      "name": "ram",
+      "required": false,
+      "type": "typing.Optional[float]",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": null,
+      "description": "DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_vram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.",
+      "env_var": "INVOKEAI_VRAM",
+      "literal_values": [],
+      "name": "vram",
+      "required": false,
+      "type": "typing.Optional[float]",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": true,
+      "description": "DEPRECATED: This setting is no longer used. Lazy-offloading is enabled by default. This config setting will be removed once the new model cache behavior is stable.",
+      "env_var": "INVOKEAI_LAZY_OFFLOAD",
+      "literal_values": [],
+      "name": "lazy_offload",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": null,
+      "description": "Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.",
+      "env_var": "INVOKEAI_PYTORCH_CUDA_ALLOC_CONF",
+      "literal_values": [],
+      "name": "pytorch_cuda_alloc_conf",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "DEVICE",
+      "default": "auto",
+      "description": "Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `cuda:N` (where N is a device number)",
+      "env_var": "INVOKEAI_DEVICE",
+      "literal_values": [],
+      "name": "device",
+      "required": false,
+      "type": "<class 'str'>",
+      "validation": {}
+    },
+    {
+      "category": "DEVICE",
+      "default": "auto",
+      "description": "Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.",
+      "env_var": "INVOKEAI_PRECISION",
+      "literal_values": [
+        "auto",
+        "float16",
+        "bfloat16",
+        "float32"
+      ],
+      "name": "precision",
+      "required": false,
+      "type": "typing.Literal['auto', 'float16', 'bfloat16', 'float32']",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": false,
+      "description": "Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.",
+      "env_var": "INVOKEAI_SEQUENTIAL_GUIDANCE",
+      "literal_values": [],
+      "name": "sequential_guidance",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": "auto",
+      "description": "Attention type.",
+      "env_var": "INVOKEAI_ATTENTION_TYPE",
+      "literal_values": [
+        "auto",
+        "normal",
+        "xformers",
+        "sliced",
+        "torch-sdp"
+      ],
+      "name": "attention_type",
+      "required": false,
+      "type": "typing.Literal['auto', 'normal', 'xformers', 'sliced', 'torch-sdp']",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": "auto",
+      "description": "Slice size, valid when attention_type==\"sliced\".",
+      "env_var": "INVOKEAI_ATTENTION_SLICE_SIZE",
+      "literal_values": [
+        "auto",
+        "balanced",
+        "max",
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8
+      ],
+      "name": "attention_slice_size",
+      "required": false,
+      "type": "typing.Literal['auto', 'balanced', 'max', 1, 2, 3, 4, 5, 6, 7, 8]",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": false,
+      "description": "Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).",
+      "env_var": "INVOKEAI_FORCE_TILED_DECODE",
+      "literal_values": [],
+      "name": "force_tiled_decode",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": 1,
+      "description": "The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.",
+      "env_var": "INVOKEAI_PIL_COMPRESS_LEVEL",
+      "literal_values": [],
+      "name": "pil_compress_level",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": 10000,
+      "description": "Maximum number of items in the session queue.",
+      "env_var": "INVOKEAI_MAX_QUEUE_SIZE",
+      "literal_values": [],
+      "name": "max_queue_size",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": false,
+      "description": "Empties session queue on startup. If true, disables `max_queue_history`.",
+      "env_var": "INVOKEAI_CLEAR_QUEUE_ON_STARTUP",
+      "literal_values": [],
+      "name": "clear_queue_on_startup",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": null,
+      "description": "Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.",
+      "env_var": "INVOKEAI_MAX_QUEUE_HISTORY",
+      "literal_values": [],
+      "name": "max_queue_history",
+      "required": false,
+      "type": "typing.Optional[int]",
+      "validation": {}
+    },
+    {
+      "category": "NODES",
+      "default": null,
+      "description": "List of nodes to allow. Omit to allow all.",
+      "env_var": "INVOKEAI_ALLOW_NODES",
+      "literal_values": [],
+      "name": "allow_nodes",
+      "required": false,
+      "type": "typing.Optional[list[str]]",
+      "validation": {}
+    },
+    {
+      "category": "NODES",
+      "default": null,
+      "description": "List of nodes to deny. Omit to deny none.",
+      "env_var": "INVOKEAI_DENY_NODES",
+      "literal_values": [],
+      "name": "deny_nodes",
+      "required": false,
+      "type": "typing.Optional[list[str]]",
+      "validation": {}
+    },
+    {
+      "category": "NODES",
+      "default": 512,
+      "description": "How many cached nodes to keep in memory.",
+      "env_var": "INVOKEAI_NODE_CACHE_SIZE",
+      "literal_values": [],
+      "name": "node_cache_size",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "MODEL INSTALL",
+      "default": "blake3_single",
+      "description": "Model hashing algorthim for model installs. 'blake3_multi' is best for SSDs. 'blake3_single' is best for spinning disk HDDs. 'random' disables hashing, instead assigning a UUID to models. Useful when using a memory db to reduce model installation time, or if you don't care about storing stable hashes for models. Alternatively, any other hashlib algorithm is accepted, though these are not nearly as performant as blake3.",
+      "env_var": "INVOKEAI_HASHING_ALGORITHM",
+      "literal_values": [
+        "blake3_multi",
+        "blake3_single",
+        "random",
+        "md5",
+        "sha1",
+        "sha224",
+        "sha256",
+        "sha384",
+        "sha512",
+        "blake2b",
+        "blake2s",
+        "sha3_224",
+        "sha3_256",
+        "sha3_384",
+        "sha3_512",
+        "shake_128",
+        "shake_256"
+      ],
+      "name": "hashing_algorithm",
+      "required": false,
+      "type": "typing.Literal['blake3_multi', 'blake3_single', 'random', 'md5', 'sha1', 'sha224', 'sha256', 'sha384', 'sha512', 'blake2b', 'blake2s', 'sha3_224', 'sha3_256', 'sha3_384', 'sha3_512', 'shake_128', 'shake_256']",
+      "validation": {}
+    },
+    {
+      "category": "MODEL INSTALL",
+      "default": null,
+      "description": "List of regular expression and token pairs used when downloading models from URLs. The download URL is tested against the regex, and if it matches, the token is provided in as a Bearer token.",
+      "env_var": "INVOKEAI_REMOTE_API_TOKENS",
+      "literal_values": [],
+      "name": "remote_api_tokens",
+      "required": false,
+      "type": "typing.Optional[list[invokeai.app.services.config.config_default.URLRegexTokenPair]]",
+      "validation": {}
+    },
+    {
+      "category": "MODEL INSTALL",
+      "default": false,
+      "description": "Scan the models directory on startup, registering orphaned models. This is typically only used in conjunction with `use_memory_db` for testing purposes.",
+      "env_var": "INVOKEAI_SCAN_MODELS_ON_STARTUP",
+      "literal_values": [],
+      "name": "scan_models_on_startup",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "MODEL INSTALL",
+      "default": false,
+      "description": "UNSAFE. Disable the picklescan security check during model installation. Recommended only for development and testing purposes. This will allow arbitrary code execution during model installation, so should never be used in production.",
+      "env_var": "INVOKEAI_UNSAFE_DISABLE_PICKLESCAN",
+      "literal_values": [],
+      "name": "unsafe_disable_picklescan",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "MODEL INSTALL",
+      "default": true,
+      "description": "Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.",
+      "env_var": "INVOKEAI_ALLOW_UNKNOWN_MODELS",
+      "literal_values": [],
+      "name": "allow_unknown_models",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "MULTIUSER",
+      "default": false,
+      "description": "Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.",
+      "env_var": "INVOKEAI_MULTIUSER",
+      "literal_values": [],
+      "name": "multiuser",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "MULTIUSER",
+      "default": false,
+      "description": "Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.",
+      "env_var": "INVOKEAI_STRICT_PASSWORD_CHECKING",
+      "literal_values": [],
+      "name": "strict_password_checking",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    }
+  ]
+}
