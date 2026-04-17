@@ -58,6 +58,15 @@ Runs a sequence of checks:
 
 1. **Type compatibility** `get_output_field_type` vs `get_input_field_type` and `are_connection_types_compatible`.
 
+   Special case:
+
+   - `call_saved_workflow` currently accepts dynamic destination handles of the form
+     `saved_workflow_input::{childNodeId}::{childFieldName}` as part of its temporary call-boundary contract.
+   - Those handles are allowed through graph validation even though they are not static Python model fields on the
+     invocation class.
+   - Runtime later validates them against the selected child workflow's exposed callable interface before applying
+     values to the child graph.
+
 1. **Iterator / collector structure** Enforce special rules:
 
    - Iterator's input must be `collection`; its outgoing edges use `item`.
@@ -121,6 +130,15 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
   work. Before returning a node, the runtime helper deep-copies inbound values into the node fields.
 - `complete(node_id, output)` Records the result, marks the exec node executed, marks the source node executed once all
   of its prepared exec copies are done, then decrements downstream indegrees and enqueues newly ready nodes.
+
+Workflow-call note:
+
+- `GraphExecutionState` can represent a paused parent execution plus an attached child execution state, but it does not
+  itself orchestrate child execution.
+- In the current temporary implementation, `DefaultSessionRunner.run_node()` runs the attached child session inline,
+  then clears the waiting state and completes the parent `call_saved_workflow` node with a stub output.
+- This is a tactical step to keep the feature testable and should eventually be replaced by a first-class parent/child
+  execution mechanism with explicit return propagation.
 
 ### 4.3 Runtime helper classes
 
@@ -237,6 +255,12 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
   time, as long as the DAG invariant holds.
 - **Workflow call boundaries**: `GraphExecutionState` can suspend a parent execution state on a workflow call, attach a
   child execution state, and later resume the parent without mutating the source graph.
+
+Current limitation:
+
+- The attached child execution state is currently executed inline by the session runner rather than as a first-class
+  queued or scheduler-visible child execution.
+- Parent completion after a workflow call still uses a temporary stub output rather than `workflow_return` propagation.
 
 ## 8) Error Model (selected)
 
