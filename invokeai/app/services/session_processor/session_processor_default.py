@@ -3,10 +3,14 @@ import traceback
 from contextlib import suppress
 from threading import BoundedSemaphore, Thread
 from threading import Event as ThreadEvent
-from typing import Optional
+from typing import Any, Optional
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
-from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
+from invokeai.app.invocations.call_saved_workflow import (
+    CallSavedWorkflowInvocation,
+    is_call_saved_workflow_dynamic_input,
+)
+from invokeai.app.invocations.primitives import IntegerOutput
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     FastAPIEvent,
@@ -31,7 +35,10 @@ from invokeai.app.services.session_processor.session_processor_common import Can
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemNotFoundError
 from invokeai.app.services.shared.graph import NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
-from invokeai.app.services.shared.workflow_graph_builder import build_graph_from_workflow
+from invokeai.app.services.shared.workflow_graph_builder import (
+    apply_workflow_inputs_to_graph,
+    build_graph_from_workflow,
+)
 from invokeai.app.util.profiler import Profiler
 
 
@@ -71,11 +78,7 @@ class DefaultSessionRunner(SessionRunnerBase):
         denoising to check if the session has been canceled."""
         return self._cancel_event.is_set()
 
-    def run(self, queue_item: SessionQueueItem):
-        # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
-
-        self._on_before_run_session(queue_item=queue_item)
-
+    def _run_session_loop(self, queue_item: SessionQueueItem) -> None:
         # Loop over invocations until the session is complete or canceled
         while True:
             try:
@@ -109,6 +112,34 @@ class DefaultSessionRunner(SessionRunnerBase):
             ):
                 break
 
+    def _collect_call_saved_workflow_inputs(
+        self, invocation: CallSavedWorkflowInvocation, queue_item: SessionQueueItem
+    ) -> dict[str, Any]:
+        workflow_inputs = dict(invocation.workflow_inputs)
+        for edge in queue_item.session.execution_graph._get_input_edges(invocation.id):
+            if not is_call_saved_workflow_dynamic_input(edge.destination.field):
+                continue
+            if edge.source.node_id not in queue_item.session.results:
+                continue
+            workflow_inputs[edge.destination.field] = getattr(
+                queue_item.session.results[edge.source.node_id], edge.source.field
+            )
+        return workflow_inputs
+
+    @staticmethod
+    def _build_child_queue_item(queue_item: SessionQueueItem, child_session) -> SessionQueueItem:
+        if hasattr(queue_item, "model_copy"):
+            return queue_item.model_copy(update={"session": child_session, "session_id": child_session.id})
+
+        child_queue_item = type(queue_item).__new__(type(queue_item))
+        child_queue_item.__dict__ = {**queue_item.__dict__, "session": child_session, "session_id": child_session.id}
+        return child_queue_item
+
+    def run(self, queue_item: SessionQueueItem):
+        # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
+
+        self._on_before_run_session(queue_item=queue_item)
+        self._run_session_loop(queue_item)
         self._on_after_run_session(queue_item=queue_item)
 
     def run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
@@ -132,9 +163,25 @@ class DefaultSessionRunner(SessionRunnerBase):
                     workflow_record = invocation.validate_selected_workflow(context)
                     call_frame = queue_item.session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
                     child_graph = build_graph_from_workflow(workflow_record.workflow.model_dump())
+                    apply_workflow_inputs_to_graph(
+                        child_graph,
+                        workflow_record.workflow.model_dump(),
+                        self._collect_call_saved_workflow_inputs(invocation, queue_item),
+                    )
                     child_session = queue_item.session.create_child_workflow_execution_state(child_graph, call_frame)
                     queue_item.session.begin_waiting_on_workflow_call(call_frame)
                     queue_item.session.attach_waiting_workflow_call_child_session(child_session)
+                    child_queue_item = self._build_child_queue_item(queue_item, child_session)
+                    self._run_session_loop(child_queue_item)
+                    if child_session.has_error():
+                        raise ValueError(
+                            f"The selected saved workflow '{invocation.workflow_id}' failed during child execution."
+                        )
+
+                    queue_item.session.end_waiting_on_workflow_call()
+                    output = IntegerOutput(value=0)
+                    queue_item.session.complete(invocation.id, output)
+                    self._on_after_run_node(invocation, queue_item, output)
                     return
 
                 # Invoke the node

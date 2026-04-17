@@ -18,6 +18,7 @@ import type { AnyInvocation, Graph } from 'services/api/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const log = logger('workflows');
+const CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX = 'saved_workflow_input::';
 
 const getBoardField = (field: BoardFieldInputInstance, state: RootState): BoardField | undefined => {
   // Translate the UI value to the graph value. See note in BoardFieldInputComponent for more info.
@@ -64,6 +65,15 @@ export const buildNodesGraph = (state: RootState, templates: Templates): Require
     const transformedInputs = reduce(
       inputs,
       (inputsAccumulator, input, name) => {
+        if (type === 'call_saved_workflow' && name.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)) {
+          const workflowInputs = {
+            ...((inputsAccumulator['workflow_inputs'] as Record<string, unknown> | undefined) ?? {}),
+          };
+          workflowInputs[name] = input.value;
+          inputsAccumulator['workflow_inputs'] = workflowInputs;
+          return inputsAccumulator;
+        }
+
         const fieldTemplate = getInvocationNodeInputTemplate(data, nodeTemplate, name);
         if (!fieldTemplate) {
           log.warn({ id, name }, 'Field template not found!');
@@ -186,7 +196,20 @@ export const buildNodesGraph = (state: RootState, templates: Templates): Require
    */
   parsedEdges.forEach((edge) => {
     const destination_node = parsedNodes[edge.destination.node_id];
+    if (!destination_node) {
+      return;
+    }
     const field = edge.destination.field;
+    const destinationNodeRecord = destination_node as Record<string, unknown>;
+    if (
+      destination_node.type === 'call_saved_workflow' &&
+      field.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX) &&
+      typeof destinationNodeRecord['workflow_inputs'] === 'object' &&
+      destinationNodeRecord['workflow_inputs'] !== null
+    ) {
+      delete (destinationNodeRecord['workflow_inputs'] as Record<string, unknown>)[field];
+      return;
+    }
     parsedNodes[edge.destination.node_id] = omit(destination_node, field) as AnyInvocation;
   });
 

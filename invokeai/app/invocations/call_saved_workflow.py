@@ -1,8 +1,28 @@
+from typing import Any
+
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import InputField, UIType
 from invokeai.app.invocations.primitives import IntegerOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowCategory, WorkflowNotFoundError
+
+CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX = "saved_workflow_input::"
+
+
+def is_call_saved_workflow_dynamic_input(field_name: str) -> bool:
+    return field_name.startswith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)
+
+
+def parse_call_saved_workflow_dynamic_input(field_name: str) -> tuple[str, str]:
+    if not is_call_saved_workflow_dynamic_input(field_name):
+        raise ValueError(f"'{field_name}' is not a call_saved_workflow dynamic input field")
+
+    raw_identifier = field_name.removeprefix(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)
+    node_id, separator, input_field_name = raw_identifier.rpartition("::")
+    if not separator or not node_id or not input_field_name:
+        raise ValueError(f"Invalid call_saved_workflow dynamic input field '{field_name}'")
+
+    return node_id, input_field_name
 
 
 @invocation(
@@ -21,6 +41,11 @@ class CallSavedWorkflowInvocation(BaseInvocation):
         default="",
         description="The selected saved workflow ID, managed by the workflow editor UI.",
         ui_type=UIType.SavedWorkflow,
+    )
+    workflow_inputs: dict[str, Any] = InputField(
+        default_factory=dict,
+        description="Literal values for the selected workflow's exposed inputs, managed by the workflow editor UI.",
+        ui_hidden=True,
     )
 
     def validate_selected_workflow(self, context: InvocationContext):

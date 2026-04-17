@@ -62,9 +62,16 @@ Implemented runtime scaffolding:
   - validates the selected workflow
   - builds a workflow call frame
   - converts the saved workflow JSON into a backend `Graph`
+  - validates and applies parent call arguments to the child graph
   - creates a child `GraphExecutionState`
   - attaches that child session to the waiting parent session
+  - runs the child session inline in the runner
+  - clears the waiting state and completes the parent `call_saved_workflow` node with the current stub output
 - `_on_after_run_session()` no longer completes queue items whose sessions are incomplete but waiting.
+- Dynamic call arguments now execute end-to-end in the current runner path:
+  - literal dynamic values are serialized into a hidden `workflow_inputs` payload on the parent node
+  - connected dynamic values are accepted as special call-boundary edges and are resolved from parent results at runtime
+  - both are validated against the child workflow's exposed form interface before being applied to the child graph
 
 Implemented conversion helper:
 
@@ -75,19 +82,20 @@ Implemented conversion helper:
 
 What is still not implemented:
 
-- the child workflow is not executed yet
+- the child workflow is executed inline by the parent runner, not yet as its own queue item or scheduler-visible unit
 - the child workflow is not persisted as its own queue item
 - parent-child queue/session identifiers are not yet formalized beyond the attached child `GraphExecutionState`
 - `workflow_return` is not yet captured and propagated back to the parent
-- the suspended parent `call_saved_workflow` node is not yet resumed/completed from child results
-- dynamic connected inputs are still not executable end-to-end because child argument injection and child execution have
-  not been wired yet
+- the parent call node still completes with a temporary stub output rather than child return data
+- saved workflows containing batch-special nodes such as `image_batch` are not supported by the current child graph
+  reconstruction path and must fail with a clear domain error rather than a low-level constructor error
 
 Conclusion:
 
 - the editor contract is largely in place
 - the parent-side runtime call boundary is in place
-- child execution and return propagation are the remaining major runtime steps
+- child execution and argument forwarding are now in place through an inline runner path
+- return propagation and first-class child execution semantics are the remaining major runtime steps
 
 ## Architectural Direction
 
@@ -163,6 +171,9 @@ Argument values may come from:
 - parent literal field values
 - resolved inbound connections into the call node's dynamic inputs
 
+For batch-aware child workflows, the parent call boundary should still pass normal exposed form inputs. Batching should
+emerge from the child workflow's own internal batch nodes or generators, not from a separate caller-side batch protocol.
+
 ### 4. Child Workflow Execution
 
 The child workflow runs as its own dependent execution context, not as an inlined copy of the parent graph.
@@ -175,6 +186,16 @@ Desired semantics:
 - parent resumes only if child execution succeeds
 
 This implies the queue/session/runtime layer needs an explicit parent-child execution relationship.
+
+Current limitation:
+
+- the temporary `workflow_graph_builder.py` path can only reconstruct the subset of child workflows that can be parsed
+  as ordinary backend invocation graphs
+- batch-special nodes from `invokeai.app.invocations.batch` are not yet supported in called workflows
+- until the child execution path is closer to normal session execution, batch-special nodes should fail early with a
+  clear unsupported-feature error
+- the current child execution path runs inline inside `DefaultSessionRunner`, so child execution is not yet a
+  first-class queue/session entity
 
 ### 5. Return Values
 
@@ -247,13 +268,18 @@ Current insertion points already used:
 
 - `DefaultSessionRunner.run_node()` detects `call_saved_workflow` and enters boundary state
 - `GraphExecutionState` stores the waiting/call-stack state and attached child session
+- `DefaultSessionRunner.run_node()` currently executes the attached child session inline before completing the parent
+  call node with the stub output
 
 Next runtime work still needed:
 
-- decide where the attached child session actually runs
+- decide whether the inline child-session execution should remain temporarily or move to a more explicit parent-child
+  runtime boundary
 - persist and/or formalize parent-child identifiers beyond the in-memory attached child session
 - define how the child completion or failure is delivered back to the suspended parent
 - complete the call node from child results
+- replace the current unsupported batch-special-node limitation by routing child execution through machinery that can
+  honor ordinary Invoke batch semantics
 
 ## Suggested Runtime Components
 
@@ -335,26 +361,31 @@ Already covered:
 - child workflow JSON conversion to backend `Graph`
 - child graph build failure does not leave the parent in a partial waiting state
 - child `GraphExecutionState` is attached to the waiting parent session
+- inline child execution completes the parent queue item instead of leaving it stuck in `in_progress`
+- literal and connected dynamic call arguments are applied to the child graph at runtime
+- non-exposed dynamic call arguments are rejected at runtime
 
 Still needed in later increments:
 
-- actual child execution lifecycle
-- parent-child resume behavior
+- parent-child resume behavior once child execution is no longer an inline runner detail
 - child failure propagation into parent failure
 - `workflow_return` capture and propagation
 - nested runtime execution beyond a single attached child state
 - eventual queue/session persistence rules if child executions become first-class queue items
+- eventual support for child workflows that contain batch-special nodes, once child execution is run through the proper
+  batch/session path
 
 ## Recommended Immediate Next Step
 
 The next incremental step should be:
 
-- decide and implement where the attached child `GraphExecutionState` actually runs
+- replace the stub parent completion path with explicit `workflow_return` capture and propagation
 - keep that step test-first
-- still defer `workflow_return` propagation until the child execution path exists and is stable
+- preserve the current bounded nested-call runtime state while making return/resume behavior explicit
 
 The current branch is at the point where:
 
 - parent call-boundary state exists
 - child execution state can be created from the selected saved workflow
-- but no child execution or parent resume path exists yet
+- child execution and argument forwarding work through the inline runner path
+- but explicit return propagation and long-term child-session execution semantics are still missing

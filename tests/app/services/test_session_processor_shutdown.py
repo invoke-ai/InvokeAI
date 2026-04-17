@@ -69,6 +69,8 @@ class _DummyConfig:
 class _DummyWorkflowRecords:
     def __init__(self) -> None:
         self.return_invalid_workflow = False
+        self.return_batch_special_workflow = False
+        self.exposed_field_name = "a"
 
     def get(self, workflow_id: str):
         workflow = SimpleNamespace(
@@ -79,7 +81,7 @@ class _DummyWorkflowRecords:
             contact="",
             tags="",
             notes="",
-            exposedFields=[],
+            exposedFields=[{"nodeId": "child-add", "fieldName": self.exposed_field_name}],
             meta=SimpleNamespace(category=WorkflowCategory.User),
             form=None,
             nodes=[
@@ -143,6 +145,42 @@ class _DummyWorkflowRecords:
                         "targetHandle": "missing_input",
                     }
                 ],
+                "form": workflow.form,
+            }
+        if self.return_batch_special_workflow:
+            workflow.model_dump = lambda: {
+                "name": workflow.name,
+                "author": workflow.author,
+                "description": workflow.description,
+                "version": workflow.version,
+                "contact": workflow.contact,
+                "tags": workflow.tags,
+                "notes": workflow.notes,
+                "exposedFields": workflow.exposedFields,
+                "meta": {"category": workflow.meta.category, "version": "1.0.0"},
+                "nodes": [
+                    {
+                        "id": "child-image-batch",
+                        "type": "invocation",
+                        "position": {"x": 0, "y": 0},
+                        "data": {
+                            "id": "child-image-batch",
+                            "type": "image_batch",
+                            "version": "1.0.0",
+                            "nodePack": "invokeai",
+                            "label": "",
+                            "notes": "",
+                            "isOpen": True,
+                            "isIntermediate": False,
+                            "useCache": True,
+                            "dynamicInputTemplates": {},
+                            "inputs": {
+                                "images": {"value": []},
+                            },
+                        },
+                    }
+                ],
+                "edges": [],
                 "form": workflow.form,
             }
         return SimpleNamespace(
@@ -281,6 +319,8 @@ class _WorkflowCallBoundarySession:
         self.waiting: WorkflowCallFrame | None = None
         self.waiting_workflow_call_child_session = None
         self.errors: dict[str, str] = {}
+        self.execution_graph = Graph()
+        self.results = {}
 
     def build_workflow_call_frame(self, exec_node_id: str, workflow_id: str) -> WorkflowCallFrame:
         frame = WorkflowCallFrame(
@@ -300,6 +340,10 @@ class _WorkflowCallBoundarySession:
 
     def attach_waiting_workflow_call_child_session(self, child_session: GraphExecutionState) -> None:
         self.waiting_workflow_call_child_session = child_session
+
+    def end_waiting_on_workflow_call(self) -> None:
+        self.waiting = None
+        self.waiting_workflow_call_child_session = None
 
     def complete(self, node_id: str, output) -> None:
         self.completed.append((node_id, output))
@@ -450,7 +494,7 @@ def test_on_after_run_session_does_not_complete_incomplete_session(monkeypatch: 
     assert session_queue.completed_item_ids == []
 
 
-def test_run_node_transitions_call_saved_workflow_into_waiting_state(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_node_executes_child_workflow_and_clears_waiting_state(monkeypatch: pytest.MonkeyPatch) -> None:
     runner, events, _workflow_records = _build_workflow_runner(monkeypatch)
     invocation = CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a")
     session = _WorkflowCallBoundarySession(invocation.id)
@@ -474,13 +518,45 @@ def test_run_node_transitions_call_saved_workflow_into_waiting_state(monkeypatch
     runner.run_node(invocation=invocation, queue_item=queue_item)
 
     assert len(session.frames) == 1
-    assert session.waiting == session.frames[0]
+    assert session.waiting is None
     assert session.frames[0].prepared_call_node_id == invocation.id
     assert session.frames[0].workflow_id == "workflow-a"
+    assert len(session.completed) == 1
+    assert len(events.started) == 2
+    assert len(events.completed) == 2
+    assert events.errors == []
+
+
+def test_run_node_fails_cleanly_for_unsupported_batch_special_child_workflow(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runner, events, workflow_records = _build_workflow_runner(monkeypatch)
+    workflow_records.return_batch_special_workflow = True
+    invocation = CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a")
+    session = _WorkflowCallBoundarySession(invocation.id)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "session_id": "test-session",
+            "user_id": "user-1",
+            "status": "in_progress",
+            "session": session,
+        },
+    )()
+
+    runner.run_node(invocation=invocation, queue_item=queue_item)
+
+    assert session.waiting is None
+    assert session.waiting_workflow_call_child_session is None
     assert session.completed == []
     assert len(events.started) == 1
     assert events.completed == []
-    assert events.errors == []
+    assert len(events.errors) == 1
+    _queue_item, _invocation, error_type, error_message, _traceback = events.errors[0]
+    assert error_type == "UnsupportedWorkflowNodeError"
+    assert "call_saved_workflow does not yet support batch-special" in error_message
 
 
 def test_run_persists_waiting_session_without_completing_queue_item(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -520,7 +596,7 @@ def test_run_persists_waiting_session_without_completing_queue_item(monkeypatch:
     assert session_queue.completed_item_ids == []
 
 
-def test_run_pauses_on_call_saved_workflow_and_does_not_run_downstream_nodes(
+def test_run_completes_call_saved_workflow_and_runs_downstream_nodes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session_queue = _DummySessionQueue()
@@ -546,18 +622,21 @@ def test_run_pauses_on_call_saved_workflow_and_does_not_run_downstream_nodes(
 
     runner.run(queue_item=queue_item)
 
-    assert session.is_waiting_on_workflow_call()
-    assert session.results == {}
-    assert "downstream-add" not in session.executed
-    assert len(events.started) == 1
-    assert events.started[0][1].get_type() == "call_saved_workflow"
-    assert events.completed == []
+    assert not session.is_waiting_on_workflow_call()
+    assert "downstream-add" in session.executed
+    assert len(events.started) == 3
+    assert [invocation.get_type() for _queue_item, invocation in events.started] == [
+        "call_saved_workflow",
+        "add",
+        "add",
+    ]
+    assert len(events.completed) == 3
     assert events.errors == []
-    assert session_queue.completed_item_ids == []
+    assert session_queue.completed_item_ids == [1]
     assert session_queue.session_updates == [(1, session)]
 
 
-def test_run_node_creates_child_execution_state_for_waiting_workflow_call(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_run_node_records_child_execution_state_for_call_saved_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
     runner, events, _workflow_records = _build_workflow_runner(monkeypatch)
 
     graph = Graph()
@@ -579,13 +658,165 @@ def test_run_node_creates_child_execution_state_for_waiting_workflow_call(monkey
 
     runner.run_node(invocation=invocation, queue_item=queue_item)
 
-    assert session.is_waiting_on_workflow_call()
-    assert session.waiting_workflow_call_child_session is not None
-    assert session.waiting_workflow_call_child_session.graph.nodes["child-add"].get_type() == "add"
-    assert session.waiting_workflow_call_child_session.workflow_call_stack == [session.waiting_workflow_call]
-    assert len(events.started) == 1
-    assert events.completed == []
+    assert not session.is_waiting_on_workflow_call()
+    assert session.waiting_workflow_call_child_session is None
+    assert invocation.id in session.executed
+    assert len(events.started) == 2
+    assert len(events.completed) == 2
     assert events.errors == []
+
+
+def test_run_executes_child_workflow_and_completes_parent_queue_item(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+        },
+    )()
+
+    runner.run(queue_item=queue_item)
+
+    assert not session.is_waiting_on_workflow_call()
+    assert session_queue.completed_item_ids == [1]
+    assert "call-node" in session.executed
+    child_add_outputs = [
+        output
+        for invocation, child_queue_item, output in events.completed
+        if invocation.get_type() == "add"
+        and child_queue_item.session.prepared_source_mapping[invocation.id] == "child-add"
+    ]
+    assert len(child_add_outputs) == 1
+    assert child_add_outputs[0].value == 3
+    parent_outputs = [
+        output for invocation, _queue_item, output in events.completed if invocation.get_type() == "call_saved_workflow"
+    ]
+    assert len(parent_outputs) == 1
+    assert parent_outputs[0].value == 0
+    assert events.errors == []
+
+
+def test_run_forwards_literal_dynamic_workflow_inputs_to_child_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+
+    graph = Graph()
+    graph.add_node(
+        CallSavedWorkflowInvocation(
+            id="call-node",
+            workflow_id="workflow-a",
+            workflow_inputs={"saved_workflow_input::child-add::a": 7},
+        )
+    )
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+        },
+    )()
+
+    runner.run(queue_item=queue_item)
+
+    child_add_outputs = [
+        output
+        for invocation, child_queue_item, output in events.completed
+        if invocation.get_type() == "add"
+        and child_queue_item.session.prepared_source_mapping[invocation.id] == "child-add"
+    ]
+    assert len(child_add_outputs) == 1
+    assert child_add_outputs[0].value == 9
+    assert session_queue.completed_item_ids == [1]
+    assert events.errors == []
+
+
+def test_run_forwards_connected_dynamic_workflow_inputs_to_child_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+
+    graph = Graph()
+    graph.add_node(AddInvocation(id="source-add", a=2, b=3))
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    graph.add_edge(create_edge("source-add", "value", "call-node", "saved_workflow_input::child-add::a"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+        },
+    )()
+
+    runner.run(queue_item=queue_item)
+
+    child_add_outputs = [
+        output
+        for invocation, child_queue_item, output in events.completed
+        if invocation.get_type() == "add"
+        and child_queue_item.session.prepared_source_mapping[invocation.id] == "child-add"
+    ]
+    assert len(child_add_outputs) == 1
+    assert child_add_outputs[0].value == 7
+    assert session_queue.completed_item_ids == [1]
+    assert events.errors == []
+
+
+def test_run_rejects_non_exposed_dynamic_workflow_inputs(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    workflow_records.exposed_field_name = "a"
+
+    graph = Graph()
+    graph.add_node(
+        CallSavedWorkflowInvocation(
+            id="call-node",
+            workflow_id="workflow-a",
+            workflow_inputs={"saved_workflow_input::child-add::b": 11},
+        )
+    )
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+        },
+    )()
+
+    runner.run(queue_item=queue_item)
+
+    assert session.has_error()
+    assert session_queue.failed_item_ids == [1]
+    assert events.completed == []
+    assert len(events.errors) == 1
+    assert "not exposed" in events.errors[0][3]
 
 
 def test_run_fails_call_saved_workflow_when_child_workflow_graph_cannot_be_built(

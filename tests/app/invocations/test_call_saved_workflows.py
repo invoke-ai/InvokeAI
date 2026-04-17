@@ -237,10 +237,13 @@ def test_call_saved_workflow_invocation_schema_declares_saved_workflow_ui_type()
 
     schema = CallSavedWorkflowInvocation.model_json_schema()
     workflow_id = schema["properties"]["workflow_id"]
+    workflow_inputs = schema["properties"]["workflow_inputs"]
 
     assert workflow_id["default"] == ""
     assert workflow_id["input"] == "any"
     assert workflow_id["ui_type"] == "SavedWorkflowField"
+    assert workflow_inputs["default"] == {}
+    assert workflow_inputs["ui_hidden"] is True
 
 
 def test_workflow_return_invocation_contract():

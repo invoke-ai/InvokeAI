@@ -1,10 +1,23 @@
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from invokeai.app.invocations.baseinvocation import Classification, InvocationRegistry
+from invokeai.app.invocations.call_saved_workflow import (
+    CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX,
+    parse_call_saved_workflow_dynamic_input,
+)
 from invokeai.app.services.shared.graph import Edge, EdgeConnection, Graph
 
 CONNECTOR_INPUT_HANDLE = "in"
 CONNECTOR_OUTPUT_HANDLE = "out"
+
+
+class UnsupportedWorkflowNodeError(ValueError):
+    pass
+
+
+class InvalidWorkflowInputError(ValueError):
+    pass
 
 
 def _is_mapping(value: Any) -> bool:
@@ -17,6 +30,124 @@ def _is_invocation_node(node: Any) -> bool:
 
 def _is_connector_node(node: Any) -> bool:
     return _is_mapping(node) and node.get("type") == "connector"
+
+
+def _build_dynamic_input_name(node_id: str, field_name: str) -> str:
+    return f"{CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX}{node_id}::{field_name}"
+
+
+def _get_form_elements(workflow: Mapping[str, Any]) -> tuple[Mapping[str, Any], str | None]:
+    form = workflow.get("form")
+    if not _is_mapping(form):
+        return {}, None
+
+    elements = form.get("elements")
+    root_element_id = form.get("rootElementId")
+    if not _is_mapping(elements) or not isinstance(root_element_id, str):
+        return {}, None
+
+    return elements, root_element_id
+
+
+def _collect_exposed_inputs_from_form(workflow: Mapping[str, Any]) -> set[str]:
+    elements, root_element_id = _get_form_elements(workflow)
+    if not elements or root_element_id is None:
+        return set()
+
+    exposed_inputs: set[str] = set()
+    stack = [root_element_id]
+    visited: set[str] = set()
+
+    while stack:
+        element_id = stack.pop()
+        if element_id in visited:
+            continue
+        visited.add(element_id)
+
+        element = elements.get(element_id)
+        if not _is_mapping(element):
+            continue
+
+        if element.get("type") == "node-field":
+            data = element.get("data")
+            if _is_mapping(data):
+                field_identifier = data.get("fieldIdentifier")
+                if _is_mapping(field_identifier):
+                    node_id = field_identifier.get("nodeId")
+                    field_name = field_identifier.get("fieldName")
+                    if isinstance(node_id, str) and isinstance(field_name, str):
+                        exposed_inputs.add(_build_dynamic_input_name(node_id, field_name))
+
+        data = element.get("data")
+        if _is_mapping(data):
+            children = data.get("children")
+            if isinstance(children, Sequence):
+                for child_id in reversed(children):
+                    if isinstance(child_id, str):
+                        stack.append(child_id)
+
+    return exposed_inputs
+
+
+def get_exposed_workflow_input_names(workflow: Mapping[str, Any]) -> set[str]:
+    exposed_inputs = _collect_exposed_inputs_from_form(workflow)
+    if exposed_inputs:
+        return exposed_inputs
+
+    workflow_exposed_fields = workflow.get("exposedFields", [])
+    if not isinstance(workflow_exposed_fields, Sequence):
+        return set()
+
+    fallback_inputs: set[str] = set()
+    for field in workflow_exposed_fields:
+        if not _is_mapping(field):
+            continue
+        node_id = field.get("nodeId")
+        field_name = field.get("fieldName")
+        if isinstance(node_id, str) and isinstance(field_name, str):
+            fallback_inputs.add(_build_dynamic_input_name(node_id, field_name))
+
+    return fallback_inputs
+
+
+def apply_workflow_inputs_to_graph(graph: Graph, workflow: Mapping[str, Any], workflow_inputs: Mapping[str, Any]) -> None:
+    if not workflow_inputs:
+        return
+
+    allowed_inputs = get_exposed_workflow_input_names(workflow)
+    for input_name, value in workflow_inputs.items():
+        if input_name not in allowed_inputs:
+            raise InvalidWorkflowInputError(
+                f"call_saved_workflow input '{input_name}' is not exposed by the selected workflow"
+            )
+
+        node_id, field_name = parse_call_saved_workflow_dynamic_input(input_name)
+        node = graph.nodes.get(node_id)
+        if node is None:
+            raise InvalidWorkflowInputError(
+                f"call_saved_workflow input '{input_name}' targets missing child workflow node '{node_id}'"
+            )
+        if field_name not in type(node).model_fields:
+            raise InvalidWorkflowInputError(
+                f"call_saved_workflow input '{input_name}' targets missing child workflow field '{field_name}'"
+            )
+
+        setattr(node, field_name, value)
+
+
+def _raise_if_unsupported_invocation_type(node_type: str, node_id: str) -> None:
+    invocation_class = InvocationRegistry.get_invocation_for_type(node_type)
+    if invocation_class is None:
+        return
+
+    if (
+        invocation_class.UIConfig.category == "batch"
+        and invocation_class.UIConfig.classification == Classification.Special
+    ):
+        raise UnsupportedWorkflowNodeError(
+            f"call_saved_workflow does not yet support batch-special child workflow nodes such as "
+            f"'{node_type}' (node '{node_id}')"
+        )
 
 
 def _get_default_edges(workflow_edges: Sequence[Any]) -> list[Mapping[str, Any]]:
@@ -89,6 +220,8 @@ def build_graph_from_workflow(workflow: Mapping[str, Any]) -> Graph:
         node_type = data.get("type")
         if not isinstance(node_id, str) or not isinstance(node_type, str):
             continue
+
+        _raise_if_unsupported_invocation_type(node_type, node_id)
 
         graph_node: dict[str, Any] = {
             "id": node_id,

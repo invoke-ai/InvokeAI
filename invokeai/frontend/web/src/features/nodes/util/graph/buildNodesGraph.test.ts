@@ -72,7 +72,7 @@ const buildState = (nodes: unknown[], edges: unknown[]) =>
   }) as unknown as Parameters<typeof buildNodesGraph>[0];
 
 describe('buildNodesGraph', () => {
-  it('includes dynamic saved workflow inputs when templates are stored on the node', () => {
+  it('serializes dynamic saved workflow inputs into workflow_inputs', () => {
     const state = nodesSliceConfig.getInitialState();
     const node = buildNode(callSavedWorkflowTemplate);
     state.nodes.push(node);
@@ -109,7 +109,59 @@ describe('buildNodesGraph', () => {
 
     expect(graph.nodes[node.id]).toMatchObject({
       workflow_id: '',
-      ['saved_workflow_input::node-1::a']: 23,
+      workflow_inputs: {
+        ['saved_workflow_input::node-1::a']: 23,
+      },
+    });
+  });
+
+  it('omits connected dynamic saved workflow literal values from workflow_inputs while preserving the edge', () => {
+    const state = nodesSliceConfig.getInitialState();
+    const sourceNode = buildNode(add);
+    const callNode = buildNode(callSavedWorkflowTemplate);
+    state.nodes.push(sourceNode, callNode);
+
+    const nextState = deepClone(
+      nodesSliceConfig.slice.reducer(
+        state,
+        callSavedWorkflowDynamicFieldsChanged({
+          nodeId: callNode.id,
+          fields: [
+            {
+              fieldName: 'saved_workflow_input::node-1::a',
+              fieldTemplate: buildDynamicIntegerTemplate('saved_workflow_input::node-1::a'),
+              label: 'Left Addend',
+              description: 'The first number',
+              initialValue: 23,
+            },
+          ],
+          edgeIdsToRemove: [],
+        })
+      )
+    );
+
+    nextState.edges.push(buildEdge(sourceNode.id, 'value', callNode.id, 'saved_workflow_input::node-1::a'));
+
+    const rootState = {
+      nodes: {
+        past: [],
+        future: [],
+        present: nextState,
+      },
+      gallery: {
+        autoAddBoardId: 'none',
+      },
+    } as never;
+
+    const graph = buildNodesGraph(rootState, templates);
+
+    expect(graph.nodes[callNode.id]).toMatchObject({
+      workflow_id: '',
+      workflow_inputs: {},
+    });
+    expect(graph.edges).toContainEqual({
+      source: { node_id: sourceNode.id, field: 'value' },
+      destination: { node_id: callNode.id, field: 'saved_workflow_input::node-1::a' },
     });
   });
 

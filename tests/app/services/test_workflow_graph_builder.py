@@ -1,5 +1,10 @@
+import pytest
+
 from invokeai.app.services.shared.graph import Graph
-from invokeai.app.services.shared.workflow_graph_builder import build_graph_from_workflow
+from invokeai.app.services.shared.workflow_graph_builder import (
+    UnsupportedWorkflowNodeError,
+    build_graph_from_workflow,
+)
 
 
 def _build_workflow_node(
@@ -113,3 +118,13 @@ def test_build_graph_from_workflow_flattens_connector_edges():
     assert edge.destination.field == "a"
     assert graph.nodes["add-2"].a == 0
     assert graph.nodes["add-2"].b == 3
+
+
+def test_build_graph_from_workflow_rejects_batch_special_nodes_with_clear_error():
+    workflow = _build_workflow(
+        nodes=[_build_workflow_node("image-batch-1", "image_batch", {"images": []})],
+        edges=[],
+    )
+
+    with pytest.raises(UnsupportedWorkflowNodeError, match="call_saved_workflow does not yet support batch-special"):
+        build_graph_from_workflow(workflow)

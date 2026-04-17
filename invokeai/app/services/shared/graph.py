@@ -29,6 +29,10 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.call_saved_workflow import (
+    CallSavedWorkflowInvocation,
+    is_call_saved_workflow_dynamic_input,
+)
 from invokeai.app.invocations.fields import Input, InputField, OutputField, UIType
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -772,6 +776,10 @@ class _ExecutionRuntime:
         for edge in input_edges:
             if allowed_fields is not None and edge.destination.field not in allowed_fields:
                 continue
+            if isinstance(node, CallSavedWorkflowInvocation) and is_call_saved_workflow_dynamic_input(
+                edge.destination.field
+            ):
+                continue
             setattr(node, edge.destination.field, self._get_copied_result_value(edge))
 
     def _prepare_collect_inputs(self, node: "CollectInvocation", input_edges: list[Edge]) -> None:
@@ -1188,6 +1196,10 @@ class Graph(BaseModel):
                 )
 
             if edge.destination.field not in type(destination_node).model_fields:
+                if isinstance(destination_node, CallSavedWorkflowInvocation) and is_call_saved_workflow_dynamic_input(
+                    edge.destination.field
+                ):
+                    continue
                 raise NodeFieldNotFoundError(
                     f"Edge destination field {edge.destination.field} does not exist in node {edge.destination.node_id}"
                 )
@@ -1199,10 +1211,15 @@ class Graph(BaseModel):
 
     def _validate_edge_type_compatibility(self) -> None:
         for edge in self.edges:
+            destination_node = self.get_node(edge.destination.node_id)
+            if isinstance(destination_node, CallSavedWorkflowInvocation) and is_call_saved_workflow_dynamic_input(
+                edge.destination.field
+            ):
+                continue
             if not are_connections_compatible(
                 self.get_node(edge.source.node_id),
                 edge.source.field,
-                self.get_node(edge.destination.node_id),
+                destination_node,
                 edge.destination.field,
             ):
                 raise InvalidEdgeError(f"Edge source and target types do not match ({edge})")
@@ -1292,6 +1309,10 @@ class Graph(BaseModel):
     def _validate_edge_field_compatibility(
         self, edge: Edge, source_node: BaseInvocation, destination_node: BaseInvocation
     ) -> None:
+        if isinstance(destination_node, CallSavedWorkflowInvocation) and is_call_saved_workflow_dynamic_input(
+            edge.destination.field
+        ):
+            return
         if not are_connections_compatible(source_node, edge.source.field, destination_node, edge.destination.field):
             raise InvalidEdgeError(f"Field types are incompatible ({edge})")
 
