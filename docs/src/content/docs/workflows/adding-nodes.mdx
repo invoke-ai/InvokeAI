@@ -1,0 +1,148 @@
+---
+title: Adding Nodes
+description: Learn how to add, connect, and configure nodes in InvokeAI's workflow editor.
+sidebar:
+  order: 3
+lastUpdated: 2026-03-16
+---
+
+import { Card, CardGrid, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Nodes are the building blocks of workflows. Each node performs a specific operation — loading a model, generating noise, applying conditioning, denoising latents, and more. By adding nodes to the canvas and connecting them together, you create a complete image generation pipeline.
+
+## Opening the Node Picker
+
+The node picker is a searchable command palette that lists every available node. There are three ways to open it:
+
+<CardGrid>
+  <Card title="Keyboard Shortcut" icon="laptop">
+    Press <kbd>Shift</kbd> + <kbd>A</kbd> or <kbd>Space</kbd> while the workflow editor is focused.
+  </Card>
+  <Card title="Add Node Button" icon="add-document">
+    Click the **+** button in the top-left corner of the canvas.
+  </Card>
+  <Card title="Drag from a Port" icon="right-arrow">
+    Drag a connection from any input or output port and release it over empty canvas. The picker will open with results **filtered to compatible nodes only**.
+  </Card>
+</CardGrid>
+
+## Finding a Node
+
+When the node picker opens, you can immediately start typing to search. The search is fuzzy and matches against several properties of each node:
+
+- **Title** — the display name (e.g. "Denoise Latents")
+- **Type** — the internal identifier
+- **Description** — a short summary of what the node does
+- **Tags** — category keywords
+- **Node Pack** — the origin module (e.g. `invokeai` for built-in nodes, or a community pack name)
+
+Each entry in the picker shows:
+
+- A **classification badge** indicating stability — _Stable_, _Beta_ (yellow), _Prototype_ (red), or _Special_ (green)
+- The **node title** and **node pack** name
+- A brief **description**
+
+Click a node or press <kbd>Enter</kbd> to add it to the canvas. The node will be placed near the center of your current viewport, or at your cursor position if you opened the picker by dragging from a port.
+
+:::tip
+If you opened the picker by dragging from a port, the list is automatically filtered to show only nodes that have a compatible input or output for that connection. This is a fast way to discover which nodes work together.
+:::
+
+## Special Nodes
+
+In addition to invocation nodes (which perform image generation operations), the picker includes two special utility nodes:
+
+<CardGrid>
+  <Card title="Notes" icon="pencil">
+    A sticky-note text area for documenting your workflow. Useful for leaving yourself reminders or explaining sections of a complex graph to others.
+  </Card>
+  <Card title="Current Image" icon="seti:image">
+    Displays the current image being generated or the most recent output. Helpful for monitoring progress in long workflows.
+  </Card>
+</CardGrid>
+
+## Connecting Nodes
+
+Nodes have **input ports** on their left edge and **output ports** on their right edge. Ports are color-coded by data type so you can quickly identify compatible connections.
+
+<Steps>
+1. **Drag from an output port** on one node toward the canvas.
+2. **Drop onto a compatible input port** on another node. Compatible ports will remain highlighted; incompatible ports will appear greyed out.
+3. A **bezier edge** is drawn between the two ports, representing the data flow.
+</Steps>
+
+:::note
+You can also drop a connection onto a node without targeting a specific port. InvokeAI will automatically connect to the **first compatible port** it finds on that node.
+:::
+
+### Connection Rules
+
+- Connections must be between compatible data types (matching colors).
+- A node cannot connect to itself.
+- Each input port accepts only one connection (but an output can connect to many inputs).
+- Connections snap within a 30px radius of a port for easy targeting.
+
+### Reconnecting and Removing Edges
+
+- **Reconnect** an edge by dragging it from its current port to a new one.
+- **Remove** an edge by dragging it away from its port and releasing it over empty canvas.
+- **Delete** selected edges with <kbd>Delete</kbd> or <kbd>Backspace</kbd>.
+
+## Configuring Nodes
+
+Once a node is on the canvas, you can configure it by editing its input fields directly. Each node exposes a set of fields specific to its function — for example, a noise node has a **Seed** field, while a model loader has a **Model** selector.
+
+- **Inline editing** — Click on any input field to edit its value directly on the node.
+- **Renaming** — Right-click a node's title or any input label to rename it.
+- **Use Cache** — Toggle the caching option in the node footer to reuse previously computed values and speed up repeat runs.
+- **Collapse** — Click the collapse button on the node header to minimize it, keeping the canvas tidy.
+
+## Managing Nodes
+
+Use these shortcuts to work efficiently with nodes on the canvas:
+
+| Action | Shortcut |
+| :--- | :--- |
+| Add Node | <kbd>Shift</kbd> + <kbd>A</kbd> or <kbd>Space</kbd> |
+| Copy | <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>C</kbd> |
+| Paste | <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>V</kbd> |
+| Paste with Edges | <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>V</kbd> |
+| Select All | <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>A</kbd> |
+| Delete | <kbd>Delete</kbd> or <kbd>Backspace</kbd> |
+| Undo | <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Z</kbd> |
+| Redo | <kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>Z</kbd> |
+| Select Multiple | <kbd>Shift</kbd> + Click & Drag |
+
+:::tip
+All keyboard shortcuts are customizable. Open the Hotkeys modal with <kbd>Shift</kbd> + <kbd>?</kbd> to view or change any binding.
+:::
+
+## Adding to Linear View
+
+Any input field on a node can be promoted to the **Linear View**, which provides a simplified UI for your workflow — perfect for sharing with others or for quick iteration.
+
+<Steps>
+1. Right-click on an **input label** on any node.
+2. Select **"Add to Linear View"**.
+3. The input now appears in the Linear View panel, where you can adjust it without navigating the full graph.
+</Steps>
+
+Custom names you set on input fields will carry over into the Linear View.
+
+## Installing Community Nodes
+
+InvokeAI's node system is extensible. Community-created nodes can add new capabilities to your workflows — from specialized image processing to LLM-powered prompt generation.
+
+To install a community node pack:
+
+<Steps>
+1. Find a node pack from the [Community Nodes](/workflows/community-nodes) list.
+2. Clone or download the node pack into the `nodes` folder inside your InvokeAI installation directory.
+3. Restart InvokeAI. The new nodes will appear in the node picker.
+</Steps>
+
+:::note
+The recommended method is `git clone`, which makes it easy to update node packs later with `git pull`.
+:::
+
+For more details and a full catalog of available community nodes, see the [Community Nodes](/workflows/community-nodes) page.
