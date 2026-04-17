@@ -12,7 +12,7 @@ from pydantic.fields import FieldInfo
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.shared import invocation_context as invocation_context_module
 
-OUTPUT_DIR = Path("docs-new/src/generated")
+OUTPUT_DIR = Path("docs/src/generated")
 EXCLUDED_SETTINGS = {"schema_version", "legacy_models_yaml_path"}
 INTERFACE_NAMES = (
     "ImagesInterface",
