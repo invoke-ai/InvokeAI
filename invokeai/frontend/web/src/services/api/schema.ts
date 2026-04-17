@@ -11721,12 +11721,6 @@ export type components = {
              */
             temperature?: number | null;
             /**
-             * Thinking Level
-             * @description Thinking level for image generation
-             * @default null
-             */
-            thinking_level?: ("minimal" | "high") | null;
-            /**
              * type
              * @default gemini_image_generation
              * @constant
