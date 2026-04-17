@@ -177,6 +177,7 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
     monkeypatch.setattr("invokeai.app.api.routers.session_queue.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.recall_parameters.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.custom_nodes.ApiDependencies", mock_deps)
     yield
 
 
@@ -1817,3 +1818,66 @@ class TestWebSocketAuth:
 
         rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
         assert "default" in rooms_emitted_to
+
+
+class TestCustomNodesAuthorization:
+    """Tests that custom_nodes endpoints enforce AdminUserOrDefault.
+
+    All four routes (list, install, uninstall, reload) should reject
+    unauthenticated callers and non-admin users in multiuser mode,
+    and succeed for admin callers.
+    """
+
+    # -- unauthenticated -------------------------------------------------------
+
+    def test_list_rejects_unauthenticated(self, client: TestClient, enable_multiuser: Any) -> None:
+        r = client.get("/api/v2/custom_nodes/")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_install_rejects_unauthenticated(self, client: TestClient, enable_multiuser: Any) -> None:
+        r = client.post("/api/v2/custom_nodes/install", json={"source": "https://example.com/repo.git"})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_uninstall_rejects_unauthenticated(self, client: TestClient, enable_multiuser: Any) -> None:
+        r = client.delete("/api/v2/custom_nodes/some_pack")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_reload_rejects_unauthenticated(self, client: TestClient, enable_multiuser: Any) -> None:
+        r = client.post("/api/v2/custom_nodes/reload")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    # -- non-admin user --------------------------------------------------------
+
+    def test_list_rejects_non_admin(self, client: TestClient, user1_token: str) -> None:
+        r = client.get("/api/v2/custom_nodes/", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_install_rejects_non_admin(self, client: TestClient, user1_token: str) -> None:
+        r = client.post(
+            "/api/v2/custom_nodes/install",
+            json={"source": "https://example.com/repo.git"},
+            headers=_auth(user1_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_uninstall_rejects_non_admin(self, client: TestClient, user1_token: str) -> None:
+        r = client.delete("/api/v2/custom_nodes/some_pack", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_reload_rejects_non_admin(self, client: TestClient, user1_token: str) -> None:
+        r = client.post("/api/v2/custom_nodes/reload", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    # -- admin caller succeeds -------------------------------------------------
+
+    def test_list_allows_admin(self, client: TestClient, admin_token: str) -> None:
+        r = client.get("/api/v2/custom_nodes/", headers=_auth(admin_token))
+        assert r.status_code == status.HTTP_200_OK
+
+    def test_reload_allows_admin(self, client: TestClient, admin_token: str, monkeypatch: Any) -> None:
+        # Stub load_custom_nodes so it doesn't actually scan the filesystem
+        monkeypatch.setattr(
+            "invokeai.app.api.routers.custom_nodes.load_custom_nodes", lambda *a, **kw: None, raising=False
+        )
+        r = client.post("/api/v2/custom_nodes/reload", headers=_auth(admin_token))
+        assert r.status_code == status.HTTP_200_OK

@@ -5,6 +5,7 @@ import { Flex } from '@invoke-ai/ui-library';
 import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import Loading from 'common/components/Loading/Loading';
+import { useIsCustomNodesEnabled } from 'features/customNodes/useIsCustomNodesEnabled';
 import { VerticalNavBar } from 'features/ui/components/VerticalNavBar';
 import { CanvasTabAutoLayout } from 'features/ui/layouts/canvas-tab-auto-layout';
 import { CustomNodesTabAutoLayout } from 'features/ui/layouts/customnodes-tab-auto-layout';
@@ -15,7 +16,7 @@ import { QueueTabAutoLayout } from 'features/ui/layouts/queue-tab-auto-layout';
 import { UpscalingTabAutoLayout } from 'features/ui/layouts/upscaling-tab-auto-layout';
 import { WorkflowsTabAutoLayout } from 'features/ui/layouts/workflows-tab-auto-layout';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { memo } from 'react';
+import { memo, useEffect } from 'react';
 
 export const AppContent = memo(() => {
   return (
@@ -29,6 +30,16 @@ AppContent.displayName = 'AppContent';
 
 const TabContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
+  const isCustomNodesEnabled = useIsCustomNodesEnabled();
+
+  // If the persisted active tab is customNodes but the user isn't permitted,
+  // redirect to generate so they don't land on an admin-only screen that
+  // would fire 403-backed requests.
+  useEffect(() => {
+    if (tab === 'customNodes' && !isCustomNodesEnabled) {
+      navigationApi.switchToTab('generate');
+    }
+  }, [tab, isCustomNodesEnabled]);
 
   return (
     <Flex position="relative" w="full" h="full" overflow="hidden">
@@ -37,7 +48,7 @@ const TabContent = memo(() => {
       {tab === 'upscaling' && <UpscalingTabAutoLayout />}
       {tab === 'workflows' && <WorkflowsTabAutoLayout />}
       {tab === 'models' && <ModelsTabAutoLayout />}
-      {tab === 'customNodes' && <CustomNodesTabAutoLayout />}
+      {tab === 'customNodes' && isCustomNodesEnabled && <CustomNodesTabAutoLayout />}
       {tab === 'queue' && <QueueTabAutoLayout />}
       <SwitchingTabsLoader />
     </Flex>
