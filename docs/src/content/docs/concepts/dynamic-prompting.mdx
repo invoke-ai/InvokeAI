@@ -1,0 +1,133 @@
+---
+title: Dynamic Prompting
+lastUpdated: 2026-03-30
+sidebar:
+  order: 4
+---
+
+import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
+
+Dynamic prompting expands a single prompt into many prompt variations. It is useful for brainstorming, prompt exploration, and batch testing without rewriting the same prompt by hand.
+
+## Basic syntax
+
+Put alternatives inside braces and separate them with `|`.
+
+```text
+a {red|green|blue} balloon
+```
+
+This can expand into:
+
+```text
+a red balloon
+a green balloon
+a blue balloon
+```
+
+You can use more than one dynamic group in the same prompt:
+
+```text
+a {red|green} {balloon|kite}
+```
+
+That creates a set of prompt combinations such as `a red balloon`, `a red kite`, `a green balloon`, and `a green kite`.
+
+## Select more than one option with `$$`
+
+Prefix a group with a number and `$$` to choose multiple distinct options from the same set.
+
+```text
+portrait, {2$$rim light|fog|rain|neon reflections}
+```
+
+Possible results include:
+
+```text
+portrait, rim light, fog
+portrait, fog, rain
+portrait, rim light, neon reflections
+```
+
+This is useful when you want controlled variety without writing every combination by hand.
+
+## Random vs combinatorial expansion
+
+<CardGrid>
+  <Card title="Combinatorial" icon="setting">
+    Walks the possible prompt combinations systematically until `Max Prompts` is reached.
+  </Card>
+  <Card title="Random" icon="star">
+    Samples prompt variations instead of enumerating every combination. A seed can make random expansion repeatable.
+  </Card>
+</CardGrid>
+
+InvokeAI supports both modes, but where you can choose them depends on the workflow.
+
+- In the current linear UI, dynamic prompt preview is driven from the positive prompt and currently follows the standard combinatorial expansion path.
+- In node and backend contexts, random and combinatorial generation are exposed more explicitly.
+
+## Max Prompts
+
+`Max Prompts` limits how many expanded prompts InvokeAI will generate.
+
+This matters because combinations grow quickly. For example:
+
+```text
+a {red|green|blue} balloon in {morning mist|golden hour|rain}
+```
+
+Even this small prompt already has nine possible combinations.
+
+:::tip[Start small]
+  Preview a handful of prompt variants first. Once the combinations look useful, increase `Max Prompts` for a larger batch.
+:::
+
+## Seed Behaviour
+
+In the current UI, the `Seed Behaviour` setting controls how seeds are reused across expanded prompts.
+
+<CardGrid>
+  <Card title="Seed per Iteration" icon="seti:image">
+    Uses one seed per iteration, so prompt variants in the same iteration share a seed. This is useful when you want to compare prompt wording more directly.
+  </Card>
+  <Card title="Seed per Image" icon="star">
+    Uses a different seed for every generated image. This is useful when you want the widest possible variety.
+  </Card>
+</CardGrid>
+
+## Using dynamic prompting in the linear UI
+
+<Steps>
+  1. **Put dynamic prompt syntax in the positive prompt**
+
+      In the current linear UI, dynamic prompt expansion is driven from the positive prompt.
+
+  2. **Open the preview**
+
+      Use `Show Dynamic Prompts` or the prompts preview to inspect the expanded list before you generate.
+
+  3. **Set `Max Prompts`**
+
+      Keep the expansion under control before launching a large batch.
+
+  4. **Choose the right seed behavior**
+
+      Use `Seed per Iteration` for easier comparison, or `Seed per Image` for more variety.
+
+  5. **Generate a small batch first**
+
+      Sanity-check the combinations before scaling up.
+</Steps>
+
+:::note[Current linear UI behavior]
+  The linear UI currently exposes `Max Prompts`, preview, and seed behavior. It does not expose a separate random-versus-combinatorial mode switch in the main positive prompt flow.
+:::
+
+## Tips
+
+- Keep each option group internally compatible.
+- Be careful with multiple groups, because the number of combinations grows quickly.
+- Review the expanded prompt list before launching a large batch.
+- Use dynamic prompting for variation, not to avoid thinking through the base prompt.
+- When one specific term needs more emphasis, use [Prompting Syntax](/concepts/prompt-syntax) instead of adding more dynamic groups.
