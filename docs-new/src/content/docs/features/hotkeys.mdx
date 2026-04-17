@@ -1,0 +1,200 @@
+---
+title: Hotkeys
+description: Learn how to use and customize hotkeys in InvokeAI, and how developers can interact with the hotkey system.
+lastUpdated: 2026-02-19
+---
+
+import { Tabs, TabItem, Steps, Card, CardGrid, Icon } from '@astrojs/starlight/components';
+
+InvokeAI allows you to customize all keyboard shortcuts (hotkeys) to match your workflow preferences. This guide covers how to use and customize hotkeys as a user, as well as providing technical documentation for developers.
+
+## User Guide
+
+<CardGrid>
+  <Card title="View All Hotkeys" icon="magnifier">
+    See all available keyboard shortcuts organized by category in one place.
+  </Card>
+  <Card title="Customize Any Hotkey" icon="pencil">
+    Change any shortcut to your preference, or assign multiple key combinations to the same action.
+  </Card>
+  <Card title="Smart Validation" icon="approve-check-circle">
+    Built-in validation prevents invalid combinations.
+  </Card>
+  <Card title="Persistent Settings" icon="setting">
+    Your custom hotkeys are safely stored and restored across sessions.
+  </Card>
+</CardGrid>
+
+### Opening the Hotkeys Modal
+
+Press <kbd>Shift</kbd> + <kbd>?</kbd> or click the **keyboard icon** in the application to open the Hotkeys Modal.
+
+### Managing Hotkeys
+
+<Tabs>
+  <TabItem label="Viewing">
+    - Browse all available hotkeys organized by category (App, Canvas, Gallery, Workflows, etc.).
+    - Search for specific hotkeys using the search bar.
+    - See the current key combination for each action.
+  </TabItem>
+  <TabItem label="Customizing">
+    <Steps>
+    1. Click the **pencil** button by the hotkey you want to change, or click the **plus** button to add a new one.
+    2. Enter your new hotkey combination in the editor.
+       - Use modifier buttons for quick-insert (<kbd>Mod</kbd>, <kbd>Ctrl</kbd>, <kbd>Shift</kbd>, <kbd>Alt</kbd>).
+       - Check the live preview to see how your hotkey will look.
+    3. Click the **checkmark** or press <kbd>Enter</kbd> to save.
+    </Steps>
+  </TabItem>
+  <TabItem label="Resetting">
+    - **Reset a single hotkey:** Click the counter-clockwise arrow icon next to customized hotkeys.
+    - **Reset all hotkeys:** In Edit Mode, click the **Reset All to Default** button at the bottom.
+  </TabItem>
+</Tabs>
+
+### Hotkey Format Reference
+
+When customizing hotkeys, use the following formats:
+
+- **Valid Modifiers:** `mod` (Ctrl on Windows/Linux, Cmd on Mac), `ctrl`, `shift`, `alt`
+- **Valid Keys:** Letters (`a-z`), Numbers (`0-9`), Function keys (`f1-f12`), Special keys (`enter`, `space`, `tab`, `backspace`, `delete`, `escape`), Arrow keys (`up`, `down`, `left`, `right`)
+- **Multiple alternatives:** Separate with commas (e.g., `mod+enter, ctrl+enter`)
+
+:::tip
+  **Valid Hotkeys:** `mod+s`, `ctrl+shift+p`, `f5, mod+r`<br/>
+  **Invalid Hotkeys:** `mod+` (no key after modifier), `shift+ctrl+` (ends with modifier)
+:::
+
+---
+
+## Developer Guide
+
+The hotkeys system allows developers to centrally define, manage, and validate hotkeys throughout the application. It is built on top of `react-hotkeys-hook`.
+
+### Architecture
+
+The customizable hotkeys feature comprises the following components:
+
+<Tabs>
+  <TabItem label="State & Persistence">
+    **Hotkeys State Slice (`hotkeysSlice.ts`)**
+    - Stores custom hotkey mappings in Redux state.
+    - Persisted to IndexedDB using `redux-remember`.
+    - Provides actions to change, reset individual, or reset all hotkeys.
+  </TabItem>
+  <TabItem label="Hooks">
+    **`useHotkeyData` Hook (`useHotkeyData.ts`)**
+    - Defines all default hotkeys and merges them with custom hotkeys from the store.
+    - Returns the effective hotkeys to be used.
+    - Provides platform-specific key translations.
+  </TabItem>
+  <TabItem label="UI Components">
+    - **`HotkeyEditor.tsx`**: Inline editor with live preview, validation, and modifier insertion.
+    - **`HotkeysModal.tsx`**: The modal interface supporting View/Edit modes, searching, and categories.
+  </TabItem>
+</Tabs>
+
+### Adding New Hotkeys
+
+To add a new hotkey to the system, follow these steps:
+
+<Steps>
+1. **Add Translation Strings**
+   In `invokeai/frontend/web/public/locales/en.json`:
+   ```json
+   {
+     "hotkeys": {
+       "app": {
+         "myAction": {
+           "title": "My Action",
+           "desc": "Description of what this hotkey does"
+         }
+       }
+     }
+   }
+   ```
+
+2. **Register the Hotkey**
+   In `invokeai/frontend/web/src/features/system/components/HotkeysModal/useHotkeyData.ts`:
+   ```typescript
+   // Inside the appropriate category builder function
+   addHotkey('app', 'myAction', ['mod+k']); // Default binding
+   ```
+
+3. **Use the Hotkey in Components**
+   ```tsx
+   import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
+
+   const MyComponent = () => {
+     const handleAction = useCallback(() => {
+       // Your action here
+     }, []);
+
+     // Automatically uses custom hotkeys if configured
+     useRegisteredHotkeys({
+       id: 'myAction',
+       category: 'app', // 'app', 'canvas', 'viewer', 'gallery', 'workflows'
+       callback: handleAction,
+       options: { enabled: true, preventDefault: true },
+       dependencies: [handleAction]
+     });
+
+     // ...
+   };
+   ```
+</Steps>
+
+### Common Patterns
+
+<Tabs>
+  <TabItem label="Conditional Hotkeys">
+    Only enable hotkeys when certain conditions are met:
+    ```typescript
+    useRegisteredHotkeys({
+      id: 'save',
+      category: 'app',
+      callback: handleSave,
+      options: {
+        enabled: hasUnsavedChanges && !isLoading, // Only when valid
+        preventDefault: true
+      },
+      dependencies: [hasUnsavedChanges, isLoading, handleSave]
+    });
+    ```
+  </TabItem>
+  <TabItem label="Focus-Scoped Hotkeys">
+    Ensure hotkeys are only active when a specific region is focused:
+    ```tsx
+    import { useFocusRegion } from 'common/hooks/focus';
+
+    const MyComponent = () => {
+      const focusRegionRef = useFocusRegion('myRegion');
+
+      // Hotkey only works when this region has focus
+      useRegisteredHotkeys({
+        id: 'myAction',
+        category: 'app',
+        callback: handleAction,
+        options: { enabled: true }
+      });
+
+      return <div ref={focusRegionRef}>...</div>;
+    };
+    ```
+  </TabItem>
+  <TabItem label="Multiple Alternatives">
+    Provide multiple alternatives for the same action:
+    ```typescript
+    // In useHotkeyData.ts
+    addHotkey('canvas', 'redo', ['mod+shift+z', 'mod+y']); // Two alternatives
+    ```
+  </TabItem>
+</Tabs>
+
+:::caution[Best Practices]
+- **Use `mod` instead of `ctrl`**: Automatically maps to <kbd>Cmd</kbd> on Mac, <kbd>Ctrl</kbd> elsewhere.
+- **Provide descriptive translations**: Help users understand what each hotkey does.
+- **Avoid conflicts**: Check existing hotkeys before adding new ones.
+- **Check enabled state**: Only activate hotkeys when the action is available.
+- **Use dependencies correctly**: Ensure callbacks are stable with `useCallback`.
+:::

@@ -13,6 +13,7 @@ import {
 import { isIPAdapterConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiExclamationMarkBold, PiEyeSlashBold, PiImageBold } from 'react-icons/pi';
 import { useImageDTOFromCroppableImage } from 'services/api/endpoints/images';
 
@@ -64,6 +65,7 @@ const getImageSxWithWeight = (weight: number): SystemStyleObject => {
 };
 
 export const RefImagePreview = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const id = useRefImageIdContext();
   const entity = useRefImageEntity(id);
@@ -105,7 +107,7 @@ export const RefImagePreview = memo(() => {
   if (!entity.config.image) {
     return (
       <IconButton
-        aria-label="Select Ref Image"
+        aria-label={t('controlLayers.selectRefImage')}
         h="full"
         variant="ghost"
         aspectRatio="1/1"
