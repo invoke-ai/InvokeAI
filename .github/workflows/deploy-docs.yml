@@ -58,23 +58,23 @@ jobs:
 
       - name: install docs dependencies
         run: pnpm install --prefer-frozen-lockfile
-        working-directory: docs-new
+        working-directory: docs
 
       # Checks
       - name: verify generated docs data
         run: pnpm run check-docs-data
-        working-directory: docs-new
+        working-directory: docs
 
       - name: build docs
         run: pnpm build
-        working-directory: docs-new
+        working-directory: docs
 
       # Upload artifact for deploy (main branch only)
       - name: upload pages artifact
         if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs-new/dist
+          path: docs/dist
 
   deploy:
     if: github.ref == 'refs/heads/main'
