@@ -30,16 +30,18 @@ AppContent.displayName = 'AppContent';
 
 const TabContent = memo(() => {
   const tab = useAppSelector(selectActiveTab);
-  const isCustomNodesEnabled = useIsCustomNodesEnabled();
+  const { isKnown: isCustomNodesKnown, isAllowed: isCustomNodesAllowed } = useIsCustomNodesEnabled();
 
-  // If the persisted active tab is customNodes but the user isn't permitted,
-  // redirect to generate so they don't land on an admin-only screen that
-  // would fire 403-backed requests.
+  // Redirect away from customNodes only once we *know* the user is denied.
+  // While setup status is still loading (isKnown=false), we do nothing —
+  // the tab content is already suppressed (isAllowed=false), and we avoid
+  // kicking a legitimate single-user session off a persisted tab before
+  // the query resolves.
   useEffect(() => {
-    if (tab === 'customNodes' && !isCustomNodesEnabled) {
+    if (tab === 'customNodes' && isCustomNodesKnown && !isCustomNodesAllowed) {
       navigationApi.switchToTab('generate');
     }
-  }, [tab, isCustomNodesEnabled]);
+  }, [tab, isCustomNodesKnown, isCustomNodesAllowed]);
 
   return (
     <Flex position="relative" w="full" h="full" overflow="hidden">
@@ -48,7 +50,7 @@ const TabContent = memo(() => {
       {tab === 'upscaling' && <UpscalingTabAutoLayout />}
       {tab === 'workflows' && <WorkflowsTabAutoLayout />}
       {tab === 'models' && <ModelsTabAutoLayout />}
-      {tab === 'customNodes' && isCustomNodesEnabled && <CustomNodesTabAutoLayout />}
+      {tab === 'customNodes' && isCustomNodesAllowed && <CustomNodesTabAutoLayout />}
       {tab === 'queue' && <QueueTabAutoLayout />}
       <SwitchingTabsLoader />
     </Flex>
