@@ -1,0 +1,138 @@
+---
+title: Prompting Syntax
+lastUpdated: 2026-03-30
+sidebar:
+  order: 3
+---
+
+import { Card, LinkCard, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <LinkCard
+    title="Prompting Guide"
+    href="/concepts/prompting-guide"
+    description="Learn how to write effective prompts for InvokeAI."
+  />
+
+  <LinkCard
+    title="Dynamic Prompting"
+    href="/concepts/dynamic-prompting"
+    description="Learn how to create many prompt variations from a single template."
+  />
+</CardGrid>
+
+InvokeAI supports Compel-style prompt weighting and prompt functions for `SD 1.5` and `SDXL` text conditioning workflows. Recent model families, including `FLUX`, `Z-Image`, `CogView4`, and `Qwen Image`, bypass Compel and do not use the syntax documented on this page. This page documents syntax for those Compel-based workflows only. If you want general advice on writing better prompts, start with [Prompting Guide](/concepts/prompting-guide).
+
+:::note[Compatibility note]
+  If a weighted prompt seems to be ignored, check whether you are using an `SD 1.5` or `SDXL` workflow. Compel syntax on this page does not apply to newer model families such as `FLUX`, `Z-Image`, `CogView4`, and `Qwen Image`.
+:::
+
+## Quick reference
+
+<Card title="Supported syntax" icon="rocket">
+  - Increase a single word: `trees+`
+  - Decrease a single word: `fog-`
+  - Weight a phrase: `(golden hour light)+`
+  - Use an exact numeric weight: `(cinematic lighting)1.25`
+  - Nest weights: `(portrait with (blue eyes)1.3)1.1`
+  - Blend prompts: `("portrait photo", "oil painting").blend(0.7, 0.3)`
+  - Conjoin clauses: `("red silk dress", "studio portrait", "soft rim light").and()`
+  - Escape literal parentheses: `colored pencil \(medium\)`
+</Card>
+
+## Attention weighting with `+` and `-`
+
+Append `+` to increase influence, or `-` to reduce it.
+
+```text
+freckles+
+background crowd-
+(soft rim light)++
+```
+
+Rules of thumb:
+
+- Single words can be weighted directly.
+- Multi-word phrases should be wrapped in parentheses.
+- Each additional `+` compounds upward.
+- Each additional `-` compounds downward in roughly 10% steps.
+
+:::tip[Start small]
+  One or two steps is usually enough. Extreme weighting can overpower the rest of the prompt.
+:::
+
+## Numeric weights
+
+Use numeric weights when you want precise control instead of repeated plus or minus markers.
+
+```text
+(cinematic lighting)1.25
+(background crowd)0.8
+(sharp focus)1.1
+```
+
+Guidelines:
+
+- `1` is neutral.
+- Values greater than `1` increase emphasis.
+- Values between `0` and `1` reduce emphasis.
+- Wrap the weighted phrase in parentheses.
+
+## Grouping and nesting
+
+You can group phrases and apply weight to the whole group, then nest another weighted phrase inside it.
+
+```text
+(portrait with (blue eyes)1.3)1.1
+```
+
+In this example, the outer group strengthens the whole phrase, and the inner group gives `blue eyes` even more emphasis.
+
+## Blend prompts with `.blend()`
+
+Use `.blend()` to mix the meaning of two or more prompts.
+
+```text
+("portrait photo, 85mm lens", "oil painting, visible brushstrokes").blend(0.7, 0.3)
+```
+
+This is most useful for combining concepts or styles that you want balanced deliberately.
+
+Tips:
+
+- Provide one weight for each prompt argument.
+- Keeping the weights near a total of `1` makes the result easier to reason about.
+- Quoted arguments are the safest choice, especially when the prompts contain commas.
+
+## Combine clauses with `.and()`
+
+Use `.and()` when you want separate prompt clauses encoded individually instead of as one long comma-separated sentence.
+
+```text
+("red silk dress", "studio portrait", "soft rim light").and()
+```
+
+This can behave differently from:
+
+```text
+red silk dress, studio portrait, soft rim light
+```
+
+If a normal prompt keeps collapsing ideas together, `.and()` is worth testing.
+
+## Escape literal parentheses
+
+Unescaped parentheses are treated as prompt syntax. If you want actual parentheses in the text, escape them with backslashes.
+
+```text
+colored pencil \(medium\)
+portrait \(realistic\) (high quality)1.2
+A bear \(with razor-sharp teeth\) in a forest
+```
+
+Use unescaped parentheses only when you mean grouping or weighting.
+
+## Related pages
+
+- For practical prompt-writing advice, read [Prompting Guide](/concepts/prompting-guide).
+- For prompt expansion and permutations, read [Dynamic Prompting](/concepts/dynamic-prompting).

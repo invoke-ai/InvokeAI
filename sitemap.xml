@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+         <loc>https://invoke-ai.github.io/InvokeAI/</loc>
+         <lastmod>2026-04-18</lastmod>
+    </url>
+    <url>
+         <loc>https://invoke-ai.github.io/InvokeAI/src/content/docs/contributing/</loc>
+         <lastmod>2026-04-18</lastmod>
+    </url>
+    <url>
+         <loc>https://invoke-ai.github.io/InvokeAI/src/content/docs/contributing/code-of-conduct/</loc>
+         <lastmod>2026-04-18</lastmod>
+    </url>
+    <url>
+         <loc>https://invoke-ai.github.io/InvokeAI/src/content/docs/contributing/contributors/</loc>
+         <lastmod>2026-04-18</lastmod>
+    </url>
+    <url>
+         <loc>https://invoke-ai.github.io/InvokeAI/src/content/docs/development/Front%20End/</loc>
+         <lastmod>2026-04-18</lastmod>
+    </url>
+</urlset>
