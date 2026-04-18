@@ -10,6 +10,14 @@ on:
       - 'opened'
       - 'synchronize'
   workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Deploy target (custom = invoke.ai, ghpages = invoke-ai.github.io/InvokeAI)'
+        type: choice
+        options:
+          - custom
+          - ghpages
+        default: custom
 
 permissions:
   contents: read
@@ -68,6 +76,8 @@ jobs:
       - name: build docs
         run: pnpm build
         working-directory: docs
+        env:
+          DEPLOY_TARGET: ${{ inputs.deploy_target || 'custom' }}
 
       # Upload artifact for deploy (main branch only)
       - name: upload pages artifact
