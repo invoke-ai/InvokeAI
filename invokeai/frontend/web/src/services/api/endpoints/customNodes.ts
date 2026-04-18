@@ -9,6 +9,7 @@ type NodePackInfo = {
 
 type NodePackListResponse = {
   node_packs: NodePackInfo[];
+  custom_nodes_path: string;
 };
 
 type InstallNodePackResponse = {

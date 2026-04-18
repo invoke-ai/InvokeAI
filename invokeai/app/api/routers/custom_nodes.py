@@ -43,6 +43,7 @@ class NodePackListResponse(BaseModel):
     """Response for listing installed node packs."""
 
     node_packs: list[NodePackInfo] = Field(description="List of installed node packs.")
+    custom_nodes_path: str = Field(description="The configured custom nodes directory path.")
 
 
 class InstallNodePackRequest(BaseModel):
@@ -137,7 +138,7 @@ async def list_custom_node_packs(current_admin: AdminUserOrDefault) -> NodePackL
     legitimate use for pack management data (install/uninstall/reload are also admin-only).
     """
     packs = _get_installed_packs()
-    return NodePackListResponse(node_packs=packs)
+    return NodePackListResponse(node_packs=packs, custom_nodes_path=str(_get_custom_nodes_path()))
 
 
 @custom_nodes_router.post(

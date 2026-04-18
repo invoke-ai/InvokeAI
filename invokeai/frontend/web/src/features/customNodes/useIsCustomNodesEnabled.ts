@@ -22,13 +22,20 @@ export const getIsCustomNodesEnabled = (multiuserEnabled: boolean, isAdmin: bool
 
 /**
  * Hook wrapper around getIsCustomNodesEnabled that reads from Redux + RTK Query.
+ *
+ * While setupStatus is still loading we return `true` (optimistic) to prevent
+ * the AppContent redirect from kicking a legitimate single-user session off a
+ * persisted customNodes tab before the query resolves. The server-side auth
+ * gate still protects the actual API calls.
  */
 export const useIsCustomNodesEnabled = (): boolean => {
   const user = useAppSelector(selectCurrentUser);
   const { data: setupStatus } = useGetSetupStatusQuery();
 
-  return useMemo(
-    () => getIsCustomNodesEnabled(setupStatus ? setupStatus.multiuser_enabled : true, user?.is_admin),
-    [setupStatus, user]
-  );
+  return useMemo(() => {
+    if (!setupStatus) {
+      return true;
+    }
+    return getIsCustomNodesEnabled(setupStatus.multiuser_enabled, user?.is_admin);
+  }, [setupStatus, user]);
 };

@@ -22806,6 +22806,11 @@ export type components = {
              * @description List of installed node packs.
              */
             node_packs: components["schemas"]["NodePackInfo"][];
+            /**
+             * Custom Nodes Path
+             * @description The configured custom nodes directory path.
+             */
+            custom_nodes_path: string;
         };
         /**
          * Create Latent Noise
