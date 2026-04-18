@@ -36,6 +36,8 @@ const launcherDownloadOptions: Record<string, LauncherDownloadOption> = {
   },
 };
 
+const withBase = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
+
 const manualDownloadOptions = {
   github: {
     headline: 'Download from GitHub',
@@ -45,7 +47,7 @@ const manualDownloadOptions = {
   docker: {
     headline: 'Run with Docker',
     description: 'For users who want to run Invoke without installing dependencies directly on their system.',
-    href: '/configuration/docker/',
+    href: withBase('/configuration/docker/'),
   },
 };
 ---

@@ -1,9 +1,11 @@
 ---
 import { LinkCard } from '@astrojs/starlight/components';
+
+const withBase = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
 ---
 
 <LinkCard
   title="System Requirements"
   description="Please check the system requirements page to make sure your hardware is capable of running the desired models."
-  href="/start-here/system-requirements"
+  href={withBase('/start-here/system-requirements/')}
 />
