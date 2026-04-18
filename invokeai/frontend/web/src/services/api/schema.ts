@@ -14839,7 +14839,7 @@ export type components = {
             calculate_image_tiles: components["schemas"]["CalculateImageTilesOutput"];
             calculate_image_tiles_even_split: components["schemas"]["CalculateImageTilesOutput"];
             calculate_image_tiles_min_overlap: components["schemas"]["CalculateImageTilesOutput"];
-            call_saved_workflow: components["schemas"]["IntegerOutput"];
+            call_saved_workflow: components["schemas"]["WorkflowReturnOutput"];
             canny_edge_detection: components["schemas"]["ImageOutput"];
             canvas_output: components["schemas"]["ImageOutput"];
             canvas_paste_back: components["schemas"]["ImageOutput"];

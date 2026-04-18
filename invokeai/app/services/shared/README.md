@@ -136,7 +136,8 @@ Workflow-call note:
 - `GraphExecutionState` can represent a paused parent execution plus an attached child execution state, but it does not
   itself orchestrate child execution.
 - In the current temporary implementation, `DefaultSessionRunner.run_node()` runs the attached child session inline,
-  then clears the waiting state and completes the parent `call_saved_workflow` node with a stub output.
+  captures the child `workflow_return` output, then clears the waiting state and completes the parent
+  `call_saved_workflow` node with that returned collection.
 - This is a tactical step to keep the feature testable and should eventually be replaced by a first-class parent/child
   execution mechanism with explicit return propagation.
 
@@ -260,7 +261,7 @@ Current limitation:
 
 - The attached child execution state is currently executed inline by the session runner rather than as a first-class
   queued or scheduler-visible child execution.
-- Parent completion after a workflow call still uses a temporary stub output rather than `workflow_return` propagation.
+- Called workflows currently require a valid `workflow_return` node to produce a parent-visible result.
 
 ## 8) Error Model (selected)
 

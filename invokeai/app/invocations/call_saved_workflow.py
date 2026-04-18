@@ -2,7 +2,7 @@ from typing import Any
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import InputField, UIType
-from invokeai.app.invocations.primitives import IntegerOutput
+from invokeai.app.invocations.workflow_return import WorkflowReturnOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowCategory, WorkflowNotFoundError
 
@@ -69,7 +69,7 @@ class CallSavedWorkflowInvocation(BaseInvocation):
 
         return workflow_record
 
-    def invoke(self, context: InvocationContext) -> IntegerOutput:
+    def invoke(self, context: InvocationContext) -> WorkflowReturnOutput:
         self.validate_selected_workflow(context)
 
-        return IntegerOutput(value=0)
+        return WorkflowReturnOutput(collection=[])

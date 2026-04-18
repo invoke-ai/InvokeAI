@@ -93,7 +93,7 @@ def build_context(
 
 def test_call_saved_workflow_invocation_contract():
     from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
-    from invokeai.app.invocations.primitives import IntegerOutput
+    from invokeai.app.invocations.workflow_return import WorkflowReturnOutput
 
     invocation = CallSavedWorkflowInvocation(id="test-node", workflow_id="workflow-123")
 
@@ -102,8 +102,8 @@ def test_call_saved_workflow_invocation_contract():
 
     output = invocation.invoke(build_context())
 
-    assert isinstance(output, IntegerOutput)
-    assert output.value == 0
+    assert isinstance(output, WorkflowReturnOutput)
+    assert output.collection == []
 
 
 def test_call_saved_workflow_invocation_raises_when_workflow_id_is_empty():
@@ -164,7 +164,7 @@ def test_call_saved_workflow_invocation_allows_shared_workflow_for_non_owner():
         )
     )
 
-    assert output.value == 0
+    assert output.collection == []
 
 
 def test_call_saved_workflow_invocation_allows_default_workflow_for_non_owner():
@@ -186,7 +186,7 @@ def test_call_saved_workflow_invocation_allows_default_workflow_for_non_owner():
         )
     )
 
-    assert output.value == 0
+    assert output.collection == []
 
 
 def test_call_saved_workflow_invocation_allows_admin_to_access_private_workflow():
@@ -208,7 +208,7 @@ def test_call_saved_workflow_invocation_allows_admin_to_access_private_workflow(
         )
     )
 
-    assert output.value == 0
+    assert output.collection == []
 
 
 def test_call_saved_workflow_invocation_raises_when_private_workflow_user_record_is_missing():

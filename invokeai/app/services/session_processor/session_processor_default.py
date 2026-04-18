@@ -10,7 +10,7 @@ from invokeai.app.invocations.call_saved_workflow import (
     CallSavedWorkflowInvocation,
     is_call_saved_workflow_dynamic_input,
 )
-from invokeai.app.invocations.primitives import IntegerOutput
+from invokeai.app.invocations.workflow_return import WorkflowReturnOutput
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     FastAPIEvent,
@@ -33,7 +33,7 @@ from invokeai.app.services.session_processor.session_processor_base import (
 )
 from invokeai.app.services.session_processor.session_processor_common import CanceledException, SessionProcessorStatus
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemNotFoundError
-from invokeai.app.services.shared.graph import NodeInputError
+from invokeai.app.services.shared.graph import GraphExecutionState, NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.services.shared.workflow_graph_builder import (
     apply_workflow_inputs_to_graph,
@@ -135,6 +135,30 @@ class DefaultSessionRunner(SessionRunnerBase):
         child_queue_item.__dict__ = {**queue_item.__dict__, "session": child_session, "session_id": child_session.id}
         return child_queue_item
 
+    @staticmethod
+    def _get_child_workflow_return_output(child_session: GraphExecutionState) -> WorkflowReturnOutput:
+        workflow_return_node_ids = [
+            node_id for node_id, node in child_session.graph.nodes.items() if node.get_type() == "workflow_return"
+        ]
+        if not workflow_return_node_ids:
+            raise ValueError("The selected saved workflow must contain exactly one workflow_return node.")
+        if len(workflow_return_node_ids) > 1:
+            raise ValueError("The selected saved workflow must not contain more than one workflow_return node.")
+
+        workflow_return_node_id = workflow_return_node_ids[0]
+        prepared_return_node_ids = child_session.source_prepared_mapping.get(workflow_return_node_id, set())
+        if len(prepared_return_node_ids) != 1:
+            raise ValueError(
+                "The selected saved workflow produced an unsupported number of workflow_return executions."
+            )
+
+        prepared_return_node_id = next(iter(prepared_return_node_ids))
+        output = child_session.results.get(prepared_return_node_id)
+        if not isinstance(output, WorkflowReturnOutput):
+            raise ValueError("The selected saved workflow did not produce a valid workflow_return output.")
+
+        return output
+
     def run(self, queue_item: SessionQueueItem):
         # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
 
@@ -178,8 +202,8 @@ class DefaultSessionRunner(SessionRunnerBase):
                             f"The selected saved workflow '{invocation.workflow_id}' failed during child execution."
                         )
 
+                    output = self._get_child_workflow_return_output(child_session)
                     queue_item.session.end_waiting_on_workflow_call()
-                    output = IntegerOutput(value=0)
                     queue_item.session.complete(invocation.id, output)
                     self._on_after_run_node(invocation, queue_item, output)
                     return

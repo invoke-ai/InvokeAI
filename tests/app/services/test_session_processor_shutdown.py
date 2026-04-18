@@ -7,7 +7,9 @@ import pytest
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
+from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.math import AddInvocation
+from invokeai.app.invocations.workflow_return import WorkflowReturnOutput
 from invokeai.app.services.session_processor.session_processor_default import DefaultSessionRunner
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, WorkflowCallFrame
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowCategory
@@ -127,9 +129,28 @@ class _DummyWorkflowRecords:
                         "a": {"value": 1},
                         "b": {"value": 2},
                     },
-                )
+                ),
+                self._invocation_node(
+                    "child-collection",
+                    "integer_collection",
+                    {"collection": {"value": [3]}},
+                ),
+                self._invocation_node(
+                    "child-return",
+                    "workflow_return",
+                    {"collection": {"value": []}},
+                ),
             ],
-            edges=[],
+            edges=[
+                {
+                    "id": "edge-default-return",
+                    "type": "default",
+                    "source": "child-collection",
+                    "sourceHandle": "collection",
+                    "target": "child-return",
+                    "targetHandle": "collection",
+                }
+            ],
             exposed_fields=[{"nodeId": "child-add", "fieldName": self.exposed_field_name}],
         )
         if self.return_invalid_workflow:
@@ -165,6 +186,16 @@ class _DummyWorkflowRecords:
                 nodes=[
                     self._invocation_node("child-add-1", "add", {"a": {"value": 1}, "b": {"value": 2}}),
                     self._invocation_node("child-add-2", "add", {"a": {"value": 0}, "b": {"value": 4}}),
+                    self._invocation_node(
+                        "child-collection",
+                        "integer_collection",
+                        {"collection": {"value": [7]}},
+                    ),
+                    self._invocation_node(
+                        "child-return",
+                        "workflow_return",
+                        {"collection": {"value": []}},
+                    ),
                 ],
                 edges=[
                     {
@@ -174,7 +205,15 @@ class _DummyWorkflowRecords:
                         "sourceHandle": "value",
                         "target": "child-add-2",
                         "targetHandle": "a",
-                    }
+                    },
+                    {
+                        "id": "edge-dependent-return",
+                        "type": "default",
+                        "source": "child-collection",
+                        "sourceHandle": "collection",
+                        "target": "child-return",
+                        "targetHandle": "collection",
+                    },
                 ],
             )
         elif workflow_id == "workflow-if":
@@ -183,6 +222,11 @@ class _DummyWorkflowRecords:
                     self._invocation_node("child-bool", "boolean", {"value": {"value": True}}),
                     self._invocation_node("child-add", "add", {"a": {"value": 2}, "b": {"value": 3}}),
                     self._invocation_node(
+                        "child-collection",
+                        "integer_collection",
+                        {"collection": {"value": [5]}},
+                    ),
+                    self._invocation_node(
                         "child-if",
                         "if",
                         {
@@ -190,6 +234,11 @@ class _DummyWorkflowRecords:
                             "true_input": {"value": None},
                             "false_input": {"value": 11},
                         },
+                    ),
+                    self._invocation_node(
+                        "child-return",
+                        "workflow_return",
+                        {"collection": {"value": []}},
                     ),
                 ],
                 edges=[
@@ -209,6 +258,14 @@ class _DummyWorkflowRecords:
                         "target": "child-if",
                         "targetHandle": "true_input",
                     },
+                    {
+                        "id": "edge-if-return",
+                        "type": "default",
+                        "source": "child-collection",
+                        "sourceHandle": "collection",
+                        "target": "child-return",
+                        "targetHandle": "collection",
+                    },
                 ],
             )
         elif workflow_id == "workflow-nested":
@@ -223,15 +280,25 @@ class _DummyWorkflowRecords:
                         },
                     ),
                     self._invocation_node("nested-add", "add", {"a": {"value": 0}, "b": {"value": 4}}),
+                    self._invocation_node(
+                        "nested-collection",
+                        "integer_collection",
+                        {"collection": {"value": [4]}},
+                    ),
+                    self._invocation_node(
+                        "nested-return",
+                        "workflow_return",
+                        {"collection": {"value": []}},
+                    ),
                 ],
                 edges=[
                     {
-                        "id": "edge-nested-downstream",
+                        "id": "edge-nested-return",
                         "type": "default",
-                        "source": "nested-call",
-                        "sourceHandle": "value",
-                        "target": "nested-add",
-                        "targetHandle": "a",
+                        "source": "nested-collection",
+                        "sourceHandle": "collection",
+                        "target": "nested-return",
+                        "targetHandle": "collection",
                     }
                 ],
             )
@@ -239,8 +306,67 @@ class _DummyWorkflowRecords:
             workflow_dump = self._workflow_dump(
                 nodes=[
                     self._invocation_node("leaf-add", "add", {"a": {"value": 5}, "b": {"value": 6}}),
+                    self._invocation_node(
+                        "leaf-collection",
+                        "integer_collection",
+                        {"collection": {"value": [11]}},
+                    ),
+                    self._invocation_node(
+                        "leaf-return",
+                        "workflow_return",
+                        {"collection": {"value": []}},
+                    ),
+                ],
+                edges=[
+                    {
+                        "id": "edge-leaf-return",
+                        "type": "default",
+                        "source": "leaf-collection",
+                        "sourceHandle": "collection",
+                        "target": "leaf-return",
+                        "targetHandle": "collection",
+                    }
+                ],
+            )
+        elif workflow_id == "workflow-return":
+            workflow_dump = self._workflow_dump(
+                nodes=[
+                    self._invocation_node(
+                        "child-collection",
+                        "integer_collection",
+                        {"collection": {"value": [7, 8]}},
+                    ),
+                    self._invocation_node(
+                        "child-return",
+                        "workflow_return",
+                        {"collection": {"value": []}},
+                    ),
+                ],
+                edges=[
+                    {
+                        "id": "edge-return-collection",
+                        "type": "default",
+                        "source": "child-collection",
+                        "sourceHandle": "collection",
+                        "target": "child-return",
+                        "targetHandle": "collection",
+                    }
+                ],
+            )
+        elif workflow_id == "workflow-no-return":
+            workflow_dump = self._workflow_dump(
+                nodes=[
+                    self._invocation_node(
+                        "child-add",
+                        "add",
+                        {
+                            "a": {"value": 1},
+                            "b": {"value": 2},
+                        },
+                    )
                 ],
                 edges=[],
+                exposed_fields=[{"nodeId": "child-add", "fieldName": self.exposed_field_name}],
             )
 
         workflow = SimpleNamespace(
@@ -580,6 +706,7 @@ def test_run_node_executes_child_workflow_and_clears_waiting_state(monkeypatch: 
             "item_id": 1,
             "session_id": "test-session",
             "user_id": "user-1",
+            "status": "in_progress",
             "session": session,
         },
     )()
@@ -597,8 +724,10 @@ def test_run_node_executes_child_workflow_and_clears_waiting_state(monkeypatch: 
     assert session.frames[0].prepared_call_node_id == invocation.id
     assert session.frames[0].workflow_id == "workflow-a"
     assert len(session.completed) == 1
-    assert len(events.started) == 2
-    assert len(events.completed) == 2
+    assert isinstance(session.completed[0][1], WorkflowReturnOutput)
+    assert session.completed[0][1].collection == [3]
+    assert len(events.started) == 4
+    assert len(events.completed) == 4
     assert events.errors == []
 
 
@@ -679,8 +808,8 @@ def test_run_completes_call_saved_workflow_and_runs_downstream_nodes(
 
     graph = Graph()
     graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
-    graph.add_node(AddInvocation(id="downstream-add", b=2))
-    graph.add_edge(create_edge("call-node", "value", "downstream-add", "a"))
+    graph.add_node(IfInvocation(id="downstream-if", condition=True, false_input=0))
+    graph.add_edge(create_edge("call-node", "collection", "downstream-if", "true_input"))
 
     session = GraphExecutionState(graph=graph)
     queue_item = type(
@@ -698,14 +827,26 @@ def test_run_completes_call_saved_workflow_and_runs_downstream_nodes(
     runner.run(queue_item=queue_item)
 
     assert not session.is_waiting_on_workflow_call()
-    assert "downstream-add" in session.executed
-    assert len(events.started) == 3
+    assert "downstream-if" in session.executed
+    assert len(events.started) == 5
     assert [invocation.get_type() for _queue_item, invocation in events.started] == [
         "call_saved_workflow",
         "add",
-        "add",
+        "integer_collection",
+        "workflow_return",
+        "if",
     ]
-    assert len(events.completed) == 3
+    assert len(events.completed) == 5
+    parent_outputs = [
+        output for invocation, _queue_item, output in events.completed if invocation.get_type() == "call_saved_workflow"
+    ]
+    downstream_outputs = [
+        output for invocation, _queue_item, output in events.completed if invocation.get_type() == "if"
+    ]
+    assert len(parent_outputs) == 1
+    assert parent_outputs[0].collection == [3]
+    assert len(downstream_outputs) == 1
+    assert downstream_outputs[0].value == [3]
     assert events.errors == []
     assert session_queue.completed_item_ids == [1]
     assert session_queue.session_updates == [(1, session)]
@@ -727,6 +868,7 @@ def test_run_node_records_child_execution_state_for_call_saved_workflow(monkeypa
             "item_id": 1,
             "session_id": "session-id",
             "user_id": "user-1",
+            "status": "in_progress",
             "session": session,
         },
     )()
@@ -736,8 +878,8 @@ def test_run_node_records_child_execution_state_for_call_saved_workflow(monkeypa
     assert not session.is_waiting_on_workflow_call()
     assert session.waiting_workflow_call_child_session is None
     assert invocation.id in session.executed
-    assert len(events.started) == 2
-    assert len(events.completed) == 2
+    assert len(events.started) == 4
+    assert len(events.completed) == 4
     assert events.errors == []
 
 
@@ -778,8 +920,76 @@ def test_run_executes_child_workflow_and_completes_parent_queue_item(monkeypatch
         output for invocation, _queue_item, output in events.completed if invocation.get_type() == "call_saved_workflow"
     ]
     assert len(parent_outputs) == 1
-    assert parent_outputs[0].value == 0
+    assert parent_outputs[0].collection == [3]
     assert events.errors == []
+
+
+def test_run_completes_call_saved_workflow_with_child_return_collection(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-return"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+        },
+    )()
+
+    runner.run(queue_item=queue_item)
+
+    child_return_outputs = [
+        output
+        for invocation, child_queue_item, output in events.completed
+        if child_queue_item.session is not session
+        and child_queue_item.session.prepared_source_mapping[invocation.id] == "child-return"
+    ]
+    parent_outputs = [
+        output for invocation, _queue_item, output in events.completed if invocation.get_type() == "call_saved_workflow"
+    ]
+
+    assert len(child_return_outputs) == 1
+    assert child_return_outputs[0].collection == [7, 8]
+    assert len(parent_outputs) == 1
+    assert parent_outputs[0].collection == [7, 8]
+    assert session_queue.completed_item_ids == [1]
+    assert events.errors == []
+
+
+def test_run_fails_call_saved_workflow_when_child_has_no_workflow_return(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-no-return"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+        },
+    )()
+
+    runner.run(queue_item=queue_item)
+
+    assert session.has_error()
+    assert session_queue.failed_item_ids == [1]
+    assert len(events.errors) == 1
+    assert "workflow_return" in events.errors[0][3]
 
 
 def test_run_respects_child_dependency_readiness(monkeypatch: pytest.MonkeyPatch) -> None:
