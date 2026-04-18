@@ -1,0 +1,196 @@
+---
+import { LinkCard, Icon, LinkButton } from '@astrojs/starlight/components';
+import { type StarlightIcon } from '@astrojs/starlight/types';
+
+type LauncherDownloadOption = {
+  icon: StarlightIcon;
+  headline: string;
+  note: string;
+  launcherDownloadLink: string;
+  launcherDownloadLabel?: string;
+};
+const launcherDownloadOptions: Record<string, LauncherDownloadOption> = {
+  windows: {
+    icon: 'seti:windows',
+    headline: 'Download for Windows',
+    note: 'Requires Windows 10 or later, and NVIDIA or AMD GPU.',
+    launcherDownloadLink:
+      'https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition.Setup.latest.exe',
+    launcherDownloadLabel: 'Download EXE',
+  },
+  macos: {
+    icon: 'apple',
+    headline: 'Download for MacOS',
+    note: 'Requires Apple Silicon (M-Series). Not compatible with Intel.',
+    launcherDownloadLink:
+      'https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest-arm64.dmg',
+    launcherDownloadLabel: 'Download DMG',
+  },
+  linux: {
+    icon: 'linux',
+    headline: 'Download for Linux',
+    note: 'Requires NVIDIA or AMD GPU. Compatible with most distributions.',
+    launcherDownloadLink:
+      'https://github.com/invoke-ai/launcher/releases/latest/download/Invoke.Community.Edition-latest.AppImage',
+    launcherDownloadLabel: 'Download AppImage',
+  },
+};
+
+const manualDownloadOptions = {
+  github: {
+    headline: 'Download from GitHub',
+    description: 'For advanced users who want to set up Invoke manually or contribute to the project.',
+    href: 'https://github.com/invoke-ai/InvokeAI/releases',
+  },
+  docker: {
+    headline: 'Run with Docker',
+    description: 'For users who want to run Invoke without installing dependencies directly on their system.',
+    href: '/configuration/docker/',
+  },
+};
+---
+
+<div class="download-options">
+  <!-- Launcher Options -->
+  <div class="download-options__grid download-options--launcher">
+    {
+      Object.entries(launcherDownloadOptions).map(
+        ([key, { icon, headline, note, launcherDownloadLink, launcherDownloadLabel }]) => (
+          <div class="download-option" data-platform={key}>
+            <Icon name={icon} size="2rem" />
+            <h3>{headline}</h3>
+            <p>{note}</p>
+
+            <div class="download-option__actions">
+              <LinkButton
+                href={launcherDownloadLink}
+                icon="download"
+                iconPlacement="start"
+                title={headline}
+                variant="secondary"
+              >
+                {launcherDownloadLabel}
+              </LinkButton>
+            </div>
+          </div>
+        ),
+      )
+    }
+  </div>
+
+  <!-- OR -->
+  <div class="download-options__separator">
+    <span>OR</span>
+  </div>
+
+  <!-- Manual Options -->
+  <div class="download-option__grid download-options--manual">
+    {
+      Object.entries(manualDownloadOptions).map(([key, { headline, href, description }]) => (
+        <LinkCard title={headline} {href} {description} />
+      ))
+    }
+  </div>
+</div>
+
+<style is:global>
+  .download-options {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .download-options__separator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+
+    > span {
+      border-radius: 999px;
+      border: 1px solid var(--sl-color-hairline);
+      background: var(--sl-color-bg);
+      width: 2.5rem;
+      aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1;
+      font-size: var(--sl-text-2xs);
+      font-family: var(--__sl-font-mono);
+      line-height: 1;
+    }
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--sl-color-hairline);
+      z-index: 0;
+    }
+  }
+
+  .download-options--launcher {
+    display: grid;
+    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+
+  .download-options--manual {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .download-option {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    border-radius: var(--radius);
+    background: var(--sl-color-black);
+    border: 1px solid var(--sl-color-gray-5);
+    padding: 1.5rem;
+
+    h3 {
+      margin-top: 1rem;
+    }
+  }
+
+  .download-option__actions {
+    margin-top: auto;
+    margin-bottom: 0;
+
+    > * {
+      margin-bottom: 0;
+    }
+  }
+</style>
+
+<script is:inline>
+  // Highlight the preferred platform's launcher button
+  function applyPreferredPlatform() {
+    const platform = detectPlatform();
+    if (!platform) return;
+
+    const option = document.querySelector(`.download-option[data-platform="${platform}"]`);
+    const link = option?.querySelector('a');
+    if (!link) return;
+
+    link.classList.remove('secondary');
+    link.classList.add('primary');
+  }
+
+  function detectPlatform() {
+    const uaDataPlatform = navigator.userAgentData?.platform?.toLowerCase();
+    const ua = (uaDataPlatform || navigator.userAgent).toLowerCase();
+
+    if (ua.includes('mac')) return 'macos';
+    if (ua.includes('win')) return 'windows';
+    if (ua.includes('linux')) return 'linux';
+    return null;
+  }
+
+  applyPreferredPlatform();
+</script>

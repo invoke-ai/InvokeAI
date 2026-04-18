@@ -1,0 +1,89 @@
+name: 'docs'
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    types:
+      - 'ready_for_review'
+      - 'opened'
+      - 'synchronize'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: 'pages'
+  cancel-in-progress: true
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      # Python (needed for generate-docs-data)
+      - name: setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: '0.6.10'
+          enable-cache: true
+          python-version: '3.11'
+
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: install python dependencies
+        run: uv pip install --editable .[test]
+
+      # Node (needed for docs build)
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.12.0'
+
+      - name: setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: install docs dependencies
+        run: pnpm install --prefer-frozen-lockfile
+        working-directory: docs-new
+
+      # Checks
+      - name: verify generated docs data
+        run: pnpm run check-docs-data
+        working-directory: docs-new
+
+      - name: build docs
+        run: pnpm build
+        working-directory: docs-new
+
+      # Upload artifact for deploy (main branch only)
+      - name: upload pages artifact
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs-new/dist
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: check-and-build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

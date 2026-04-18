@@ -1,0 +1,120 @@
+---
+title: ComfyUI Migration Guide
+sidebar:
+  label: ComfyUI Migration
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+If you're coming to InvokeAI from ComfyUI, welcome! You'll find things are similar but different - the good news is that you already know how things should work, and it's just a matter of wiring them up!
+
+<Card title="Node Granularity" icon="information">
+  InvokeAI's nodes tend to be more granular than default nodes in Comfy. This means each node in Invoke will do a specific task, and you might need to use multiple nodes to achieve the same result. The added granularity improves the control you have over your workflows.
+</Card>
+<Card title="Backend Differences" icon="puzzle">
+  InvokeAI's backend and ComfyUI's backend are very different, which means Comfy workflows are not able to be imported directly into InvokeAI. However, we have created a [list of popular workflows](/workflows/community-nodes) for you to get started with Nodes in InvokeAI!
+</Card>
+
+## Node Equivalents
+
+Finding the right node is the hardest part of switching. Use the categories below to find the InvokeAI equivalents for the ComfyUI nodes you are used to.
+
+### Sampling
+
+| ComfyUI Node | Invoke Equivalent |
+| :--- | :--- |
+| KSampler | Denoise Latents |
+| Ksampler Advanced | Denoise Latents |
+
+### Loaders
+
+| ComfyUI Node | Invoke Equivalent |
+| :--- | :--- |
+| Load Checkpoint | Main Model Loader _or_ SDXL Main Model Loader |
+| Load VAE | VAE Loader |
+| Load Lora | LoRA Loader _or_ SDXL Lora Loader |
+| Load ControlNet Model | ControlNet |
+| Load ControlNet Model (diff) | ControlNet |
+| Load Style Model | Reference Only ControlNet will be coming in a future version of InvokeAI |
+| unCLIPCheckpointLoader | N/A |
+| GLIGENLoader | N/A |
+| Hypernetwork Loader | N/A |
+| Load Upscale Model | Occurs within "Upscale (RealESRGAN)" |
+
+### Conditioning
+
+| ComfyUI Node | Invoke Equivalent |
+| :--- | :--- |
+| CLIP Text Encode (Prompt) | Compel (Prompt) or SDXL Compel (Prompt) |
+| CLIP Set Last Layer | CLIP Skip |
+| Conditioning (Average) | Use the .blend() feature of prompts |
+| Conditioning (Combine) | N/A |
+| Conditioning (Concat) | See the Prompt Tools Community Node |
+| Conditioning (Set Area) | N/A |
+| Conditioning (Set Mask) | Mask Edge |
+| CLIP Vision Encode | N/A |
+| unCLIPConditioning | N/A |
+| Apply ControlNet | ControlNet |
+| Apply ControlNet (Advanced) | ControlNet |
+
+### Latent
+
+| ComfyUI Node | Invoke Equivalent |
+| :--- | :--- |
+| VAE Decode | Latents to Image |
+| VAE Encode | Image to Latents |
+| Empty Latent Image | Noise |
+| Upscale Latent | Resize Latents |
+| Upscale Latent By | Scale Latents |
+| Latent Composite | Blend Latents |
+| LatentCompositeMasked | N/A |
+
+### Image
+
+| ComfyUI Node | Invoke Equivalent |
+| :--- | :--- |
+| Save Image | Image |
+| Preview Image | Current |
+| Load Image | Image |
+| Empty Image | Blank Image |
+| Invert Image | Invert Lerp Image |
+| Batch Images | Link "Image" nodes into an "Image Collection" node |
+| Pad Image for Outpainting | Outpainting is easily accomplished in the Unified Canvas |
+| ImageCompositeMasked | Paste Image |
+| Upscale Image | Resize Image |
+| Upscale Image By | Upscale Image |
+| Upscale Image (using Model) | Upscale Image |
+| ImageBlur | Blur Image |
+| ImageQuantize | N/A |
+| ImageSharpen | N/A |
+| Canny | Canny Processor |
+
+### Mask
+
+| ComfyUI Node | Invoke Equivalent |
+| :--- | :--- |
+| Load Image (as Mask) | Image |
+| Convert Mask to Image | Image |
+| Convert Image to Mask | Image |
+| SolidMask | N/A |
+| InvertMask | Invert Lerp Image |
+| CropMask | Crop Image |
+| MaskComposite | Combine Mask |
+| FeatherMask | Blur Image |
+
+### Advanced
+
+| ComfyUI Node | Invoke Equivalent |
+| :--- | :--- |
+| Load CLIP | Main Model Loader _or_ SDXL Main Model Loader |
+| UNETLoader | Main Model Loader _or_ SDXL Main Model Loader |
+| DualCLIPLoader | Main Model Loader _or_ SDXL Main Model Loader |
+| Load Checkpoint | Main Model Loader _or_ SDXL Main Model Loader |
+| ConditioningZeroOut | N/A |
+| ConditioningSetTimestepRange | N/A |
+| CLIPTextEncodeSDXLRefiner | Compel (Prompt) or SDXL Compel (Prompt) |
+| CLIPTextEncodeSDXL | Compel (Prompt) or SDXL Compel (Prompt) |
+| ModelMergeSimple | Model Merging is available in the Model Manager |
+| ModelMergeBlocks | Model Merging is available in the Model Manager |
+| CheckpointSave | Model saving is available in the Model Manager |
+| CLIPMergeSimple | N/A |

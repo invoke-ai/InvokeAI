@@ -1,0 +1,231 @@
+---
+import settingsData from '../../generated/settings.json';
+
+const groupedSettings = Object.entries(
+  settingsData.settings.reduce((groups, setting) => {
+    const category = setting.category || 'OTHER';
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category].push(setting);
+    return groups;
+  }, {}),
+);
+
+const formatValue = (value) => {
+  if (value === null) {
+    return 'null';
+  }
+  if (Array.isArray(value) || typeof value === 'object') {
+    return JSON.stringify(value);
+  }
+  return String(value);
+};
+
+/** Clean up Python type representations for display */
+const formatType = (typeStr) => {
+  // Strip <class '...'> wrapper
+  const classMatch = typeStr.match(/^<class '(.+)'>$/);
+  if (classMatch) {
+    const inner = classMatch[1];
+    // Strip module paths (e.g. pathlib.Path -> Path)
+    return inner.split('.').pop();
+  }
+  // Strip typing. prefix
+  let cleaned = typeStr.replace(/typing\./g, '');
+  // Strip module paths inside brackets
+  cleaned = cleaned.replace(/[a-z_][a-z0-9_.]*\.([A-Z][A-Za-z]*)/g, '$1');
+  return cleaned;
+};
+
+/** Format category name: "MODEL INSTALL" -> "Model Install" */
+const formatCategoryName = (category) => {
+  return category
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+---
+
+{groupedSettings.map(([category, settings]) => (
+  <details class="settings-accordion">
+    <summary>
+      <span class="settings-accordion-title">{formatCategoryName(category)}</span>
+      <span class="settings-accordion-count">{settings.length}</span>
+    </summary>
+    <dl class="settings-ref-list">
+      {settings.map((setting) => (
+        <div class="settings-ref-entry">
+          <!-- Setting name -->
+          <dt class="settings-ref-name-row">
+            <code class="settings-ref-name">{setting.name}</code>
+          </dt>
+          <!-- Granular details -->
+          <dd class="settings-ref-col settings-ref-type-col">
+            <span class="settings-ref-label">Type</span>
+            <code>{formatType(setting.type)}</code>
+          </dd>
+          <dd class="settings-ref-col settings-ref-default-col">
+            <span class="settings-ref-label">Default</span>
+            <code>{formatValue(setting.default)}</code>
+          </dd>
+          <dd class="settings-ref-col settings-ref-env-col">
+            <span class="settings-ref-label">Env</span>
+            <code>{setting.env_var}</code>
+          </dd>
+          <!-- Description -->
+          <dd class="settings-ref-desc-row">
+            {setting.description}
+            {setting.literal_values.length > 0 && (
+              <span class="settings-ref-values">
+                Values: {setting.literal_values.map((v) => <code>{formatValue(v)}</code>).reduce((prev, curr) => [prev, ' ', curr])}
+              </span>
+            )}
+            {Object.keys(setting.validation).length > 0 && (
+              <span class="settings-ref-constraints">
+                {Object.entries(setting.validation).map(([key, value]) => (
+                  <code>{key}={formatValue(value)}</code>
+                )).reduce((prev, curr) => [prev, ' ', curr])}
+              </span>
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  </details>
+))}
+
+<style>
+  .settings-accordion {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--sl-color-hairline);
+    border-radius: var(--radius, 0.35rem);
+    margin-bottom: 0.5rem;
+    background: transparent;
+  }
+
+  .settings-accordion[open] {
+    background: var(--sl-color-bg);
+  }
+
+  .settings-accordion summary {
+    cursor: pointer;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: var(--sl-text-sm);
+    user-select: none;
+    list-style: none;
+  }
+
+  .settings-accordion summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .settings-accordion summary::before {
+    content: '▸';
+    font-size: 0.7em;
+    transition: transform 150ms ease;
+    flex-shrink: 0;
+  }
+
+  .settings-accordion[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .settings-accordion-title {
+    font-weight: 600;
+  }
+
+  .settings-accordion-count {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+    background: var(--sl-color-hairline);
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+  }
+
+  .settings-ref-list {
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--sl-color-hairline);
+  }
+
+  .settings-ref-entry {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 0;
+    padding: 0.4rem 0.75rem;
+    margin: 0;
+    border-bottom: 1px solid var(--sl-color-hairline);
+  }
+
+  .settings-ref-entry:last-child {
+    border-bottom: none;
+  }
+
+  .settings-ref-entry:hover {
+    background: var(--sl-color-bg-sidebar);
+  }
+
+  .settings-ref-name-row {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
+  .settings-ref-name {
+    font-size: var(--sl-text-sm);
+    font-weight: 600;
+    color: var(--sl-color-text-accent);
+  }
+
+  .settings-ref-col {
+    margin: 0.15rem 0 0 0;
+    padding: 0 0.75rem;
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .settings-ref-col:not(.settings-ref-env-col) {
+    border-right: 1px solid var(--sl-color-hairline);
+  }
+
+  .settings-ref-col code {
+    font-size: var(--sl-text-xs);
+  }
+
+  .settings-ref-label {
+    display: block;
+    font-size: 0.65rem;
+    color: var(--sl-color-gray-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.05rem;
+  }
+
+  .settings-ref-desc-row {
+    grid-column: 1 / -1;
+    margin: 0.2rem 0 0 0;
+    padding: 0;
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-2);
+  }
+
+  .settings-ref-values,
+  .settings-ref-constraints {
+    display: block;
+    margin-top: 0.1rem;
+  }
+
+  .settings-ref-values code,
+  .settings-ref-constraints code {
+    font-size: var(--sl-text-xs);
+  }
+</style>
