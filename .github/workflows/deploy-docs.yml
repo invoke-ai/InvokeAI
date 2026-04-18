@@ -21,15 +21,51 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
+  pull-requests: read
 
 concurrency:
-  group: 'pages'
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      docs: ${{ steps.manual.outputs.docs || steps.filter.outputs.docs }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: mark manual run
+        if: github.event_name == 'workflow_dispatch'
+        id: manual
+        run: echo "docs=true" >> "$GITHUB_OUTPUT"
+
+      - name: detect docs-related changes
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            docs:
+              - '.github/workflows/deploy-docs.yml'
+              - 'docs/**'
+              - 'scripts/generate_docs_json.py'
+              - 'invokeai/app/**'
+              - 'invokeai/backend/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+
   check-and-build:
+    needs: changes
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' &&
+        github.event.pull_request.draft == false &&
+        needs.changes.outputs.docs == 'true') ||
+      (github.event_name == 'push' && needs.changes.outputs.docs == 'true')
     runs-on: ubuntu-22.04
     timeout-minutes: 20
     steps:
@@ -49,8 +85,10 @@ jobs:
         with:
           python-version: '3.11'
 
+      # generate_docs_json.py only needs the invokeai package importable
+      # (pydantic + invokeai.app/backend). Skip the [test] extra to keep CI fast.
       - name: install python dependencies
-        run: uv pip install --editable .[test]
+        run: uv pip install --editable .
 
       # Node (needed for docs build)
       - name: setup node
@@ -90,6 +128,10 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: check-and-build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
