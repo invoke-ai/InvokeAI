@@ -1,8 +1,11 @@
 from typing import Any, ClassVar, Literal
 
+from pydantic import Field
+
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
+    FieldKind,
     ImageField,
     InputField,
     MetadataField,
@@ -25,6 +28,15 @@ class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBo
     """Generate images using an external provider."""
 
     provider_id: ClassVar[str | None] = None
+
+    # External API calls are non-deterministic and incur usage costs — caching
+    # would return stale image references on repeat invokes instead of producing
+    # new images, leaving the gallery unchanged.
+    use_cache: bool = Field(
+        default=False,
+        description="Whether or not to use the cache",
+        json_schema_extra={"field_kind": FieldKind.NodeAttribute},
+    )
 
     model: ModelIdentifierField = InputField(
         description=FieldDescriptions.main_model,
@@ -167,7 +179,14 @@ class OpenAIImageGenerationInvocation(BaseExternalImageGenerationInvocation):
         ui_model_provider_id=["openai"],
     )
 
-    # No OpenAI model currently supports inpaint mode — hide mask_image.
+    # OpenAI's API has no img2img/inpaint distinction — the edits endpoint is used
+    # automatically when reference images are provided. Hide mode and init_image
+    # (init_image is functionally identical to a reference image), and hide
+    # mask_image since no OpenAI model supports inpainting.
+    mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode.", ui_hidden=True)
+    init_image: ImageField | None = InputField(
+        default=None, description="Init image (use reference_images instead)", ui_hidden=True
+    )
     mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
 
     quality: Literal["auto", "high", "medium", "low"] = InputField(default="auto", description="Output image quality")
