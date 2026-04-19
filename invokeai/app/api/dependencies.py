@@ -5,19 +5,21 @@ from logging import Logger
 
 import torch
 
-from invokeai.app.services.app_settings import AppSettingsService
+from invokeai.app.services.app_settings.app_settings_sqlmodel import AppSettingsServiceSqlModel
 from invokeai.app.services.auth.token_service import set_jwt_secret
-from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+from invokeai.app.services.board_image_records.board_image_records_sqlmodel import SqlModelBoardImageRecordStorage
 from invokeai.app.services.board_images.board_images_default import BoardImagesService
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.board_records.board_records_sqlmodel import SqlModelBoardRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
-from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
+from invokeai.app.services.client_state_persistence.client_state_persistence_sqlmodel import (
+    ClientStatePersistenceSqlModel,
+)
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.download.download_default import DownloadQueueService
 from invokeai.app.services.events.events_fastapievents import FastAPIEventService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_sqlmodel import SqlModelImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_services import InvocationServices
@@ -25,9 +27,9 @@ from invokeai.app.services.invocation_stats.invocation_stats_default import Invo
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_images.model_images_default import ModelImageFileStorageDisk
 from invokeai.app.services.model_manager.model_manager_default import ModelManagerService
-from invokeai.app.services.model_records.model_records_sql import ModelRecordServiceSQL
-from invokeai.app.services.model_relationship_records.model_relationship_records_sqlite import (
-    SqliteModelRelationshipRecordStorage,
+from invokeai.app.services.model_records.model_records_sqlmodel import ModelRecordServiceSqlModel
+from invokeai.app.services.model_relationship_records.model_relationship_records_sqlmodel import (
+    SqlModelModelRelationshipRecordStorage,
 )
 from invokeai.app.services.model_relationships.model_relationships_default import ModelRelationshipsService
 from invokeai.app.services.names.names_default import SimpleNameService
@@ -40,10 +42,10 @@ from invokeai.app.services.session_processor.session_processor_default import (
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
-from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
+from invokeai.app.services.style_preset_records.style_preset_records_sqlmodel import SqlModelStylePresetRecordsStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
-from invokeai.app.services.users.users_default import UserService
-from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
+from invokeai.app.services.users.users_sqlmodel import UserServiceSqlModel
+from invokeai.app.services.workflow_records.workflow_records_sqlmodel import SqlModelWorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     AnimaConditioningInfo,
@@ -107,7 +109,7 @@ class ApiDependencies:
         db = init_db(config=config, logger=logger, image_files=image_files)
 
         # Initialize JWT secret from database
-        app_settings = AppSettingsService(db=db)
+        app_settings = AppSettingsServiceSqlModel(db=db)
         jwt_secret = app_settings.get_jwt_secret()
         set_jwt_secret(jwt_secret)
         logger.info("JWT secret loaded from database")
@@ -115,13 +117,13 @@ class ApiDependencies:
         configuration = config
         logger = logger
 
-        board_image_records = SqliteBoardImageRecordStorage(db=db)
+        board_image_records = SqlModelBoardImageRecordStorage(db=db)
         board_images = BoardImagesService()
-        board_records = SqliteBoardRecordStorage(db=db)
+        board_records = SqlModelBoardRecordStorage(db=db)
         boards = BoardService()
         events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
-        image_records = SqliteImageRecordStorage(db=db)
+        image_records = SqlModelImageRecordStorage(db=db)
         images = ImageService()
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(
@@ -152,23 +154,23 @@ class ApiDependencies:
         model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
         model_manager = ModelManagerService.build_model_manager(
             app_config=configuration,
-            model_record_service=ModelRecordServiceSQL(db=db, logger=logger),
+            model_record_service=ModelRecordServiceSqlModel(db=db, logger=logger),
             download_queue=download_queue_service,
             events=events,
         )
         model_relationships = ModelRelationshipsService()
-        model_relationship_records = SqliteModelRelationshipRecordStorage(db=db)
+        model_relationship_records = SqlModelModelRelationshipRecordStorage(db=db)
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
         session_processor = DefaultSessionProcessor(session_runner=DefaultSessionRunner())
-        session_queue = SqliteSessionQueue(db=db)
+        session_queue = SqliteSessionQueue(db=db)  # Stays raw SQL (Phase 3)
         urls = LocalUrlService()
-        workflow_records = SqliteWorkflowRecordsStorage(db=db)
-        style_preset_records = SqliteStylePresetRecordsStorage(db=db)
+        workflow_records = SqlModelWorkflowRecordsStorage(db=db)
+        style_preset_records = SqlModelStylePresetRecordsStorage(db=db)
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
         workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
-        client_state_persistence = ClientStatePersistenceSqlite(db=db)
-        users = UserService(db=db)
+        client_state_persistence = ClientStatePersistenceSqlModel(db=db)
+        users = UserServiceSqlModel(db=db)
 
         services = InvocationServices(
             board_image_records=board_image_records,

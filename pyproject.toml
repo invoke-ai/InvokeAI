@@ -61,6 +61,7 @@ dependencies = [
   "pydantic-settings",
   "pydantic",
   "python-socketio",
+  "sqlmodel",
   "uvicorn[standard]",
 
   # Auxiliary dependencies, pinned only if necessary.
