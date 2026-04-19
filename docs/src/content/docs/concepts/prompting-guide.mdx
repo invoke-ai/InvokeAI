@@ -10,13 +10,13 @@ import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
 <CardGrid>
   <LinkCard
     title="Prompting Syntax"
-    href="/concepts/prompt-syntax"
+    href="../prompt-syntax"
     description="Learn how to weight prompt terms, blend concepts, and use prompt conjunctions for more control."
   />
 
   <LinkCard
     title="Dynamic Prompting"
-    href="/concepts/dynamic-prompting"
+    href="../dynamic-prompting"
     description="Learn how to create many prompt variations from a single template."
   />
 </CardGrid>
@@ -82,7 +82,7 @@ Good negative prompts usually name specific failure modes: `blurry`, `distorted 
 
   5. Escalate only when needed
 
-      If the result is close but one element is too weak or too strong, move to [Prompting Syntax](/concepts/prompt-syntax) for weighting. If you want lots of variations, use [Dynamic Prompting](/concepts/dynamic-prompting).
+      If the result is close but one element is too weak or too strong, move to [Prompting Syntax](../prompt-syntax) for weighting. If you want lots of variations, use [Dynamic Prompting](../dynamic-prompting).
 </Steps>
 
 Here is the same idea refined in stages:
@@ -108,10 +108,10 @@ The same prompt can behave very differently across models.
 
 Reach for advanced syntax when a normal comma-separated prompt is almost right, but you need more control.
 
-- Use [Prompting Syntax](/concepts/prompt-syntax) when one term needs more or less influence.
+- Use [Prompting Syntax](../prompt-syntax) when one term needs more or less influence.
 - Use `.blend()` when you want to mix concepts or styles deliberately.
 - Use `.and()` when you want separate prompt clauses encoded individually.
-- Use [Dynamic Prompting](/concepts/dynamic-prompting) when you want many prompt variations from one template.
+- Use [Dynamic Prompting](../dynamic-prompting) when you want many prompt variations from one template.
 
 ## Common mistakes
 
