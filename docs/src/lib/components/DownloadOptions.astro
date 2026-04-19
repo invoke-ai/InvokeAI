@@ -1,6 +1,7 @@
 ---
 import { LinkCard, Icon, LinkButton } from '@astrojs/starlight/components';
 import { type StarlightIcon } from '@astrojs/starlight/types';
+import { withBase } from '../base-path';
 
 type LauncherDownloadOption = {
   icon: StarlightIcon;
@@ -45,7 +46,7 @@ const manualDownloadOptions = {
   docker: {
     headline: 'Run with Docker',
     description: 'For users who want to run Invoke without installing dependencies directly on their system.',
-    href: '/configuration/docker/',
+    href: withBase('/configuration/docker/', import.meta.env.BASE_URL),
   },
 };
 ---
