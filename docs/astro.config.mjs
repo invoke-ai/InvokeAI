@@ -133,7 +133,12 @@ export default defineConfig({
         //     'copy', 'view', 'chatgpt', 'claude'
         //   ]
         // }),
-      ],
+      ]
     }),
   ],
+  redirects: {
+    '/configuration': '/configuration/invokeai-yaml',
+    '/features/low-vram/': '/configuration/low-vram-mode/',
+    '/faq': '/troubleshooting/faq',
+  }
 });
