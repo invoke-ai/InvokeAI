@@ -137,6 +137,7 @@ export default defineConfig({
     }),
   ],
   redirects: {
+    '/installation': '/start-here/installation',
     '/configuration': '/configuration/invokeai-yaml',
     '/features/low-vram/': '/configuration/low-vram-mode/',
     '/faq': '/troubleshooting/faq',
