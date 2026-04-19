@@ -28,6 +28,24 @@ export type CustomNodesPermission = {
   isAllowed: boolean;
 };
 
+/** Minimal shapes the derivation needs — matches the runtime types from auth slice + RTK Query. */
+type SetupStatusLike = { multiuser_enabled: boolean } | undefined;
+type UserLike = { is_admin: boolean } | null | undefined;
+
+/**
+ * Pure derivation of the permission state from the raw inputs the hook reads.
+ * Both the hook and the tests consume this directly so the two can never drift.
+ *
+ * - loading  (setupStatus undefined) -> { isKnown: false, isAllowed: false }
+ * - resolved (setupStatus defined)   -> { isKnown: true,  isAllowed: getIsCustomNodesEnabled(...) }
+ */
+export const deriveCustomNodesPermission = (setupStatus: SetupStatusLike, user: UserLike): CustomNodesPermission => {
+  if (!setupStatus) {
+    return { isKnown: false, isAllowed: false };
+  }
+  return { isKnown: true, isAllowed: getIsCustomNodesEnabled(setupStatus.multiuser_enabled, user?.is_admin) };
+};
+
 /**
  * Hook that returns two-state permission info for custom node management.
  *
@@ -43,11 +61,5 @@ export const useIsCustomNodesEnabled = (): CustomNodesPermission => {
   const user = useAppSelector(selectCurrentUser);
   const { data: setupStatus } = useGetSetupStatusQuery();
 
-  return useMemo(() => {
-    if (!setupStatus) {
-      return { isKnown: false, isAllowed: false };
-    }
-    const isAllowed = getIsCustomNodesEnabled(setupStatus.multiuser_enabled, user?.is_admin);
-    return { isKnown: true, isAllowed };
-  }, [setupStatus, user]);
+  return useMemo(() => deriveCustomNodesPermission(setupStatus, user), [setupStatus, user]);
 };

@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CustomNodesPermission } from './useIsCustomNodesEnabled';
-import { getIsCustomNodesEnabled } from './useIsCustomNodesEnabled';
+import { deriveCustomNodesPermission, getIsCustomNodesEnabled } from './useIsCustomNodesEnabled';
 
 describe('getIsCustomNodesEnabled', () => {
   it('returns true in single-user mode regardless of admin status', () => {
@@ -24,65 +23,66 @@ describe('getIsCustomNodesEnabled', () => {
 });
 
 /**
- * Hook-level contract tests.
+ * Permission-state tests.
  *
- * The hook (useIsCustomNodesEnabled) returns { isKnown, isAllowed } so that
- * consumers can distinguish three states:
- *   loading   — isKnown=false, isAllowed=false → hide tab, do NOT redirect
- *   allowed   — isKnown=true,  isAllowed=true  → show tab, render content
- *   denied    — isKnown=true,  isAllowed=false  → hide tab, redirect away
+ * These call deriveCustomNodesPermission directly — the same function the hook
+ * uses internally — so the test and the hook can never drift. The contract is:
+ *   loading (setupStatus undefined) -> { isKnown: false, isAllowed: false }
+ *   resolved                        -> { isKnown: true,  isAllowed: getIsCustomNodesEnabled(...) }
  *
- * We simulate the hook's decision path here to verify the contract without
- * needing a full Redux/RTK Query harness.
+ * Consumers read this state:
+ *   VerticalNavBar   shows tab only when isAllowed
+ *   AppContent       redirects only when isKnown && !isAllowed
  */
-describe('useIsCustomNodesEnabled hook contract', () => {
-  const simulateHook = (
-    setupStatus: { multiuser_enabled: boolean } | undefined,
-    user: { is_admin: boolean } | undefined
-  ): CustomNodesPermission => {
-    if (!setupStatus) {
-      return { isKnown: false, isAllowed: false };
-    }
-    const isAllowed = getIsCustomNodesEnabled(setupStatus.multiuser_enabled, user?.is_admin);
-    return { isKnown: true, isAllowed };
-  };
-
+describe('deriveCustomNodesPermission', () => {
   it('returns unknown/denied while setupStatus is still loading', () => {
-    // Tab hidden, no redirect, no admin-only requests fired
-    expect(simulateHook(undefined, undefined)).toEqual({ isKnown: false, isAllowed: false });
-    expect(simulateHook(undefined, { is_admin: false })).toEqual({ isKnown: false, isAllowed: false });
-    expect(simulateHook(undefined, { is_admin: true })).toEqual({ isKnown: false, isAllowed: false });
+    expect(deriveCustomNodesPermission(undefined, undefined)).toEqual({ isKnown: false, isAllowed: false });
+    expect(deriveCustomNodesPermission(undefined, null)).toEqual({ isKnown: false, isAllowed: false });
+    expect(deriveCustomNodesPermission(undefined, { is_admin: false })).toEqual({ isKnown: false, isAllowed: false });
+    expect(deriveCustomNodesPermission(undefined, { is_admin: true })).toEqual({ isKnown: false, isAllowed: false });
   });
 
-  it('resolves to known/allowed in single-user mode', () => {
-    expect(simulateHook({ multiuser_enabled: false }, undefined)).toEqual({ isKnown: true, isAllowed: true });
-    expect(simulateHook({ multiuser_enabled: false }, { is_admin: false })).toEqual({
+  it('resolves to known/allowed in single-user mode regardless of user', () => {
+    expect(deriveCustomNodesPermission({ multiuser_enabled: false }, undefined)).toEqual({
+      isKnown: true,
+      isAllowed: true,
+    });
+    expect(deriveCustomNodesPermission({ multiuser_enabled: false }, null)).toEqual({
+      isKnown: true,
+      isAllowed: true,
+    });
+    expect(deriveCustomNodesPermission({ multiuser_enabled: false }, { is_admin: false })).toEqual({
       isKnown: true,
       isAllowed: true,
     });
   });
 
   it('resolves to known/allowed for multiuser admin', () => {
-    expect(simulateHook({ multiuser_enabled: true }, { is_admin: true })).toEqual({
+    expect(deriveCustomNodesPermission({ multiuser_enabled: true }, { is_admin: true })).toEqual({
       isKnown: true,
       isAllowed: true,
     });
   });
 
-  it('resolves to known/denied for multiuser non-admin', () => {
-    expect(simulateHook({ multiuser_enabled: true }, { is_admin: false })).toEqual({
+  it('resolves to known/denied for multiuser non-admin or missing user', () => {
+    expect(deriveCustomNodesPermission({ multiuser_enabled: true }, { is_admin: false })).toEqual({
       isKnown: true,
       isAllowed: false,
     });
-    expect(simulateHook({ multiuser_enabled: true }, undefined)).toEqual({ isKnown: true, isAllowed: false });
+    expect(deriveCustomNodesPermission({ multiuser_enabled: true }, null)).toEqual({
+      isKnown: true,
+      isAllowed: false,
+    });
+    expect(deriveCustomNodesPermission({ multiuser_enabled: true }, undefined)).toEqual({
+      isKnown: true,
+      isAllowed: false,
+    });
   });
 
   it('non-admin multiuser user never sees isAllowed=true in any state', () => {
-    // This is the regression test: during loading AND after resolution,
-    // a non-admin in multiuser mode must never get isAllowed=true.
-    const loading = simulateHook(undefined, { is_admin: false });
-    const resolved = simulateHook({ multiuser_enabled: true }, { is_admin: false });
-    expect(loading.isAllowed).toBe(false);
-    expect(resolved.isAllowed).toBe(false);
+    // Regression: during loading AND after resolution, a non-admin in multiuser
+    // mode must never get isAllowed=true, so the tab never renders content.
+    expect(deriveCustomNodesPermission(undefined, { is_admin: false }).isAllowed).toBe(false);
+    expect(deriveCustomNodesPermission({ multiuser_enabled: true }, { is_admin: false }).isAllowed).toBe(false);
   });
 });
