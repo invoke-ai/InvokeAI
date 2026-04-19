@@ -1,6 +1,7 @@
 """Tests for the custom nodes router."""
 
 import json
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -8,6 +9,8 @@ from invokeai.app.api.routers.custom_nodes import (
     PACK_MANIFEST_FILENAME,
     _get_installed_packs,
     _import_workflows_from_pack,
+    _load_node_pack,
+    _purge_pack_modules,
     _read_pack_manifest,
     _remove_workflows_by_ids,
     _write_pack_manifest,
@@ -398,3 +401,100 @@ class TestUnregisterPack:
         finally:
             InvocationRegistry._invocation_classes = original_invocations
             InvocationRegistry._output_classes = original_outputs
+
+
+class TestPurgePackModules:
+    """Tests for _purge_pack_modules() — clears the pack subtree from sys.modules."""
+
+    def test_removes_root_module(self) -> None:
+        sys.modules["purge_test_root"] = MagicMock()
+        try:
+            removed = _purge_pack_modules("purge_test_root")
+            assert "purge_test_root" in removed
+            assert "purge_test_root" not in sys.modules
+        finally:
+            sys.modules.pop("purge_test_root", None)
+
+    def test_removes_submodules(self) -> None:
+        sys.modules["purge_test_pack"] = MagicMock()
+        sys.modules["purge_test_pack.nodes"] = MagicMock()
+        sys.modules["purge_test_pack.utils.helpers"] = MagicMock()
+        try:
+            removed = _purge_pack_modules("purge_test_pack")
+            assert set(removed) == {
+                "purge_test_pack",
+                "purge_test_pack.nodes",
+                "purge_test_pack.utils.helpers",
+            }
+            assert "purge_test_pack" not in sys.modules
+            assert "purge_test_pack.nodes" not in sys.modules
+            assert "purge_test_pack.utils.helpers" not in sys.modules
+        finally:
+            for key in ("purge_test_pack", "purge_test_pack.nodes", "purge_test_pack.utils.helpers"):
+                sys.modules.pop(key, None)
+
+    def test_does_not_remove_unrelated_modules_with_prefix_collision(self) -> None:
+        # "foo_pack_extra" must NOT be removed when purging "foo_pack"
+        sys.modules["foo_pack"] = MagicMock()
+        sys.modules["foo_pack_extra"] = MagicMock()
+        sys.modules["foo_pack.sub"] = MagicMock()
+        try:
+            removed = _purge_pack_modules("foo_pack")
+            assert set(removed) == {"foo_pack", "foo_pack.sub"}
+            assert "foo_pack_extra" in sys.modules
+        finally:
+            for key in ("foo_pack", "foo_pack_extra", "foo_pack.sub"):
+                sys.modules.pop(key, None)
+
+    def test_noop_when_pack_not_loaded(self) -> None:
+        removed = _purge_pack_modules("never_loaded_pack_xyz")
+        assert removed == []
+
+
+class TestUninstallReinstallReloadsSubmodules:
+    """Regression test for the uninstall -> reinstall cache bug.
+
+    Before the fix, uninstall only cleared sys.modules[pack_name] and left
+    submodules cached. On reinstall, Python reused the cached submodules,
+    their @invocation decorators never re-ran, and the pack loaded with
+    zero registered nodes until a full process restart.
+    """
+
+    def test_reinstall_re_executes_submodule(self, tmp_path: Path) -> None:
+        pack_name = "reinstall_regression_pack"
+        pack_dir = tmp_path / pack_name
+        pack_dir.mkdir()
+
+        # __init__.py imports from a submodule — this is the shape that triggered the bug
+        (pack_dir / "__init__.py").write_text("from .nodes import *  # noqa: F401,F403\n")
+        submodule = pack_dir / "nodes.py"
+
+        # Each import of the submodule must append a marker to this file.
+        # If the submodule gets reused from sys.modules instead of re-executed,
+        # the second install won't produce a second marker.
+        marker_file = tmp_path / "exec_markers.txt"
+        submodule.write_text(
+            f"from pathlib import Path\n"
+            f"Path(r'{marker_file.as_posix()}').open('a').write('exec\\n')\n"
+        )
+
+        try:
+            # First install
+            _load_node_pack(pack_name, pack_dir)
+            assert pack_name in sys.modules
+            assert f"{pack_name}.nodes" in sys.modules
+            assert marker_file.read_text().count("exec") == 1
+
+            # Simulate uninstall's module cleanup
+            _purge_pack_modules(pack_name)
+            assert pack_name not in sys.modules
+            assert f"{pack_name}.nodes" not in sys.modules
+
+            # Reinstall — submodule MUST re-execute
+            _load_node_pack(pack_name, pack_dir)
+            assert marker_file.read_text().count("exec") == 2, (
+                "Submodule was not re-executed on reinstall — the @invocation "
+                "decorators would not have re-registered the pack's nodes."
+            )
+        finally:
+            _purge_pack_modules(pack_name)

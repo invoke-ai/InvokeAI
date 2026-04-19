@@ -295,9 +295,11 @@ async def uninstall_custom_node_pack(
                 f"Unregistered {len(removed_types)} node(s) from pack '{pack_name}': {', '.join(removed_types)}"
             )
 
-        # Remove the module from sys.modules so it won't interfere
-        if pack_name in sys.modules:
-            del sys.modules[pack_name]
+        # Remove the pack's module subtree from sys.modules. Only dropping the
+        # root module would leave submodules cached; on reinstall the cached
+        # submodules would be reused without re-running their @invocation
+        # decorators, so the pack would show up with 0 nodes until restart.
+        _purge_pack_modules(pack_name)
 
         # Remove only workflows this pack imported, using the manifest-recorded IDs
         workflows_removed = _remove_workflows_by_ids(imported_workflow_ids, pack_name)
@@ -344,6 +346,21 @@ async def reload_custom_nodes(current_admin: AdminUserOrDefault) -> dict[str, st
     app.openapi_schema = None
 
     return {"status": "Custom nodes reloaded successfully."}
+
+
+def _purge_pack_modules(pack_name: str) -> list[str]:
+    """Removes the pack's root module and all of its submodules from sys.modules.
+
+    After uninstall, cached submodules (e.g. `pack_name.nodes`, `pack_name.foo.bar`)
+    must be evicted as well — otherwise a subsequent reinstall reuses the cached
+    objects, the @invocation decorators never re-run, and the pack ends up loaded
+    with zero registered nodes until a full process restart.
+    """
+    prefix = f"{pack_name}."
+    to_remove = [name for name in sys.modules if name == pack_name or name.startswith(prefix)]
+    for name in to_remove:
+        del sys.modules[name]
+    return to_remove
 
 
 def _load_node_pack(pack_name: str, pack_dir: Path) -> None:
