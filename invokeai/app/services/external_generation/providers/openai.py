@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 
 import requests
-from PIL import Image
 from PIL.Image import Image as PILImageType
 
 from invokeai.app.services.external_generation.errors import (
@@ -68,11 +67,7 @@ class OpenAIProvider(ExternalProvider):
         else:
             images: list[PILImageType] = []
             if request.init_image is not None:
-                init = request.init_image
-                if request.mask_image is not None and not is_gpt_image:
-                    # DALL-E 2 requires RGBA init image when using a mask
-                    init = init.convert("RGBA")
-                images.append(init)
+                images.append(request.init_image)
             images.extend(reference.image for reference in request.reference_images)
             if not images:
                 raise ExternalProviderRequestError(
@@ -89,7 +84,7 @@ class OpenAIProvider(ExternalProvider):
 
             if request.mask_image is not None:
                 mask_buffer = io.BytesIO()
-                _prepare_openai_mask(request.mask_image).save(mask_buffer, format="PNG")
+                request.mask_image.save(mask_buffer, format="PNG")
                 mask_buffer.seek(0)
                 files.append(("mask", ("mask.png", mask_buffer, "image/png")))
 
@@ -153,22 +148,6 @@ class OpenAIProvider(ExternalProvider):
             provider_request_id=response.headers.get("x-request-id"),
             provider_metadata={"model": model_id},
         )
-
-
-def _prepare_openai_mask(mask: PILImageType) -> PILImageType:
-    """Convert InvokeAI's grayscale mask to DALL-E 2's expected RGBA format.
-
-    InvokeAI masks: white (255) = area to paint, black (0) = area to keep.
-    OpenAI masks: transparent (alpha 0) = area to edit, opaque (alpha 255) = area to keep.
-    """
-    from PIL import ImageOps
-
-    grayscale = mask.convert("L")
-    # Invert: white (paint) -> 0 (transparent), black (keep) -> 255 (opaque)
-    alpha = ImageOps.invert(grayscale)
-    rgba = Image.new("RGBA", mask.size, (0, 0, 0, 0))
-    rgba.putalpha(alpha)
-    return rgba
 
 
 def _parse_retry_after(value: str | None) -> float | None:

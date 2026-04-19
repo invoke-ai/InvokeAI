@@ -167,6 +167,9 @@ class OpenAIImageGenerationInvocation(BaseExternalImageGenerationInvocation):
         ui_model_provider_id=["openai"],
     )
 
+    # No OpenAI model currently supports inpaint mode — hide mask_image.
+    mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
+
     quality: Literal["auto", "high", "medium", "low"] = InputField(default="auto", description="Output image quality")
     background: Literal["auto", "transparent", "opaque"] = InputField(
         default="auto", description="Background transparency handling"
@@ -213,6 +216,14 @@ class GeminiImageGenerationInvocation(BaseExternalImageGenerationInvocation):
         ui_model_format=[ModelFormat.ExternalApi],
         ui_model_provider_id=["gemini"],
     )
+
+    # Gemini only supports txt2img — hide mode/init_image/mask_image fields
+    # that are inherited from the base class but not usable with any Gemini model.
+    mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode.", ui_hidden=True)
+    init_image: ImageField | None = InputField(
+        default=None, description="Init image for img2img/inpaint", ui_hidden=True
+    )
+    mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
 
     temperature: float | None = InputField(default=None, ge=0.0, le=2.0, description="Sampling temperature")
 
