@@ -59,7 +59,7 @@ Invoke offers a fully featured workflow management solution, enabling users to c
 Invoke features an organized gallery system for easily storing, accessing, and remixing your content in the Invoke workspace. Images can be dragged/dropped onto any Image-base UI element in the application, and rich metadata within the Image allows for easy recall of key prompts or settings used in your workflow.
 
 ### Model Support
-- SD 1.5 
+- SD 1.5
 - SD 2.0
 - SDXL
 - SD 3.5 Medium
@@ -110,8 +110,8 @@ Original portions of the software are Copyright © 2024 by respective contributo
 [faq]: https://invoke-ai.github.io/InvokeAI/faq/
 [contributors]: https://invoke-ai.github.io/InvokeAI/contributing/contributors/
 [github issues]: https://github.com/invoke-ai/InvokeAI/issues
-[docs home]: https://invoke-ai.github.io/InvokeAI
-[installation docs]: https://invoke-ai.github.io/InvokeAI/installation/
+[docs home]: https://invoke.ai
+[installation docs]: https://invoke.ai/start-here/installation/
 [#dev-chat]: https://discord.com/channels/1020123559063990373/1049495067846524939
 [contributing docs]: https://invoke-ai.github.io/InvokeAI/contributing/
 [CI checks on main badge]: https://flat.badgen.net/github/checks/invoke-ai/InvokeAI/main?label=CI%20status%20on%20main&cache=900&icon=github
