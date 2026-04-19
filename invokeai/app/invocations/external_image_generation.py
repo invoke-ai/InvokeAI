@@ -9,7 +9,6 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
-
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageCollectionOutput
 from invokeai.app.services.external_generation.external_generation_common import (

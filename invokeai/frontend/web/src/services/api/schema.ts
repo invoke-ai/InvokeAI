@@ -23315,7 +23315,7 @@ export type components = {
             model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * Mode
-             * @description Generation mode. Not all modes are supported by every model; unsupported modes raise at runtime.
+             * @description Generation mode.
              * @default txt2img
              * @enum {string}
              */
@@ -23357,7 +23357,7 @@ export type components = {
              */
             image_size?: string | null;
             /**
-             * @description Init image for img2img/inpaint
+             * @description Init image (use reference_images instead)
              * @default null
              */
             init_image?: components["schemas"]["ImageField"] | null;
