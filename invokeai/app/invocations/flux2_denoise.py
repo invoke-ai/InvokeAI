@@ -53,7 +53,7 @@ from invokeai.backend.util.devices import TorchDevice
     "flux2_denoise",
     title="FLUX2 Denoise",
     tags=["image", "flux", "flux2", "klein", "denoise"],
-    category="image",
+    category="latents",
     version="1.4.0",
     classification=Classification.Prototype,
 )

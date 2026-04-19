@@ -3,6 +3,11 @@ import { set } from 'es-toolkit/compat';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import { describe, expect, it } from 'vitest';
 
+import {
+  CONNECTOR_INPUT_HANDLE,
+  CONNECTOR_OUTPUT_HANDLE,
+  getConnectorDeletionSpliceConnections,
+} from './connectorTopology';
 import { add, buildEdge, buildNode, collect, img_resize, main_model_loader, sub, templates } from './testUtils';
 import { validateConnection } from './validateConnection';
 
@@ -11,6 +16,7 @@ const ifTemplate: InvocationTemplate = {
   type: 'if',
   version: '1.0.0',
   tags: [],
+  category: 'math',
   description: 'Selects between two inputs based on a boolean condition',
   outputType: 'if_output',
   inputs: {
@@ -88,6 +94,7 @@ const floatOutputTemplate: InvocationTemplate = {
   type: 'float_output',
   version: '1.0.0',
   tags: [],
+  category: 'primitives',
   description: 'Outputs a float',
   outputType: 'float_output',
   inputs: {},
@@ -116,6 +123,7 @@ const integerCollectionOutputTemplate: InvocationTemplate = {
   type: 'integer_collection_output',
   version: '1.0.0',
   tags: [],
+  category: 'primitives',
   description: 'Outputs an integer collection',
   outputType: 'integer_collection_output',
   inputs: {},
@@ -138,6 +146,18 @@ const integerCollectionOutputTemplate: InvocationTemplate = {
   nodePack: 'invokeai',
   classification: 'stable',
 };
+
+const buildConnectorNode = (id: string) => ({
+  id,
+  type: 'connector' as const,
+  position: { x: 0, y: 0 },
+  data: {
+    id,
+    type: 'connector' as const,
+    label: 'Connector',
+    isOpen: true,
+  },
+});
 
 describe(validateConnection.name, () => {
   it('should reject invalid connection to self', () => {
@@ -456,6 +476,214 @@ describe(validateConnection.name, () => {
     const c = { source: n2.id, sourceHandle: 'value', target: n1.id, targetHandle: 'a' };
     const r = validateConnection(c, nodes, edges, templates, null);
     expect(r).toEqual('nodes.connectionWouldCreateCycle');
+  });
+
+  describe('connectors', () => {
+    it('should accept invocation output to connector input', () => {
+      const n1 = buildNode(add);
+      const connector = buildConnectorNode('connector-1');
+      const r = validateConnection(
+        { source: n1.id, sourceHandle: 'value', target: connector.id, targetHandle: CONNECTOR_INPUT_HANDLE },
+        [n1, connector],
+        [],
+        templates,
+        null
+      );
+      expect(r).toEqual(null);
+    });
+
+    it('should reject a second input into a connector', () => {
+      const n1 = buildNode(add);
+      const n2 = buildNode(sub);
+      const connector = buildConnectorNode('connector-1');
+      const edges = [buildEdge(n1.id, 'value', connector.id, CONNECTOR_INPUT_HANDLE)];
+      const r = validateConnection(
+        { source: n2.id, sourceHandle: 'value', target: connector.id, targetHandle: CONNECTOR_INPUT_HANDLE },
+        [n1, n2, connector],
+        edges,
+        templates,
+        null
+      );
+      expect(r).toEqual('nodes.inputMayOnlyHaveOneConnection');
+    });
+
+    it('should accept connector output to invocation input when the upstream type matches', () => {
+      const n1 = buildNode(add);
+      const connector = buildConnectorNode('connector-1');
+      const n2 = buildNode(sub);
+      const edges = [buildEdge(n1.id, 'value', connector.id, CONNECTOR_INPUT_HANDLE)];
+      const r = validateConnection(
+        { source: connector.id, sourceHandle: CONNECTOR_OUTPUT_HANDLE, target: n2.id, targetHandle: 'a' },
+        [n1, connector, n2],
+        edges,
+        templates,
+        null
+      );
+      expect(r).toEqual(null);
+    });
+
+    it('should reject connector output to invocation input when the upstream type mismatches', () => {
+      const n1 = buildNode(add);
+      const connector = buildConnectorNode('connector-1');
+      const n2 = buildNode(img_resize);
+      const edges = [buildEdge(n1.id, 'value', connector.id, CONNECTOR_INPUT_HANDLE)];
+      const r = validateConnection(
+        { source: connector.id, sourceHandle: CONNECTOR_OUTPUT_HANDLE, target: n2.id, targetHandle: 'image' },
+        [n1, connector, n2],
+        edges,
+        templates,
+        null
+      );
+      expect(r).toEqual('nodes.fieldTypesMustMatch');
+    });
+
+    it('should accept unresolved connector output to a typed invocation input as the first downstream constraint', () => {
+      const connector = buildConnectorNode('connector-1');
+      const n2 = buildNode(sub);
+      const r = validateConnection(
+        { source: connector.id, sourceHandle: CONNECTOR_OUTPUT_HANDLE, target: n2.id, targetHandle: 'a' },
+        [connector, n2],
+        [],
+        templates,
+        null
+      );
+      expect(r).toEqual(null);
+    });
+
+    it('should reject unresolved connector output when it conflicts with an existing downstream typed constraint', () => {
+      const connector = buildConnectorNode('connector-1');
+      const n1 = buildNode(sub);
+      const n2 = buildNode(img_resize);
+      const edges = [buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, n1.id, 'a')];
+      const r = validateConnection(
+        { source: connector.id, sourceHandle: CONNECTOR_OUTPUT_HANDLE, target: n2.id, targetHandle: 'image' },
+        [connector, n1, n2],
+        edges,
+        templates,
+        null
+      );
+      expect(r).toEqual('nodes.fieldTypesMustMatch');
+    });
+
+    it('should reject connecting an incompatible upstream source into a connector with downstream typed constraints', () => {
+      const source = buildNode(main_model_loader);
+      const connector = buildConnectorNode('connector-1');
+      const target = buildNode(sub);
+      const edges = [buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, target.id, 'a')];
+      const r = validateConnection(
+        { source: source.id, sourceHandle: 'vae', target: connector.id, targetHandle: CONNECTOR_INPUT_HANDLE },
+        [source, connector, target],
+        edges,
+        templates,
+        null
+      );
+      expect(r).toEqual('nodes.fieldTypesMustMatch');
+    });
+
+    it('should preserve type information through chained connectors', () => {
+      const n1 = buildNode(add);
+      const connectorA = buildConnectorNode('connector-a');
+      const connectorB = buildConnectorNode('connector-b');
+      const n2 = buildNode(sub);
+      const edges = [
+        buildEdge(n1.id, 'value', connectorA.id, CONNECTOR_INPUT_HANDLE),
+        buildEdge(connectorA.id, CONNECTOR_OUTPUT_HANDLE, connectorB.id, CONNECTOR_INPUT_HANDLE),
+      ];
+      const r = validateConnection(
+        { source: connectorB.id, sourceHandle: CONNECTOR_OUTPUT_HANDLE, target: n2.id, targetHandle: 'a' },
+        [n1, connectorA, connectorB, n2],
+        edges,
+        templates,
+        null
+      );
+      expect(r).toEqual(null);
+    });
+
+    it('should reject cycles routed through connectors', () => {
+      const n1 = buildNode(add);
+      const n2 = buildNode(sub);
+      const connector = buildConnectorNode('connector-1');
+      const edges = [
+        buildEdge(n1.id, 'value', connector.id, CONNECTOR_INPUT_HANDLE),
+        buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, n2.id, 'a'),
+      ];
+      const r = validateConnection(
+        { source: n2.id, sourceHandle: 'value', target: n1.id, targetHandle: 'a' },
+        [n1, n2, connector],
+        edges,
+        templates,
+        null
+      );
+      expect(r).toEqual('nodes.connectionWouldCreateCycle');
+    });
+
+    it('should preserve collect item validation through connectors', () => {
+      const n1 = buildNode(add);
+      const n2 = buildNode(collect);
+      const n3 = buildNode(main_model_loader);
+      const connector = buildConnectorNode('connector-1');
+      const edges = [
+        buildEdge(n1.id, 'value', n2.id, 'item'),
+        buildEdge(n3.id, 'vae', connector.id, CONNECTOR_INPUT_HANDLE),
+      ];
+      const r = validateConnection(
+        { source: connector.id, sourceHandle: CONNECTOR_OUTPUT_HANDLE, target: n2.id, targetHandle: 'item' },
+        [n1, n2, n3, connector],
+        edges,
+        templates,
+        null
+      );
+      expect(r).toEqual('nodes.cannotMixAndMatchCollectionItemTypes');
+    });
+
+    it('should preserve if branch validation through connectors', () => {
+      const n1 = buildNode(add);
+      const n2 = buildNode(img_resize);
+      const n3 = buildNode(ifTemplate);
+      const connector = buildConnectorNode('connector-1');
+      const edges = [
+        buildEdge(n1.id, 'value', connector.id, CONNECTOR_INPUT_HANDLE),
+        buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, n3.id, 'true_input'),
+      ];
+      const r = validateConnection(
+        { source: n2.id, sourceHandle: 'image', target: n3.id, targetHandle: 'false_input' },
+        [n1, n2, n3, connector],
+        edges,
+        { ...templates, if: ifTemplate },
+        null
+      );
+      expect(r).toEqual('nodes.fieldTypesMustMatch');
+    });
+
+    it('should reject connector deletion splice-through when it would duplicate an existing direct edge', () => {
+      const n1 = buildNode(add);
+      const n2 = buildNode(sub);
+      const connector = buildConnectorNode('connector-1');
+      const edges = [
+        buildEdge(n1.id, 'value', connector.id, CONNECTOR_INPUT_HANDLE),
+        buildEdge(connector.id, CONNECTOR_OUTPUT_HANDLE, n2.id, 'a'),
+        buildEdge(n1.id, 'value', n2.id, 'a'),
+      ];
+
+      expect(getConnectorDeletionSpliceConnections(connector.id, [n1, n2, connector], edges, templates)).toBe(null);
+    });
+
+    it('should reject connector deletion splice-through when fan-out would violate a single-input target', () => {
+      const n1 = buildNode(add);
+      const connectorA = buildConnectorNode('connector-a');
+      const connectorB = buildConnectorNode('connector-b');
+      const n2 = buildNode(sub);
+      const edges = [
+        buildEdge(n1.id, 'value', connectorA.id, CONNECTOR_INPUT_HANDLE),
+        buildEdge(connectorA.id, CONNECTOR_OUTPUT_HANDLE, connectorB.id, CONNECTOR_INPUT_HANDLE),
+        buildEdge(connectorA.id, CONNECTOR_OUTPUT_HANDLE, n2.id, 'a'),
+        buildEdge(connectorB.id, CONNECTOR_OUTPUT_HANDLE, n2.id, 'a'),
+      ];
+
+      expect(
+        getConnectorDeletionSpliceConnections(connectorA.id, [n1, connectorA, connectorB, n2], edges, templates)
+      ).toBe(null);
+    });
   });
 
   describe('non-strict mode', () => {

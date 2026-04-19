@@ -31,7 +31,7 @@ SD3_T5_MAX_SEQ_LEN = 256
     "sd3_text_encoder",
     title="Prompt - SD3",
     tags=["prompt", "conditioning", "sd3"],
-    category="conditioning",
+    category="prompt",
     version="1.0.1",
 )
 class Sd3TextEncoderInvocation(BaseInvocation):

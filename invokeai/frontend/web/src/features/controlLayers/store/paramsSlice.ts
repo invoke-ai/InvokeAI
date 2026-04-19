@@ -221,17 +221,14 @@ const slice = createSlice({
       }
       state.animaVaeModel = result.data;
     },
-    animaQwen3EncoderModelSelected: (
-      state,
-      action: PayloadAction<{ key: string; name: string; base: string } | null>
-    ) => {
+    animaQwen3EncoderModelSelected: (state, action: PayloadAction<ParameterT5EncoderModel | null>) => {
       const result = zParamsState.shape.animaQwen3EncoderModel.safeParse(action.payload);
       if (!result.success) {
         return;
       }
       state.animaQwen3EncoderModel = result.data;
     },
-    animaT5EncoderModelSelected: (state, action: PayloadAction<{ key: string; name: string; base: string } | null>) => {
+    animaT5EncoderModelSelected: (state, action: PayloadAction<ParameterT5EncoderModel | null>) => {
       const result = zParamsState.shape.animaT5EncoderModel.safeParse(action.payload);
       if (!result.success) {
         return;
@@ -471,6 +468,9 @@ const slice = createSlice({
       }
     },
     paramsReset: (state) => resetState(state),
+    paramsRecalled: (_state, action: PayloadAction<ParamsState>) => {
+      return action.payload;
+    },
   },
   extraReducers(builder) {
     // Reset params state on logout to prevent user data leakage when switching users
@@ -609,6 +609,7 @@ export const {
   syncedToOptimalDimension,
 
   paramsReset,
+  paramsRecalled,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
   animaT5EncoderModelSelected,

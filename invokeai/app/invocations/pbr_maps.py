@@ -16,7 +16,9 @@ class PBRMapsOutput(BaseInvocationOutput):
     displacement_map: ImageField = OutputField(default=None, description="The generated displacement map")
 
 
-@invocation("pbr_maps", title="PBR Maps", tags=["image", "material"], category="image", version="1.0.0")
+@invocation(
+    "pbr_maps", title="PBR Maps", tags=["image", "material"], category="controlnet_preprocessors", version="1.0.0"
+)
 class PBRMapsInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generate Normal, Displacement and Roughness Map from a given image"""
 

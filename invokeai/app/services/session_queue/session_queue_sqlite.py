@@ -45,10 +45,19 @@ class SqliteSessionQueue(SessionQueueBase):
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
         self._set_in_progress_to_canceled()
-        if self.__invoker.services.configuration.clear_queue_on_startup:
+        config = self.__invoker.services.configuration
+        if config.clear_queue_on_startup:
             clear_result = self.clear(DEFAULT_QUEUE_ID)
             if clear_result.deleted > 0:
                 self.__invoker.services.logger.info(f"Cleared all {clear_result.deleted} queue items")
+            return
+
+        if config.max_queue_history is not None:
+            deleted = self._prune_terminal_to_limit(DEFAULT_QUEUE_ID, config.max_queue_history)
+            if deleted > 0:
+                self.__invoker.services.logger.info(
+                    f"Pruned {deleted} completed/failed/canceled queue items (kept up to {config.max_queue_history})"
+                )
 
     def __init__(self, db: SqliteDatabase) -> None:
         super().__init__()
@@ -67,6 +76,51 @@ class SqliteSessionQueue(SessionQueueBase):
                 WHERE status = 'in_progress';
                 """
             )
+
+    def _prune_terminal_to_limit(self, queue_id: str, keep: int) -> int:
+        """Prune terminal items (completed/failed/canceled) to keep at most N most-recent items."""
+        with self._db.transaction() as cursor:
+            where = """--sql
+                WHERE
+                queue_id = ?
+                AND (
+                    status = 'completed'
+                    OR status = 'failed'
+                    OR status = 'canceled'
+                )
+                """
+            cursor.execute(
+                f"""--sql
+                SELECT COUNT(*)
+                FROM session_queue
+                {where}
+                AND item_id NOT IN (
+                    SELECT item_id
+                    FROM session_queue
+                    {where}
+                    ORDER BY COALESCE(completed_at, updated_at, created_at) DESC, item_id DESC
+                    LIMIT ?
+                );
+                """,
+                (queue_id, queue_id, keep),
+            )
+            count = cursor.fetchone()[0]
+            cursor.execute(
+                f"""--sql
+                DELETE
+                FROM session_queue
+                {where}
+                AND item_id NOT IN (
+                    SELECT item_id
+                    FROM session_queue
+                    {where}
+                    ORDER BY COALESCE(completed_at, updated_at, created_at) DESC, item_id DESC
+                    LIMIT ?
+                );
+                """,
+                (queue_id, queue_id, keep),
+            )
+        return count
 
     def _get_current_queue_size(self, queue_id: str) -> int:
         """Gets the current number of pending queue items"""
@@ -151,7 +205,7 @@ class SqliteSessionQueue(SessionQueueBase):
             priority=priority,
             item_ids=item_ids,
         )
-        self.__invoker.services.events.emit_batch_enqueued(enqueue_result)
+        self.__invoker.services.events.emit_batch_enqueued(enqueue_result, user_id=user_id)
         return enqueue_result
 
     def dequeue(self) -> Optional[SessionQueueItem]:
@@ -765,15 +819,21 @@ class SqliteSessionQueue(SessionQueueBase):
         self,
         queue_id: str,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        user_id: Optional[str] = None,
     ) -> ItemIdsResult:
         with self._db.transaction() as cursor_:
-            query = f"""--sql
+            query = """--sql
                 SELECT item_id
                 FROM session_queue
                 WHERE queue_id = ?
-                ORDER BY created_at {order_dir.value}
                 """
-            query_params = [queue_id]
+            query_params: list[str] = [queue_id]
+
+            if user_id is not None:
+                query += " AND user_id = ?"
+                query_params.append(user_id)
+
+            query += f" ORDER BY created_at {order_dir.value}"
 
             cursor_.execute(query, query_params)
             result = cast(list[sqlite3.Row], cursor_.fetchall())
@@ -783,20 +843,7 @@ class SqliteSessionQueue(SessionQueueBase):
 
     def get_queue_status(self, queue_id: str, user_id: Optional[str] = None) -> SessionQueueStatus:
         with self._db.transaction() as cursor:
-            # Get total counts
-            cursor.execute(
-                """--sql
-                SELECT status, count(*)
-                FROM session_queue
-                WHERE queue_id = ?
-                GROUP BY status
-                """,
-                (queue_id,),
-            )
-            counts_result = cast(list[sqlite3.Row], cursor.fetchall())
-
-            # Get user-specific counts if user_id is provided (using a single query with CASE)
-            user_counts_result = []
+            # When user_id is provided (non-admin), only count that user's items
             if user_id is not None:
                 cursor.execute(
                     """--sql
@@ -807,48 +854,51 @@ class SqliteSessionQueue(SessionQueueBase):
                     """,
                     (queue_id, user_id),
                 )
-                user_counts_result = cast(list[sqlite3.Row], cursor.fetchall())
+            else:
+                cursor.execute(
+                    """--sql
+                    SELECT status, count(*)
+                    FROM session_queue
+                    WHERE queue_id = ?
+                    GROUP BY status
+                    """,
+                    (queue_id,),
+                )
+            counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
         current_item = self.get_current(queue_id=queue_id)
         total = sum(row[1] or 0 for row in counts_result)
         counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
 
-        # Process user-specific counts if available
-        user_pending = None
-        user_in_progress = None
-        if user_id is not None:
-            user_counts: dict[str, int] = {row[0]: row[1] for row in user_counts_result}
-            user_pending = user_counts.get("pending", 0)
-            user_in_progress = user_counts.get("in_progress", 0)
+        # For non-admin users, hide current item details if they don't own it
+        show_current_item = current_item is not None and (user_id is None or current_item.user_id == user_id)
 
         return SessionQueueStatus(
             queue_id=queue_id,
-            item_id=current_item.item_id if current_item else None,
-            session_id=current_item.session_id if current_item else None,
-            batch_id=current_item.batch_id if current_item else None,
+            item_id=current_item.item_id if show_current_item else None,
+            session_id=current_item.session_id if show_current_item else None,
+            batch_id=current_item.batch_id if show_current_item else None,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
             completed=counts.get("completed", 0),
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
             total=total,
-            user_pending=user_pending,
-            user_in_progress=user_in_progress,
         )
 
-    def get_batch_status(self, queue_id: str, batch_id: str) -> BatchStatus:
+    def get_batch_status(self, queue_id: str, batch_id: str, user_id: Optional[str] = None) -> BatchStatus:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
+            query = """--sql
                 SELECT status, count(*), origin, destination
                 FROM session_queue
-                WHERE
-                    queue_id = ?
-                    AND batch_id = ?
-                GROUP BY status
-                """,
-                (queue_id, batch_id),
-            )
+                WHERE queue_id = ? AND batch_id = ?
+                """
+            params: list[str] = [queue_id, batch_id]
+            if user_id is not None:
+                query += " AND user_id = ?"
+                params.append(user_id)
+            query += " GROUP BY status"
+            cursor.execute(query, params)
             result = cast(list[sqlite3.Row], cursor.fetchall())
         total = sum(row[1] or 0 for row in result)
         counts: dict[str, int] = {row[0]: row[1] for row in result}
@@ -868,18 +918,21 @@ class SqliteSessionQueue(SessionQueueBase):
             total=total,
         )
 
-    def get_counts_by_destination(self, queue_id: str, destination: str) -> SessionQueueCountsByDestination:
+    def get_counts_by_destination(
+        self, queue_id: str, destination: str, user_id: Optional[str] = None
+    ) -> SessionQueueCountsByDestination:
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
+            query = """--sql
                 SELECT status, count(*)
                 FROM session_queue
-                WHERE queue_id = ?
-                AND destination = ?
-                GROUP BY status
-                """,
-                (queue_id, destination),
-            )
+                WHERE queue_id = ? AND destination = ?
+                """
+            params: list[str] = [queue_id, destination]
+            if user_id is not None:
+                query += " AND user_id = ?"
+                params.append(user_id)
+            query += " GROUP BY status"
+            cursor.execute(query, params)
             counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
         total = sum(row[1] or 0 for row in counts_result)
