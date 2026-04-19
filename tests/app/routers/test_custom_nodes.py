@@ -474,8 +474,7 @@ class TestUninstallReinstallReloadsSubmodules:
         # the second install won't produce a second marker.
         marker_file = tmp_path / "exec_markers.txt"
         submodule.write_text(
-            f"from pathlib import Path\n"
-            f"Path(r'{marker_file.as_posix()}').open('a').write('exec\\n')\n"
+            f"from pathlib import Path\nPath(r'{marker_file.as_posix()}').open('a').write('exec\\n')\n"
         )
 
         try:
