@@ -102,9 +102,7 @@ class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBo
 
         return ImageCollectionOutput(collection=outputs)
 
-    def invoke_internal(
-        self, context: InvocationContext, services: "InvocationServices"
-    ) -> BaseInvocationOutput:
+    def invoke_internal(self, context: InvocationContext, services: "InvocationServices") -> BaseInvocationOutput:
         """Override default cache behavior so cache hits produce new gallery entries.
 
         The standard invocation cache returns the cached output (with stale image_name
