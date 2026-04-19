@@ -8,11 +8,16 @@ import starlightLlmsText from 'starlight-llms-txt';
 import starlightChangelogs, { makeChangelogsSidebarLinks } from 'starlight-changelogs';
 // import starlightContextualMenu from 'starlight-contextual-menu';
 
+// Deployment target: 'custom' (default, custom domain at invoke.ai) or 'ghpages'
+// (GitHub Pages project URL at invoke-ai.github.io/InvokeAI). Drive site/base from this
+// so the same source can be deployed to either target.
+const deployTarget = process.env.DEPLOY_TARGET ?? 'custom';
+const isGhPages = deployTarget === 'ghpages';
+
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://invoke.ai',
-  // base is only needed if no custom domain is available, or if the site is hosted in a subdirectory
-  // base: '/InvokeAI',
+  site: isGhPages ? 'https://invoke-ai.github.io' : 'https://invoke.ai',
+  base: isGhPages ? '/InvokeAI' : undefined,
   integrations: [
     starlight({
       // Content
@@ -24,7 +29,7 @@ export default defineConfig({
         alt: 'InvokeAI Logo',
         replacesTitle: true,
       },
-      favicon: './src/assets/invoke-icon.svg',
+      favicon: 'favicon.svg',
       editLink: {
         baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
       },

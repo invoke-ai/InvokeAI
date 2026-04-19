@@ -200,8 +200,10 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                 dispatch(
                   animaQwen3EncoderModelSelected({
                     key: qwen3Encoder.key,
+                    hash: qwen3Encoder.hash,
                     name: qwen3Encoder.name,
                     base: qwen3Encoder.base,
+                    type: qwen3Encoder.type,
                   })
                 );
               }
@@ -221,8 +223,10 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                 dispatch(
                   animaT5EncoderModelSelected({
                     key: t5Encoder.key,
+                    hash: t5Encoder.hash,
                     name: t5Encoder.name,
                     base: t5Encoder.base,
+                    type: t5Encoder.type,
                   })
                 );
               }
