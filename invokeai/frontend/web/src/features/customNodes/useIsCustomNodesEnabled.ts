@@ -20,7 +20,7 @@ export const getIsCustomNodesEnabled = (multiuserEnabled: boolean, isAdmin: bool
   return isAdmin ?? false;
 };
 
-export type CustomNodesPermission = {
+type CustomNodesPermission = {
   /** Whether setup status has loaded and a permission decision can be made. */
   isKnown: boolean;
   /** Whether the current user is allowed to access custom node management.
