@@ -141,6 +141,7 @@ nav:
       - Database: 'features/database.md'
       - Gallery: 'features/gallery.md'
       - Hot Keys: 'features/hotkeys.md'
+      - Tiled Upscaling: 'features/upscaling.md'
   - Multi-User Mode:
       - User Guide: 'multiuser/user_guide.md'
       - Administrator Guide: 'multiuser/admin_guide.md'

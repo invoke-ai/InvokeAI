@@ -7,7 +7,7 @@ import type { Invocation, S } from 'services/api/types';
 export const addFLUXLoRAs = (
   state: RootState,
   g: Graph,
-  denoise: Invocation<'flux_denoise'>,
+  denoise: Invocation<'flux_denoise'> | Invocation<'tiled_flux_denoise'>,
   modelLoader: Invocation<'flux_model_loader'>,
   fluxTextEncoder: Invocation<'flux_text_encoder'>
 ): void => {

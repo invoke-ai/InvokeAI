@@ -3075,7 +3075,7 @@
         "missingUpscaleModel": "Missing upscale model",
         "missingTileControlNetModel": "No valid tile ControlNet models installed",
         "incompatibleBaseModel": "Unsupported main model architecture for upscaling",
-        "incompatibleBaseModelDesc": "Upscaling is supported for SD1.5 and SDXL architecture models only. Change the main model to enable upscaling."
+        "incompatibleBaseModelDesc": "Upscaling is supported for SD1.5, SDXL, FLUX, and Z-Image architecture models only. Change the main model to enable upscaling."
     },
     "stylePresets": {
         "active": "Active",
