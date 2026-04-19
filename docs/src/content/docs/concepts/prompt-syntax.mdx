@@ -10,18 +10,18 @@ import { Card, LinkCard, CardGrid } from '@astrojs/starlight/components';
 <CardGrid>
   <LinkCard
     title="Prompting Guide"
-    href="/concepts/prompting-guide"
+    href="../prompting-guide"
     description="Learn how to write effective prompts for InvokeAI."
   />
 
   <LinkCard
     title="Dynamic Prompting"
-    href="/concepts/dynamic-prompting"
+    href="../dynamic-prompting"
     description="Learn how to create many prompt variations from a single template."
   />
 </CardGrid>
 
-InvokeAI supports Compel-style prompt weighting and prompt functions for `SD 1.5` and `SDXL` text conditioning workflows. Recent model families, including `FLUX`, `Z-Image`, `CogView4`, and `Qwen Image`, bypass Compel and do not use the syntax documented on this page. This page documents syntax for those Compel-based workflows only. If you want general advice on writing better prompts, start with [Prompting Guide](/concepts/prompting-guide).
+InvokeAI supports Compel-style prompt weighting and prompt functions for `SD 1.5` and `SDXL` text conditioning workflows. Recent model families, including `FLUX`, `Z-Image`, `CogView4`, and `Qwen Image`, bypass Compel and do not use the syntax documented on this page. This page documents syntax for those Compel-based workflows only. If you want general advice on writing better prompts, start with [Prompting Guide](../prompting-guide).
 
 :::note[Compatibility note]
   If a weighted prompt seems to be ignored, check whether you are using an `SD 1.5` or `SDXL` workflow. Compel syntax on this page does not apply to newer model families such as `FLUX`, `Z-Image`, `CogView4`, and `Qwen Image`.
@@ -134,5 +134,5 @@ Use unescaped parentheses only when you mean grouping or weighting.
 
 ## Related pages
 
-- For practical prompt-writing advice, read [Prompting Guide](/concepts/prompting-guide).
-- For prompt expansion and permutations, read [Dynamic Prompting](/concepts/dynamic-prompting).
+- For practical prompt-writing advice, read [Prompting Guide](../prompting-guide).
+- For prompt expansion and permutations, read [Dynamic Prompting](../dynamic-prompting).

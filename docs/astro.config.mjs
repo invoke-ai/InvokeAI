@@ -29,7 +29,7 @@ export default defineConfig({
         alt: 'InvokeAI Logo',
         replacesTitle: true,
       },
-      favicon: '/favicon.svg',
+      favicon: 'favicon.svg',
       editLink: {
         baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
       },
@@ -122,17 +122,10 @@ export default defineConfig({
         PageFrame: './src/layouts/PageFrameExtended.astro',
       },
       plugins: [
-        // The links validator is skipped for the ghpages target because content uses
-        // root-absolute links (e.g. /concepts/...) that don't include the /InvokeAI base.
-        // Production (custom domain) still enforces link validation.
-        ...(isGhPages
-          ? []
-          : [
-              starlightLinksValidator({
-                errorOnRelativeLinks: false,
-                errorOnLocalLinks: false,
-              }),
-            ]),
+        starlightLinksValidator({
+          errorOnRelativeLinks: false,
+          errorOnLocalLinks: false,
+        }),
         starlightLlmsText(),
         starlightChangelogs(),
         // starlightContextualMenu({
