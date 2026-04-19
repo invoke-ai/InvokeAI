@@ -1,17 +1,15 @@
-from typing import Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
-from pydantic import Field
-
-from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
-    FieldKind,
     ImageField,
     InputField,
     MetadataField,
     WithBoard,
     WithMetadata,
 )
+
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import ImageCollectionOutput
 from invokeai.app.services.external_generation.external_generation_common import (
@@ -23,20 +21,14 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalGenerationMode
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 
+if TYPE_CHECKING:
+    from invokeai.app.services.invocation_services import InvocationServices
+
 
 class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generate images using an external provider."""
 
     provider_id: ClassVar[str | None] = None
-
-    # External API calls are non-deterministic and incur usage costs — caching
-    # would return stale image references on repeat invokes instead of producing
-    # new images, leaving the gallery unchanged.
-    use_cache: bool = Field(
-        default=False,
-        description="Whether or not to use the cache",
-        json_schema_extra={"field_kind": FieldKind.NodeAttribute},
-    )
 
     model: ModelIdentifierField = InputField(
         description=FieldDescriptions.main_model,
@@ -109,6 +101,39 @@ class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBo
             image_dto = context.images.save(image=generated.image, metadata=metadata)
             outputs.append(ImageField(image_name=image_dto.image_name))
 
+        return ImageCollectionOutput(collection=outputs)
+
+    def invoke_internal(
+        self, context: InvocationContext, services: "InvocationServices"
+    ) -> BaseInvocationOutput:
+        """Override default cache behavior so cache hits produce new gallery entries.
+
+        The standard invocation cache returns the cached output (with stale image_name
+        references) without re-running invoke(), which means no new images are saved
+        to the gallery on repeat invokes. For external API nodes — where the API call
+        is the expensive part — we want cache hits to skip the API call but still
+        produce fresh gallery entries by copying the cached images.
+        """
+        if services.configuration.node_cache_size == 0 or not self.use_cache:
+            return super().invoke_internal(context, services)
+
+        key = services.invocation_cache.create_key(self)
+        cached_value = services.invocation_cache.get(key)
+        if cached_value is None:
+            services.logger.debug(f'Invocation cache miss for type "{self.get_type()}": {self.id}')
+            output = self.invoke(context)
+            services.invocation_cache.save(key, output)
+            return output
+
+        services.logger.debug(f'Invocation cache hit for type "{self.get_type()}": {self.id}, duplicating images')
+        if not isinstance(cached_value, ImageCollectionOutput):
+            return cached_value
+
+        outputs: list[ImageField] = []
+        for image_field in cached_value.collection:
+            cached_image = context.images.get_pil(image_field.image_name, mode="RGB")
+            image_dto = context.images.save(image=cached_image)
+            outputs.append(ImageField(image_name=image_dto.image_name))
         return ImageCollectionOutput(collection=outputs)
 
     def _build_request_metadata(self) -> dict[str, Any] | None:
