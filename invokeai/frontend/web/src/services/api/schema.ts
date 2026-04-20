@@ -25565,8 +25565,17 @@ export type components = {
             type: "save_image";
         };
         /**
-         * Save Image To File
-         * @description Saves an image to the gallery and additionally exports a copy to the filesystem with a custom filename (prefix + UUID + suffix).
+         * Save Image (Gallery + File Export)
+         * @description Saves an image to the gallery (like the standard Save Image node) AND additionally exports a copy
+         *     to the filesystem with a custom filename.
+         *
+         *     Filename pattern: {prefix}{uuid}{suffix}.{file_format}
+         *     - The UUID is the same UUID used for the gallery entry, so the exported file can be matched to the gallery item.
+         *     - The gallery entry itself always uses the plain UUID (prefix/suffix apply only to the exported file on disk).
+         *     - Board and Metadata inputs behave exactly like the standard Save Image node.
+         *     - The export target is restricted to (subfolders of) the InvokeAI outputs folder — absolute paths are rejected.
+         *
+         *     Example: prefix="hero_", suffix="_final", file_format="png" → "hero_<uuid>_final.png"
          */
         SaveImageToFileInvocation: {
             /**
@@ -25597,38 +25606,38 @@ export type components = {
              */
             use_cache?: boolean;
             /**
-             * @description The image to export
+             * @description The image to save and export
              * @default null
              */
             image?: components["schemas"]["ImageField"] | null;
             /**
              * Output Directory
-             * @description Target directory. Empty or relative paths resolve under <outputs>/exports/. Absolute paths are used as-is.
+             * @description Target subdirectory (relative to the configured InvokeAI outputs folder) for the exported file. Leave empty to use the outputs folder directly. Example: 'my-exports' → <outputs>/my-exports/. Nested paths like 'exports/2026' are allowed. Absolute paths and path traversal ('..') are not allowed for security reasons. The directory is created automatically if it doesn't exist.
              * @default
              */
             output_directory?: string;
             /**
              * Prefix
-             * @description String prepended to the UUID
+             * @description Text prepended to the UUID in the exported filename. Example: 'portrait_' → 'portrait_<uuid>.png'
              * @default
              */
             prefix?: string;
             /**
              * Suffix
-             * @description String appended to the UUID (before extension)
+             * @description Text appended to the UUID (before the extension). Example: '_v2' → '<uuid>_v2.png'
              * @default
              */
             suffix?: string;
             /**
              * File Format
-             * @description File format to save as
+             * @description File format for the exported file. PNG is lossless; JPG/WEBP are lossy and respect 'quality'.
              * @default png
              * @enum {string}
              */
             file_format?: "png" | "jpg" | "webp";
             /**
              * Quality
-             * @description Quality for JPG/WEBP (1-100). Ignored for PNG.
+             * @description Compression quality for JPG and WEBP (1-100, higher = better quality, larger file). Ignored for PNG.
              * @default 95
              */
             quality?: number;
