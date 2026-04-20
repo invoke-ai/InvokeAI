@@ -1,10 +1,11 @@
-import { ExternalLink, Flex, Text } from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, isNil, round } from 'es-toolkit/compat';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
+import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
   heightChanged,
@@ -27,7 +28,7 @@ import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
-import { toast } from 'features/toast/toast';
+import { toast, toastApi } from 'features/toast/toast';
 import { t } from 'i18next';
 import { LRUCache } from 'lru-cache';
 import { Trans } from 'react-i18next';
@@ -159,6 +160,10 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         error_traceback,
       };
       upsertExecutionState(nes.nodeId, nes);
+    }
+    // Clear canvas workflow integration processing state on error
+    if (data.origin === 'canvas_workflow_integration') {
+      dispatch(canvasWorkflowIntegrationProcessingCompleted());
     }
   });
 
@@ -406,6 +411,25 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         draft.error_traceback = error_traceback;
       })
     );
+
+    // Optimistically update the listAllQueueItems cache for this destination so the canvas
+    // staging area immediately reflects status changes without waiting for a tag-based refetch
+    if (destination) {
+      dispatch(
+        queueApi.util.updateQueryData('listAllQueueItems', { destination }, (draft) => {
+          const item = draft.find((i) => i.item_id === item_id);
+          if (item) {
+            item.status = status;
+            item.started_at = started_at;
+            item.updated_at = updated_at;
+            item.completed_at = completed_at;
+            item.error_type = error_type;
+            item.error_message = error_message;
+            item.error_traceback = error_traceback;
+          }
+        })
+      );
+    }
 
     // Invalidate caches for things we cannot easily update
     // Invalidate SessionQueueStatus to refetch with user-specific counts
@@ -831,19 +855,60 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug({ data }, 'Bulk gallery download ready');
     const { bulk_download_item_name } = data;
 
-    // TODO(psyche): This URL may break in in some environments (e.g. Nvidia workbench) but we need to test it first
+    // Dismiss the "preparing" toast (which uses a prefixed id to avoid the
+    // race condition where this socket event arrives before the Redux
+    // middleware processes the POST response).
+    toastApi.close(`preparing:${bulk_download_item_name}`);
+
+    // The GET endpoint requires authentication, so we use fetch() with the
+    // Authorization header rather than a plain <a download> link (which cannot
+    // carry headers).  After fetching the blob, we create a temporary object
+    // URL and trigger the browser's save dialog programmatically.
     const url = `/api/v1/images/download/${bulk_download_item_name}`;
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const handleDownload = () => {
+      fetch(url, { headers })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`Download failed: ${res.status}`);
+          }
+          return res.blob();
+        })
+        .then((blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = bulk_download_item_name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          // Delay revocation — the browser's save dialog is asynchronous,
+          // and revoking immediately would invalidate the URL before the
+          // download completes.
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+        })
+        .catch((err) => {
+          log.error({ err }, 'Bulk download fetch failed');
+          toast({
+            id: `error:${bulk_download_item_name}`,
+            title: t('gallery.bulkDownloadFailed'),
+            status: 'error',
+            description: String(err),
+          });
+        });
+    };
 
     toast({
       id: bulk_download_item_name,
-      title: t('gallery.bulkDownloadReady', 'Download ready'),
+      title: t('gallery.bulkDownloadReady'),
       status: 'success',
       description: (
-        <ExternalLink
-          label={t('gallery.clickToDownload', 'Click here to download')}
-          href={url}
-          download={bulk_download_item_name}
-        />
+        // eslint-disable-next-line react/jsx-no-bind -- not a component render; no re-render cost
+        <Text as="button" onClick={handleDownload} textDecoration="underline" cursor="pointer">
+          {t('gallery.clickToDownload')}
+        </Text>
       ),
       duration: null,
     });
@@ -853,6 +918,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.error({ data }, 'Bulk gallery download error');
 
     const { bulk_download_item_name, error } = data;
+
+    // Dismiss the "preparing" toast
+    toastApi.close(`preparing:${bulk_download_item_name}`);
 
     toast({
       id: bulk_download_item_name,
