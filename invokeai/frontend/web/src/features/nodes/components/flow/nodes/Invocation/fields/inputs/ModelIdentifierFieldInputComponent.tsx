@@ -36,7 +36,7 @@ const ModelIdentifierFieldInputComponent = (props: Props) => {
       return EMPTY_ARRAY;
     }
 
-    if (!fieldTemplate.ui_model_base && !fieldTemplate.ui_model_type) {
+    if (!fieldTemplate.ui_model_base && !fieldTemplate.ui_model_type && !fieldTemplate.ui_model_provider_id) {
       return modelConfigsAdapterSelectors.selectAll(data);
     }
 
@@ -56,6 +56,12 @@ const ModelIdentifierFieldInputComponent = (props: Props) => {
         return false;
       }
       if (fieldTemplate.ui_model_format && !fieldTemplate.ui_model_format.includes(config.format)) {
+        return false;
+      }
+      if (
+        fieldTemplate.ui_model_provider_id &&
+        (!('provider_id' in config) || !fieldTemplate.ui_model_provider_id.includes(config.provider_id as string))
+      ) {
         return false;
       }
       return true;
