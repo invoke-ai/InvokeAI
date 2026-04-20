@@ -5,13 +5,13 @@ import { MODEL_VARIANT_TO_LONG_NAME } from 'features/modelManagerV2/models';
 import { useCallback, useMemo } from 'react';
 import type { Control } from 'react-hook-form';
 import { useController } from 'react-hook-form';
-import type { UpdateModelArg } from 'services/api/endpoints/models';
+import type { UpdateModelBody } from 'services/api/types';
 import { objectEntries } from 'tsafe';
 
 const options: ComboboxOption[] = objectEntries(MODEL_VARIANT_TO_LONG_NAME).map(([value, label]) => ({ label, value }));
 
 type Props = {
-  control: Control<UpdateModelArg['body']>;
+  control: Control<UpdateModelBody>;
 };
 
 const ModelVariantSelect = ({ control }: Props) => {
