@@ -1,0 +1,10 @@
+---
+import { LinkCard } from '@astrojs/starlight/components';
+import { withBase } from '../base-path';
+---
+
+<LinkCard
+  title="System Requirements"
+  description="Please check the system requirements page to make sure your hardware is capable of running the desired models."
+  href={withBase('/start-here/system-requirements/', import.meta.env.BASE_URL)}
+/>
