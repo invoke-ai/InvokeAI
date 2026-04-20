@@ -4,7 +4,9 @@ import { EMPTY_ARRAY } from 'app/store/constants';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
+  selectModelSupportsDimensions,
   selectModelSupportsOptimizedDenoising,
+  selectModelSupportsSeed,
   selectShouldRandomizeSeed,
 } from 'features/controlLayers/store/paramsSlice';
 import { selectBbox, selectScaleMethod } from 'features/controlLayers/store/selectors';
@@ -19,30 +21,33 @@ import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const selectBadges = createMemoizedSelector([selectBbox, selectShouldRandomizeSeed], (bbox, shouldRandomizeSeed) => {
-  const badges: string[] = [];
+const selectBadges = createMemoizedSelector(
+  [selectBbox, selectShouldRandomizeSeed, selectModelSupportsSeed],
+  (bbox, shouldRandomizeSeed, modelSupportsSeed) => {
+    const badges: string[] = [];
 
-  const { aspectRatio, rect } = bbox;
-  const { width, height } = rect;
+    const { aspectRatio, rect } = bbox;
+    const { width, height } = rect;
 
-  badges.push(`${width}×${height}`);
+    badges.push(`${width}×${height}`);
 
-  badges.push(aspectRatio.id);
+    badges.push(aspectRatio.id);
 
-  if (aspectRatio.isLocked) {
-    badges.push('locked');
+    if (aspectRatio.isLocked) {
+      badges.push('locked');
+    }
+
+    if (modelSupportsSeed && !shouldRandomizeSeed) {
+      badges.push('Manual Seed');
+    }
+
+    if (badges.length === 0) {
+      return EMPTY_ARRAY;
+    }
+
+    return badges;
   }
-
-  if (!shouldRandomizeSeed) {
-    badges.push('Manual Seed');
-  }
-
-  if (badges.length === 0) {
-    return EMPTY_ARRAY;
-  }
-
-  return badges;
-});
+);
 
 const scalingLabelProps: FormLabelProps = {
   minW: '4.5rem',
@@ -60,7 +65,9 @@ export const CanvasTabImageSettingsAccordion = memo(() => {
     id: 'image-settings-advanced',
     defaultIsOpen: false,
   });
+  const modelSupportsDimensions = useAppSelector(selectModelSupportsDimensions);
   const modelSupportsOptimizedDenoising = useAppSelector(selectModelSupportsOptimizedDenoising);
+  const modelSupportsSeed = useAppSelector(selectModelSupportsSeed);
 
   return (
     <StandaloneAccordion
@@ -70,8 +77,8 @@ export const CanvasTabImageSettingsAccordion = memo(() => {
       onToggle={onToggleAccordion}
     >
       <Flex px={4} pt={4} pb={0} w="full" h="full" flexDir="column" data-testid="image-settings-accordion">
-        <BboxSettings />
-        <ParamSeed pt={3} pb={0} />
+        {modelSupportsDimensions && <BboxSettings />}
+        {modelSupportsSeed && <ParamSeed pt={3} pb={0} />}
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} pb={4} flexDir="column">
             {modelSupportsOptimizedDenoising && <ParamOptimizedDenoisingToggle />}

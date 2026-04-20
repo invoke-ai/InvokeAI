@@ -723,6 +723,50 @@
       "required": false,
       "type": "<class 'bool'>",
       "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "API key for Gemini image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_GEMINI_API_KEY",
+      "literal_values": [],
+      "name": "external_gemini_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "API key for OpenAI image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_OPENAI_API_KEY",
+      "literal_values": [],
+      "name": "external_openai_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for Gemini image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_GEMINI_BASE_URL",
+      "literal_values": [],
+      "name": "external_gemini_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for OpenAI image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_OPENAI_BASE_URL",
+      "literal_values": [],
+      "name": "external_openai_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
     }
   ]
 }
