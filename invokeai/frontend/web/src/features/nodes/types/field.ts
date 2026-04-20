@@ -75,6 +75,7 @@ const zFieldInputTemplateBase = zFieldTemplateBase.extend({
   ui_model_type: z.array(zModelType).nullish(),
   ui_model_variant: z.array(zAnyModelVariant).nullish(),
   ui_model_format: z.array(zModelFormat).nullish(),
+  ui_model_provider_id: z.array(z.string()).nullish(),
 });
 const zFieldOutputTemplateBase = zFieldTemplateBase.extend({
   fieldKind: z.literal('output'),
