@@ -47,7 +47,7 @@ DOWNSAMPLING_FUNCTIONS = Literal["nearest", "bilinear", "bicubic", "area", "near
     "flux_redux",
     title="FLUX Redux",
     tags=["ip_adapter", "control"],
-    category="ip_adapter",
+    category="conditioning",
     version="2.1.0",
     classification=Classification.Beta,
 )

@@ -9,7 +9,7 @@ from invokeai.backend.image_util.lineart_anime import LineartAnimeEdgeDetector, 
     "lineart_anime_edge_detection",
     title="Lineart Anime Edge Detection",
     tags=["controlnet", "lineart"],
-    category="controlnet",
+    category="controlnet_preprocessors",
     version="1.0.0",
 )
 class LineartAnimeEdgeDetectionInvocation(BaseInvocation, WithMetadata, WithBoard):

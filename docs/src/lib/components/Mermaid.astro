@@ -1,0 +1,58 @@
+---
+type Props = {
+  title?: string;
+};
+
+const { title = '' } = Astro.props as Props;
+---
+
+<script>
+  import mermaid from 'mermaid';
+  mermaid.initialize({ startOnLoad: false });
+
+  function extractAndCleanMermaidCode() {
+    const mermaidElements = document.querySelectorAll('figure.expandable-diagram');
+    mermaidElements.forEach((element) => {
+      // Find the code element within the complex structure
+      const codeElement = element.querySelector('pre[data-language="mermaid"] code');
+      if (!codeElement) return;
+
+      // Extract the text content from each line div
+      const codeLines = codeElement.querySelectorAll('.ec-line .code');
+      let cleanedCode = Array.from(codeLines)
+        .map((line) => line.textContent.trim())
+        .join('\n');
+
+      // Remove any leading/trailing whitespace
+      cleanedCode = cleanedCode.trim();
+
+      // Create a new pre element with just the cleaned code
+      const newPreElement = document.createElement('pre');
+      newPreElement.className = 'mermaid not-prose';
+      newPreElement.textContent = cleanedCode;
+
+      // Find the diagram content container
+      const diagramContentContainer = element.querySelector('.diagram-content');
+
+      // Replace existing diagram content child with the new pre element
+      diagramContentContainer?.replaceChild(newPreElement, diagramContentContainer.firstChild);
+    });
+  }
+
+  // Wait for the DOM to be fully loaded
+  document.addEventListener('DOMContentLoaded', async () => {
+    extractAndCleanMermaidCode();
+    mermaid.initialize({ startOnLoad: true });
+  });
+</script>
+
+<figure class="expandable-diagram">
+  <figcaption>{title}</figcaption>
+
+  <div class="diagram-content">Loading diagram...</div>
+
+  <details>
+    <summary>Source</summary>
+    <slot />
+  </details>
+</figure>

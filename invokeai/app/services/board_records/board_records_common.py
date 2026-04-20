@@ -9,6 +9,17 @@ from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 
+class BoardVisibility(str, Enum, metaclass=MetaEnum):
+    """The visibility options for a board."""
+
+    Private = "private"
+    """Only the board owner (and admins) can see and modify this board."""
+    Shared = "shared"
+    """All users can view this board, but only the owner (and admins) can modify it."""
+    Public = "public"
+    """All users can view this board; only the owner (and admins) can modify its structure."""
+
+
 class BoardRecord(BaseModelExcludeNull):
     """Deserialized board record."""
 
@@ -28,6 +39,10 @@ class BoardRecord(BaseModelExcludeNull):
     """The name of the cover image of the board."""
     archived: bool = Field(description="Whether or not the board is archived.")
     """Whether or not the board is archived."""
+    board_visibility: BoardVisibility = Field(
+        default=BoardVisibility.Private, description="The visibility of the board."
+    )
+    """The visibility of the board (private, shared, or public)."""
 
 
 def deserialize_board_record(board_dict: dict) -> BoardRecord:
@@ -44,6 +59,11 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
     updated_at = board_dict.get("updated_at", get_iso_timestamp())
     deleted_at = board_dict.get("deleted_at", get_iso_timestamp())
     archived = board_dict.get("archived", False)
+    board_visibility_raw = board_dict.get("board_visibility", BoardVisibility.Private.value)
+    try:
+        board_visibility = BoardVisibility(board_visibility_raw)
+    except ValueError:
+        board_visibility = BoardVisibility.Private
 
     return BoardRecord(
         board_id=board_id,
@@ -54,6 +74,7 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
         updated_at=updated_at,
         deleted_at=deleted_at,
         archived=archived,
+        board_visibility=board_visibility,
     )
 
 
@@ -61,6 +82,7 @@ class BoardChanges(BaseModel, extra="forbid"):
     board_name: Optional[str] = Field(default=None, description="The board's new name.", max_length=300)
     cover_image_name: Optional[str] = Field(default=None, description="The name of the board's new cover image.")
     archived: Optional[bool] = Field(default=None, description="Whether or not the board is archived")
+    board_visibility: Optional[BoardVisibility] = Field(default=None, description="The visibility of the board.")
 
 
 class BoardRecordOrderBy(str, Enum, metaclass=MetaEnum):

@@ -31,6 +31,10 @@ from invokeai.backend.model_manager.taxonomy import (
     ZImageVariantType,
 )
 from invokeai.backend.model_manager.util.model_util import lora_token_vector_length
+from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
+    has_cosmos_dit_kohya_keys,
+    has_cosmos_dit_peft_keys,
+)
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
 
 
@@ -637,6 +641,13 @@ class LoRA_LyCORIS_Config_Base(LoRA_Config_Base):
             return BaseModelType.Flux
 
         state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        # Rule out Anima LoRAs — their lora_te_ keys have shapes that
+        # lora_token_vector_length() misidentifies as SD2/SDXL.
+        if has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys):
+            raise NotAMatchError("model looks like an Anima LoRA, not a Stable Diffusion LoRA")
+
         # If we've gotten here, we assume that the model is a Stable Diffusion model
         token_vector_length = lora_token_vector_length(state_dict)
         if token_vector_length == 768:
@@ -711,6 +722,8 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             state_dict,
             {
                 "diffusion_model.layers.",  # Z-Image S3-DiT layer pattern
+                "transformer.layers.",  # OneTrainer/diffusers prefix variant
+                "base_model.model.transformer.layers.",  # PEFT-wrapped variant
             },
         )
 
@@ -747,6 +760,8 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             state_dict,
             {
                 "diffusion_model.layers.",  # Z-Image S3-DiT layer pattern
+                "transformer.layers.",  # OneTrainer/diffusers prefix variant
+                "base_model.model.transformer.layers.",  # PEFT-wrapped variant
             },
         )
 
@@ -755,6 +770,142 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
             return BaseModelType.ZImage
 
         raise NotAMatchError("model does not look like a Z-Image LoRA")
+
+
+class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Qwen Image Edit LoRA models in LyCORIS format."""
+
+    base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Qwen Image Edit LoRAs have keys like transformer_blocks.X.attn.to_k.lora_down.weight."""
+        state_dict = mod.load_state_dict()
+
+        has_qwen_ie_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "transformer_blocks.",
+                "transformer.transformer_blocks.",
+                "lora_unet_transformer_blocks_",  # Kohya format
+            },
+        )
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+                "dora_scale",
+                "lokr_w1",
+                "lokr_w2",  # LoKR format
+            },
+        )
+        # Must NOT have diffusion_model.layers (Z-Image) or Flux-style keys.
+        # Flux LoRAs can have transformer.single_transformer_blocks or transformer.transformer_blocks
+        # (with the "transformer." prefix and "single_" variant) which would falsely match our check.
+        # Flux Kohya LoRAs use lora_unet_double_blocks or lora_unet_single_blocks.
+        has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        has_flux_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "double_blocks.",
+                "single_blocks.",
+                "single_transformer_blocks.",
+                "transformer.single_transformer_blocks.",
+                "lora_unet_double_blocks_",
+                "lora_unet_single_blocks_",
+                "lora_unet_single_transformer_blocks_",
+            },
+        )
+
+        if has_qwen_ie_keys and has_lora_suffix and not has_z_image_keys and not has_flux_keys:
+            return
+
+        raise NotAMatchError("model does not match Qwen Image LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        state_dict = mod.load_state_dict()
+        has_qwen_ie_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {"transformer_blocks.", "transformer.transformer_blocks.", "lora_unet_transformer_blocks_"},
+        )
+        has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
+        has_flux_keys = state_dict_has_any_keys_starting_with(
+            state_dict,
+            {
+                "double_blocks.",
+                "single_blocks.",
+                "single_transformer_blocks.",
+                "transformer.single_transformer_blocks.",
+                "lora_unet_double_blocks_",
+                "lora_unet_single_blocks_",
+                "lora_unet_single_transformer_blocks_",
+            },
+        )
+
+        if has_qwen_ie_keys and not has_z_image_keys and not has_flux_keys:
+            return BaseModelType.QwenImage
+        raise NotAMatchError("model does not look like a Qwen Image Edit LoRA")
+
+
+class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for Anima LoRA models in LyCORIS format."""
+
+    base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        """Anima LoRAs use Kohya-style keys targeting Cosmos DiT blocks.
+
+        Anima LoRAs have keys like:
+        - lora_unet_blocks_0_cross_attn_k_proj.lora_down.weight (Kohya format)
+        - diffusion_model.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
+        - transformer.blocks.0.cross_attn.k_proj.lora_A.weight (diffusers PEFT format)
+
+        Detection requires Cosmos DiT-specific subcomponent names (cross_attn,
+        self_attn, mlp, adaln_modulation) to avoid false-positives on other
+        architectures that also use ``blocks`` in their paths.
+        """
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        has_cosmos_keys = has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys)
+
+        # Also check for LoRA/LoKR weight suffixes
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+                "dora_scale",
+                ".lokr_w1",
+                ".lokr_w2",
+            },
+        )
+
+        if has_cosmos_keys and has_lora_suffix:
+            return
+
+        raise NotAMatchError("model does not match Anima LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        """Anima LoRAs target Cosmos DiT blocks (blocks.X.cross_attn, blocks.X.self_attn, etc.).
+
+        Uses Cosmos DiT-specific subcomponent names to avoid false-positives.
+        """
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        if has_cosmos_dit_kohya_keys(str_keys) or has_cosmos_dit_peft_keys(str_keys):
+            return BaseModelType.Anima
+
+        raise NotAMatchError("model does not look like an Anima LoRA")
 
 
 class ControlAdapter_Config_Base(ABC, BaseModel):
