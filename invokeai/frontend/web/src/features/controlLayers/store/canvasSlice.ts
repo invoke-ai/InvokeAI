@@ -7,7 +7,7 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { merge } from 'es-toolkit/compat';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
-import { modelChanged } from 'features/controlLayers/store/paramsSlice';
+import { aspectRatioIdChanged, modelChanged, resolutionPresetSelected } from 'features/controlLayers/store/paramsSlice';
 import {
   selectAllEntities,
   selectAllEntitiesOfType,
@@ -31,6 +31,7 @@ import type {
   RgbColor,
   SimpleAdjustmentsConfig,
 } from 'features/controlLayers/store/types';
+import { isAspectRatioID } from 'features/controlLayers/store/types';
 import {
   calculateNewSize,
   getScaledBoundingBoxDimensions,
@@ -1288,21 +1289,31 @@ const slice = createSlice({
       state.bbox.aspectRatio.isLocked = !state.bbox.aspectRatio.isLocked;
       syncScaledSize(state);
     },
-    bboxAspectRatioIdChanged: (state, action: PayloadAction<{ id: AspectRatioID }>) => {
-      const { id } = action.payload;
+    bboxAspectRatioIdChanged: (
+      state,
+      action: PayloadAction<{ id: AspectRatioID; fixedSize?: { width: number; height: number } }>
+    ) => {
+      const { id, fixedSize } = action.payload;
       state.bbox.aspectRatio.id = id;
       if (id === 'Free') {
         state.bbox.aspectRatio.isLocked = false;
       } else {
         state.bbox.aspectRatio.isLocked = true;
-        state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
-        const { width, height } = calculateNewSize(
-          state.bbox.aspectRatio.value,
-          state.bbox.rect.width * state.bbox.rect.height,
-          state.bbox.modelBase
-        );
-        state.bbox.rect.width = width;
-        state.bbox.rect.height = height;
+        if (fixedSize) {
+          // External models provide fixed dimensions for each aspect ratio
+          state.bbox.aspectRatio.value = fixedSize.width / fixedSize.height;
+          state.bbox.rect.width = fixedSize.width;
+          state.bbox.rect.height = fixedSize.height;
+        } else {
+          state.bbox.aspectRatio.value = ASPECT_RATIO_MAP[id].ratio;
+          const { width, height } = calculateNewSize(
+            state.bbox.aspectRatio.value,
+            state.bbox.rect.width * state.bbox.rect.height,
+            state.bbox.modelBase
+          );
+          state.bbox.rect.width = width;
+          state.bbox.rect.height = height;
+        }
       }
 
       syncScaledSize(state);
@@ -1820,6 +1831,29 @@ const slice = createSlice({
         state.bbox.modelBase = base;
         syncScaledSize(state);
       }
+    });
+    // Sync bbox when external model resolution preset is selected (aspect_ratio_sizes)
+    builder.addCase(aspectRatioIdChanged, (state, action) => {
+      const { id, fixedSize } = action.payload;
+      // Only sync when fixedSize is provided (external models with aspect_ratio_sizes)
+      if (fixedSize) {
+        state.bbox.rect.width = fixedSize.width;
+        state.bbox.rect.height = fixedSize.height;
+        state.bbox.aspectRatio.value = fixedSize.width / fixedSize.height;
+        state.bbox.aspectRatio.id = id;
+        state.bbox.aspectRatio.isLocked = true;
+        syncScaledSize(state);
+      }
+    });
+    // Sync bbox when external model resolution preset is selected (resolution_presets)
+    builder.addCase(resolutionPresetSelected, (state, action) => {
+      const { width, height, aspectRatio } = action.payload;
+      state.bbox.rect.width = width;
+      state.bbox.rect.height = height;
+      state.bbox.aspectRatio.value = width / height;
+      state.bbox.aspectRatio.id = isAspectRatioID(aspectRatio) ? aspectRatio : 'Free';
+      state.bbox.aspectRatio.isLocked = true;
+      syncScaledSize(state);
     });
   },
 });
