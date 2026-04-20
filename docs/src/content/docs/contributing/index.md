@@ -10,13 +10,13 @@ We welcome contributions, whether features, bug fixes, code cleanup, testing, co
 
 ## Development
 
-If you’d like to help with development, please see our [development guide](contribution_guides/development.md).
+If you’d like to help with development, please see our [development guide](/development/).
 
-**New Contributors:** If you’re unfamiliar with contributing to open source projects, take a look at our [new contributor guide](contribution_guides/newContributorChecklist.md).
+**New Contributors:** If you’re unfamiliar with contributing to open source projects, take a look at our [new contributor guide](/contributing/new-contributor-guide/).
 
 ## Nodes
 
-If you’d like to add a Node, please see our [nodes contribution guide](../nodes/contributingNodes.md).
+If you’d like to add a Node, please see our [nodes contribution guide](/development/guides/creating-nodes/).
 
 ## Support and Triaging
 
@@ -42,7 +42,7 @@ This project is a combined effort of dedicated people from across the world. [C
 
 ## Code of Conduct
 
-The InvokeAI community is a welcoming place, and we want your help in maintaining that. Please review our [Code of Conduct](../CODE_OF_CONDUCT.md) to learn more - it's essential to maintaining a respectful and inclusive environment.
+The InvokeAI community is a welcoming place, and we want your help in maintaining that. Please review our [Code of Conduct](/contributing/code-of-conduct/) to learn more - it's essential to maintaining a respectful and inclusive environment.
 
 By making a contribution to this project, you certify that:
 

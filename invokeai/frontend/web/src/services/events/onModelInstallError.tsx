@@ -74,7 +74,7 @@ export const buildOnModelInstallError = (getState: AppGetState, dispatch: AppDis
               {t('modelManager.urlUnauthorizedErrorMessage')}
               <ExternalLink
                 label={t('modelManager.urlUnauthorizedErrorMessage2')}
-                href="https://invoke-ai.github.io/InvokeAI/configuration/#model-marketplace-api-keys"
+                href="https://invoke.ai/configuration/invokeai-yaml/#model-marketplace-api-keys"
               />
             </Text>
           ),
