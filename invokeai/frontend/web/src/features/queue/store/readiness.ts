@@ -41,7 +41,6 @@ import i18n from 'i18next';
 import { atom, computed } from 'nanostores';
 import { useEffect } from 'react';
 import { selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
-import type { MainModelConfig } from 'services/api/types';
 import type { MainOrExternalModelConfig } from 'services/api/types';
 import { isExternalApiModelConfig } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
