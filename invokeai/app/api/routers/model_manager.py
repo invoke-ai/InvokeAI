@@ -30,6 +30,7 @@ from invokeai.app.services.model_records import (
 )
 from invokeai.app.services.orphaned_models import OrphanedModelInfo
 from invokeai.app.util.suppress_output import SuppressOutput
+from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SD1_Config,
@@ -75,8 +76,36 @@ class CacheType(str, Enum):
 def add_cover_image_to_model_config(config: AnyModelConfig, dependencies: Type[ApiDependencies]) -> AnyModelConfig:
     """Add a cover image URL to a model configuration."""
     cover_image = dependencies.invoker.services.model_images.get_url(config.key)
-    config.cover_image = cover_image
-    return config
+    return config.model_copy(update={"cover_image": cover_image})
+
+
+def apply_external_starter_model_overrides(config: AnyModelConfig) -> AnyModelConfig:
+    """Overlay starter-model metadata onto installed external model configs."""
+    if not isinstance(config, ExternalApiModelConfig):
+        return config
+
+    starter_match = next((starter for starter in STARTER_MODELS if starter.source == config.source), None)
+    if starter_match is None:
+        return config
+
+    model_updates: dict[str, object] = {}
+    if starter_match.capabilities is not None:
+        model_updates["capabilities"] = starter_match.capabilities
+    if starter_match.default_settings is not None:
+        model_updates["default_settings"] = starter_match.default_settings
+    if starter_match.panel_schema is not None:
+        model_updates["panel_schema"] = starter_match.panel_schema
+
+    if not model_updates:
+        return config
+
+    return config.model_copy(update=model_updates)
+
+
+def prepare_model_config_for_response(config: AnyModelConfig, dependencies: Type[ApiDependencies]) -> AnyModelConfig:
+    """Apply API-only model config overlays before returning a response."""
+    config = apply_external_starter_model_overrides(config)
+    return add_cover_image_to_model_config(config, dependencies)
 
 
 ##############################################################################
@@ -145,8 +174,8 @@ async def list_model_records(
         found_models.extend(
             record_store.search_by_attr(model_type=model_type, model_name=model_name, model_format=model_format)
         )
-    for model in found_models:
-        model = add_cover_image_to_model_config(model, ApiDependencies)
+    for index, model in enumerate(found_models):
+        found_models[index] = prepare_model_config_for_response(model, ApiDependencies)
     return ModelsList(models=found_models)
 
 
@@ -166,6 +195,8 @@ async def list_missing_models() -> ModelsList:
 
     missing_models: list[AnyModelConfig] = []
     for model_config in record_store.all_models():
+        if model_config.base == BaseModelType.External or model_config.format == ModelFormat.ExternalApi:
+            continue
         if not (models_path / model_config.path).resolve().exists():
             missing_models.append(model_config)
 
@@ -190,7 +221,7 @@ async def get_model_records_by_attrs(
     if not configs:
         raise HTTPException(status_code=404, detail="No model found with these attributes")
 
-    return configs[0]
+    return prepare_model_config_for_response(configs[0], ApiDependencies)
 
 
 @model_manager_router.get(
@@ -207,7 +238,7 @@ async def get_model_records_by_hash(
     if not configs:
         raise HTTPException(status_code=404, detail="No model found with this hash")
 
-    return configs[0]
+    return prepare_model_config_for_response(configs[0], ApiDependencies)
 
 
 @model_manager_router.get(
@@ -228,7 +259,7 @@ async def get_model_record(
     """Get a model record"""
     try:
         config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
-        return add_cover_image_to_model_config(config, ApiDependencies)
+        return prepare_model_config_for_response(config, ApiDependencies)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -268,7 +299,7 @@ async def reidentify_model(
         result.config.name = config.name
         result.config.description = config.description
         result.config.cover_image = config.cover_image
-        if hasattr(config, "trigger_phrases") and hasattr(result.config, "trigger_phrases"):
+        if hasattr(result.config, "trigger_phrases") and hasattr(config, "trigger_phrases"):
             result.config.trigger_phrases = config.trigger_phrases
         result.config.source = config.source
         result.config.source_type = config.source_type
@@ -392,7 +423,7 @@ async def update_model_record(
     record_store = ApiDependencies.invoker.services.model_manager.store
     try:
         config = record_store.update_model(key, changes=changes, allow_class_change=True)
-        config = add_cover_image_to_model_config(config, ApiDependencies)
+        config = prepare_model_config_for_response(config, ApiDependencies)
         logger.info(f"Updated model: {key}")
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -1124,7 +1155,7 @@ async def convert_model(
 
     # return the config record for the new diffusers directory
     new_config = store.get_model(new_key)
-    new_config = add_cover_image_to_model_config(new_config, ApiDependencies)
+    new_config = prepare_model_config_for_response(new_config, ApiDependencies)
     return new_config
 
 
