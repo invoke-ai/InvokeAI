@@ -31,10 +31,10 @@ import {
   useRemoveModelRelationshipMutation,
 } from 'services/api/endpoints/modelRelationships';
 import { useGetModelConfigsQuery } from 'services/api/endpoints/models';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfig, AnyModelConfigWithExternal } from 'services/api/types';
 
 type Props = {
-  modelConfig: AnyModelConfig;
+  modelConfig: AnyModelConfigWithExternal;
 };
 
 type ModelGroup = {
@@ -52,7 +52,10 @@ type ModelGroup = {
 //
 // TODO: In the future, refine this logic to more strictly validate
 // relationships based on model types or actual usage patterns.
-const isBaseCompatible = (a: AnyModelConfig, b: AnyModelConfig): boolean => {
+const isBaseCompatible = (a: AnyModelConfigWithExternal, b: AnyModelConfig): boolean => {
+  if (a.base === 'external') {
+    return false;
+  }
   if (a.base === 'any' || b.base === 'any') {
     return true;
   }

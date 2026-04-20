@@ -39,9 +39,9 @@ type CanvasCacheModuleConfig = {
 
 const DEFAULT_CONFIG: CanvasCacheModuleConfig = {
   imageNameCacheSize: 1000,
-  imageDataCacheSize: 32,
+  imageDataCacheSize: 64,
   transparencyCalculationCacheSize: 1000,
-  canvasElementCacheSize: 32,
+  canvasElementCacheSize: 128,
   generationModeCacheSize: 100,
 };
 
