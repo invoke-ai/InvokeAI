@@ -137,7 +137,7 @@ const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
       <Flex layerStyle="second" h={512} w="full" borderRadius="base" alignItems="center" justifyContent="center">
         {queueItem ? (
           <DataViewer
-            label="Queue Item"
+            label={t('queue.queueItem')}
             data={queueItem}
             extraCopyActions={[{ label: 'Graph', getData: (data) => get(data, 'session.graph') }]}
           />

@@ -73,7 +73,7 @@ CLIP_VISION_MODEL_MAP: dict[Literal["ViT-L", "ViT-H", "ViT-G"], StarterModel] = 
     "ip_adapter",
     title="IP-Adapter - SD1.5, SDXL",
     tags=["ip_adapter", "control"],
-    category="ip_adapter",
+    category="conditioning",
     version="1.5.1",
 )
 class IPAdapterInvocation(BaseInvocation):

@@ -1,0 +1,126 @@
+---
+title: AI Image Generation<br /> for Creatives
+description: A leading creative engine built to empower professionals and enthusiasts alike.
+template: splash
+hero:
+  tagline: Invoke is a free and open-source creative engine for AI-powered image generation. Built by creatives, for creatives. Self-hosted, fully customizable, and Apache 2.0 licensed.
+  actions:
+    - text: Get Started
+      link: start-here/installation
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/invoke-ai/InvokeAI
+      icon: github
+      variant: minimal
+---
+
+import { Image } from 'astro:assets'
+import { Card, CardGrid, LinkButton } from '@astrojs/starlight/components';
+import DownloadOptions from '@components/DownloadOptions.astro';
+
+import splashImage from './assets/invoke-webui-canvas.png';
+
+<div class="splash-img">
+  <Image
+    src={splashImage}
+    alt="Invoke WebUI"
+    loading="eager"
+  />
+</div>
+
+## The Creative Engine
+
+Invoke provides the most feature-complete and professional toolkit for AI image generation, built with production workflows in mind.
+
+<CardGrid>
+  <Card title="Unified Canvas" icon="pencil">
+    Experience true **Layer-based Canvas Editing**. Invoke's powerful canvas allows you to draw, paint, sketch, and edit your creations with unhindered precision. Each layer can be independently manipulated—giving you the freedom to compose intricate scenes seamlessly without breaking a sweat.
+  </Card>
+  <Card title="Node-based Workflows" icon="setting">
+    Unlock limitless possibilities with **Advanced Node-based Workflows**. Build your own complex, reproducible pipelines via a completely visual graph backend. Expose custom UI parameters to share and update values easily without diving deep into the graph.
+  </Card>
+  <Card title="Leading Model Support" icon="rocket">
+    Stay on the cutting edge with out-of-the-box support for the latest foundational models, including **Flux, SDXL, SD 1.5**, and more. Manage checkpoints, LoRAs, Textual Inversions, and ControlNets with an intuitive Model Manager.
+  </Card>
+  <Card title="100% Local & Private" icon="laptop">
+    **Completely Local & Self-hosted**. Invoke runs locally on your own hardware. Your data, prompts, and creations belong entirely to you. Say goodbye to restrictive cloud services and privacy concerns—maintain absolute control over your art.
+  </Card>
+</CardGrid>
+
+---
+
+## Built for Production
+
+Invoke is designed to keep your creative flow moving. Unlike other tools that feel like engineering experiments, Invoke is a polished, professional-grade application.
+
+<CardGrid>
+  <Card title="Intuitive Interface" icon="magnifier">
+    A beautiful, clean interface that prioritizes your artwork. No cluttered menus—just the tools you need right where you expect them.
+  </Card>
+  <Card title="ControlNet Mastery" icon="puzzle">
+    Extensive ControlNet implementation allows you to guide generations with depth maps, edges, poses, and more for exact composition control.
+  </Card>
+  <Card title="Seamless Iteration" icon="random">
+    Rapidly iterate on concepts with batch generation, prompt wildcards, and high-resolution upscaling, all without leaving the app.
+  </Card>
+  <Card title="Community Driven" icon="heart">
+    Actively developed by a passionate open-source community. Jump into the conversation, report bugs, or request features directly.
+  </Card>
+</CardGrid>
+
+---
+
+## Join the Ecosystem
+
+Whether you are looking to install the app, get support, train your own models, or contribute to the project, the Invoke community has you covered.
+
+<CardGrid>
+  <Card title="Get Installed" icon="download">
+    Ready to dive in? The [Invoke Launcher](installation/quick_start.md) is the fastest way to get up and running on Windows, macOS, and Linux. For advanced setups, try [Docker](installation/docker.md) or a [manual Python installation](installation/manual.md).
+
+    <LinkButton href="download" icon="right-arrow">
+      Get Invoke
+    </LinkButton>
+  </Card>
+
+  <Card title="Train Your Models" icon="star">
+    Want to train models on your own style? Invoke Training provides a dedicated UI for **Textual Inversion** and **LoRA training**.
+
+    <LinkButton href="https://github.com/invoke-ai/invoke-training" variant="secondary" icon="external">
+      Explore Invoke Training
+    </LinkButton>
+  </Card>
+
+  <Card title="Get Support" icon="discord">
+    Stuck? Check out our comprehensive [FAQ](./faq.md) for quick answers. If you still need a hand, our community is incredibly active and helpful.
+
+    <LinkButton href="https://discord.gg/ZmtBAhwWhy" variant="secondary" icon="discord">Join our Discord</LinkButton>
+  </Card>
+
+  <Card title="Contribute" icon="github">
+    Invoke is open-source software made possible by [people across the world](contributing/contributors.md). We welcome code, documentation, and design contributions of any size! Read our [contributing guide](contributing/index.md) to start.
+
+    <LinkButton href="contributing/new-contributor-guide" variant="secondary" icon="open-book">
+      Read Contribution Guide
+    </LinkButton>
+  </Card>
+</CardGrid>
+
+---
+
+## Download Invoke
+
+Ready to unleash your creativity? Invoke is available for Windows, macOS, and Linux. Self-hosted, fully customizable, and Apache 2.0 licensed.
+
+<DownloadOptions />
+
+---
+
+:::note[About the Hosted Version]
+The Invoke hosted platform has been shut down as the founding team joined Adobe. However, Invoke lives on as a thriving open-source project maintained by the community.
+
+The open-source version offers the same powerful features you may have used in the hosted service, with the added benefit of complete control and privacy through self-hosting.
+
+Stewardship of the project has been passed to Lincoln Stein (lstein) and Vic (Blessedcoolant), who have been core maintainers since the project's inception and continue to drive development forward with the community.
+:::

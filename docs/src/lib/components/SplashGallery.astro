@@ -1,0 +1,263 @@
+---
+// Community  Gallery Marquee
+
+import {Image} from 'astro:assets';
+
+import linearview from '../../content/docs/workflows/assets/linearview.png';
+import workflowLibrary from '../../content/docs/workflows/assets/workflow_library.png';
+import groupsMultigenSeeding from '../../content/docs/workflows/assets/groupsmultigenseeding.png';
+import groupsImgVae from '../../content/docs/workflows/assets/groupsimgvae.png';
+import groupsConditioning from '../../content/docs/workflows/assets/groupsconditioning.png';
+import groupsControl from '../../content/docs/workflows/assets/groupscontrol.png';
+import groupsLora from '../../content/docs/workflows/assets/groupslora.png';
+import groupsNoise from '../../content/docs/workflows/assets/groupsnoise.png';
+import groupsIterate from '../../content/docs/workflows/assets/groupsiterate.png';
+
+const placeholderSocials = [
+  { label: 'Instagram', href: 'https://example.com/instagram' },
+  { label: 'X', href: 'https://example.com/x' },
+  { label: 'ArtStation', href: 'https://example.com/artstation' },
+];
+
+const rows = [
+  [
+    {
+      id: 'linearview',
+      image: linearview,
+      alt: 'Linear workflow editor view',
+      socials: placeholderSocials,
+    },
+    {
+      id: 'workflow-library',
+      image: workflowLibrary,
+      alt: 'Workflow library browser view',
+      socials: placeholderSocials,
+    },
+    {
+      id: 'conditioning',
+      image: groupsConditioning,
+      alt: 'Workflow conditioning group',
+      socials: placeholderSocials,
+    },
+    {
+      id: 'img-vae',
+      image: groupsImgVae,
+      alt: 'Workflow image and VAE group',
+      socials: placeholderSocials,
+    },
+    {
+      id: 'multigen',
+      image: groupsMultigenSeeding,
+      alt: 'Workflow multigen seeding group',
+      socials: placeholderSocials,
+    },
+  ],
+  [
+    {
+      id: 'control',
+      image: groupsControl,
+      alt: 'Workflow control group',
+      socials: placeholderSocials,
+    },
+    {
+      id: 'lora',
+      image: groupsLora,
+      alt: 'Workflow LoRA group',
+      socials: placeholderSocials,
+    },
+    {
+      id: 'noise',
+      image: groupsNoise,
+      alt: 'Workflow noise group',
+      socials: placeholderSocials,
+    },
+    {
+      id: 'iterate',
+      image: groupsIterate,
+      alt: 'Workflow iterate group',
+      socials: placeholderSocials,
+    },
+  ],
+];
+---
+
+<div class="splash-gallery not-content" aria-label="Workflow gallery preview">
+  {rows.map((row, rowIndex) => (
+    <div class="gallery-row">
+      <div class:list={['gallery-track', rowIndex === 1 && 'gallery-track--reverse']}>
+        <!-- 2 segments, 1 real and 1 duplicate -->
+        {[...Array(2)].map((_, segmentIndex) => (
+          <div
+            class:list={['gallery-segment', segmentIndex === 1 && 'gallery-segment--duplicate']}
+            aria-hidden={segmentIndex === 1}
+          >
+            {row.map((tile) => (
+              <figure
+                class="gallery-tile"
+                style={`--tile-aspect-ratio:${tile.image.width}/${tile.image.height};`}
+              >
+                <Image
+                  src={tile.image}
+                  alt={segmentIndex === 0 ? tile.alt : ''}
+                  decoding="async"
+                />
+                <figcaption class="gallery-tile__overlay">
+                  <span class="gallery-tile__label">Submitted by</span>
+                  <div class="gallery-tile__socials">
+                    {tile.socials.map((social) => (
+                      <a href={social.href} tabindex={segmentIndex === 0 ? '0' : '-1'}>{social.label}</a>
+                    ))}
+                  </div>
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  ))}
+</div>
+
+<style>
+  @keyframes splash-gallery-marquee {
+    from {
+      transform: translateX(0);
+    }
+
+    to {
+      transform: translateX(calc(-50% - (var(--gallery-gap) / 2)));
+    }
+  }
+
+  .splash-gallery {
+    --gallery-gap: 0.5rem;
+    --gallery-row-height: clamp(7.5rem, 18vw, 13rem);
+
+    display: grid;
+    gap: var(--gallery-gap);
+    position: relative;
+    padding: 5rem 0;
+  }
+
+  .gallery-row {
+    overflow: hidden;
+    position: relative;
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black 4rem,
+      black calc(100% - 4rem),
+      transparent
+    );
+  }
+
+  .gallery-track {
+    display: flex;
+    width: max-content;
+    gap: var(--gallery-gap);
+    animation: splash-gallery-marquee 40s linear infinite;
+    will-change: transform;
+  }
+
+  .gallery-track--reverse {
+    animation-direction: reverse;
+  }
+
+  .gallery-row:hover .gallery-track,
+  .gallery-row:focus-within .gallery-track {
+    animation-play-state: paused;
+  }
+
+  .gallery-segment {
+    display: flex;
+    flex-shrink: 0;
+    gap: var(--gallery-gap);
+    min-width: max-content;
+  }
+
+  .gallery-tile {
+    position: relative;
+    flex: 0 0 auto;
+    height: var(--gallery-row-height);
+    aspect-ratio: var(--tile-aspect-ratio);
+    margin: 0;
+    overflow: hidden;
+    border-radius: calc(var(--radius) - 0.05rem);
+    border: 1px solid var(--sl-color-hairline-light);
+    background: var(--sl-color-bg-sidebar);
+  }
+
+  .gallery-tile img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .gallery-tile__overlay {
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: 0;
+    display: grid;
+    gap: 0.3rem;
+    padding: 0.65rem 0.75rem;
+    background: linear-gradient(to top, rgba(17, 18, 21, 0.94), rgba(17, 18, 21, 0.65), transparent);
+    opacity: 0;
+    transform: translateY(12%);
+    transition:
+      opacity 120ms ease,
+      transform 120ms ease;
+    pointer-events: none;
+  }
+
+  .gallery-tile:hover .gallery-tile__overlay,
+  .gallery-tile:focus-within .gallery-tile__overlay {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .gallery-tile__label {
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .gallery-tile__socials {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.75rem;
+  }
+
+  .gallery-tile__socials a {
+    color: white;
+    font-size: 0.85rem;
+    text-decoration: none;
+  }
+
+  .gallery-tile__socials a:hover,
+  .gallery-tile__socials a:focus-visible {
+    color: var(--sl-color-text-accent);
+  }
+
+  @media (hover: none), (pointer: coarse) {
+    .gallery-tile__overlay {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      background: linear-gradient(to top, rgba(17, 18, 21, 0.94), rgba(17, 18, 21, 0.56), transparent);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .gallery-track {
+      animation: none;
+      transform: none;
+    }
+
+    .gallery-segment--duplicate {
+      display: none;
+    }
+  }
+</style>

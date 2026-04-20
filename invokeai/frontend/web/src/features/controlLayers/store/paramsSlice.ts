@@ -86,6 +86,9 @@ const slice = createSlice({
     setZImageScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
       state.zImageScheduler = action.payload;
     },
+    setZImageShift: (state, action: PayloadAction<number | null>) => {
+      state.zImageShift = action.payload;
+    },
     setZImageSeedVarianceEnabled: (state, action: PayloadAction<boolean>) => {
       state.zImageSeedVarianceEnabled = action.payload;
     },
@@ -254,6 +257,19 @@ const slice = createSlice({
         return;
       }
       state.kleinQwen3EncoderModel = result.data;
+    },
+    qwenImageComponentSourceSelected: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.qwenImageComponentSource.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageComponentSource = result.data;
+    },
+    qwenImageQuantizationChanged: (state, action: PayloadAction<'none' | 'int8' | 'nf4'>) => {
+      state.qwenImageQuantization = action.payload;
+    },
+    qwenImageShiftChanged: (state, action: PayloadAction<number | null>) => {
+      state.qwenImageShift = action.payload;
     },
     vaePrecisionChanged: (state, action: PayloadAction<ParameterPrecision>) => {
       state.vaePrecision = action.payload;
@@ -455,6 +471,9 @@ const slice = createSlice({
       }
     },
     paramsReset: (state) => resetState(state),
+    paramsRecalled: (_state, action: PayloadAction<ParamsState>) => {
+      return action.payload;
+    },
   },
   extraReducers(builder) {
     // Reset params state on logout to prevent user data leakage when switching users
@@ -512,6 +531,9 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.animaT5EncoderModel = oldState.animaT5EncoderModel;
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
+  newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
+  newState.qwenImageQuantization = oldState.qwenImageQuantization;
+  newState.qwenImageShift = oldState.qwenImageShift;
   return newState;
 };
 
@@ -535,6 +557,7 @@ export const {
   setFluxDypeScale,
   setFluxDypeExponent,
   setZImageScheduler,
+  setZImageShift,
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
   setZImageSeedVarianceRandomizePercent,
@@ -558,6 +581,9 @@ export const {
   zImageQwen3SourceModelSelected,
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
+  qwenImageComponentSourceSelected,
+  qwenImageQuantizationChanged,
+  qwenImageShiftChanged,
   setClipSkip,
   shouldUseCpuNoiseChanged,
   setColorCompensation,
@@ -586,6 +612,7 @@ export const {
   syncedToOptimalDimension,
 
   paramsReset,
+  paramsRecalled,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
   animaT5EncoderModelSelected,
@@ -629,6 +656,7 @@ export const selectIsCogView4 = createParamsSelector((params) => params.model?.b
 export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
 export const selectIsAnima = createParamsSelector((params) => params.model?.base === 'anima');
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
+export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
 export const selectIsFluxKontext = createParamsSelector((params) => {
   if (params.model?.base === 'flux' && params.model?.name.toLowerCase().includes('kontext')) {
     return true;
@@ -655,6 +683,9 @@ export const selectAnimaT5EncoderModel = createParamsSelector((params) => params
 export const selectAnimaScheduler = createParamsSelector((params) => params.animaScheduler);
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
+export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
+export const selectQwenImageQuantization = createParamsSelector((params) => params.qwenImageQuantization);
+export const selectQwenImageShift = createParamsSelector((params) => params.qwenImageShift);
 
 export const selectCFGScale = createParamsSelector((params) => params.cfgScale);
 export const selectGuidance = createParamsSelector((params) => params.guidance);
@@ -696,6 +727,7 @@ export const selectFluxDypePreset = createParamsSelector((params) => params.flux
 export const selectFluxDypeScale = createParamsSelector((params) => params.fluxDypeScale);
 export const selectFluxDypeExponent = createParamsSelector((params) => params.fluxDypeExponent);
 export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
+export const selectZImageShift = createParamsSelector((params) => params.zImageShift);
 export const selectZImageSeedVarianceEnabled = createParamsSelector((params) => params.zImageSeedVarianceEnabled);
 export const selectZImageSeedVarianceStrength = createParamsSelector((params) => params.zImageSeedVarianceStrength);
 export const selectZImageSeedVarianceRandomizePercent = createParamsSelector(

@@ -34,7 +34,37 @@ async function generateTypes(schema) {
     },
     defaultNonNullable: false,
   });
-  fs.writeFileSync(OUTPUT_FILE, astToString(types));
+  let output = astToString(types);
+
+  // Post-process: openapi-typescript sometimes computes enum types from `const`
+  // usage in discriminated unions rather than from the enum definition itself,
+  // dropping values that only appear in some union members. Patch the generated
+  // output to match the OpenAPI schema's actual enum definitions.
+  //
+  // The `schema` parameter is a parsed JSON object when piped from stdin, or
+  // a URL/Buffer when passed as an argument. We only patch in the JSON case.
+  if (schema && typeof schema === 'object' && !Buffer.isBuffer(schema)) {
+    const schemas = schema.components?.schemas;
+    if (schemas) {
+      // Collect all string enum types and their expected values from the OpenAPI schema
+      for (const [typeName, typeDef] of Object.entries(schemas)) {
+        if (typeDef && typeDef.type === 'string' && Array.isArray(typeDef.enum)) {
+          const expectedUnion = typeDef.enum.map((v) => `"${v}"`).join(' | ');
+          // Match the type definition line. These appear as:
+          //   `TypeName: "val1" | "val2" | ...;`
+          // Use word boundary to avoid matching types that contain this
+          // type name as a substring (e.g. ModelType vs BaseModelType).
+          const regex = new RegExp(`(\\b${typeName}: )"[^;]+(;)`);
+          const match = output.match(regex);
+          if (match) {
+            output = output.replace(regex, `$1${expectedUnion}$2`);
+          }
+        }
+      }
+    }
+  }
+
+  fs.writeFileSync(OUTPUT_FILE, output);
   process.stdout.write(`\nOK!\r\n`);
 }
 
