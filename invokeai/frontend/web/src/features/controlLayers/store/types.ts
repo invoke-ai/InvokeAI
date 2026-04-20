@@ -212,6 +212,7 @@ const zCanvasBrushLineState = z.object({
   points: zPoints,
   color: zRgbaColor,
   clip: zRect.nullable(),
+  globalCompositeOperation: z.string().optional(),
 });
 export type CanvasBrushLineState = z.infer<typeof zCanvasBrushLineState>;
 
@@ -225,6 +226,7 @@ const zCanvasBrushLineWithPressureState = z.object({
   points: zPointsWithPressure,
   color: zRgbaColor,
   clip: zRect.nullable(),
+  globalCompositeOperation: z.string().optional(),
 });
 export type CanvasBrushLineWithPressureState = z.infer<typeof zCanvasBrushLineWithPressureState>;
 
@@ -613,6 +615,8 @@ const zCanvasRasterLayerState = zCanvasEntityBase.extend({
   adjustments: zRasterLayerAdjustments.optional(),
   // Optional per-layer composite operation. When undefined, defaults to 'source-over'.
   globalCompositeOperation: z.enum(COMPOSITE_OPERATIONS).optional(),
+  // When true, brush strokes only paint where existing pixels are non-transparent (preserve alpha).
+  isTransparencyLocked: z.boolean().optional(),
 });
 export type CanvasRasterLayerState = z.infer<typeof zCanvasRasterLayerState>;
 
