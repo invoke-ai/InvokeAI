@@ -2723,6 +2723,8 @@
         "logDebugInfo": "Log Debug Info",
         "locked": "Locked",
         "unlocked": "Unlocked",
+        "transparencyLocked": "Transparency Locked",
+        "transparencyUnlocked": "Transparency Unlocked",
         "deleteSelected": "Delete Selected",
         "stagingOnCanvas": "Staging images on",
         "replaceLayer": "Replace Layer",
