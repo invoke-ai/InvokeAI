@@ -2,6 +2,13 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from invokeai.backend.model_manager.configs.external_api import (
+    ExternalApiModelDefaultSettings,
+    ExternalImageSize,
+    ExternalModelCapabilities,
+    ExternalModelPanelSchema,
+    ExternalResolutionPreset,
+)
 from invokeai.backend.model_manager.taxonomy import (
     AnyVariant,
     BaseModelType,
@@ -20,6 +27,9 @@ class StarterModelWithoutDependencies(BaseModel):
     format: Optional[ModelFormat] = None
     variant: Optional[AnyVariant] = None
     is_installed: bool = False
+    capabilities: ExternalModelCapabilities | None = None
+    default_settings: ExternalApiModelDefaultSettings | None = None
+    panel_schema: ExternalModelPanelSchema | None = None
     # allows us to track what models a user has installed across name changes within starter models
     # if you update a starter model name, please add the old one to this list for that starter model
     previous_names: list[str] = []
@@ -1001,6 +1011,226 @@ z_image_controlnet_tile = StarterModel(
 )
 # endregion
 
+# region External API
+GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS = [
+    "1:1",
+    "1:4",
+    "1:8",
+    "2:3",
+    "3:2",
+    "3:4",
+    "4:1",
+    "4:3",
+    "4:5",
+    "5:4",
+    "8:1",
+    "9:16",
+    "16:9",
+    "21:9",
+]
+GEMINI_3_IMAGE_MAX_SIZE = ExternalImageSize(width=4096, height=4096)
+
+
+def _gemini_3_resolution_presets(
+    image_sizes: list[str],
+    aspect_ratios: list[str] | None = None,
+) -> list[ExternalResolutionPreset]:
+    """Build resolution presets for Gemini 3 models.
+
+    Each preset combines an aspect ratio with an image size preset (512/1K/2K/4K).
+    Pixel dimensions are approximations based on the preset name (longest side).
+    """
+    if aspect_ratios is None:
+        aspect_ratios = GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS
+    base_pixels = {"512": 512, "1K": 1024, "2K": 2048, "4K": 4096}
+    presets: list[ExternalResolutionPreset] = []
+    for image_size in image_sizes:
+        base = base_pixels[image_size]
+        for ratio_str in aspect_ratios:
+            w_part, h_part = (int(x) for x in ratio_str.split(":"))
+            if w_part >= h_part:
+                w = base
+                h = max(1, round(base * h_part / w_part))
+            else:
+                h = base
+                w = max(1, round(base * w_part / h_part))
+            presets.append(
+                ExternalResolutionPreset(
+                    label=f"{ratio_str} ({image_size}) — {w}\u00d7{h}",
+                    aspect_ratio=ratio_str,
+                    image_size=image_size,
+                    width=w,
+                    height=h,
+                )
+            )
+    return presets
+
+
+GEMINI_3_PRO_RESOLUTION_PRESETS = _gemini_3_resolution_presets(["1K", "2K", "4K"])
+GEMINI_3_1_FLASH_RESOLUTION_PRESETS = _gemini_3_resolution_presets(["512", "1K", "2K", "4K"])
+
+gemini_flash_image = StarterModel(
+    name="Gemini 2.5 Flash Image",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-2.5-flash-image",
+    description="Google Gemini 2.5 Flash image generation model (external API). Requires a configured Gemini API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_seed=True,
+        supports_reference_images=True,
+        max_images_per_request=1,
+        allowed_aspect_ratios=[
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9",
+        ],
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "2:3": ExternalImageSize(width=832, height=1248),
+            "3:2": ExternalImageSize(width=1248, height=832),
+            "3:4": ExternalImageSize(width=864, height=1184),
+            "4:3": ExternalImageSize(width=1184, height=864),
+            "4:5": ExternalImageSize(width=896, height=1152),
+            "5:4": ExternalImageSize(width=1152, height=896),
+            "9:16": ExternalImageSize(width=768, height=1344),
+            "16:9": ExternalImageSize(width=1344, height=768),
+            "21:9": ExternalImageSize(width=1536, height=672),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
+gemini_pro_image_preview = StarterModel(
+    name="Gemini 3 Pro Image Preview",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-3-pro-image-preview",
+    description="Google Gemini 3 Pro image generation preview model (external API). Supports up to 14 reference images, including up to 6 object references and up to 5 character references. Supports 1K/2K/4K resolution presets. Requires a configured Gemini API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_seed=True,
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=1,
+        max_image_size=GEMINI_3_IMAGE_MAX_SIZE,
+        allowed_aspect_ratios=GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS,
+        resolution_presets=GEMINI_3_PRO_RESOLUTION_PRESETS,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
+gemini_3_1_flash_image_preview = StarterModel(
+    name="Gemini 3.1 Flash Image Preview",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-3.1-flash-image-preview",
+    description="Google Gemini 3.1 Flash image generation preview model (external API). Supports up to 14 reference images, including up to 10 object references and up to 4 character references. Supports 512/1K/2K/4K resolution presets. Requires a configured Gemini API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_seed=True,
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=1,
+        max_image_size=GEMINI_3_IMAGE_MAX_SIZE,
+        allowed_aspect_ratios=GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS,
+        resolution_presets=GEMINI_3_1_FLASH_RESOLUTION_PRESETS,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
+OPENAI_GPT_IMAGE_ASPECT_RATIOS = ["1:1", "3:2", "2:3"]
+OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES = {
+    "1:1": ExternalImageSize(width=1024, height=1024),
+    "3:2": ExternalImageSize(width=1536, height=1024),
+    "2:3": ExternalImageSize(width=1024, height=1536),
+}
+OPENAI_GPT_IMAGE_PANEL_SCHEMA = ExternalModelPanelSchema(
+    prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]
+)
+
+openai_gpt_image_1_5 = StarterModel(
+    name="GPT Image 1.5",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1.5",
+    description="OpenAI GPT-Image-1.5 image generation model. Fastest and most affordable GPT image model. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_gpt_image_1 = StarterModel(
+    name="GPT Image 1",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1",
+    description="OpenAI GPT-Image-1 image generation model. High quality image generation. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_gpt_image_1_mini = StarterModel(
+    name="GPT Image 1 Mini",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1-mini",
+    description="OpenAI GPT-Image-1-Mini image generation model. Cost-efficient option, 80%% cheaper than GPT-Image-1. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_dall_e_3 = StarterModel(
+    name="DALL-E 3",
+    base=BaseModelType.External,
+    source="external://openai/dall-e-3",
+    description="OpenAI DALL-E 3 image generation model. Supports vivid and natural styles. Only text-to-image, no editing. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        max_images_per_request=1,
+        allowed_aspect_ratios=["1:1", "7:4", "4:7"],
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "7:4": ExternalImageSize(width=1792, height=1024),
+            "4:7": ExternalImageSize(width=1024, height=1792),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+# DALL-E 2 removed — deprecated by OpenAI, shutdown May 12, 2026.
 # region Anima
 anima_qwen3_encoder = StarterModel(
     name="Anima Qwen3 0.6B Text Encoder",
@@ -1140,6 +1370,13 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
+    gemini_flash_image,
+    gemini_pro_image_preview,
+    gemini_3_1_flash_image_preview,
+    openai_gpt_image_1_5,
+    openai_gpt_image_1,
+    openai_gpt_image_1_mini,
+    openai_dall_e_3,
     anima_preview3,
     anima_qwen3_encoder,
     anima_vae,
