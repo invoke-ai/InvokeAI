@@ -29,7 +29,7 @@ class FluxFillOutput(BaseInvocationOutput):
     "flux_fill",
     title="FLUX Fill Conditioning",
     tags=["inpaint"],
-    category="inpaint",
+    category="conditioning",
     version="1.0.0",
     classification=Classification.Beta,
 )

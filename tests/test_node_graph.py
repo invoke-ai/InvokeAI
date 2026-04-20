@@ -40,6 +40,7 @@ from tests.test_nodes import (
     PromptTestInvocation,
     PromptTestInvocationOutput,
     TextToImageTestInvocation,
+    UnionCollectionTestInvocation,
     get_single_output_from_session,
     run_session_with_mock_context,
 )
@@ -335,6 +336,100 @@ def test_graph_collector_invalid_with_non_list_output():
 
     with pytest.raises(InvalidEdgeError):
         g.add_edge(e3)
+
+
+def test_graph_collector_can_chain_collection_input():
+    g = Graph()
+    n1 = PromptCollectionTestInvocation(id="1", collection=["Banana", "Sushi"])
+    n2 = PromptTestInvocation(id="2", prompt="Ramen")
+    n3 = CollectInvocation(id="3")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+
+    g.add_edge(create_edge("1", "collection", "3", "collection"))
+    g.add_edge(create_edge("2", "prompt", "3", "item"))
+
+    session = GraphExecutionState(graph=g)
+    run_session_with_mock_context(session)
+    output = get_single_output_from_session(session, n3.id)
+
+    assert isinstance(output, CollectInvocationOutput)
+    assert output.collection == ["Banana", "Sushi", "Ramen"]
+
+
+def test_graph_collector_chain_rejects_mismatched_item_type():
+    g = Graph()
+    n1 = PromptCollectionTestInvocation(id="1", collection=["Banana", "Sushi"])
+    n2 = IntegerInvocation(id="2", value=7)
+    n3 = CollectInvocation(id="3")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+
+    g.add_edge(create_edge("1", "collection", "3", "collection"))
+    with pytest.raises(InvalidEdgeError):
+        g.add_edge(create_edge("2", "value", "3", "item"))
+
+
+def test_graph_iterator_accepts_collector_chained_collection_input():
+    g = Graph()
+    n1 = PromptTestInvocation(id="1", prompt="Banana")
+    n2 = CollectInvocation(id="2")
+    n3 = CollectInvocation(id="3")
+    n4 = IterateInvocation(id="4")
+    n5 = PromptTestInvocation(id="5")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+    g.add_node(n4)
+    g.add_node(n5)
+
+    g.add_edge(create_edge("1", "prompt", "2", "item"))
+    g.add_edge(create_edge("2", "collection", "3", "collection"))
+    g.add_edge(create_edge("3", "collection", "4", "collection"))
+    g.add_edge(create_edge("4", "item", "5", "prompt"))
+
+    session = GraphExecutionState(graph=g)
+    run_session_with_mock_context(session)
+
+    output = get_single_output_from_session(session, n5.id)
+    assert isinstance(output, PromptTestInvocationOutput)
+    assert output.prompt == "Banana"
+
+
+def test_graph_collector_chain_rejects_upstream_mismatch_added_late():
+    g = Graph()
+    n1 = CollectInvocation(id="1")
+    n2 = CollectInvocation(id="2")
+    n3 = PromptTestInvocation(id="3", prompt="typed-as-string")
+    n4 = ColorInvocation(id="4")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+    g.add_node(n4)
+
+    # Connect chain first while n1 is still untyped.
+    g.add_edge(create_edge("1", "collection", "2", "collection"))
+    # Constrain downstream collector to strings.
+    g.add_edge(create_edge("3", "prompt", "2", "item"))
+    # Now adding an incompatible type to the upstream collector must fail.
+    with pytest.raises(InvalidEdgeError):
+        g.add_edge(create_edge("4", "color", "1", "item"))
+
+
+def test_graph_collector_rejects_mismatched_item_with_union_collection_input():
+    g = Graph()
+    n1 = UnionCollectionTestInvocation(id="1")
+    n2 = CollectInvocation(id="2")
+    n3 = ColorInvocation(id="3")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+
+    g.add_edge(create_edge("1", "value", "2", "collection"))
+    with pytest.raises(InvalidEdgeError):
+        g.add_edge(create_edge("3", "color", "2", "item"))
 
 
 def test_graph_connects_iterator():
@@ -707,6 +802,24 @@ def test_iterate_accepts_collection():
     e1 = create_edge(n1.id, "value", n3.id, "item")
     e2 = create_edge(n2.id, "value", n3.id, "item")
     e3 = create_edge(n3.id, "collection", n4.id, "collection")
+    g.add_edge(e1)
+    g.add_edge(e2)
+    g.add_edge(e3)
+
+
+def test_iterate_accepts_collection_from_any_only_collector():
+    g = Graph()
+    n1 = AnyTypeTestInvocation(id="1")
+    n2 = CollectInvocation(id="2")
+    n3 = IterateInvocation(id="3")
+    n4 = AnyTypeTestInvocation(id="4")
+    g.add_node(n1)
+    g.add_node(n2)
+    g.add_node(n3)
+    g.add_node(n4)
+    e1 = create_edge(n1.id, "value", n2.id, "item")
+    e2 = create_edge(n2.id, "collection", n3.id, "collection")
+    e3 = create_edge(n3.id, "item", n4.id, "value")
     g.add_edge(e1)
     g.add_edge(e2)
     g.add_edge(e3)

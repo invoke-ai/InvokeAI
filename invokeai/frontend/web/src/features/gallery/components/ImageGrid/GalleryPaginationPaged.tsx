@@ -1,5 +1,6 @@
 import { Button, Flex, IconButton, Spacer } from '@invoke-ai/ui-library';
 import { memo, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiCaretLeftBold, PiCaretRightBold } from 'react-icons/pi';
 
 import { JumpToPaged } from './JumpToPaged';
@@ -55,6 +56,7 @@ type GalleryPaginationPagedProps = {
 
 export const GalleryPaginationPaged = memo(
   ({ pageIndex, pageCount, onPrev, onNext, onGoToPage, onPageInputChange }: GalleryPaginationPagedProps) => {
+    const { t } = useTranslation();
     const pageButtons = useMemo(() => {
       if (pageCount > 7) {
         return getRange(pageIndex + 1, pageCount, 1);
@@ -78,7 +80,7 @@ export const GalleryPaginationPaged = memo(
       <Flex justifyContent="center" alignItems="center" w="full" gap={1} pt={2}>
         <IconButton
           size="sm"
-          aria-label="prev"
+          aria-label={t('common.previous')}
           icon={<PiCaretLeftBold />}
           onClick={onClickPrev}
           isDisabled={pageIndex === 0}
@@ -91,7 +93,7 @@ export const GalleryPaginationPaged = memo(
         <Spacer />
         <IconButton
           size="sm"
-          aria-label="next"
+          aria-label={t('common.next')}
           icon={<PiCaretRightBold />}
           onClick={onClickNext}
           isDisabled={pageIndex >= pageCount - 1}

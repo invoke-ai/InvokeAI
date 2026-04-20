@@ -4,6 +4,7 @@ from typing import Optional
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.workflow_records.workflow_records_common import (
+    WORKFLOW_LIBRARY_DEFAULT_USER_ID,
     Workflow,
     WorkflowCategory,
     WorkflowRecordDTO,
@@ -22,18 +23,23 @@ class WorkflowRecordsStorageBase(ABC):
         pass
 
     @abstractmethod
-    def create(self, workflow: WorkflowWithoutID) -> WorkflowRecordDTO:
+    def create(
+        self,
+        workflow: WorkflowWithoutID,
+        user_id: str = WORKFLOW_LIBRARY_DEFAULT_USER_ID,
+        is_public: bool = False,
+    ) -> WorkflowRecordDTO:
         """Creates a workflow."""
         pass
 
     @abstractmethod
-    def update(self, workflow: Workflow) -> WorkflowRecordDTO:
-        """Updates a workflow."""
+    def update(self, workflow: Workflow, user_id: Optional[str] = None) -> WorkflowRecordDTO:
+        """Updates a workflow. When user_id is provided, the UPDATE is scoped to that user."""
         pass
 
     @abstractmethod
-    def delete(self, workflow_id: str) -> None:
-        """Deletes a workflow."""
+    def delete(self, workflow_id: str, user_id: Optional[str] = None) -> None:
+        """Deletes a workflow. When user_id is provided, the DELETE is scoped to that user."""
         pass
 
     @abstractmethod
@@ -47,6 +53,8 @@ class WorkflowRecordsStorageBase(ABC):
         query: Optional[str],
         tags: Optional[list[str]],
         has_been_opened: Optional[bool],
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> PaginatedResults[WorkflowRecordListItemDTO]:
         """Gets many workflows."""
         pass
@@ -56,6 +64,8 @@ class WorkflowRecordsStorageBase(ABC):
         self,
         categories: list[WorkflowCategory],
         has_been_opened: Optional[bool] = None,
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> dict[str, int]:
         """Gets a dictionary of counts for each of the provided categories."""
         pass
@@ -66,19 +76,28 @@ class WorkflowRecordsStorageBase(ABC):
         tags: list[str],
         categories: Optional[list[WorkflowCategory]] = None,
         has_been_opened: Optional[bool] = None,
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> dict[str, int]:
         """Gets a dictionary of counts for each of the provided tags."""
         pass
 
     @abstractmethod
-    def update_opened_at(self, workflow_id: str) -> None:
-        """Open a workflow."""
+    def update_opened_at(self, workflow_id: str, user_id: Optional[str] = None) -> None:
+        """Open a workflow. When user_id is provided, the UPDATE is scoped to that user."""
         pass
 
     @abstractmethod
     def get_all_tags(
         self,
         categories: Optional[list[WorkflowCategory]] = None,
+        user_id: Optional[str] = None,
+        is_public: Optional[bool] = None,
     ) -> list[str]:
         """Gets all unique tags from workflows."""
+        pass
+
+    @abstractmethod
+    def update_is_public(self, workflow_id: str, is_public: bool, user_id: Optional[str] = None) -> WorkflowRecordDTO:
+        """Updates the is_public field of a workflow. When user_id is provided, the UPDATE is scoped to that user."""
         pass
