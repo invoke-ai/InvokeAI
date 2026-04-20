@@ -146,7 +146,9 @@
         "settings": "Impostazioni",
         "toggleRgbHex": "Attiva/disattiva RGB/HEX",
         "unpin": "Sblocca",
-        "openSlider": "Apri il cursore"
+        "openSlider": "Apri il cursore",
+        "collapseAll": "Comprimi tutto",
+        "expandAll": "Espandi tutto"
     },
     "gallery": {
         "galleryImageSize": "Dimensione dell'immagine",
@@ -462,6 +464,10 @@
             "toggleFillColor": {
                 "title": "Attiva/disattiva colore di riempimento",
                 "desc": "Attiva/disattiva il colore di riempimento dello strumento corrente."
+            },
+            "selectLassoTool": {
+                "title": "Strumento Lazo",
+                "desc": "Seleziona lo strumento lazo."
             }
         },
         "workflows": {
@@ -888,7 +894,9 @@
         "qwenImageComponentSourcePlaceholder": "Necessario per i modelli GGUF",
         "qwenImageComponentSource": "VAE/Sorgente Encoder (Diffusori)",
         "qwenImageQuantization": "Quantizzazione dell'encoder",
-        "qwenImageQuantizationNone": "Nessuna (bf16)"
+        "qwenImageQuantizationNone": "Nessuna (bf16)",
+        "modelPickerFallbackNoModelsInstalledNonAdmin": "Nessun modello installato. Chiedi al tuo amministratore di InvokeAI (<AdminEmailLink />) di installare alcuni modelli.",
+        "noModelsInstalledAskAdmin": "Chiedi al tuo amministratore di installarne alcuni."
     },
     "parameters": {
         "images": "Immagini",
@@ -983,7 +991,8 @@
             "noAnimaVaeModelSelected": "Nessun modello VAE Anima selezionato",
             "noAnimaQwen3EncoderModelSelected": "Nessun modello di encoder Anima Qwen3 selezionato",
             "noAnimaT5EncoderModelSelected": "Nessun modello di encoder Anima T5 selezionato",
-            "noQwenImageComponentSourceSelected": "I modelli GGUF Qwen Image richiedono una sorgente componente diffusori per VAE/encoder"
+            "noQwenImageComponentSourceSelected": "I modelli GGUF Qwen Image richiedono una sorgente componente diffusori per VAE/encoder",
+            "boardNotWritable": "Non hai i permessi di scrittura per la bacheca \"{{boardName}}\". Seleziona una bacheca di tua proprietà oppure passa a Non categorizzata."
         },
         "useCpuNoise": "Usa la CPU per generare rumore",
         "iterations": "Iterazioni",
@@ -1064,7 +1073,9 @@
         "enableHighlightFocusedRegions": "Evidenzia le regioni interessate",
         "modelDescriptionsDisabled": "Descrizioni dei modelli nei menu a discesa disabilitate",
         "modelDescriptionsDisabledDesc": "Le descrizioni dei modelli nei menu a discesa sono state disattivate. Abilitale nelle Impostazioni.",
-        "preferAttentionStyleNumeric": "Preferisci lo stile di attenzione numerico"
+        "preferAttentionStyleNumeric": "Preferisci lo stile di attenzione numerico",
+        "maxQueueHistory": "Cronologia massima della coda",
+        "maxQueueHistorySaveFailed": "Impossibile salvare la cronologia della coda massima"
     },
     "toast": {
         "uploadFailed": "Caricamento fallito",
@@ -1386,7 +1397,11 @@
         "floatRangeGenerator": "Generatore di intervallo di numeri decimali",
         "integerRangeGenerator": "Generatore di intervallo di numeri interi",
         "noWorkflowToSave": "Nessun flusso di lavoro da salvare",
-        "nodeData": "Dati del nodo"
+        "nodeData": "Dati del nodo",
+        "groupNodesByCategory": "Raggruppa i nodi per categoria",
+        "groupNodesByCategoryHelp": "Raggruppa i nodi per categoria nella finestra di dialogo \"Aggiungi nodo\"",
+        "addConnector": "Aggiungi connettore",
+        "deleteConnector": "Elimina connettore"
     },
     "boards": {
         "autoAddBoard": "Aggiungi automaticamente bacheca",
@@ -1441,7 +1456,17 @@
         "restartFailed": "Riavvio non riuscito",
         "restartFile": "Riavvia il file",
         "restartRequired": "Riavvio richiesto",
-        "resumeRefused": "Ripristino rifiutato dal server. Riavvio richiesto."
+        "resumeRefused": "Ripristino rifiutato dal server. Riavvio richiesto.",
+        "setBoardVisibility": "Visibilità della bacheca",
+        "setVisibilityPrivate": "Imposta come privata",
+        "setVisibilityShared": "Imposta come condivisa",
+        "setVisibilityPublic": "Imposta come pubblica",
+        "visibilityPrivate": "Privata",
+        "visibilityShared": "Condivisa",
+        "visibilityPublic": "Pubblica",
+        "visibilityBadgeShared": "Bacheca condivisa",
+        "visibilityBadgePublic": "Bacheca pubblica",
+        "updateBoardVisibilityError": "Errore durante l'aggiornamento della visibilità della bacheca"
     },
     "queue": {
         "queueFront": "Aggiungi all'inizio della coda",
@@ -2285,7 +2310,9 @@
         "searchWorkflows": "Ricerca flussi di lavoro",
         "clearWorkflowSearchFilter": "Cancella filtro di ricerca del flusso di lavoro",
         "openLibrary": "Apri libreria",
-        "tags": "Etichette"
+        "tags": "Etichette",
+        "sharedWorkflows": "Flussi di lavoro condivisi",
+        "shareWorkflow": "Flusso di lavoro condiviso"
     },
     "accordions": {
         "compositing": {
@@ -2920,7 +2947,25 @@
         "invertRegion": "Inverti la regione",
         "invalidReferenceImage": "Immagine di riferimento non valida:",
         "removeImageFromCollection": "Rimuovi l'immagine dalla raccolta",
-        "selectRefImage": "Seleziona l'immagine di riferimento"
+        "selectRefImage": "Seleziona l'immagine di riferimento",
+        "canvasProject": {
+            "project": "Progetto",
+            "saveProject": "Salva il progetto Tela",
+            "loadProject": "Carica il progetto Tela",
+            "saveSuccess": "Progetto salvato",
+            "saveSuccessDesc": "Progetto salvato con {{count}} immagini",
+            "saveError": "Impossibile salvare il progetto",
+            "loadSuccess": "Progetto caricato",
+            "loadSuccessDesc": "Stato della tela ripristinato dal file di progetto",
+            "loadError": "Impossibile caricare il progetto",
+            "loadWarning": "Il caricamento di un progetto sostituirà l'area di lavoro corrente, inclusi tutti i livelli, le maschere, le immagini di riferimento e i parametri di generazione. Questa operazione è irreversibile.",
+            "projectName": "Nome del progetto"
+        },
+        "lasso": {
+            "freehand": "A mano libera",
+            "polygon": "Poligono",
+            "polygonHint": "Fai clic per aggiungere punti, fai clic sul primo punto per chiudere."
+        }
     },
     "ui": {
         "tabs": {
@@ -2956,7 +3001,8 @@
                 "loadFromFile": {
                     "title": "Carica flusso di lavoro da file",
                     "description": "Carica un flusso di lavoro per iniziare con una configurazione esistente"
-                }
+                },
+                "descriptionMultiuser": "I flussi di lavoro sono modelli riutilizzabili che automatizzano le attività di generazione di immagini, consentendo di eseguire rapidamente operazioni complesse e ottenere risultati coerenti. È possibile condividere i flussi di lavoro con altri utenti del sistema selezionando \"Flusso di lavoro condiviso\" durante la creazione o la modifica."
             },
             "upscaling": {
                 "uploadImage": {
@@ -3041,7 +3087,8 @@
         "incompatibleBaseModelDesc": "L'ampliamento è supportato solo per i modelli di architettura SD1.5 e SDXL. Cambia il modello principale per abilitare l'ampliamento.",
         "tileControl": "Controllo del riquadro",
         "tileSize": "Dimensione del riquadro",
-        "tileOverlap": "Sovrapposizione riquadro"
+        "tileOverlap": "Sovrapposizione riquadro",
+        "missingModelsWarningNonAdmin": "Chiedi al tuo amministratore di InvokeAI (<AdminEmailLink />) di installare i modelli richiesti:"
     },
     "stylePresets": {
         "active": "Attivo",
@@ -3096,7 +3143,9 @@
         "noModelsInstalled": "Sembra che non hai installato alcun modello! Puoi <DownloadStarterModelsButton>scaricare un pacchetto di modelli di avvio</DownloadStarterModelsButton> o <ImportModelsButton>importare modelli</ImportModelsButton>.",
         "toGetStartedLocal": "Per iniziare, assicurati di scaricare o importare i modelli necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le tue immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
         "lowVRAMMode": "Per prestazioni ottimali, segui la nostra <LinkComponent>guida per bassa VRAM</LinkComponent>.",
-        "toGetStartedWorkflow": "Per iniziare, compila i campi a sinistra e premi <StrongComponent>Invoke</StrongComponent> per generare la tua immagine. Vuoi esplorare altri flussi di lavoro? Fai clic sull'<StrongComponent>icona della cartella</StrongComponent> accanto al titolo del flusso di lavoro per visualizzare un elenco di altri modelli che puoi provare."
+        "toGetStartedWorkflow": "Per iniziare, compila i campi a sinistra e premi <StrongComponent>Invoke</StrongComponent> per generare la tua immagine. Vuoi esplorare altri flussi di lavoro? Fai clic sull'<StrongComponent>icona della cartella</StrongComponent> accanto al titolo del flusso di lavoro per visualizzare un elenco di altri modelli che puoi provare.",
+        "toGetStartedNonAdmin": "Per iniziare, chiedi al tuo amministratore di InvokeAI (<AdminEmailLink />) di installare i modelli AI necessari per eseguire Invoke. Quindi, inserisci un prompt nella casella e fai clic su <StrongComponent>Invoke</StrongComponent> per generare la tua prima immagine. Seleziona un modello di prompt per migliorare i risultati. Puoi scegliere di salvare le immagini direttamente nella <StrongComponent>Galleria</StrongComponent> o modificarle nella <StrongComponent>Tela</StrongComponent>.",
+        "noModelsInstalledAskAdmin": "Chiedi al tuo amministratore di installarne alcuni."
     },
     "whatsNew": {
         "whatsNewInInvoke": "Novità in Invoke",
