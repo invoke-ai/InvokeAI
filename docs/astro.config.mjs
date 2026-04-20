@@ -29,7 +29,7 @@ export default defineConfig({
         alt: 'InvokeAI Logo',
         replacesTitle: true,
       },
-      favicon: '/favicon.svg',
+      favicon: 'favicon.svg',
       editLink: {
         baseUrl: 'https://github.com/invoke-ai/InvokeAI/edit/main/docs',
       },
@@ -122,17 +122,10 @@ export default defineConfig({
         PageFrame: './src/layouts/PageFrameExtended.astro',
       },
       plugins: [
-        // The links validator is skipped for the ghpages target because content uses
-        // root-absolute links (e.g. /concepts/...) that don't include the /InvokeAI base.
-        // Production (custom domain) still enforces link validation.
-        ...(isGhPages
-          ? []
-          : [
-              starlightLinksValidator({
-                errorOnRelativeLinks: false,
-                errorOnLocalLinks: false,
-              }),
-            ]),
+        starlightLinksValidator({
+          errorOnRelativeLinks: false,
+          errorOnLocalLinks: false,
+        }),
         starlightLlmsText(),
         starlightChangelogs(),
         // starlightContextualMenu({
@@ -140,7 +133,45 @@ export default defineConfig({
         //     'copy', 'view', 'chatgpt', 'claude'
         //   ]
         // }),
-      ],
+      ]
     }),
   ],
+  redirects: {
+    '/CODE_OF_CONDUCT': '/contributing/code-of-conduct',
+    '/RELEASE': '/development/process/release-process',
+    '/installation': '/start-here/installation',
+    '/installation/docker': '/configuration/docker',
+    '/installation/manual': '/start-here/manual',
+    '/installation/models': '/concepts/models',
+    '/installation/patchmatch': '/configuration/patchmatch',
+    '/installation/quick_start': '/start-here/installation',
+    '/installation/requirements': '/start-here/system-requirements',
+    '/configuration': '/configuration/invokeai-yaml',
+    '/features/low-vram/': '/configuration/low-vram-mode/',
+    '/faq': '/troubleshooting/faq',
+    '/help/SAMPLER_CONVERGENCE': '/concepts/parameters',
+    '/help/diffusion': '/concepts/diffusion',
+    '/help/gettingStartedWithAI': '/concepts/image-generation',
+    '/nodes/NODES': '/workflows/editor-interface',
+    '/nodes/NODES_MIGRATION_V3_V4': '/development/guides/api-development',
+    '/nodes/comfyToInvoke': '/workflows/comfyui-migration',
+    '/nodes/communityNodes': '/workflows/community-nodes',
+    '/nodes/contributingNodes': '/development/guides/creating-nodes',
+    '/nodes/invocation-api': '/development/guides/api-development',
+    '/contributing/ARCHITECTURE': '/development/architecture/overview',
+    '/contributing/DOWNLOAD_QUEUE': '/development/architecture/model-manager',
+    '/contributing/HOTKEYS': '/features/hotkeys',
+    '/contributing/INVOCATIONS': '/development/architecture/invocations',
+    '/contributing/LOCAL_DEVELOPMENT': '/development/setup/dev-environment',
+    '/contributing/MODEL_MANAGER': '/development/architecture/model-manager',
+    '/contributing/NEW_MODEL_INTEGRATION': '/development/guides/models',
+    '/contributing/PR-MERGE-POLICY': '/development/process/pr-merge-policy',
+    '/contributing/TESTS': '/development/guides/tests',
+    '/contributing/contribution_guides/development': '/development',
+    '/contributing/contribution_guides/newContributorChecklist': '/contributing/new-contributor-guide',
+    '/contributing/dev-environment': '/development/setup/dev-environment',
+    '/contributing/frontend': '/development/front-end',
+    '/contributing/frontend/state-management': '/development/front-end/state-management',
+    '/contributing/frontend/workflows': '/development/front-end/workflows',
+  }
 });

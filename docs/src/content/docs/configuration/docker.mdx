@@ -14,7 +14,7 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
       Docker Desktop on Windows [includes GPU support](https://www.docker.com/blog/wsl-2-gpu-support-for-docker-desktop-on-nvidia-gpus/).
     </TabItem>
     <TabItem label="MacOS" icon="apple">
-      Docker can not access the GPU on macOS, so your generation speeds will be slow. Use the [launcher](/start-here/installation) instead.
+      Docker can not access the GPU on macOS, so your generation speeds will be slow. Use the [launcher](../../start-here/installation) instead.
     </TabItem>
     <TabItem label="Linux" icon="linux">
       Configure Docker to access your machine's GPU.
@@ -55,7 +55,7 @@ On the [Docker Desktop app](https://docs.docker.com/get-docker/), go to `Prefere
 
 Set up your environment variables. In the `docker` directory, make a copy of `.env.sample` and name it `.env`. Make changes as necessary.
 
-Any environment variables supported by InvokeAI can be set here - please see [Configurations](../configuration.md) for further detail.
+Any environment variables supported by InvokeAI can be set here - please see the [configuration docs](/configuration/invokeai-yaml/) for further detail.
 
 At the very least, you might want to set the `INVOKEAI_ROOT` environment variable
 to point to the location where you wish to store your InvokeAI models, configuration, and outputs.
