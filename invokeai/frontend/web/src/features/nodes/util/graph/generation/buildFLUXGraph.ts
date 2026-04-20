@@ -10,7 +10,8 @@ import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlic
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isFlux2ReferenceImageConfig, isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
-import { zImageField } from 'features/nodes/types/common';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
+import { zImageField, zModelIdentifierField } from 'features/nodes/types/common';
 import { addFlux2KleinLoRAs } from 'features/nodes/util/graph/generation/addFlux2KleinLoRAs';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
@@ -26,6 +27,7 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
+import { isFlux2KleinQwen3Compatible } from 'features/parameters/util/flux2Klein';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
 import { selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
@@ -144,22 +146,18 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     // Flux2 Klein: Use Qwen3-based model loader, text encoder, and dedicated denoise node
     // VAE and Qwen3 encoder can be extracted from the main Diffusers model or selected separately.
     // For non-diffusers main models, find a diffusers flux2 model to use as the source for VAE/encoder.
-    let qwen3SourceModel: typeof kleinVaeModel | undefined;
+    let qwen3SourceModel: ModelIdentifierField | undefined;
     if (model.format !== 'diffusers' && (!kleinVaeModel || !kleinQwen3EncoderModel)) {
       const diffusersModels = selectFlux2DiffusersModels(state);
-      // Prefer a diffusers model with a matching variant (same Qwen3 encoder size).
+      // Prefer a diffusers model that shares the same Qwen3 encoder (e.g. klein_9b and klein_9b_base both use qwen3_8b).
       // Fall back to any diffusers model if only the VAE is needed.
       const modelVariant = 'variant' in model ? model.variant : undefined;
-      const variantMatch = diffusersModels.find((m) => 'variant' in m && m.variant === modelVariant);
+      const variantMatch = diffusersModels.find(
+        (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
+      );
       const sourceModel = variantMatch ?? (kleinQwen3EncoderModel ? diffusersModels[0] : undefined);
       if (sourceModel) {
-        qwen3SourceModel = {
-          key: sourceModel.key,
-          hash: sourceModel.hash,
-          name: sourceModel.name,
-          base: sourceModel.base,
-          type: sourceModel.type,
-        };
+        qwen3SourceModel = zModelIdentifierField.parse(sourceModel);
       }
     }
 

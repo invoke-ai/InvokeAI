@@ -9,6 +9,7 @@ import {
   selectMainModelConfig,
 } from 'features/controlLayers/store/paramsSlice';
 import { zModelIdentifierField } from 'features/nodes/types/common';
+import { isFlux2KleinQwen3Compatible, KLEIN_TO_QWEN3_VARIANT_MAP } from 'features/parameters/util/flux2Klein';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useFlux2DiffusersModels, useFlux2VAEModels, useQwen3EncoderModels } from 'services/api/hooks/modelsByType';
@@ -67,15 +68,6 @@ const ParamFlux2KleinVaeModelSelect = memo(() => {
 ParamFlux2KleinVaeModelSelect.displayName = 'ParamFlux2KleinVaeModelSelect';
 
 /**
- * Maps FLUX.2 Klein variants to compatible Qwen3 encoder variants
- */
-const KLEIN_TO_QWEN3_VARIANT_MAP: Record<string, string> = {
-  klein_4b: 'qwen3_4b',
-  klein_9b: 'qwen3_8b',
-  klein_9b_base: 'qwen3_8b',
-};
-
-/**
  * FLUX.2 Klein Qwen3 Encoder Model Select
  * Selects a Qwen3 text encoder model for FLUX.2 Klein
  * Only shows encoders compatible with the selected Klein model variant
@@ -120,11 +112,15 @@ const ParamFlux2KleinQwen3EncoderModelSelect = memo(() => {
     isLoading,
   });
 
-  // Qwen3 encoder requires a variant-matching diffusers model (Klein 4B needs 4B source, 9B needs 9B source)
+  // Qwen3 encoder requires a Qwen3-compatible diffusers model (variants that share the same Qwen3 encoder).
   const hasMatchingDiffusersSource =
     mainModelConfig?.format === 'diffusers' ||
     diffusersModels.some(
-      (m) => 'variant' in m && mainModelConfig && 'variant' in mainModelConfig && m.variant === mainModelConfig.variant
+      (m) =>
+        'variant' in m &&
+        mainModelConfig &&
+        'variant' in mainModelConfig &&
+        isFlux2KleinQwen3Compatible(m.variant, mainModelConfig.variant)
     );
   const placeholder = hasMatchingDiffusersSource
     ? t('modelManager.flux2KleinQwen3EncoderPlaceholder')

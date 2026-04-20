@@ -33,6 +33,7 @@ import { isBatchNode, isExecutableNode, isInvocationNode } from 'features/nodes/
 import { resolveBatchValue } from 'features/nodes/util/node/resolveBatchValue';
 import type { UpscaleState } from 'features/parameters/store/upscaleSlice';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import { isFlux2KleinQwen3Compatible } from 'features/parameters/util/flux2Klein';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import type { TabName } from 'features/ui/store/uiTypes';
@@ -112,7 +113,9 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     const flux2DiffusersModels = selectFlux2DiffusersModels(store.getState());
     const hasFlux2DiffusersVaeSource = flux2DiffusersModels.length > 0;
     const modelVariant = model && 'variant' in model ? model.variant : undefined;
-    const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some((m) => 'variant' in m && m.variant === modelVariant);
+    const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some(
+      (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
+    );
     const reasons = await getReasonsWhyCannotEnqueueGenerateTab({
       isConnected,
       model,
@@ -129,7 +132,9 @@ const debouncedUpdateReasons = debounce(async (arg: UpdateReasonsArg) => {
     const flux2DiffusersModels = selectFlux2DiffusersModels(store.getState());
     const hasFlux2DiffusersVaeSource = flux2DiffusersModels.length > 0;
     const modelVariant = model && 'variant' in model ? model.variant : undefined;
-    const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some((m) => 'variant' in m && m.variant === modelVariant);
+    const hasFlux2DiffusersQwen3Source = flux2DiffusersModels.some(
+      (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
+    );
     const reasons = await getReasonsWhyCannotEnqueueCanvasTab({
       isConnected,
       model,
