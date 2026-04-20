@@ -7,7 +7,10 @@ import { zModelType } from 'features/nodes/types/common';
 import { assert } from 'tsafe';
 import z from 'zod';
 
-const zModelCategoryType = zModelType.exclude(['onnx']).or(z.literal('refiner'));
+const zModelCategoryType = zModelType
+  .exclude(['onnx'])
+  .or(z.literal('refiner'))
+  .or(z.literal('external_image_generator'));
 export type ModelCategoryType = z.infer<typeof zModelCategoryType>;
 
 const zFilterableModelType = zModelCategoryType.or(z.literal('missing'));

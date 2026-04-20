@@ -8,11 +8,14 @@ import {
   selectFluxDypePreset,
   selectIsAnima,
   selectIsCogView4,
+  selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
   selectIsQwenImage,
   selectIsSD3,
   selectIsZImage,
+  selectModelSupportsGuidance,
+  selectModelSupportsSteps,
 } from 'features/controlLayers/store/paramsSlice';
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
@@ -49,9 +52,13 @@ export const GenerationSettingsAccordion = memo(() => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
+  const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
+  const modelSupportsGuidance = useAppSelector(selectModelSupportsGuidance);
+  const modelSupportsSteps = useAppSelector(selectModelSupportsSteps);
+  const hasExpanderContent = isExternal ? modelSupportsGuidance || modelSupportsSteps : true;
 
   const selectBadges = useMemo(
     () =>
@@ -76,37 +83,47 @@ export const GenerationSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion
       label={t('accordions.generation.title')}
-      badges={[...accordionBadges, ...loraTabBadges]}
+      badges={[...accordionBadges, ...(isExternal ? EMPTY_ARRAY : loraTabBadges)]}
       isOpen={isOpenAccordion}
       onToggle={onToggleAccordion}
     >
-      <Box px={4} pt={4} data-testid="generation-accordion">
+      <Box px={4} pt={4} pb={hasExpanderContent ? 0 : 4} data-testid="generation-accordion">
         <Flex gap={4} flexDir="column" pb={0}>
           <MainModelPicker />
-          <LoRASelect />
-          <LoRAList />
+          {!isExternal && <LoRASelect />}
+          {!isExternal && <LoRAList />}
         </Flex>
-        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
-          <Flex gap={4} flexDir="column" pb={4}>
-            <FormControlGroup formLabelProps={formLabelProps}>
-              {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && !isQwenImage && !isAnima && (
-                <ParamScheduler />
-              )}
-              {isFLUX && <ParamFluxScheduler />}
-              {isZImage && <ParamZImageScheduler />}
-              {isAnima && <ParamAnimaScheduler />}
-              <ParamSteps />
-              {(isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
-              {!isFLUX && !isFlux2 && <ParamCFGScale />}
-              {isZImage && <ParamZImageShift />}
-              {isQwenImage && <ParamQwenImageShift />}
-              {isFLUX && <ParamFluxDypePreset />}
-              {isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeScale />}
-              {isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
-            </FormControlGroup>
-            {isZImage && <ParamZImageSeedVarianceSettings />}
-          </Flex>
-        </Expander>
+        {hasExpanderContent && (
+          <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
+            <Flex gap={4} flexDir="column" pb={4}>
+              <FormControlGroup formLabelProps={formLabelProps}>
+                {!isExternal &&
+                  !isFLUX &&
+                  !isFlux2 &&
+                  !isSD3 &&
+                  !isCogView4 &&
+                  !isZImage &&
+                  !isQwenImage &&
+                  !isAnima && <ParamScheduler />}
+                {!isExternal && isFLUX && <ParamFluxScheduler />}
+                {!isExternal && isZImage && <ParamZImageScheduler />}
+                {!isExternal && isAnima && <ParamAnimaScheduler />}
+                {modelSupportsSteps && <ParamSteps />}
+                {isExternal && modelSupportsGuidance && <ParamGuidance />}
+                {!isExternal && (isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && (
+                  <ParamGuidance />
+                )}
+                {!isExternal && !isFLUX && !isFlux2 && <ParamCFGScale />}
+                {!isExternal && isZImage && <ParamZImageShift />}
+                {!isExternal && isQwenImage && <ParamQwenImageShift />}
+                {!isExternal && isFLUX && <ParamFluxDypePreset />}
+                {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeScale />}
+                {!isExternal && isFLUX && fluxDypePreset === 'manual' && <ParamFluxDypeExponent />}
+              </FormControlGroup>
+              {!isExternal && isZImage && <ParamZImageSeedVarianceSettings />}
+            </Flex>
+          </Expander>
+        )}
       </Box>
     </StandaloneAccordion>
   );
