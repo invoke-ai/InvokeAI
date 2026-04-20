@@ -225,8 +225,15 @@ class FluxDenoiseInvocation(BaseInvocation):
             init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
         # Prepare input noise.
-        noise = self._prepare_noise_tensor(context, inference_dtype, device)
-        b, _c, latent_h, latent_w = noise.shape
+        # If noise will never be consumed, avoid validating/loading it.
+        should_ignore_noise = init_latents is not None and not self.add_noise and self.denoise_mask is None
+        noise: Optional[torch.Tensor]
+        if should_ignore_noise:
+            noise = None
+            b, _c, latent_h, latent_w = init_latents.shape
+        else:
+            noise = self._prepare_noise_tensor(context, inference_dtype, device)
+            b, _c, latent_h, latent_w = noise.shape
         packed_h = latent_h // 2
         packed_w = latent_w // 2
 
@@ -307,6 +314,7 @@ class FluxDenoiseInvocation(BaseInvocation):
                 )
 
             if self.add_noise:
+                assert noise is not None
                 # Noise the orig_latents by the appropriate amount for the first
                 # timestep in InvokeAI's clipped schedule.
                 #
@@ -325,6 +333,7 @@ class FluxDenoiseInvocation(BaseInvocation):
             if self.denoising_start > 1e-5:
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
 
+            assert noise is not None
             x = noise
 
         # If len(timesteps) == 1, then short-circuit. We are just noising the input latents, but not taking any
@@ -365,6 +374,7 @@ class FluxDenoiseInvocation(BaseInvocation):
         inpaint_extension: RectifiedFlowInpaintExtension | None = None
         if inpaint_mask is not None:
             assert init_latents is not None
+            assert noise is not None
             inpaint_extension = RectifiedFlowInpaintExtension(
                 init_latents=init_latents,
                 inpaint_mask=inpaint_mask,

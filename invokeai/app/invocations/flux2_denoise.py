@@ -245,9 +245,16 @@ class Flux2DenoiseInvocation(BaseInvocation):
         if init_latents is not None:
             init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
-        # Prepare input noise (FLUX.2 uses 32 channels)
-        noise = self._prepare_noise_tensor(context, inference_dtype, device)
-        b, _c, latent_h, latent_w = noise.shape
+        # Prepare input noise (FLUX.2 uses 32 channels).
+        # If noise will never be consumed, avoid validating/loading it.
+        should_ignore_noise = init_latents is not None and not self.add_noise and self.denoise_mask is None
+        noise: Optional[torch.Tensor]
+        if should_ignore_noise:
+            noise = None
+            b, _c, latent_h, latent_w = init_latents.shape
+        else:
+            noise = self._prepare_noise_tensor(context, inference_dtype, device)
+            b, _c, latent_h, latent_w = noise.shape
         packed_h = latent_h // 2
         packed_w = latent_w // 2
 
@@ -305,6 +312,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Prepare input latent image
         if init_latents is not None:
             if self.add_noise:
+                assert noise is not None
                 # Noise the init latents using the first timestep from the clipped
                 # InvokeAI schedule.
                 #
@@ -320,6 +328,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         else:
             if self.denoising_start > 1e-5:
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            assert noise is not None
             x = noise
 
         # If len(timesteps) == 1, then short-circuit
@@ -336,7 +345,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Pack all latent tensors
         init_latents_packed = pack_flux2(init_latents) if init_latents is not None else None
         inpaint_mask_packed = pack_flux2(inpaint_mask) if inpaint_mask is not None else None
-        noise_packed = pack_flux2(noise)
+        noise_packed = pack_flux2(noise) if noise is not None else None
         x = pack_flux2(x)
 
         # BN normalization for img2img/inpainting:
@@ -356,7 +365,8 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 # Also normalize noise for InpaintExtension - it's used to compute
                 # noised_init_latents = noise * t + init_latents * (1-t)
                 # Both operands must be in the same normalized space
-                noise_packed = self._bn_normalize(noise_packed, bn_mean, bn_std)
+                if noise_packed is not None:
+                    noise_packed = self._bn_normalize(noise_packed, bn_mean, bn_std)
             # For img2img/inpainting, x is computed from init_latents and must also be normalized
             # For txt2img, x is pure noise (already N(0,1)) - normalizing it would be incorrect
             # We detect img2img by checking if init_latents was provided
@@ -370,6 +380,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         inpaint_extension: Optional[RectifiedFlowInpaintExtension] = None
         if inpaint_mask_packed is not None:
             assert init_latents_packed is not None
+            assert noise_packed is not None
             inpaint_extension = RectifiedFlowInpaintExtension(
                 init_latents=init_latents_packed,
                 inpaint_mask=inpaint_mask_packed,

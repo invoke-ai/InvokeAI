@@ -462,12 +462,19 @@ class AnimaDenoiseInvocation(BaseInvocation):
             if init_latents.ndim == 4:
                 init_latents = init_latents.unsqueeze(2)  # [B, C, H, W] -> [B, C, 1, H, W]
 
-        # Generate initial noise (3D latent: [B, C, T, H, W])
-        noise = self._prepare_noise_tensor(context, inference_dtype, device)
+        # Generate initial noise (3D latent: [B, C, T, H, W]).
+        # If noise will never be consumed, avoid validating/loading it.
+        should_ignore_noise = init_latents is not None and not self.add_noise and self.denoise_mask is None
+        noise: torch.Tensor | None
+        if should_ignore_noise:
+            noise = None
+        else:
+            noise = self._prepare_noise_tensor(context, inference_dtype, device)
 
         # Prepare input latents
         if init_latents is not None:
             if self.add_noise:
+                assert noise is not None
                 # Noise the init latents using the first sigma from the clipped
                 # InvokeAI schedule.
                 #
@@ -483,6 +490,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
         else:
             if self.denoising_start > 1e-5:
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            assert noise is not None
             latents = noise
 
         if total_steps <= 0:
@@ -494,6 +502,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
         if inpaint_mask is not None:
             if init_latents is None:
                 raise ValueError("Initial latents are required when using an inpaint mask (image-to-image inpainting)")
+            assert noise is not None
             inpaint_extension = AnimaInpaintExtension(
                 init_latents=init_latents.squeeze(2),
                 inpaint_mask=inpaint_mask,

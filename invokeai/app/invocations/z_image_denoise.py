@@ -352,12 +352,19 @@ class ZImageDenoiseInvocation(BaseInvocation):
         if init_latents is not None:
             init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
-        # Generate initial noise
-        noise = self._prepare_noise_tensor(context, inference_dtype, device)
+        # Generate initial noise.
+        # If noise will never be consumed, avoid validating/loading it.
+        should_ignore_noise = init_latents is not None and not self.add_noise and self.denoise_mask is None
+        noise: torch.Tensor | None
+        if should_ignore_noise:
+            noise = None
+        else:
+            noise = self._prepare_noise_tensor(context, inference_dtype, device)
 
         # Prepare input latent image
         if init_latents is not None:
             if self.add_noise:
+                assert noise is not None
                 # Noise the init latents using the first sigma from the clipped
                 # InvokeAI schedule.
                 #
@@ -373,6 +380,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
         else:
             if self.denoising_start > 1e-5:
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            assert noise is not None
             latents = noise
 
         # Short-circuit if no denoising steps
@@ -385,6 +393,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
         if inpaint_mask is not None:
             if init_latents is None:
                 raise ValueError("Initial latents are required when using an inpaint mask (image-to-image inpainting)")
+            assert noise is not None
             inpaint_extension = RectifiedFlowInpaintExtension(
                 init_latents=init_latents,
                 inpaint_mask=inpaint_mask,
