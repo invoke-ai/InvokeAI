@@ -39,6 +39,7 @@ import {
   selectSystemShouldEnableInformationalPopovers,
   selectSystemShouldEnableModelDescriptions,
   selectSystemShouldShowInvocationProgressDetail,
+  selectSystemShouldUseMiddleClickToOpenInNewTab,
   selectSystemShouldUseNSFWChecker,
   selectSystemShouldUseWatermarker,
   setPrefersNumericAttentionStyle,
@@ -47,6 +48,7 @@ import {
   setShouldEnableModelDescriptions,
   setShouldHighlightFocusedRegions,
   setShouldShowInvocationProgressDetail,
+  setShouldUseMiddleClickToOpenInNewTab,
   shouldAntialiasProgressImageChanged,
   shouldConfirmOnNewSessionToggled,
   shouldUseNSFWCheckerChanged,
@@ -100,6 +102,7 @@ const SettingsModal = (props: { children: ReactElement }) => {
   const shouldEnableInformationalPopovers = useAppSelector(selectSystemShouldEnableInformationalPopovers);
   const shouldEnableModelDescriptions = useAppSelector(selectSystemShouldEnableModelDescriptions);
   const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);
+  const shouldUseMiddleClickToOpenInNewTab = useAppSelector(selectSystemShouldUseMiddleClickToOpenInNewTab);
   const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
   const shouldShowInvocationProgressDetail = useAppSelector(selectSystemShouldShowInvocationProgressDetail);
   const maxQueueHistory = runtimeConfig?.config.max_queue_history ?? null;
@@ -235,6 +238,13 @@ const SettingsModal = (props: { children: ReactElement }) => {
     [dispatch]
   );
 
+  const handleChangeShouldUseMiddleClickToOpenInNewTab = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldUseMiddleClickToOpenInNewTab(e.target.checked));
+    },
+    [dispatch]
+  );
+
   const handleChangePreferAttentionStyleNumeric = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(setPrefersNumericAttentionStyle(e.target.checked));
@@ -363,6 +373,13 @@ const SettingsModal = (props: { children: ReactElement }) => {
                       <Switch
                         isChecked={shouldHighlightFocusedRegions}
                         onChange={handleChangeShouldHighlightFocusedRegions}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('settings.middleClickOpenInNewTab')}</FormLabel>
+                      <Switch
+                        isChecked={shouldUseMiddleClickToOpenInNewTab}
+                        onChange={handleChangeShouldUseMiddleClickToOpenInNewTab}
                       />
                     </FormControl>
                   </StickyScrollable>
