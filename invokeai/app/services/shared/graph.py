@@ -194,11 +194,11 @@ class _IfBranchScheduler:
 
     def _prune_unselected_if_inputs(self, exec_node_id: str, unselected_field: str) -> None:
         for edge in self._state.execution_graph._get_input_edges(exec_node_id, unselected_field):
-            if edge.source.node_id in self._state.executed:
-                continue
-            if self._state.indegree[exec_node_id] == 0:
-                raise RuntimeError(f"indegree underflow for {exec_node_id} when pruning {unselected_field}")
-            self._state.indegree[exec_node_id] -= 1
+            if edge.source.node_id not in self._state.executed:
+                if self._state.indegree[exec_node_id] == 0:
+                    raise RuntimeError(f"indegree underflow for {exec_node_id} when pruning {unselected_field}")
+                self._state.indegree[exec_node_id] -= 1
+            self._state.execution_graph.delete_edge(edge)
 
     def _apply_branch_resolution(
         self,
@@ -424,7 +424,11 @@ class _ExecutionMaterializer:
         return [n for n in nx.ancestors(g, node_id) if isinstance(self._state.graph.get_node(n), IterateInvocation)]
 
     def _get_prepared_nodes_for_source(self, source_node_id: str) -> set[str]:
-        return self._state.source_prepared_mapping[source_node_id]
+        return {
+            exec_node_id
+            for exec_node_id in self._state.source_prepared_mapping[source_node_id]
+            if self._state._get_prepared_exec_metadata(exec_node_id).state != "skipped"
+        }
 
     def _get_parent_iterator_exec_nodes(
         self, source_node_id: str, graph: nx.DiGraph, prepared_iterator_nodes: list[str]
@@ -743,6 +747,12 @@ class _ExecutionRuntime:
     def _get_copied_result_value(self, edge: Edge) -> Any:
         return copydeep(getattr(self._state.results[edge.source.node_id], edge.source.field))
 
+    def _try_get_copied_result_value(self, edge: Edge) -> tuple[bool, Any]:
+        source_output = self._state.results.get(edge.source.node_id)
+        if source_output is None:
+            return False, None
+        return True, copydeep(getattr(source_output, edge.source.field))
+
     def _build_collect_collection(self, input_edges: list[Edge]) -> list[Any]:
         item_edges = self._sort_collect_input_edges(input_edges, ITEM_FIELD)
         collection_edges = self._sort_collect_input_edges(input_edges, COLLECTION_FIELD)
@@ -771,7 +781,18 @@ class _ExecutionRuntime:
     def _prepare_if_inputs(self, node: IfInvocation, input_edges: list[Edge]) -> None:
         selected_field = self._state._resolved_if_exec_branches.get(node.id)
         allowed_fields = {"condition", selected_field} if selected_field is not None else {"condition"}
-        self._set_node_inputs(node, input_edges, allowed_fields)
+
+        for edge in input_edges:
+            if edge.destination.field not in allowed_fields:
+                continue
+
+            found_value, copied_value = self._try_get_copied_result_value(edge)
+            if not found_value:
+                # A skipped branch-local exec node is considered executed for scheduling purposes, but it does not
+                # produce an output payload. Leave the optional branch input at its default None instead of crashing.
+                continue
+
+            setattr(node, edge.destination.field, copied_value)
 
     def _prepare_default_inputs(self, node: BaseInvocation, input_edges: list[Edge]) -> None:
         self._set_node_inputs(node, input_edges)
