@@ -1,5 +1,6 @@
 # Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
 
+from pathlib import Path
 from typing import Literal, Optional
 
 import cv2
@@ -987,6 +988,101 @@ class SaveImageInvocation(BaseInvocation, WithMetadata, WithBoard):
         image = context.images.get_pil(self.image.image_name)
 
         image_dto = context.images.save(image=image)
+
+        return ImageOutput.build(image_dto)
+
+
+@invocation(
+    "save_image_to_file",
+    title="Save Image (Gallery + File Export)",
+    tags=["image", "export", "file", "save"],
+    category="image",
+    version="1.0.0",
+    use_cache=False,
+)
+class SaveImageToFileInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Saves an image to the gallery (like the standard Save Image node) AND additionally exports a copy
+    to the filesystem with a custom filename.
+
+    Filename pattern: {prefix}{uuid}{suffix}.{file_format}
+    - The UUID is the same UUID used for the gallery entry, so the exported file can be matched to the gallery item.
+    - The gallery entry itself always uses the plain UUID (prefix/suffix apply only to the exported file on disk).
+    - Board and Metadata inputs behave exactly like the standard Save Image node.
+    - The export target is restricted to (subfolders of) the InvokeAI outputs folder — absolute paths are rejected.
+
+    Example: prefix="hero_", suffix="_final", file_format="png" → "hero_<uuid>_final.png"
+    """
+
+    image: ImageField = InputField(description="The image to save and export")
+    output_directory: str = InputField(
+        default="",
+        description=(
+            "Target subdirectory (relative to the configured InvokeAI outputs folder) for the exported file. "
+            "Leave empty to use the outputs folder directly. "
+            "Example: 'my-exports' → <outputs>/my-exports/. Nested paths like 'exports/2026' are allowed. "
+            "Absolute paths and path traversal ('..') are not allowed for security reasons. "
+            "The directory is created automatically if it doesn't exist."
+        ),
+    )
+    prefix: str = InputField(
+        default="",
+        description="Text prepended to the UUID in the exported filename. Example: 'portrait_' → 'portrait_<uuid>.png'",
+    )
+    suffix: str = InputField(
+        default="",
+        description="Text appended to the UUID (before the extension). Example: '_v2' → '<uuid>_v2.png'",
+    )
+    file_format: Literal["png", "jpg", "webp"] = InputField(
+        default="png",
+        description="File format for the exported file. PNG is lossless; JPG/WEBP are lossy and respect 'quality'.",
+    )
+    quality: int = InputField(
+        default=95,
+        ge=1,
+        le=100,
+        description="Compression quality for JPG and WEBP (1-100, higher = better quality, larger file). Ignored for PNG.",
+    )
+
+    def invoke(self, context: InvocationContext) -> ImageOutput:
+        image = context.images.get_pil(self.image.image_name)
+
+        image_dto = context.images.save(image=image)
+
+        uuid = Path(image_dto.image_name).stem
+
+        outputs_path = context.config.get().outputs_path
+        assert outputs_path is not None
+
+        if not self.output_directory:
+            target_dir = outputs_path
+        else:
+            raw = Path(self.output_directory)
+            if raw.is_absolute() or raw.drive or raw.as_posix().startswith("/"):
+                raise ValueError(
+                    f"Absolute paths are not allowed in output_directory: {self.output_directory!r}. "
+                    "Use a path relative to the InvokeAI outputs folder."
+                )
+            candidate = (outputs_path / raw).resolve()
+            outputs_resolved = outputs_path.resolve()
+            if outputs_resolved != candidate and outputs_resolved not in candidate.parents:
+                raise ValueError(
+                    f"output_directory must stay within the outputs folder: {self.output_directory!r}"
+                )
+            target_dir = candidate
+
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        filename = f"{self.prefix}{uuid}{self.suffix}.{self.file_format}"
+        target_path = target_dir / filename
+
+        if self.file_format == "png":
+            image.save(target_path, format="PNG")
+        elif self.file_format == "jpg":
+            if image.mode in ("RGBA", "LA", "P"):
+                image = image.convert("RGB")
+            image.save(target_path, format="JPEG", quality=self.quality)
+        else:
+            image.save(target_path, format="WEBP", quality=self.quality)
 
         return ImageOutput.build(image_dto)
 
