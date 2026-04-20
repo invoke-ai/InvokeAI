@@ -36,9 +36,10 @@ type PayloadActionWithId<T = void> = T extends void
     >;
 
 /** Fingerprint used to match the same reference image entry after recall when ids are regenerated. */
+/** Empty configs of the same type may collide; the worst case is selecting an equivalent empty entity. */
 const getRefImageRecallMatchKey = (entity: RefImageState): string => {
   const { config } = entity;
-  const imageName = config.image?.original.image.image_name ?? config.image?.crop?.image.image_name ?? '';
+  const imageName = config.image?.original.image.image_name ?? '';
   const modelKey = 'model' in config && config.model ? config.model.key : '';
   return `${config.type}\0${modelKey}\0${imageName}`;
 };
@@ -84,6 +85,11 @@ const slice = createSlice({
       }
       const firstEntity = entities[0];
       assert(firstEntity);
+      if (previousSelectedId === null) {
+        // Open panel must have a selection; otherwise, fall back to the first entity.
+        state.selectedEntityId = firstEntity.id;
+        return;
+      }
       if (previousSelectedId !== null && entities.some((e) => e.id === previousSelectedId)) {
         state.selectedEntityId = previousSelectedId;
         return;
