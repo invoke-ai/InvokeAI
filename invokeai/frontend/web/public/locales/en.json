@@ -1749,6 +1749,7 @@
         "informationalPopoversDisabledDesc": "Informational popovers have been disabled. Enable them in Settings.",
         "enableModelDescriptions": "Enable Model Descriptions in Dropdowns",
         "enableHighlightFocusedRegions": "Highlight Focused Regions",
+        "middleClickOpenInNewTab": "Use Middle Click to Open Images in New Tab",
         "modelDescriptionsDisabled": "Model Descriptions in Dropdowns Disabled",
         "modelDescriptionsDisabledDesc": "Model descriptions in dropdowns have been disabled. Enable them in Settings.",
         "enableInvisibleWatermark": "Enable Invisible Watermark",
