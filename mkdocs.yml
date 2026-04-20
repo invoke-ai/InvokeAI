@@ -9,7 +9,7 @@ dev_addr: '127.0.0.1:8080'
 # Repository
 repo_name: 'invoke-ai/InvokeAI'
 repo_url: 'https://github.com/invoke-ai/InvokeAI'
-edit_uri: edit/main/docs/
+edit_uri: edit/main/docs-old/
 
 # Copyright
 copyright: Copyright &copy; 2022-2024 InvokeAI Team
@@ -141,6 +141,10 @@ nav:
       - Database: 'features/database.md'
       - Gallery: 'features/gallery.md'
       - Hot Keys: 'features/hotkeys.md'
+      - External Models:
+          - Overview: 'features/external-models/index.md'
+          - Google Gemini: 'features/external-models/gemini.md'
+          - OpenAI: 'features/external-models/openai.md'
   - Multi-User Mode:
       - User Guide: 'multiuser/user_guide.md'
       - Administrator Guide: 'multiuser/admin_guide.md'
