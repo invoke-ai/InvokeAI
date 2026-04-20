@@ -1056,16 +1056,19 @@ class SaveImageToFileInvocation(BaseInvocation, WithMetadata, WithBoard):
         if not self.output_directory:
             target_dir = outputs_path
         else:
-            raw = Path(self.output_directory)
-            if raw.is_absolute() or raw.drive or raw.as_posix().startswith("/"):
+            raw_str = self.output_directory
+            raw = Path(raw_str)
+            has_windows_drive = len(raw_str) >= 2 and raw_str[0].isalpha() and raw_str[1] == ":"
+            starts_with_sep = raw_str.startswith("/") or raw_str.startswith("\\")
+            if raw.is_absolute() or raw.drive or has_windows_drive or starts_with_sep:
                 raise ValueError(
-                    f"Absolute paths are not allowed in output_directory: {self.output_directory!r}. "
+                    f"Absolute paths are not allowed in output_directory: {raw_str!r}. "
                     "Use a path relative to the InvokeAI outputs folder."
                 )
             candidate = (outputs_path / raw).resolve()
             outputs_resolved = outputs_path.resolve()
             if outputs_resolved != candidate and outputs_resolved not in candidate.parents:
-                raise ValueError(f"output_directory must stay within the outputs folder: {self.output_directory!r}")
+                raise ValueError(f"output_directory must stay within the outputs folder: {raw_str!r}")
             target_dir = candidate
 
         target_dir.mkdir(parents=True, exist_ok=True)
