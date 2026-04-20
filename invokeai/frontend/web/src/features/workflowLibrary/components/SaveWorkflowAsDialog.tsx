@@ -20,6 +20,7 @@ import { t } from 'i18next';
 import { atom, computed } from 'nanostores';
 import type { ChangeEvent, RefObject } from 'react';
 import { memo, useCallback, useRef, useState } from 'react';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
 import { useUpdateWorkflowIsPublicMutation } from 'services/api/endpoints/workflows';
 import { assert } from 'tsafe';
 
@@ -90,6 +91,8 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
     return '';
   });
   const [isPublic, setIsPublic] = useState(false);
+  const { data: setupStatus } = useGetSetupStatusQuery();
+  const multiuserEnabled = setupStatus?.multiuser_enabled ?? false;
 
   const { createNewWorkflow } = useCreateLibraryWorkflow();
   const [updateIsPublic] = useUpdateWorkflowIsPublicMutation();
@@ -143,10 +146,12 @@ const Content = memo(({ workflow, cancelRef }: { workflow: WorkflowV3; cancelRef
           <FormLabel mt="2">{t('workflows.workflowName')}</FormLabel>
           <Flex flexDir="column" width="full" gap="2">
             <Input ref={inputRef} value={name} onChange={onChange} placeholder={t('workflows.workflowName')} />
-            <Flex alignItems="center" gap={2}>
-              <Checkbox isChecked={isPublic} onChange={onChangeIsPublic} />
-              <FormLabel mb={0}>{t('workflows.shareWorkflow')}</FormLabel>
-            </Flex>
+            {multiuserEnabled && (
+              <Flex alignItems="center" gap={2}>
+                <Checkbox isChecked={isPublic} onChange={onChangeIsPublic} />
+                <FormLabel mb={0}>{t('workflows.shareWorkflow')}</FormLabel>
+              </Flex>
+            )}
           </Flex>
         </FormControl>
       </AlertDialogBody>
