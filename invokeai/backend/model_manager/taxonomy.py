@@ -52,6 +52,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
     """Indicates the model is associated with Z-Image model architecture, including Z-Image-Turbo."""
+    External = "external"
+    """Indicates the model is hosted by an external provider."""
     QwenImage = "qwen-image"
     """Indicates the model is associated with Qwen Image Edit 2511 model architecture."""
     Anima = "anima"
@@ -81,6 +83,7 @@ class ModelType(str, Enum):
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
     TextLLM = "text_llm"
+    ExternalImageGenerator = "external_image_generator"
     Unknown = "unknown"
 
 
@@ -188,6 +191,7 @@ class ModelFormat(str, Enum):
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
+    ExternalApi = "external_api"
     Unknown = "unknown"
 
 
@@ -216,6 +220,7 @@ class ModelSourceType(str, Enum):
     Path = "path"
     Url = "url"
     HFRepoID = "hf_repo_id"
+    External = "external"
 
 
 class FluxLoRAFormat(str, Enum):

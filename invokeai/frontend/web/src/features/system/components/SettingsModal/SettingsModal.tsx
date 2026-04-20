@@ -23,6 +23,7 @@ import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableCon
 import { buildUseBoolean } from 'common/hooks/useBoolean';
 import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { selectShouldUseCPUNoise, shouldUseCpuNoiseChanged } from 'features/controlLayers/store/paramsSlice';
+import { ExternalProviderStatusList } from 'features/system/components/SettingsModal/ExternalProviderStatusList';
 import { useRefreshAfterResetModal } from 'features/system/components/SettingsModal/RefreshAfterResetModal';
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
@@ -308,6 +309,10 @@ const SettingsModal = (props: { children: ReactElement }) => {
                         <NumberInputField onKeyDown={handleKeyDownMaxQueueHistory} />
                       </NumberInput>
                     </FormControl>
+                  </StickyScrollable>
+
+                  <StickyScrollable title={t('settings.models')}>
+                    <ExternalProviderStatusList />
                   </StickyScrollable>
 
                   <StickyScrollable title={t('settings.ui')}>

@@ -97,6 +97,7 @@ export const zBaseModelType = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'external',
   'anima',
   'unknown',
 ]);
@@ -134,6 +135,7 @@ export const zModelType = z.enum([
   'clip_embed',
   'siglip',
   'flux_redux',
+  'external_image_generator',
   'unknown',
 ]);
 export type ModelType = z.infer<typeof zModelType>;
@@ -185,6 +187,7 @@ export const zModelFormat = z.enum([
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',
+  'external_api',
   'unknown',
 ]);
 export type ModelFormat = z.infer<typeof zModelFormat>;
@@ -198,6 +201,17 @@ export const zModelIdentifierField = z.object({
   submodel_type: zSubModelType.nullish(),
 });
 export type ModelIdentifierField = z.infer<typeof zModelIdentifierField>;
+
+// Frontend-only identifier for external API models (not part of the backend schema)
+export const zExternalModelIdentifierField = z.object({
+  key: z.string().min(1),
+  hash: z.string().min(1),
+  name: z.string().min(1),
+  base: z.literal('external'),
+  type: z.literal('external_image_generator'),
+  submodel_type: zSubModelType.nullish(),
+});
+
 // #endregion
 
 // #region Control Adapters
