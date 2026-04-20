@@ -1283,7 +1283,6 @@
         "flux2KleinQwen3Encoder": "Qwen3 Encoder (optional)",
         "flux2KleinQwen3EncoderPlaceholder": "From diffusers model",
         "flux2KleinQwen3EncoderNoModelPlaceholder": "No diffusers model available",
-        "flux2KleinQwen3EncoderPlaceholder": "From main model",
         "qwenImageComponentSource": "VAE/Encoder Source (Diffusers)",
         "qwenImageComponentSourcePlaceholder": "Required for GGUF models",
         "qwenImageQuantization": "Encoder Quantization",
