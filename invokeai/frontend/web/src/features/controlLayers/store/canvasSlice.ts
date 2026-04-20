@@ -218,6 +218,17 @@ const slice = createSlice({
         layer.globalCompositeOperation = globalCompositeOperation;
       }
     },
+    rasterLayerIsTransparencyLockedToggled: (
+      state,
+      action: PayloadAction<EntityIdentifierPayload<void, 'raster_layer'>>
+    ) => {
+      const { entityIdentifier } = action.payload;
+      const layer = selectEntity(state, entityIdentifier);
+      if (!layer) {
+        return;
+      }
+      layer.isTransparencyLocked = !layer.isTransparencyLocked;
+    },
     rasterLayerAdded: {
       reducer: (
         state,
@@ -1890,6 +1901,7 @@ export const {
   rasterLayerAdjustmentsSimpleUpdated,
   rasterLayerAdjustmentsCurvesUpdated,
   rasterLayerGlobalCompositeOperationChanged,
+  rasterLayerIsTransparencyLockedToggled,
   entityDeleted,
   entityArrangedForwardOne,
   entityArrangedToFront,
