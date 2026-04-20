@@ -7,7 +7,7 @@ Invoke's UI is made possible by many contributors and open-source libraries. Tha
 
 ## Dev environment
 
-Follow the [dev environment](../dev-environment.md) guide to get set up. Run the UI using `pnpm dev`.
+Follow the [dev environment](/development/setup/dev-environment/) guide to get set up. Run the UI using `pnpm dev`.
 
 ## Package scripts
 
