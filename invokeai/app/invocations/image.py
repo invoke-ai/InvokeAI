@@ -1065,9 +1065,7 @@ class SaveImageToFileInvocation(BaseInvocation, WithMetadata, WithBoard):
             candidate = (outputs_path / raw).resolve()
             outputs_resolved = outputs_path.resolve()
             if outputs_resolved != candidate and outputs_resolved not in candidate.parents:
-                raise ValueError(
-                    f"output_directory must stay within the outputs folder: {self.output_directory!r}"
-                )
+                raise ValueError(f"output_directory must stay within the outputs folder: {self.output_directory!r}")
             target_dir = candidate
 
         target_dir.mkdir(parents=True, exist_ok=True)

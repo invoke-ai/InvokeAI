@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from PIL import Image
+from pydantic import ValidationError
 
 from invokeai.app.invocations.image import SaveImageToFileInvocation
 
@@ -22,10 +23,10 @@ def _make_context(tmp_path: Path, pil_image: Image.Image, gallery_uuid: str = "a
 
 
 def _build_node(**overrides) -> SaveImageToFileInvocation:
-    defaults = dict(
-        id="test",
-        image={"image_name": "input.png"},
-    )
+    defaults = {
+        "id": "test",
+        "image": {"image_name": "input.png"},
+    }
     defaults.update(overrides)
     return SaveImageToFileInvocation(**defaults)
 
@@ -179,9 +180,9 @@ class TestSaveImageToFileInvocation:
             assert saved.format == "WEBP"
 
     def test_quality_bounds_enforced_by_pydantic(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             _build_node(quality=0)
-        with pytest.raises(Exception):
+        with pytest.raises(ValidationError):
             _build_node(quality=101)
 
     def test_output_is_pass_through_of_gallery_dto(self, tmp_path):
