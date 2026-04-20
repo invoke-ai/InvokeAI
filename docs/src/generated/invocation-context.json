@@ -1,0 +1,657 @@
+{
+  "description": "Provides access to various services and data for the current invocation.\n\nAttributes:\n    images (ImagesInterface): Methods to save, get and update images and their metadata.\n    tensors (TensorsInterface): Methods to save and get tensors, including image, noise, masks, and masked images.\n    conditioning (ConditioningInterface): Methods to save and get conditioning data.\n    models (ModelsInterface): Methods to check if a model exists, get a model, and get a model's info.\n    logger (LoggerInterface): The app logger.\n    config (ConfigInterface): The app config.\n    util (UtilInterface): Utility methods, including a method to check if an invocation was canceled and step callbacks.\n    boards (BoardsInterface): Methods to interact with boards.",
+  "interfaces": [
+    {
+      "description": "",
+      "methods": [
+        {
+          "description": "Gets an image as an ImageDTO object.",
+          "name": "get_dto",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The name of the image to get.",
+              "name": "image_name",
+              "type": "str"
+            }
+          ],
+          "return_type": "ImageDTO",
+          "returns": "The image as an ImageDTO object.",
+          "signature": "(image_name: str) -> ImageDTO"
+        },
+        {
+          "description": "Gets an image's metadata, if it has any.",
+          "name": "get_metadata",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The name of the image to get the metadata for.",
+              "name": "image_name",
+              "type": "str"
+            }
+          ],
+          "return_type": "Optional[MetadataField]",
+          "returns": "The image's metadata, if it has any.",
+          "signature": "(image_name: str) -> Optional[MetadataField]"
+        },
+        {
+          "description": "Gets the internal path to an image or thumbnail.",
+          "name": "get_path",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The name of the image to get the path of.",
+              "name": "image_name",
+              "type": "str"
+            },
+            {
+              "default": "False",
+              "description": "Get the path of the thumbnail instead of the full image",
+              "name": "thumbnail",
+              "type": "bool"
+            }
+          ],
+          "return_type": "Path",
+          "returns": "The local path of the image or thumbnail.",
+          "signature": "(image_name: str, thumbnail: bool = False) -> Path"
+        },
+        {
+          "description": "Gets an image as a PIL Image object. This method returns a copy of the image.",
+          "name": "get_pil",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The name of the image to get.",
+              "name": "image_name",
+              "type": "str"
+            },
+            {
+              "default": "None",
+              "description": "The color mode to convert the image to. If None, the original mode is used.",
+              "name": "mode",
+              "type": "Optional[Literal['L', 'RGB', 'RGBA', 'CMYK', 'YCbCr', 'LAB', 'HSV', 'I', 'F']]"
+            }
+          ],
+          "return_type": "Image",
+          "returns": "The image as a PIL Image object.",
+          "signature": "(image_name: str, mode: Optional[Literal['L', 'RGB', 'RGBA', 'CMYK', 'YCbCr', 'LAB', 'HSV', 'I', 'F']] = None) -> Image"
+        },
+        {
+          "description": "Saves an image, returning its DTO.\nIf the current queue item has a workflow or metadata, it is automatically saved with the image.",
+          "name": "save",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The image to save, as a PIL image.",
+              "name": "image",
+              "type": "Image"
+            },
+            {
+              "default": "None",
+              "description": "The board ID to add the image to, if it should be added. It the invocation             inherits from `WithBoard`, that board will be used automatically. **Use this only if             you want to override or provide a board manually!**",
+              "name": "board_id",
+              "type": "Optional[str]"
+            },
+            {
+              "default": "ImageCategory.GENERAL",
+              "description": "The category of the image. Only the GENERAL category is added             to the gallery.",
+              "name": "image_category",
+              "type": "ImageCategory"
+            },
+            {
+              "default": "None",
+              "description": "The metadata to save with the image, if it should have any. If the             invocation inherits from `WithMetadata`, that metadata will be used automatically.             **Use this only if you want to override or provide metadata manually!**",
+              "name": "metadata",
+              "type": "Optional[MetadataField]"
+            }
+          ],
+          "return_type": "ImageDTO",
+          "returns": "The saved image DTO.",
+          "signature": "(image: Image, board_id: Optional[str] = None, image_category: ImageCategory = ImageCategory.GENERAL, metadata: Optional[MetadataField] = None) -> ImageDTO"
+        }
+      ],
+      "name": "ImagesInterface"
+    },
+    {
+      "description": "",
+      "methods": [
+        {
+          "description": "Loads a tensor by name. This method returns a copy of the tensor.",
+          "name": "load",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The name of the tensor to load.",
+              "name": "name",
+              "type": "str"
+            }
+          ],
+          "return_type": "Tensor",
+          "returns": "The tensor.",
+          "signature": "(name: str) -> Tensor"
+        },
+        {
+          "description": "Saves a tensor, returning its name.",
+          "name": "save",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The tensor to save.",
+              "name": "tensor",
+              "type": "Tensor"
+            }
+          ],
+          "return_type": "str",
+          "returns": "The name of the saved tensor.",
+          "signature": "(tensor: Tensor) -> str"
+        }
+      ],
+      "name": "TensorsInterface"
+    },
+    {
+      "description": "",
+      "methods": [
+        {
+          "description": "Loads conditioning data by name. This method returns a copy of the conditioning data.",
+          "name": "load",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The name of the conditioning data to load.",
+              "name": "name",
+              "type": "str"
+            }
+          ],
+          "return_type": "ConditioningFieldData",
+          "returns": "The conditioning data.",
+          "signature": "(name: str) -> ConditioningFieldData"
+        },
+        {
+          "description": "Saves a conditioning data object, returning its name.",
+          "name": "save",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The conditioning data to save.",
+              "name": "conditioning_data",
+              "type": "ConditioningFieldData"
+            }
+          ],
+          "return_type": "str",
+          "returns": "The name of the saved conditioning data.",
+          "signature": "(conditioning_data: ConditioningFieldData) -> str"
+        }
+      ],
+      "name": "ConditioningInterface"
+    },
+    {
+      "description": "Common API for loading, downloading and managing models.",
+      "methods": [
+        {
+          "description": "Download the model file located at source to the models cache and return its Path.\nThis can be used to single-file install models and other resources of arbitrary types\nwhich should not get registered with the database. If the model is already\ninstalled, the cached path will be returned. Otherwise it will be downloaded.",
+          "name": "download_and_cache_model",
+          "parameters": [
+            {
+              "default": "",
+              "description": "A URL that points to the model, or a huggingface repo_id.",
+              "name": "source",
+              "type": "str | AnyHttpUrl"
+            }
+          ],
+          "return_type": "Path",
+          "returns": "Path to the downloaded model",
+          "signature": "(source: str | AnyHttpUrl) -> Path"
+        },
+        {
+          "description": "Check if a model exists.",
+          "name": "exists",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The key or ModelField representing the model.",
+              "name": "identifier",
+              "type": "Union[str, ModelIdentifierField]"
+            }
+          ],
+          "return_type": "bool",
+          "returns": "True if the model exists, False if not.",
+          "signature": "(identifier: Union[str, ModelIdentifierField]) -> bool"
+        },
+        {
+          "description": "Gets the absolute path for a given model config or path.\nFor example, if the model's path is `flux/main/FLUX Dev.safetensors`, and the models path is\n`/home/username/InvokeAI/models`, this method will return\n`/home/username/InvokeAI/models/flux/main/FLUX Dev.safetensors`.",
+          "name": "get_absolute_path",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The model config or path.",
+              "name": "config_or_path",
+              "type": "Union[AnyModelConfig, Path, str]"
+            }
+          ],
+          "return_type": "Path",
+          "returns": "The absolute path to the model.",
+          "signature": "(config_or_path: Union[AnyModelConfig, Path, str]) -> Path"
+        },
+        {
+          "description": "Get a model's config.",
+          "name": "get_config",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The key or ModelField representing the model.",
+              "name": "identifier",
+              "type": "Union[str, ModelIdentifierField]"
+            }
+          ],
+          "return_type": "AnyModelConfig",
+          "returns": "The model's config.",
+          "signature": "(identifier: Union[str, ModelIdentifierField]) -> AnyModelConfig"
+        },
+        {
+          "description": "Load a model.",
+          "name": "load",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The key or ModelField representing the model.",
+              "name": "identifier",
+              "type": "Union[str, ModelIdentifierField]"
+            },
+            {
+              "default": "None",
+              "description": "The submodel of the model to get.",
+              "name": "submodel_type",
+              "type": "Optional[SubModelType]"
+            }
+          ],
+          "return_type": "LoadedModel",
+          "returns": "An object representing the loaded model.",
+          "signature": "(identifier: Union[str, ModelIdentifierField], submodel_type: Optional[SubModelType] = None) -> LoadedModel"
+        },
+        {
+          "description": "Load a model by its attributes.",
+          "name": "load_by_attrs",
+          "parameters": [
+            {
+              "default": "",
+              "description": "Name of the model.",
+              "name": "name",
+              "type": "str"
+            },
+            {
+              "default": "",
+              "description": "The models' base type, e.g. `BaseModelType.StableDiffusion1`, `BaseModelType.StableDiffusionXL`, etc.",
+              "name": "base",
+              "type": "BaseModelType"
+            },
+            {
+              "default": "",
+              "description": "Type of the model, e.g. `ModelType.Main`, `ModelType.Vae`, etc.",
+              "name": "type",
+              "type": "ModelType"
+            },
+            {
+              "default": "None",
+              "description": "The type of submodel to load, e.g. `SubModelType.UNet`, `SubModelType.TextEncoder`, etc. Only main models have submodels.",
+              "name": "submodel_type",
+              "type": "Optional[SubModelType]"
+            }
+          ],
+          "return_type": "LoadedModel",
+          "returns": "An object representing the loaded model.",
+          "signature": "(name: str, base: BaseModelType, type: ModelType, submodel_type: Optional[SubModelType] = None) -> LoadedModel"
+        },
+        {
+          "description": "Load the model file located at the indicated path\nIf a loader callable is provided, it will be invoked to load the model. Otherwise,\n`safetensors.torch.load_file()` or `torch.load()` will be called to load the model.\nBe aware that the LoadedModelWithoutConfig object has no `config` attribute",
+          "name": "load_local_model",
+          "parameters": [
+            {
+              "default": "",
+              "description": "",
+              "name": "model_path",
+              "type": "Path"
+            },
+            {
+              "default": "None",
+              "description": "A Callable that expects a Path and returns a dict[str|int, Any]",
+              "name": "loader",
+              "type": "Optional[Callable[[Path], AnyModel]]"
+            }
+          ],
+          "return_type": "LoadedModelWithoutConfig",
+          "returns": "A LoadedModelWithoutConfig object.",
+          "signature": "(model_path: Path, loader: Optional[Callable[[Path], AnyModel]] = None) -> LoadedModelWithoutConfig"
+        },
+        {
+          "description": "Download, cache, and load the model file located at the indicated URL or repo_id.\nIf the model is already downloaded, it will be loaded from the cache.\nIf the a loader callable is provided, it will be invoked to load the model. Otherwise,\n`safetensors.torch.load_file()` or `torch.load()` will be called to load the model.\nBe aware that the LoadedModelWithoutConfig object has no `config` attribute",
+          "name": "load_remote_model",
+          "parameters": [
+            {
+              "default": "",
+              "description": "A URL or huggingface repoid.",
+              "name": "source",
+              "type": "str | AnyHttpUrl"
+            },
+            {
+              "default": "None",
+              "description": "A Callable that expects a Path and returns a dict[str|int, Any]",
+              "name": "loader",
+              "type": "Optional[Callable[[Path], AnyModel]]"
+            }
+          ],
+          "return_type": "LoadedModelWithoutConfig",
+          "returns": "A LoadedModelWithoutConfig object.",
+          "signature": "(source: str | AnyHttpUrl, loader: Optional[Callable[[Path], AnyModel]] = None) -> LoadedModelWithoutConfig"
+        },
+        {
+          "description": "Search for models by attributes.",
+          "name": "search_by_attrs",
+          "parameters": [
+            {
+              "default": "None",
+              "description": "The name to search for (exact match).",
+              "name": "name",
+              "type": "Optional[str]"
+            },
+            {
+              "default": "None",
+              "description": "The base to search for, e.g. `BaseModelType.StableDiffusion1`, `BaseModelType.StableDiffusionXL`, etc.",
+              "name": "base",
+              "type": "Optional[BaseModelType]"
+            },
+            {
+              "default": "None",
+              "description": "Type type of model to search for, e.g. `ModelType.Main`, `ModelType.Vae`, etc.",
+              "name": "type",
+              "type": "Optional[ModelType]"
+            },
+            {
+              "default": "None",
+              "description": "The format of model to search for, e.g. `ModelFormat.Checkpoint`, `ModelFormat.Diffusers`, etc.",
+              "name": "format",
+              "type": "Optional[ModelFormat]"
+            }
+          ],
+          "return_type": "list[AnyModelConfig]",
+          "returns": "A list of models that match the attributes.",
+          "signature": "(name: Optional[str] = None, base: Optional[BaseModelType] = None, type: Optional[ModelType] = None, format: Optional[ModelFormat] = None) -> list[AnyModelConfig]"
+        },
+        {
+          "description": "Search for models by path.",
+          "name": "search_by_path",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The path to search for.",
+              "name": "path",
+              "type": "Path"
+            }
+          ],
+          "return_type": "list[AnyModelConfig]",
+          "returns": "A list of models that match the path.",
+          "signature": "(path: Path) -> list[AnyModelConfig]"
+        }
+      ],
+      "name": "ModelsInterface"
+    },
+    {
+      "description": "",
+      "methods": [
+        {
+          "description": "Logs a debug message.",
+          "name": "debug",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The message to log.",
+              "name": "message",
+              "type": "str"
+            }
+          ],
+          "return_type": "None",
+          "returns": "",
+          "signature": "(message: str) -> None"
+        },
+        {
+          "description": "Logs an error message.",
+          "name": "error",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The message to log.",
+              "name": "message",
+              "type": "str"
+            }
+          ],
+          "return_type": "None",
+          "returns": "",
+          "signature": "(message: str) -> None"
+        },
+        {
+          "description": "Logs an info message.",
+          "name": "info",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The message to log.",
+              "name": "message",
+              "type": "str"
+            }
+          ],
+          "return_type": "None",
+          "returns": "",
+          "signature": "(message: str) -> None"
+        },
+        {
+          "description": "Logs a warning message.",
+          "name": "warning",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The message to log.",
+              "name": "message",
+              "type": "str"
+            }
+          ],
+          "return_type": "None",
+          "returns": "",
+          "signature": "(message: str) -> None"
+        }
+      ],
+      "name": "LoggerInterface"
+    },
+    {
+      "description": "",
+      "methods": [
+        {
+          "description": "Gets the app's config.",
+          "name": "get",
+          "parameters": [],
+          "return_type": "InvokeAIAppConfig",
+          "returns": "The app's config.",
+          "signature": "() -> InvokeAIAppConfig"
+        }
+      ],
+      "name": "ConfigInterface"
+    },
+    {
+      "description": "",
+      "methods": [
+        {
+          "description": "The step callback for FLUX.2 Klein models (32-channel VAE).",
+          "name": "flux2_step_callback",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The intermediate state of the diffusion pipeline.",
+              "name": "intermediate_state",
+              "type": "PipelineIntermediateState"
+            }
+          ],
+          "return_type": "None",
+          "returns": "",
+          "signature": "(intermediate_state: PipelineIntermediateState) -> None"
+        },
+        {
+          "description": "The step callback emits a progress event with the current step, the total number of\nsteps, a preview image, and some other internal metadata.\nThis should be called after each denoising step.",
+          "name": "flux_step_callback",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The intermediate state of the diffusion pipeline.",
+              "name": "intermediate_state",
+              "type": "PipelineIntermediateState"
+            }
+          ],
+          "return_type": "None",
+          "returns": "",
+          "signature": "(intermediate_state: PipelineIntermediateState) -> None"
+        },
+        {
+          "description": "Checks if the current session has been canceled.",
+          "name": "is_canceled",
+          "parameters": [],
+          "return_type": "bool",
+          "returns": "True if the current session has been canceled, False if not.",
+          "signature": "() -> bool"
+        },
+        {
+          "description": "The step callback emits a progress event with the current step, the total number of\nsteps, a preview image, and some other internal metadata.\nThis should be called after each denoising step.",
+          "name": "sd_step_callback",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The intermediate state of the diffusion pipeline.",
+              "name": "intermediate_state",
+              "type": "PipelineIntermediateState"
+            },
+            {
+              "default": "",
+              "description": "The base model for the current denoising step.",
+              "name": "base_model",
+              "type": "BaseModelType"
+            }
+          ],
+          "return_type": "None",
+          "returns": "",
+          "signature": "(intermediate_state: PipelineIntermediateState, base_model: BaseModelType) -> None"
+        },
+        {
+          "description": "Signals the progress of some long-running invocation. The progress is displayed in the UI.\nIf a percentage is provided, the UI will display a progress bar and automatically append the percentage to the\nmessage. You should not include the percentage in the message.\nExample:\n```py\ntotal_steps = 10\nfor i in range(total_steps):\npercentage = i / (total_steps - 1)\ncontext.util.signal_progress(\"Doing something cool\", percentage)\n```\nIf an image is provided, the UI will display it. If your image should be displayed at a different size, provide\na tuple of `(width, height)` for the `image_size` parameter. The image will be displayed at the specified size\nin the UI.\nFor example, SD denoising progress images are 1/8 the size of the original image, so you'd do this to ensure the\nimage is displayed at the correct size:\n```py\n# Calculate the output size of the image (8x the progress image's size)\nwidth = progress_image.width * 8\nheight = progress_image.height * 8\n# Signal the progress with the image and output size\nsignal_progress(\"Denoising\", percentage, progress_image, (width, height))\n```\nIf your progress image is very large, consider downscaling it to reduce the payload size and provide the original\nsize to the `image_size` parameter. The PIL `thumbnail` method is useful for this, as it maintains the aspect\nratio of the image:\n```py\n# `thumbnail` modifies the image in-place, so we need to first make a copy\nthumbnail_image = progress_image.copy()\n# Resize the image to a maximum of 256x256 pixels, maintaining the aspect ratio\nthumbnail_image.thumbnail((256, 256))\n# Signal the progress with the thumbnail, passing the original size\nsignal_progress(\"Denoising\", percentage, thumbnail, progress_image.size)\n```",
+          "name": "signal_progress",
+          "parameters": [
+            {
+              "default": "",
+              "description": "A message describing the current status. Do not include the percentage in this message.",
+              "name": "message",
+              "type": "str"
+            },
+            {
+              "default": "None",
+              "description": "The current percentage completion for the process. Omit for indeterminate progress.",
+              "name": "percentage",
+              "type": "float | None"
+            },
+            {
+              "default": "None",
+              "description": "An optional image to display.",
+              "name": "image",
+              "type": "Image | None"
+            },
+            {
+              "default": "None",
+              "description": "The optional size of the image to display. If omitted, the image will be displayed at its original size.",
+              "name": "image_size",
+              "type": "tuple[int, int] | None"
+            }
+          ],
+          "return_type": "None",
+          "returns": "",
+          "signature": "(message: str, percentage: float | None = None, image: Image | None = None, image_size: tuple[int, int] | None = None) -> None"
+        }
+      ],
+      "name": "UtilInterface"
+    },
+    {
+      "description": "",
+      "methods": [
+        {
+          "description": "Adds an image to a board.",
+          "name": "add_image_to_board",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The ID of the board to add the image to.",
+              "name": "board_id",
+              "type": "str"
+            },
+            {
+              "default": "",
+              "description": "The name of the image to add to the board.",
+              "name": "image_name",
+              "type": "str"
+            }
+          ],
+          "return_type": "None",
+          "returns": "",
+          "signature": "(board_id: str, image_name: str) -> None"
+        },
+        {
+          "description": "Creates a board for the current user.",
+          "name": "create",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The name of the board to create.",
+              "name": "board_name",
+              "type": "str"
+            }
+          ],
+          "return_type": "BoardDTO",
+          "returns": "The created board DTO.",
+          "signature": "(board_name: str) -> BoardDTO"
+        },
+        {
+          "description": "Gets all boards accessible to the current user.",
+          "name": "get_all",
+          "parameters": [],
+          "return_type": "list[BoardDTO]",
+          "returns": "A list of all boards accessible to the current user.",
+          "signature": "() -> list[BoardDTO]"
+        },
+        {
+          "description": "Gets all image names for a board.",
+          "name": "get_all_image_names_for_board",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The ID of the board to get the image names for.",
+              "name": "board_id",
+              "type": "str"
+            }
+          ],
+          "return_type": "list[str]",
+          "returns": "A list of all image names for the board.",
+          "signature": "(board_id: str) -> list[str]"
+        },
+        {
+          "description": "Gets a board DTO.",
+          "name": "get_dto",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The ID of the board to get.",
+              "name": "board_id",
+              "type": "str"
+            }
+          ],
+          "return_type": "BoardDTO",
+          "returns": "The board DTO.",
+          "signature": "(board_id: str) -> BoardDTO"
+        }
+      ],
+      "name": "BoardsInterface"
+    }
+  ],
+  "name": "InvocationContext"
+}

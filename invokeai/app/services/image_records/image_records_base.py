@@ -74,8 +74,8 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_intermediates_count(self) -> int:
-        """Gets a count of all intermediate images."""
+    def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
+        """Gets a count of intermediate images. If user_id is provided, only counts that user's intermediates."""
         pass
 
     @abstractmethod
@@ -95,6 +95,11 @@ class ImageRecordStorageBase(ABC):
         user_id: Optional[str] = None,
     ) -> datetime:
         """Saves an image record."""
+        pass
+
+    @abstractmethod
+    def get_user_id(self, image_name: str) -> Optional[str]:
+        """Gets the user_id of the image owner. Returns None if image not found."""
         pass
 
     @abstractmethod
