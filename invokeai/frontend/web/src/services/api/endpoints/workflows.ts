@@ -157,6 +157,21 @@ export const workflowsApi = api.injectEndpoints({
       }),
       invalidatesTags: (result, error, workflow_id) => [{ type: 'Workflow', id: workflow_id }],
     }),
+    updateWorkflowIsPublic: build.mutation<
+      paths['/api/v1/workflows/i/{workflow_id}/is_public']['patch']['responses']['200']['content']['application/json'],
+      { workflow_id: string; is_public: boolean }
+    >({
+      query: ({ workflow_id, is_public }) => ({
+        url: buildWorkflowsUrl(`i/${workflow_id}/is_public`),
+        method: 'PATCH',
+        body: { is_public },
+      }),
+      invalidatesTags: (result, error, { workflow_id }) => [
+        { type: 'Workflow', id: workflow_id },
+        { type: 'Workflow', id: LIST_TAG },
+        'WorkflowCategoryCounts',
+      ],
+    }),
   }),
 });
 
@@ -173,4 +188,5 @@ export const {
   useListWorkflowsInfiniteInfiniteQuery,
   useSetWorkflowThumbnailMutation,
   useDeleteWorkflowThumbnailMutation,
+  useUpdateWorkflowIsPublicMutation,
 } = workflowsApi;
