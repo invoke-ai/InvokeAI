@@ -141,6 +141,7 @@ class SessionQueueTable(SQLModel, table=True):
     destination: Optional[str] = Field(default=None)
     retried_from_item_id: Optional[int] = Field(default=None)
     user_id: str = Field(default="system")
+    workflow: Optional[str] = Field(default=None)  # JSON blob
 
 
 # --- models ---

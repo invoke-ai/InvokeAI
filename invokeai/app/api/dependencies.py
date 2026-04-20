@@ -42,7 +42,7 @@ from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
 )
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_sqlmodel import SqlModelSessionQueue
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
 from invokeai.app.services.style_preset_records.style_preset_records_sqlmodel import SqlModelStylePresetRecordsStorage
@@ -175,7 +175,7 @@ class ApiDependencies:
         names = SimpleNameService()
         performance_statistics = InvocationStatsService()
         session_processor = DefaultSessionProcessor(session_runner=DefaultSessionRunner())
-        session_queue = SqliteSessionQueue(db=db)  # Stays raw SQL (Phase 3)
+        session_queue = SqlModelSessionQueue(db=db)
         urls = LocalUrlService()
         workflow_records = SqlModelWorkflowRecordsStorage(db=db)
         style_preset_records = SqlModelStylePresetRecordsStorage(db=db)
