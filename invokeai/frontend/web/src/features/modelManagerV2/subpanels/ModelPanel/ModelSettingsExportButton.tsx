@@ -3,13 +3,13 @@ import { toast } from 'features/toast/toast';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiDownloadSimpleBold } from 'react-icons/pi';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfigWithExternal } from 'services/api/types';
 
 type Props = {
-  modelConfig: AnyModelConfig;
+  modelConfig: AnyModelConfigWithExternal;
 };
 
-const buildExportData = (modelConfig: AnyModelConfig): Record<string, unknown> => {
+const buildExportData = (modelConfig: AnyModelConfigWithExternal): Record<string, unknown> => {
   const data: Record<string, unknown> = {};
 
   if (

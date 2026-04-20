@@ -11,7 +11,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import WavyLine from 'common/components/WavyLine';
-import { selectImg2imgStrength, setImg2imgStrength } from 'features/controlLayers/store/paramsSlice';
+import { selectImg2imgStrength, selectIsExternal, setImg2imgStrength } from 'features/controlLayers/store/paramsSlice';
 import { selectActiveRasterLayerEntities } from 'features/controlLayers/store/selectors';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -37,6 +37,7 @@ export const ParamDenoisingStrength = memo(() => {
   const img2imgStrength = useAppSelector(selectImg2imgStrength);
   const dispatch = useAppDispatch();
   const hasRasterLayersWithContent = useAppSelector(selectHasRasterLayersWithContent);
+  const isExternal = useAppSelector(selectIsExternal);
   const selectedModelConfig = useSelectedModelConfig();
 
   const onChange = useCallback(
@@ -55,12 +56,16 @@ export const ParamDenoisingStrength = memo(() => {
       // Denoising strength does nothing if there are no raster layers w/ content
       return true;
     }
+    if (isExternal) {
+      // External models don't support denoise strength - they handle img2img via prompt
+      return true;
+    }
     if (selectedModelConfig && isFluxFillMainModelModelConfig(selectedModelConfig)) {
       // Denoising strength is ignored by FLUX Fill, which is indicated by the variant being 'inpaint'
       return true;
     }
     return false;
-  }, [hasRasterLayersWithContent, selectedModelConfig]);
+  }, [hasRasterLayersWithContent, isExternal, selectedModelConfig]);
 
   return (
     <FormControl isDisabled={isDisabled} p={1} justifyContent="space-between" h={8}>
@@ -96,7 +101,9 @@ export const ParamDenoisingStrength = memo(() => {
         </>
       ) : (
         <Flex alignItems="center">
-          <Badge opacity="0.6">{t('parameters.disabledNoRasterContent')}</Badge>
+          <Badge opacity="0.6">
+            {isExternal ? t('parameters.disabledNotSupported') : t('parameters.disabledNoRasterContent')}
+          </Badge>
         </Flex>
       )}
     </FormControl>

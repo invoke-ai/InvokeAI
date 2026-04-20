@@ -1,6 +1,6 @@
 import { IconButton } from '@invoke-ai/ui-library';
-import { useAppDispatch } from 'app/store/storeHooks';
-import { dimensionsSwapped } from 'features/controlLayers/store/paramsSlice';
+import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { dimensionsSwapped, selectHasFixedDimensionSizes } from 'features/controlLayers/store/paramsSlice';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiArrowsDownUpBold } from 'react-icons/pi';
@@ -8,6 +8,7 @@ import { PiArrowsDownUpBold } from 'react-icons/pi';
 export const DimensionsSwapButton = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
+  const hasFixedSizes = useAppSelector(selectHasFixedDimensionSizes);
   const onClick = useCallback(() => {
     dispatch(dimensionsSwapped());
   }, [dispatch]);
@@ -19,6 +20,7 @@ export const DimensionsSwapButton = memo(() => {
       variant="ghost"
       size="sm"
       icon={<PiArrowsDownUpBold />}
+      isDisabled={hasFixedSizes}
     />
   );
 });
