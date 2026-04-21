@@ -116,6 +116,7 @@ export const RefImagePreview = memo(() => {
         ref={dndRef}
         position="relative"
         h="full"
+        aspectRatio="1/1"
         flexShrink={0}
         opacity={isDragging ? 0.3 : 1}
         data-ref-image-id={id}
@@ -143,7 +144,15 @@ export const RefImagePreview = memo(() => {
     );
   }
   return (
-    <Box ref={dndRef} position="relative" h="full" flexShrink={0} opacity={isDragging ? 0.3 : 1} data-ref-image-id={id}>
+    <Box
+      ref={dndRef}
+      position="relative"
+      h="full"
+      aspectRatio="1/1"
+      flexShrink={0}
+      opacity={isDragging ? 0.3 : 1}
+      data-ref-image-id={id}
+    >
       <Tooltip label={warnings.length > 0 ? <RefImageWarningTooltipContent warnings={warnings} /> : undefined}>
         <Flex
           position="relative"
