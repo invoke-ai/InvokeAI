@@ -50,10 +50,17 @@ Implemented runtime scaffolding:
 
 - `GraphExecutionState` now persists workflow-call runtime state:
   - `workflow_call_stack`
+  - `workflow_call_history`
+  - `workflow_call_parent`
   - `waiting_workflow_call`
+  - `waiting_workflow_call_execution`
   - `waiting_workflow_call_child_session`
   - `max_workflow_call_depth`
 - Nested and recursive calls are represented by the stack, with a runtime depth cap of 4.
+- Parent/child workflow-call identity is now explicit in runtime state:
+  - the parent tracks an active `WorkflowCallExecution` record while waiting
+  - completed and failed calls are preserved in `workflow_call_history`
+  - child sessions carry a `workflow_call_parent` reference back to the parent call relationship
 - `GraphExecutionState.next()` returns no runnable node while the parent session is waiting on a child workflow call.
 - `GraphExecutionState.is_complete()` stays false while waiting.
 - `DefaultSessionRunner.run_node()` now treats `call_saved_workflow` as a call boundary instead of a normal executable

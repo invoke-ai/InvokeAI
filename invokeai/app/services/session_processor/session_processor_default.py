@@ -128,12 +128,13 @@ class WorkflowCallCoordinator:
         if child_session is None:
             raise ValueError("Execution state is waiting on a workflow call but has no attached child session.")
         output = self.get_child_workflow_return_output(child_session)
-        queue_item.session.end_waiting_on_workflow_call()
+        queue_item.session.end_waiting_on_workflow_call(status="completed")
         queue_item.session.complete(invocation.id, output)
         self._session_runner._on_after_run_node(invocation, queue_item, output)
 
     def fail_waiting_workflow_call(self, queue_item: SessionQueueItem, error_message: str) -> None:
         invocation = self.get_waiting_workflow_call_invocation(queue_item)
+        queue_item.session.end_waiting_on_workflow_call(status="failed", error_message=error_message)
         self._session_runner._on_node_error(
             invocation=invocation,
             queue_item=queue_item,

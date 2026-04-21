@@ -237,6 +237,46 @@ def test_graph_child_workflow_execution_state_inherits_stack_and_isolates_runtim
     assert child_state.executed == set()
 
 
+def test_graph_waiting_workflow_call_tracks_parent_child_metadata():
+    parent = GraphExecutionState(graph=Graph())
+    parent.execution_graph.add_node(PromptTestInvocation(id="prepared-parent", prompt="a"))
+    parent.prepared_source_mapping["prepared-parent"] = "source-parent"
+    frame = parent.build_workflow_call_frame(exec_node_id="prepared-parent", workflow_id="workflow-a")
+
+    child = parent.create_child_workflow_execution_state(graph=Graph(), frame=frame)
+    parent.begin_waiting_on_workflow_call(frame)
+    parent.attach_waiting_workflow_call_child_session(child)
+
+    assert parent.waiting_workflow_call_execution is not None
+    assert parent.waiting_workflow_call_execution.parent_session_id == parent.id
+    assert parent.waiting_workflow_call_execution.child_session_id == child.id
+    assert parent.waiting_workflow_call_execution.status == "running_child"
+    assert child.workflow_call_parent is not None
+    assert child.workflow_call_parent.workflow_call_id == parent.waiting_workflow_call_execution.id
+    assert child.workflow_call_parent.parent_session_id == parent.id
+
+
+def test_graph_end_waiting_on_workflow_call_records_lifecycle_history():
+    parent = GraphExecutionState(graph=Graph())
+    parent.execution_graph.add_node(PromptTestInvocation(id="prepared-parent", prompt="a"))
+    parent.prepared_source_mapping["prepared-parent"] = "source-parent"
+    frame = parent.build_workflow_call_frame(exec_node_id="prepared-parent", workflow_id="workflow-a")
+
+    child = parent.create_child_workflow_execution_state(graph=Graph(), frame=frame)
+    parent.begin_waiting_on_workflow_call(frame)
+    parent.attach_waiting_workflow_call_child_session(child)
+    parent.end_waiting_on_workflow_call(status="failed", error_message="child failed")
+
+    assert parent.waiting_workflow_call is None
+    assert parent.waiting_workflow_call_execution is None
+    assert parent.waiting_workflow_call_child_session is None
+    assert len(parent.workflow_call_history) == 1
+    assert parent.workflow_call_history[0].status == "failed"
+    assert parent.workflow_call_history[0].error_message == "child failed"
+    assert parent.workflow_call_history[0].parent_session_id == parent.id
+    assert parent.workflow_call_history[0].child_session_id == child.id
+
+
 def test_graph_execution_state_serializes_recursive_workflow_call_stack():
     g = GraphExecutionState(
         graph=Graph(),

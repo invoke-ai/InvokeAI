@@ -70,6 +70,7 @@ class Edge(BaseModel):
 
 
 PreparedExecState = Literal["pending", "ready", "executed", "skipped"]
+WorkflowCallStatus = Literal["waiting_for_child", "running_child", "completed", "failed"]
 
 
 class WorkflowCallFrame(BaseModel):
@@ -77,6 +78,31 @@ class WorkflowCallFrame(BaseModel):
 
     prepared_call_node_id: str = Field(description="The prepared exec node id for the call site.")
     source_call_node_id: str = Field(description="The source graph node id for the call site.")
+    workflow_id: str = Field(description="The saved workflow being called.")
+    depth: int = Field(description="The 1-based depth of this call frame.", ge=1)
+
+
+class WorkflowCallExecution(BaseModel):
+    """Tracks one parent/child workflow-call relationship and its lifecycle."""
+
+    id: str = Field(description="The workflow-call execution id.", default_factory=uuid_string)
+    parent_session_id: str = Field(description="The parent graph execution state id.")
+    child_session_id: Optional[str] = Field(default=None, description="The child graph execution state id, if any.")
+    prepared_call_node_id: str = Field(description="The prepared exec node id for the parent call site.")
+    source_call_node_id: str = Field(description="The source graph node id for the parent call site.")
+    workflow_id: str = Field(description="The saved workflow being called.")
+    depth: int = Field(description="The 1-based depth of this call frame.", ge=1)
+    status: WorkflowCallStatus = Field(description="The current workflow-call lifecycle state.")
+    error_message: Optional[str] = Field(default=None, description="Failure reason, if the call failed.")
+
+
+class WorkflowCallParentRef(BaseModel):
+    """Reference from a child execution state back to its parent workflow-call relationship."""
+
+    workflow_call_id: str = Field(description="The workflow-call execution id.")
+    parent_session_id: str = Field(description="The parent graph execution state id.")
+    prepared_call_node_id: str = Field(description="The prepared exec node id for the parent call site.")
+    source_call_node_id: str = Field(description="The source graph node id for the parent call site.")
     workflow_id: str = Field(description="The saved workflow being called.")
     depth: int = Field(description="The 1-based depth of this call frame.", ge=1)
 
@@ -1748,9 +1774,21 @@ class GraphExecutionState(BaseModel):
         description="The nested workflow call stack inherited by this execution state.",
         default_factory=list,
     )
+    workflow_call_history: list[WorkflowCallExecution] = Field(
+        description="Completed or failed workflow-call relationships observed by this execution state.",
+        default_factory=list,
+    )
+    workflow_call_parent: Optional[WorkflowCallParentRef] = Field(
+        default=None,
+        description="Parent workflow-call relationship metadata when this execution state is a child workflow session.",
+    )
     waiting_workflow_call: Optional[WorkflowCallFrame] = Field(
         default=None,
         description="The child workflow call this execution state is currently waiting on, if any.",
+    )
+    waiting_workflow_call_execution: Optional[WorkflowCallExecution] = Field(
+        default=None,
+        description="The active workflow-call relationship metadata for the current waiting child workflow, if any.",
     )
     waiting_workflow_call_child_session: Optional["GraphExecutionState"] = Field(
         default=None,
@@ -1878,6 +1916,7 @@ class GraphExecutionState(BaseModel):
                 "results",
                 "errors",
                 "workflow_call_stack",
+                "workflow_call_history",
                 "prepared_source_mapping",
                 "source_prepared_mapping",
             ]
@@ -1962,14 +2001,43 @@ class GraphExecutionState(BaseModel):
         if self.waiting_workflow_call is not None:
             raise ValueError("Execution state is already waiting on a workflow call")
         self.waiting_workflow_call = frame
+        self.waiting_workflow_call_execution = WorkflowCallExecution(
+            parent_session_id=self.id,
+            prepared_call_node_id=frame.prepared_call_node_id,
+            source_call_node_id=frame.source_call_node_id,
+            workflow_id=frame.workflow_id,
+            depth=frame.depth,
+            status="waiting_for_child",
+        )
 
     def attach_waiting_workflow_call_child_session(self, child_session: "GraphExecutionState") -> None:
         if self.waiting_workflow_call is None:
             raise ValueError("Execution state must be waiting on a workflow call before attaching a child session")
+        if self.waiting_workflow_call_execution is None:
+            raise ValueError("Execution state is waiting on a workflow call but has no workflow call execution")
         self.waiting_workflow_call_child_session = child_session
+        self.waiting_workflow_call_execution.child_session_id = child_session.id
+        self.waiting_workflow_call_execution.status = "running_child"
+        child_session.workflow_call_parent = WorkflowCallParentRef(
+            workflow_call_id=self.waiting_workflow_call_execution.id,
+            parent_session_id=self.waiting_workflow_call_execution.parent_session_id,
+            prepared_call_node_id=self.waiting_workflow_call_execution.prepared_call_node_id,
+            source_call_node_id=self.waiting_workflow_call_execution.source_call_node_id,
+            workflow_id=self.waiting_workflow_call_execution.workflow_id,
+            depth=self.waiting_workflow_call_execution.depth,
+        )
 
-    def end_waiting_on_workflow_call(self) -> None:
+    def end_waiting_on_workflow_call(
+        self,
+        status: Literal["completed", "failed"] = "completed",
+        error_message: Optional[str] = None,
+    ) -> None:
+        if self.waiting_workflow_call_execution is not None:
+            self.waiting_workflow_call_execution.status = status
+            self.waiting_workflow_call_execution.error_message = error_message
+            self.workflow_call_history.append(self.waiting_workflow_call_execution.model_copy(deep=True))
         self.waiting_workflow_call = None
+        self.waiting_workflow_call_execution = None
         self.waiting_workflow_call_child_session = None
 
     def create_child_workflow_execution_state(self, graph: Graph, frame: WorkflowCallFrame) -> "GraphExecutionState":

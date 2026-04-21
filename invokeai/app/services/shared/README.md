@@ -113,7 +113,10 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
 - `indegree: dict[str, int]` - unmet inputs per exec node.
 - Workflow-call runtime state:
   - `workflow_call_stack` - active parent call frames.
+  - `workflow_call_history` - completed or failed workflow-call relationships observed by this execution state.
+  - `workflow_call_parent` - parent workflow-call relationship metadata when this execution state is a child session.
   - `waiting_workflow_call` - the call frame currently suspending this execution state, if any.
+  - `waiting_workflow_call_execution` - the active parent/child workflow-call relationship record for the waiting call.
   - `waiting_workflow_call_child_session` - attached child execution state for the waiting workflow call, if any.
   - `max_workflow_call_depth` - runtime guardrail for nested or recursive workflow calls.
 - Prepared exec metadata caches:

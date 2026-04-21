@@ -841,6 +841,9 @@ def test_workflow_call_coordinator_runs_child_session_and_resumes_parent_workflo
     assert parent_outputs[0].collection == [3]
     assert len(downstream_outputs) == 1
     assert downstream_outputs[0].value == [3]
+    assert len(session.workflow_call_history) == 1
+    assert session.workflow_call_history[0].status == "completed"
+    assert session.workflow_call_history[0].child_session_id is not None
     assert session_queue.completed_item_ids == [1]
     assert events.errors == []
 
@@ -1036,6 +1039,9 @@ def test_run_fails_call_saved_workflow_when_child_has_no_workflow_return(monkeyp
     processor.session_runner.workflow_call_coordinator.run_queue_item(queue_item)
 
     assert session.has_error()
+    assert len(session.workflow_call_history) == 1
+    assert session.workflow_call_history[0].status == "failed"
+    assert session.workflow_call_history[0].error_message is not None
     assert session_queue.failed_item_ids == [1]
     assert len(events.errors) == 1
     assert "workflow_return" in events.errors[0][3]
