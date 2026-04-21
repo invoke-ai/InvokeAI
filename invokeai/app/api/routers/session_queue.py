@@ -72,6 +72,11 @@ def sanitize_queue_item_for_user(
     sanitized_item.priority = 0
     sanitized_item.field_values = None
     sanitized_item.retried_from_item_id = None
+    sanitized_item.workflow_call_id = None
+    sanitized_item.parent_item_id = None
+    sanitized_item.parent_session_id = None
+    sanitized_item.root_item_id = None
+    sanitized_item.workflow_call_depth = None
     sanitized_item.workflow = None
     sanitized_item.error_type = None
     sanitized_item.error_message = None
