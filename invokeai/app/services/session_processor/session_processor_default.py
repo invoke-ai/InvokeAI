@@ -42,6 +42,153 @@ from invokeai.app.services.shared.workflow_graph_builder import (
 from invokeai.app.util.profiler import Profiler
 
 
+class WorkflowCallCoordinator:
+    """Coordinates temporary parent/child workflow-call execution."""
+
+    def __init__(self, session_runner: "DefaultSessionRunner") -> None:
+        self._session_runner = session_runner
+
+    def _collect_call_saved_workflow_inputs(
+        self, invocation: CallSavedWorkflowInvocation, queue_item: SessionQueueItem
+    ) -> dict[str, Any]:
+        workflow_inputs = dict(invocation.workflow_inputs)
+        for edge in queue_item.session.execution_graph._get_input_edges(invocation.id):
+            if not is_call_saved_workflow_dynamic_input(edge.destination.field):
+                continue
+            if edge.source.node_id not in queue_item.session.results:
+                continue
+            workflow_inputs[edge.destination.field] = getattr(
+                queue_item.session.results[edge.source.node_id], edge.source.field
+            )
+        return workflow_inputs
+
+    @staticmethod
+    def build_child_queue_item(queue_item: SessionQueueItem, child_session: GraphExecutionState) -> SessionQueueItem:
+        if hasattr(queue_item, "model_copy"):
+            return queue_item.model_copy(update={"session": child_session, "session_id": child_session.id})
+
+        child_queue_item = type(queue_item).__new__(type(queue_item))
+        child_queue_item.__dict__ = {**queue_item.__dict__, "session": child_session, "session_id": child_session.id}
+        return child_queue_item
+
+    @staticmethod
+    def get_waiting_workflow_call_invocation(queue_item: SessionQueueItem) -> CallSavedWorkflowInvocation:
+        waiting_frame = queue_item.session.waiting_workflow_call
+        if waiting_frame is None:
+            raise ValueError("Execution state is not waiting on a workflow call.")
+        invocation = queue_item.session.execution_graph.nodes.get(waiting_frame.prepared_call_node_id)
+        if not isinstance(invocation, CallSavedWorkflowInvocation):
+            raise ValueError("Waiting workflow call frame does not point to a call_saved_workflow invocation.")
+        return invocation
+
+    @staticmethod
+    def get_child_workflow_return_output(child_session: GraphExecutionState) -> WorkflowReturnOutput:
+        workflow_return_node_ids = [
+            node_id for node_id, node in child_session.graph.nodes.items() if node.get_type() == "workflow_return"
+        ]
+        if not workflow_return_node_ids:
+            raise ValueError("The selected saved workflow must contain exactly one workflow_return node.")
+        if len(workflow_return_node_ids) > 1:
+            raise ValueError("The selected saved workflow must not contain more than one workflow_return node.")
+
+        workflow_return_node_id = workflow_return_node_ids[0]
+        prepared_return_node_ids = child_session.source_prepared_mapping.get(workflow_return_node_id, set())
+        if len(prepared_return_node_ids) != 1:
+            raise ValueError(
+                "The selected saved workflow produced an unsupported number of workflow_return executions."
+            )
+
+        prepared_return_node_id = next(iter(prepared_return_node_ids))
+        output = child_session.results.get(prepared_return_node_id)
+        if not isinstance(output, WorkflowReturnOutput):
+            raise ValueError("The selected saved workflow did not produce a valid workflow_return output.")
+
+        return output
+
+    def begin_workflow_call_boundary(
+        self,
+        invocation: CallSavedWorkflowInvocation,
+        queue_item: SessionQueueItem,
+        workflow_record,
+    ) -> None:
+        call_frame = queue_item.session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
+        child_graph = build_graph_from_workflow(workflow_record.workflow.model_dump())
+        apply_workflow_inputs_to_graph(
+            child_graph,
+            workflow_record.workflow.model_dump(),
+            self._collect_call_saved_workflow_inputs(invocation, queue_item),
+        )
+        child_session = queue_item.session.create_child_workflow_execution_state(child_graph, call_frame)
+        queue_item.session.begin_waiting_on_workflow_call(call_frame)
+        queue_item.session.attach_waiting_workflow_call_child_session(child_session)
+
+    def resume_waiting_workflow_call(self, queue_item: SessionQueueItem) -> None:
+        invocation = self.get_waiting_workflow_call_invocation(queue_item)
+        child_session = queue_item.session.waiting_workflow_call_child_session
+        if child_session is None:
+            raise ValueError("Execution state is waiting on a workflow call but has no attached child session.")
+        output = self.get_child_workflow_return_output(child_session)
+        queue_item.session.end_waiting_on_workflow_call()
+        queue_item.session.complete(invocation.id, output)
+        self._session_runner._on_after_run_node(invocation, queue_item, output)
+
+    def fail_waiting_workflow_call(self, queue_item: SessionQueueItem, error_message: str) -> None:
+        invocation = self.get_waiting_workflow_call_invocation(queue_item)
+        self._session_runner._on_node_error(
+            invocation=invocation,
+            queue_item=queue_item,
+            error_type="ValueError",
+            error_message=error_message,
+            error_traceback=error_message,
+        )
+
+    def run_queue_item(self, queue_item: SessionQueueItem) -> None:
+        self._session_runner._on_before_run_session(queue_item=queue_item)
+
+        active_queue_item = queue_item
+        parent_queue_items: list[SessionQueueItem] = []
+
+        while True:
+            self._session_runner._run_session_loop(active_queue_item)
+
+            if active_queue_item.session.has_error():
+                if not parent_queue_items:
+                    break
+                parent_queue_item = parent_queue_items.pop()
+                waiting_frame = parent_queue_item.session.waiting_workflow_call
+                if waiting_frame is None:
+                    raise ValueError("Parent queue item is missing workflow call waiting state.")
+                self.fail_waiting_workflow_call(
+                    parent_queue_item,
+                    f"The selected saved workflow '{waiting_frame.workflow_id}' failed during child execution.",
+                )
+                active_queue_item = parent_queue_item
+                break
+
+            if active_queue_item.session.is_waiting_on_workflow_call():
+                child_session = active_queue_item.session.waiting_workflow_call_child_session
+                if child_session is None:
+                    raise ValueError("Execution state is waiting on a workflow call but has no attached child session.")
+                parent_queue_items.append(active_queue_item)
+                active_queue_item = self.build_child_queue_item(active_queue_item, child_session)
+                continue
+
+            if parent_queue_items:
+                parent_queue_item = parent_queue_items.pop()
+                try:
+                    self.resume_waiting_workflow_call(parent_queue_item)
+                except Exception as e:
+                    self.fail_waiting_workflow_call(parent_queue_item, str(e))
+                    active_queue_item = parent_queue_item
+                    break
+                active_queue_item = parent_queue_item
+                continue
+
+            break
+
+        self._session_runner._on_after_run_session(queue_item=queue_item)
+
+
 class DefaultSessionRunner(SessionRunnerBase):
     """Processes a single session's invocations."""
 
@@ -67,6 +214,7 @@ class DefaultSessionRunner(SessionRunnerBase):
         self._on_after_run_node_callbacks = on_after_run_node_callbacks or []
         self._on_node_error_callbacks = on_node_error_callbacks or []
         self._on_after_run_session_callbacks = on_after_run_session_callbacks or []
+        self.workflow_call_coordinator = WorkflowCallCoordinator(self)
 
     def start(self, services: InvocationServices, cancel_event: ThreadEvent, profiler: Optional[Profiler] = None):
         self._services = services
@@ -112,53 +260,6 @@ class DefaultSessionRunner(SessionRunnerBase):
             ):
                 break
 
-    def _collect_call_saved_workflow_inputs(
-        self, invocation: CallSavedWorkflowInvocation, queue_item: SessionQueueItem
-    ) -> dict[str, Any]:
-        workflow_inputs = dict(invocation.workflow_inputs)
-        for edge in queue_item.session.execution_graph._get_input_edges(invocation.id):
-            if not is_call_saved_workflow_dynamic_input(edge.destination.field):
-                continue
-            if edge.source.node_id not in queue_item.session.results:
-                continue
-            workflow_inputs[edge.destination.field] = getattr(
-                queue_item.session.results[edge.source.node_id], edge.source.field
-            )
-        return workflow_inputs
-
-    @staticmethod
-    def _build_child_queue_item(queue_item: SessionQueueItem, child_session) -> SessionQueueItem:
-        if hasattr(queue_item, "model_copy"):
-            return queue_item.model_copy(update={"session": child_session, "session_id": child_session.id})
-
-        child_queue_item = type(queue_item).__new__(type(queue_item))
-        child_queue_item.__dict__ = {**queue_item.__dict__, "session": child_session, "session_id": child_session.id}
-        return child_queue_item
-
-    @staticmethod
-    def _get_child_workflow_return_output(child_session: GraphExecutionState) -> WorkflowReturnOutput:
-        workflow_return_node_ids = [
-            node_id for node_id, node in child_session.graph.nodes.items() if node.get_type() == "workflow_return"
-        ]
-        if not workflow_return_node_ids:
-            raise ValueError("The selected saved workflow must contain exactly one workflow_return node.")
-        if len(workflow_return_node_ids) > 1:
-            raise ValueError("The selected saved workflow must not contain more than one workflow_return node.")
-
-        workflow_return_node_id = workflow_return_node_ids[0]
-        prepared_return_node_ids = child_session.source_prepared_mapping.get(workflow_return_node_id, set())
-        if len(prepared_return_node_ids) != 1:
-            raise ValueError(
-                "The selected saved workflow produced an unsupported number of workflow_return executions."
-            )
-
-        prepared_return_node_id = next(iter(prepared_return_node_ids))
-        output = child_session.results.get(prepared_return_node_id)
-        if not isinstance(output, WorkflowReturnOutput):
-            raise ValueError("The selected saved workflow did not produce a valid workflow_return output.")
-
-        return output
-
     def run(self, queue_item: SessionQueueItem):
         # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
 
@@ -185,27 +286,7 @@ class DefaultSessionRunner(SessionRunnerBase):
 
                 if isinstance(invocation, CallSavedWorkflowInvocation):
                     workflow_record = invocation.validate_selected_workflow(context)
-                    call_frame = queue_item.session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
-                    child_graph = build_graph_from_workflow(workflow_record.workflow.model_dump())
-                    apply_workflow_inputs_to_graph(
-                        child_graph,
-                        workflow_record.workflow.model_dump(),
-                        self._collect_call_saved_workflow_inputs(invocation, queue_item),
-                    )
-                    child_session = queue_item.session.create_child_workflow_execution_state(child_graph, call_frame)
-                    queue_item.session.begin_waiting_on_workflow_call(call_frame)
-                    queue_item.session.attach_waiting_workflow_call_child_session(child_session)
-                    child_queue_item = self._build_child_queue_item(queue_item, child_session)
-                    self._run_session_loop(child_queue_item)
-                    if child_session.has_error():
-                        raise ValueError(
-                            f"The selected saved workflow '{invocation.workflow_id}' failed during child execution."
-                        )
-
-                    output = self._get_child_workflow_return_output(child_session)
-                    queue_item.session.end_waiting_on_workflow_call()
-                    queue_item.session.complete(invocation.id, output)
-                    self._on_after_run_node(invocation, queue_item, output)
+                    self.workflow_call_coordinator.begin_workflow_call_boundary(invocation, queue_item, workflow_record)
                     return
 
                 # Invoke the node
@@ -540,7 +621,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     cancel_event.clear()
 
                     # Run the graph
-                    self.session_runner.run(queue_item=self._queue_item)
+                    self.workflow_call_coordinator.run_queue_item(self._queue_item)
 
                 except Exception as e:
                     error_type = e.__class__.__name__
