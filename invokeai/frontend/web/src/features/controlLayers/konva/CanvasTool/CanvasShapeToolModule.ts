@@ -2,7 +2,13 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
-import { addCoords, floorCoord, getPrefixedId, isDistanceMoreThanMin, offsetCoord } from 'features/controlLayers/konva/util';
+import {
+  addCoords,
+  floorCoord,
+  getPrefixedId,
+  isDistanceMoreThanMin,
+  offsetCoord,
+} from 'features/controlLayers/konva/util';
 import { selectShapeType } from 'features/controlLayers/store/canvasSettingsSlice';
 import type {
   CanvasEntityIdentifier,
@@ -120,7 +126,9 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
   }
 
   hasActiveSession = (): boolean => {
-    return Boolean(this.dragStartPoint || this.isDrawingFreehand || this.freehandPoints.length || this.polygonPoints.length);
+    return Boolean(
+      this.dragStartPoint || this.isDrawingFreehand || this.freehandPoints.length || this.polygonPoints.length
+    );
   };
 
   hasActiveDragSession = (): boolean => {
@@ -257,7 +265,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (shapeType !== 'rect' && shapeType !== 'oval' || !this.dragStartPoint) {
+    if ((shapeType !== 'rect' && shapeType !== 'oval') || !this.dragStartPoint) {
       return;
     }
 
@@ -698,10 +706,13 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return points;
     }
 
-    const simplifiedFlatPoints = simplifyFlatNumbersArray(points.flatMap((point) => [point.x, point.y]), {
-      tolerance: this.config.FREEHAND_SIMPLIFY_TOLERANCE,
-      highestQuality: true,
-    });
+    const simplifiedFlatPoints = simplifyFlatNumbersArray(
+      points.flatMap((point) => [point.x, point.y]),
+      {
+        tolerance: this.config.FREEHAND_SIMPLIFY_TOLERANCE,
+        highestQuality: true,
+      }
+    );
 
     if (simplifiedFlatPoints.length < 6) {
       return points;
