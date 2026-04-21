@@ -146,6 +146,11 @@ Workflow-call note:
   the higher-level scheduler semantics are still evolving.
 - The `session_queue` schema now has matching columns for those relationship fields, and parent queue items can enter a
   `waiting` status while suspended on a child workflow execution.
+- Queue lifecycle semantics are now partially defined for workflow-call chains:
+  - child success resumes the waiting parent
+  - child failure fails the waiting parent and can cascade upward through ancestors
+  - cancelation is chain-aware across parents and children
+  - retry is root-oriented and should not be exposed directly on child queue rows in the UI
 - This is still an intermediate architecture step and should eventually be replaced by a more general parent/child
   execution mechanism rather than coordinator-specific resume/fail behavior.
 

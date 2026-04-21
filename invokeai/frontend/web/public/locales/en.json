@@ -432,6 +432,7 @@
         "credits": "Credits",
         "pending": "Pending",
         "in_progress": "In Progress",
+        "waiting": "Waiting On Child Workflow",
         "paused": "Paused",
         "completed": "Completed",
         "failed": "Failed",

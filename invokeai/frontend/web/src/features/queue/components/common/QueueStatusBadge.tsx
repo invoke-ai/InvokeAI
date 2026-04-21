@@ -6,6 +6,7 @@ import type { SessionQueueItemStatus } from 'services/api/endpoints/queue';
 const STATUSES = {
   pending: { colorScheme: 'cyan', translationKey: 'queue.pending' },
   in_progress: { colorScheme: 'yellow', translationKey: 'queue.in_progress' },
+  waiting: { colorScheme: 'purple', translationKey: 'queue.waiting' },
   completed: { colorScheme: 'green', translationKey: 'queue.completed' },
   failed: { colorScheme: 'red', translationKey: 'queue.failed' },
   canceled: { colorScheme: 'orange', translationKey: 'queue.canceled' },

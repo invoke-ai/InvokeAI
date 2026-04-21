@@ -3529,6 +3529,11 @@ export type components = {
              */
             in_progress: number;
             /**
+             * Waiting
+             * @description Number of queue items with status 'waiting'
+             */
+            waiting: number;
+            /**
              * Completed
              * @description Number of queue items with status 'complete'
              */
@@ -11920,8 +11925,17 @@ export type components = {
              * @description The nested workflow call stack inherited by this execution state.
              */
             workflow_call_stack: components["schemas"]["WorkflowCallFrame"][];
+            /**
+             * Workflow Call History
+             * @description Completed or failed workflow-call relationships observed by this execution state.
+             */
+            workflow_call_history: components["schemas"]["WorkflowCallExecution"][];
+            /** @description Parent workflow-call relationship metadata when this execution state is a child workflow session. */
+            workflow_call_parent?: components["schemas"]["WorkflowCallParentRef"] | null;
             /** @description The child workflow call this execution state is currently waiting on, if any. */
             waiting_workflow_call?: components["schemas"]["WorkflowCallFrame"] | null;
+            /** @description The active workflow-call relationship metadata for the current waiting child workflow, if any. */
+            waiting_workflow_call_execution?: components["schemas"]["WorkflowCallExecution"] | null;
             /** @description The child workflow execution state spawned by the current waiting workflow call, if any. */
             waiting_workflow_call_child_session?: components["schemas"]["GraphExecutionState"] | null;
             /**
@@ -24026,7 +24040,7 @@ export type components = {
              * @description The new status of the queue item
              * @enum {string}
              */
-            status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
+            status: "pending" | "in_progress" | "waiting" | "completed" | "failed" | "canceled";
             /**
              * Error Type
              * @description The error type, if any
@@ -26670,6 +26684,11 @@ export type components = {
              */
             in_progress: number;
             /**
+             * Waiting
+             * @description Number of queue items with status 'waiting' for the destination
+             */
+            waiting: number;
+            /**
              * Completed
              * @description Number of queue items with status 'complete' for the destination
              */
@@ -26706,7 +26725,7 @@ export type components = {
              * @default pending
              * @enum {string}
              */
-            status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
+            status: "pending" | "in_progress" | "waiting" | "completed" | "failed" | "canceled";
             /**
              * Priority
              * @description The priority of this queue item
@@ -26799,6 +26818,31 @@ export type components = {
              * @description The item_id of the queue item that this item was retried from
              */
             retried_from_item_id?: number | null;
+            /**
+             * Workflow Call Id
+             * @description The active workflow-call relationship id when this queue item is a child execution.
+             */
+            workflow_call_id?: string | null;
+            /**
+             * Parent Item Id
+             * @description The parent queue item id when this queue item is a child workflow execution.
+             */
+            parent_item_id?: number | null;
+            /**
+             * Parent Session Id
+             * @description The parent session id when this queue item is a child workflow execution.
+             */
+            parent_session_id?: string | null;
+            /**
+             * Root Item Id
+             * @description The root queue item id for this workflow call chain, if any.
+             */
+            root_item_id?: number | null;
+            /**
+             * Workflow Call Depth
+             * @description The 1-based workflow-call depth for this queue item when it is a child execution.
+             */
+            workflow_call_depth?: number | null;
             /** @description The fully-populated session to be executed */
             session: components["schemas"]["GraphExecutionState"];
             /** @description The workflow associated with this queue item */
@@ -26836,6 +26880,11 @@ export type components = {
              * @description Number of queue items with status 'in_progress'
              */
             in_progress: number;
+            /**
+             * Waiting
+             * @description Number of queue items with status 'waiting'
+             */
+            waiting: number;
             /**
              * Completed
              * @description Number of queue items with status 'complete'
@@ -30159,6 +30208,58 @@ export type components = {
             graph: string | null;
         };
         /**
+         * WorkflowCallExecution
+         * @description Tracks one parent/child workflow-call relationship and its lifecycle.
+         */
+        WorkflowCallExecution: {
+            /**
+             * Id
+             * @description The workflow-call execution id.
+             */
+            id?: string;
+            /**
+             * Parent Session Id
+             * @description The parent graph execution state id.
+             */
+            parent_session_id: string;
+            /**
+             * Child Session Id
+             * @description The child graph execution state id, if any.
+             */
+            child_session_id?: string | null;
+            /**
+             * Prepared Call Node Id
+             * @description The prepared exec node id for the parent call site.
+             */
+            prepared_call_node_id: string;
+            /**
+             * Source Call Node Id
+             * @description The source graph node id for the parent call site.
+             */
+            source_call_node_id: string;
+            /**
+             * Workflow Id
+             * @description The saved workflow being called.
+             */
+            workflow_id: string;
+            /**
+             * Depth
+             * @description The 1-based depth of this call frame.
+             */
+            depth: number;
+            /**
+             * Status
+             * @description The current workflow-call lifecycle state.
+             * @enum {string}
+             */
+            status: "waiting_for_child" | "running_child" | "completed" | "failed";
+            /**
+             * Error Message
+             * @description Failure reason, if the call failed.
+             */
+            error_message?: string | null;
+        };
+        /**
          * WorkflowCallFrame
          * @description Represents one workflow-call frame in a nested call chain.
          */
@@ -30171,6 +30272,42 @@ export type components = {
             /**
              * Source Call Node Id
              * @description The source graph node id for the call site.
+             */
+            source_call_node_id: string;
+            /**
+             * Workflow Id
+             * @description The saved workflow being called.
+             */
+            workflow_id: string;
+            /**
+             * Depth
+             * @description The 1-based depth of this call frame.
+             */
+            depth: number;
+        };
+        /**
+         * WorkflowCallParentRef
+         * @description Reference from a child execution state back to its parent workflow-call relationship.
+         */
+        WorkflowCallParentRef: {
+            /**
+             * Workflow Call Id
+             * @description The workflow-call execution id.
+             */
+            workflow_call_id: string;
+            /**
+             * Parent Session Id
+             * @description The parent graph execution state id.
+             */
+            parent_session_id: string;
+            /**
+             * Prepared Call Node Id
+             * @description The prepared exec node id for the parent call site.
+             */
+            prepared_call_node_id: string;
+            /**
+             * Source Call Node Id
+             * @description The source graph node id for the parent call site.
              */
             source_call_node_id: string;
             /**

@@ -99,6 +99,16 @@ Implemented runtime scaffolding:
   - literal dynamic values are serialized into a hidden `workflow_inputs` payload on the parent node
   - connected dynamic values are accepted as special call-boundary edges and are resolved from parent results at runtime
   - both are validated against the child workflow's exposed form interface before being applied to the child graph
+- Queue lifecycle semantics now exist for workflow-call chains:
+  - parent queue items are suspended in `waiting` while a child queue row runs
+  - child success resumes the suspended parent and completes the parent call node with the child `workflow_return`
+  - child failure fails the suspended parent and cascades upward through any waiting parent chain
+  - canceling a parent cancels its descendant child chain
+  - canceling a child cancels the waiting parent chain upward
+  - retry is root-oriented rather than child-oriented; child queue rows should not be directly retried from the UI
+  - the current UI policy is:
+    - child queue rows keep `Cancel`
+    - child queue rows hide `Retry`
 
 Implemented conversion helper:
 
@@ -222,6 +232,25 @@ Current limitation:
   directly rather than a more general queue scheduler abstraction
 - the current implementation is still an intermediate architecture step, but it is now materially closer to the
   intended durable parent/child model than the earlier inline-runner path
+
+### 4a. Queue Lifecycle Contract
+
+The current queue-visible implementation uses the following lifecycle contract:
+
+- root or parent queue items may enter `waiting` while suspended on a child workflow call
+- child workflow executions are represented as real queue rows with explicit parent/child relationship metadata
+- child completion resumes the suspended parent and returns control to normal queue execution
+- child failure fails the suspended parent call node and cascades upward through any ancestor chain
+- cancel operations are chain-aware:
+  - canceling a waiting parent cancels descendants
+  - canceling a child cancels waiting ancestors
+- retry operations are root-aware:
+  - retrying a root queue item creates a new root execution
+  - retrying a child queue item should be normalized to the root by backend code
+  - child queue rows should not expose direct retry affordances in the UI
+
+This is now part of the intended user-facing contract, even though the orchestration still lives in
+`WorkflowCallCoordinator`.
 
 ### 5. Return Values
 
@@ -398,9 +427,9 @@ Still needed in later increments:
 - parent-child resume behavior once child execution is no longer an inline runner detail
 - child failure propagation into parent failure
 - nested runtime execution beyond a single attached child state
-- eventual queue/session persistence rules if child executions become first-class queue items
 - eventual support for child workflows that contain batch-special nodes, once child execution is run through the proper
   batch/session path
+- eventual migration from coordinator-owned resume/fail behavior to a more general scheduler or queue-lifecycle model
 
 ## Recommended Immediate Next Step
 

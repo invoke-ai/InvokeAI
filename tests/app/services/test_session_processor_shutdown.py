@@ -588,9 +588,7 @@ class _DummySessionQueue:
                 "parent_item_id": parent_queue_item.item_id,
                 "parent_session_id": parent_queue_item.session_id,
                 "root_item_id": getattr(parent_queue_item, "root_item_id", None) or parent_queue_item.item_id,
-                "workflow_call_depth": (
-                    workflow_call_execution.depth if workflow_call_execution is not None else None
-                ),
+                "workflow_call_depth": (workflow_call_execution.depth if workflow_call_execution is not None else None),
                 "workflow": None,
             },
         )()
@@ -607,7 +605,9 @@ class _DummySessionQueue:
         return queue_item
 
 
-def _drain_workflow_call_queue(coordinator: WorkflowCallCoordinator, session_queue: _DummySessionQueue, queue_item) -> None:
+def _drain_workflow_call_queue(
+    coordinator: WorkflowCallCoordinator, session_queue: _DummySessionQueue, queue_item
+) -> None:
     session_queue.add_queue_item(queue_item)
     coordinator.run_queue_item(queue_item)
     while True:
@@ -976,6 +976,48 @@ def test_workflow_call_coordinator_suspends_parent_and_enqueues_child_queue_item
     ]
     assert child_started_queue_items == []
     assert session.workflow_call_history == []
+    assert events.errors == []
+
+
+def test_workflow_call_coordinator_leaves_non_call_workflows_on_normal_execution_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    coordinator = WorkflowCallCoordinator(runner)
+
+    graph = Graph()
+    graph.add_node(AddInvocation(id="source-add", a=2, b=3))
+    graph.add_node(IfInvocation(id="downstream-if", condition=True, false_input=0))
+    graph.add_edge(create_edge("source-add", "value", "downstream-if", "true_input"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+        },
+    )()
+
+    session_queue.add_queue_item(queue_item)
+    coordinator.run_queue_item(queue_item)
+
+    assert not session.is_waiting_on_workflow_call()
+    assert "source-add" in session.executed
+    assert "downstream-if" in session.executed
+    assert session_queue.enqueued_child_item_ids == []
+    assert session_queue.waiting_item_ids == []
+    assert session_queue.resumed_item_ids == []
+    assert session_queue.completed_item_ids == [1]
+    assert [invocation.get_type() for _queue_item, invocation in events.started] == ["add", "if"]
+    assert [invocation.get_type() for invocation, _queue_item, _output in events.completed] == ["add", "if"]
     assert events.errors == []
 
 
