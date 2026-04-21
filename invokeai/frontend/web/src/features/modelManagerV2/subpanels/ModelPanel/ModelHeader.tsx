@@ -4,10 +4,10 @@ import ModelImageUpload from 'features/modelManagerV2/subpanels/ModelPanel/Field
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { AnyModelConfig } from 'services/api/types';
+import type { AnyModelConfigWithExternal } from 'services/api/types';
 
 type Props = PropsWithChildren<{
-  modelConfig: AnyModelConfig;
+  modelConfig: AnyModelConfigWithExternal;
 }>;
 
 export const ModelHeader = memo(({ modelConfig, children }: Props) => {
