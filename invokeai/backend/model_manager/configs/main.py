@@ -160,17 +160,20 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
         ".lora_A.weight",
         ".lora_B.weight",
         ".dora_scale",
+        ".alpha",
     )
 
+    # First pass: check if any key has LoRA suffixes - if so, this is a LoRA not a main model
     for key in state_dict.keys():
         if isinstance(key, int):
             continue
-
-        # If we find any LoRA-specific keys, this is not a main model
         if key.endswith(lora_suffixes):
             return False
 
-        # Check for Z-Image specific key prefixes
+    # Second pass: check for Z-Image specific key parts
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
         # Handle both direct keys (cap_embedder.0.weight) and
         # ComfyUI-style keys (model.diffusion_model.cap_embedder.0.weight)
         key_parts = key.split(".")
