@@ -864,8 +864,7 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         - Klein 4B/4B Base: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
         - Klein 9B/9B Base: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
 
-        Distilled and Base variants share identical architectures and both have
-        guidance_embeds=False. We use a filename heuristic to detect Base models.
+        Distilled and Base variants share identical architectures. We use a filename heuristic to detect Base models.
         """
         KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
         KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
