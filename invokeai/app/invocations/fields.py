@@ -455,6 +455,7 @@ class InputFieldJSONSchemaExtra(BaseModel):
     ui_model_type: Optional[list[ModelType]] = None
     ui_model_variant: Optional[list[ClipVariantType | ModelVariantType]] = None
     ui_model_format: Optional[list[ModelFormat]] = None
+    ui_model_provider_id: Optional[list[str]] = None
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -636,6 +637,7 @@ def InputField(
     ui_model_type: Optional[ModelType | list[ModelType]] = None,
     ui_model_variant: Optional[ClipVariantType | ModelVariantType | list[ClipVariantType | ModelVariantType]] = None,
     ui_model_format: Optional[ModelFormat | list[ModelFormat]] = None,
+    ui_model_provider_id: Optional[str | list[str]] = None,
 ) -> Any:
     """
     Creates an input field for an invocation.
@@ -685,6 +687,11 @@ def InputField(
         `ui_model_format=ModelFormat.Diffusers` will show only models in the diffusers format. This arg is only valid
         if this Input field is annotated as a `ModelIdentifierField`.
 
+        ui_model_provider_id: Specifies the external provider id(s) to filter the model list by in the Workflow Editor.
+        For example, `ui_model_provider_id="openai"` will show only models registered under the OpenAI external provider.
+        This arg is only valid if this Input field is annotated as a `ModelIdentifierField` and the target models are
+        external API models.
+
         ui_choice_labels: Specifies the labels to use for the choices in an enum field. If omitted, the enum values
         will be used. This arg is only valid if the field is annotated with as a `Literal`. For example,
         `Literal["choice1", "choice2", "choice3"]` with `ui_choice_labels={"choice1": "Choice 1", "choice2": "Choice 2",
@@ -724,6 +731,11 @@ def InputField(
             json_schema_extra_.ui_model_format = ui_model_format
         else:
             json_schema_extra_.ui_model_format = [ui_model_format]
+    if ui_model_provider_id is not None:
+        if isinstance(ui_model_provider_id, list):
+            json_schema_extra_.ui_model_provider_id = ui_model_provider_id
+        else:
+            json_schema_extra_.ui_model_provider_id = [ui_model_provider_id]
     if ui_type is not None:
         json_schema_extra_.ui_type = ui_type
 
