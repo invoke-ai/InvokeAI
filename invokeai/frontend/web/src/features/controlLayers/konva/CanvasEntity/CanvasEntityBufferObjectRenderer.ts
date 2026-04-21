@@ -271,30 +271,40 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
 
     this.log.trace({ buffer: this.renderer.repr() }, 'Committing buffer');
 
+    let committedState = this.state;
+
+    // Polygon previews render an outline while they are still live in the buffer.
+    // Clear that preview state before adopting the renderer into the persistent object group.
+    if (committedState.type === 'polygon' && this.renderer instanceof CanvasObjectPolygon) {
+      committedState = { ...committedState, previewPoint: undefined };
+      this.state = null;
+      this.renderer.update(committedState, true);
+    }
+
     // Move the buffer to the persistent objects group/renderers
     this.parent.renderer.adoptObjectRenderer(this.renderer);
 
     if (pushToState) {
       const entityIdentifier = this.parent.entityIdentifier;
-      switch (this.state.type) {
+      switch (committedState.type) {
         case 'brush_line':
         case 'brush_line_with_pressure':
-          this.manager.stateApi.addBrushLine({ entityIdentifier, brushLine: this.state });
+          this.manager.stateApi.addBrushLine({ entityIdentifier, brushLine: committedState });
           break;
         case 'eraser_line':
         case 'eraser_line_with_pressure':
-          this.manager.stateApi.addEraserLine({ entityIdentifier, eraserLine: this.state });
+          this.manager.stateApi.addEraserLine({ entityIdentifier, eraserLine: committedState });
           break;
         case 'rect':
         case 'oval':
         case 'polygon':
-          this.manager.stateApi.addShape({ entityIdentifier, shape: this.state });
+          this.manager.stateApi.addShape({ entityIdentifier, shape: committedState });
           break;
         case 'lasso':
-          this.manager.stateApi.addLasso({ entityIdentifier, lasso: this.state });
+          this.manager.stateApi.addLasso({ entityIdentifier, lasso: committedState });
           break;
         case 'gradient':
-          this.manager.stateApi.addGradient({ entityIdentifier, gradient: this.state });
+          this.manager.stateApi.addGradient({ entityIdentifier, gradient: committedState });
           break;
       }
     }
