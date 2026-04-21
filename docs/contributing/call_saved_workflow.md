@@ -78,6 +78,13 @@ Implemented runtime scaffolding:
   - when the child finishes successfully, the coordinator resumes the parent session
   - the parent is completed with the child `workflow_return` collection during that resume path
   - if the child fails, the coordinator fails the suspended parent `call_saved_workflow` node
+- Child `SessionQueueItem` wrappers now carry explicit relationship metadata during temporary attached-session execution:
+  - `workflow_call_id`
+  - `parent_item_id`
+  - `parent_session_id`
+  - `root_item_id`
+  - `workflow_call_depth`
+  - this metadata is used in runtime events now and should survive the later move to durable child queue rows
 - `_on_after_run_session()` no longer completes queue items whose sessions are incomplete but waiting.
 - Dynamic call arguments now execute end-to-end in the current runner path:
   - literal dynamic values are serialized into a hidden `workflow_inputs` payload on the parent node
@@ -286,6 +293,8 @@ Current insertion points already used:
 - `GraphExecutionState` stores the waiting/call-stack state and attached child session
 - `WorkflowCallCoordinator` currently runs the attached child session, then resumes the parent and completes the call
   node with the child `workflow_return` collection
+- child queue-item wrappers already carry stable parent/child identifiers even though child executions are not yet
+  persisted as their own queue rows
 
 Next runtime work still needed:
 
@@ -381,6 +390,7 @@ Already covered:
 - non-exposed dynamic call arguments are rejected at runtime
 - child `workflow_return` output is captured and becomes the parent `call_saved_workflow` output
 - child workflows without a `workflow_return` node fail cleanly when called
+- child execution events now include stable workflow-call relationship metadata on the child `SessionQueueItem`
 
 Still needed in later increments:
 

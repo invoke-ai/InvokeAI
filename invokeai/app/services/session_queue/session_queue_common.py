@@ -257,6 +257,21 @@ class SessionQueueItem(BaseModel):
     retried_from_item_id: Optional[int] = Field(
         default=None, description="The item_id of the queue item that this item was retried from"
     )
+    workflow_call_id: Optional[str] = Field(
+        default=None, description="The active workflow-call relationship id when this queue item is a child execution."
+    )
+    parent_item_id: Optional[int] = Field(
+        default=None, description="The parent queue item id when this queue item is a child workflow execution."
+    )
+    parent_session_id: Optional[str] = Field(
+        default=None, description="The parent session id when this queue item is a child workflow execution."
+    )
+    root_item_id: Optional[int] = Field(
+        default=None, description="The root queue item id for this workflow call chain, if any."
+    )
+    workflow_call_depth: Optional[int] = Field(
+        default=None, description="The 1-based workflow-call depth for this queue item when it is a child execution."
+    )
     session: GraphExecutionState = Field(description="The fully-populated session to be executed")
     workflow: Optional[WorkflowWithoutID] = Field(
         default=None, description="The workflow associated with this queue item"

@@ -841,11 +841,69 @@ def test_workflow_call_coordinator_runs_child_session_and_resumes_parent_workflo
     assert parent_outputs[0].collection == [3]
     assert len(downstream_outputs) == 1
     assert downstream_outputs[0].value == [3]
+    child_started_queue_items = [
+        child_queue_item
+        for child_queue_item, invocation in events.started
+        if invocation.get_type() != "call_saved_workflow" and child_queue_item.session_id != queue_item.session_id
+    ]
+    assert len(child_started_queue_items) > 0
+    assert all(child_queue_item.workflow_call_id is not None for child_queue_item in child_started_queue_items)
+    assert all(child_queue_item.parent_item_id == queue_item.item_id for child_queue_item in child_started_queue_items)
+    assert all(
+        child_queue_item.parent_session_id == queue_item.session_id for child_queue_item in child_started_queue_items
+    )
+    assert all(child_queue_item.root_item_id == queue_item.item_id for child_queue_item in child_started_queue_items)
+    assert all(child_queue_item.workflow_call_depth == 1 for child_queue_item in child_started_queue_items)
     assert len(session.workflow_call_history) == 1
     assert session.workflow_call_history[0].status == "completed"
     assert session.workflow_call_history[0].child_session_id is not None
     assert session_queue.completed_item_ids == [1]
     assert events.errors == []
+
+
+def test_workflow_call_coordinator_builds_child_queue_item_with_relationship_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_queue = _DummySessionQueue()
+    runner, _events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    coordinator = WorkflowCallCoordinator(runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    parent_session = GraphExecutionState(graph=graph)
+    invocation = parent_session.next()
+    assert isinstance(invocation, CallSavedWorkflowInvocation)
+
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 42,
+            "status": "in_progress",
+            "session": parent_session,
+            "session_id": parent_session.id,
+            "user_id": "user-1",
+            "workflow_call_id": None,
+            "parent_item_id": None,
+            "parent_session_id": None,
+            "root_item_id": None,
+            "workflow_call_depth": None,
+        },
+    )()
+
+    workflow_record = runner._services.workflow_records.get(invocation.workflow_id)
+    coordinator.begin_workflow_call_boundary(invocation, queue_item, workflow_record)
+    child_session = parent_session.waiting_workflow_call_child_session
+    assert child_session is not None
+
+    child_queue_item = coordinator.build_child_queue_item(queue_item, child_session)
+
+    assert child_queue_item.workflow_call_id == parent_session.waiting_workflow_call_execution.id
+    assert child_queue_item.parent_item_id == queue_item.item_id
+    assert child_queue_item.parent_session_id == queue_item.session_id
+    assert child_queue_item.root_item_id == queue_item.item_id
+    assert child_queue_item.workflow_call_depth == 1
+    assert child_queue_item.session_id == child_session.id
 
 
 def test_run_completes_call_saved_workflow_and_runs_downstream_nodes(

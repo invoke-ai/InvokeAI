@@ -64,11 +64,24 @@ class WorkflowCallCoordinator:
 
     @staticmethod
     def build_child_queue_item(queue_item: SessionQueueItem, child_session: GraphExecutionState) -> SessionQueueItem:
+        workflow_call_execution = queue_item.session.waiting_workflow_call_execution
+        if workflow_call_execution is None:
+            raise ValueError("Parent queue item is missing active workflow call execution metadata.")
+        root_item_id = getattr(queue_item, "root_item_id", None) or queue_item.item_id
+        child_updates = {
+            "session": child_session,
+            "session_id": child_session.id,
+            "workflow_call_id": workflow_call_execution.id,
+            "parent_item_id": queue_item.item_id,
+            "parent_session_id": queue_item.session_id,
+            "root_item_id": root_item_id,
+            "workflow_call_depth": workflow_call_execution.depth,
+        }
         if hasattr(queue_item, "model_copy"):
-            return queue_item.model_copy(update={"session": child_session, "session_id": child_session.id})
+            return queue_item.model_copy(update=child_updates)
 
         child_queue_item = type(queue_item).__new__(type(queue_item))
-        child_queue_item.__dict__ = {**queue_item.__dict__, "session": child_session, "session_id": child_session.id}
+        child_queue_item.__dict__ = {**queue_item.__dict__, **child_updates}
         return child_queue_item
 
     @staticmethod
