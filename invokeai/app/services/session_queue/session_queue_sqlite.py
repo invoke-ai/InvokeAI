@@ -320,6 +320,47 @@ class SqliteSessionQueue(SessionQueueBase):
         self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
         return queue_item
 
+    def _get_workflow_call_child_ids(self, item_id: int) -> list[int]:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT item_id
+                FROM session_queue
+                WHERE parent_item_id = ?
+                ORDER BY item_id ASC
+                """,
+                (item_id,),
+            )
+            rows = cast(list[sqlite3.Row], cursor.fetchall())
+        return [row[0] for row in rows]
+
+    def _get_workflow_call_descendant_ids(self, item_id: int) -> list[int]:
+        descendant_ids: list[int] = []
+        queue: list[int] = [item_id]
+        while queue:
+            current_item_id = queue.pop(0)
+            child_ids = self._get_workflow_call_child_ids(current_item_id)
+            descendant_ids.extend(child_ids)
+            queue.extend(child_ids)
+        return descendant_ids
+
+    def _get_workflow_call_ancestor_ids(self, item_id: int) -> list[int]:
+        ancestor_ids: list[int] = []
+        current_queue_item = self.get_queue_item(item_id)
+        while current_queue_item.parent_item_id is not None:
+            parent_item_id = current_queue_item.parent_item_id
+            ancestor_ids.append(parent_item_id)
+            current_queue_item = self.get_queue_item(parent_item_id)
+        return ancestor_ids
+
+    def _get_workflow_call_chain_item_ids(self, item_id: int) -> list[int]:
+        ancestor_ids = self._get_workflow_call_ancestor_ids(item_id)
+        root_item_id = ancestor_ids[-1] if ancestor_ids else item_id
+        descendant_ids = self._get_workflow_call_descendant_ids(root_item_id)
+        chain_item_ids = ancestor_ids + [item_id] + descendant_ids
+        deduped_chain_item_ids = list(dict.fromkeys(chain_item_ids))
+        return deduped_chain_item_ids
+
     def is_empty(self, queue_id: str) -> IsEmptyResult:
         with self._db.transaction() as cursor:
             cursor.execute(
@@ -415,8 +456,10 @@ class SqliteSessionQueue(SessionQueueBase):
         return PruneResult(deleted=count)
 
     def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
-        queue_item = self._set_queue_item_status(item_id=item_id, status="canceled")
-        return queue_item
+        chain_item_ids = self._get_workflow_call_chain_item_ids(item_id)
+        for chain_item_id in chain_item_ids:
+            self._set_queue_item_status(item_id=chain_item_id, status="canceled")
+        return self.get_queue_item(item_id)
 
     def delete_queue_item(self, item_id: int) -> None:
         """Deletes a session queue item"""
@@ -1026,7 +1069,8 @@ class SqliteSessionQueue(SessionQueueBase):
         """Retries the given queue items"""
         with self._db.transaction() as cursor:
             values_to_insert: list[ValueToInsertTuple] = []
-            retried_item_ids: list[int] = []
+            retried_root_item_ids: list[int] = []
+            seen_root_item_ids: set[int] = set()
 
             for item_id in item_ids:
                 queue_item = self.get_queue_item(item_id)
@@ -1034,35 +1078,48 @@ class SqliteSessionQueue(SessionQueueBase):
                 if queue_item.status not in ("failed", "canceled"):
                     continue
 
-                retried_item_ids.append(item_id)
+                root_item_id = queue_item.root_item_id or queue_item.item_id
+                if root_item_id in seen_root_item_ids:
+                    continue
+                seen_root_item_ids.add(root_item_id)
+
+                root_queue_item = self.get_queue_item(root_item_id)
+                if root_queue_item.status not in ("failed", "canceled"):
+                    continue
+
+                retried_root_item_ids.append(root_item_id)
 
                 field_values_json = (
-                    json.dumps(queue_item.field_values, default=to_jsonable_python) if queue_item.field_values else None
+                    json.dumps(root_queue_item.field_values, default=to_jsonable_python)
+                    if root_queue_item.field_values
+                    else None
                 )
                 workflow_json = (
-                    json.dumps(queue_item.workflow, default=to_jsonable_python) if queue_item.workflow else None
+                    json.dumps(root_queue_item.workflow, default=to_jsonable_python)
+                    if root_queue_item.workflow
+                    else None
                 )
-                cloned_session = GraphExecutionState(graph=queue_item.session.graph)
+                cloned_session = GraphExecutionState(graph=root_queue_item.session.graph)
                 cloned_session_json = cloned_session.model_dump_json(warnings=False, exclude_none=True)
 
                 retried_from_item_id = (
-                    queue_item.retried_from_item_id
-                    if queue_item.retried_from_item_id is not None
-                    else queue_item.item_id
+                    root_queue_item.retried_from_item_id
+                    if root_queue_item.retried_from_item_id is not None
+                    else root_queue_item.item_id
                 )
 
                 value_to_insert: ValueToInsertTuple = (
-                    queue_item.queue_id,
+                    root_queue_item.queue_id,
                     cloned_session_json,
                     cloned_session.id,
-                    queue_item.batch_id,
+                    root_queue_item.batch_id,
                     field_values_json,
-                    queue_item.priority,
+                    root_queue_item.priority,
                     workflow_json,
-                    queue_item.origin,
-                    queue_item.destination,
+                    root_queue_item.origin,
+                    root_queue_item.destination,
                     retried_from_item_id,
-                    queue_item.user_id,
+                    root_queue_item.user_id,
                 )
                 values_to_insert.append(value_to_insert)
 
@@ -1078,7 +1135,7 @@ class SqliteSessionQueue(SessionQueueBase):
 
         retry_result = RetryItemsResult(
             queue_id=queue_id,
-            retried_item_ids=retried_item_ids,
+            retried_item_ids=retried_root_item_ids,
         )
         self.__invoker.services.events.emit_queue_items_retried(retry_result)
         return retry_result
