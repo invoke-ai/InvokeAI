@@ -35,6 +35,7 @@ from invokeai.app.services.events.events_common import (
     ModelLoadStartedEvent,
     QueueClearedEvent,
     QueueEventBase,
+    QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
     WorkflowCreatedEvent,
@@ -69,6 +70,7 @@ QUEUE_EVENTS = {
     InvocationErrorEvent,
     QueueItemStatusChangedEvent,
     BatchEnqueuedEvent,
+    QueueItemsRetriedEvent,
     QueueClearedEvent,
     RecallParametersUpdatedEvent,
 }
@@ -338,6 +340,17 @@ class SocketIO:
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
                 logger.debug(f"Emitted private batch_enqueued event to user room {user_room} and admin room")
+
+            # QueueItemsRetriedEvent carries queue item ids that should only be visible
+            # to the affected owners + admins.
+            elif isinstance(event_data, QueueItemsRetriedEvent):
+                for user_id in event_data.user_ids:
+                    user_room = f"user:{user_id}"
+                    await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
+                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+                logger.debug(
+                    f"Emitted private queue_items_retried event to user rooms {event_data.user_ids} and admin room"
+                )
 
             else:
                 # For remaining queue events (e.g. QueueClearedEvent) that do not

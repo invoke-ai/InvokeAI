@@ -1070,6 +1070,7 @@ class SqliteSessionQueue(SessionQueueBase):
         with self._db.transaction() as cursor:
             values_to_insert: list[ValueToInsertTuple] = []
             retried_root_item_ids: list[int] = []
+            retried_user_ids: list[str] = []
             seen_root_item_ids: set[int] = set()
 
             for item_id in item_ids:
@@ -1088,6 +1089,7 @@ class SqliteSessionQueue(SessionQueueBase):
                     continue
 
                 retried_root_item_ids.append(root_item_id)
+                retried_user_ids.append(root_queue_item.user_id)
 
                 field_values_json = (
                     json.dumps(root_queue_item.field_values, default=to_jsonable_python)
@@ -1137,5 +1139,7 @@ class SqliteSessionQueue(SessionQueueBase):
             queue_id=queue_id,
             retried_item_ids=retried_root_item_ids,
         )
-        self.__invoker.services.events.emit_queue_items_retried(retry_result)
+        self.__invoker.services.events.emit_queue_items_retried(
+            retry_result, user_ids=list(dict.fromkeys(retried_user_ids))
+        )
         return retry_result

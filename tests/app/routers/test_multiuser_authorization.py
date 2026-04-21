@@ -1322,6 +1322,7 @@ class TestQueueStatusScoping:
             batch_id=None,
             pending=2,
             in_progress=0,
+            waiting=0,
             completed=1,
             failed=0,
             canceled=0,
@@ -1739,6 +1740,7 @@ class TestWebSocketAuth:
                 destination="canvas",
                 pending=0,
                 in_progress=1,
+                waiting=0,
                 completed=0,
                 failed=0,
                 canceled=0,
@@ -1751,6 +1753,7 @@ class TestWebSocketAuth:
                 batch_id="batch-private",
                 pending=0,
                 in_progress=1,
+                waiting=0,
                 completed=0,
                 failed=0,
                 canceled=0,
@@ -1799,6 +1802,43 @@ class TestWebSocketAuth:
 
         rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
         assert "user:owner-zzz" in rooms_emitted_to
+        assert "admin" in rooms_emitted_to
+        assert "default" not in rooms_emitted_to
+
+    def test_queue_items_retried_event_carries_user_ids(self) -> None:
+        """QueueItemsRetriedEvent must carry owner identity so retry notifications are
+        routed privately instead of broadcast to all queue subscribers."""
+        from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
+        from invokeai.app.services.session_queue.session_queue_common import RetryItemsResult
+
+        retry_result = RetryItemsResult(queue_id="default", retried_item_ids=[10])
+        event = QueueItemsRetriedEvent.build(retry_result, user_ids=["owner-123"])
+
+        assert event.user_ids == ["owner-123"]
+        assert event.retried_item_ids == [10]
+        assert event.queue_id == "default"
+
+    def test_queue_items_retried_routed_privately(self, socketio: Any) -> None:
+        """Verify that queue_items_retried is emitted only to owner/admin rooms."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
+        from invokeai.app.services.session_queue.session_queue_common import RetryItemsResult
+
+        event = QueueItemsRetriedEvent.build(
+            RetryItemsResult(queue_id="default", retried_item_ids=[10]),
+            user_ids=["owner-123", "owner-456"],
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_retried", event)))
+
+        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
+        assert "user:owner-123" in rooms_emitted_to
+        assert "user:owner-456" in rooms_emitted_to
         assert "admin" in rooms_emitted_to
         assert "default" not in rooms_emitted_to
 
