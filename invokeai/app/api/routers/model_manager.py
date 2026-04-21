@@ -26,9 +26,11 @@ from invokeai.app.services.model_install.model_install_common import ModelInstal
 from invokeai.app.services.model_records import (
     InvalidModelException,
     ModelRecordChanges,
+    ModelRecordOrderBy,
     UnknownModelException,
 )
 from invokeai.app.services.orphaned_models import OrphanedModelInfo
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
@@ -159,6 +161,8 @@ async def list_model_records(
     model_format: Optional[ModelFormat] = Query(
         default=None, description="Exact match on the format of the model (e.g. 'diffusers')"
     ),
+    order_by: ModelRecordOrderBy = Query(default=ModelRecordOrderBy.Name, description="The field to order by"),
+    direction: SQLiteDirection = Query(default=SQLiteDirection.Ascending, description="The direction to order by"),
 ) -> ModelsList:
     """Get a list of models."""
     record_store = ApiDependencies.invoker.services.model_manager.store
@@ -167,12 +171,23 @@ async def list_model_records(
         for base_model in base_models:
             found_models.extend(
                 record_store.search_by_attr(
-                    base_model=base_model, model_type=model_type, model_name=model_name, model_format=model_format
+                    base_model=base_model,
+                    model_type=model_type,
+                    model_name=model_name,
+                    model_format=model_format,
+                    order_by=order_by,
+                    direction=direction,
                 )
             )
     else:
         found_models.extend(
-            record_store.search_by_attr(model_type=model_type, model_name=model_name, model_format=model_format)
+            record_store.search_by_attr(
+                model_type=model_type,
+                model_name=model_name,
+                model_format=model_format,
+                order_by=order_by,
+                direction=direction,
+            )
         )
     for index, model in enumerate(found_models):
         found_models[index] = prepare_model_config_for_response(model, ApiDependencies)
