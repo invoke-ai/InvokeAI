@@ -51,6 +51,13 @@ const weightDisplaySx: SystemStyleObject = {
   },
 };
 
+// Scoped to ref image thumbnails only: prevents the iOS long-press "Save Image"
+// callout from hijacking drag attempts on iPad.
+const wrapperSx: SystemStyleObject = {
+  WebkitTouchCallout: 'none',
+  userSelect: 'none',
+};
+
 const getImageSxWithWeight = (weight: number): SystemStyleObject => {
   const fillPercentage = Math.max(0, Math.min(100, weight * 100));
 
@@ -120,6 +127,7 @@ export const RefImagePreview = memo(() => {
         flexShrink={0}
         opacity={isDragging ? 0.3 : 1}
         data-ref-image-id={id}
+        sx={wrapperSx}
       >
         <IconButton
           aria-label={t('controlLayers.selectRefImage')}
@@ -152,6 +160,7 @@ export const RefImagePreview = memo(() => {
       flexShrink={0}
       opacity={isDragging ? 0.3 : 1}
       data-ref-image-id={id}
+      sx={wrapperSx}
     >
       <Tooltip label={warnings.length > 0 ? <RefImageWarningTooltipContent warnings={warnings} /> : undefined}>
         <Flex
