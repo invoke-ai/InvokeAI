@@ -12,7 +12,10 @@ from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
+)
+from invokeai.app.services.session_processor.workflow_call_runtime import (
     WorkflowCallCoordinator,
+    WorkflowCallQueueLifecycle,
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, WorkflowCallFrame
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowCategory
@@ -606,15 +609,15 @@ class _DummySessionQueue:
 
 
 def _drain_workflow_call_queue(
-    coordinator: WorkflowCallCoordinator, session_queue: _DummySessionQueue, queue_item
+    lifecycle: WorkflowCallQueueLifecycle, session_queue: _DummySessionQueue, queue_item
 ) -> None:
     session_queue.add_queue_item(queue_item)
-    coordinator.run_queue_item(queue_item)
+    lifecycle.run_queue_item(queue_item)
     while True:
         next_queue_item = session_queue.dequeue()
         if next_queue_item is None:
             return
-        coordinator.run_queue_item(next_queue_item)
+        lifecycle.run_queue_item(next_queue_item)
 
 
 class _WaitingSession:
@@ -935,7 +938,6 @@ def test_workflow_call_coordinator_suspends_parent_and_enqueues_child_queue_item
 ) -> None:
     session_queue = _DummySessionQueue()
     runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
-    coordinator = WorkflowCallCoordinator(runner)
 
     graph = Graph()
     graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
@@ -958,7 +960,7 @@ def test_workflow_call_coordinator_suspends_parent_and_enqueues_child_queue_item
     )()
 
     session_queue.add_queue_item(queue_item)
-    coordinator.run_queue_item(queue_item)
+    runner.run(queue_item)
 
     assert session.is_waiting_on_workflow_call()
     assert session_queue.waiting_item_ids == [1]
@@ -979,12 +981,12 @@ def test_workflow_call_coordinator_suspends_parent_and_enqueues_child_queue_item
     assert events.errors == []
 
 
-def test_workflow_call_coordinator_leaves_non_call_workflows_on_normal_execution_path(
+def test_workflow_call_queue_lifecycle_leaves_non_call_workflows_on_normal_execution_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     session_queue = _DummySessionQueue()
     runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
-    coordinator = WorkflowCallCoordinator(runner)
+    lifecycle = WorkflowCallQueueLifecycle(runner)
 
     graph = Graph()
     graph.add_node(AddInvocation(id="source-add", a=2, b=3))
@@ -1007,7 +1009,7 @@ def test_workflow_call_coordinator_leaves_non_call_workflows_on_normal_execution
     )()
 
     session_queue.add_queue_item(queue_item)
-    coordinator.run_queue_item(queue_item)
+    lifecycle.run_queue_item(queue_item)
 
     assert not session.is_waiting_on_workflow_call()
     assert "source-add" in session.executed
@@ -1019,6 +1021,42 @@ def test_workflow_call_coordinator_leaves_non_call_workflows_on_normal_execution
     assert [invocation.get_type() for _queue_item, invocation in events.started] == ["add", "if"]
     assert [invocation.get_type() for invocation, _queue_item, _output in events.completed] == ["add", "if"]
     assert events.errors == []
+
+
+def test_workflow_call_queue_lifecycle_resumes_parent_from_completed_child(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    processor = DefaultSessionProcessor(session_runner=runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+        },
+    )()
+
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
+
+    assert session_queue.completed_item_ids == [100, 1]
+    assert session_queue.resumed_item_ids == []
+    parent_outputs = [
+        output for invocation, _queue_item, output in events.completed if invocation.get_type() == "call_saved_workflow"
+    ]
+    assert len(parent_outputs) == 1
+    assert parent_outputs[0].collection == [3]
 
 
 def test_workflow_call_coordinator_builds_child_queue_item_with_relationship_metadata(
@@ -1093,7 +1131,7 @@ def test_run_completes_call_saved_workflow_and_runs_downstream_nodes(
         },
     )()
 
-    _drain_workflow_call_queue(processor.session_runner.workflow_call_coordinator, session_queue, queue_item)
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
 
     assert not session.is_waiting_on_workflow_call()
     assert "downstream-if" in session.executed
@@ -1176,7 +1214,7 @@ def test_run_executes_child_workflow_and_completes_parent_queue_item(monkeypatch
         },
     )()
 
-    _drain_workflow_call_queue(processor.session_runner.workflow_call_coordinator, session_queue, queue_item)
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
 
     assert not session.is_waiting_on_workflow_call()
     assert session_queue.completed_item_ids == [100, 1]
@@ -1220,7 +1258,7 @@ def test_run_completes_call_saved_workflow_with_child_return_collection(monkeypa
         },
     )()
 
-    _drain_workflow_call_queue(processor.session_runner.workflow_call_coordinator, session_queue, queue_item)
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
 
     child_return_outputs = [
         output
@@ -1263,7 +1301,7 @@ def test_run_fails_call_saved_workflow_when_child_has_no_workflow_return(monkeyp
         },
     )()
 
-    _drain_workflow_call_queue(processor.session_runner.workflow_call_coordinator, session_queue, queue_item)
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
 
     assert session.has_error()
     assert len(session.workflow_call_history) == 1
@@ -1298,7 +1336,7 @@ def test_run_respects_child_dependency_readiness(monkeypatch: pytest.MonkeyPatch
         },
     )()
 
-    _drain_workflow_call_queue(processor.session_runner.workflow_call_coordinator, session_queue, queue_item)
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
 
     child_completions = [
         (child_queue_item.session.prepared_source_mapping[invocation.id], output)
@@ -1335,7 +1373,7 @@ def test_run_respects_child_if_branching(monkeypatch: pytest.MonkeyPatch) -> Non
         },
     )()
 
-    _drain_workflow_call_queue(processor.session_runner.workflow_call_coordinator, session_queue, queue_item)
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
 
     child_if_outputs = [
         output
@@ -1371,7 +1409,7 @@ def test_run_supports_nested_call_saved_workflow_execution(monkeypatch: pytest.M
         },
     )()
 
-    _drain_workflow_call_queue(processor.session_runner.workflow_call_coordinator, session_queue, queue_item)
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
 
     call_started = [
         queue_item.session.prepared_source_mapping[invocation.id]
@@ -1429,7 +1467,7 @@ def test_run_cascades_nested_child_workflow_failures_to_all_parents(monkeypatch:
         },
     )()
 
-    _drain_workflow_call_queue(processor.session_runner.workflow_call_coordinator, session_queue, queue_item)
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
 
     assert session.has_error()
     assert session_queue.completed_item_ids == [101]
@@ -1468,7 +1506,7 @@ def test_run_forwards_literal_dynamic_workflow_inputs_to_child_workflow(monkeypa
         },
     )()
 
-    _drain_workflow_call_queue(processor.session_runner.workflow_call_coordinator, session_queue, queue_item)
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
 
     child_add_outputs = [
         output
@@ -1507,7 +1545,7 @@ def test_run_forwards_connected_dynamic_workflow_inputs_to_child_workflow(monkey
         },
     )()
 
-    _drain_workflow_call_queue(processor.session_runner.workflow_call_coordinator, session_queue, queue_item)
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
 
     child_add_outputs = [
         output

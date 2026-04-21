@@ -72,13 +72,17 @@ Implemented runtime scaffolding:
   - validates and applies parent call arguments to the child graph
   - creates a child `GraphExecutionState`
   - attaches that child session to the waiting parent session
-- `WorkflowCallCoordinator` now owns the temporary parent/child orchestration path:
-  - when a session is waiting on a workflow call, the coordinator suspends the parent queue item and enqueues a real
-    child queue item
-  - when the child finishes successfully, the coordinator resumes the parent session
-  - the parent is completed with the child `workflow_return` collection during that resume path
-  - if the child fails, the coordinator fails the suspended parent `call_saved_workflow` node and cascades that
-    failure upward through any parent call chain
+- Workflow-call runtime responsibilities are now split:
+  - `WorkflowCallCoordinator` handles call-specific setup:
+    - build the child graph
+    - apply parent call arguments
+    - create the child `GraphExecutionState`
+    - suspend the parent and enqueue the child queue item
+  - `WorkflowCallQueueLifecycle` handles queue-visible parent/child lifecycle:
+    - run child queue items
+    - resume waiting parents after child success
+    - complete the parent call node with the child `workflow_return` collection
+    - fail suspended parents after child failure and cascade that failure upward through parent call chains
 - Child `SessionQueueItem` rows now carry explicit relationship metadata:
   - `workflow_call_id`
   - `parent_item_id`
@@ -323,15 +327,16 @@ Current insertion points already used:
 
 - `DefaultSessionRunner.run_node()` detects `call_saved_workflow` and enters boundary state
 - `GraphExecutionState` stores the waiting/call-stack state and attached child session
-- `WorkflowCallCoordinator` currently enqueues child workflow executions as real queue rows, then resumes or fails the
-  parent when those child rows complete
+- `WorkflowCallCoordinator` currently establishes the call boundary and enqueues child workflow executions as real
+  queue rows
+- `WorkflowCallQueueLifecycle` currently resumes or fails parents when those child rows complete
 - child queue items already carry stable parent/child identifiers in both runtime objects and durable queue columns
 
 Next runtime work still needed:
 
-- generalize parent/child queue scheduling so parent resume/failure is not coordinated only by
-  `WorkflowCallCoordinator`
 - decide whether parent resumption should remain immediate on child completion or become a more explicit scheduler step
+- decide whether `WorkflowCallQueueLifecycle` should remain a dedicated workflow-call runtime component or eventually
+  fold into a more general queue scheduler/lifecycle layer
 - replace the current unsupported batch-special-node limitation by routing child execution through machinery that can
   honor ordinary Invoke batch semantics
 
@@ -429,7 +434,7 @@ Still needed in later increments:
 - nested runtime execution beyond a single attached child state
 - eventual support for child workflows that contain batch-special nodes, once child execution is run through the proper
   batch/session path
-- eventual migration from coordinator-owned resume/fail behavior to a more general scheduler or queue-lifecycle model
+- eventual migration from dedicated workflow-call queue lifecycle handling to a more general scheduler or queue-lifecycle model
 
 ## Recommended Immediate Next Step
 

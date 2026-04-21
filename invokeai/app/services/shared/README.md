@@ -139,8 +139,8 @@ Workflow-call note:
 - `GraphExecutionState` can represent a paused parent execution plus an attached child execution state, but it does not
   itself orchestrate child execution.
 - In the current implementation, `DefaultSessionRunner.run_node()` establishes the workflow call boundary and attaches
-  the child execution state, while `WorkflowCallCoordinator` suspends the parent queue item, enqueues a real child
-  queue item, and later resumes or fails the parent based on that child queue row's outcome.
+  the child execution state, while `WorkflowCallCoordinator` handles call-specific setup and
+  `WorkflowCallQueueLifecycle` later resumes or fails the parent based on that child queue row's outcome.
 - Child `SessionQueueItem` rows created by the coordinator now carry explicit relationship metadata such as
   `workflow_call_id`, `parent_item_id`, `parent_session_id`, `root_item_id`, and `workflow_call_depth`, even though
   the higher-level scheduler semantics are still evolving.
@@ -152,7 +152,7 @@ Workflow-call note:
   - cancelation is chain-aware across parents and children
   - retry is root-oriented and should not be exposed directly on child queue rows in the UI
 - This is still an intermediate architecture step and should eventually be replaced by a more general parent/child
-  execution mechanism rather than coordinator-specific resume/fail behavior.
+  execution mechanism rather than workflow-call-specific queue lifecycle handling.
 
 ### 4.3 Runtime helper classes
 
@@ -280,7 +280,7 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
 Current limitation:
 
 - Child workflow executions are now represented as first-class queue items, but parent resume/failure is still
-  coordinator-driven rather than part of a generalized queue scheduler contract.
+  handled by a dedicated workflow-call queue lifecycle component rather than a generalized queue scheduler contract.
 - Called workflows currently require a valid `workflow_return` node to produce a parent-visible result.
 
 ## 8) Error Model (selected)
