@@ -172,7 +172,7 @@ class Batch(BaseModel):
 DEFAULT_QUEUE_ID = "default"
 SYSTEM_USER_ID = "system"  # Default user_id for system-generated queue items
 
-QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "completed", "failed", "canceled"]
+QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "waiting", "completed", "failed", "canceled"]
 
 
 class ItemIdsResult(BaseModel):
@@ -315,6 +315,7 @@ class SessionQueueStatus(BaseModel):
     session_id: Optional[str] = Field(description="The current queue item's session id")
     pending: int = Field(..., description="Number of queue items with status 'pending'")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress'")
+    waiting: int = Field(..., description="Number of queue items with status 'waiting'")
     completed: int = Field(..., description="Number of queue items with status 'complete'")
     failed: int = Field(..., description="Number of queue items with status 'error'")
     canceled: int = Field(..., description="Number of queue items with status 'canceled'")
@@ -326,6 +327,7 @@ class SessionQueueCountsByDestination(BaseModel):
     destination: str = Field(..., description="The destination of queue items included in this status")
     pending: int = Field(..., description="Number of queue items with status 'pending' for the destination")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress' for the destination")
+    waiting: int = Field(..., description="Number of queue items with status 'waiting' for the destination")
     completed: int = Field(..., description="Number of queue items with status 'complete' for the destination")
     failed: int = Field(..., description="Number of queue items with status 'error' for the destination")
     canceled: int = Field(..., description="Number of queue items with status 'canceled' for the destination")
@@ -339,6 +341,7 @@ class BatchStatus(BaseModel):
     destination: str | None = Field(..., description="The destination of the batch")
     pending: int = Field(..., description="Number of queue items with status 'pending'")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress'")
+    waiting: int = Field(..., description="Number of queue items with status 'waiting'")
     completed: int = Field(..., description="Number of queue items with status 'complete'")
     failed: int = Field(..., description="Number of queue items with status 'error'")
     canceled: int = Field(..., description="Number of queue items with status 'canceled'")

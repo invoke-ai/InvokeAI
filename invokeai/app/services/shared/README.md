@@ -138,16 +138,16 @@ Workflow-call note:
 
 - `GraphExecutionState` can represent a paused parent execution plus an attached child execution state, but it does not
   itself orchestrate child execution.
-- In the current temporary implementation, `DefaultSessionRunner.run_node()` establishes the workflow call boundary and
-  attaches the child execution state, while `WorkflowCallCoordinator` runs that attached child session, resumes the
-  parent, and completes the parent `call_saved_workflow` node with the child `workflow_return` output.
-- Child `SessionQueueItem` wrappers created by the coordinator now carry explicit relationship metadata such as
+- In the current implementation, `DefaultSessionRunner.run_node()` establishes the workflow call boundary and attaches
+  the child execution state, while `WorkflowCallCoordinator` suspends the parent queue item, enqueues a real child
+  queue item, and later resumes or fails the parent based on that child queue row's outcome.
+- Child `SessionQueueItem` rows created by the coordinator now carry explicit relationship metadata such as
   `workflow_call_id`, `parent_item_id`, `parent_session_id`, `root_item_id`, and `workflow_call_depth`, even though
-  child executions are not yet persisted as separate queue rows.
-- The `session_queue` schema now has matching columns for those relationship fields, so the identifiers are durable
-  once child workflow executions start being represented as real queue rows.
-- This is a tactical step to keep the feature testable and should eventually be replaced by a first-class parent/child
-  execution mechanism with explicit queue-visible child lifecycle and return propagation.
+  the higher-level scheduler semantics are still evolving.
+- The `session_queue` schema now has matching columns for those relationship fields, and parent queue items can enter a
+  `waiting` status while suspended on a child workflow execution.
+- This is still an intermediate architecture step and should eventually be replaced by a more general parent/child
+  execution mechanism rather than coordinator-specific resume/fail behavior.
 
 ### 4.3 Runtime helper classes
 
@@ -274,8 +274,8 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
 
 Current limitation:
 
-- The attached child execution state is currently executed inline by the session runner rather than as a first-class
-  queued or scheduler-visible child execution.
+- Child workflow executions are now represented as first-class queue items, but parent resume/failure is still
+  coordinator-driven rather than part of a generalized queue scheduler contract.
 - Called workflows currently require a valid `workflow_return` node to produce a parent-visible result.
 
 ## 8) Error Model (selected)

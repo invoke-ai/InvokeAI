@@ -65,15 +65,16 @@ class SqliteSessionQueue(SessionQueueBase):
 
     def _set_in_progress_to_canceled(self) -> None:
         """
-        Sets all in_progress queue items to canceled. Run on app startup, not associated with any queue.
-        This is necessary because the invoker may have been killed while processing a queue item.
+        Sets all in_progress or waiting queue items to canceled. Run on app startup, not associated with any queue.
+        This is necessary because the invoker may have been killed while processing a queue item or while a parent
+        queue item was suspended waiting on a child workflow execution.
         """
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
                 UPDATE session_queue
                 SET status = 'canceled'
-                WHERE status = 'in_progress';
+                WHERE status IN ('in_progress', 'waiting');
                 """
             )
 
@@ -437,6 +438,14 @@ class SqliteSessionQueue(SessionQueueBase):
         queue_item = self._set_queue_item_status(item_id=item_id, status="completed")
         return queue_item
 
+    def suspend_queue_item(self, item_id: int) -> SessionQueueItem:
+        queue_item = self._set_queue_item_status(item_id=item_id, status="waiting")
+        return queue_item
+
+    def resume_queue_item(self, item_id: int) -> SessionQueueItem:
+        queue_item = self._set_queue_item_status(item_id=item_id, status="pending")
+        return queue_item
+
     def fail_queue_item(
         self,
         item_id: int,
@@ -727,6 +736,67 @@ class SqliteSessionQueue(SessionQueueBase):
             )
         return self.get_queue_item(item_id)
 
+    def enqueue_workflow_call_child(
+        self, parent_queue_item: SessionQueueItem, child_session: GraphExecutionState
+    ) -> SessionQueueItem:
+        workflow_call_execution = parent_queue_item.session.waiting_workflow_call_execution
+        if workflow_call_execution is None:
+            raise ValueError("Parent queue item is missing active workflow call execution metadata.")
+
+        session_json = child_session.model_dump_json(warnings=False, exclude_none=True)
+        root_item_id = parent_queue_item.root_item_id or parent_queue_item.item_id
+
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                INSERT INTO session_queue (
+                    queue_id,
+                    session,
+                    session_id,
+                    batch_id,
+                    field_values,
+                    priority,
+                    workflow,
+                    origin,
+                    destination,
+                    retried_from_item_id,
+                    user_id,
+                    workflow_call_id,
+                    parent_item_id,
+                    parent_session_id,
+                    root_item_id,
+                    workflow_call_depth,
+                    status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending')
+                """,
+                (
+                    parent_queue_item.queue_id,
+                    session_json,
+                    child_session.id,
+                    parent_queue_item.batch_id,
+                    None,
+                    parent_queue_item.priority,
+                    None,
+                    parent_queue_item.origin,
+                    parent_queue_item.destination,
+                    None,
+                    parent_queue_item.user_id,
+                    workflow_call_execution.id,
+                    parent_queue_item.item_id,
+                    parent_queue_item.session_id,
+                    root_item_id,
+                    workflow_call_execution.depth,
+                ),
+            )
+            item_id = cursor.lastrowid
+
+        queue_item = self.get_queue_item(item_id)
+        batch_status = self.get_batch_status(queue_id=queue_item.queue_id, batch_id=queue_item.batch_id)
+        queue_status = self.get_queue_status(queue_id=queue_item.queue_id)
+        self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
+        return queue_item
+
     def list_queue_items(
         self,
         queue_id: str,
@@ -880,6 +950,7 @@ class SqliteSessionQueue(SessionQueueBase):
             batch_id=current_item.batch_id if show_current_item else None,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
+            waiting=counts.get("waiting", 0),
             completed=counts.get("completed", 0),
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
@@ -912,6 +983,7 @@ class SqliteSessionQueue(SessionQueueBase):
             queue_id=queue_id,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
+            waiting=counts.get("waiting", 0),
             completed=counts.get("completed", 0),
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),
@@ -943,6 +1015,7 @@ class SqliteSessionQueue(SessionQueueBase):
             destination=destination,
             pending=counts.get("pending", 0),
             in_progress=counts.get("in_progress", 0),
+            waiting=counts.get("waiting", 0),
             completed=counts.get("completed", 0),
             failed=counts.get("failed", 0),
             canceled=counts.get("canceled", 0),

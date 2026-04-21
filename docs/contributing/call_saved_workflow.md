@@ -73,26 +73,27 @@ Implemented runtime scaffolding:
   - creates a child `GraphExecutionState`
   - attaches that child session to the waiting parent session
 - `WorkflowCallCoordinator` now owns the temporary parent/child orchestration path:
-  - when a session is waiting on a workflow call, the coordinator runs the attached child session as a distinct
-    execution unit
+  - when a session is waiting on a workflow call, the coordinator suspends the parent queue item and enqueues a real
+    child queue item
   - when the child finishes successfully, the coordinator resumes the parent session
   - the parent is completed with the child `workflow_return` collection during that resume path
-  - if the child fails, the coordinator fails the suspended parent `call_saved_workflow` node
-- Child `SessionQueueItem` wrappers now carry explicit relationship metadata during temporary attached-session execution:
+  - if the child fails, the coordinator fails the suspended parent `call_saved_workflow` node and cascades that
+    failure upward through any parent call chain
+- Child `SessionQueueItem` rows now carry explicit relationship metadata:
   - `workflow_call_id`
   - `parent_item_id`
   - `parent_session_id`
   - `root_item_id`
   - `workflow_call_depth`
-  - this metadata is used in runtime events now and should survive the later move to durable child queue rows
+  - this metadata is now used directly by queue-visible child execution and parent resume/failure handling
 - The `session_queue` table now has matching durable columns for that relationship metadata:
   - `workflow_call_id`
   - `parent_item_id`
   - `parent_session_id`
   - `root_item_id`
   - `workflow_call_depth`
-  - those columns currently round-trip through `SessionQueueItem`, but child workflow executions are not yet inserted as
-    their own queue rows
+  - child workflow executions are now inserted as their own pending queue rows using those columns
+- Parent queue items now enter a real `waiting` status while suspended on a child workflow execution.
 - `_on_after_run_session()` no longer completes queue items whose sessions are incomplete but waiting.
 - Dynamic call arguments now execute end-to-end in the current runner path:
   - literal dynamic values are serialized into a hidden `workflow_inputs` payload on the parent node
@@ -108,10 +109,6 @@ Implemented conversion helper:
 
 What is still not implemented:
 
-- the child workflow is still executed through a temporary attached-session path, not yet as its own queue item or
-  scheduler-visible unit
-- the child workflow is not persisted as its own queue item
-- parent-child queue/session identifiers are not yet formalized beyond the attached child `GraphExecutionState`
 - saved workflows containing batch-special nodes such as `image_batch` are not supported by the current child graph
   reconstruction path and must fail with a clear domain error rather than a low-level constructor error
 
@@ -119,10 +116,10 @@ Conclusion:
 
 - the editor contract is largely in place
 - the parent-side runtime call boundary is in place
-- child execution, argument forwarding, and explicit child return capture now work through the temporary
-  coordinator-owned
-  attached-session path
-- first-class child execution semantics are the remaining major runtime step
+- child execution, argument forwarding, explicit child return capture, suspended parent status, queue-visible child
+  rows, and upward failure cascade now work
+- the remaining major runtime work is to harden and generalize the parent/child scheduler model rather than prove the
+  basic call boundary
 
 ## Architectural Direction
 
@@ -221,12 +218,10 @@ Current limitation:
 - batch-special nodes from `invokeai.app.invocations.batch` are not yet supported in called workflows
 - until the child execution path is closer to normal session execution, batch-special nodes should fail early with a
   clear unsupported-feature error
-- the current child execution path runs inline inside `DefaultSessionRunner`, so child execution is not yet a
-  first-class queue/session entity
-- the current inline runner path is an intentionally temporary implementation step used to keep the feature testable
-  while the durable parent-child execution architecture is being built
-- the plan is to replace the inline runner path with a first-class parent-child execution mechanism once return-value
-  propagation and child-session lifecycle handling are implemented cleanly
+- the current queue-visible child execution path still relies on `WorkflowCallCoordinator` to resume or fail parents
+  directly rather than a more general queue scheduler abstraction
+- the current implementation is still an intermediate architecture step, but it is now materially closer to the
+  intended durable parent/child model than the earlier inline-runner path
 
 ### 5. Return Values
 
@@ -299,17 +294,15 @@ Current insertion points already used:
 
 - `DefaultSessionRunner.run_node()` detects `call_saved_workflow` and enters boundary state
 - `GraphExecutionState` stores the waiting/call-stack state and attached child session
-- `WorkflowCallCoordinator` currently runs the attached child session, then resumes the parent and completes the call
-  node with the child `workflow_return` collection
-- child queue-item wrappers already carry stable parent/child identifiers even though child executions are not yet
-  persisted as their own queue rows
+- `WorkflowCallCoordinator` currently enqueues child workflow executions as real queue rows, then resumes or fails the
+  parent when those child rows complete
+- child queue items already carry stable parent/child identifiers in both runtime objects and durable queue columns
 
 Next runtime work still needed:
 
-- move child execution off the temporary attached-session processor path and onto the intended first-class parent-child
-  runtime boundary
-- persist and/or formalize parent-child identifiers beyond the in-memory attached child session
-- define how the child completion or failure is delivered back to the suspended parent
+- generalize parent/child queue scheduling so parent resume/failure is not coordinated only by
+  `WorkflowCallCoordinator`
+- decide whether parent resumption should remain immediate on child completion or become a more explicit scheduler step
 - replace the current unsupported batch-special-node limitation by routing child execution through machinery that can
   honor ordinary Invoke batch semantics
 
@@ -421,5 +414,6 @@ The current branch is at the point where:
 
 - parent call-boundary state exists
 - child execution state can be created from the selected saved workflow
-- child execution, argument forwarding, and explicit return propagation work through the inline runner path
-- but long-term child-session execution semantics are still missing
+- child execution, argument forwarding, explicit return propagation, suspended parent status, queue-visible child rows,
+  and upward failure cascade work through the current coordinator + queue path
+- but long-term generalized parent/child scheduling semantics are still missing

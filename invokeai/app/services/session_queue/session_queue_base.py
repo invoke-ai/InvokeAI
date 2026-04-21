@@ -95,6 +95,16 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def suspend_queue_item(self, item_id: int) -> SessionQueueItem:
+        """Suspends a session queue item while waiting on a child workflow execution."""
+        pass
+
+    @abstractmethod
+    def resume_queue_item(self, item_id: int) -> SessionQueueItem:
+        """Resumes a suspended session queue item by returning it to pending state."""
+        pass
+
+    @abstractmethod
     def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
         """Cancels a session queue item"""
         pass
@@ -187,6 +197,13 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
         """Sets the session for a session queue item. Use this to update the session state."""
+        pass
+
+    @abstractmethod
+    def enqueue_workflow_call_child(
+        self, parent_queue_item: SessionQueueItem, child_session: GraphExecutionState
+    ) -> SessionQueueItem:
+        """Enqueues a child workflow execution linked to a suspended parent queue item."""
         pass
 
     @abstractmethod
