@@ -144,6 +144,8 @@ Workflow-call note:
 - Child `SessionQueueItem` wrappers created by the coordinator now carry explicit relationship metadata such as
   `workflow_call_id`, `parent_item_id`, `parent_session_id`, `root_item_id`, and `workflow_call_depth`, even though
   child executions are not yet persisted as separate queue rows.
+- The `session_queue` schema now has matching columns for those relationship fields, so the identifiers are durable
+  once child workflow executions start being represented as real queue rows.
 - This is a tactical step to keep the feature testable and should eventually be replaced by a first-class parent/child
   execution mechanism with explicit queue-visible child lifecycle and return propagation.
 

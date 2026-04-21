@@ -85,6 +85,14 @@ Implemented runtime scaffolding:
   - `root_item_id`
   - `workflow_call_depth`
   - this metadata is used in runtime events now and should survive the later move to durable child queue rows
+- The `session_queue` table now has matching durable columns for that relationship metadata:
+  - `workflow_call_id`
+  - `parent_item_id`
+  - `parent_session_id`
+  - `root_item_id`
+  - `workflow_call_depth`
+  - those columns currently round-trip through `SessionQueueItem`, but child workflow executions are not yet inserted as
+    their own queue rows
 - `_on_after_run_session()` no longer completes queue items whose sessions are incomplete but waiting.
 - Dynamic call arguments now execute end-to-end in the current runner path:
   - literal dynamic values are serialized into a hidden `workflow_inputs` payload on the parent node

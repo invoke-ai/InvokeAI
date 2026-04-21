@@ -375,6 +375,31 @@ def test_migration_27_creates_users_table(logger: Logger) -> None:
     db._conn.close()
 
 
+def test_migration_30_adds_workflow_call_columns_to_session_queue(logger: Logger) -> None:
+    from invokeai.app.services.shared.sqlite_migrator.migrations.migration_30 import Migration30Callback
+
+    db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
+    cursor = db._conn.cursor()
+
+    cursor.execute("CREATE TABLE IF NOT EXISTS session_queue (item_id INTEGER PRIMARY KEY);")
+    db._conn.commit()
+
+    migration_callback = Migration30Callback()
+    migration_callback(cursor)
+    db._conn.commit()
+
+    cursor.execute("PRAGMA table_info(session_queue);")
+    columns = [row[1] for row in cursor.fetchall()]
+
+    assert "workflow_call_id" in columns
+    assert "parent_item_id" in columns
+    assert "parent_session_id" in columns
+    assert "root_item_id" in columns
+    assert "workflow_call_depth" in columns
+
+    db._conn.close()
+
+
 def test_migration_27_with_existing_client_state_data(logger: Logger) -> None:
     """Test that migration 27 correctly migrates existing data from the old client_state schema."""
     import json
