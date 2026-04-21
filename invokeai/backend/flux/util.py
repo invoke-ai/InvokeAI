@@ -135,6 +135,23 @@ _flux_transformer_params: dict[AnyVariant, FluxParams] = {
         qkv_bias=True,
         guidance_embed=False,
     ),
+    # Flux2 Klein 4B Base is the undistilled foundation model. It shares the same
+    # architecture as Klein 4B (distilled) and reports guidance_embeds=False in its
+    # HF transformer config - classical CFG (external negative pass) is the guidance mechanism.
+    Flux2VariantType.Klein4BBase: FluxParams(
+        in_channels=64,
+        vec_in_dim=2560,  # Qwen3-4B hidden size (used for pooled output)
+        context_in_dim=7680,  # 3 layers * 2560 = 7680 for Qwen3-4B
+        hidden_size=3072,
+        mlp_ratio=4.0,
+        num_heads=24,
+        depth=19,
+        depth_single_blocks=38,
+        axes_dim=[16, 56, 56],
+        theta=10_000,
+        qkv_bias=True,
+        guidance_embed=False,
+    ),
     # Flux2 Klein 9B uses Qwen3 8B text encoder with stacked embeddings from layers [9, 18, 27]
     # The context_in_dim is 3 * hidden_size of Qwen3 (3 * 4096 = 12288)
     Flux2VariantType.Klein9B: FluxParams(

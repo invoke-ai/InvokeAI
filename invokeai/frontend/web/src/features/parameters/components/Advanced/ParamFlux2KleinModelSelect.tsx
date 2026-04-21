@@ -64,6 +64,7 @@ ParamFlux2KleinVaeModelSelect.displayName = 'ParamFlux2KleinVaeModelSelect';
  */
 const KLEIN_TO_QWEN3_VARIANT_MAP: Record<string, string> = {
   klein_4b: 'qwen3_4b',
+  klein_4b_base: 'qwen3_4b',
   klein_9b: 'qwen3_8b',
   klein_9b_base: 'qwen3_8b',
 };
