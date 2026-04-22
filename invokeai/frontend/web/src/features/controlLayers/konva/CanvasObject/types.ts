@@ -34,7 +34,6 @@ export type AnyObjectRenderer =
   | CanvasObjectLasso
   | CanvasObjectOval
   | CanvasObjectPolygon
-  | CanvasObjectLasso
   | CanvasObjectImage
   | CanvasObjectGradient;
 /**
@@ -50,5 +49,4 @@ export type AnyObjectState =
   | CanvasLassoState
   | CanvasOvalState
   | CanvasPolygonState
-  | CanvasLassoState
   | CanvasGradientState;

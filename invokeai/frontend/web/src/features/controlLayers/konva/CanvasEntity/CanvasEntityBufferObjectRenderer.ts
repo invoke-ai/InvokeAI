@@ -85,17 +85,20 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
     this.subscriptions.add(
       this.manager.tool.$tool.listen(() => {
         if (this.hasBuffer() && !this.manager.$isBusy.get()) {
-          if (this.state?.type === 'polygon' && this.state.previewPoint) {
-            const hasActivePolygonSession = this.manager.tool.tools.rect.hasActivePolygonSession();
-            const isTemporaryViewSwitch =
-              hasActivePolygonSession &&
-              ((this.manager.tool.$tool.get() === 'view' && this.manager.tool.$toolBuffer.get() === 'rect') ||
-                this.manager.tool.$tool.get() === 'rect');
-            if (!isTemporaryViewSwitch) {
-              this.clearBuffer();
-            }
+          const isTemporaryShapesViewSwitch =
+            this.manager.tool.tools.rect.hasSuspendableSession() &&
+            ((this.manager.tool.$tool.get() === 'view' && this.manager.tool.$toolBuffer.get() === 'rect') ||
+              this.manager.tool.$tool.get() === 'rect');
+
+          if (isTemporaryShapesViewSwitch) {
             return;
           }
+
+          if (this.state?.type === 'polygon' && this.state.previewPoint) {
+            this.clearBuffer();
+            return;
+          }
+
           this.commitBuffer();
         }
       })

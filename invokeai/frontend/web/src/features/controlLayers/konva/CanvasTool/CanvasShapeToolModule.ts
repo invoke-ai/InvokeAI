@@ -131,6 +131,10 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     );
   };
 
+  hasSuspendableSession = (): boolean => {
+    return Boolean(this.isDrawingFreehand || this.freehandPoints.length || this.polygonPoints.length);
+  };
+
   hasActiveDragSession = (): boolean => {
     return Boolean(this.dragStartPoint || this.isDrawingFreehand);
   };
@@ -141,8 +145,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   onToolChanged = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryViewSwitch =
-      tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasActivePolygonSession();
+    const isTemporaryViewSwitch = tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
     if (tool !== 'rect' && !isTemporaryViewSwitch) {
       this.cancel();
     }
@@ -154,8 +157,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   render = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryViewSwitch =
-      tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasActivePolygonSession();
+    const isTemporaryViewSwitch = tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
     if (tool !== 'rect' && !isTemporaryViewSwitch) {
       this.konva.startPointIndicator.visible(false);
       return;
@@ -286,35 +288,20 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
-    const activeEntity = this.getActiveEntityAdapter();
-    if (!activeEntity) {
-      this.resetState();
-      return;
-    }
-
-    const bufferState = activeEntity.bufferRenderer.state;
-    if (
-      bufferState &&
-      (bufferState.type === 'rect' || bufferState.type === 'oval') &&
-      activeEntity.bufferRenderer.hasBuffer() &&
-      bufferState.rect.width > 0 &&
-      bufferState.rect.height > 0
-    ) {
-      activeEntity.bufferRenderer.commitBuffer();
-    } else {
-      activeEntity.bufferRenderer.clearBuffer();
-    }
-
-    this.resetState();
-    this.render();
+    await this.finishDragShapeSession();
   };
 
   onWindowPointerUp = async () => {
-    if (this.manager.stateApi.getSettings().shapeType !== 'freehand') {
+    if (this.isDrawingFreehand) {
+      await this.commitFreehand();
       return;
     }
 
-    await this.commitFreehand();
+    if (!this.dragStartPoint) {
+      return;
+    }
+
+    await this.finishDragShapeSession();
   };
 
   repr = () => {
@@ -342,8 +329,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   private onModifierChanged = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryViewSwitch =
-      tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasActivePolygonSession();
+    const isTemporaryViewSwitch = tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
     if (tool !== 'rect' && !isTemporaryViewSwitch) {
       return;
     }
@@ -773,6 +759,31 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return null;
     }
     return this.manager.getAdapter(this.activeEntityIdentifier);
+  };
+
+  private finishDragShapeSession = async () => {
+    const activeEntity = this.getActiveEntityAdapter();
+    if (!activeEntity) {
+      this.resetState();
+      this.render();
+      return;
+    }
+
+    const bufferState = activeEntity.bufferRenderer.state;
+    if (
+      bufferState &&
+      (bufferState.type === 'rect' || bufferState.type === 'oval') &&
+      activeEntity.bufferRenderer.hasBuffer() &&
+      bufferState.rect.width > 0 &&
+      bufferState.rect.height > 0
+    ) {
+      activeEntity.bufferRenderer.commitBuffer();
+    } else {
+      activeEntity.bufferRenderer.clearBuffer();
+    }
+
+    this.resetState();
+    this.render();
   };
 
   private clearActiveBuffer = () => {

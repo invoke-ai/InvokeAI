@@ -153,11 +153,17 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.render));
     this.subscriptions.add(
       this.$tool.listen((tool, previousTool) => {
-        // Preserve pointer state during temporary view switching so lasso sessions can freeze/resume on space.
-        const shouldPreservePointerState =
+        // Preserve pointer state during temporary view switching so lasso and shapes sessions can freeze/resume on
+        // space.
+        const shouldPreserveLassoPointerState =
           this.$toolBuffer.get() === 'lasso' &&
           this.tools.lasso.hasActiveSession() &&
           ((previousTool === 'lasso' && tool === 'view') || (previousTool === 'view' && tool === 'lasso'));
+        const shouldPreserveShapesPointerState =
+          this.$toolBuffer.get() === 'rect' &&
+          this.tools.rect.hasSuspendableSession() &&
+          ((previousTool === 'rect' && tool === 'view') || (previousTool === 'view' && tool === 'rect'));
+        const shouldPreservePointerState = shouldPreserveLassoPointerState || shouldPreserveShapesPointerState;
 
         if (!shouldPreservePointerState) {
           // On tool switch, reset mouse state
@@ -607,10 +613,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     try {
       this.$isPrimaryPointerDown.set(false);
       void this.tools.lasso.onWindowPointerUp();
-
-      if (this.$tool.get() === 'rect') {
-        await this.tools.rect.onWindowPointerUp();
-      }
+      await this.tools.rect.onWindowPointerUp();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
       if (
@@ -722,6 +725,9 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.$tool.set('view');
       if (currentTool === 'lasso' && this.tools.lasso.hasActiveSession() && this.$isPrimaryPointerDown.get()) {
         // Start panning immediately if user is already drawing with freehand lasso.
+        this.manager.stage.startDragging();
+      } else if (currentTool === 'rect' && this.tools.rect.hasSuspendableSession() && this.$isPrimaryPointerDown.get()) {
+        // Match lasso: allow an in-progress freehand shapes session to freeze and pan immediately on space.
         this.manager.stage.startDragging();
       } else {
         this.$cursorPos.set(null);
