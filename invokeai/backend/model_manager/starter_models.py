@@ -1077,7 +1077,7 @@ gemini_flash_image = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
-        modes=["txt2img", "img2img", "inpaint"],
+        modes=["txt2img"],
         supports_seed=True,
         supports_reference_images=True,
         max_images_per_request=1,
@@ -1117,7 +1117,7 @@ gemini_pro_image_preview = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
-        modes=["txt2img", "img2img", "inpaint"],
+        modes=["txt2img"],
         supports_seed=True,
         supports_reference_images=True,
         max_reference_images=14,
@@ -1137,7 +1137,7 @@ gemini_3_1_flash_image_preview = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
-        modes=["txt2img", "img2img", "inpaint"],
+        modes=["txt2img"],
         supports_seed=True,
         supports_reference_images=True,
         max_reference_images=14,
@@ -1291,7 +1291,7 @@ openai_gpt_image_1_5 = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
-        modes=["txt2img", "img2img", "inpaint"],
+        modes=["txt2img", "img2img"],
         supports_reference_images=True,
         max_images_per_request=10,
         allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
@@ -1308,7 +1308,7 @@ openai_gpt_image_1 = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
-        modes=["txt2img", "img2img", "inpaint"],
+        modes=["txt2img", "img2img"],
         supports_reference_images=True,
         max_images_per_request=10,
         allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
@@ -1325,7 +1325,7 @@ openai_gpt_image_1_mini = StarterModel(
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
-        modes=["txt2img", "img2img", "inpaint"],
+        modes=["txt2img", "img2img"],
         supports_reference_images=True,
         max_images_per_request=10,
         allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
@@ -1354,24 +1354,7 @@ openai_dall_e_3 = StarterModel(
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
 )
-openai_dall_e_2 = StarterModel(
-    name="DALL-E 2",
-    base=BaseModelType.External,
-    source="external://openai/dall-e-2",
-    description="OpenAI DALL-E 2 image generation model. Supports square images only. Requires a configured OpenAI API key and may incur provider usage costs.",
-    type=ModelType.ExternalImageGenerator,
-    format=ModelFormat.ExternalApi,
-    capabilities=ExternalModelCapabilities(
-        modes=["txt2img", "img2img", "inpaint"],
-        max_images_per_request=10,
-        allowed_aspect_ratios=["1:1"],
-        aspect_ratio_sizes={
-            "1:1": ExternalImageSize(width=1024, height=1024),
-        },
-    ),
-    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
-    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
-)
+# DALL-E 2 removed — deprecated by OpenAI, shutdown May 12, 2026.
 # region Anima
 anima_qwen3_encoder = StarterModel(
     name="Anima Qwen3 0.6B Text Encoder",
@@ -1518,7 +1501,6 @@ STARTER_MODELS: list[StarterModel] = [
     openai_gpt_image_1,
     openai_gpt_image_1_mini,
     openai_dall_e_3,
-    openai_dall_e_2,
     alibabacloud_qwen_image_2_pro,
     alibabacloud_qwen_image_2,
     alibabacloud_qwen_image_max,

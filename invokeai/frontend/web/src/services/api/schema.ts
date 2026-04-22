@@ -11760,7 +11760,7 @@ export type components = {
             model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * Mode
-             * @description Generation mode. Not all modes are supported by every model; unsupported modes raise at runtime.
+             * @description Generation mode.
              * @default txt2img
              * @enum {string}
              */
@@ -15855,14 +15855,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models/.convert_cache
+             * @default models\.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models/.download_cache
+             * @default models\.download_cache
              */
             download_cache_dir?: string;
             /**
@@ -23119,6 +23119,12 @@ export type components = {
              */
             config_path?: string | null;
         };
+        /**
+         * ModelRecordOrderBy
+         * @description The order in which to return model summaries.
+         * @enum {string}
+         */
+        ModelRecordOrderBy: "default" | "type" | "base" | "name" | "format" | "size" | "created_at" | "updated_at" | "path";
         /** ModelRelationshipBatchRequest */
         ModelRelationshipBatchRequest: {
             /**
@@ -23437,7 +23443,7 @@ export type components = {
             model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * Mode
-             * @description Generation mode. Not all modes are supported by every model; unsupported modes raise at runtime.
+             * @description Generation mode.
              * @default txt2img
              * @enum {string}
              */
@@ -23479,7 +23485,7 @@ export type components = {
              */
             image_size?: string | null;
             /**
-             * @description Init image for img2img/inpaint
+             * @description Init image (use reference_images instead)
              * @default null
              */
             init_image?: components["schemas"]["ImageField"] | null;
@@ -31647,6 +31653,10 @@ export interface operations {
                 model_name?: string | null;
                 /** @description Exact match on the format of the model (e.g. 'diffusers') */
                 model_format?: components["schemas"]["ModelFormat"] | null;
+                /** @description The field to order by */
+                order_by?: components["schemas"]["ModelRecordOrderBy"];
+                /** @description The direction to order by */
+                direction?: components["schemas"]["SQLiteDirection"];
             };
             header?: never;
             path?: never;

@@ -11,6 +11,7 @@ from typing import List, Optional, Set, Union
 from pydantic import BaseModel, Field
 
 from invokeai.app.services.shared.pagination import PaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.external_api import (
@@ -60,6 +61,10 @@ class ModelRecordOrderBy(str, Enum):
     Base = "base"
     Name = "name"
     Format = "format"
+    Size = "size"
+    DateAdded = "created_at"
+    DateModified = "updated_at"
+    Path = "path"
 
 
 class ModelSummary(BaseModel):
@@ -200,7 +205,11 @@ class ModelRecordServiceBase(ABC):
 
     @abstractmethod
     def list_models(
-        self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
+        self,
+        page: int = 0,
+        per_page: int = 10,
+        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> PaginatedResults[ModelSummary]:
         """Return a paginated summary listing of each model in the database."""
         pass
@@ -237,6 +246,8 @@ class ModelRecordServiceBase(ABC):
         base_model: Optional[BaseModelType] = None,
         model_type: Optional[ModelType] = None,
         model_format: Optional[ModelFormat] = None,
+        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> List[AnyModelConfig]:
         """
         Return models matching name, base and/or type.
