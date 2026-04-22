@@ -88,6 +88,15 @@ const buildInvocationCompleteEvent = (
   }) as S['InvocationCompleteEvent'];
 
 describe(getUpdatedNodeExecutionStateOnInvocationStarted.name, () => {
+  it('creates an execution state when started arrives before initialization', () => {
+    const event = buildInvocationStartedEvent();
+    const updated = getUpdatedNodeExecutionStateOnInvocationStarted(undefined, event, new Set<string>());
+
+    expect(updated?.nodeId).toBe(event.invocation_source_id);
+    expect(updated?.status).toBe(zNodeStatus.enum.IN_PROGRESS);
+    expect(updated?.outputs).toEqual([]);
+  });
+
   it('marks the node in progress on invocation start', () => {
     const updated = getUpdatedNodeExecutionStateOnInvocationStarted(
       buildNodeExecutionState(),
@@ -111,6 +120,16 @@ describe(getUpdatedNodeExecutionStateOnInvocationStarted.name, () => {
 });
 
 describe(getUpdatedNodeExecutionStateOnInvocationProgress.name, () => {
+  it('creates an execution state when progress arrives before initialization', () => {
+    const event = buildInvocationProgressEvent();
+    const updated = getUpdatedNodeExecutionStateOnInvocationProgress(undefined, event, new Set<string>());
+
+    expect(updated?.nodeId).toBe(event.invocation_source_id);
+    expect(updated?.status).toBe(zNodeStatus.enum.IN_PROGRESS);
+    expect(updated?.progress).toBe(event.percentage);
+    expect(updated?.progressImage).toEqual(event.image);
+  });
+
   it('marks the node in progress and preserves progress updates', () => {
     const event = buildInvocationProgressEvent();
     const updated = getUpdatedNodeExecutionStateOnInvocationProgress(
@@ -137,6 +156,17 @@ describe(getUpdatedNodeExecutionStateOnInvocationProgress.name, () => {
 });
 
 describe(getUpdatedNodeExecutionStateOnInvocationComplete.name, () => {
+  it('creates an execution state when completion arrives before initialization', () => {
+    const event = buildInvocationCompleteEvent();
+    const completedInvocationKeys = new Set<string>();
+    const updated = getUpdatedNodeExecutionStateOnInvocationComplete(undefined, event, completedInvocationKeys);
+
+    expect(updated?.nodeId).toBe(event.invocation_source_id);
+    expect(updated?.status).toBe(zNodeStatus.enum.COMPLETED);
+    expect(updated?.outputs).toEqual([event.result]);
+    expect(completedInvocationKeys).toEqual(new Set([`${event.item_id}:${event.invocation.id}`]));
+  });
+
   it('records a completed invocation result once', () => {
     const event = buildInvocationCompleteEvent();
     const completedInvocationKeys = new Set<string>();

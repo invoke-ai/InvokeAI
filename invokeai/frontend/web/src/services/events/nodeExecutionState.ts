@@ -6,20 +6,25 @@ import type { S } from 'services/api/types';
 const getInvocationKey = (data: { item_id: number; invocation: { id: string } }) =>
   `${data.item_id}:${data.invocation.id}`;
 
+const getInitialNodeExecutionState = (nodeId: string): NodeExecutionState => ({
+  nodeId,
+  status: zNodeStatus.enum.PENDING,
+  progress: null,
+  progressImage: null,
+  outputs: [],
+  error: null,
+});
+
 export const getUpdatedNodeExecutionStateOnInvocationStarted = (
   nodeExecutionState: NodeExecutionState | undefined,
   data: S['InvocationStartedEvent'],
   completedInvocationKeys: Set<string>
 ) => {
-  if (!nodeExecutionState) {
-    return;
-  }
-
   if (completedInvocationKeys.has(getInvocationKey(data))) {
     return;
   }
 
-  const _nodeExecutionState = deepClone(nodeExecutionState);
+  const _nodeExecutionState = deepClone(nodeExecutionState ?? getInitialNodeExecutionState(data.invocation_source_id));
   _nodeExecutionState.status = zNodeStatus.enum.IN_PROGRESS;
 
   return _nodeExecutionState;
@@ -30,15 +35,11 @@ export const getUpdatedNodeExecutionStateOnInvocationProgress = (
   data: S['InvocationProgressEvent'],
   completedInvocationKeys: Set<string>
 ) => {
-  if (!nodeExecutionState) {
-    return;
-  }
-
   if (completedInvocationKeys.has(getInvocationKey(data))) {
     return;
   }
 
-  const _nodeExecutionState = deepClone(nodeExecutionState);
+  const _nodeExecutionState = deepClone(nodeExecutionState ?? getInitialNodeExecutionState(data.invocation_source_id));
   _nodeExecutionState.status = zNodeStatus.enum.IN_PROGRESS;
   _nodeExecutionState.progress = data.percentage ?? null;
   _nodeExecutionState.progressImage = data.image ?? null;
@@ -51,17 +52,13 @@ export const getUpdatedNodeExecutionStateOnInvocationComplete = (
   data: S['InvocationCompleteEvent'],
   completedInvocationKeys: Set<string>
 ) => {
-  if (!nodeExecutionState) {
-    return;
-  }
-
   const completedInvocationKey = getInvocationKey(data);
 
   if (completedInvocationKeys.has(completedInvocationKey)) {
     return;
   }
 
-  const _nodeExecutionState = deepClone(nodeExecutionState);
+  const _nodeExecutionState = deepClone(nodeExecutionState ?? getInitialNodeExecutionState(data.invocation_source_id));
   _nodeExecutionState.status = zNodeStatus.enum.COMPLETED;
   if (_nodeExecutionState.progress !== null) {
     _nodeExecutionState.progress = 1;
