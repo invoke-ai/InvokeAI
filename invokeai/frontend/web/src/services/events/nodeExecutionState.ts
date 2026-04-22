@@ -68,3 +68,20 @@ export const getUpdatedNodeExecutionStateOnInvocationComplete = (
 
   return _nodeExecutionState;
 };
+
+export const getUpdatedNodeExecutionStateOnInvocationError = (
+  nodeExecutionState: NodeExecutionState | undefined,
+  data: S['InvocationErrorEvent']
+) => {
+  const _nodeExecutionState = deepClone(nodeExecutionState ?? getInitialNodeExecutionState(data.invocation_source_id));
+  _nodeExecutionState.status = zNodeStatus.enum.FAILED;
+  _nodeExecutionState.progress = null;
+  _nodeExecutionState.progressImage = null;
+  _nodeExecutionState.error = {
+    error_type: data.error_type,
+    error_message: data.error_message,
+    error_traceback: data.error_traceback,
+  };
+
+  return _nodeExecutionState;
+};

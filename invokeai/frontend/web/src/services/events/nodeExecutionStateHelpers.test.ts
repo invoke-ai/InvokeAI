@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getUpdatedNodeExecutionStateOnInvocationComplete,
+  getUpdatedNodeExecutionStateOnInvocationError,
   getUpdatedNodeExecutionStateOnInvocationProgress,
   getUpdatedNodeExecutionStateOnInvocationStarted,
 } from './nodeExecutionState';
@@ -86,6 +87,26 @@ const buildInvocationCompleteEvent = (
     },
     ...overrides,
   }) as S['InvocationCompleteEvent'];
+
+const buildInvocationErrorEvent = (overrides: Partial<S['InvocationErrorEvent']> = {}): S['InvocationErrorEvent'] =>
+  ({
+    queue_id: 'default',
+    item_id: 1,
+    batch_id: 'batch-1',
+    origin: 'workflows',
+    destination: 'gallery',
+    user_id: 'user-1',
+    session_id: 'session-1',
+    invocation_source_id: 'node-1',
+    invocation: {
+      id: 'prepared-node-1',
+      type: 'add',
+    },
+    error_type: 'TestError',
+    error_message: 'boom',
+    error_traceback: 'traceback',
+    ...overrides,
+  }) as S['InvocationErrorEvent'];
 
 describe(getUpdatedNodeExecutionStateOnInvocationStarted.name, () => {
   it('creates an execution state when started arrives before initialization', () => {
@@ -217,5 +238,43 @@ describe(getUpdatedNodeExecutionStateOnInvocationComplete.name, () => {
     );
 
     expect(secondUpdate?.outputs).toEqual([firstEvent.result, secondEvent.result]);
+  });
+});
+
+describe(getUpdatedNodeExecutionStateOnInvocationError.name, () => {
+  it('creates an execution state when error arrives before initialization', () => {
+    const event = buildInvocationErrorEvent();
+    const updated = getUpdatedNodeExecutionStateOnInvocationError(undefined, event);
+
+    expect(updated?.nodeId).toBe(event.invocation_source_id);
+    expect(updated?.status).toBe(zNodeStatus.enum.FAILED);
+    expect(updated?.progress).toBeNull();
+    expect(updated?.progressImage).toBeNull();
+    expect(updated?.error).toEqual({
+      error_type: event.error_type,
+      error_message: event.error_message,
+      error_traceback: event.error_traceback,
+    });
+  });
+
+  it('marks the node failed and records the error', () => {
+    const event = buildInvocationErrorEvent();
+    const updated = getUpdatedNodeExecutionStateOnInvocationError(
+      buildNodeExecutionState({
+        status: zNodeStatus.enum.IN_PROGRESS,
+        progress: 0.5,
+        progressImage: { dataURL: 'data:image/png;base64,abc', width: 64, height: 64 },
+      }),
+      event
+    );
+
+    expect(updated?.status).toBe(zNodeStatus.enum.FAILED);
+    expect(updated?.progress).toBeNull();
+    expect(updated?.progressImage).toBeNull();
+    expect(updated?.error).toEqual({
+      error_type: event.error_type,
+      error_message: event.error_message,
+      error_traceback: event.error_traceback,
+    });
   });
 });

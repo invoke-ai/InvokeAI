@@ -38,6 +38,7 @@ import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
 import {
+  getUpdatedNodeExecutionStateOnInvocationError,
   getUpdatedNodeExecutionStateOnInvocationProgress,
   getUpdatedNodeExecutionStateOnInvocationStarted,
 } from 'services/events/nodeExecutionState';
@@ -161,19 +162,12 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
       return;
     }
-    const { invocation_source_id, invocation, error_type, error_message, error_traceback } = data;
+    const { invocation_source_id, invocation } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
-    const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-    if (nes) {
-      nes.status = zNodeStatus.enum.FAILED;
-      nes.progress = null;
-      nes.progressImage = null;
-      nes.error = {
-        error_type,
-        error_message,
-        error_traceback,
-      };
-      upsertExecutionState(nes.nodeId, nes);
+    const nes = $nodeExecutionStates.get()[invocation_source_id];
+    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationError(nes, data);
+    if (updatedNodeExecutionState) {
+      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
     }
     // Clear canvas workflow integration processing state on error
     if (data.origin === 'canvas_workflow_integration') {
