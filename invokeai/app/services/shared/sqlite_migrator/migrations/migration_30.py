@@ -18,11 +18,15 @@ class Migration30Callback:
 
         if "workflow_call_id" not in columns:
             cursor.execute("ALTER TABLE session_queue ADD COLUMN workflow_call_id TEXT;")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_queue_workflow_call_id ON session_queue(workflow_call_id);")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_session_queue_workflow_call_id ON session_queue(workflow_call_id);"
+            )
 
         if "parent_item_id" not in columns:
             cursor.execute("ALTER TABLE session_queue ADD COLUMN parent_item_id INTEGER;")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_queue_parent_item_id ON session_queue(parent_item_id);")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_session_queue_parent_item_id ON session_queue(parent_item_id);"
+            )
 
         if "parent_session_id" not in columns:
             cursor.execute("ALTER TABLE session_queue ADD COLUMN parent_session_id TEXT;")
