@@ -304,13 +304,19 @@ class QueueItemsRetriedEvent(QueueEventBase):
 
     retried_item_ids: list[int] = Field(description="The IDs of the queue items that were retried")
     user_ids: list[str] = Field(description="The IDs of the users who own the retried root queue items")
+    retried_item_ids_by_user: dict[str, list[int]] = Field(
+        description="The retried root queue item IDs keyed by owner user ID."
+    )
 
     @classmethod
-    def build(cls, retry_result: RetryItemsResult, user_ids: list[str]) -> "QueueItemsRetriedEvent":
+    def build(
+        cls, retry_result: RetryItemsResult, user_ids: list[str], retried_item_ids_by_user: dict[str, list[int]]
+    ) -> "QueueItemsRetriedEvent":
         return cls(
             queue_id=retry_result.queue_id,
             retried_item_ids=retry_result.retried_item_ids,
             user_ids=user_ids,
+            retried_item_ids_by_user=retried_item_ids_by_user,
         )
 
 

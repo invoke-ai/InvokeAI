@@ -9,9 +9,11 @@ from typing import Any
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 
 from invokeai.app.invocations.fields import ImageField
+from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy, BoardVisibility
 from invokeai.app.services.image_records.image_records_common import ASSETS_CATEGORIES, IMAGE_CATEGORIES
 from invokeai.app.services.session_queue.session_queue_common import Batch, BatchDatum, create_session_nfv_tuples
 from invokeai.app.services.shared.graph import GraphExecutionState, WorkflowCallFrame
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.workflow_graph_builder import (
     UnsupportedWorkflowNodeError,
     apply_workflow_inputs_to_workflow,
@@ -219,13 +221,66 @@ def _resolve_string_generator(value: Mapping[str, Any]) -> list[str]:
     raise UnsupportedWorkflowNodeError(f"Unsupported string generator type '{generator_type}'")
 
 
-def _resolve_image_generator(value: Mapping[str, Any], services: Any) -> list[ImageField]:
+def _assert_user_can_access_board(board_id: str, services: Any, user_id: str | None) -> None:
+    if not user_id:
+        return
+
+    board_records = getattr(services, "board_records", None)
+    if board_records is None or not hasattr(board_records, "get"):
+        return
+
+    users = getattr(services, "users", None)
+    user = users.get(user_id) if users is not None and hasattr(users, "get") else None
+    is_admin = bool(user and getattr(user, "is_admin", False))
+    if is_admin:
+        return
+
+    try:
+        board_record = board_records.get(board_id)
+    except Exception as e:
+        raise UnsupportedWorkflowNodeError(
+            f"call_saved_workflow could not access board '{board_id}' for image generator expansion"
+        ) from e
+
+    if getattr(board_record, "user_id", None) == user_id:
+        return
+
+    board_visibility = getattr(board_record, "board_visibility", BoardVisibility.Private)
+    if isinstance(board_visibility, str):
+        try:
+            board_visibility = BoardVisibility(board_visibility)
+        except ValueError:
+            board_visibility = BoardVisibility.Private
+    if board_visibility in {BoardVisibility.Shared, BoardVisibility.Public}:
+        return
+
+    if hasattr(board_records, "get_all"):
+        try:
+            accessible_boards = board_records.get_all(
+                user_id=user_id,
+                is_admin=False,
+                order_by=BoardRecordOrderBy.Name,
+                direction=SQLiteDirection.Ascending,
+                include_archived=True,
+            )
+        except Exception:
+            accessible_boards = []
+        if any(getattr(board, "board_id", None) == board_id for board in accessible_boards):
+            return
+
+    raise UnsupportedWorkflowNodeError(
+        f"call_saved_workflow caller does not have access to board '{board_id}' for image generator expansion"
+    )
+
+
+def _resolve_image_generator(value: Mapping[str, Any], services: Any, user_id: str | None) -> list[ImageField]:
     generator_type = value.get("type")
     if generator_type != "image_generator_images_from_board":
         raise UnsupportedWorkflowNodeError(f"Unsupported image generator type '{generator_type}'")
     board_id = value.get("board_id")
     if not isinstance(board_id, str) or not board_id:
         return []
+    _assert_user_can_access_board(board_id, services, user_id)
     category = value.get("category", "images")
     categories = IMAGE_CATEGORIES if category == "images" else ASSETS_CATEGORIES
     image_names = services.board_images.get_all_board_image_names_for_board(
@@ -236,7 +291,7 @@ def _resolve_image_generator(value: Mapping[str, Any], services: Any) -> list[Im
     return [ImageField(image_name=image_name) for image_name in image_names]
 
 
-def _resolve_generator_items(generator_node: Mapping[str, Any], services: Any) -> list[Any]:
+def _resolve_generator_items(generator_node: Mapping[str, Any], services: Any, user_id: str | None) -> list[Any]:
     generator_node_data = generator_node["data"]
     node_type = generator_node_data.get("type")
     inputs = generator_node_data.get("inputs")
@@ -259,7 +314,7 @@ def _resolve_generator_items(generator_node: Mapping[str, Any], services: Any) -
     if node_type == "string_generator":
         return _resolve_string_generator(generator_value)
     if node_type == "image_generator":
-        return _resolve_image_generator(generator_value, services)
+        return _resolve_image_generator(generator_value, services, user_id)
     raise UnsupportedWorkflowNodeError(f"Unsupported generator node type '{node_type}'")
 
 
@@ -398,7 +453,7 @@ def build_batch_child_workflow_sessions(
                 raise UnsupportedWorkflowNodeError(
                     "call_saved_workflow image-generator-backed batch child workflows require runtime services"
                 )
-            batch_items = _resolve_generator_items(generator_node, services)
+            batch_items = _resolve_generator_items(generator_node, services, user_id)
             if not batch_items:
                 raise UnsupportedWorkflowNodeError(
                     f"call_saved_workflow generator-backed batch child workflow node '{generator_source_id}' produced no batch items"

@@ -107,9 +107,11 @@ class EventServiceBase:
         """Emitted when a batch is enqueued"""
         self.dispatch(BatchEnqueuedEvent.build(enqueue_result, user_id))
 
-    def emit_queue_items_retried(self, retry_result: "RetryItemsResult", user_ids: list[str]) -> None:
+    def emit_queue_items_retried(
+        self, retry_result: "RetryItemsResult", user_ids: list[str], retried_item_ids_by_user: dict[str, list[int]]
+    ) -> None:
         """Emitted when a list of queue items are retried"""
-        self.dispatch(QueueItemsRetriedEvent.build(retry_result, user_ids))
+        self.dispatch(QueueItemsRetriedEvent.build(retry_result, user_ids, retried_item_ids_by_user))
 
     def emit_queue_cleared(self, queue_id: str) -> None:
         """Emitted when a queue is cleared"""

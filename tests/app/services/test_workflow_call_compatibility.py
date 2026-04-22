@@ -189,3 +189,44 @@ def test_get_workflow_call_compatibility_reports_unsupported_connected_batch_inp
     assert compatibility.is_callable is False
     assert compatibility.reason is WorkflowCallCompatibilityReason.UnsupportedBatchInput
     assert "connected batch child workflow inputs" in (compatibility.message or "")
+
+
+def test_get_workflow_call_compatibility_allows_workflow_with_required_exposed_input() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node("target", "integer", {"value": {}}),
+            _invocation_node("collect", "collect", {"collection": {"value": []}}),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-target-collect",
+                "type": "default",
+                "source": "target",
+                "sourceHandle": "value",
+                "target": "collect",
+                "targetHandle": "item",
+            },
+            {
+                "id": "edge-collect-return",
+                "type": "default",
+                "source": "collect",
+                "sourceHandle": "collection",
+                "target": "return",
+                "targetHandle": "collection",
+            },
+        ],
+    )
+    workflow["exposedFields"] = [{"nodeId": "target", "fieldName": "value"}]
+
+    compatibility = get_workflow_call_compatibility(
+        workflow=workflow,
+        workflow_id="workflow-a",
+        services=_services(),
+        user_id="user-1",
+        maximum_children=1000,
+    )
+
+    assert compatibility.is_callable is True
+    assert compatibility.reason is WorkflowCallCompatibilityReason.Ok
+    assert compatibility.message is None

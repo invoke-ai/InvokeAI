@@ -112,6 +112,203 @@ def test_build_child_workflow_sessions_expands_direct_integer_batch() -> None:
     assert [child_session.graph.nodes["target"].value for child_session in child_sessions] == [2, 4, 6]
 
 
+def test_build_child_workflow_sessions_rejects_inaccessible_image_generator_board() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node(
+                "generator",
+                "image_generator",
+                {
+                    "generator": {
+                        "value": {
+                            "type": "image_generator_images_from_board",
+                            "board_id": "private-board",
+                            "category": "images",
+                        }
+                    }
+                },
+            ),
+            _invocation_node(
+                "batch",
+                "image_batch",
+                {"images": {"value": []}, "batch_group_id": {"value": "None"}},
+            ),
+            _invocation_node("target", "img_paste", {"image": {"value": None}, "board": {"value": None}}),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-generator-batch",
+                "type": "default",
+                "source": "generator",
+                "sourceHandle": "images",
+                "target": "batch",
+                "targetHandle": "images",
+            },
+            {
+                "id": "edge-batch-target",
+                "type": "default",
+                "source": "batch",
+                "sourceHandle": "images",
+                "target": "target",
+                "targetHandle": "image",
+            },
+            {
+                "id": "edge-target-return",
+                "type": "default",
+                "source": "target",
+                "sourceHandle": "image",
+                "target": "return",
+                "targetHandle": "collection",
+            },
+        ],
+    )
+
+    services = type(
+        "Services",
+        (),
+        {
+            "board_images": type(
+                "BoardImages",
+                (),
+                {
+                    "get_all_board_image_names_for_board": staticmethod(
+                        lambda board_id, categories, is_intermediate: ["img-a"]
+                    )
+                },
+            )(),
+            "board_records": type(
+                "BoardRecords",
+                (),
+                {
+                    "get": staticmethod(
+                        lambda board_id: type(
+                            "BoardRecord",
+                            (),
+                            {"board_id": board_id, "user_id": "owner-1", "board_visibility": "private"},
+                        )()
+                    )
+                },
+            )(),
+            "users": type(
+                "Users",
+                (),
+                {"get": staticmethod(lambda user_id: type("User", (), {"is_admin": False})())},
+            )(),
+        },
+    )()
+
+    with pytest.raises(UnsupportedWorkflowNodeError, match="does not have access to board 'private-board'"):
+        build_child_workflow_sessions(
+            parent_session=GraphExecutionState(graph=Graph()),
+            workflow=workflow,
+            workflow_inputs={},
+            call_frame=_call_frame(),
+            maximum_children=10,
+            services=services,
+            user_id="caller-1",
+        )
+
+
+def test_build_child_workflow_sessions_allows_shared_image_generator_board() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node(
+                "generator",
+                "image_generator",
+                {
+                    "generator": {
+                        "value": {
+                            "type": "image_generator_images_from_board",
+                            "board_id": "shared-board",
+                            "category": "images",
+                        }
+                    }
+                },
+            ),
+            _invocation_node(
+                "batch",
+                "image_batch",
+                {"images": {"value": []}, "batch_group_id": {"value": "None"}},
+            ),
+            _invocation_node("target", "img_paste", {"image": {"value": None}, "board": {"value": None}}),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-generator-batch",
+                "type": "default",
+                "source": "generator",
+                "sourceHandle": "images",
+                "target": "batch",
+                "targetHandle": "images",
+            },
+            {
+                "id": "edge-batch-target",
+                "type": "default",
+                "source": "batch",
+                "sourceHandle": "images",
+                "target": "target",
+                "targetHandle": "image",
+            },
+            {
+                "id": "edge-target-return",
+                "type": "default",
+                "source": "target",
+                "sourceHandle": "image",
+                "target": "return",
+                "targetHandle": "collection",
+            },
+        ],
+    )
+
+    services = type(
+        "Services",
+        (),
+        {
+            "board_images": type(
+                "BoardImages",
+                (),
+                {
+                    "get_all_board_image_names_for_board": staticmethod(
+                        lambda board_id, categories, is_intermediate: ["img-a", "img-b"]
+                    )
+                },
+            )(),
+            "board_records": type(
+                "BoardRecords",
+                (),
+                {
+                    "get": staticmethod(
+                        lambda board_id: type(
+                            "BoardRecord",
+                            (),
+                            {"board_id": board_id, "user_id": "owner-1", "board_visibility": "shared"},
+                        )()
+                    )
+                },
+            )(),
+            "users": type(
+                "Users",
+                (),
+                {"get": staticmethod(lambda user_id: type("User", (), {"is_admin": False})())},
+            )(),
+        },
+    )()
+
+    child_sessions = build_child_workflow_sessions(
+        parent_session=GraphExecutionState(graph=Graph()),
+        workflow=workflow,
+        workflow_inputs={},
+        call_frame=_call_frame(),
+        maximum_children=10,
+        services=services,
+        user_id="caller-1",
+    )
+
+    assert len(child_sessions) == 2
+
+
 def test_build_child_workflow_sessions_zips_grouped_batches() -> None:
     workflow = _workflow_dump(
         nodes=[

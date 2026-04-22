@@ -101,6 +101,7 @@ def test_retry_items_by_id_retries_root_once_for_child_chain_item(
     assert len(retry_events) == 1
     assert retry_events[0].retried_item_ids == [root_item.item_id]
     assert retry_events[0].user_ids == ["user-1"]
+    assert retry_events[0].retried_item_ids_by_user == {"user-1": [root_item.item_id]}
 
 
 def test_retry_items_by_id_emits_unique_owner_ids_for_multiple_roots(
@@ -126,3 +127,7 @@ def test_retry_items_by_id_emits_unique_owner_ids_for_multiple_roots(
     retry_events = [event for event in event_bus.events if isinstance(event, QueueItemsRetriedEvent)]
     assert len(retry_events) == 1
     assert retry_events[0].user_ids == ["user-1", "user-2"]
+    assert retry_events[0].retried_item_ids_by_user == {
+        "user-1": [first_root_item.item_id],
+        "user-2": [second_root_item.item_id],
+    }

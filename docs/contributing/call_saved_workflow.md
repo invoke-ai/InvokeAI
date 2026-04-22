@@ -269,6 +269,8 @@ The current queue-visible implementation uses the following lifecycle contract:
   - retrying a root queue item creates a new root execution
   - retrying a child queue item should be normalized to the root by backend code
   - child queue rows should not expose direct retry affordances in the UI
+  - retry websocket delivery is owner-scoped; when an admin retries roots owned by multiple users, each non-admin user
+    must receive only the retry item ids for their own roots, while admins can still observe the full retried set
 
 This is now part of the intended user-facing contract, even though the orchestration still lives in
 `WorkflowCallCoordinator`.
@@ -301,6 +303,11 @@ Current semantics:
 - parent resume waits for all child rows tied to that workflow call
 - parent return aggregation appends each child `workflow_return.collection` into one parent collection
 - if any child row fails, remaining sibling child rows are canceled and the parent call fails
+- generator-backed image batches must respect board access:
+  - the caller may expand images from a board they own
+  - admins may expand any board
+  - shared/public boards may be expanded by other users
+  - inaccessible private boards must fail before image expansion rather than leaking board contents across users
 
 Current generator coverage:
 
@@ -535,6 +542,9 @@ The frontend remains responsible for editor-time behavior:
 - preserving compatible inbound edges when workflow selection changes
 - clearing incompatible edges and invalid selections in a predictable way
 - using backend compatibility metadata so unsupported saved workflows are not presented as callable choices
+  - compatibility analysis now tolerates required exposed caller inputs by synthesizing placeholder values for those
+    inputs during backend compatibility evaluation, so workflows that are valid once the caller supplies exposed values
+    are not disabled prematurely
 
 Potential future optimization:
 

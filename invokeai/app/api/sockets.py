@@ -346,7 +346,16 @@ class SocketIO:
             elif isinstance(event_data, QueueItemsRetriedEvent):
                 for user_id in event_data.user_ids:
                     user_room = f"user:{user_id}"
-                    await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
+                    owner_event_data = event_data.model_copy(
+                        update={
+                            "retried_item_ids": event_data.retried_item_ids_by_user.get(user_id, []),
+                            "user_ids": [user_id],
+                            "retried_item_ids_by_user": {user_id: event_data.retried_item_ids_by_user.get(user_id, [])},
+                        }
+                    )
+                    await self._sio.emit(
+                        event=event_name, data=owner_event_data.model_dump(mode="json"), room=user_room
+                    )
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
                 logger.debug(
                     f"Emitted private queue_items_retried event to user rooms {event_data.user_ids} and admin room"

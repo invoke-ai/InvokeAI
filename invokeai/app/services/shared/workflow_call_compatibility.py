@@ -1,12 +1,24 @@
-from typing import Any
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any, get_args, get_origin
 
+from pydantic import BaseModel
+from pydantic_core import PydanticUndefined
+
+from invokeai.app.invocations.baseinvocation import InvocationRegistry
+from invokeai.app.invocations.call_saved_workflow import parse_call_saved_workflow_dynamic_input
+from invokeai.app.invocations.fields import ImageField
 from invokeai.app.services.session_processor.workflow_call_batch import build_child_workflow_sessions
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, WorkflowCallFrame
 from invokeai.app.services.shared.workflow_call_compatibility_common import (
     WorkflowCallCompatibility,
     WorkflowCallCompatibilityReason,
 )
-from invokeai.app.services.shared.workflow_graph_builder import InvalidWorkflowInputError, UnsupportedWorkflowNodeError
+from invokeai.app.services.shared.workflow_graph_builder import (
+    InvalidWorkflowInputError,
+    UnsupportedWorkflowNodeError,
+    get_exposed_workflow_input_names,
+)
 
 
 def _count_workflow_return_nodes(workflow: dict[str, Any]) -> int:
@@ -18,6 +30,88 @@ def _count_workflow_return_nodes(workflow: dict[str, Any]) -> int:
         if isinstance(data, dict) and data.get("type") == "workflow_return":
             workflow_return_count += 1
     return workflow_return_count
+
+
+def _is_mapping(value: Any) -> bool:
+    return isinstance(value, Mapping)
+
+
+def _get_placeholder_for_annotation(annotation: Any) -> Any:
+    origin = get_origin(annotation)
+    if origin is not None:
+        if origin is list:
+            return []
+        if origin is dict:
+            return {}
+        if origin is tuple:
+            return []
+        if origin is set:
+            return []
+        args = [arg for arg in get_args(annotation) if arg is not type(None)]
+        if args:
+            return _get_placeholder_for_annotation(args[0])
+        return None
+
+    if annotation is Any:
+        return {}
+    if annotation is str:
+        return ""
+    if annotation is int:
+        return 0
+    if annotation is float:
+        return 0.0
+    if annotation is bool:
+        return False
+    if annotation is ImageField:
+        return ImageField(image_name="compatibility-placeholder")
+    if isinstance(annotation, type) and issubclass(annotation, BaseModel):
+        try:
+            return annotation()
+        except Exception:
+            return None
+    return None
+
+
+def _build_compatibility_workflow_inputs(workflow: dict[str, Any]) -> dict[str, Any]:
+    workflow_inputs: dict[str, Any] = {}
+    workflow_nodes = workflow.get("nodes", [])
+    if not isinstance(workflow_nodes, list):
+        return workflow_inputs
+
+    nodes_by_id = {
+        node.get("id"): node
+        for node in workflow_nodes
+        if _is_mapping(node) and isinstance(node.get("id"), str) and _is_mapping(node.get("data"))
+    }
+
+    for input_name in get_exposed_workflow_input_names(workflow):
+        node_id, field_name = parse_call_saved_workflow_dynamic_input(input_name)
+        node = nodes_by_id.get(node_id)
+        if not _is_mapping(node):
+            continue
+        node_data = node.get("data")
+        if not _is_mapping(node_data):
+            continue
+        node_type = node_data.get("type")
+        if not isinstance(node_type, str):
+            continue
+        invocation_class = InvocationRegistry.get_invocation_for_type(node_type)
+        if invocation_class is None:
+            continue
+        field_info = invocation_class.model_fields.get(field_name)
+        if field_info is None:
+            continue
+        if field_info.default is not PydanticUndefined:
+            workflow_inputs[input_name] = deepcopy(field_info.default)
+            continue
+        if field_info.default_factory is not None:
+            workflow_inputs[input_name] = field_info.default_factory()
+            continue
+        placeholder = _get_placeholder_for_annotation(field_info.annotation)
+        if placeholder is not None:
+            workflow_inputs[input_name] = placeholder
+
+    return workflow_inputs
 
 
 def get_workflow_call_compatibility(
@@ -43,10 +137,11 @@ def get_workflow_call_compatibility(
         )
 
     try:
+        workflow_inputs = _build_compatibility_workflow_inputs(workflow)
         build_child_workflow_sessions(
             parent_session=GraphExecutionState(graph=Graph()),
             workflow=workflow,
-            workflow_inputs={},
+            workflow_inputs=workflow_inputs,
             call_frame=WorkflowCallFrame(
                 prepared_call_node_id="compatibility-call",
                 source_call_node_id="compatibility-call",
