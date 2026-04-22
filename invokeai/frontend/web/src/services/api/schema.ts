@@ -23312,6 +23312,12 @@ export type components = {
              */
             config_path?: string | null;
         };
+        /**
+         * ModelRecordOrderBy
+         * @description The order in which to return model summaries.
+         * @enum {string}
+         */
+        ModelRecordOrderBy: "default" | "type" | "base" | "name" | "format" | "size" | "created_at" | "updated_at" | "path";
         /** ModelRelationshipBatchRequest */
         ModelRelationshipBatchRequest: {
             /**
@@ -31965,6 +31971,10 @@ export interface operations {
                 model_name?: string | null;
                 /** @description Exact match on the format of the model (e.g. 'diffusers') */
                 model_format?: components["schemas"]["ModelFormat"] | null;
+                /** @description The field to order by */
+                order_by?: components["schemas"]["ModelRecordOrderBy"];
+                /** @description The direction to order by */
+                direction?: components["schemas"]["SQLiteDirection"];
             };
             header?: never;
             path?: never;
