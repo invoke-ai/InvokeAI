@@ -120,6 +120,10 @@ Implemented conversion helper:
 - It currently supports the invocation-node subset needed for this feature.
 - It flattens connector nodes and omits explicit destination field values when a connection exists, matching frontend
   graph-build semantics.
+- It now serves as the first explicit callable-workflow compatibility gate:
+  - the selected workflow must contain exactly one `workflow_return` node
+  - batch-special child nodes still fail early with a clear unsupported-feature error
+  - unsupported callees are rejected before any child queue row is created
 
 What is still not implemented:
 

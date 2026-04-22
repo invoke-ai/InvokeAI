@@ -152,6 +152,30 @@ def _raise_if_unsupported_invocation_type(node_type: str, node_id: str) -> None:
         )
 
 
+def _validate_callable_workflow_nodes(workflow_nodes: Sequence[Any]) -> None:
+    workflow_return_node_ids: list[str] = []
+
+    for node in workflow_nodes:
+        if not _is_invocation_node(node):
+            continue
+
+        data = node["data"]
+        node_id = data.get("id")
+        node_type = data.get("type")
+        if not isinstance(node_id, str) or not isinstance(node_type, str):
+            continue
+
+        _raise_if_unsupported_invocation_type(node_type, node_id)
+
+        if node_type == "workflow_return":
+            workflow_return_node_ids.append(node_id)
+
+    if len(workflow_return_node_ids) != 1:
+        raise UnsupportedWorkflowNodeError(
+            "call_saved_workflow requires the selected workflow to contain exactly one workflow_return node"
+        )
+
+
 def _get_default_edges(workflow_edges: Sequence[Any]) -> list[Mapping[str, Any]]:
     return [edge for edge in workflow_edges if _is_mapping(edge) and edge.get("type") == "default"]
 
@@ -206,6 +230,7 @@ def _resolve_connector_source(
 def build_graph_from_workflow(workflow: Mapping[str, Any]) -> Graph:
     workflow_nodes_raw = workflow.get("nodes", [])
     workflow_edges_raw = workflow.get("edges", [])
+    _validate_callable_workflow_nodes(workflow_nodes_raw if isinstance(workflow_nodes_raw, Sequence) else [])
 
     workflow_nodes = {
         node["id"]: node for node in workflow_nodes_raw if _is_mapping(node) and isinstance(node.get("id"), str)
@@ -222,8 +247,6 @@ def build_graph_from_workflow(workflow: Mapping[str, Any]) -> Graph:
         node_type = data.get("type")
         if not isinstance(node_id, str) or not isinstance(node_type, str):
             continue
-
-        _raise_if_unsupported_invocation_type(node_type, node_id)
 
         graph_node: dict[str, Any] = {
             "id": node_id,

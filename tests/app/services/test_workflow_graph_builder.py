@@ -68,17 +68,21 @@ def _build_workflow(edges: list[dict], nodes: list[dict]):
 
 def test_build_graph_from_workflow_converts_invocation_nodes():
     workflow = _build_workflow(
-        nodes=[_build_workflow_node("add-1", "add", {"a": 1, "b": 2})],
+        nodes=[
+            _build_workflow_node("add-1", "add", {"a": 1, "b": 2}),
+            _build_workflow_node("return-1", "workflow_return", {"collection": []}),
+        ],
         edges=[],
     )
 
     graph = build_graph_from_workflow(workflow)
 
     assert isinstance(graph, Graph)
-    assert set(graph.nodes.keys()) == {"add-1"}
+    assert set(graph.nodes.keys()) == {"add-1", "return-1"}
     assert graph.nodes["add-1"].get_type() == "add"
     assert graph.nodes["add-1"].a == 1
     assert graph.nodes["add-1"].b == 2
+    assert graph.nodes["return-1"].get_type() == "workflow_return"
 
 
 def test_build_graph_from_workflow_flattens_connector_edges():
@@ -87,6 +91,7 @@ def test_build_graph_from_workflow_flattens_connector_edges():
             _build_workflow_node("add-1", "add", {"a": 1, "b": 2}),
             _build_connector_node("connector-1"),
             _build_workflow_node("add-2", "add", {"a": 999, "b": 3}),
+            _build_workflow_node("return-1", "workflow_return", {"collection": []}),
         ],
         edges=[
             {
@@ -105,19 +110,32 @@ def test_build_graph_from_workflow_flattens_connector_edges():
                 "target": "add-2",
                 "targetHandle": "a",
             },
+            {
+                "id": "edge-3",
+                "type": "default",
+                "source": "add-2",
+                "sourceHandle": "value",
+                "target": "return-1",
+                "targetHandle": "collection",
+            },
         ],
     )
 
     graph = build_graph_from_workflow(workflow)
 
-    assert len(graph.edges) == 1
-    edge = graph.edges[0]
-    assert edge.source.node_id == "add-1"
-    assert edge.source.field == "value"
-    assert edge.destination.node_id == "add-2"
-    assert edge.destination.field == "a"
+    assert len(graph.edges) == 2
+    first_edge, second_edge = graph.edges
+    assert first_edge.source.node_id == "add-1"
+    assert first_edge.source.field == "value"
+    assert first_edge.destination.node_id == "add-2"
+    assert first_edge.destination.field == "a"
+    assert second_edge.source.node_id == "add-2"
+    assert second_edge.source.field == "value"
+    assert second_edge.destination.node_id == "return-1"
+    assert second_edge.destination.field == "collection"
     assert graph.nodes["add-2"].a == 0
     assert graph.nodes["add-2"].b == 3
+    assert graph.nodes["return-1"].collection == []
 
 
 def test_build_graph_from_workflow_rejects_batch_special_nodes_with_clear_error():
@@ -127,4 +145,27 @@ def test_build_graph_from_workflow_rejects_batch_special_nodes_with_clear_error(
     )
 
     with pytest.raises(UnsupportedWorkflowNodeError, match="call_saved_workflow does not yet support batch-special"):
+        build_graph_from_workflow(workflow)
+
+
+def test_build_graph_from_workflow_rejects_workflows_without_workflow_return():
+    workflow = _build_workflow(
+        nodes=[_build_workflow_node("add-1", "add", {"a": 1, "b": 2})],
+        edges=[],
+    )
+
+    with pytest.raises(UnsupportedWorkflowNodeError, match="exactly one workflow_return"):
+        build_graph_from_workflow(workflow)
+
+
+def test_build_graph_from_workflow_rejects_workflows_with_multiple_workflow_return_nodes():
+    workflow = _build_workflow(
+        nodes=[
+            _build_workflow_node("return-1", "workflow_return", {"collection": []}),
+            _build_workflow_node("return-2", "workflow_return", {"collection": []}),
+        ],
+        edges=[],
+    )
+
+    with pytest.raises(UnsupportedWorkflowNodeError, match="exactly one workflow_return"):
         build_graph_from_workflow(workflow)

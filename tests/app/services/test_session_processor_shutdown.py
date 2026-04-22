@@ -1281,7 +1281,6 @@ def test_run_completes_call_saved_workflow_with_child_return_collection(monkeypa
 def test_run_fails_call_saved_workflow_when_child_has_no_workflow_return(monkeypatch: pytest.MonkeyPatch) -> None:
     session_queue = _DummySessionQueue()
     runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
-    processor = DefaultSessionProcessor(session_runner=runner)
 
     graph = Graph()
     graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-no-return"))
@@ -1301,13 +1300,16 @@ def test_run_fails_call_saved_workflow_when_child_has_no_workflow_return(monkeyp
         },
     )()
 
-    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
+    session_queue.add_queue_item(queue_item)
+    runner.run(queue_item=queue_item)
 
+    assert not session.is_waiting_on_workflow_call()
+    assert session.waiting_workflow_call_child_session is None
     assert session.has_error()
-    assert len(session.workflow_call_history) == 1
-    assert session.workflow_call_history[0].status == "failed"
-    assert session.workflow_call_history[0].error_message is not None
-    assert session_queue.completed_item_ids == [100]
+    assert session.workflow_call_history == []
+    assert session_queue.enqueued_child_item_ids == []
+    assert session_queue.waiting_item_ids == []
+    assert session_queue.completed_item_ids == []
     assert session_queue.failed_item_ids == [1]
     assert len(events.errors) == 1
     assert "workflow_return" in events.errors[0][3]
@@ -1470,7 +1472,7 @@ def test_run_cascades_nested_child_workflow_failures_to_all_parents(monkeypatch:
     _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
 
     assert session.has_error()
-    assert session_queue.completed_item_ids == [101]
+    assert session_queue.completed_item_ids == []
     assert session_queue.failed_item_ids == [100, 1]
     assert len(events.errors) == 2
     assert "workflow_return" in events.errors[0][3]

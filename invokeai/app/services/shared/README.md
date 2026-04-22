@@ -281,7 +281,9 @@ Current limitation:
 
 - Child workflow executions are now represented as first-class queue items, but parent resume/failure is still
   handled by a dedicated workflow-call queue lifecycle component rather than a generalized queue scheduler contract.
-- Called workflows currently require a valid `workflow_return` node to produce a parent-visible result.
+- Called workflows currently require exactly one valid `workflow_return` node to be callable at all.
+- Unsupported callees such as workflows containing batch-special child nodes are rejected before any child queue row is
+  created.
 
 ## 8) Error Model (selected)
 
