@@ -1,6 +1,6 @@
-from typing import Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -19,6 +19,9 @@ from invokeai.app.services.external_generation.external_generation_common import
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalGenerationMode
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+
+if TYPE_CHECKING:
+    from invokeai.app.services.invocation_services import InvocationServices
 
 
 class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -99,6 +102,37 @@ class BaseExternalImageGenerationInvocation(BaseInvocation, WithMetadata, WithBo
 
         return ImageCollectionOutput(collection=outputs)
 
+    def invoke_internal(self, context: InvocationContext, services: "InvocationServices") -> BaseInvocationOutput:
+        """Override default cache behavior so cache hits produce new gallery entries.
+
+        The standard invocation cache returns the cached output (with stale image_name
+        references) without re-running invoke(), which means no new images are saved
+        to the gallery on repeat invokes. For external API nodes — where the API call
+        is the expensive part — we want cache hits to skip the API call but still
+        produce fresh gallery entries by copying the cached images.
+        """
+        if services.configuration.node_cache_size == 0 or not self.use_cache:
+            return super().invoke_internal(context, services)
+
+        key = services.invocation_cache.create_key(self)
+        cached_value = services.invocation_cache.get(key)
+        if cached_value is None:
+            services.logger.debug(f'Invocation cache miss for type "{self.get_type()}": {self.id}')
+            output = self.invoke(context)
+            services.invocation_cache.save(key, output)
+            return output
+
+        services.logger.debug(f'Invocation cache hit for type "{self.get_type()}": {self.id}, duplicating images')
+        if not isinstance(cached_value, ImageCollectionOutput):
+            return cached_value
+
+        outputs: list[ImageField] = []
+        for image_field in cached_value.collection:
+            cached_image = context.images.get_pil(image_field.image_name, mode="RGB")
+            image_dto = context.images.save(image=cached_image)
+            outputs.append(ImageField(image_name=image_dto.image_name))
+        return ImageCollectionOutput(collection=outputs)
+
     def _build_request_metadata(self) -> dict[str, Any] | None:
         if self.metadata is None:
             return None
@@ -167,6 +201,16 @@ class OpenAIImageGenerationInvocation(BaseExternalImageGenerationInvocation):
         ui_model_provider_id=["openai"],
     )
 
+    # OpenAI's API has no img2img/inpaint distinction — the edits endpoint is used
+    # automatically when reference images are provided. Hide mode and init_image
+    # (init_image is functionally identical to a reference image), and hide
+    # mask_image since no OpenAI model supports inpainting.
+    mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode.", ui_hidden=True)
+    init_image: ImageField | None = InputField(
+        default=None, description="Init image (use reference_images instead)", ui_hidden=True
+    )
+    mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
+
     quality: Literal["auto", "high", "medium", "low"] = InputField(default="auto", description="Output image quality")
     background: Literal["auto", "transparent", "opaque"] = InputField(
         default="auto", description="Background transparency handling"
@@ -213,6 +257,14 @@ class GeminiImageGenerationInvocation(BaseExternalImageGenerationInvocation):
         ui_model_format=[ModelFormat.ExternalApi],
         ui_model_provider_id=["gemini"],
     )
+
+    # Gemini only supports txt2img — hide mode/init_image/mask_image fields
+    # that are inherited from the base class but not usable with any Gemini model.
+    mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode.", ui_hidden=True)
+    init_image: ImageField | None = InputField(
+        default=None, description="Init image for img2img/inpaint", ui_hidden=True
+    )
+    mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
 
     temperature: float | None = InputField(default=None, ge=0.0, le=2.0, description="Sampling temperature")
     thinking_level: Literal["minimal", "high"] | None = InputField(
