@@ -2382,6 +2382,7 @@
         "noRecentWorkflows": "No Recent Workflows",
         "private": "Private",
         "shared": "Shared",
+        "savedWorkflowUnsupportedDescription": "This workflow cannot currently be used by Call Saved Workflow.",
         "published": "Published",
         "browseWorkflows": "Browse Workflows",
         "deselectAll": "Deselect All",

@@ -292,6 +292,8 @@ Current limitation:
   queue row is created.
 - Workflow library API responses now include compatibility metadata so the frontend can disable unsupported callees
   before execution rather than failing only at runtime.
+- The workflow library list also surfaces that metadata as an informational unsupported state; workflows remain
+  viewable/editable even when they are not currently callable by `call_saved_workflow`.
 
 ## 8) Error Model (selected)
 

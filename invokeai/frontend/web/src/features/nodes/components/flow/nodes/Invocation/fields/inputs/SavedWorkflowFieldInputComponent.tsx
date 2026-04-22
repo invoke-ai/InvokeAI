@@ -5,6 +5,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldStringValueChanged } from 'features/nodes/store/nodesSlice';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { SavedWorkflowFieldInputInstance, SavedWorkflowFieldInputTemplate } from 'features/nodes/types/field';
+import { getWorkflowCallCompatibilityState } from 'features/workflowLibrary/util/workflowCallCompatibility';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListWorkflowsInfiniteInfiniteQuery } from 'services/api/endpoints/workflows';
@@ -62,6 +63,12 @@ const SavedWorkflowFieldInputComponent = (
     }
     return selectionState.status === 'missing' ? t('nodes.savedWorkflowMissing') : t('nodes.savedWorkflowChoose');
   }, [selectionState.status, t]);
+  const compatibilityState = useMemo(() => {
+    if (selectionState.status !== 'selected') {
+      return null;
+    }
+    return getWorkflowCallCompatibilityState(selectionState.workflow);
+  }, [selectionState]);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
@@ -94,7 +101,7 @@ const SavedWorkflowFieldInputComponent = (
           <Text fontSize="xs" variant="subtext" noOfLines={1}>
             {selectionState.workflow.name}
           </Text>
-          {selectionState.workflow.call_saved_workflow_compatibility?.is_callable === false && (
+          {compatibilityState?.isUnsupported && (
             <Badge variant="subtle">{t('nodes.savedWorkflowUnsupported')}</Badge>
           )}
           {selectionState.workflow.category === 'default' && (
@@ -107,9 +114,9 @@ const SavedWorkflowFieldInputComponent = (
       ) : (
         <Badge variant="subtle">{statusLabel ?? t('nodes.savedWorkflowChoose')}</Badge>
       )}
-      {selectionState.status === 'selected' && selectionState.workflow.call_saved_workflow_compatibility?.message && (
+      {selectionState.status === 'selected' && compatibilityState?.message && (
         <Text variant="subtext" fontSize="xs">
-          {selectionState.workflow.call_saved_workflow_compatibility.message}
+          {compatibilityState.message}
         </Text>
       )}
       {isFetching && (

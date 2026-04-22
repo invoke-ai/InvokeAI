@@ -130,6 +130,8 @@ Implemented conversion helper:
   - the saved-workflow picker uses that metadata to disable unsupported workflows before execution
   - the picker still allows an already-selected unsupported workflow to render, with an explicit unsupported state and
     backend-provided reason message
+  - workflow library list items now surface an explicit unsupported badge and backend-provided reason message without
+    blocking normal workflow viewing or editing
 
 What is still not implemented:
 

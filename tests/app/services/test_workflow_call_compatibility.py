@@ -109,6 +109,28 @@ def test_get_workflow_call_compatibility_reports_missing_workflow_return() -> No
     assert compatibility.message == "The workflow must contain exactly one workflow_return node."
 
 
+def test_get_workflow_call_compatibility_reports_multiple_workflow_return_nodes() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node("return-a", "workflow_return", {"collection": {"value": []}}),
+            _invocation_node("return-b", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[],
+    )
+
+    compatibility = get_workflow_call_compatibility(
+        workflow=workflow,
+        workflow_id="workflow-a",
+        services=_services(),
+        user_id="user-1",
+        maximum_children=1000,
+    )
+
+    assert compatibility.is_callable is False
+    assert compatibility.reason is WorkflowCallCompatibilityReason.MultipleWorkflowReturn
+    assert compatibility.message == "The workflow must not contain more than one workflow_return node."
+
+
 def test_get_workflow_call_compatibility_reports_unsupported_connected_batch_input() -> None:
     workflow = _workflow_dump(
         nodes=[
