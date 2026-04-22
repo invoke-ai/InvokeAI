@@ -9802,7 +9802,7 @@ export type components = {
             negative_text_conditioning?: components["schemas"]["FluxConditioningField"] | null;
             /**
              * Guidance
-             * @description The guidance strength. Only used by undistilled models (Klein 9B Base). Ignored by distilled models (Klein 4B, Klein 9B).
+             * @description Guidance strength for distilled guidance-embedding models. Inert for all current FLUX.2 Klein variants (their guidance_embeds weights are absent/zero); kept for node-graph compatibility and future guidance-embedded models.
              * @default 4
              */
             guidance?: number;
