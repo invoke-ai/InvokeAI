@@ -7,12 +7,9 @@ from invokeai.app.invocations.call_saved_workflow import (
     is_call_saved_workflow_dynamic_input,
 )
 from invokeai.app.invocations.workflow_return import WorkflowReturnOutput
+from invokeai.app.services.session_processor.workflow_call_batch import build_child_workflow_sessions
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.services.shared.graph import GraphExecutionState
-from invokeai.app.services.shared.workflow_graph_builder import (
-    apply_workflow_inputs_to_graph,
-    build_graph_from_workflow,
-)
 
 if TYPE_CHECKING:
     from invokeai.app.services.session_processor.session_processor_default import DefaultSessionRunner
@@ -67,22 +64,27 @@ class WorkflowCallCoordinator:
         workflow_record,
     ) -> SessionQueueItem:
         call_frame = queue_item.session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
-        child_graph = build_graph_from_workflow(workflow_record.workflow.model_dump())
-        apply_workflow_inputs_to_graph(
-            child_graph,
-            workflow_record.workflow.model_dump(),
-            self._collect_call_saved_workflow_inputs(invocation, queue_item),
+        workflow_inputs = self._collect_call_saved_workflow_inputs(invocation, queue_item)
+        child_sessions = build_child_workflow_sessions(
+            parent_session=queue_item.session,
+            workflow=workflow_record.workflow.model_dump(),
+            workflow_inputs=workflow_inputs,
+            call_frame=call_frame,
+            maximum_children=self._session_runner._services.configuration.max_queue_size,
         )
-        child_session = queue_item.session.create_child_workflow_execution_state(child_graph, call_frame)
         queue_item.session.begin_waiting_on_workflow_call(call_frame)
-        queue_item.session.attach_waiting_workflow_call_child_session(child_session)
+        queue_item.session.attach_waiting_workflow_call_child_sessions(child_sessions)
         self._session_runner._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
-        child_queue_item = self._session_runner._services.session_queue.enqueue_workflow_call_child(
-            parent_queue_item=queue_item,
-            child_session=child_session,
-        )
+        child_queue_item = None
+        for child_session in child_sessions:
+            child_queue_item = self._session_runner._services.session_queue.enqueue_workflow_call_child(
+                parent_queue_item=queue_item,
+                child_session=child_session,
+            )
         self._session_runner._services.session_queue.suspend_queue_item(queue_item.item_id)
         queue_item.status = "waiting"
+        if child_queue_item is None:
+            raise ValueError("Workflow call did not produce any child executions.")
         return child_queue_item
 
 
@@ -155,15 +157,30 @@ class WorkflowCallQueueLifecycle:
 
     def _resume_parent_from_completed_child(self, child_queue_item: SessionQueueItem) -> None:
         parent_queue_item = self._get_parent_queue_item(child_queue_item)
-        parent_queue_item.session.waiting_workflow_call_child_session = child_queue_item.session
         try:
-            self.resume_waiting_workflow_call(parent_queue_item)
+            output = self.get_child_workflow_return_output(child_queue_item.session)
+            should_resume_parent, aggregated_collection = (
+                parent_queue_item.session.record_waiting_workflow_call_child_completion(
+                    child_queue_item.item_id, output.collection
+                )
+            )
         except Exception as e:
             self.fail_waiting_workflow_call(parent_queue_item, str(e))
             parent_queue_item = self._session_runner._services.session_queue.get_queue_item(parent_queue_item.item_id)
             if getattr(parent_queue_item, "parent_item_id", None) is not None:
                 self._fail_parent_from_failed_child(parent_queue_item)
             return
+        if not should_resume_parent:
+            self._session_runner._services.session_queue.set_queue_item_session(
+                parent_queue_item.item_id, parent_queue_item.session
+            )
+            return
+        parent_queue_item.session.waiting_workflow_call_child_session = child_queue_item.session
+        waiting_invocation = self.get_waiting_workflow_call_invocation(parent_queue_item)
+        parent_queue_item.session.end_waiting_on_workflow_call(status="completed")
+        parent_output = WorkflowReturnOutput(collection=aggregated_collection)
+        parent_queue_item.session.complete(waiting_invocation.id, parent_output)
+        self._session_runner._on_after_run_node(waiting_invocation, parent_queue_item, parent_output)
         parent_queue_item = self._session_runner._services.session_queue.set_queue_item_session(
             parent_queue_item.item_id, parent_queue_item.session
         )
@@ -181,6 +198,12 @@ class WorkflowCallQueueLifecycle:
         waiting_frame = parent_queue_item.session.waiting_workflow_call
         if waiting_frame is None:
             raise ValueError("Parent queue item is missing workflow call waiting state.")
+        workflow_call_execution = parent_queue_item.session.waiting_workflow_call_execution
+        if workflow_call_execution is not None:
+            self._session_runner._services.session_queue.cancel_workflow_call_children(
+                workflow_call_execution.id,
+                exclude_item_ids={child_queue_item.item_id},
+            )
         child_error_message = getattr(child_queue_item, "error_message", None) or (
             f"The selected saved workflow '{waiting_frame.workflow_id}' failed during child execution."
         )

@@ -7,6 +7,7 @@ import pytest
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation, invocation_output
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
+from invokeai.app.invocations.fields import InputField, OutputField
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.services.session_processor.session_processor_default import (
@@ -32,6 +33,21 @@ class InterruptTestOutput(BaseInvocationOutput):
 class KeyboardInterruptInvocation(BaseInvocation):
     def invoke(self, context) -> InterruptTestOutput:
         raise KeyboardInterrupt
+
+
+@invocation_output("test_fail_on_integer_output")
+class FailOnIntegerOutput(BaseInvocationOutput):
+    value: int = OutputField(description="The validated integer")
+
+
+@invocation("test_fail_on_integer", version="1.0.0")
+class FailOnIntegerInvocation(BaseInvocation):
+    value: int = InputField(default=0, description="The integer to validate")
+
+    def invoke(self, context) -> FailOnIntegerOutput:
+        if self.value == 2:
+            raise ValueError("Refusing integer value 2")
+        return FailOnIntegerOutput(value=self.value)
 
 
 class _DummyStats:
@@ -73,6 +89,7 @@ class _DummyLogger:
 class _DummyConfig:
     node_cache_size = 0
     multiuser = False
+    max_queue_size = 1000
 
 
 class _DummyWorkflowRecords:
@@ -407,6 +424,261 @@ class _DummyWorkflowRecords:
                 edges=[],
                 exposed_fields=[{"nodeId": "child-add", "fieldName": self.exposed_field_name}],
             )
+        elif workflow_id == "workflow-batch-direct":
+            workflow_dump = self._workflow_dump(
+                nodes=[
+                    self._invocation_node(
+                        "child-batch",
+                        "integer_batch",
+                        {
+                            "integers": {"value": [2, 4, 6]},
+                            "batch_group_id": {"value": "None"},
+                        },
+                    ),
+                    self._invocation_node("child-int", "integer", {"value": {"value": 0}}),
+                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
+                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                ],
+                edges=[
+                    {
+                        "id": "edge-batch-int",
+                        "type": "default",
+                        "source": "child-batch",
+                        "sourceHandle": "integers",
+                        "target": "child-int",
+                        "targetHandle": "value",
+                    },
+                    {
+                        "id": "edge-int-collect",
+                        "type": "default",
+                        "source": "child-int",
+                        "sourceHandle": "value",
+                        "target": "child-collect",
+                        "targetHandle": "item",
+                    },
+                    {
+                        "id": "edge-collect-return",
+                        "type": "default",
+                        "source": "child-collect",
+                        "sourceHandle": "collection",
+                        "target": "child-return",
+                        "targetHandle": "collection",
+                    },
+                ],
+            )
+        elif workflow_id == "workflow-batch-grouped":
+            workflow_dump = self._workflow_dump(
+                nodes=[
+                    self._invocation_node(
+                        "child-batch-a",
+                        "integer_batch",
+                        {
+                            "integers": {"value": [1, 2, 3]},
+                            "batch_group_id": {"value": "Group 1"},
+                        },
+                    ),
+                    self._invocation_node(
+                        "child-batch-b",
+                        "integer_batch",
+                        {
+                            "integers": {"value": [10, 20, 30]},
+                            "batch_group_id": {"value": "Group 1"},
+                        },
+                    ),
+                    self._invocation_node("child-add", "add", {"a": {"value": 0}, "b": {"value": 0}}),
+                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
+                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                ],
+                edges=[
+                    {
+                        "id": "edge-group-a",
+                        "type": "default",
+                        "source": "child-batch-a",
+                        "sourceHandle": "integers",
+                        "target": "child-add",
+                        "targetHandle": "a",
+                    },
+                    {
+                        "id": "edge-group-b",
+                        "type": "default",
+                        "source": "child-batch-b",
+                        "sourceHandle": "integers",
+                        "target": "child-add",
+                        "targetHandle": "b",
+                    },
+                    {
+                        "id": "edge-group-collect",
+                        "type": "default",
+                        "source": "child-add",
+                        "sourceHandle": "value",
+                        "target": "child-collect",
+                        "targetHandle": "item",
+                    },
+                    {
+                        "id": "edge-group-return",
+                        "type": "default",
+                        "source": "child-collect",
+                        "sourceHandle": "collection",
+                        "target": "child-return",
+                        "targetHandle": "collection",
+                    },
+                ],
+            )
+        elif workflow_id == "workflow-batch-cartesian":
+            workflow_dump = self._workflow_dump(
+                nodes=[
+                    self._invocation_node(
+                        "child-batch-a",
+                        "integer_batch",
+                        {
+                            "integers": {"value": [1, 2]},
+                            "batch_group_id": {"value": "None"},
+                        },
+                    ),
+                    self._invocation_node(
+                        "child-batch-b",
+                        "integer_batch",
+                        {
+                            "integers": {"value": [10, 20]},
+                            "batch_group_id": {"value": "None"},
+                        },
+                    ),
+                    self._invocation_node("child-add", "add", {"a": {"value": 0}, "b": {"value": 0}}),
+                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
+                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                ],
+                edges=[
+                    {
+                        "id": "edge-cart-a",
+                        "type": "default",
+                        "source": "child-batch-a",
+                        "sourceHandle": "integers",
+                        "target": "child-add",
+                        "targetHandle": "a",
+                    },
+                    {
+                        "id": "edge-cart-b",
+                        "type": "default",
+                        "source": "child-batch-b",
+                        "sourceHandle": "integers",
+                        "target": "child-add",
+                        "targetHandle": "b",
+                    },
+                    {
+                        "id": "edge-cart-collect",
+                        "type": "default",
+                        "source": "child-add",
+                        "sourceHandle": "value",
+                        "target": "child-collect",
+                        "targetHandle": "item",
+                    },
+                    {
+                        "id": "edge-cart-return",
+                        "type": "default",
+                        "source": "child-collect",
+                        "sourceHandle": "collection",
+                        "target": "child-return",
+                        "targetHandle": "collection",
+                    },
+                ],
+            )
+        elif workflow_id == "workflow-batch-failure":
+            workflow_dump = self._workflow_dump(
+                nodes=[
+                    self._invocation_node(
+                        "child-batch",
+                        "integer_batch",
+                        {
+                            "integers": {"value": [1, 2, 3]},
+                            "batch_group_id": {"value": "None"},
+                        },
+                    ),
+                    self._invocation_node("child-guard", "test_fail_on_integer", {"value": {"value": 0}}),
+                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
+                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                ],
+                edges=[
+                    {
+                        "id": "edge-failure-value",
+                        "type": "default",
+                        "source": "child-batch",
+                        "sourceHandle": "integers",
+                        "target": "child-guard",
+                        "targetHandle": "value",
+                    },
+                    {
+                        "id": "edge-failure-collect",
+                        "type": "default",
+                        "source": "child-guard",
+                        "sourceHandle": "value",
+                        "target": "child-collect",
+                        "targetHandle": "item",
+                    },
+                    {
+                        "id": "edge-failure-return",
+                        "type": "default",
+                        "source": "child-collect",
+                        "sourceHandle": "collection",
+                        "target": "child-return",
+                        "targetHandle": "collection",
+                    },
+                ],
+            )
+        elif workflow_id == "workflow-batch-generator":
+            workflow_dump = self._workflow_dump(
+                nodes=[
+                    self._invocation_node(
+                        "child-generator",
+                        "integer_generator",
+                        {"generator": {"value": {}}},
+                    ),
+                    self._invocation_node(
+                        "child-batch",
+                        "integer_batch",
+                        {
+                            "integers": {"value": []},
+                            "batch_group_id": {"value": "None"},
+                        },
+                    ),
+                    self._invocation_node("child-int", "integer", {"value": {"value": 0}}),
+                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
+                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                ],
+                edges=[
+                    {
+                        "id": "edge-generator-batch",
+                        "type": "default",
+                        "source": "child-generator",
+                        "sourceHandle": "integers",
+                        "target": "child-batch",
+                        "targetHandle": "integers",
+                    },
+                    {
+                        "id": "edge-generator-value",
+                        "type": "default",
+                        "source": "child-batch",
+                        "sourceHandle": "integers",
+                        "target": "child-int",
+                        "targetHandle": "value",
+                    },
+                    {
+                        "id": "edge-generator-collect",
+                        "type": "default",
+                        "source": "child-int",
+                        "sourceHandle": "value",
+                        "target": "child-collect",
+                        "targetHandle": "item",
+                    },
+                    {
+                        "id": "edge-generator-return",
+                        "type": "default",
+                        "source": "child-collect",
+                        "sourceHandle": "collection",
+                        "target": "child-return",
+                        "targetHandle": "collection",
+                    },
+                ],
+            )
 
         workflow = SimpleNamespace(
             name="Child Workflow",
@@ -508,6 +780,7 @@ class _DummySessionQueue:
         self.waiting_item_ids: list[int] = []
         self.resumed_item_ids: list[int] = []
         self.enqueued_child_item_ids: list[int] = []
+        self.canceled_item_ids: list[int] = []
 
     def add_queue_item(self, queue_item):
         self.items[queue_item.item_id] = queue_item
@@ -568,6 +841,23 @@ class _DummySessionQueue:
         queue_item.error_traceback = error_traceback
         self.failed_item_ids.append(item_id)
         return queue_item
+
+    def cancel_workflow_call_children(
+        self, workflow_call_id: str, exclude_item_ids: set[int] | None = None
+    ) -> list[int]:
+        exclude_item_ids = exclude_item_ids or set()
+        canceled_item_ids: list[int] = []
+        for item_id, queue_item in self.items.items():
+            if item_id in exclude_item_ids:
+                continue
+            if getattr(queue_item, "workflow_call_id", None) != workflow_call_id:
+                continue
+            if queue_item.status in {"completed", "failed", "canceled"}:
+                continue
+            queue_item.status = "canceled"
+            canceled_item_ids.append(item_id)
+            self.canceled_item_ids.append(item_id)
+        return canceled_item_ids
 
     def enqueue_workflow_call_child(self, parent_queue_item, child_session):
         workflow_call_execution = parent_queue_item.session.waiting_workflow_call_execution
@@ -672,6 +962,10 @@ class _WorkflowCallBoundarySession:
     def attach_waiting_workflow_call_child_session(self, child_session: GraphExecutionState) -> None:
         self.waiting_workflow_call_execution = SimpleNamespace(id="workflow-call-1", depth=1)
         self.waiting_workflow_call_child_session = child_session
+
+    def attach_waiting_workflow_call_child_sessions(self, child_sessions: list[GraphExecutionState]) -> None:
+        self.waiting_workflow_call_execution = SimpleNamespace(id="workflow-call-1", depth=1)
+        self.waiting_workflow_call_child_session = child_sessions[0] if len(child_sessions) == 1 else None
 
     def end_waiting_on_workflow_call(self) -> None:
         self.waiting = None
@@ -862,7 +1156,7 @@ def test_run_node_enters_waiting_state_without_executing_child_inline(monkeypatc
     assert events.errors == []
 
 
-def test_run_node_fails_cleanly_for_unsupported_batch_special_child_workflow(
+def test_run_node_fails_cleanly_for_invalid_batch_child_workflow(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runner, events, workflow_records = _build_workflow_runner(monkeypatch)
@@ -892,7 +1186,7 @@ def test_run_node_fails_cleanly_for_unsupported_batch_special_child_workflow(
     assert len(events.errors) == 1
     _queue_item, _invocation, error_type, error_message, _traceback = events.errors[0]
     assert error_type == "UnsupportedWorkflowNodeError"
-    assert "call_saved_workflow does not yet support batch-special" in error_message
+    assert "must provide at least one batch item" in error_message
 
 
 def test_run_persists_waiting_session_without_completing_queue_item(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1276,6 +1570,174 @@ def test_run_completes_call_saved_workflow_with_child_return_collection(monkeypa
     assert parent_outputs[0].collection == [7, 8]
     assert session_queue.completed_item_ids == [100, 1]
     assert events.errors == []
+
+
+def test_run_completes_call_saved_workflow_with_batched_child_returns(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    processor = DefaultSessionProcessor(session_runner=runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-batch-direct"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+        },
+    )()
+
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
+
+    parent_outputs = [
+        output for invocation, _queue_item, output in events.completed if invocation.get_type() == "call_saved_workflow"
+    ]
+
+    assert session_queue.enqueued_child_item_ids == [100, 101, 102]
+    assert session_queue.completed_item_ids == [100, 101, 102, 1]
+    assert len(parent_outputs) == 1
+    assert parent_outputs[0].collection == [2, 4, 6]
+    assert events.errors == []
+
+
+def test_run_zips_grouped_batch_children(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    processor = DefaultSessionProcessor(session_runner=runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-batch-grouped"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+        },
+    )()
+
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
+
+    parent_outputs = [
+        output for invocation, _queue_item, output in events.completed if invocation.get_type() == "call_saved_workflow"
+    ]
+
+    assert session_queue.enqueued_child_item_ids == [100, 101, 102]
+    assert len(parent_outputs) == 1
+    assert parent_outputs[0].collection == [11, 22, 33]
+
+
+def test_run_expands_ungrouped_batch_children_as_cartesian_product(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    processor = DefaultSessionProcessor(session_runner=runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-batch-cartesian"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+        },
+    )()
+
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
+
+    parent_outputs = [
+        output for invocation, _queue_item, output in events.completed if invocation.get_type() == "call_saved_workflow"
+    ]
+
+    assert session_queue.enqueued_child_item_ids == [100, 101, 102, 103]
+    assert len(parent_outputs) == 1
+    assert parent_outputs[0].collection == [11, 21, 12, 22]
+
+
+def test_run_fails_batched_child_workflow_and_cancels_remaining_siblings(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    processor = DefaultSessionProcessor(session_runner=runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-batch-failure"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+        },
+    )()
+
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
+
+    assert session.has_error()
+    assert session_queue.failed_item_ids == [101, 1]
+    assert session_queue.canceled_item_ids == [102]
+    assert len(events.errors) == 2
+    assert "Refusing integer value 2" in events.errors[0][3]
+
+
+def test_run_rejects_generator_backed_batched_child_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-batch-generator"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+        },
+    )()
+
+    session_queue.add_queue_item(queue_item)
+    runner.run(queue_item=queue_item)
+
+    assert session.has_error()
+    assert session_queue.enqueued_child_item_ids == []
+    assert session_queue.failed_item_ids == [1]
+    assert len(events.errors) == 1
+    assert "generator-backed batch child workflow nodes" in events.errors[0][3]
 
 
 def test_run_fails_call_saved_workflow_when_child_has_no_workflow_return(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -94,6 +94,16 @@ class WorkflowCallExecution(BaseModel):
     depth: int = Field(description="The 1-based depth of this call frame.", ge=1)
     status: WorkflowCallStatus = Field(description="The current workflow-call lifecycle state.")
     error_message: Optional[str] = Field(default=None, description="Failure reason, if the call failed.")
+    child_session_ids: list[str] = Field(default_factory=list, description="All child graph execution state ids.")
+    expected_child_count: int = Field(default=1, ge=1, description="The number of child executions for this call.")
+    completed_child_item_ids: list[int] = Field(
+        default_factory=list,
+        description="The child queue item ids whose workflow_return outputs have been aggregated.",
+    )
+    aggregated_collection: list[Any] = Field(
+        default_factory=list,
+        description="The aggregated workflow_return collection accumulated from child executions.",
+    )
 
 
 class WorkflowCallParentRef(BaseModel):
@@ -2038,6 +2048,8 @@ class GraphExecutionState(BaseModel):
             raise ValueError("Execution state is waiting on a workflow call but has no workflow call execution")
         self.waiting_workflow_call_child_session = child_session
         self.waiting_workflow_call_execution.child_session_id = child_session.id
+        self.waiting_workflow_call_execution.child_session_ids = [child_session.id]
+        self.waiting_workflow_call_execution.expected_child_count = 1
         self.waiting_workflow_call_execution.status = "running_child"
         child_session.workflow_call_parent = WorkflowCallParentRef(
             workflow_call_id=self.waiting_workflow_call_execution.id,
@@ -2047,6 +2059,40 @@ class GraphExecutionState(BaseModel):
             workflow_id=self.waiting_workflow_call_execution.workflow_id,
             depth=self.waiting_workflow_call_execution.depth,
         )
+
+    def attach_waiting_workflow_call_child_sessions(self, child_sessions: list["GraphExecutionState"]) -> None:
+        if not child_sessions:
+            raise ValueError("Workflow call must attach at least one child session")
+        if self.waiting_workflow_call_execution is None:
+            raise ValueError("Execution state is waiting on a workflow call but has no workflow call execution")
+        self.waiting_workflow_call_child_session = child_sessions[0] if len(child_sessions) == 1 else None
+        self.waiting_workflow_call_execution.child_session_id = child_sessions[0].id
+        self.waiting_workflow_call_execution.child_session_ids = [child_session.id for child_session in child_sessions]
+        self.waiting_workflow_call_execution.expected_child_count = len(child_sessions)
+        self.waiting_workflow_call_execution.status = "running_child"
+        for child_session in child_sessions:
+            child_session.workflow_call_parent = WorkflowCallParentRef(
+                workflow_call_id=self.waiting_workflow_call_execution.id,
+                parent_session_id=self.waiting_workflow_call_execution.parent_session_id,
+                prepared_call_node_id=self.waiting_workflow_call_execution.prepared_call_node_id,
+                source_call_node_id=self.waiting_workflow_call_execution.source_call_node_id,
+                workflow_id=self.waiting_workflow_call_execution.workflow_id,
+                depth=self.waiting_workflow_call_execution.depth,
+            )
+
+    def record_waiting_workflow_call_child_completion(
+        self, child_item_id: int, output_collection: list[Any]
+    ) -> tuple[bool, list[Any]]:
+        if self.waiting_workflow_call_execution is None:
+            raise ValueError("Execution state is not waiting on a workflow call.")
+        if child_item_id not in self.waiting_workflow_call_execution.completed_child_item_ids:
+            self.waiting_workflow_call_execution.completed_child_item_ids.append(child_item_id)
+            self.waiting_workflow_call_execution.aggregated_collection.extend(output_collection)
+        is_complete = (
+            len(self.waiting_workflow_call_execution.completed_child_item_ids)
+            >= self.waiting_workflow_call_execution.expected_child_count
+        )
+        return is_complete, list(self.waiting_workflow_call_execution.aggregated_collection)
 
     def end_waiting_on_workflow_call(
         self,

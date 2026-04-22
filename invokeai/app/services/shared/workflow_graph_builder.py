@@ -1,4 +1,4 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
 from typing import Any
 
 from invokeai.app.invocations.baseinvocation import Classification, InvocationRegistry
@@ -110,9 +110,7 @@ def get_exposed_workflow_input_names(workflow: Mapping[str, Any]) -> set[str]:
     return fallback_inputs
 
 
-def apply_workflow_inputs_to_graph(
-    graph: Graph, workflow: Mapping[str, Any], workflow_inputs: Mapping[str, Any]
-) -> None:
+def apply_workflow_inputs_to_workflow(workflow: MutableMapping[str, Any], workflow_inputs: Mapping[str, Any]) -> None:
     if not workflow_inputs:
         return
 
@@ -124,16 +122,58 @@ def apply_workflow_inputs_to_graph(
             )
 
         node_id, field_name = parse_call_saved_workflow_dynamic_input(input_name)
-        node = graph.nodes.get(node_id)
-        if node is None:
+        workflow_nodes = workflow.get("nodes", [])
+        if not isinstance(workflow_nodes, list):
             raise InvalidWorkflowInputError(
                 f"call_saved_workflow input '{input_name}' targets missing child workflow node '{node_id}'"
             )
-        if field_name not in type(node).model_fields:
+        matching_node = next(
+            (
+                node
+                for node in workflow_nodes
+                if _is_mapping(node)
+                and _is_mapping(node.get("data"))
+                and node.get("id") == node_id
+                and node["data"].get("id") == node_id
+            ),
+            None,
+        )
+        if matching_node is None:
+            raise InvalidWorkflowInputError(
+                f"call_saved_workflow input '{input_name}' targets missing child workflow node '{node_id}'"
+            )
+        matching_node_data = matching_node["data"]
+        node_type = matching_node_data.get("type")
+        if not isinstance(node_type, str):
+            raise InvalidWorkflowInputError(
+                f"call_saved_workflow input '{input_name}' targets missing child workflow node '{node_id}'"
+            )
+        invocation_class = InvocationRegistry.get_invocation_for_type(node_type)
+        if invocation_class is None or field_name not in invocation_class.model_fields:
             raise InvalidWorkflowInputError(
                 f"call_saved_workflow input '{input_name}' targets missing child workflow field '{field_name}'"
             )
+        inputs = matching_node_data.setdefault("inputs", {})
+        if not _is_mapping(inputs):
+            raise InvalidWorkflowInputError(
+                f"call_saved_workflow input '{input_name}' targets invalid child workflow inputs on '{node_id}'"
+            )
+        inputs[field_name] = {"value": value}
 
+
+def apply_workflow_inputs_to_graph(
+    graph: Graph, workflow: Mapping[str, Any], workflow_inputs: Mapping[str, Any]
+) -> None:
+    if not workflow_inputs:
+        return
+
+    mutable_workflow = dict(workflow)
+    apply_workflow_inputs_to_workflow(mutable_workflow, workflow_inputs)
+    for input_name, value in workflow_inputs.items():
+        node_id, field_name = parse_call_saved_workflow_dynamic_input(input_name)
+        node = graph.nodes.get(node_id)
+        if node is None:
+            continue
         setattr(node, field_name, value)
 
 

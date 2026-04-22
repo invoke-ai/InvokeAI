@@ -256,6 +256,49 @@ def test_graph_waiting_workflow_call_tracks_parent_child_metadata():
     assert child.workflow_call_parent.parent_session_id == parent.id
 
 
+def test_graph_attach_waiting_workflow_call_child_sessions_tracks_fan_out_metadata():
+    parent = GraphExecutionState(graph=Graph())
+    parent.execution_graph.add_node(AddInvocation(id="prepared-parent", a=1, b=2))
+    parent.prepared_source_mapping["prepared-parent"] = "source-parent"
+
+    frame = parent.build_workflow_call_frame(exec_node_id="prepared-parent", workflow_id="workflow-a")
+    child_a = parent.create_child_workflow_execution_state(Graph(), frame)
+    child_b = parent.create_child_workflow_execution_state(Graph(), frame)
+
+    parent.begin_waiting_on_workflow_call(frame)
+    parent.attach_waiting_workflow_call_child_sessions([child_a, child_b])
+
+    assert parent.waiting_workflow_call_execution is not None
+    assert parent.waiting_workflow_call_execution.child_session_ids == [child_a.id, child_b.id]
+    assert parent.waiting_workflow_call_execution.expected_child_count == 2
+    assert parent.waiting_workflow_call_child_session is None
+    assert child_a.workflow_call_parent is not None
+    assert child_b.workflow_call_parent is not None
+
+
+def test_graph_record_waiting_workflow_call_child_completion_aggregates_collections():
+    parent = GraphExecutionState(graph=Graph())
+    parent.execution_graph.add_node(AddInvocation(id="prepared-parent", a=1, b=2))
+    parent.prepared_source_mapping["prepared-parent"] = "source-parent"
+
+    frame = parent.build_workflow_call_frame(exec_node_id="prepared-parent", workflow_id="workflow-a")
+    child_a = parent.create_child_workflow_execution_state(Graph(), frame)
+    child_b = parent.create_child_workflow_execution_state(Graph(), frame)
+
+    parent.begin_waiting_on_workflow_call(frame)
+    parent.attach_waiting_workflow_call_child_sessions([child_a, child_b])
+
+    is_complete, aggregated_collection = parent.record_waiting_workflow_call_child_completion(101, [1, 2])
+    assert is_complete is False
+    assert aggregated_collection == [1, 2]
+
+    is_complete, aggregated_collection = parent.record_waiting_workflow_call_child_completion(102, [3])
+    assert is_complete is True
+    assert aggregated_collection == [1, 2, 3]
+    assert parent.waiting_workflow_call_execution is not None
+    assert parent.waiting_workflow_call_execution.completed_child_item_ids == [101, 102]
+
+
 def test_graph_end_waiting_on_workflow_call_records_lifecycle_history():
     parent = GraphExecutionState(graph=Graph())
     parent.execution_graph.add_node(PromptTestInvocation(id="prepared-parent", prompt="a"))

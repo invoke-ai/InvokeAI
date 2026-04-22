@@ -148,7 +148,10 @@ Workflow-call note:
   `waiting` status while suspended on a child workflow execution.
 - Queue lifecycle semantics are now partially defined for workflow-call chains:
   - child success resumes the waiting parent
+  - multiple child queue rows may complete under one waiting parent when the called workflow contains direct batch
+    nodes; the parent resumes only after all expected child rows complete
   - child failure fails the waiting parent and can cascade upward through ancestors
+  - failing child rows cancel their remaining workflow-call siblings before the parent is failed
   - cancelation is chain-aware across parents and children
   - retry is root-oriented and should not be exposed directly on child queue rows in the UI
 - This is still an intermediate architecture step and should eventually be replaced by a more general parent/child
@@ -282,8 +285,8 @@ Current limitation:
 - Child workflow executions are now represented as first-class queue items, but parent resume/failure is still
   handled by a dedicated workflow-call queue lifecycle component rather than a generalized queue scheduler contract.
 - Called workflows currently require exactly one valid `workflow_return` node to be callable at all.
-- Unsupported callees such as workflows containing batch-special child nodes are rejected before any child queue row is
-  created.
+- Direct batch-special child workflows are now supported by expanding them into multiple child queue rows.
+- Generator-backed batch child workflows are still rejected before any child queue row is created.
 
 ## 8) Error Model (selected)
 

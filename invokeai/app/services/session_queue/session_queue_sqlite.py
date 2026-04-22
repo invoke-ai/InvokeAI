@@ -840,6 +840,32 @@ class SqliteSessionQueue(SessionQueueBase):
         self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
         return queue_item
 
+    def cancel_workflow_call_children(
+        self, workflow_call_id: str, exclude_item_ids: set[int] | None = None
+    ) -> list[int]:
+        exclude_item_ids = exclude_item_ids or set()
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT item_id
+                FROM session_queue
+                WHERE workflow_call_id = ?
+                ORDER BY item_id ASC
+                """,
+                (workflow_call_id,),
+            )
+            item_ids = [row[0] for row in cast(list[sqlite3.Row], cursor.fetchall())]
+        canceled_item_ids: list[int] = []
+        for item_id in item_ids:
+            if item_id in exclude_item_ids:
+                continue
+            queue_item = self.get_queue_item(item_id)
+            if queue_item.status in {"completed", "failed", "canceled"}:
+                continue
+            self._set_queue_item_status(item_id=item_id, status="canceled")
+            canceled_item_ids.append(item_id)
+        return canceled_item_ids
+
     def list_queue_items(
         self,
         queue_id: str,

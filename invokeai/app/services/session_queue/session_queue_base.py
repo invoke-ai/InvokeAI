@@ -207,6 +207,13 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def cancel_workflow_call_children(
+        self, workflow_call_id: str, exclude_item_ids: set[int] | None = None
+    ) -> list[int]:
+        """Cancels child workflow queue items for a workflow call without canceling the waiting parent chain."""
+        pass
+
+    @abstractmethod
     def retry_items_by_id(self, queue_id: str, item_ids: list[int]) -> RetryItemsResult:
         """Retries the given queue items"""
         pass

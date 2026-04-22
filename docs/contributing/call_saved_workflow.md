@@ -122,13 +122,14 @@ Implemented conversion helper:
   graph-build semantics.
 - It now serves as the first explicit callable-workflow compatibility gate:
   - the selected workflow must contain exactly one `workflow_return` node
-  - batch-special child nodes still fail early with a clear unsupported-feature error
+  - generator-backed batch child nodes still fail early with a clear unsupported-feature error
   - unsupported callees are rejected before any child queue row is created
 
 What is still not implemented:
 
-- saved workflows containing batch-special nodes such as `image_batch` are not supported by the current child graph
-  reconstruction path and must fail with a clear domain error rather than a low-level constructor error
+- saved workflows containing generator-backed batch nodes are not supported yet and must fail with a clear domain error
+- direct batch-special child workflows now expand to multiple child queue rows and aggregate their
+  `workflow_return.collection` values back into the parent call boundary
 
 Conclusion:
 
@@ -231,10 +232,10 @@ This implies the queue/session/runtime layer needs an explicit parent-child exec
 
 Current limitation:
 
-- the temporary `workflow_graph_builder.py` path can only reconstruct the subset of child workflows that can be parsed
-  as ordinary backend invocation graphs
-- batch-special nodes from `invokeai.app.invocations.batch` are not yet supported in called workflows
-- until the child execution path is closer to normal session execution, batch-special nodes should fail early with a
+- the temporary `workflow_graph_builder.py` path still reconstructs only the ordinary invocation subset of child
+  workflows
+- direct batch-special child workflows now bypass that path and use queue batch expansion instead
+- generator-backed batch child workflows are still not supported in called workflows and should fail early with a
   clear unsupported-feature error
 - the current queue-visible child execution path still relies on `WorkflowCallCoordinator` to resume or fail parents
   directly rather than a more general queue scheduler abstraction
@@ -259,6 +260,31 @@ The current queue-visible implementation uses the following lifecycle contract:
 
 This is now part of the intended user-facing contract, even though the orchestration still lives in
 `WorkflowCallCoordinator`.
+
+### 4b. Batch Child Workflows
+
+The current implementation now supports direct batch-special child workflows for:
+
+- `image_batch`
+- `string_batch`
+- `integer_batch`
+- `float_batch`
+
+Current semantics:
+
+- batch-special nodes are removed from the executable child graph before ordinary graph validation
+- their outgoing edges are converted into queue batch substitutions
+- ungrouped batch nodes expand as a cartesian product
+- grouped batch nodes zip by `batch_group_id`
+- the workflow call creates one child queue row per expanded batch session
+- parent resume waits for all child rows tied to that workflow call
+- parent return aggregation appends each child `workflow_return.collection` into one parent collection
+- if any child row fails, remaining sibling child rows are canceled and the parent call fails
+
+Still unsupported:
+
+- generator-backed batch workflows
+- connected batch inputs whose batch values are produced by non-generator upstream nodes
 
 ### 5. Return Values
 
