@@ -145,7 +145,8 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   onToolChanged = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryViewSwitch = tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
+    const isTemporaryViewSwitch =
+      tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
     if (tool !== 'rect' && !isTemporaryViewSwitch) {
       this.cancel();
     }
@@ -157,7 +158,8 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   render = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryViewSwitch = tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
+    const isTemporaryViewSwitch =
+      tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
     if (tool !== 'rect' && !isTemporaryViewSwitch) {
       this.konva.startPointIndicator.visible(false);
       return;
@@ -288,7 +290,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
-    await this.finishDragShapeSession();
+    this.finishDragShapeSession();
   };
 
   onWindowPointerUp = async () => {
@@ -301,7 +303,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
-    await this.finishDragShapeSession();
+    this.finishDragShapeSession();
   };
 
   repr = () => {
@@ -329,7 +331,8 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   private onModifierChanged = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryViewSwitch = tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
+    const isTemporaryViewSwitch =
+      tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
     if (tool !== 'rect' && !isTemporaryViewSwitch) {
       return;
     }
@@ -761,7 +764,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     return this.manager.getAdapter(this.activeEntityIdentifier);
   };
 
-  private finishDragShapeSession = async () => {
+  private finishDragShapeSession = () => {
     const activeEntity = this.getActiveEntityAdapter();
     if (!activeEntity) {
       this.resetState();

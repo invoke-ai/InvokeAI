@@ -726,7 +726,11 @@ export class CanvasToolModule extends CanvasModuleBase {
       if (currentTool === 'lasso' && this.tools.lasso.hasActiveSession() && this.$isPrimaryPointerDown.get()) {
         // Start panning immediately if user is already drawing with freehand lasso.
         this.manager.stage.startDragging();
-      } else if (currentTool === 'rect' && this.tools.rect.hasSuspendableSession() && this.$isPrimaryPointerDown.get()) {
+      } else if (
+        currentTool === 'rect' &&
+        this.tools.rect.hasSuspendableSession() &&
+        this.$isPrimaryPointerDown.get()
+      ) {
         // Match lasso: allow an in-progress freehand shapes session to freeze and pan immediately on space.
         this.manager.stage.startDragging();
       } else {
