@@ -169,8 +169,8 @@ explicit = true
 "invoke-usermod" = "invokeai.app.util.user_management:usermod"
 
 [project.urls]
-"Homepage" = "https://invoke-ai.github.io/InvokeAI/"
-"Documentation" = "https://invoke-ai.github.io/InvokeAI/"
+"Homepage" = "https://invoke.ai/"
+"Documentation" = "https://invoke.ai/"
 "Source" = "https://github.com/invoke-ai/InvokeAI/"
 "Bug Reports" = "https://github.com/invoke-ai/InvokeAI/issues"
 "Discord" = "https://discord.gg/ZmtBAhwWhy"

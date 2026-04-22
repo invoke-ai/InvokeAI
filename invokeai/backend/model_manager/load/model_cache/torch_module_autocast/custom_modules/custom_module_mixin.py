@@ -49,7 +49,9 @@ class CustomModuleMixin:
         # parameters. But, of course, any sub-layers that need to access the actual values of the parameters will fail.
         for param_name in orig_params.keys():
             param = orig_params[param_name]
-            if type(param) is torch.nn.Parameter and type(param.data) is torch.Tensor:
+            if isinstance(param, torch.nn.Parameter) and type(param.data) is torch.Tensor:
+                pass
+            elif type(param) is torch.Tensor:
                 pass
             elif type(param) is GGMLTensor:
                 # Move to device and dequantize here. Doing it in the patch layer can result in redundant casts /
