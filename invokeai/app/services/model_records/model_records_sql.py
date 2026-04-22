@@ -57,6 +57,7 @@ from invokeai.app.services.model_records.model_records_base import (
     UnknownModelException,
 )
 from invokeai.app.services.shared.pagination import PaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
@@ -257,6 +258,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         model_type: Optional[ModelType] = None,
         model_format: Optional[ModelFormat] = None,
         order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> List[AnyModelConfig]:
         """
         Return models matching name, base and/or type.
@@ -266,18 +268,24 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         :param model_type: Filter by type of model (optional)
         :param model_format: Filter by model format (e.g. "diffusers") (optional)
         :param order_by: Result order
+        :param direction: Result direction
 
         If none of the optional filters are passed, will return all
         models in the database.
         """
         with self._db.transaction() as cursor:
             assert isinstance(order_by, ModelRecordOrderBy)
+            order_dir = "DESC" if direction == SQLiteDirection.Descending else "ASC"
             ordering = {
-                ModelRecordOrderBy.Default: "type, base, name, format",
+                ModelRecordOrderBy.Default: f"type {order_dir}, base COLLATE NOCASE {order_dir}, name COLLATE NOCASE {order_dir}, format",
                 ModelRecordOrderBy.Type: "type",
-                ModelRecordOrderBy.Base: "base",
-                ModelRecordOrderBy.Name: "name",
+                ModelRecordOrderBy.Base: "base COLLATE NOCASE",
+                ModelRecordOrderBy.Name: "name COLLATE NOCASE",
                 ModelRecordOrderBy.Format: "format",
+                ModelRecordOrderBy.Size: "IFNULL(json_extract(config, '$.file_size'), 0)",
+                ModelRecordOrderBy.DateAdded: "created_at",
+                ModelRecordOrderBy.DateModified: "updated_at",
+                ModelRecordOrderBy.Path: "path",
             }
 
             where_clause: list[str] = []
@@ -301,7 +309,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 SELECT config
                 FROM models
                 {where}
-                ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason;
+                ORDER BY {ordering[order_by]} {order_dir} -- using ? to bind doesn't work here for some reason;
                 """,
                 tuple(bindings),
             )
@@ -357,17 +365,26 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
         return results
 
     def list_models(
-        self, page: int = 0, per_page: int = 10, order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default
+        self,
+        page: int = 0,
+        per_page: int = 10,
+        order_by: ModelRecordOrderBy = ModelRecordOrderBy.Default,
+        direction: SQLiteDirection = SQLiteDirection.Ascending,
     ) -> PaginatedResults[ModelSummary]:
         """Return a paginated summary listing of each model in the database."""
         with self._db.transaction() as cursor:
             assert isinstance(order_by, ModelRecordOrderBy)
+            order_dir = "DESC" if direction == SQLiteDirection.Descending else "ASC"
             ordering = {
-                ModelRecordOrderBy.Default: "type, base, name, format",
+                ModelRecordOrderBy.Default: f"type {order_dir}, base COLLATE NOCASE {order_dir}, name COLLATE NOCASE {order_dir}, format",
                 ModelRecordOrderBy.Type: "type",
-                ModelRecordOrderBy.Base: "base",
-                ModelRecordOrderBy.Name: "name",
+                ModelRecordOrderBy.Base: "base COLLATE NOCASE",
+                ModelRecordOrderBy.Name: "name COLLATE NOCASE",
                 ModelRecordOrderBy.Format: "format",
+                ModelRecordOrderBy.Size: "IFNULL(json_extract(config, '$.file_size'), 0)",
+                ModelRecordOrderBy.DateAdded: "created_at",
+                ModelRecordOrderBy.DateModified: "updated_at",
+                ModelRecordOrderBy.Path: "path",
             }
 
             # Lock so that the database isn't updated while we're doing the two queries.
@@ -385,7 +402,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 f"""--sql
                 SELECT config
                 FROM models
-                ORDER BY {ordering[order_by]} -- using ? to bind doesn't work here for some reason
+                ORDER BY {ordering[order_by]} {order_dir} -- using ? to bind doesn't work here for some reason
                 LIMIT ?
                 OFFSET ?;
                 """,

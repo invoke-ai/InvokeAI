@@ -1,4 +1,5 @@
 import copy
+from collections.abc import Callable
 
 import gguf
 import pytest
@@ -122,6 +123,67 @@ def wrap_single_custom_layer(layer: torch.nn.Module):
 def unwrap_single_custom_layer(layer: torch.nn.Module):
     orig_layer_type = AUTOCAST_MODULE_TYPE_MAPPING_INVERSE[type(layer)]
     return unwrap_custom_layer(layer, orig_layer_type)
+
+
+class ZeroParamPatch(BaseLayerPatch):
+    """A minimal parameter patch that exercises the aggregated sidecar patch path."""
+
+    def get_parameters(self, orig_parameters: dict[str, torch.Tensor], weight: float) -> dict[str, torch.Tensor]:
+        return {name: torch.zeros_like(param) for name, param in orig_parameters.items()}
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        return self
+
+    def calc_size(self) -> int:
+        return 0
+
+
+def _cpu_dtype_supported(
+    layer_factory: Callable[[], torch.nn.Module],
+    input_factory: Callable[[torch.dtype], torch.Tensor],
+    dtype: torch.dtype,
+) -> bool:
+    try:
+        layer = layer_factory().to(dtype=dtype)
+        input_tensor = input_factory(dtype)
+        with torch.no_grad():
+            _ = layer(input_tensor)
+        return True
+    except (RuntimeError, TypeError, NotImplementedError):
+        return False
+
+
+def _cpu_dtype_param(
+    dtype: torch.dtype,
+    layer_factory: Callable[[], torch.nn.Module],
+    input_factory: Callable[[torch.dtype], torch.Tensor],
+):
+    supported = _cpu_dtype_supported(layer_factory, input_factory, dtype)
+    return pytest.param(
+        dtype,
+        id=str(dtype).removeprefix("torch."),
+        marks=pytest.mark.skipif(not supported, reason=f"CPU {dtype} is not supported for this op"),
+    )
+
+
+LINEAR_CPU_MIXED_DTYPE_PARAMS = [
+    _cpu_dtype_param(torch.bfloat16, lambda: torch.nn.Linear(8, 16), lambda dtype: torch.randn(2, 8, dtype=dtype)),
+    _cpu_dtype_param(torch.float16, lambda: torch.nn.Linear(8, 16), lambda dtype: torch.randn(2, 8, dtype=dtype)),
+]
+
+
+CONV2D_CPU_MIXED_DTYPE_PARAMS = [
+    _cpu_dtype_param(
+        torch.bfloat16,
+        lambda: torch.nn.Conv2d(8, 16, 3),
+        lambda dtype: torch.randn(2, 8, 5, 5, dtype=dtype),
+    ),
+    _cpu_dtype_param(
+        torch.float16,
+        lambda: torch.nn.Conv2d(8, 16, 3),
+        lambda dtype: torch.randn(2, 8, 5, 5, dtype=dtype),
+    ),
+]
 
 
 def test_isinstance(layer_under_test: LayerUnderTest):
@@ -550,3 +612,67 @@ def test_quantized_linear_sidecar_patches_with_autocast_from_cpu_to_device(
 
     # Assert that the outputs with and without autocasting are the same.
     assert torch.allclose(expected_output, autocast_output, atol=1e-6)
+
+
+@pytest.mark.parametrize("dtype", LINEAR_CPU_MIXED_DTYPE_PARAMS)
+@torch.no_grad()
+def test_linear_mixed_dtype_inference_without_patches(dtype: torch.dtype):
+    layer = wrap_single_custom_layer(torch.nn.Linear(8, 16))
+    input = torch.randn(2, 8, dtype=dtype)
+
+    output = layer(input)
+
+    assert output.dtype == input.dtype
+    assert output.shape == (2, 16)
+
+
+@pytest.mark.parametrize("dtype", LINEAR_CPU_MIXED_DTYPE_PARAMS)
+@torch.no_grad()
+def test_linear_mixed_dtype_inference_without_patches_bias_only_mismatch(dtype: torch.dtype):
+    layer = torch.nn.Linear(8, 16).to(dtype=dtype)
+    layer.bias = torch.nn.Parameter(layer.bias.detach().to(torch.float32))
+    layer = wrap_single_custom_layer(layer)
+    input = torch.randn(2, 8, dtype=dtype)
+
+    output = layer(input)
+
+    assert output.dtype == input.dtype
+    assert output.shape == (2, 16)
+
+
+@pytest.mark.parametrize("dtype", CONV2D_CPU_MIXED_DTYPE_PARAMS)
+@torch.no_grad()
+def test_conv2d_mixed_dtype_inference_without_patches(dtype: torch.dtype):
+    layer = wrap_single_custom_layer(torch.nn.Conv2d(8, 16, 3))
+    input = torch.randn(2, 8, 5, 5, dtype=dtype)
+
+    output = layer(input)
+
+    assert output.dtype == input.dtype
+    assert output.shape == (2, 16, 3, 3)
+
+
+@pytest.mark.parametrize("dtype", LINEAR_CPU_MIXED_DTYPE_PARAMS)
+@torch.no_grad()
+def test_linear_mixed_dtype_sidecar_parameter_patch(dtype: torch.dtype):
+    layer = wrap_single_custom_layer(torch.nn.Linear(8, 16))
+    layer.add_patch(ZeroParamPatch(), 1.0)
+    input = torch.randn(2, 8, dtype=dtype)
+
+    output = layer(input)
+
+    assert output.dtype == input.dtype
+    assert output.shape == (2, 16)
+
+
+@pytest.mark.parametrize("dtype", CONV2D_CPU_MIXED_DTYPE_PARAMS)
+@torch.no_grad()
+def test_conv2d_mixed_dtype_sidecar_parameter_patch(dtype: torch.dtype):
+    layer = wrap_single_custom_layer(torch.nn.Conv2d(8, 16, 3))
+    layer.add_patch(ZeroParamPatch(), 1.0)
+    input = torch.randn(2, 8, 5, 5, dtype=dtype)
+
+    output = layer(input)
+
+    assert output.dtype == input.dtype
+    assert output.shape == (2, 16, 3, 3)
