@@ -94,6 +94,9 @@ const SavedWorkflowFieldInputComponent = (
           <Text fontSize="xs" variant="subtext" noOfLines={1}>
             {selectionState.workflow.name}
           </Text>
+          {selectionState.workflow.call_saved_workflow_compatibility?.is_callable === false && (
+            <Badge variant="subtle">{t('nodes.savedWorkflowUnsupported')}</Badge>
+          )}
           {selectionState.workflow.category === 'default' && (
             <Badge variant="subtle">{t('nodes.savedWorkflowDefaultBadge')}</Badge>
           )}
@@ -103,6 +106,11 @@ const SavedWorkflowFieldInputComponent = (
         </Flex>
       ) : (
         <Badge variant="subtle">{statusLabel ?? t('nodes.savedWorkflowChoose')}</Badge>
+      )}
+      {selectionState.status === 'selected' && selectionState.workflow.call_saved_workflow_compatibility?.message && (
+        <Text variant="subtext" fontSize="xs">
+          {selectionState.workflow.call_saved_workflow_compatibility.message}
+        </Text>
       )}
       {isFetching && (
         <Text variant="subtext" fontSize="xs">

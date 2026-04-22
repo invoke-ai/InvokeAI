@@ -244,7 +244,9 @@ def _resolve_generator_items(generator_node: Mapping[str, Any], services: Any) -
         raise UnsupportedWorkflowNodeError("call_saved_workflow generator node is malformed")
     generator_input = inputs.get("generator")
     if not _is_mapping(generator_input):
-        raise UnsupportedWorkflowNodeError(f"call_saved_workflow generator node '{generator_node_data.get('id')}' is missing generator input")
+        raise UnsupportedWorkflowNodeError(
+            f"call_saved_workflow generator node '{generator_node_data.get('id')}' is missing generator input"
+        )
     generator_value = generator_input.get("value")
     if not _is_mapping(generator_value):
         raise UnsupportedWorkflowNodeError(
@@ -339,11 +341,7 @@ def _resolve_batch_items_from_inputs(
     ]
     if not incoming_edges:
         return None
-    incoming_source_ids = [
-        edge.get("source")
-        for edge in incoming_edges
-        if isinstance(edge.get("source"), str)
-    ]
+    incoming_source_ids = [edge.get("source") for edge in incoming_edges if isinstance(edge.get("source"), str)]
     if len(incoming_source_ids) != 1:
         raise UnsupportedWorkflowNodeError(
             f"call_saved_workflow does not yet support multiple connected batch inputs on node '{node_id}'"

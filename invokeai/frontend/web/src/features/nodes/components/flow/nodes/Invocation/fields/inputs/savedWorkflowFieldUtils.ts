@@ -12,6 +12,7 @@ export const buildSavedWorkflowOptions = (workflows: WorkflowRecordListItemWithT
   return workflows.map((workflow) => ({
     label: workflow.name,
     value: workflow.workflow_id,
+    isDisabled: workflow.call_saved_workflow_compatibility?.is_callable === false,
   }));
 };
 

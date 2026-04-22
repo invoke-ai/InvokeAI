@@ -21,6 +21,11 @@ const workflows: WorkflowRecordListItemWithThumbnailDTO[] = [
     thumbnail_url: null,
     category: 'user',
     user_id: 'user-a',
+    call_saved_workflow_compatibility: {
+      is_callable: true,
+      reason: 'ok',
+      message: null,
+    },
   },
   {
     workflow_id: 'workflow-b',
@@ -34,14 +39,19 @@ const workflows: WorkflowRecordListItemWithThumbnailDTO[] = [
     thumbnail_url: null,
     category: 'default',
     user_id: 'system',
+    call_saved_workflow_compatibility: {
+      is_callable: false,
+      reason: 'missing_workflow_return',
+      message: 'The workflow must contain exactly one workflow_return node.',
+    },
   },
 ];
 
 describe('savedWorkflowFieldUtils', () => {
   it('builds combobox options from visible workflows', () => {
     expect(buildSavedWorkflowOptions(workflows)).toEqual([
-      { label: 'Alpha Workflow', value: 'workflow-a' },
-      { label: 'Beta Workflow', value: 'workflow-b' },
+      { label: 'Alpha Workflow', value: 'workflow-a', isDisabled: false },
+      { label: 'Beta Workflow', value: 'workflow-b', isDisabled: true },
     ]);
   });
 

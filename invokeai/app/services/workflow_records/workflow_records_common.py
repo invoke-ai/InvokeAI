@@ -5,6 +5,7 @@ from typing import Any, Optional, Union
 import semver
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, TypeAdapter, field_validator
 
+from invokeai.app.services.shared.workflow_call_compatibility_common import WorkflowCallCompatibility
 from invokeai.app.util.metaenum import MetaEnum
 
 __workflow_meta_version__ = semver.Version.parse("1.0.0")
@@ -148,7 +149,13 @@ WorkflowRecordListItemDTOValidator = TypeAdapter(WorkflowRecordListItemDTO)
 
 class WorkflowRecordWithThumbnailDTO(WorkflowRecordDTO):
     thumbnail_url: str | None = Field(default=None, description="The URL of the workflow thumbnail.")
+    call_saved_workflow_compatibility: WorkflowCallCompatibility | None = Field(
+        default=None, description="Whether this workflow is currently callable by call_saved_workflow."
+    )
 
 
 class WorkflowRecordListItemWithThumbnailDTO(WorkflowRecordListItemDTO):
     thumbnail_url: str | None = Field(default=None, description="The URL of the workflow thumbnail.")
+    call_saved_workflow_compatibility: WorkflowCallCompatibility | None = Field(
+        default=None, description="Whether this workflow is currently callable by call_saved_workflow."
+    )

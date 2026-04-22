@@ -125,6 +125,11 @@ Implemented conversion helper:
   - connected batch child inputs produced by ordinary non-generator upstream nodes still fail early with a clear
     unsupported-feature error
   - unsupported callees are rejected before any child queue row is created
+- Compatibility metadata is now exposed through workflow library API responses:
+  - workflow list items and workflow detail responses include `call_saved_workflow_compatibility`
+  - the saved-workflow picker uses that metadata to disable unsupported workflows before execution
+  - the picker still allows an already-selected unsupported workflow to render, with an explicit unsupported state and
+    backend-provided reason message
 
 What is still not implemented:
 
@@ -527,6 +532,7 @@ The frontend remains responsible for editor-time behavior:
 - persisting those dynamic fields and their values
 - preserving compatible inbound edges when workflow selection changes
 - clearing incompatible edges and invalid selections in a predictable way
+- using backend compatibility metadata so unsupported saved workflows are not presented as callable choices
 
 Potential future optimization:
 

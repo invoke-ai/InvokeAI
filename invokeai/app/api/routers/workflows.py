@@ -10,6 +10,7 @@ from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.workflow_call_compatibility import get_workflow_call_compatibility
 from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,
     WorkflowCategory,
@@ -51,7 +52,18 @@ async def get_workflow(
             raise HTTPException(status_code=403, detail="Not authorized to access this workflow")
 
     thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow_id)
-    return WorkflowRecordWithThumbnailDTO(thumbnail_url=thumbnail_url, **workflow.model_dump())
+    compatibility = get_workflow_call_compatibility(
+        workflow=workflow.workflow.model_dump(),
+        workflow_id=workflow.workflow_id,
+        services=ApiDependencies.invoker.services,
+        user_id=current_user.user_id,
+        maximum_children=ApiDependencies.invoker.services.configuration.max_queue_size,
+    )
+    return WorkflowRecordWithThumbnailDTO(
+        thumbnail_url=thumbnail_url,
+        call_saved_workflow_compatibility=compatibility,
+        **workflow.model_dump(),
+    )
 
 
 @workflows_router.patch(
@@ -191,9 +203,18 @@ async def list_workflows(
         is_public=is_public,
     )
     for workflow in workflows.items:
+        full_workflow = ApiDependencies.invoker.services.workflow_records.get(workflow.workflow_id)
+        compatibility = get_workflow_call_compatibility(
+            workflow=full_workflow.workflow.model_dump(),
+            workflow_id=full_workflow.workflow_id,
+            services=ApiDependencies.invoker.services,
+            user_id=current_user.user_id,
+            maximum_children=ApiDependencies.invoker.services.configuration.max_queue_size,
+        )
         workflows_with_thumbnails.append(
             WorkflowRecordListItemWithThumbnailDTO(
                 thumbnail_url=ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow.workflow_id),
+                call_saved_workflow_compatibility=compatibility,
                 **workflow.model_dump(),
             )
         )

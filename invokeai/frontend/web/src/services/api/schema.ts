@@ -24111,6 +24111,11 @@ export type components = {
              * @description The IDs of the queue items that were retried
              */
             retried_item_ids: number[];
+            /**
+             * User Ids
+             * @description The IDs of the users who own the retried root queue items
+             */
+            user_ids: string[];
         };
         /**
          * Qwen3EncoderField
@@ -30207,6 +30212,26 @@ export type components = {
              */
             graph: string | null;
         };
+        /** WorkflowCallCompatibility */
+        WorkflowCallCompatibility: {
+            /**
+             * Is Callable
+             * @description Whether the workflow can currently be executed by call_saved_workflow.
+             */
+            is_callable: boolean;
+            /** @description Structured compatibility result. */
+            reason: components["schemas"]["WorkflowCallCompatibilityReason"];
+            /**
+             * Message
+             * @description Human-readable compatibility detail when unavailable.
+             */
+            message?: string | null;
+        };
+        /**
+         * WorkflowCallCompatibilityReason
+         * @enum {string}
+         */
+        WorkflowCallCompatibilityReason: "ok" | "missing_workflow_return" | "multiple_workflow_return" | "unsupported_node" | "unsupported_batch_input" | "invalid_graph" | "invalid_inputs" | "unknown";
         /**
          * WorkflowCallExecution
          * @description Tracks one parent/child workflow-call relationship and its lifecycle.
@@ -30258,6 +30283,27 @@ export type components = {
              * @description Failure reason, if the call failed.
              */
             error_message?: string | null;
+            /**
+             * Child Session Ids
+             * @description All child graph execution state ids.
+             */
+            child_session_ids?: string[];
+            /**
+             * Expected Child Count
+             * @description The number of child executions for this call.
+             * @default 1
+             */
+            expected_child_count?: number;
+            /**
+             * Completed Child Item Ids
+             * @description The child queue item ids whose workflow_return outputs have been aggregated.
+             */
+            completed_child_item_ids?: number[];
+            /**
+             * Aggregated Collection
+             * @description The aggregated workflow_return collection accumulated from child executions.
+             */
+            aggregated_collection?: unknown[];
         };
         /**
          * WorkflowCallFrame
@@ -30482,6 +30528,8 @@ export type components = {
              * @description The URL of the workflow thumbnail.
              */
             thumbnail_url?: string | null;
+            /** @description Whether this workflow is currently callable by call_saved_workflow. */
+            call_saved_workflow_compatibility?: components["schemas"]["WorkflowCallCompatibility"] | null;
         };
         /**
          * WorkflowRecordOrderBy
@@ -30533,6 +30581,8 @@ export type components = {
              * @description The URL of the workflow thumbnail.
              */
             thumbnail_url?: string | null;
+            /** @description Whether this workflow is currently callable by call_saved_workflow. */
+            call_saved_workflow_compatibility?: components["schemas"]["WorkflowCallCompatibility"] | null;
         };
         /**
          * Workflow Return

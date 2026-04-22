@@ -290,6 +290,8 @@ Current limitation:
   float, string, or image generator.
 - Connected batch child inputs produced by ordinary non-generator upstream nodes are still rejected before any child
   queue row is created.
+- Workflow library API responses now include compatibility metadata so the frontend can disable unsupported callees
+  before execution rather than failing only at runtime.
 
 ## 8) Error Model (selected)
 
