@@ -45,7 +45,7 @@ import type { ClientToServerEvents, ServerToClientEvents } from 'services/events
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastProgressEvent } from './stores';
+import { $lastProgressEvent, $loadingModelsCount } from './stores';
 
 const log = logger('events');
 
@@ -75,12 +75,14 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     socket.emit('subscribe_queue', { queue_id: 'default' });
     socket.emit('subscribe_bulk_download', { bulk_download_id: 'default' });
     $lastProgressEvent.set(null);
+    $loadingModelsCount.set(0);
   });
 
   socket.on('connect_error', (error) => {
     log.debug('Connect error');
     setIsConnected(false);
     $lastProgressEvent.set(null);
+    $loadingModelsCount.set(0);
     if (error && error.message) {
       const data: string | undefined = (error as unknown as { data: string | undefined }).data;
       if (data === 'ERR_UNAUTHENTICATED') {
@@ -97,6 +99,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('disconnect', () => {
     log.debug('Disconnected');
     $lastProgressEvent.set(null);
+    $loadingModelsCount.set(0);
     setIsConnected(false);
   });
 
@@ -231,6 +234,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const message = `Model load started: ${name} (${extras.join(', ')})`;
 
     log.debug({ data }, message);
+    $loadingModelsCount.set($loadingModelsCount.get() + 1);
   });
 
   socket.on('model_load_complete', (data) => {
@@ -245,6 +249,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const message = `Model load complete: ${name} (${extras.join(', ')})`;
 
     log.debug({ data }, message);
+    $loadingModelsCount.set(Math.max(0, $loadingModelsCount.get() - 1));
   });
 
   socket.on('download_started', (data) => {
