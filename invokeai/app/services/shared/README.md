@@ -142,8 +142,8 @@ Workflow-call note:
   the child execution state, while `WorkflowCallCoordinator` handles call-specific setup and
   `WorkflowCallQueueLifecycle` later resumes or fails the parent based on that child queue row's outcome.
 - Child `SessionQueueItem` rows created by the coordinator now carry explicit relationship metadata such as
-  `workflow_call_id`, `parent_item_id`, `parent_session_id`, `root_item_id`, and `workflow_call_depth`, even though
-  the higher-level scheduler semantics are still evolving.
+  `workflow_call_id`, `parent_item_id`, `parent_session_id`, `root_item_id`, and `workflow_call_depth`, even though the
+  higher-level scheduler semantics are still evolving.
 - The `session_queue` schema now has matching columns for those relationship fields, and parent queue items can enter a
   `waiting` status while suspended on a child workflow execution.
 - Queue lifecycle semantics are now partially defined for workflow-call chains:
@@ -282,12 +282,12 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
 
 Current limitation:
 
-- Child workflow executions are now represented as first-class queue items, but parent resume/failure is still
-  handled by a dedicated workflow-call queue lifecycle component rather than a generalized queue scheduler contract.
+- Child workflow executions are now represented as first-class queue items, but parent resume/failure is still handled
+  by a dedicated workflow-call queue lifecycle component rather than a generalized queue scheduler contract.
 - Called workflows currently require exactly one valid `workflow_return` node to be callable at all.
 - Direct batch-special child workflows are now supported by expanding them into multiple child queue rows.
-- Generator-backed batch child workflows are now supported when the batch node is fed directly by a supported
-  integer, float, string, or image generator.
+- Generator-backed batch child workflows are now supported when the batch node is fed directly by a supported integer,
+  float, string, or image generator.
 - Connected batch child inputs produced by ordinary non-generator upstream nodes are still rejected before any child
   queue row is created.
 

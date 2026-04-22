@@ -240,12 +240,12 @@ Current limitation:
 - direct batch-special child workflows now bypass that path and use queue batch expansion instead
 - generator-backed batch child workflows now bypass that path too when the batch is fed directly by a supported
   generator node
-- connected batch child inputs produced by ordinary non-generator upstream nodes are still not supported and should
-  fail early with a clear unsupported-feature error
+- connected batch child inputs produced by ordinary non-generator upstream nodes are still not supported and should fail
+  early with a clear unsupported-feature error
 - the current queue-visible child execution path still relies on `WorkflowCallCoordinator` to resume or fail parents
   directly rather than a more general queue scheduler abstraction
-- the current implementation is still an intermediate architecture step, but it is now materially closer to the
-  intended durable parent/child model than the earlier inline-runner path
+- the current implementation is still an intermediate architecture step, but it is now materially closer to the intended
+  durable parent/child model than the earlier inline-runner path
 
 ### 4a. Queue Lifecycle Contract
 
@@ -318,6 +318,71 @@ Still unsupported:
 
 - connected batch inputs whose batch values are produced by non-generator upstream nodes
 
+Plain-English summary:
+
+1. The parent workflow reaches `call_saved_workflow`.
+1. The parent pauses and enters `waiting`.
+1. The child workflow is inspected before execution.
+1. If the child contains supported batch inputs, that one call expands into multiple child executions instead of one.
+1. Each expanded child execution becomes its own queue row.
+1. Those child queue rows run independently.
+1. The parent does not resume until all child queue rows for that call have finished.
+1. Each child execution produces its own `workflow_return.collection`.
+1. The parent aggregates those returned collections into one combined collection.
+1. The `call_saved_workflow` node completes with that combined collection, and the parent workflow continues.
+
+Expansion rules:
+
+- ungrouped batch inputs expand as a cartesian product
+- batch inputs that share the same `batch_group_id` zip together by position
+
+Example:
+
+- ungrouped inputs `[1, 2]` and `[10, 20]` produce 4 child executions:
+  - `(1, 10)`
+  - `(1, 20)`
+  - `(2, 10)`
+  - `(2, 20)`
+- grouped inputs `[1, 2, 3]` and `[10, 20, 30]` with the same `batch_group_id` produce 3 child executions:
+  - `(1, 10)`
+  - `(2, 20)`
+  - `(3, 30)`
+
+### 4c. Tricky Areas
+
+The following parts of the runtime contract are easy to misread and should stay explicit in both code and tests.
+
+Waiting and resume:
+
+- a parent queue row in `waiting` is suspended, not completed
+- a parent resumes only after every child queue row tied to that workflow call has reached a terminal state
+
+Return aggregation:
+
+- each child queue row returns its own `workflow_return.collection`
+- the parent call node output is the aggregate of those child collections, in child-completion order
+- this is different from returning exactly one child collection unchanged
+
+Sibling failure behavior:
+
+- if one child queue row in a batched workflow call fails, remaining sibling child rows for that same workflow call are
+  canceled
+- after sibling cancelation, the parent call fails
+- if that parent is itself a child of another workflow call, failure continues upward through the ancestor chain
+
+Cancel behavior:
+
+- canceling a waiting parent cancels descendant child rows
+- canceling a child row cancels waiting ancestors
+- cancelation should stay cancelation; it should not be rewritten into ordinary failure semantics
+
+Retry behavior:
+
+- retry is root-oriented
+- child queue rows should not be directly retried from the UI
+- backend retry of a child id should normalize to the root workflow call chain rather than create an isolated child-only
+  rerun
+
 ### 5. Return Values
 
 Return values should be explicit.
@@ -389,8 +454,8 @@ Current insertion points already used:
 
 - `DefaultSessionRunner.run_node()` detects `call_saved_workflow` and enters boundary state
 - `GraphExecutionState` stores the waiting/call-stack state and attached child session
-- `WorkflowCallCoordinator` currently establishes the call boundary and enqueues child workflow executions as real
-  queue rows
+- `WorkflowCallCoordinator` currently establishes the call boundary and enqueues child workflow executions as real queue
+  rows
 - `WorkflowCallQueueLifecycle` currently resumes or fails parents when those child rows complete
 - child queue items already carry stable parent/child identifiers in both runtime objects and durable queue columns
 
@@ -496,7 +561,8 @@ Still needed in later increments:
 - nested runtime execution beyond a single attached child state
 - eventual support for child workflows that contain batch-special nodes, once child execution is run through the proper
   batch/session path
-- eventual migration from dedicated workflow-call queue lifecycle handling to a more general scheduler or queue-lifecycle model
+- eventual migration from dedicated workflow-call queue lifecycle handling to a more general scheduler or
+  queue-lifecycle model
 
 ## Recommended Immediate Next Step
 
