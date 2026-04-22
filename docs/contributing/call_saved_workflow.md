@@ -122,14 +122,17 @@ Implemented conversion helper:
   graph-build semantics.
 - It now serves as the first explicit callable-workflow compatibility gate:
   - the selected workflow must contain exactly one `workflow_return` node
-  - generator-backed batch child nodes still fail early with a clear unsupported-feature error
+  - connected batch child inputs produced by ordinary non-generator upstream nodes still fail early with a clear
+    unsupported-feature error
   - unsupported callees are rejected before any child queue row is created
 
 What is still not implemented:
 
-- saved workflows containing generator-backed batch nodes are not supported yet and must fail with a clear domain error
 - direct batch-special child workflows now expand to multiple child queue rows and aggregate their
   `workflow_return.collection` values back into the parent call boundary
+- generator-backed batch child workflows now work for supported integer, float, string, and image generators
+- connected batch child inputs whose batch values are produced by ordinary non-generator upstream nodes are still not
+  supported and must fail with a clear domain error
 
 Conclusion:
 
@@ -235,8 +238,10 @@ Current limitation:
 - the temporary `workflow_graph_builder.py` path still reconstructs only the ordinary invocation subset of child
   workflows
 - direct batch-special child workflows now bypass that path and use queue batch expansion instead
-- generator-backed batch child workflows are still not supported in called workflows and should fail early with a
-  clear unsupported-feature error
+- generator-backed batch child workflows now bypass that path too when the batch is fed directly by a supported
+  generator node
+- connected batch child inputs produced by ordinary non-generator upstream nodes are still not supported and should
+  fail early with a clear unsupported-feature error
 - the current queue-visible child execution path still relies on `WorkflowCallCoordinator` to resume or fail parents
   directly rather than a more general queue scheduler abstraction
 - the current implementation is still an intermediate architecture step, but it is now materially closer to the
@@ -270,20 +275,47 @@ The current implementation now supports direct batch-special child workflows for
 - `integer_batch`
 - `float_batch`
 
+It also supports generator-backed batch child workflows when those batch nodes are fed directly by:
+
+- `integer_generator`
+- `float_generator`
+- `string_generator`
+- `image_generator` using `image_generator_images_from_board`
+
 Current semantics:
 
 - batch-special nodes are removed from the executable child graph before ordinary graph validation
+- supported generator nodes that feed those batch-special nodes are removed from the executable child graph as well
 - their outgoing edges are converted into queue batch substitutions
 - ungrouped batch nodes expand as a cartesian product
 - grouped batch nodes zip by `batch_group_id`
 - the workflow call creates one child queue row per expanded batch session
+- supported generator value shapes are resolved into concrete batch items before queue batch expansion
 - parent resume waits for all child rows tied to that workflow call
 - parent return aggregation appends each child `workflow_return.collection` into one parent collection
 - if any child row fails, remaining sibling child rows are canceled and the parent call fails
 
+Current generator coverage:
+
+- integer generators:
+  - arithmetic sequence
+  - linear distribution
+  - parse string
+  - seeded uniform random distribution
+- float generators:
+  - arithmetic sequence
+  - linear distribution
+  - parse string
+  - seeded uniform random distribution
+- string generators:
+  - parse string
+  - dynamic prompts combinatorial
+  - dynamic prompts random
+- image generators:
+  - images from board
+
 Still unsupported:
 
-- generator-backed batch workflows
 - connected batch inputs whose batch values are produced by non-generator upstream nodes
 
 ### 5. Return Values

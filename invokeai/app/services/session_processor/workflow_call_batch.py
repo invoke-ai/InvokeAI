@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import copy
+import json
+import random
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
+
+from invokeai.app.invocations.fields import ImageField
+from invokeai.app.services.image_records.image_records_common import ASSETS_CATEGORIES, IMAGE_CATEGORIES
 from invokeai.app.services.session_queue.session_queue_common import Batch, BatchDatum, create_session_nfv_tuples
 from invokeai.app.services.shared.graph import GraphExecutionState, WorkflowCallFrame
 from invokeai.app.services.shared.workflow_graph_builder import (
@@ -26,6 +32,12 @@ SUPPORTED_BATCH_GROUP_IDS = {
     "Group 3",
     "Group 4",
     "Group 5",
+}
+GENERATOR_OUTPUT_FIELD_NAMES = {
+    "image_generator": "images",
+    "string_generator": "strings",
+    "integer_generator": "integers",
+    "float_generator": "floats",
 }
 
 
@@ -73,7 +85,10 @@ def _build_child_graph_workflow(workflow: Mapping[str, Any]) -> dict[str, Any]:
     filtered_nodes = [
         node
         for node in workflow_nodes
-        if not (_is_invocation_node(node) and node["data"].get("type") in SUPPORTED_BATCH_TYPES)
+        if not (
+            _is_invocation_node(node)
+            and node["data"].get("type") in {*SUPPORTED_BATCH_TYPES, *GENERATOR_OUTPUT_FIELD_NAMES}
+        )
     ]
     filtered_node_ids = {node["id"] for node in filtered_nodes if _is_mapping(node) and isinstance(node.get("id"), str)}
     filtered_edges = [
@@ -116,11 +131,134 @@ def _get_batch_items(node_data: Mapping[str, Any], field_name: str) -> list[Any]
         raise UnsupportedWorkflowNodeError(
             f"call_saved_workflow batch child workflow node '{node_data.get('id')}' must provide a direct list for '{field_name}'"
         )
-    if not batch_items:
-        raise UnsupportedWorkflowNodeError(
-            f"call_saved_workflow batch child workflow node '{node_data.get('id')}' must provide at least one batch item"
-        )
     return batch_items
+
+
+def _parse_split_values(input_value: str, split_on: str) -> list[str]:
+    if split_on == "":
+        return [input_value]
+    try:
+        return input_value.split(json.loads(f'"{split_on}"'))
+    except Exception:
+        return input_value.split(split_on)
+
+
+def _resolve_float_generator(value: Mapping[str, Any]) -> list[float]:
+    generator_type = value.get("type")
+    if generator_type == "float_generator_arithmetic_sequence":
+        start = float(value.get("start", 0))
+        step = float(value.get("step", 1))
+        count = int(value.get("count", 10))
+        if step == 0:
+            return [start]
+        return [start + i * step for i in range(count)]
+    if generator_type == "float_generator_linear_distribution":
+        start = float(value.get("start", 0))
+        end = float(value.get("end", 1))
+        count = int(value.get("count", 10))
+        if count == 1:
+            return [start]
+        return [start + (end - start) * (i / (count - 1)) for i in range(count)]
+    if generator_type == "float_generator_random_distribution_uniform":
+        minimum = float(value.get("min", 0))
+        maximum = float(value.get("max", 1))
+        count = int(value.get("count", 10))
+        if "values" in value and isinstance(value["values"], list):
+            return [float(v) for v in value["values"]]
+        rng = random.Random(value.get("seed"))
+        return [rng.random() * (maximum - minimum) + minimum for _ in range(count)]
+    if generator_type == "float_generator_parse_string":
+        if "values" in value and isinstance(value["values"], list):
+            return [float(v) for v in value["values"]]
+        split_values = _parse_split_values(str(value.get("input", "")), str(value.get("splitOn", ",")))
+        return [float(v.strip()) for v in split_values if v.strip()]
+    raise UnsupportedWorkflowNodeError(f"Unsupported float generator type '{generator_type}'")
+
+
+def _resolve_integer_generator(value: Mapping[str, Any]) -> list[int]:
+    generator_type = value.get("type")
+    if generator_type == "integer_generator_arithmetic_sequence":
+        start = int(value.get("start", 0))
+        step = int(value.get("step", 1))
+        count = int(value.get("count", 10))
+        if step == 0:
+            return [start]
+        return [start + i * step for i in range(count)]
+    if generator_type == "integer_generator_linear_distribution":
+        start = int(value.get("start", 0))
+        end = int(value.get("end", 10))
+        count = int(value.get("count", 10))
+        if count == 1:
+            return [start]
+        return [start + round((end - start) * (i / (count - 1))) for i in range(count)]
+    if generator_type == "integer_generator_random_distribution_uniform":
+        minimum = int(value.get("min", 0))
+        maximum = int(value.get("max", 10))
+        count = int(value.get("count", 10))
+        rng = random.Random(value.get("seed"))
+        return [int(rng.random() * (maximum - minimum + 1)) + minimum for _ in range(count)]
+    if generator_type == "integer_generator_parse_string":
+        split_values = _parse_split_values(str(value.get("input", "")), str(value.get("splitOn", ",")))
+        return [int(v.strip()) for v in split_values if v.strip()]
+    raise UnsupportedWorkflowNodeError(f"Unsupported integer generator type '{generator_type}'")
+
+
+def _resolve_string_generator(value: Mapping[str, Any]) -> list[str]:
+    generator_type = value.get("type")
+    if generator_type == "string_generator_parse_string":
+        return [v for v in _parse_split_values(str(value.get("input", "")), str(value.get("splitOn", ","))) if v]
+    if generator_type == "string_generator_dynamic_prompts_combinatorial":
+        generator = CombinatorialPromptGenerator()
+        return list(generator.generate(str(value.get("input", "")), max_prompts=int(value.get("maxPrompts", 10))))
+    if generator_type == "string_generator_dynamic_prompts_random":
+        seed = value.get("seed")
+        if seed is None:
+            seed = random.randint(0, 2**31 - 1)
+        generator = RandomPromptGenerator(seed=int(seed))
+        return list(generator.generate(str(value.get("input", "")), num_images=int(value.get("count", 10))))
+    raise UnsupportedWorkflowNodeError(f"Unsupported string generator type '{generator_type}'")
+
+
+def _resolve_image_generator(value: Mapping[str, Any], services: Any) -> list[ImageField]:
+    generator_type = value.get("type")
+    if generator_type != "image_generator_images_from_board":
+        raise UnsupportedWorkflowNodeError(f"Unsupported image generator type '{generator_type}'")
+    board_id = value.get("board_id")
+    if not isinstance(board_id, str) or not board_id:
+        return []
+    category = value.get("category", "images")
+    categories = IMAGE_CATEGORIES if category == "images" else ASSETS_CATEGORIES
+    image_names = services.board_images.get_all_board_image_names_for_board(
+        board_id=board_id,
+        categories=categories,
+        is_intermediate=False,
+    )
+    return [ImageField(image_name=image_name) for image_name in image_names]
+
+
+def _resolve_generator_items(generator_node: Mapping[str, Any], services: Any) -> list[Any]:
+    generator_node_data = generator_node["data"]
+    node_type = generator_node_data.get("type")
+    inputs = generator_node_data.get("inputs")
+    if not isinstance(node_type, str) or not _is_mapping(inputs):
+        raise UnsupportedWorkflowNodeError("call_saved_workflow generator node is malformed")
+    generator_input = inputs.get("generator")
+    if not _is_mapping(generator_input):
+        raise UnsupportedWorkflowNodeError(f"call_saved_workflow generator node '{generator_node_data.get('id')}' is missing generator input")
+    generator_value = generator_input.get("value")
+    if not _is_mapping(generator_value):
+        raise UnsupportedWorkflowNodeError(
+            f"call_saved_workflow generator node '{generator_node_data.get('id')}' has invalid generator value"
+        )
+    if node_type == "integer_generator":
+        return _resolve_integer_generator(generator_value)
+    if node_type == "float_generator":
+        return _resolve_float_generator(generator_value)
+    if node_type == "string_generator":
+        return _resolve_string_generator(generator_value)
+    if node_type == "image_generator":
+        return _resolve_image_generator(generator_value, services)
+    raise UnsupportedWorkflowNodeError(f"Unsupported generator node type '{node_type}'")
 
 
 def _get_outgoing_default_edges(
@@ -182,30 +320,38 @@ def _resolve_batch_destinations(
     return destinations
 
 
-def _raise_if_generator_backed_batch(
+def _normalize_batch_item_for_destination(destination_field: str, batch_items: list[Any]) -> list[Any]:
+    if destination_field == "collection":
+        return [[item] for item in batch_items]
+    return batch_items
+
+
+def _resolve_batch_items_from_inputs(
     node_id: str,
     field_name: str,
     workflow_edges: Sequence[Mapping[str, Any]],
     workflow_nodes: Mapping[str, Mapping[str, Any]],
-) -> None:
+) -> list[Any] | None:
     incoming_edges = [
         edge
         for edge in workflow_edges
         if edge.get("target") == node_id and edge.get("targetHandle") == field_name and edge.get("type") == "default"
     ]
     if not incoming_edges:
-        return
-    generator_node_ids = {
+        return None
+    incoming_source_ids = [
         edge.get("source")
         for edge in incoming_edges
         if isinstance(edge.get("source"), str)
-        and _is_invocation_node(workflow_nodes.get(edge.get("source")))
-        and workflow_nodes[edge["source"]]["data"].get("type", "").endswith("_generator")
-    }
-    if generator_node_ids:
+    ]
+    if len(incoming_source_ids) != 1:
         raise UnsupportedWorkflowNodeError(
-            "call_saved_workflow does not yet support generator-backed batch child workflow nodes"
+            f"call_saved_workflow does not yet support multiple connected batch inputs on node '{node_id}'"
         )
+    source_id = incoming_source_ids[0]
+    source_node = workflow_nodes.get(source_id)
+    if _is_invocation_node(source_node) and source_node["data"].get("type", "").endswith("_generator"):
+        return source_id
     raise UnsupportedWorkflowNodeError(
         f"call_saved_workflow does not yet support connected batch child workflow inputs on node '{node_id}'"
     )
@@ -218,6 +364,8 @@ def build_batch_child_workflow_sessions(
     workflow_inputs: Mapping[str, Any],
     call_frame: WorkflowCallFrame,
     maximum_children: int,
+    services: Any = None,
+    user_id: str | None = None,
 ) -> list[GraphExecutionState]:
     mutable_workflow = copy.deepcopy(workflow)
     apply_workflow_inputs_to_workflow(mutable_workflow, workflow_inputs)
@@ -235,15 +383,34 @@ def build_batch_child_workflow_sessions(
         if not isinstance(node_id, str) or not isinstance(node_type, str):
             continue
         if node_type.endswith("_generator"):
-            raise UnsupportedWorkflowNodeError(
-                "call_saved_workflow does not yet support generator-backed batch child workflow nodes"
-            )
+            continue
         if node_type not in SUPPORTED_BATCH_TYPES:
             continue
 
         field_name = BATCH_FIELD_NAMES[node_type]
-        _raise_if_generator_backed_batch(node_id, field_name, workflow_edges, workflow_nodes)
-        batch_items = _get_batch_items(node_data, field_name)
+        generator_source_id = _resolve_batch_items_from_inputs(node_id, field_name, workflow_edges, workflow_nodes)
+        if generator_source_id is not None:
+            generator_node = workflow_nodes.get(generator_source_id)
+            if generator_node is None:
+                raise UnsupportedWorkflowNodeError(
+                    f"call_saved_workflow generator-backed batch child workflow is missing generator node '{generator_source_id}'"
+                )
+            generator_node_type = generator_node["data"].get("type") if _is_invocation_node(generator_node) else None
+            if generator_node_type == "image_generator" and services is None:
+                raise UnsupportedWorkflowNodeError(
+                    "call_saved_workflow image-generator-backed batch child workflows require runtime services"
+                )
+            batch_items = _resolve_generator_items(generator_node, services)
+            if not batch_items:
+                raise UnsupportedWorkflowNodeError(
+                    f"call_saved_workflow generator-backed batch child workflow node '{generator_source_id}' produced no batch items"
+                )
+        else:
+            batch_items = _get_batch_items(node_data, field_name)
+            if not batch_items:
+                raise UnsupportedWorkflowNodeError(
+                    f"call_saved_workflow batch child workflow node '{node_id}' must provide at least one batch item"
+                )
         batch_group_id = _get_batch_group_id(node_data)
         destinations = _resolve_batch_destinations(node_id, field_name, workflow_nodes, workflow_edges)
         if not destinations:
@@ -253,7 +420,11 @@ def build_batch_child_workflow_sessions(
         group_batch_data = batch_data_by_group.setdefault(batch_group_id, [])
         for destination_node_id, destination_field in destinations:
             group_batch_data.append(
-                BatchDatum(node_path=destination_node_id, field_name=destination_field, items=batch_items)
+                BatchDatum(
+                    node_path=destination_node_id,
+                    field_name=destination_field,
+                    items=_normalize_batch_item_for_destination(destination_field, batch_items),
+                )
             )
 
     if not batch_data_by_group:
@@ -281,6 +452,8 @@ def build_child_workflow_sessions(
     workflow_inputs: Mapping[str, Any],
     call_frame: WorkflowCallFrame,
     maximum_children: int,
+    services: Any = None,
+    user_id: str | None = None,
 ) -> list[GraphExecutionState]:
     if workflow_contains_supported_batch_nodes(workflow):
         return build_batch_child_workflow_sessions(
@@ -289,6 +462,8 @@ def build_child_workflow_sessions(
             workflow_inputs=workflow_inputs,
             call_frame=call_frame,
             maximum_children=maximum_children,
+            services=services,
+            user_id=user_id,
         )
 
     mutable_workflow = copy.deepcopy(workflow)

@@ -286,7 +286,10 @@ Current limitation:
   handled by a dedicated workflow-call queue lifecycle component rather than a generalized queue scheduler contract.
 - Called workflows currently require exactly one valid `workflow_return` node to be callable at all.
 - Direct batch-special child workflows are now supported by expanding them into multiple child queue rows.
-- Generator-backed batch child workflows are still rejected before any child queue row is created.
+- Generator-backed batch child workflows are now supported when the batch node is fed directly by a supported
+  integer, float, string, or image generator.
+- Connected batch child inputs produced by ordinary non-generator upstream nodes are still rejected before any child
+  queue row is created.
 
 ## 8) Error Model (selected)
 

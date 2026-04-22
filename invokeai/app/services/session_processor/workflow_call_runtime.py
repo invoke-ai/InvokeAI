@@ -71,6 +71,8 @@ class WorkflowCallCoordinator:
             workflow_inputs=workflow_inputs,
             call_frame=call_frame,
             maximum_children=self._session_runner._services.configuration.max_queue_size,
+            services=self._session_runner._services,
+            user_id=getattr(queue_item, "user_id", None),
         )
         queue_item.session.begin_waiting_on_workflow_call(call_frame)
         queue_item.session.attach_waiting_workflow_call_child_sessions(child_sessions)
