@@ -10236,7 +10236,7 @@ export type components = {
          * @description FLUX.2 model variants.
          * @enum {string}
          */
-        Flux2VariantType: "klein_4b" | "klein_9b" | "klein_9b_base";
+        Flux2VariantType: "klein_4b" | "klein_4b_base" | "klein_9b" | "klein_9b_base";
         /**
          * FluxConditioningCollectionOutput
          * @description Base class for nodes that output a collection of conditioning tensors

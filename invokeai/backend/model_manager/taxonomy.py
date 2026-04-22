@@ -131,7 +131,10 @@ class Flux2VariantType(str, Enum):
     """FLUX.2 model variants."""
 
     Klein4B = "klein_4b"
-    """Flux2 Klein 4B variant using Qwen3 4B text encoder."""
+    """Flux2 Klein 4B variant using Qwen3 4B text encoder (distilled)."""
+
+    Klein4BBase = "klein_4b_base"
+    """Flux2 Klein 4B Base variant - undistilled foundation model using Qwen3 4B text encoder."""
 
     Klein9B = "klein_9b"
     """Flux2 Klein 9B variant using Qwen3 8B text encoder (distilled)."""
