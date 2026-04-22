@@ -168,7 +168,9 @@ _flux_transformer_params: dict[AnyVariant, FluxParams] = {
         qkv_bias=True,
         guidance_embed=False,
     ),
-    # Flux2 Klein 9B Base is the undistilled foundation model with guidance_embeds=True
+    # Flux2 Klein 9B Base is the undistilled foundation model. It shares the same
+    # architecture as Klein 9B (distilled) and reports guidance_embeds=False in its
+    # HF transformer config - the guidance scalar is inert for all Klein variants.
     Flux2VariantType.Klein9BBase: FluxParams(
         in_channels=64,
         vec_in_dim=4096,  # Qwen3-8B hidden size (used for pooled output)
@@ -181,7 +183,7 @@ _flux_transformer_params: dict[AnyVariant, FluxParams] = {
         axes_dim=[16, 56, 56],
         theta=10_000,
         qkv_bias=True,
-        guidance_embed=True,
+        guidance_embed=False,
     ),
 }
 

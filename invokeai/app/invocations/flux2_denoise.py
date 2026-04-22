@@ -105,8 +105,9 @@ class Flux2DenoiseInvocation(BaseInvocation):
         default=4.0,
         ge=0,
         le=20,
-        description="The guidance strength. Only used by undistilled models (Klein 9B Base). "
-        "Ignored by distilled models (Klein 4B, Klein 9B).",
+        description="Guidance strength for distilled guidance-embedding models. "
+        "Inert for all current FLUX.2 Klein variants (their guidance_embeds weights are absent/zero); "
+        "kept for node-graph compatibility and future guidance-embedded models.",
     )
     cfg_scale: float = InputField(
         default=1.0,

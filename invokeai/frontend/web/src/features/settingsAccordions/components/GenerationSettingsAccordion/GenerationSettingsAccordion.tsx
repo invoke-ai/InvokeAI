@@ -113,11 +113,6 @@ export const GenerationSettingsAccordion = memo(() => {
                 {!isExternal && isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && (
                   <ParamGuidance />
                 )}
-                {!isExternal &&
-                  isFlux2 &&
-                  modelConfig &&
-                  'variant' in modelConfig &&
-                  modelConfig.variant === 'klein_9b_base' && <ParamGuidance />}
                 {!isExternal && !isFLUX && !isFlux2 && <ParamCFGScale />}
                 {!isExternal && isZImage && <ParamZImageShift />}
                 {!isExternal && isQwenImage && <ParamQwenImageShift />}
