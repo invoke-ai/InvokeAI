@@ -478,6 +478,67 @@ def test_delete_queue_item_removes_entire_workflow_call_chain(session_queue: Sql
         session_queue.get_queue_item(grandchild_item_id)
 
 
+def test_delete_queue_item_cancels_active_workflow_call_chain_before_deleting(
+    session_queue: SqliteSessionQueue, event_bus: TestEventService
+) -> None:
+    parent_session = GraphExecutionState(graph=Graph())
+    child_session = GraphExecutionState(graph=Graph())
+
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id, session, session_id, batch_id, priority, user_id, status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "default",
+                parent_session.model_dump_json(warnings=False),
+                parent_session.id,
+                str(uuid.uuid4()),
+                0,
+                "user-1",
+                "waiting",
+            ),
+        )
+        parent_item_id = cursor.lastrowid
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id, session, session_id, batch_id, priority, user_id, status,
+                workflow_call_id, parent_item_id, parent_session_id, root_item_id, workflow_call_depth
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "default",
+                child_session.model_dump_json(warnings=False),
+                child_session.id,
+                str(uuid.uuid4()),
+                0,
+                "user-1",
+                "in_progress",
+                "workflow-call-1",
+                parent_item_id,
+                parent_session.id,
+                parent_item_id,
+                1,
+            ),
+        )
+        child_item_id = cursor.lastrowid
+
+    session_queue.delete_queue_item(child_item_id)
+
+    canceled_events = [event for event in event_bus.events if isinstance(event, QueueItemStatusChangedEvent)]
+    assert [event.item_id for event in canceled_events if event.status == "canceled"] == [parent_item_id, child_item_id]
+
+    with pytest.raises(SessionQueueItemNotFoundError):
+        session_queue.get_queue_item(parent_item_id)
+    with pytest.raises(SessionQueueItemNotFoundError):
+        session_queue.get_queue_item(child_item_id)
+
+
 def test_cancel_queue_item_cascade_emits_canceled_events_for_waiting_parent_and_running_child(
     session_queue: SqliteSessionQueue, event_bus: TestEventService
 ) -> None:
@@ -682,3 +743,51 @@ def test_retry_items_by_id_emits_root_only_retry_event_for_nested_failure_chain(
     retry_events = [event for event in event_bus.events if isinstance(event, QueueItemsRetriedEvent)]
     assert len(retry_events) == 1
     assert retry_events[0].retried_item_ids == [root_item_id]
+
+
+def test_retry_items_by_id_respects_remaining_queue_capacity(session_queue: SqliteSessionQueue) -> None:
+    root_session = GraphExecutionState(graph=Graph())
+    pending_session = GraphExecutionState(graph=Graph())
+
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id, session, session_id, batch_id, priority, user_id, status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "default",
+                pending_session.model_dump_json(warnings=False),
+                pending_session.id,
+                str(uuid.uuid4()),
+                0,
+                "user-1",
+                "pending",
+            ),
+        )
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id, session, session_id, batch_id, priority, user_id, status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "default",
+                root_session.model_dump_json(warnings=False),
+                root_session.id,
+                str(uuid.uuid4()),
+                0,
+                "user-1",
+                "failed",
+            ),
+        )
+        root_item_id = cursor.lastrowid
+
+    session_queue._SqliteSessionQueue__invoker.services.configuration.max_queue_size = 1
+    retry_result = session_queue.retry_items_by_id("default", [root_item_id])
+
+    assert retry_result.retried_item_ids == []
+    assert session_queue.get_queue_status("default").pending == 1

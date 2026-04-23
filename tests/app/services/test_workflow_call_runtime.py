@@ -23,6 +23,10 @@ def test_workflow_call_queue_lifecycle_resumes_parent_from_completed_child(monke
     workflow_call_tests.test_workflow_call_queue_lifecycle_resumes_parent_from_completed_child(monkeypatch)
 
 
+def test_run_preserves_canceled_child_workflow_chain_without_failing_parent(monkeypatch) -> None:
+    workflow_call_tests.test_run_preserves_canceled_child_workflow_chain_without_failing_parent(monkeypatch)
+
+
 def test_workflow_call_coordinator_builds_child_queue_item_with_relationship_metadata(monkeypatch) -> None:
     workflow_call_tests.test_workflow_call_coordinator_builds_child_queue_item_with_relationship_metadata(monkeypatch)
 

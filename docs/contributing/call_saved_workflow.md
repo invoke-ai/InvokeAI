@@ -132,6 +132,8 @@ Implemented conversion helper:
   - the selected workflow must contain exactly one `workflow_return` node
   - connected batch child inputs produced by ordinary non-generator upstream nodes still fail early with a clear
     unsupported-feature error
+  - child workflows that mix supported batch nodes with unrelated generator nodes are currently rejected with a clear
+    unsupported-feature error
   - unsupported callees are rejected before any child queue row is created
 - Compatibility metadata is now exposed through workflow library API responses:
   - workflow list items and workflow detail responses include `call_saved_workflow_compatibility`
@@ -148,6 +150,8 @@ What is still not implemented:
 - generator-backed batch child workflows now work for supported integer, float, string, and image generators
 - connected batch child inputs whose batch values are produced by ordinary non-generator upstream nodes are still not
   supported and must fail with a clear domain error
+- child workflows that mix supported batch nodes with unrelated generator nodes are still not supported and must fail
+  with a clear domain error
 
 Conclusion:
 

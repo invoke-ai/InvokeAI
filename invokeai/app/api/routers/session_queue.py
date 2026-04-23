@@ -318,6 +318,7 @@ async def retry_items_by_id(
     """Retries the given queue items. Users can only retry their own items unless they are an admin."""
     try:
         # Check queue membership for all items and ownership for non-admins.
+        valid_item_ids: list[int] = []
         for item_id in item_ids:
             try:
                 queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
@@ -329,11 +330,14 @@ async def retry_items_by_id(
                     raise HTTPException(
                         status_code=403, detail=f"You do not have permission to retry queue item {item_id}"
                     )
+                valid_item_ids.append(item_id)
             except SessionQueueItemNotFoundError:
                 # Skip items that don't exist - they will be handled by retry_items_by_id
                 continue
 
-        return ApiDependencies.invoker.services.session_queue.retry_items_by_id(queue_id=queue_id, item_ids=item_ids)
+        return ApiDependencies.invoker.services.session_queue.retry_items_by_id(
+            queue_id=queue_id, item_ids=valid_item_ids
+        )
     except HTTPException:
         raise
     except Exception as e:

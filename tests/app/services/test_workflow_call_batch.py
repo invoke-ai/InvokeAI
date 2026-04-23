@@ -535,6 +535,160 @@ def test_build_child_workflow_sessions_rejects_non_generator_connected_batch_nod
         )
 
 
+def test_build_child_workflow_sessions_supports_generator_backed_batch_input_through_connector() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node(
+                "generator",
+                "integer_generator",
+                {
+                    "generator": {
+                        "value": {
+                            "type": "integer_generator_arithmetic_sequence",
+                            "start": 1,
+                            "step": 1,
+                            "count": 3,
+                        }
+                    }
+                },
+            ),
+            {
+                "id": "connector",
+                "type": "connector",
+                "position": {"x": 0, "y": 0},
+                "data": {"id": "connector", "type": "connector", "label": "Connector", "isOpen": True},
+            },
+            _invocation_node(
+                "batch",
+                "integer_batch",
+                {"integers": {"value": []}, "batch_group_id": {"value": "None"}},
+            ),
+            _invocation_node("target", "integer", {"value": {"value": 0}}),
+            _invocation_node("collect", "collect", {"collection": {"value": []}}),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-generator-connector",
+                "type": "default",
+                "source": "generator",
+                "sourceHandle": "integers",
+                "target": "connector",
+                "targetHandle": "in",
+            },
+            {
+                "id": "edge-connector-batch",
+                "type": "default",
+                "source": "connector",
+                "sourceHandle": "out",
+                "target": "batch",
+                "targetHandle": "integers",
+            },
+            {
+                "id": "edge-batch-target",
+                "type": "default",
+                "source": "batch",
+                "sourceHandle": "integers",
+                "target": "target",
+                "targetHandle": "value",
+            },
+            {
+                "id": "edge-target-collect",
+                "type": "default",
+                "source": "target",
+                "sourceHandle": "value",
+                "target": "collect",
+                "targetHandle": "item",
+            },
+            {
+                "id": "edge-collect-return",
+                "type": "default",
+                "source": "collect",
+                "sourceHandle": "collection",
+                "target": "return",
+                "targetHandle": "collection",
+            },
+        ],
+    )
+
+    child_sessions = build_child_workflow_sessions(
+        parent_session=GraphExecutionState(graph=Graph()),
+        workflow=workflow,
+        workflow_inputs={},
+        call_frame=_call_frame(),
+        maximum_children=10,
+    )
+
+    assert [child_session.graph.nodes["target"].value for child_session in child_sessions] == [1, 2, 3]
+
+
+def test_build_child_workflow_sessions_rejects_hybrid_child_workflows_with_unrelated_generator_nodes() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node(
+                "batch",
+                "integer_batch",
+                {"integers": {"value": [2, 4]}, "batch_group_id": {"value": "None"}},
+            ),
+            _invocation_node(
+                "side-generator",
+                "integer_generator",
+                {
+                    "generator": {
+                        "value": {
+                            "type": "integer_generator_arithmetic_sequence",
+                            "start": 5,
+                            "step": 1,
+                            "count": 2,
+                        }
+                    }
+                },
+            ),
+            _invocation_node("target", "integer", {"value": {"value": 0}}),
+            _invocation_node("collect", "collect", {"collection": {"value": []}}),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-batch-target",
+                "type": "default",
+                "source": "batch",
+                "sourceHandle": "integers",
+                "target": "target",
+                "targetHandle": "value",
+            },
+            {
+                "id": "edge-target-collect",
+                "type": "default",
+                "source": "target",
+                "sourceHandle": "value",
+                "target": "collect",
+                "targetHandle": "item",
+            },
+            {
+                "id": "edge-collect-return",
+                "type": "default",
+                "source": "collect",
+                "sourceHandle": "collection",
+                "target": "return",
+                "targetHandle": "collection",
+            },
+        ],
+    )
+
+    with pytest.raises(
+        UnsupportedWorkflowNodeError,
+        match="mix supported batch nodes with unrelated generator nodes",
+    ):
+        build_child_workflow_sessions(
+            parent_session=GraphExecutionState(graph=Graph()),
+            workflow=workflow,
+            workflow_inputs={},
+            call_frame=_call_frame(),
+            maximum_children=10,
+        )
+
+
 def test_build_child_workflow_sessions_supports_integer_generator() -> None:
     workflow = _workflow_dump(
         nodes=[

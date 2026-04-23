@@ -185,6 +185,7 @@ def _raise_if_unsupported_invocation_type(node_type: str, node_id: str) -> None:
     if (
         invocation_class.UIConfig.category == "batch"
         and invocation_class.UIConfig.classification == Classification.Special
+        and not node_type.endswith("_generator")
     ):
         raise UnsupportedWorkflowNodeError(
             f"call_saved_workflow does not yet support batch-special child workflow nodes such as "

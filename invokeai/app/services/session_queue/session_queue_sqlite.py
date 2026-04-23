@@ -478,6 +478,11 @@ class SqliteSessionQueue(SessionQueueBase):
     def delete_queue_item(self, item_id: int) -> None:
         """Deletes a session queue item"""
         chain_item_ids = self._get_workflow_call_chain_item_ids(item_id)
+        if any(
+            self.get_queue_item(chain_item_id).status not in {"completed", "failed", "canceled"}
+            for chain_item_id in chain_item_ids
+        ):
+            self.cancel_queue_item(item_id)
         self.delete_queue_items_by_id(chain_item_ids)
 
     def complete_queue_item(self, item_id: int) -> SessionQueueItem:
@@ -1102,9 +1107,18 @@ class SqliteSessionQueue(SessionQueueBase):
             retried_user_ids: list[str] = []
             retried_item_ids_by_user: dict[str, list[int]] = {}
             seen_root_item_ids: set[int] = set()
+            max_new_queue_items = self.__invoker.services.configuration.max_queue_size - self._get_current_queue_size(
+                queue_id
+            )
+
+            if max_new_queue_items <= 0:
+                return RetryItemsResult(queue_id=queue_id, retried_item_ids=[])
 
             for item_id in item_ids:
-                queue_item = self.get_queue_item(item_id)
+                try:
+                    queue_item = self.get_queue_item(item_id)
+                except SessionQueueItemNotFoundError:
+                    continue
                 if queue_item.queue_id != queue_id:
                     continue
 
@@ -1158,7 +1172,8 @@ class SqliteSessionQueue(SessionQueueBase):
                 )
                 values_to_insert.append(value_to_insert)
 
-            # TODO(psyche): Handle max queue size?
+                if len(values_to_insert) >= max_new_queue_items:
+                    break
 
             cursor.executemany(
                 """--sql

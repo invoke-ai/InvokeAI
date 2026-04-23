@@ -41,12 +41,7 @@ SUPPORTED_BATCH_GROUP_IDS = {
     "Group 4",
     "Group 5",
 }
-GENERATOR_OUTPUT_FIELD_NAMES = {
-    "image_generator": "images",
-    "string_generator": "strings",
-    "integer_generator": "integers",
-    "float_generator": "floats",
-}
+CONNECTOR_INPUT_HANDLE = "in"
 
 
 def _is_mapping(value: Any) -> bool:
@@ -84,7 +79,54 @@ def _get_default_edges(workflow: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return [edge for edge in workflow_edges if _is_mapping(edge) and edge.get("type") == "default"]
 
 
-def _build_child_graph_workflow(workflow: Mapping[str, Any]) -> dict[str, Any]:
+def _get_connector_input_edge(
+    connector_id: str, workflow_edges: Sequence[Mapping[str, Any]]
+) -> Mapping[str, Any] | None:
+    return next(
+        (
+            edge
+            for edge in workflow_edges
+            if edge.get("target") == connector_id and edge.get("targetHandle") == CONNECTOR_INPUT_HANDLE
+        ),
+        None,
+    )
+
+
+def _resolve_connector_source(
+    connector_id: str, workflow_nodes: Mapping[str, Mapping[str, Any]], workflow_edges: Sequence[Mapping[str, Any]]
+) -> tuple[str, str] | None:
+    visited: set[str] = set()
+
+    def resolve(node_id: str) -> tuple[str, str] | None:
+        if node_id in visited:
+            return None
+        visited.add(node_id)
+
+        incoming_edge = _get_connector_input_edge(node_id, workflow_edges)
+        if incoming_edge is None:
+            return None
+
+        source_id = incoming_edge.get("source")
+        source_handle = incoming_edge.get("sourceHandle")
+        if not isinstance(source_id, str) or not isinstance(source_handle, str):
+            return None
+
+        source_node = workflow_nodes.get(source_id)
+        if source_node is None:
+            return None
+
+        if _is_invocation_node(source_node):
+            return (source_id, source_handle)
+
+        if _is_connector_node(source_node):
+            return resolve(source_id)
+
+        return None
+
+    return resolve(connector_id)
+
+
+def _build_child_graph_workflow(workflow: Mapping[str, Any], used_generator_node_ids: set[str]) -> dict[str, Any]:
     workflow_nodes = workflow.get("nodes", [])
     workflow_edges = workflow.get("edges", [])
     if not isinstance(workflow_nodes, list) or not isinstance(workflow_edges, list):
@@ -95,7 +137,10 @@ def _build_child_graph_workflow(workflow: Mapping[str, Any]) -> dict[str, Any]:
         for node in workflow_nodes
         if not (
             _is_invocation_node(node)
-            and node["data"].get("type") in {*SUPPORTED_BATCH_TYPES, *GENERATOR_OUTPUT_FIELD_NAMES}
+            and (
+                node["data"].get("type") in SUPPORTED_BATCH_TYPES
+                or (isinstance(node.get("id"), str) and node["id"] in used_generator_node_ids)
+            )
         )
     ]
     filtered_node_ids = {node["id"] for node in filtered_nodes if _is_mapping(node) and isinstance(node.get("id"), str)}
@@ -108,6 +153,34 @@ def _build_child_graph_workflow(workflow: Mapping[str, Any]) -> dict[str, Any]:
         and edge.get("target") in filtered_node_ids
     ]
     return {**workflow, "nodes": filtered_nodes, "edges": filtered_edges}
+
+
+def _reject_unrelated_generator_nodes(workflow: Mapping[str, Any], used_generator_node_ids: set[str]) -> None:
+    workflow_nodes = workflow.get("nodes", [])
+    if not isinstance(workflow_nodes, list):
+        raise UnsupportedWorkflowNodeError("call_saved_workflow child workflow is malformed")
+
+    unrelated_generator_nodes: list[tuple[str, str]] = []
+    for node in workflow_nodes:
+        if not _is_invocation_node(node):
+            continue
+
+        node_data = node["data"]
+        node_id = node_data.get("id")
+        node_type = node_data.get("type")
+        if not isinstance(node_id, str) or not isinstance(node_type, str):
+            continue
+        if node_type.endswith("_generator") and node_id not in used_generator_node_ids:
+            unrelated_generator_nodes.append((node_type, node_id))
+
+    if unrelated_generator_nodes:
+        unsupported_nodes = ", ".join(
+            f"'{node_type}' (node '{node_id}')" for node_type, node_id in unrelated_generator_nodes
+        )
+        raise UnsupportedWorkflowNodeError(
+            "call_saved_workflow does not yet support child workflows that mix supported batch nodes with "
+            f"unrelated generator nodes: {unsupported_nodes}"
+        )
 
 
 def _get_batch_group_id(node_data: Mapping[str, Any]) -> str:
@@ -411,6 +484,15 @@ def _resolve_batch_items_from_inputs(
     source_node = workflow_nodes.get(source_id)
     if _is_invocation_node(source_node) and source_node["data"].get("type", "").endswith("_generator"):
         return source_id
+    if _is_connector_node(source_node):
+        resolved_source = _resolve_connector_source(source_id, workflow_nodes, workflow_edges)
+        if resolved_source is not None:
+            resolved_source_id, _resolved_source_handle = resolved_source
+            resolved_source_node = workflow_nodes.get(resolved_source_id)
+            if _is_invocation_node(resolved_source_node) and resolved_source_node["data"].get("type", "").endswith(
+                "_generator"
+            ):
+                return resolved_source_id
     raise UnsupportedWorkflowNodeError(
         f"call_saved_workflow does not yet support connected batch child workflow inputs on node '{node_id}'"
     )
@@ -433,6 +515,7 @@ def build_batch_child_workflow_sessions(
     workflow_edges = _get_default_edges(mutable_workflow)
 
     batch_data_by_group: dict[str, list[BatchDatum]] = {}
+    used_generator_node_ids: set[str] = set()
     for node in workflow_nodes.values():
         if not _is_invocation_node(node):
             continue
@@ -460,6 +543,7 @@ def build_batch_child_workflow_sessions(
                     "call_saved_workflow image-generator-backed batch child workflows require runtime services"
                 )
             batch_items = _resolve_generator_items(generator_node, services, user_id)
+            used_generator_node_ids.add(generator_source_id)
             if not batch_items:
                 raise UnsupportedWorkflowNodeError(
                     f"call_saved_workflow generator-backed batch child workflow node '{generator_source_id}' produced no batch items"
@@ -489,7 +573,8 @@ def build_batch_child_workflow_sessions(
     if not batch_data_by_group:
         raise UnsupportedWorkflowNodeError("call_saved_workflow batch child workflow contains no supported batch nodes")
 
-    sanitized_workflow = _build_child_graph_workflow(mutable_workflow)
+    _reject_unrelated_generator_nodes(mutable_workflow, used_generator_node_ids)
+    sanitized_workflow = _build_child_graph_workflow(mutable_workflow, used_generator_node_ids)
     child_graph = build_graph_from_workflow(sanitized_workflow)
     batch_data = [[datum] for datum in batch_data_by_group.pop("None", [])]
     batch_data.extend(batch_data_by_group.values())

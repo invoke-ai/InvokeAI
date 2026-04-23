@@ -297,6 +297,24 @@ def test_retry_items_by_id_rejects_items_from_other_queue(
     assert response.status_code == 404
 
 
+def test_retry_items_by_id_skips_missing_items_and_retries_valid_items(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+) -> None:
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    root_item_id = _insert_queue_item(mock_invoker.services.session_queue, user_id=user1.user_id, status="failed")
+
+    response = client.put(
+        "/api/v1/queue/default/retry_items_by_id",
+        headers=_auth(user1_token),
+        json=[root_item_id + 9999, root_item_id],
+    )
+
+    assert response.status_code == 200
+    assert response.json()["retried_item_ids"] == [root_item_id]
+
+
 def test_cancel_queue_item_cascades_to_waiting_parent_via_router(
     client: TestClient, mock_invoker: Invoker, user1_token: str
 ) -> None:

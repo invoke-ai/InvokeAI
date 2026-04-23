@@ -158,6 +158,7 @@ Workflow-call note:
   - retry is root-oriented and should not be exposed directly on child queue rows in the UI
   - child queue-row creation is cleaned up on boundary-setup failure and child fan-out is bounded by remaining queue
     capacity
+  - child workflows that mix supported batch nodes with unrelated generator nodes are rejected for now
 - This is still an intermediate architecture step and should eventually be replaced by a more general parent/child
   execution mechanism rather than workflow-call-specific queue lifecycle handling.
 

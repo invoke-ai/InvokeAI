@@ -229,6 +229,12 @@ class WorkflowCallQueueLifecycle:
         if getattr(parent_queue_item, "parent_item_id", None) is not None:
             self._fail_parent_from_failed_child(parent_queue_item)
 
+    def _cancel_parent_from_canceled_child(self, child_queue_item: SessionQueueItem) -> None:
+        parent_queue_item = self._get_parent_queue_item(child_queue_item)
+        if parent_queue_item.status == "canceled":
+            return
+        self._session_runner._services.session_queue.cancel_queue_item(parent_queue_item.item_id)
+
     def run_queue_item(self, queue_item: SessionQueueItem) -> None:
         self._session_runner.run(queue_item)
         updated_queue_item = self._session_runner._services.session_queue.get_queue_item(queue_item.item_id)
@@ -236,5 +242,7 @@ class WorkflowCallQueueLifecycle:
             return
         if updated_queue_item.status == "completed":
             self._resume_parent_from_completed_child(updated_queue_item)
-        elif updated_queue_item.status in ["failed", "canceled"]:
+        elif updated_queue_item.status == "failed":
             self._fail_parent_from_failed_child(updated_queue_item)
+        elif updated_queue_item.status == "canceled":
+            self._cancel_parent_from_canceled_child(updated_queue_item)

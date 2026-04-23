@@ -2275,6 +2275,53 @@ def test_run_cascades_nested_child_workflow_failures_to_all_parents(monkeypatch:
     assert "workflow_return" in events.errors[1][3]
 
 
+def test_run_preserves_canceled_child_workflow_chain_without_failing_parent(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    lifecycle = WorkflowCallQueueLifecycle(runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+
+    session = GraphExecutionState(graph=graph)
+    invocation = session.next()
+    assert isinstance(invocation, CallSavedWorkflowInvocation)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+            "priority": 0,
+            "origin": None,
+            "destination": None,
+            "root_item_id": None,
+        },
+    )()
+
+    workflow_record = runner._services.workflow_records.get(invocation.workflow_id)
+    child_queue_item = runner.workflow_call_coordinator.begin_workflow_call_boundary(
+        invocation, queue_item, workflow_record
+    )
+
+    session_queue.items[queue_item.item_id].status = "canceled"
+    session_queue.items[child_queue_item.item_id].status = "canceled"
+    monkeypatch.setattr(runner, "run", lambda queue_item: None)
+
+    lifecycle.run_queue_item(child_queue_item)
+
+    assert not session.has_error()
+    assert session_queue.failed_item_ids == []
+    assert events.errors == []
+
+
 def test_run_forwards_literal_dynamic_workflow_inputs_to_child_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
     session_queue = _DummySessionQueue()
     runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
