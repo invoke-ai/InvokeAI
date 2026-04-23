@@ -145,13 +145,14 @@ Implemented conversion helper:
 
 What is still not implemented:
 
-- direct batch-special child workflows now expand to multiple child queue rows and aggregate their
-  `workflow_return.collection` values back into the parent call boundary
-- generator-backed batch child workflows now work for supported integer, float, string, and image generators
 - connected batch child inputs whose batch values are produced by ordinary non-generator upstream nodes are still not
   supported and must fail with a clear domain error
 - child workflows that mix supported batch nodes with unrelated generator nodes are still not supported and must fail
   with a clear domain error
+- broader child-workflow compatibility coverage still needs to be expanded from real unsupported shapes rather than
+  trying to interpret every frontend-only workflow representation through the current graph-builder path
+- the current workflow-call queue lifecycle is still implemented through dedicated workflow-call runtime classes rather
+  than a fully generalized parent/child scheduler model
 
 Conclusion:
 
