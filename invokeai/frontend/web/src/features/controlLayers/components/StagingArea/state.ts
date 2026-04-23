@@ -143,6 +143,7 @@ export class StagingAreaApi {
       if (statusSequence < previousSequence) {
         return false;
       }
+      // Equal-sequence updates should be rare; if they happen, let the later terminal-vs-terminal arrival win.
       return previousRank === undefined || nextRank >= previousRank;
     }
 
@@ -152,6 +153,7 @@ export class StagingAreaApi {
   _pruneSeenItemOrdering = (items: S['SessionQueueItem'][]): void => {
     const itemIds = new Set(items.map(({ item_id }) => item_id));
 
+    // Evict vanished items so long-lived sessions do not grow these maps without bound.
     for (const itemId of this._seenItemStatusRanks.keys()) {
       if (!itemIds.has(itemId)) {
         this._seenItemStatusRanks.delete(itemId);

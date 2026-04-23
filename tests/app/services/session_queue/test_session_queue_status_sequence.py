@@ -88,3 +88,16 @@ def test_status_sequence_increments_for_bulk_cancel_paths(session_queue: SqliteS
     assert session_queue.get_queue_item(first_item_id).status_sequence == 1
     assert session_queue.get_queue_item(second_item_id).status == "canceled"
     assert session_queue.get_queue_item(second_item_id).status_sequence == 1
+
+
+def test_status_sequence_continues_after_dequeue_then_cancel(session_queue: SqliteSessionQueue) -> None:
+    item_id = _insert_queue_item(session_queue)
+
+    in_progress_item = session_queue.dequeue()
+    assert in_progress_item is not None
+    assert in_progress_item.item_id == item_id
+    assert in_progress_item.status_sequence == 1
+
+    canceled_item = session_queue.cancel_queue_item(item_id)
+    assert canceled_item.status == "canceled"
+    assert canceled_item.status_sequence == 2

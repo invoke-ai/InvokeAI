@@ -221,6 +221,7 @@ class SessionQueueItem(BaseModel):
     status: QUEUE_ITEM_STATUS = Field(default="pending", description="The status of this queue item")
     status_sequence: int | None = Field(
         default=None,
+        # Fallback for rows serialized before migration_28 added the DB-level default of 0.
         description="A monotonically increasing version for this queue item's visible status lifecycle",
     )
     priority: int = Field(default=0, description="The priority of this queue item")
