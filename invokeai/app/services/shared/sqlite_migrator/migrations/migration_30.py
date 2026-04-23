@@ -1,4 +1,8 @@
-"""Migration 30: Add workflow-call relationship columns to session_queue."""
+"""Migration 30: Add per-item queue status sequencing.
+
+This migration adds a `status_sequence` column to `session_queue` so queue item
+status updates can be ordered across asynchronous event and snapshot channels.
+"""
 
 import sqlite3
 
@@ -6,7 +10,7 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 
 
 class Migration30Callback:
-    """Add durable parent/child workflow-call relationship columns to session_queue."""
+    """Add a per-queue-item status sequence for cross-channel ordering."""
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='session_queue';")
@@ -16,33 +20,9 @@ class Migration30Callback:
         cursor.execute("PRAGMA table_info(session_queue);")
         columns = [row[1] for row in cursor.fetchall()]
 
-        if "workflow_call_id" not in columns:
-            cursor.execute("ALTER TABLE session_queue ADD COLUMN workflow_call_id TEXT;")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_session_queue_workflow_call_id ON session_queue(workflow_call_id);"
-            )
-
-        if "parent_item_id" not in columns:
-            cursor.execute("ALTER TABLE session_queue ADD COLUMN parent_item_id INTEGER;")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_session_queue_parent_item_id ON session_queue(parent_item_id);"
-            )
-
-        if "parent_session_id" not in columns:
-            cursor.execute("ALTER TABLE session_queue ADD COLUMN parent_session_id TEXT;")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_session_queue_parent_session_id ON session_queue(parent_session_id);"
-            )
-
-        if "root_item_id" not in columns:
-            cursor.execute("ALTER TABLE session_queue ADD COLUMN root_item_id INTEGER;")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_queue_root_item_id ON session_queue(root_item_id);")
-
-        if "workflow_call_depth" not in columns:
-            cursor.execute("ALTER TABLE session_queue ADD COLUMN workflow_call_depth INTEGER;")
-            cursor.execute(
-                "CREATE INDEX IF NOT EXISTS idx_session_queue_workflow_call_depth ON session_queue(workflow_call_depth);"
-            )
+        if "status_sequence" not in columns:
+            cursor.execute("ALTER TABLE session_queue ADD COLUMN status_sequence INTEGER DEFAULT 0;")
+            cursor.execute("UPDATE session_queue SET status_sequence = 0 WHERE status_sequence IS NULL;")
 
 
 def build_migration_30() -> Migration:

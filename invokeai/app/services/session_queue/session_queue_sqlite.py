@@ -73,8 +73,9 @@ class SqliteSessionQueue(SessionQueueBase):
             cursor.execute(
                 """--sql
                 UPDATE session_queue
-                SET status = 'canceled'
-                WHERE status IN ('in_progress', 'waiting');
+                SET status = 'canceled',
+                    status_sequence = COALESCE(status_sequence, 0) + 1
+                WHERE status = 'in_progress';
                 """
             )
 
@@ -308,7 +309,7 @@ class SqliteSessionQueue(SessionQueueBase):
             cursor.execute(
                 """--sql
                 UPDATE session_queue
-                SET status = ?, error_type = ?, error_message = ?, error_traceback = ?
+                SET status = ?, status_sequence = COALESCE(status_sequence, 0) + 1, error_type = ?, error_message = ?, error_traceback = ?
                 WHERE item_id = ?
                 """,
                 (status, error_type, error_message, error_traceback, item_id),
@@ -549,7 +550,8 @@ class SqliteSessionQueue(SessionQueueBase):
             cursor.execute(
                 f"""--sql
                 UPDATE session_queue
-                SET status = 'canceled'
+                SET status = 'canceled',
+                    status_sequence = COALESCE(status_sequence, 0) + 1
                 {where};
                 """,
                 tuple(params),
@@ -597,7 +599,8 @@ class SqliteSessionQueue(SessionQueueBase):
             cursor.execute(
                 f"""--sql
                 UPDATE session_queue
-                SET status = 'canceled'
+                SET status = 'canceled',
+                    status_sequence = COALESCE(status_sequence, 0) + 1
                 {where};
                 """,
                 tuple(params),
@@ -709,7 +712,8 @@ class SqliteSessionQueue(SessionQueueBase):
             cursor.execute(
                 f"""--sql
                 UPDATE session_queue
-                SET status = 'canceled'
+                SET status = 'canceled',
+                    status_sequence = COALESCE(status_sequence, 0) + 1
                 {where};
                 """,
                 tuple(params),
@@ -745,7 +749,8 @@ class SqliteSessionQueue(SessionQueueBase):
             cursor.execute(
                 f"""--sql
                 UPDATE session_queue
-                SET status = 'canceled'
+                SET status = 'canceled',
+                    status_sequence = COALESCE(status_sequence, 0) + 1
                 {where};
                 """,
                 tuple(params),
