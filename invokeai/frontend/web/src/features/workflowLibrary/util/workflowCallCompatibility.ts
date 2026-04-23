@@ -23,6 +23,6 @@ export const getWorkflowCallCompatibilityState = (
 
   return {
     isUnsupported: true,
-    message: compatibility.message,
+    message: compatibility.message ?? null,
   };
 };

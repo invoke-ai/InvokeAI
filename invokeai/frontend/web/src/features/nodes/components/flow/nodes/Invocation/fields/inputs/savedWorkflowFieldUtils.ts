@@ -1,7 +1,9 @@
 import type { ComboboxOption } from '@invoke-ai/ui-library';
+import { getWorkflowCallCompatibilityState } from 'features/workflowLibrary/util/workflowCallCompatibility';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 export const MISSING_WORKFLOW_OPTION_VALUE = '__missing_workflow__';
+export type SavedWorkflowBadge = 'unsupported' | 'default' | 'shared';
 
 type SavedWorkflowSelectionState =
   | { status: 'unselected' }
@@ -47,5 +49,59 @@ export const getSavedWorkflowSelectionOption = (selectionState: SavedWorkflowSel
   return {
     label: MISSING_WORKFLOW_OPTION_VALUE,
     value: MISSING_WORKFLOW_OPTION_VALUE,
+  };
+};
+
+export type SavedWorkflowDisplayState =
+  | {
+      selection: 'unselected' | 'missing';
+      statusLabelKey: 'nodes.savedWorkflowChoose' | 'nodes.savedWorkflowMissing';
+      badges: SavedWorkflowBadge[];
+      compatibilityMessage: null;
+    }
+  | {
+      selection: 'selected';
+      statusLabelKey: null;
+      badges: SavedWorkflowBadge[];
+      compatibilityMessage: string | null;
+    };
+
+export const getSavedWorkflowDisplayState = (
+  selectionState: SavedWorkflowSelectionState
+): SavedWorkflowDisplayState => {
+  if (selectionState.status === 'unselected') {
+    return {
+      selection: 'unselected',
+      statusLabelKey: 'nodes.savedWorkflowChoose',
+      badges: [],
+      compatibilityMessage: null,
+    };
+  }
+
+  if (selectionState.status === 'missing') {
+    return {
+      selection: 'missing',
+      statusLabelKey: 'nodes.savedWorkflowMissing',
+      badges: [],
+      compatibilityMessage: null,
+    };
+  }
+
+  const compatibilityState = getWorkflowCallCompatibilityState(selectionState.workflow);
+  const badges: SavedWorkflowBadge[] = [];
+  if (compatibilityState.isUnsupported) {
+    badges.push('unsupported');
+  }
+  if (selectionState.workflow.category === 'default') {
+    badges.push('default');
+  } else if (selectionState.workflow.is_public) {
+    badges.push('shared');
+  }
+
+  return {
+    selection: 'selected',
+    statusLabelKey: null,
+    badges,
+    compatibilityMessage: compatibilityState.message,
   };
 };

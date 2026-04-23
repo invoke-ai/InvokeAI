@@ -5,7 +5,7 @@ import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { selectWorkflowId } from 'features/nodes/store/selectors';
 import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
-import { getWorkflowCallCompatibilityState } from 'features/workflowLibrary/util/workflowCallCompatibility';
+import { getWorkflowLibraryListItemState } from 'features/workflowLibrary/util/workflowLibraryListItemState';
 import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
 import { type ChangeEvent, memo, type MouseEvent, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -66,7 +66,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
       .map((tag) => tag.trim())
       .filter((tag) => tag.length > 0);
   }, [workflow.tags]);
-  const compatibilityState = useMemo(() => getWorkflowCallCompatibilityState(workflow), [workflow]);
+  const listItemState = useMemo(() => getWorkflowLibraryListItemState(workflow), [workflow]);
 
   const handleClickLoad = useCallback(() => {
     loadWorkflowWithDialog({
@@ -121,7 +121,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   {t('workflows.opened')}
                 </Badge>
               )}
-              {setupStatus?.multiuser_enabled && workflow.is_public && workflow.category !== 'default' && (
+              {setupStatus?.multiuser_enabled && listItemState.showSharedBadge && (
                 <Badge
                   color="invokeGreen.400"
                   borderColor="invokeGreen.700"
@@ -133,8 +133,8 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   {t('workflows.shared')}
                 </Badge>
               )}
-              {compatibilityState.isUnsupported && (
-                <Tooltip label={compatibilityState.message ?? t('workflows.savedWorkflowUnsupportedDescription')}>
+              {listItemState.showUnsupportedBadge && (
+                <Tooltip label={listItemState.unsupportedMessage ?? t('workflows.savedWorkflowUnsupportedDescription')}>
                   <Badge
                     color="warning.300"
                     borderColor="warning.600"
@@ -147,7 +147,7 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   </Badge>
                 </Tooltip>
               )}
-              {workflow.category === 'default' && (
+              {listItemState.showDefaultIcon && (
                 <Image
                   src={InvokeLogo}
                   alt="invoke-logo"
@@ -164,9 +164,9 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
           <Text variant="subtext" fontSize="xs" noOfLines={3}>
             {workflow.description}
           </Text>
-          {compatibilityState.isUnsupported && (
+          {listItemState.showUnsupportedBadge && (
             <Text variant="subtext" fontSize="xs" noOfLines={2} color="warning.300">
-              {compatibilityState.message ?? t('workflows.savedWorkflowUnsupportedDescription')}
+              {listItemState.unsupportedMessage ?? t('workflows.savedWorkflowUnsupportedDescription')}
             </Text>
           )}
           {tags.length > 0 && (

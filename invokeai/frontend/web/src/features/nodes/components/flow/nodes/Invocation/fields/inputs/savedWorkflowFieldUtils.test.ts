@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildSavedWorkflowOptions,
+  getSavedWorkflowDisplayState,
   getSavedWorkflowSelectionOption,
   getSavedWorkflowSelectionState,
   MISSING_WORKFLOW_OPTION_VALUE,
@@ -76,6 +77,33 @@ describe('savedWorkflowFieldUtils', () => {
     expect(getSavedWorkflowSelectionOption(selectionState)).toEqual({
       label: MISSING_WORKFLOW_OPTION_VALUE,
       value: MISSING_WORKFLOW_OPTION_VALUE,
+    });
+  });
+
+  it('builds display state for an already-selected unsupported workflow', () => {
+    const selectionState = getSavedWorkflowSelectionState(workflows, 'workflow-b');
+
+    expect(getSavedWorkflowDisplayState(selectionState)).toEqual({
+      selection: 'selected',
+      statusLabelKey: null,
+      badges: ['unsupported', 'default'],
+      compatibilityMessage: 'The workflow must contain exactly one workflow_return node.',
+    });
+  });
+
+  it('builds display state for missing and unselected workflows', () => {
+    expect(getSavedWorkflowDisplayState({ status: 'unselected' })).toEqual({
+      selection: 'unselected',
+      statusLabelKey: 'nodes.savedWorkflowChoose',
+      badges: [],
+      compatibilityMessage: null,
+    });
+
+    expect(getSavedWorkflowDisplayState({ status: 'missing', workflowId: 'missing-workflow' })).toEqual({
+      selection: 'missing',
+      statusLabelKey: 'nodes.savedWorkflowMissing',
+      badges: [],
+      compatibilityMessage: null,
     });
   });
 });

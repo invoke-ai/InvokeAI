@@ -5,13 +5,13 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldStringValueChanged } from 'features/nodes/store/nodesSlice';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { SavedWorkflowFieldInputInstance, SavedWorkflowFieldInputTemplate } from 'features/nodes/types/field';
-import { getWorkflowCallCompatibilityState } from 'features/workflowLibrary/util/workflowCallCompatibility';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useListWorkflowsInfiniteInfiniteQuery } from 'services/api/endpoints/workflows';
 
 import {
   buildSavedWorkflowOptions,
+  getSavedWorkflowDisplayState,
   getSavedWorkflowSelectionOption,
   getSavedWorkflowSelectionState,
   MISSING_WORKFLOW_OPTION_VALUE,
@@ -58,17 +58,10 @@ const SavedWorkflowFieldInputComponent = (
     return option;
   }, [selectionState, t]);
   const statusLabel = useMemo(() => {
-    if (selectionState.status === 'selected') {
-      return null;
-    }
-    return selectionState.status === 'missing' ? t('nodes.savedWorkflowMissing') : t('nodes.savedWorkflowChoose');
-  }, [selectionState.status, t]);
-  const compatibilityState = useMemo(() => {
-    if (selectionState.status !== 'selected') {
-      return null;
-    }
-    return getWorkflowCallCompatibilityState(selectionState.workflow);
-  }, [selectionState]);
+    const displayState = getSavedWorkflowDisplayState(selectionState);
+    return displayState.statusLabelKey ? t(displayState.statusLabelKey) : null;
+  }, [selectionState, t]);
+  const displayState = useMemo(() => getSavedWorkflowDisplayState(selectionState), [selectionState]);
 
   const onChange = useCallback<ComboboxOnChange>(
     (v) => {
@@ -101,22 +94,20 @@ const SavedWorkflowFieldInputComponent = (
           <Text fontSize="xs" variant="subtext" noOfLines={1}>
             {selectionState.workflow.name}
           </Text>
-          {compatibilityState?.isUnsupported && (
+          {displayState.badges.includes('unsupported') && (
             <Badge variant="subtle">{t('nodes.savedWorkflowUnsupported')}</Badge>
           )}
-          {selectionState.workflow.category === 'default' && (
+          {displayState.badges.includes('default') && (
             <Badge variant="subtle">{t('nodes.savedWorkflowDefaultBadge')}</Badge>
           )}
-          {selectionState.workflow.is_public && selectionState.workflow.category !== 'default' && (
-            <Badge variant="subtle">{t('workflows.shared')}</Badge>
-          )}
+          {displayState.badges.includes('shared') && <Badge variant="subtle">{t('workflows.shared')}</Badge>}
         </Flex>
       ) : (
         <Badge variant="subtle">{statusLabel ?? t('nodes.savedWorkflowChoose')}</Badge>
       )}
-      {selectionState.status === 'selected' && compatibilityState?.message && (
+      {selectionState.status === 'selected' && displayState.compatibilityMessage && (
         <Text variant="subtext" fontSize="xs">
-          {compatibilityState.message}
+          {displayState.compatibilityMessage}
         </Text>
       )}
       {isFetching && (
