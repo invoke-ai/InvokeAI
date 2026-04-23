@@ -23994,6 +23994,12 @@ export type components = {
              */
             status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
             /**
+             * Status Sequence
+             * @description A monotonically increasing version for this queue item's visible status lifecycle
+             * @default null
+             */
+            status_sequence: number | null;
+            /**
              * Error Type
              * @description The error type, if any
              * @default null
@@ -26678,6 +26684,11 @@ export type components = {
              * @enum {string}
              */
             status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
+            /**
+             * Status Sequence
+             * @description A monotonically increasing version for this queue item's visible status lifecycle
+             */
+            status_sequence?: number | null;
             /**
              * Priority
              * @description The priority of this queue item
