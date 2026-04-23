@@ -23078,6 +23078,12 @@ export type components = {
              */
             config_path?: string | null;
         };
+        /**
+         * ModelRecordOrderBy
+         * @description The order in which to return model summaries.
+         * @enum {string}
+         */
+        ModelRecordOrderBy: "default" | "type" | "base" | "name" | "format" | "size" | "created_at" | "updated_at" | "path";
         /** ModelRelationshipBatchRequest */
         ModelRelationshipBatchRequest: {
             /**
@@ -24042,6 +24048,12 @@ export type components = {
              * @enum {string}
              */
             status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
+            /**
+             * Status Sequence
+             * @description A monotonically increasing version for this queue item's visible status lifecycle
+             * @default null
+             */
+            status_sequence: number | null;
             /**
              * Error Type
              * @description The error type, if any
@@ -26722,6 +26734,11 @@ export type components = {
              * @enum {string}
              */
             status: "pending" | "in_progress" | "completed" | "failed" | "canceled";
+            /**
+             * Status Sequence
+             * @description A monotonically increasing version for this queue item's visible status lifecycle
+             */
+            status_sequence?: number | null;
             /**
              * Priority
              * @description The priority of this queue item
@@ -31803,6 +31820,10 @@ export interface operations {
                 model_name?: string | null;
                 /** @description Exact match on the format of the model (e.g. 'diffusers') */
                 model_format?: components["schemas"]["ModelFormat"] | null;
+                /** @description The field to order by */
+                order_by?: components["schemas"]["ModelRecordOrderBy"];
+                /** @description The direction to order by */
+                direction?: components["schemas"]["SQLiteDirection"];
             };
             header?: never;
             path?: never;

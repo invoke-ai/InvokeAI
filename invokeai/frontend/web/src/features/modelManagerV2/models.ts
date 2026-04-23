@@ -32,7 +32,7 @@ export type ModelCategoryData = {
   filter: (config: AnyModelConfig) => boolean;
 };
 
-export const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
+const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
   unknown: {
     category: 'unknown',
     i18nKey: 'common.unknown',
