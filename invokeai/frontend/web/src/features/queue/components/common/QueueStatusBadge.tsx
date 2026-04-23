@@ -3,7 +3,7 @@ import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { SessionQueueItemStatus } from 'services/api/endpoints/queue';
 
-const STATUSES = {
+export const QUEUE_STATUS_BADGE_STATES = {
   pending: { colorScheme: 'cyan', translationKey: 'queue.pending' },
   in_progress: { colorScheme: 'yellow', translationKey: 'queue.in_progress' },
   waiting: { colorScheme: 'purple', translationKey: 'queue.waiting' },
@@ -12,8 +12,11 @@ const STATUSES = {
   canceled: { colorScheme: 'orange', translationKey: 'queue.canceled' },
 };
 
+export const getQueueStatusBadgeState = (status: SessionQueueItemStatus) => QUEUE_STATUS_BADGE_STATES[status];
+
 const StatusBadge = ({ status }: { status: SessionQueueItemStatus }) => {
   const { t } = useTranslation();
-  return <Badge colorScheme={STATUSES[status].colorScheme}>{t(STATUSES[status].translationKey)}</Badge>;
+  const badgeState = getQueueStatusBadgeState(status);
+  return <Badge colorScheme={badgeState.colorScheme}>{t(badgeState.translationKey)}</Badge>;
 };
 export default memo(StatusBadge);

@@ -71,6 +71,8 @@ const getQueueItemStatusRank = (status: S['SessionQueueItem']['status']): number
     case 'pending':
       return 0;
     case 'in_progress':
+    // Waiting items are suspended on child workflow execution, but they are still nonterminal.
+    case 'waiting':
       return 1;
     case 'completed':
     case 'failed':
