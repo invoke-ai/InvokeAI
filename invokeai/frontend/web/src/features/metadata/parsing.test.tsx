@@ -125,4 +125,50 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
       expect(parsed.key).toBe('vae-key');
     });
   });
+
+  describe('Guidance (legacy FLUX.2 gating)', () => {
+    // Prior to the Klein guidance cleanup, FLUX.2 images wrote a `guidance`
+    // field into metadata. The guidance scalar is inert for all current Klein
+    // variants, so legacy values must not be recalled into the shared guidance
+    // state — otherwise they leak back into FLUX.1 when the user switches
+    // models.
+    it('rejects parsing when the image was generated with a FLUX.2 model', async () => {
+      const store = makeStore();
+
+      await expect(
+        Promise.resolve().then(() =>
+          ImageMetadataHandlers.Guidance.parse(
+            {
+              model: { key: 'k', hash: 'h', name: 'Klein 9B Base', base: 'flux2', type: 'main' },
+              guidance: 3.5,
+            },
+            store
+          )
+        )
+      ).rejects.toThrow();
+    });
+
+    it('parses successfully for FLUX.1 metadata', async () => {
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.Guidance.parse(
+        {
+          model: { key: 'k', hash: 'h', name: 'FLUX Dev', base: 'flux', type: 'main' },
+          guidance: 3.5,
+        },
+        store
+      );
+
+      expect(parsed).toBe(3.5);
+    });
+
+    it('parses successfully when no model metadata is present', async () => {
+      // Metadata without a model field should still parse (back-compat for
+      // images where only scalar params were saved).
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.Guidance.parse({ guidance: 3.5 }, store);
+      expect(parsed).toBe(3.5);
+    });
+  });
 });
