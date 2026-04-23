@@ -7,6 +7,7 @@ import pytest
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.services.events.events_common import QueueItemsRetriedEvent, QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.session_queue.session_queue_common import SessionQueueItemNotFoundError
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from tests.test_nodes import TestEventService
@@ -392,6 +393,89 @@ def test_cancel_queue_item_cascades_from_child_to_waiting_parents(session_queue:
 
     assert session_queue.get_queue_item(child_item_id).status == "canceled"
     assert session_queue.get_queue_item(parent_item_id).status == "canceled"
+
+
+def test_delete_queue_item_removes_entire_workflow_call_chain(session_queue: SqliteSessionQueue) -> None:
+    parent_session = GraphExecutionState(graph=Graph())
+    child_session = GraphExecutionState(graph=Graph())
+    grandchild_session = GraphExecutionState(graph=Graph())
+
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id, session, session_id, batch_id, priority, user_id, status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "default",
+                parent_session.model_dump_json(warnings=False),
+                parent_session.id,
+                str(uuid.uuid4()),
+                0,
+                "user-1",
+                "failed",
+            ),
+        )
+        parent_item_id = cursor.lastrowid
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id, session, session_id, batch_id, priority, user_id, status,
+                workflow_call_id, parent_item_id, parent_session_id, root_item_id, workflow_call_depth
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "default",
+                child_session.model_dump_json(warnings=False),
+                child_session.id,
+                str(uuid.uuid4()),
+                0,
+                "user-1",
+                "canceled",
+                "workflow-call-1",
+                parent_item_id,
+                parent_session.id,
+                parent_item_id,
+                1,
+            ),
+        )
+        child_item_id = cursor.lastrowid
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id, session, session_id, batch_id, priority, user_id, status,
+                workflow_call_id, parent_item_id, parent_session_id, root_item_id, workflow_call_depth
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "default",
+                grandchild_session.model_dump_json(warnings=False),
+                grandchild_session.id,
+                str(uuid.uuid4()),
+                0,
+                "user-1",
+                "canceled",
+                "workflow-call-2",
+                child_item_id,
+                child_session.id,
+                parent_item_id,
+                2,
+            ),
+        )
+        grandchild_item_id = cursor.lastrowid
+
+    session_queue.delete_queue_item(child_item_id)
+
+    with pytest.raises(SessionQueueItemNotFoundError):
+        session_queue.get_queue_item(parent_item_id)
+    with pytest.raises(SessionQueueItemNotFoundError):
+        session_queue.get_queue_item(child_item_id)
+    with pytest.raises(SessionQueueItemNotFoundError):
+        session_queue.get_queue_item(grandchild_item_id)
 
 
 def test_cancel_queue_item_cascade_emits_canceled_events_for_waiting_parent_and_running_child(

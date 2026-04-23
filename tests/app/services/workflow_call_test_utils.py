@@ -925,6 +925,9 @@ class _DummySessionQueue:
         self.resumed_item_ids: list[int] = []
         self.enqueued_child_item_ids: list[int] = []
         self.canceled_item_ids: list[int] = []
+        self.deleted_item_ids: list[int] = []
+        self.pending_count = 0
+        self.fail_enqueue_after: int | None = None
 
     def add_queue_item(self, queue_item):
         self.items[queue_item.item_id] = queue_item
@@ -1004,6 +1007,8 @@ class _DummySessionQueue:
         return canceled_item_ids
 
     def enqueue_workflow_call_child(self, parent_queue_item, child_session):
+        if self.fail_enqueue_after is not None and len(self.enqueued_child_item_ids) >= self.fail_enqueue_after:
+            raise RuntimeError("Injected child enqueue failure")
         workflow_call_execution = parent_queue_item.session.waiting_workflow_call_execution
         item_id = self.next_item_id
         self.next_item_id += 1
@@ -1032,6 +1037,15 @@ class _DummySessionQueue:
         self.add_queue_item(child_queue_item)
         self.enqueued_child_item_ids.append(item_id)
         return child_queue_item
+
+    def delete_queue_items_by_id(self, item_ids: list[int]):
+        for item_id in item_ids:
+            if item_id in self.items:
+                del self.items[item_id]
+                self.deleted_item_ids.append(item_id)
+
+    def get_queue_status(self, queue_id: str):
+        return SimpleNamespace(pending=self.pending_count)
 
     def dequeue(self):
         pending_item_ids = sorted(item_id for item_id, item in self.items.items() if item.status == "pending")
@@ -1278,6 +1292,12 @@ def test_run_node_enters_waiting_state_without_executing_child_inline(monkeypatc
             "user_id": "user-1",
             "status": "in_progress",
             "session": session,
+            "queue_id": "default",
+            "batch_id": "batch-1",
+            "priority": 0,
+            "origin": None,
+            "destination": None,
+            "root_item_id": None,
         },
     )()
 
@@ -1316,6 +1336,12 @@ def test_run_node_fails_cleanly_for_invalid_batch_child_workflow(
             "user_id": "user-1",
             "status": "in_progress",
             "session": session,
+            "queue_id": "default",
+            "batch_id": "batch-1",
+            "priority": 0,
+            "origin": None,
+            "destination": None,
+            "root_item_id": None,
         },
     )()
     runner._services.session_queue.add_queue_item(queue_item)
@@ -1497,6 +1523,89 @@ def test_workflow_call_queue_lifecycle_resumes_parent_from_completed_child(
     assert parent_outputs[0].collection == [3]
 
 
+def test_workflow_call_coordinator_cleans_up_enqueued_children_when_boundary_setup_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_queue = _DummySessionQueue()
+    session_queue.fail_enqueue_after = 1
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    coordinator = WorkflowCallCoordinator(runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-batch-direct"))
+    session = GraphExecutionState(graph=graph)
+    invocation = session.next()
+    assert isinstance(invocation, CallSavedWorkflowInvocation)
+    queue_item = SimpleNamespace(
+        item_id=1,
+        status="in_progress",
+        session=session,
+        session_id="session-id",
+        user_id="user-1",
+        queue_id="default",
+        batch_id="batch-1",
+        priority=0,
+        origin=None,
+        destination=None,
+        root_item_id=None,
+    )
+    session_queue.add_queue_item(queue_item)
+    workflow_record = runner._services.workflow_records.get(invocation.workflow_id)
+
+    with pytest.raises(RuntimeError, match="Injected child enqueue failure"):
+        coordinator.begin_workflow_call_boundary(invocation, queue_item, workflow_record)
+
+    assert session_queue.enqueued_child_item_ids == [100]
+    assert session_queue.deleted_item_ids == [100]
+    assert session_queue.items[1].status == "in_progress"
+    assert session.waiting_workflow_call is None
+    assert session.waiting_workflow_call_execution is None
+    assert session.waiting_workflow_call_child_session is None
+    assert events.completed == []
+    assert events.errors == []
+
+
+def test_workflow_call_coordinator_rejects_child_expansion_that_exceeds_remaining_queue_capacity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_queue = _DummySessionQueue()
+    session_queue.pending_count = 999
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    runner._services.configuration.max_queue_size = 1000
+    coordinator = WorkflowCallCoordinator(runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-batch-direct"))
+    session = GraphExecutionState(graph=graph)
+    invocation = session.next()
+    assert isinstance(invocation, CallSavedWorkflowInvocation)
+    queue_item = SimpleNamespace(
+        item_id=1,
+        status="in_progress",
+        session=session,
+        session_id="session-id",
+        user_id="user-1",
+        queue_id="default",
+        batch_id="batch-1",
+        priority=0,
+        origin=None,
+        destination=None,
+        root_item_id=None,
+    )
+    session_queue.add_queue_item(queue_item)
+    workflow_record = runner._services.workflow_records.get(invocation.workflow_id)
+
+    with pytest.raises(ValueError, match="remaining queue capacity"):
+        coordinator.begin_workflow_call_boundary(invocation, queue_item, workflow_record)
+
+    assert session_queue.enqueued_child_item_ids == []
+    assert session_queue.waiting_item_ids == []
+    assert session.waiting_workflow_call is None
+    assert session.waiting_workflow_call_execution is None
+    assert events.completed == []
+    assert events.errors == []
+
+
 def test_workflow_call_coordinator_builds_child_queue_item_with_relationship_metadata(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1519,6 +1628,11 @@ def test_workflow_call_coordinator_builds_child_queue_item_with_relationship_met
             "session": parent_session,
             "session_id": parent_session.id,
             "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+            "priority": 0,
+            "origin": None,
+            "destination": None,
             "workflow_call_id": None,
             "parent_item_id": None,
             "parent_session_id": None,
@@ -1616,6 +1730,12 @@ def test_run_node_records_child_execution_state_for_call_saved_workflow(monkeypa
             "user_id": "user-1",
             "status": "in_progress",
             "session": session,
+            "queue_id": "default",
+            "batch_id": "batch-1",
+            "priority": 0,
+            "origin": None,
+            "destination": None,
+            "root_item_id": None,
         },
     )()
 

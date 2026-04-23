@@ -153,7 +153,11 @@ Workflow-call note:
   - child failure fails the waiting parent and can cascade upward through ancestors
   - failing child rows cancel their remaining workflow-call siblings before the parent is failed
   - cancelation is chain-aware across parents and children
+  - deleting a workflow-call queue row currently deletes the whole parent/child chain rather than leaving orphaned rows
+    behind
   - retry is root-oriented and should not be exposed directly on child queue rows in the UI
+  - child queue-row creation is cleaned up on boundary-setup failure and child fan-out is bounded by remaining queue
+    capacity
 - This is still an intermediate architecture step and should eventually be replaced by a more general parent/child
   execution mechanism rather than workflow-call-specific queue lifecycle handling.
 

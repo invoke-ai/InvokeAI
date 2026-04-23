@@ -242,6 +242,41 @@ def test_admin_can_delete_any_workflow(client: TestClient, admin_token: str, use
     assert response.status_code == 200
 
 
+def test_list_workflows_skips_stale_workflow_rows(
+    client: TestClient, user1_token: str, mock_invoker: Invoker, monkeypatch: Any
+):
+    workflow_id = create_workflow(client, user1_token)
+    stale_id = "stale-workflow"
+    workflow_records = mock_invoker.services.workflow_records
+    existing = workflow_records.get(workflow_id)
+
+    original_get_many = workflow_records.get_many
+    original_get = workflow_records.get
+
+    def fake_get_many(*args, **kwargs):
+        results = original_get_many(*args, **kwargs)
+        return results.model_copy(
+            update={"items": [*results.items, results.items[0].model_copy(update={"workflow_id": stale_id})]}
+        )
+
+    def fake_get(requested_workflow_id: str):
+        if requested_workflow_id == stale_id:
+            from invokeai.app.services.workflow_records.workflow_records_common import WorkflowNotFoundError
+
+            raise WorkflowNotFoundError("stale")
+        return original_get(requested_workflow_id)
+
+    monkeypatch.setattr(workflow_records, "get_many", fake_get_many)
+    monkeypatch.setattr(workflow_records, "get", fake_get)
+
+    response = client.get("/api/v1/workflows/?categories=user", headers={"Authorization": f"Bearer {user1_token}"})
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["total"] == 1
+    assert [item["workflow_id"] for item in payload["items"]] == [existing.workflow_id]
+
+
 # ---------------------------------------------------------------------------
 # Shared workflow (is_public)
 # ---------------------------------------------------------------------------

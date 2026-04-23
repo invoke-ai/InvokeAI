@@ -36,6 +36,22 @@ def _is_mapping(value: Any) -> bool:
     return isinstance(value, Mapping)
 
 
+def _build_placeholder_model(annotation: type[BaseModel]) -> Any:
+    values: dict[str, Any] = {}
+    for field_name, field_info in annotation.model_fields.items():
+        if field_info.default is not PydanticUndefined:
+            values[field_name] = deepcopy(field_info.default)
+            continue
+        if field_info.default_factory is not None:
+            values[field_name] = field_info.default_factory()
+            continue
+        placeholder = _get_placeholder_for_annotation(field_info.annotation)
+        if placeholder is None:
+            return None
+        values[field_name] = placeholder
+    return annotation.model_construct(**values)
+
+
 def _get_placeholder_for_annotation(annotation: Any) -> Any:
     origin = get_origin(annotation)
     if origin is not None:
@@ -65,10 +81,7 @@ def _get_placeholder_for_annotation(annotation: Any) -> Any:
     if annotation is ImageField:
         return ImageField(image_name="compatibility-placeholder")
     if isinstance(annotation, type) and issubclass(annotation, BaseModel):
-        try:
-            return annotation()
-        except Exception:
-            return None
+        return _build_placeholder_model(annotation)
     return None
 
 

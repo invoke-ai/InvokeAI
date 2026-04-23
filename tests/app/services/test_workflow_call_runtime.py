@@ -27,6 +27,18 @@ def test_workflow_call_coordinator_builds_child_queue_item_with_relationship_met
     workflow_call_tests.test_workflow_call_coordinator_builds_child_queue_item_with_relationship_metadata(monkeypatch)
 
 
+def test_workflow_call_coordinator_cleans_up_enqueued_children_when_boundary_setup_fails(monkeypatch) -> None:
+    workflow_call_tests.test_workflow_call_coordinator_cleans_up_enqueued_children_when_boundary_setup_fails(
+        monkeypatch
+    )
+
+
+def test_workflow_call_coordinator_rejects_child_expansion_that_exceeds_remaining_queue_capacity(monkeypatch) -> None:
+    workflow_call_tests.test_workflow_call_coordinator_rejects_child_expansion_that_exceeds_remaining_queue_capacity(
+        monkeypatch
+    )
+
+
 def test_run_completes_call_saved_workflow_and_runs_downstream_nodes(monkeypatch) -> None:
     workflow_call_tests.test_run_completes_call_saved_workflow_and_runs_downstream_nodes(monkeypatch)
 

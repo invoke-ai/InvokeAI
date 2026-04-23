@@ -11,7 +11,13 @@ from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPrompt
 from invokeai.app.invocations.fields import ImageField
 from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy, BoardVisibility
 from invokeai.app.services.image_records.image_records_common import ASSETS_CATEGORIES, IMAGE_CATEGORIES
-from invokeai.app.services.session_queue.session_queue_common import Batch, BatchDatum, create_session_nfv_tuples
+from invokeai.app.services.session_queue.session_queue_common import (
+    Batch,
+    BatchDatum,
+    TooManySessionsError,
+    calc_session_count,
+    create_session_nfv_tuples,
+)
 from invokeai.app.services.shared.graph import GraphExecutionState, WorkflowCallFrame
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.workflow_graph_builder import (
@@ -488,6 +494,8 @@ def build_batch_child_workflow_sessions(
     batch_data = [[datum] for datum in batch_data_by_group.pop("None", [])]
     batch_data.extend(batch_data_by_group.values())
     batch = Batch(graph=child_graph, data=batch_data)
+    if calc_session_count(batch) > maximum_children:
+        raise TooManySessionsError("call_saved_workflow exceeds remaining queue capacity for child workflow executions")
 
     child_sessions: list[GraphExecutionState] = []
     for session_id, session_json, _field_values_json in create_session_nfv_tuples(batch, maximum_children):

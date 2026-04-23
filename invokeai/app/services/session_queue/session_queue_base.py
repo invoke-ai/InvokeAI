@@ -115,6 +115,11 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def delete_queue_items_by_id(self, item_ids: list[int]) -> None:
+        """Deletes session queue items by ID."""
+        pass
+
+    @abstractmethod
     def fail_queue_item(
         self, item_id: int, error_type: str, error_message: str, error_traceback: str
     ) -> SessionQueueItem:

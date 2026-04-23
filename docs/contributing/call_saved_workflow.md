@@ -109,10 +109,18 @@ Implemented runtime scaffolding:
   - child failure fails the suspended parent and cascades upward through any waiting parent chain
   - canceling a parent cancels its descendant child chain
   - canceling a child cancels the waiting parent chain upward
+  - deleting any queue row in a workflow-call chain deletes the full chain to avoid leaving orphaned parent or child
+    rows behind
   - retry is root-oriented rather than child-oriented; child queue rows should not be directly retried from the UI
   - the current UI policy is:
     - child queue rows keep `Cancel`
     - child queue rows hide `Retry`
+  - child queue-row creation is now fail-clean:
+    - if call-boundary setup fails after some child rows have already been inserted, those child rows are deleted before
+      the parent invocation is failed
+  - child queue-row fan-out is bounded by remaining queue capacity, not just the global queue-size setting:
+    - a workflow call that would exceed the remaining pending capacity now fails instead of silently truncating or
+      over-enqueuing child rows
 
 Implemented conversion helper:
 

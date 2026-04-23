@@ -230,3 +230,44 @@ def test_get_workflow_call_compatibility_allows_workflow_with_required_exposed_i
     assert compatibility.is_callable is True
     assert compatibility.reason is WorkflowCallCompatibilityReason.Ok
     assert compatibility.message is None
+
+
+def test_get_workflow_call_compatibility_allows_workflow_with_required_structured_exposed_input() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node("template", "prompt_template", {"style_preset": {}}),
+            _invocation_node("collect", "collect", {"collection": {"value": []}}),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-template-collect",
+                "type": "default",
+                "source": "template",
+                "sourceHandle": "positive_prompt",
+                "target": "collect",
+                "targetHandle": "item",
+            },
+            {
+                "id": "edge-collect-return",
+                "type": "default",
+                "source": "collect",
+                "sourceHandle": "collection",
+                "target": "return",
+                "targetHandle": "collection",
+            },
+        ],
+    )
+    workflow["exposedFields"] = [{"nodeId": "template", "fieldName": "style_preset"}]
+
+    compatibility = get_workflow_call_compatibility(
+        workflow=workflow,
+        workflow_id="workflow-a",
+        services=_services(),
+        user_id="user-1",
+        maximum_children=1000,
+    )
+
+    assert compatibility.is_callable is True
+    assert compatibility.reason is WorkflowCallCompatibilityReason.Ok
+    assert compatibility.message is None

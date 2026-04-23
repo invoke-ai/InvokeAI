@@ -317,18 +317,21 @@ async def retry_items_by_id(
 ) -> RetryItemsResult:
     """Retries the given queue items. Users can only retry their own items unless they are an admin."""
     try:
-        # Check authorization: user must own all items or be an admin
-        if not current_user.is_admin:
-            for item_id in item_ids:
-                try:
-                    queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
-                    if queue_item.user_id != current_user.user_id:
-                        raise HTTPException(
-                            status_code=403, detail=f"You do not have permission to retry queue item {item_id}"
-                        )
-                except SessionQueueItemNotFoundError:
-                    # Skip items that don't exist - they will be handled by retry_items_by_id
-                    continue
+        # Check queue membership for all items and ownership for non-admins.
+        for item_id in item_ids:
+            try:
+                queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+                if queue_item.queue_id != queue_id:
+                    raise HTTPException(
+                        status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}"
+                    )
+                if not current_user.is_admin and queue_item.user_id != current_user.user_id:
+                    raise HTTPException(
+                        status_code=403, detail=f"You do not have permission to retry queue item {item_id}"
+                    )
+            except SessionQueueItemNotFoundError:
+                # Skip items that don't exist - they will be handled by retry_items_by_id
+                continue
 
         return ApiDependencies.invoker.services.session_queue.retry_items_by_id(queue_id=queue_id, item_ids=item_ids)
     except HTTPException:
@@ -512,6 +515,8 @@ async def delete_queue_item(
     try:
         # Get the queue item to check ownership
         queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+        if queue_item.queue_id != queue_id:
+            raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
 
         # Check authorization: user must own the item or be an admin
         if queue_item.user_id != current_user.user_id and not current_user.is_admin:
@@ -542,6 +547,8 @@ async def cancel_queue_item(
     try:
         # Get the queue item to check ownership
         queue_item = ApiDependencies.invoker.services.session_queue.get_queue_item(item_id)
+        if queue_item.queue_id != queue_id:
+            raise HTTPException(status_code=404, detail=f"Queue item with id {item_id} not found in queue {queue_id}")
 
         # Check authorization: user must own the item or be an admin
         if queue_item.user_id != current_user.user_id and not current_user.is_admin:

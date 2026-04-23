@@ -157,6 +157,7 @@ def user2_token(enable_multiuser: Any, mock_invoker: Invoker, client: TestClient
 def _insert_queue_item(
     session_queue: SqliteSessionQueue,
     *,
+    queue_id: str = "default",
     user_id: str,
     status: str,
     session: GraphExecutionState | None = None,
@@ -178,7 +179,7 @@ def _insert_queue_item(
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                "default",
+                queue_id,
                 session.model_dump_json(warnings=False),
                 session.id,
                 str(uuid.uuid4()),
@@ -278,6 +279,24 @@ def test_retry_items_by_id_normalizes_child_to_root_at_router(
     assert response.json()["retried_item_ids"] == [root_item_id]
 
 
+def test_retry_items_by_id_rejects_items_from_other_queue(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+) -> None:
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    item_id = _insert_queue_item(
+        mock_invoker.services.session_queue,
+        queue_id="secondary",
+        user_id=user1.user_id,
+        status="failed",
+    )
+
+    response = client.put("/api/v1/queue/default/retry_items_by_id", headers=_auth(user1_token), json=[item_id])
+
+    assert response.status_code == 404
+
+
 def test_cancel_queue_item_cascades_to_waiting_parent_via_router(
     client: TestClient, mock_invoker: Invoker, user1_token: str
 ) -> None:
@@ -302,3 +321,39 @@ def test_cancel_queue_item_cascades_to_waiting_parent_via_router(
     assert response.json()["status"] == "canceled"
     assert mock_invoker.services.session_queue.get_queue_item(parent_item_id).status == "canceled"
     assert mock_invoker.services.session_queue.get_queue_item(child_item_id).status == "canceled"
+
+
+def test_cancel_queue_item_rejects_item_from_other_queue(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+) -> None:
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    item_id = _insert_queue_item(
+        mock_invoker.services.session_queue,
+        queue_id="secondary",
+        user_id=user1.user_id,
+        status="pending",
+    )
+
+    response = client.put(f"/api/v1/queue/default/i/{item_id}/cancel", headers=_auth(user1_token))
+
+    assert response.status_code == 404
+
+
+def test_delete_queue_item_rejects_item_from_other_queue(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+) -> None:
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+
+    item_id = _insert_queue_item(
+        mock_invoker.services.session_queue,
+        queue_id="secondary",
+        user_id=user1.user_id,
+        status="failed",
+    )
+
+    response = client.delete(f"/api/v1/queue/default/i/{item_id}", headers=_auth(user1_token))
+
+    assert response.status_code == 404

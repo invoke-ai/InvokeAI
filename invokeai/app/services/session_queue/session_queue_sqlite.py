@@ -418,6 +418,20 @@ class SqliteSessionQueue(SessionQueueBase):
         self.__invoker.services.events.emit_queue_cleared(queue_id)
         return ClearResult(deleted=count)
 
+    def delete_queue_items_by_id(self, item_ids: list[int]) -> None:
+        if not item_ids:
+            return
+        placeholders = ", ".join(["?" for _ in item_ids])
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                f"""--sql
+                DELETE
+                FROM session_queue
+                WHERE item_id IN ({placeholders})
+                """,
+                tuple(item_ids),
+            )
+
     def prune(self, queue_id: str, user_id: Optional[str] = None) -> PruneResult:
         with self._db.transaction() as cursor:
             # Build WHERE clause with optional user_id filter
@@ -463,19 +477,8 @@ class SqliteSessionQueue(SessionQueueBase):
 
     def delete_queue_item(self, item_id: int) -> None:
         """Deletes a session queue item"""
-        try:
-            self.cancel_queue_item(item_id)
-        except SessionQueueItemNotFoundError:
-            pass
-        with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                DELETE
-                FROM session_queue
-                WHERE item_id = ?
-                """,
-                (item_id,),
-            )
+        chain_item_ids = self._get_workflow_call_chain_item_ids(item_id)
+        self.delete_queue_items_by_id(chain_item_ids)
 
     def complete_queue_item(self, item_id: int) -> SessionQueueItem:
         queue_item = self._set_queue_item_status(item_id=item_id, status="completed")
@@ -1102,6 +1105,8 @@ class SqliteSessionQueue(SessionQueueBase):
 
             for item_id in item_ids:
                 queue_item = self.get_queue_item(item_id)
+                if queue_item.queue_id != queue_id:
+                    continue
 
                 if queue_item.status not in ("failed", "canceled"):
                     continue

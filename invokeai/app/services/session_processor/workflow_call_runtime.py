@@ -63,6 +63,11 @@ class WorkflowCallCoordinator:
         queue_item: SessionQueueItem,
         workflow_record,
     ) -> SessionQueueItem:
+        queue_status = self._session_runner._services.session_queue.get_queue_status(queue_item.queue_id)
+        remaining_queue_capacity = self._session_runner._services.configuration.max_queue_size - queue_status.pending
+        if remaining_queue_capacity <= 0:
+            raise ValueError("call_saved_workflow exceeds remaining queue capacity for child workflow executions")
+
         call_frame = queue_item.session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
         workflow_inputs = self._collect_call_saved_workflow_inputs(invocation, queue_item)
         child_sessions = build_child_workflow_sessions(
@@ -70,20 +75,30 @@ class WorkflowCallCoordinator:
             workflow=workflow_record.workflow.model_dump(),
             workflow_inputs=workflow_inputs,
             call_frame=call_frame,
-            maximum_children=self._session_runner._services.configuration.max_queue_size,
+            maximum_children=remaining_queue_capacity,
             services=self._session_runner._services,
             user_id=getattr(queue_item, "user_id", None),
         )
+        if len(child_sessions) > remaining_queue_capacity:
+            raise ValueError("call_saved_workflow exceeds remaining queue capacity for child workflow executions")
         queue_item.session.begin_waiting_on_workflow_call(call_frame)
         queue_item.session.attach_waiting_workflow_call_child_sessions(child_sessions)
-        self._session_runner._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
         child_queue_item = None
-        for child_session in child_sessions:
-            child_queue_item = self._session_runner._services.session_queue.enqueue_workflow_call_child(
-                parent_queue_item=queue_item,
-                child_session=child_session,
-            )
-        self._session_runner._services.session_queue.suspend_queue_item(queue_item.item_id)
+        enqueued_child_item_ids: list[int] = []
+        try:
+            self._session_runner._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
+            for child_session in child_sessions:
+                child_queue_item = self._session_runner._services.session_queue.enqueue_workflow_call_child(
+                    parent_queue_item=queue_item,
+                    child_session=child_session,
+                )
+                enqueued_child_item_ids.append(child_queue_item.item_id)
+            self._session_runner._services.session_queue.suspend_queue_item(queue_item.item_id)
+        except Exception as e:
+            if enqueued_child_item_ids:
+                self._session_runner._services.session_queue.delete_queue_items_by_id(enqueued_child_item_ids)
+            queue_item.session.end_waiting_on_workflow_call(status="failed", error_message=str(e))
+            raise
         queue_item.status = "waiting"
         if child_queue_item is None:
             raise ValueError("Workflow call did not produce any child executions.")

@@ -202,8 +202,13 @@ async def list_workflows(
         user_id=user_id_filter,
         is_public=is_public,
     )
+    skipped_missing_workflows = 0
     for workflow in workflows.items:
-        full_workflow = ApiDependencies.invoker.services.workflow_records.get(workflow.workflow_id)
+        try:
+            full_workflow = ApiDependencies.invoker.services.workflow_records.get(workflow.workflow_id)
+        except WorkflowNotFoundError:
+            skipped_missing_workflows += 1
+            continue
         compatibility = get_workflow_call_compatibility(
             workflow=full_workflow.workflow.model_dump(),
             workflow_id=full_workflow.workflow_id,
@@ -220,7 +225,7 @@ async def list_workflows(
         )
     return PaginatedResults[WorkflowRecordListItemWithThumbnailDTO](
         items=workflows_with_thumbnails,
-        total=workflows.total,
+        total=max(len(workflows_with_thumbnails), workflows.total - skipped_missing_workflows),
         page=workflows.page,
         pages=workflows.pages,
         per_page=workflows.per_page,
