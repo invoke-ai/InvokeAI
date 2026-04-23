@@ -246,21 +246,11 @@ afterEach(resetState);
 
 describe('buildFLUXGraph (FLUX.2 Klein)', () => {
   describe('guidance gating', () => {
-    it('writes guidance into metadata and the denoise node for klein_9b_base', async () => {
-      currentModel = makeFlux2Model('klein_9b_base');
-
-      const { g } = await buildFLUXGraph(buildGraphArg());
-
-      const metadata = getMetadata(g);
-      expect(metadata.guidance).toBe(mockParams.guidance);
-
-      const denoise = findFlux2Denoise(g);
-      expect(denoise).toBeDefined();
-      expect(denoise?.guidance).toBe(mockParams.guidance);
-    });
-
-    it.each(['klein_9b', 'klein_4b'])(
-      'omits guidance from metadata and denoise for distilled variant %s',
+    // guidance_embeds is inert for all current FLUX.2 Klein variants (weights are
+    // absent or zeroed), so the linear UI does not expose it and the graph builder
+    // must not write it into the denoise node or metadata.
+    it.each(['klein_9b_base', 'klein_9b', 'klein_4b_base', 'klein_4b'])(
+      'omits guidance from metadata and denoise for variant %s',
       async (variant) => {
         currentModel = makeFlux2Model(variant);
 
