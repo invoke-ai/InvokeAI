@@ -495,7 +495,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
     const rect = this.getDragRect(this.dragStartPoint, this.dragCurrentPoint, {
       fromCenter: this.manager.stateApi.$altKey.get(),
-      constrainSquare: shapeType === 'oval' && this.manager.stateApi.$shiftKey.get(),
+      constrainSquare: this.manager.stateApi.$shiftKey.get(),
     });
 
     await activeEntity.bufferRenderer.setBuffer({
