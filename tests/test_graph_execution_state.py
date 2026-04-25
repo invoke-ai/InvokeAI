@@ -160,7 +160,9 @@ def test_graph_state_resumes_partially_executed_session_after_json_round_trip():
     resumed = TypeAdapter(GraphExecutionState).validate_json(raw, strict=False)
     registry = resumed._prepared_registry()
 
-    assert all(registry.get_iteration_path(exec_node_id) is not None for exec_node_id in resumed.prepared_source_mapping)
+    assert all(
+        registry.get_iteration_path(exec_node_id) is not None for exec_node_id in resumed.prepared_source_mapping
+    )
 
     executed_source_ids = execute_all_nodes(resumed)
 
