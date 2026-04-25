@@ -243,7 +243,8 @@ class _IfBranchScheduler:
         return False
 
     def mark_exec_node_skipped(self, exec_node_id: str) -> None:
-        if self._state._get_prepared_exec_metadata(exec_node_id).state == "executed":
+        state = self._state._get_prepared_exec_metadata(exec_node_id).state
+        if state in ("executed", "skipped"):
             return
 
         self._state._remove_from_ready_queues(exec_node_id)
@@ -478,6 +479,9 @@ class _ExecutionMaterializer:
         prepared_iterator_nodes: list[str],
     ) -> Optional[str]:
         prepared_nodes = self._get_prepared_nodes_for_source(source_node_id)
+        if len(prepared_nodes) == 1 and not prepared_iterator_nodes:
+            return next(iter(prepared_nodes))
+
         parent_iterators = self._get_parent_iterator_exec_nodes(source_node_id, graph, prepared_iterator_nodes)
         if len(prepared_nodes) == 1:
             prepared_node_id = next(iter(prepared_nodes))
@@ -783,8 +787,10 @@ class _ExecutionRuntime:
 
             found_value, copied_value = self._try_get_copied_result_value(edge)
             if not found_value:
+                iteration_path = self._state._get_iteration_path(node.id)
                 raise RuntimeError(
-                    "IfInvocation selected input edge points at an exec node with no stored result output"
+                    "IfInvocation selected input edge points at an exec node with no stored result output: "
+                    f"if_exec_id={node.id}, source_exec_id={edge.source.node_id}, iteration_path={iteration_path}"
                 )
 
             setattr(node, edge.destination.field, copied_value)

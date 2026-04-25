@@ -24,6 +24,7 @@ from invokeai.app.services.shared.graph import (
 # This import must happen before other invoke imports or test in other files(!!) break
 from tests.test_nodes import (
     AnyTypeTestInvocation,
+    AnyTypeTestInvocationOutput,
     PromptCollectionTestInvocation,
     PromptTestInvocation,
     TextToImageTestInvocation,
@@ -915,8 +916,13 @@ def test_prepare_if_inputs_raises_when_selected_branch_source_has_no_result():
     g._resolved_if_exec_branches[if_exec_id] = "true_input"
 
     if_node = g.execution_graph.get_node(if_exec_id)
-    with pytest.raises(RuntimeError, match="selected input edge"):
+    with pytest.raises(RuntimeError) as exc_info:
         g._prepare_inputs(if_node)
+
+    message = str(exc_info.value)
+    assert if_exec_id in message
+    assert true_value_exec_id in message
+    assert "iteration_path=()" in message
 
 
 def test_get_collect_iteration_mappings_ignores_skipped_prepared_exec_nodes():
@@ -1025,7 +1031,7 @@ def test_mark_exec_node_skipped_does_not_hide_already_executed_results():
     g = GraphExecutionState(graph=graph)
 
     exec_id = g._create_execution_node("value", [])[0]
-    g.results[exec_id] = AnyTypeTestInvocation(id="result", value="value").invoke(Mock(InvocationContext))
+    g.results[exec_id] = AnyTypeTestInvocationOutput(value="value")
     g.executed.add(exec_id)
     g._set_prepared_exec_state(exec_id, "executed")
 
@@ -1033,6 +1039,21 @@ def test_mark_exec_node_skipped_does_not_hide_already_executed_results():
 
     assert g._get_prepared_exec_metadata(exec_id).state == "executed"
     assert g.results[exec_id].value == "value"
+
+
+def test_mark_exec_node_skipped_is_idempotent_for_skipped_state():
+    graph = Graph()
+    graph.add_node(AnyTypeTestInvocation(id="value", value="value"))
+
+    g = GraphExecutionState(graph=graph)
+
+    exec_id = g._create_execution_node("value", [])[0]
+
+    g._if_scheduler().mark_exec_node_skipped(exec_id)
+    g._if_scheduler().mark_exec_node_skipped(exec_id)
+
+    assert g._get_prepared_exec_metadata(exec_id).state == "skipped"
+    assert g.executed_history.count("value") == 1
 
 
 def test_are_connection_types_compatible_accepts_subclass_to_base():
