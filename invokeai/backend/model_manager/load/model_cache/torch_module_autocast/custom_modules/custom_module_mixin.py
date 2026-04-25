@@ -52,6 +52,7 @@ class CustomModuleMixin:
             if isinstance(param, torch.nn.Parameter) and type(param.data) is torch.Tensor:
                 pass
             elif type(param) is torch.Tensor:
+                # Plain tensor (e.g. after cast_to_device moved a Parameter to another device).
                 pass
             elif type(param) is GGMLTensor:
                 # Move to device and dequantize here. Doing it in the patch layer can result in redundant casts /
