@@ -37,6 +37,15 @@ import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
+import {
+  clearCompletedInvocationKeysForQueueItem,
+  shouldIgnoreFinishedQueueItemInvocationEvent,
+} from 'services/events/invocationTracking';
+import {
+  getUpdatedNodeExecutionStateOnInvocationError,
+  getUpdatedNodeExecutionStateOnInvocationProgress,
+  getUpdatedNodeExecutionStateOnInvocationStarted,
+} from 'services/events/nodeExecutionState';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
@@ -65,6 +74,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const finishedQueueItemIds = new LRUCache<number, boolean>({ max: 100 });
+  const completedInvocationKeysByItemId = new Map<number, Set<string>>();
 
   socket.on('connect', () => {
     log.debug('Connected');
@@ -102,24 +112,28 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_started', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
+    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_started', finishedQueueItemIds, data.item_id)) {
       return;
     }
     const { invocation_source_id, invocation } = data;
     log.debug({ data } as JsonObject, `Invocation started (${invocation.type}, ${invocation_source_id})`);
-    const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-    if (nes) {
-      nes.status = zNodeStatus.enum.IN_PROGRESS;
-      upsertExecutionState(nes.nodeId, nes);
+    const nes = $nodeExecutionStates.get()[invocation_source_id];
+    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationStarted(
+      nes,
+      data,
+      completedInvocationKeysByItemId
+    );
+    if (updatedNodeExecutionState) {
+      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
     }
   });
 
   socket.on('invocation_progress', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
+    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_progress', finishedQueueItemIds, data.item_id)) {
       log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
       return;
     }
-    const { invocation_source_id, invocation, image, origin, percentage, message } = data;
+    const { invocation_source_id, invocation, origin, percentage, message } = data;
 
     let _message = 'Invocation progress';
     if (message) {
@@ -135,34 +149,25 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     $lastProgressEvent.set(data);
 
     if (origin === 'workflows') {
-      const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-      if (nes) {
-        nes.status = zNodeStatus.enum.IN_PROGRESS;
-        nes.progress = percentage;
-        nes.progressImage = image ?? null;
-        upsertExecutionState(nes.nodeId, nes);
+      const nes = $nodeExecutionStates.get()[invocation_source_id];
+      const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationProgress(
+        nes,
+        data,
+        completedInvocationKeysByItemId
+      );
+      if (updatedNodeExecutionState) {
+        upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
       }
     }
   });
 
   socket.on('invocation_error', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
-      log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
-      return;
-    }
-    const { invocation_source_id, invocation, error_type, error_message, error_traceback } = data;
+    const { invocation_source_id, invocation } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
-    const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-    if (nes) {
-      nes.status = zNodeStatus.enum.FAILED;
-      nes.progress = null;
-      nes.progressImage = null;
-      nes.error = {
-        error_type,
-        error_message,
-        error_traceback,
-      };
-      upsertExecutionState(nes.nodeId, nes);
+    const nes = $nodeExecutionStates.get()[invocation_source_id];
+    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationError(nes, data);
+    if (updatedNodeExecutionState) {
+      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
     }
     // Clear canvas workflow integration processing state on error
     if (data.origin === 'canvas_workflow_integration') {
@@ -170,7 +175,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
   });
 
-  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, finishedQueueItemIds);
+  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, completedInvocationKeysByItemId);
   socket.on('invocation_complete', onInvocationComplete);
 
   socket.on('model_load_started', (data) => {
@@ -472,6 +477,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       });
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       finishedQueueItemIds.set(item_id, true);
+      clearCompletedInvocationKeysForQueueItem(completedInvocationKeysByItemId, item_id);
       if (status === 'failed' && error_type) {
         toast({
           id: `INVOCATION_ERROR_${error_type}`,
