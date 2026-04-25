@@ -73,8 +73,19 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def get_queue_status(self, queue_id: str, user_id: Optional[str] = None) -> SessionQueueStatus:
-        """Gets the status of the queue. If user_id is provided, also includes user-specific counts."""
+    def get_queue_status(
+        self,
+        queue_id: str,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+    ) -> SessionQueueStatus:
+        """Gets the status of the queue.
+
+        Always returns global pending/in_progress/etc. counts. When user_id is provided, also
+        populates user_pending and user_in_progress with that user's own counts (so the UI can
+        render an X/Y badge). When is_admin is False, the current item's identifiers are hidden
+        unless the calling user owns the in-progress item.
+        """
         pass
 
     @abstractmethod

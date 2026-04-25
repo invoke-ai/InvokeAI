@@ -309,6 +309,12 @@ class SessionQueueStatus(BaseModel):
     failed: int = Field(..., description="Number of queue items with status 'error'")
     canceled: int = Field(..., description="Number of queue items with status 'canceled'")
     total: int = Field(..., description="Total number of queue items")
+    user_pending: Optional[int] = Field(
+        default=None, description="Number of pending queue items for the calling user (multiuser only)"
+    )
+    user_in_progress: Optional[int] = Field(
+        default=None, description="Number of in-progress queue items for the calling user (multiuser only)"
+    )
 
 
 class SessionQueueCountsByDestination(BaseModel):

@@ -1795,7 +1795,9 @@ export type paths = {
         };
         /**
          * Get Queue Item Ids
-         * @description Gets all queue item ids that match the given parameters. Non-admin users only see their own items.
+         * @description Gets all queue item ids that match the given parameters. The IDs themselves are not sensitive;
+         *     per-item field redaction is performed when the items are fetched via list_all_queue_items or
+         *     get_queue_items_by_item_ids.
          */
         get: operations["get_queue_item_ids"];
         put?: never;
@@ -2055,7 +2057,9 @@ export type paths = {
         };
         /**
          * Get Queue Status
-         * @description Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it.
+         * @description Gets the status of the session queue. Returns global counts plus the calling user's own
+         *     pending/in_progress counts (so the UI can show an X/Y badge). Non-admin users cannot see the
+         *     current item's identifiers unless they own it.
          */
         get: operations["get_queue_status"];
         put?: never;
@@ -15641,6 +15645,7 @@ export type components = {
          *         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).
          *         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
          *         max_queue_size: Maximum number of items in the session queue.
+         *         session_queue_mode: Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.<br>Valid values: `FIFO`, `round_robin`
          *         clear_queue_on_startup: Empties session queue on startup. If true, disables `max_queue_history`.
          *         max_queue_history: Keep the last N completed, failed, and canceled queue items. Older items are deleted on startup. Set to 0 to prune all terminal items. Ignored if `clear_queue_on_startup` is true.
          *         allow_nodes: List of nodes to allow. Omit to allow all.
@@ -15972,6 +15977,13 @@ export type components = {
              * @default 10000
              */
             max_queue_size?: number;
+            /**
+             * Session Queue Mode
+             * @description Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.
+             * @default round_robin
+             * @enum {string}
+             */
+            session_queue_mode?: "FIFO" | "round_robin";
             /**
              * Clear Queue On Startup
              * @description Empties session queue on startup. If true, disables `max_queue_history`.
@@ -26807,6 +26819,16 @@ export type components = {
              * @description Total number of queue items
              */
             total: number;
+            /**
+             * User Pending
+             * @description Number of pending queue items for the calling user (multiuser only)
+             */
+            user_pending?: number | null;
+            /**
+             * User In Progress
+             * @description Number of in-progress queue items for the calling user (multiuser only)
+             */
+            user_in_progress?: number | null;
         };
         /**
          * SetupRequest
