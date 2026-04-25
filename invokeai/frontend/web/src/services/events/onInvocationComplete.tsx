@@ -1,6 +1,6 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
+import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import {
   selectAutoSwitch,
   selectGalleryView,
@@ -11,13 +11,14 @@ import {
 import { boardIdSelected, galleryViewChanged, imageSelected } from 'features/gallery/store/gallerySlice';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { isImageField, isImageFieldCollection } from 'features/nodes/types/common';
-import { zNodeStatus } from 'features/nodes/types/invocation';
-import type { LRUCache } from 'lru-cache';
+import { LIST_ALL_TAG } from 'services/api';
 import { boardsApi } from 'services/api/endpoints/boards';
 import { getImageDTOSafe, imagesApi } from 'services/api/endpoints/images';
+import { queueApi } from 'services/api/endpoints/queue';
 import type { ImageDTO, S } from 'services/api/types';
 import { getCategories } from 'services/api/util';
 import { insertImageIntoNamesResult } from 'services/api/util/optimisticUpdates';
+import { getUpdatedNodeExecutionStateOnInvocationComplete } from 'services/events/nodeExecutionState';
 import { $lastProgressEvent } from 'services/events/stores';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
@@ -35,13 +36,13 @@ const nodeTypeDenylist = ['load_image', 'image'];
  *
  * @param getState The Redux getState function.
  * @param dispatch The Redux dispatch function.
- * @param finishedQueueItemIds A cache of finished queue item IDs to prevent duplicate handling and avoid race
- * conditions that can happen when a graph finishes very quickly.
+ * @param completedInvocationKeysByItemId A listener-local map used to dedupe repeated invocation completion events
+ * and to share completion knowledge with the other invocation event handlers.
  */
 export const buildOnInvocationComplete = (
   getState: AppGetState,
   dispatch: AppDispatch,
-  finishedQueueItemIds: LRUCache<number, boolean>
+  completedInvocationKeysByItemId: Map<number, Set<string>>
 ) => {
   const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
@@ -217,25 +218,52 @@ export const buildOnInvocationComplete = (
     return imageDTOs;
   };
 
-  return async (data: S['InvocationCompleteEvent']) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
-      log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
+  const clearCanvasWorkflowIntegrationProcessing = (data: S['InvocationCompleteEvent']) => {
+    // Check if this is a canvas workflow integration result
+    // Results go to staging area automatically via destination = canvasSessionId
+    if (data.origin !== 'canvas_workflow_integration') {
       return;
     }
+    // Clear processing state so the modal loading spinner stops
+    dispatch(canvasWorkflowIntegrationProcessingCompleted());
+
+    // Check if this invocation produced an image output
+    const hasImageOutput = objectEntries(data.result).some(([_name, value]) => {
+      return isImageField(value) || isImageFieldCollection(value);
+    });
+
+    // Only invalidate if this invocation produced an image - this ensures the staging area
+    // gets updated immediately when output images are available, without invalidating on every invocation
+    if (hasImageOutput) {
+      dispatch(queueApi.util.invalidateTags([{ type: 'SessionQueueItem', id: LIST_ALL_TAG }]));
+    }
+  };
+
+  return async (data: S['InvocationCompleteEvent']) => {
     log.debug({ data } as JsonObject, `Invocation complete (${data.invocation.type}, ${data.invocation_source_id})`);
 
     const nodeExecutionState = $nodeExecutionStates.get()[data.invocation_source_id];
+    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationComplete(
+      nodeExecutionState,
+      data,
+      completedInvocationKeysByItemId
+    );
 
-    if (nodeExecutionState) {
-      const _nodeExecutionState = deepClone(nodeExecutionState);
-      _nodeExecutionState.status = zNodeStatus.enum.COMPLETED;
-      if (_nodeExecutionState.progress !== null) {
-        _nodeExecutionState.progress = 1;
-      }
-      _nodeExecutionState.outputs.push(data.result);
-      upsertExecutionState(_nodeExecutionState.nodeId, _nodeExecutionState);
+    if (nodeExecutionState && !updatedNodeExecutionState) {
+      log.trace(
+        { data } as JsonObject,
+        `Ignoring duplicate invocation complete (${data.invocation.type}, ${data.invocation_source_id})`
+      );
     }
 
+    if (updatedNodeExecutionState) {
+      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
+    }
+
+    // Clear canvas workflow integration processing state if needed
+    clearCanvasWorkflowIntegrationProcessing(data);
+
+    // Add images to gallery (canvas workflow integration results go to staging area automatically)
     await addImagesToGallery(data);
 
     $lastProgressEvent.set(null);

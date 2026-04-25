@@ -109,7 +109,7 @@ CONTAINER_UID=1000
 GPU_DRIVER=cuda
 ```
 
-Any environment variables supported by InvokeAI can be set here. See the [Configuration docs](https://invoke-ai.github.io/InvokeAI/features/CONFIGURATION/) for further detail.
+Any environment variables supported by InvokeAI can be set here. See the [Configuration docs](https://invoke.ai/configuration/invokeai-yaml/) for further detail.
 
 ---
 

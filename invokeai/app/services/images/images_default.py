@@ -310,9 +310,9 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem deleting image records and files")
             raise e
 
-    def get_intermediates_count(self) -> int:
+    def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
         try:
-            return self.__invoker.services.image_records.get_intermediates_count()
+            return self.__invoker.services.image_records.get_intermediates_count(user_id=user_id)
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting intermediates count")
             raise e

@@ -79,6 +79,8 @@ class SetupStatusResponse(BaseModel):
 
     setup_required: bool = Field(description="Whether initial setup is required")
     multiuser_enabled: bool = Field(description="Whether multiuser mode is enabled")
+    strict_password_checking: bool = Field(description="Whether strict password requirements are enforced")
+    admin_email: str | None = Field(default=None, description="Email of the first active admin user, if any")
 
 
 @auth_router.get("/status", response_model=SetupStatusResponse)
@@ -92,13 +94,27 @@ async def get_setup_status() -> SetupStatusResponse:
 
     # If multiuser is disabled, setup is never required
     if not config.multiuser:
-        return SetupStatusResponse(setup_required=False, multiuser_enabled=False)
+        return SetupStatusResponse(
+            setup_required=False,
+            multiuser_enabled=False,
+            strict_password_checking=config.strict_password_checking,
+            admin_email=None,
+        )
 
     # In multiuser mode, check if an admin exists
     user_service = ApiDependencies.invoker.services.users
     setup_required = not user_service.has_admin()
 
-    return SetupStatusResponse(setup_required=setup_required, multiuser_enabled=True)
+    # Only expose admin_email during initial setup to avoid leaking
+    # administrator identity on public deployments.
+    admin_email = user_service.get_admin_email() if setup_required else None
+
+    return SetupStatusResponse(
+        setup_required=setup_required,
+        multiuser_enabled=True,
+        strict_password_checking=config.strict_password_checking,
+        admin_email=admin_email,
+    )
 
 
 @auth_router.post("/login", response_model=LoginResponse)
@@ -145,6 +161,7 @@ async def login(
         user_id=user.user_id,
         email=user.email,
         is_admin=user.is_admin,
+        remember_me=request.remember_me,
     )
     token = create_access_token(token_data, expires_delta)
 
@@ -248,7 +265,7 @@ async def setup_admin(
             password=request.password,
             is_admin=True,
         )
-        user = user_service.create_admin(user_data)
+        user = user_service.create_admin(user_data, strict_password_checking=config.strict_password_checking)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
@@ -359,6 +376,7 @@ async def create_user(
         HTTPException: 400 if email already exists or password is weak
     """
     user_service = ApiDependencies.invoker.services.users
+    config = ApiDependencies.invoker.services.configuration
     try:
         user_data = UserCreateRequest(
             email=request.email,
@@ -366,7 +384,7 @@ async def create_user(
             password=request.password,
             is_admin=request.is_admin,
         )
-        return user_service.create(user_data)
+        return user_service.create(user_data, strict_password_checking=config.strict_password_checking)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
@@ -414,6 +432,7 @@ async def update_user(
         HTTPException: 404 if user not found
     """
     user_service = ApiDependencies.invoker.services.users
+    config = ApiDependencies.invoker.services.configuration
     try:
         changes = UserUpdateRequest(
             display_name=request.display_name,
@@ -421,7 +440,7 @@ async def update_user(
             is_admin=request.is_admin,
             is_active=request.is_active,
         )
-        return user_service.update(user_id, changes)
+        return user_service.update(user_id, changes, strict_password_checking=config.strict_password_checking)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
@@ -483,6 +502,7 @@ async def update_current_user(
         HTTPException: 404 if user not found
     """
     user_service = ApiDependencies.invoker.services.users
+    config = ApiDependencies.invoker.services.configuration
 
     # Verify current password when attempting a password change
     if request.new_password is not None:
@@ -509,6 +529,8 @@ async def update_current_user(
             display_name=request.display_name,
             password=request.new_password,
         )
-        return user_service.update(current_user.user_id, changes)
+        return user_service.update(
+            current_user.user_id, changes, strict_password_checking=config.strict_password_checking
+        )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e

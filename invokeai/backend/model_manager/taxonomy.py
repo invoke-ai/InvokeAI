@@ -52,6 +52,12 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
     """Indicates the model is associated with Z-Image model architecture, including Z-Image-Turbo."""
+    External = "external"
+    """Indicates the model is hosted by an external provider."""
+    QwenImage = "qwen-image"
+    """Indicates the model is associated with Qwen Image Edit 2511 model architecture."""
+    Anima = "anima"
+    """Indicates the model is associated with Anima model architecture (Cosmos Predict2 DiT + LLM Adapter)."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -76,6 +82,7 @@ class ModelType(str, Enum):
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
+    ExternalImageGenerator = "external_image_generator"
     Unknown = "unknown"
 
 
@@ -143,6 +150,16 @@ class ZImageVariantType(str, Enum):
     """Z-Image Base - undistilled foundation model with full CFG and negative prompt support."""
 
 
+class QwenImageVariantType(str, Enum):
+    """Qwen Image model variants."""
+
+    Generate = "generate"
+    """Qwen Image - text-to-image generation model."""
+
+    Edit = "edit"
+    """Qwen Image Edit - image editing model with reference image support."""
+
+
 class Qwen3VariantType(str, Enum):
     """Qwen3 text encoder variants based on model size."""
 
@@ -151,6 +168,9 @@ class Qwen3VariantType(str, Enum):
 
     Qwen3_8B = "qwen3_8b"
     """Qwen3 8B text encoder (hidden_size=4096). Used by FLUX.2 Klein 9B."""
+
+    Qwen3_06B = "qwen3_06b"
+    """Qwen3 0.6B text encoder (hidden_size=1024). Used by Anima."""
 
 
 class ModelFormat(str, Enum):
@@ -170,6 +190,7 @@ class ModelFormat(str, Enum):
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
+    ExternalApi = "external_api"
     Unknown = "unknown"
 
 
@@ -198,6 +219,7 @@ class ModelSourceType(str, Enum):
     Path = "path"
     Url = "url"
     HFRepoID = "hf_repo_id"
+    External = "external"
 
 
 class FluxLoRAFormat(str, Enum):
@@ -210,11 +232,32 @@ class FluxLoRAFormat(str, Enum):
     AIToolkit = "flux.aitoolkit"
     XLabs = "flux.xlabs"
     BflPeft = "flux.bfl_peft"
+    OneTrainerBfl = "flux.onetrainer_bfl"
 
 
 AnyVariant: TypeAlias = Union[
-    ModelVariantType, ClipVariantType, FluxVariantType, Flux2VariantType, ZImageVariantType, Qwen3VariantType
+    ModelVariantType,
+    ClipVariantType,
+    FluxVariantType,
+    Flux2VariantType,
+    ZImageVariantType,
+    QwenImageVariantType,
+    Qwen3VariantType,
 ]
 variant_type_adapter = TypeAdapter[
-    ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | ZImageVariantType | Qwen3VariantType
-](ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | ZImageVariantType | Qwen3VariantType)
+    ModelVariantType
+    | ClipVariantType
+    | FluxVariantType
+    | Flux2VariantType
+    | ZImageVariantType
+    | QwenImageVariantType
+    | Qwen3VariantType
+](
+    ModelVariantType
+    | ClipVariantType
+    | FluxVariantType
+    | Flux2VariantType
+    | ZImageVariantType
+    | QwenImageVariantType
+    | Qwen3VariantType
+)

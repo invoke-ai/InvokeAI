@@ -26,10 +26,13 @@ from invokeai.app.services.model_install.model_install_common import ModelInstal
 from invokeai.app.services.model_records import (
     InvalidModelException,
     ModelRecordChanges,
+    ModelRecordOrderBy,
     UnknownModelException,
 )
 from invokeai.app.services.orphaned_models import OrphanedModelInfo
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.suppress_output import SuppressOutput
+from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SD1_Config,
@@ -75,8 +78,36 @@ class CacheType(str, Enum):
 def add_cover_image_to_model_config(config: AnyModelConfig, dependencies: Type[ApiDependencies]) -> AnyModelConfig:
     """Add a cover image URL to a model configuration."""
     cover_image = dependencies.invoker.services.model_images.get_url(config.key)
-    config.cover_image = cover_image
-    return config
+    return config.model_copy(update={"cover_image": cover_image})
+
+
+def apply_external_starter_model_overrides(config: AnyModelConfig) -> AnyModelConfig:
+    """Overlay starter-model metadata onto installed external model configs."""
+    if not isinstance(config, ExternalApiModelConfig):
+        return config
+
+    starter_match = next((starter for starter in STARTER_MODELS if starter.source == config.source), None)
+    if starter_match is None:
+        return config
+
+    model_updates: dict[str, object] = {}
+    if starter_match.capabilities is not None:
+        model_updates["capabilities"] = starter_match.capabilities
+    if starter_match.default_settings is not None:
+        model_updates["default_settings"] = starter_match.default_settings
+    if starter_match.panel_schema is not None:
+        model_updates["panel_schema"] = starter_match.panel_schema
+
+    if not model_updates:
+        return config
+
+    return config.model_copy(update=model_updates)
+
+
+def prepare_model_config_for_response(config: AnyModelConfig, dependencies: Type[ApiDependencies]) -> AnyModelConfig:
+    """Apply API-only model config overlays before returning a response."""
+    config = apply_external_starter_model_overrides(config)
+    return add_cover_image_to_model_config(config, dependencies)
 
 
 ##############################################################################
@@ -130,6 +161,8 @@ async def list_model_records(
     model_format: Optional[ModelFormat] = Query(
         default=None, description="Exact match on the format of the model (e.g. 'diffusers')"
     ),
+    order_by: ModelRecordOrderBy = Query(default=ModelRecordOrderBy.Name, description="The field to order by"),
+    direction: SQLiteDirection = Query(default=SQLiteDirection.Ascending, description="The direction to order by"),
 ) -> ModelsList:
     """Get a list of models."""
     record_store = ApiDependencies.invoker.services.model_manager.store
@@ -138,15 +171,26 @@ async def list_model_records(
         for base_model in base_models:
             found_models.extend(
                 record_store.search_by_attr(
-                    base_model=base_model, model_type=model_type, model_name=model_name, model_format=model_format
+                    base_model=base_model,
+                    model_type=model_type,
+                    model_name=model_name,
+                    model_format=model_format,
+                    order_by=order_by,
+                    direction=direction,
                 )
             )
     else:
         found_models.extend(
-            record_store.search_by_attr(model_type=model_type, model_name=model_name, model_format=model_format)
+            record_store.search_by_attr(
+                model_type=model_type,
+                model_name=model_name,
+                model_format=model_format,
+                order_by=order_by,
+                direction=direction,
+            )
         )
-    for model in found_models:
-        model = add_cover_image_to_model_config(model, ApiDependencies)
+    for index, model in enumerate(found_models):
+        found_models[index] = prepare_model_config_for_response(model, ApiDependencies)
     return ModelsList(models=found_models)
 
 
@@ -166,6 +210,8 @@ async def list_missing_models() -> ModelsList:
 
     missing_models: list[AnyModelConfig] = []
     for model_config in record_store.all_models():
+        if model_config.base == BaseModelType.External or model_config.format == ModelFormat.ExternalApi:
+            continue
         if not (models_path / model_config.path).resolve().exists():
             missing_models.append(model_config)
 
@@ -190,7 +236,24 @@ async def get_model_records_by_attrs(
     if not configs:
         raise HTTPException(status_code=404, detail="No model found with these attributes")
 
-    return configs[0]
+    return prepare_model_config_for_response(configs[0], ApiDependencies)
+
+
+@model_manager_router.get(
+    "/get_by_hash",
+    operation_id="get_model_records_by_hash",
+    response_model=AnyModelConfig,
+)
+async def get_model_records_by_hash(
+    hash: str = Query(description="The hash of the model"),
+) -> AnyModelConfig:
+    """Gets a model by its hash. This is useful for recalling models that were deleted and reinstalled,
+    as the hash remains stable across reinstallations while the key (UUID) changes."""
+    configs = ApiDependencies.invoker.services.model_manager.store.search_by_hash(hash)
+    if not configs:
+        raise HTTPException(status_code=404, detail="No model found with this hash")
+
+    return prepare_model_config_for_response(configs[0], ApiDependencies)
 
 
 @model_manager_router.get(
@@ -211,7 +274,7 @@ async def get_model_record(
     """Get a model record"""
     try:
         config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
-        return add_cover_image_to_model_config(config, ApiDependencies)
+        return prepare_model_config_for_response(config, ApiDependencies)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -251,7 +314,7 @@ async def reidentify_model(
         result.config.name = config.name
         result.config.description = config.description
         result.config.cover_image = config.cover_image
-        if hasattr(config, "trigger_phrases") and hasattr(result.config, "trigger_phrases"):
+        if hasattr(result.config, "trigger_phrases") and hasattr(config, "trigger_phrases"):
             result.config.trigger_phrases = config.trigger_phrases
         result.config.source = config.source
         result.config.source_type = config.source_type
@@ -375,7 +438,7 @@ async def update_model_record(
     record_store = ApiDependencies.invoker.services.model_manager.store
     try:
         config = record_store.update_model(key, changes=changes, allow_class_change=True)
-        config = add_cover_image_to_model_config(config, ApiDependencies)
+        config = prepare_model_config_for_response(config, ApiDependencies)
         logger.info(f"Updated model: {key}")
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -499,6 +562,19 @@ class BulkDeleteModelsResponse(BaseModel):
     failed: List[dict] = Field(description="List of failed deletions with error messages")
 
 
+class BulkReidentifyModelsRequest(BaseModel):
+    """Request body for bulk model reidentification."""
+
+    keys: List[str] = Field(description="List of model keys to reidentify")
+
+
+class BulkReidentifyModelsResponse(BaseModel):
+    """Response body for bulk model reidentification."""
+
+    succeeded: List[str] = Field(description="List of successfully reidentified model keys")
+    failed: List[dict] = Field(description="List of failed reidentifications with error messages")
+
+
 @model_manager_router.post(
     "/i/bulk_delete",
     operation_id="bulk_delete_models",
@@ -538,6 +614,67 @@ async def bulk_delete_models(
 
     logger.info(f"Bulk delete completed: {len(deleted)} deleted, {len(failed)} failed")
     return BulkDeleteModelsResponse(deleted=deleted, failed=failed)
+
+
+@model_manager_router.post(
+    "/i/bulk_reidentify",
+    operation_id="bulk_reidentify_models",
+    responses={
+        200: {"description": "Models reidentified (possibly with some failures)"},
+    },
+    status_code=200,
+)
+async def bulk_reidentify_models(
+    current_admin: AdminUserOrDefault,
+    request: BulkReidentifyModelsRequest = Body(description="List of model keys to reidentify"),
+) -> BulkReidentifyModelsResponse:
+    """
+    Reidentify multiple models by re-probing their weights files.
+
+    Returns a list of successfully reidentified keys and failed reidentifications with error messages.
+    """
+    logger = ApiDependencies.invoker.services.logger
+    store = ApiDependencies.invoker.services.model_manager.store
+    models_path = ApiDependencies.invoker.services.configuration.models_path
+
+    succeeded = []
+    failed = []
+
+    for key in request.keys:
+        try:
+            config = store.get_model(key)
+            if pathlib.Path(config.path).is_relative_to(models_path):
+                model_path = pathlib.Path(config.path)
+            else:
+                model_path = models_path / config.path
+            mod = ModelOnDisk(model_path)
+            result = ModelConfigFactory.from_model_on_disk(mod)
+            if result.config is None:
+                raise InvalidModelException("Unable to identify model format")
+
+            # Retain user-editable fields from the original config
+            result.config.path = config.path
+            result.config.key = config.key
+            result.config.name = config.name
+            result.config.description = config.description
+            result.config.cover_image = config.cover_image
+            if hasattr(config, "trigger_phrases") and hasattr(result.config, "trigger_phrases"):
+                result.config.trigger_phrases = config.trigger_phrases
+            result.config.source = config.source
+            result.config.source_type = config.source_type
+
+            store.replace_model(config.key, result.config)
+            succeeded.append(key)
+            logger.info(f"Reidentified model: {key}")
+        except UnknownModelException as e:
+            logger.error(f"Failed to reidentify model {key}: {str(e)}")
+            failed.append({"key": key, "error": str(e)})
+        except Exception as e:
+            logger.error(f"Failed to reidentify model {key}: {str(e)}")
+            failed.append({"key": key, "error": str(e)})
+
+    logger.info(f"Bulk reidentify completed: {len(succeeded)} succeeded, {len(failed)} failed")
+    return BulkReidentifyModelsResponse(succeeded=succeeded, failed=failed)
 
 
 @model_manager_router.delete(
@@ -767,7 +904,7 @@ async def install_hugging_face_model(
     "/install",
     operation_id="list_model_installs",
 )
-async def list_model_installs() -> List[ModelInstallJob]:
+async def list_model_installs(current_admin: AdminUserOrDefault) -> List[ModelInstallJob]:
     """Return the list of model install jobs.
 
     Install jobs have a numeric `id`, a `status`, and other fields that provide information on
@@ -799,7 +936,9 @@ async def list_model_installs() -> List[ModelInstallJob]:
         404: {"description": "No such job"},
     },
 )
-async def get_model_install_job(id: int = Path(description="Model install id")) -> ModelInstallJob:
+async def get_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install id")
+) -> ModelInstallJob:
     """
     Return model install job corresponding to the given source. See the documentation for 'List Model Install Jobs'
     for information on the format of the return value.
@@ -842,7 +981,9 @@ async def cancel_model_install_job(
     },
     status_code=201,
 )
-async def pause_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+async def pause_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
+) -> ModelInstallJob:
     """Pause the model install job corresponding to the given job ID."""
     installer = ApiDependencies.invoker.services.model_manager.install
     try:
@@ -862,7 +1003,9 @@ async def pause_model_install_job(id: int = Path(description="Model install job 
     },
     status_code=201,
 )
-async def resume_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+async def resume_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
+) -> ModelInstallJob:
     """Resume a paused model install job corresponding to the given job ID."""
     installer = ApiDependencies.invoker.services.model_manager.install
     try:
@@ -882,7 +1025,9 @@ async def resume_model_install_job(id: int = Path(description="Model install job
     },
     status_code=201,
 )
-async def restart_failed_model_install_job(id: int = Path(description="Model install job ID")) -> ModelInstallJob:
+async def restart_failed_model_install_job(
+    current_admin: AdminUserOrDefault, id: int = Path(description="Model install job ID")
+) -> ModelInstallJob:
     """Restart failed or non-resumable file downloads for the given job."""
     installer = ApiDependencies.invoker.services.model_manager.install
     try:
@@ -903,6 +1048,7 @@ async def restart_failed_model_install_job(id: int = Path(description="Model ins
     status_code=201,
 )
 async def restart_model_install_file(
+    current_admin: AdminUserOrDefault,
     id: int = Path(description="Model install job ID"),
     file_source: AnyHttpUrl = Body(description="File download URL to restart"),
 ) -> ModelInstallJob:
@@ -1024,7 +1170,7 @@ async def convert_model(
 
     # return the config record for the new diffusers directory
     new_config = store.get_model(new_key)
-    new_config = add_cover_image_to_model_config(new_config, ApiDependencies)
+    new_config = prepare_model_config_for_response(new_config, ApiDependencies)
     return new_config
 
 
@@ -1214,7 +1360,7 @@ class DeleteOrphanedModelsResponse(BaseModel):
     operation_id="get_orphaned_models",
     response_model=list[OrphanedModelInfo],
 )
-async def get_orphaned_models() -> list[OrphanedModelInfo]:
+async def get_orphaned_models(_: AdminUserOrDefault) -> list[OrphanedModelInfo]:
     """Find orphaned model directories.
 
     Orphaned models are directories in the models folder that contain model files
@@ -1241,7 +1387,9 @@ async def get_orphaned_models() -> list[OrphanedModelInfo]:
     operation_id="delete_orphaned_models",
     response_model=DeleteOrphanedModelsResponse,
 )
-async def delete_orphaned_models(request: DeleteOrphanedModelsRequest) -> DeleteOrphanedModelsResponse:
+async def delete_orphaned_models(
+    request: DeleteOrphanedModelsRequest, _: AdminUserOrDefault
+) -> DeleteOrphanedModelsResponse:
     """Delete specified orphaned model directories.
 
     Args:

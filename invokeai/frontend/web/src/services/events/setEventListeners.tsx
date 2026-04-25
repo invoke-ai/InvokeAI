@@ -1,10 +1,11 @@
-import { ExternalLink, Flex, Text } from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, isNil, round } from 'es-toolkit/compat';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
+import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
 import {
   heightChanged,
@@ -27,7 +28,7 @@ import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
-import { toast } from 'features/toast/toast';
+import { toast, toastApi } from 'features/toast/toast';
 import { t } from 'i18next';
 import { LRUCache } from 'lru-cache';
 import { Trans } from 'react-i18next';
@@ -36,13 +37,22 @@ import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
+import {
+  clearCompletedInvocationKeysForQueueItem,
+  shouldIgnoreFinishedQueueItemInvocationEvent,
+} from 'services/events/invocationTracking';
+import {
+  getUpdatedNodeExecutionStateOnInvocationError,
+  getUpdatedNodeExecutionStateOnInvocationProgress,
+  getUpdatedNodeExecutionStateOnInvocationStarted,
+} from 'services/events/nodeExecutionState';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastProgressEvent } from './stores';
+import { $lastProgressEvent, $loadingModelsCount } from './stores';
 
 const log = logger('events');
 
@@ -64,6 +74,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const finishedQueueItemIds = new LRUCache<number, boolean>({ max: 100 });
+  const completedInvocationKeysByItemId = new Map<number, Set<string>>();
 
   socket.on('connect', () => {
     log.debug('Connected');
@@ -72,12 +83,14 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     socket.emit('subscribe_queue', { queue_id: 'default' });
     socket.emit('subscribe_bulk_download', { bulk_download_id: 'default' });
     $lastProgressEvent.set(null);
+    $loadingModelsCount.set(0);
   });
 
   socket.on('connect_error', (error) => {
     log.debug('Connect error');
     setIsConnected(false);
     $lastProgressEvent.set(null);
+    $loadingModelsCount.set(0);
     if (error && error.message) {
       const data: string | undefined = (error as unknown as { data: string | undefined }).data;
       if (data === 'ERR_UNAUTHENTICATED') {
@@ -94,28 +107,33 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('disconnect', () => {
     log.debug('Disconnected');
     $lastProgressEvent.set(null);
+    $loadingModelsCount.set(0);
     setIsConnected(false);
   });
 
   socket.on('invocation_started', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
+    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_started', finishedQueueItemIds, data.item_id)) {
       return;
     }
     const { invocation_source_id, invocation } = data;
     log.debug({ data } as JsonObject, `Invocation started (${invocation.type}, ${invocation_source_id})`);
-    const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-    if (nes) {
-      nes.status = zNodeStatus.enum.IN_PROGRESS;
-      upsertExecutionState(nes.nodeId, nes);
+    const nes = $nodeExecutionStates.get()[invocation_source_id];
+    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationStarted(
+      nes,
+      data,
+      completedInvocationKeysByItemId
+    );
+    if (updatedNodeExecutionState) {
+      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
     }
   });
 
   socket.on('invocation_progress', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
+    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_progress', finishedQueueItemIds, data.item_id)) {
       log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
       return;
     }
-    const { invocation_source_id, invocation, image, origin, percentage, message } = data;
+    const { invocation_source_id, invocation, origin, percentage, message } = data;
 
     let _message = 'Invocation progress';
     if (message) {
@@ -131,38 +149,33 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     $lastProgressEvent.set(data);
 
     if (origin === 'workflows') {
-      const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-      if (nes) {
-        nes.status = zNodeStatus.enum.IN_PROGRESS;
-        nes.progress = percentage;
-        nes.progressImage = image ?? null;
-        upsertExecutionState(nes.nodeId, nes);
+      const nes = $nodeExecutionStates.get()[invocation_source_id];
+      const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationProgress(
+        nes,
+        data,
+        completedInvocationKeysByItemId
+      );
+      if (updatedNodeExecutionState) {
+        upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
       }
     }
   });
 
   socket.on('invocation_error', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
-      log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
-      return;
-    }
-    const { invocation_source_id, invocation, error_type, error_message, error_traceback } = data;
+    const { invocation_source_id, invocation } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
-    const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-    if (nes) {
-      nes.status = zNodeStatus.enum.FAILED;
-      nes.progress = null;
-      nes.progressImage = null;
-      nes.error = {
-        error_type,
-        error_message,
-        error_traceback,
-      };
-      upsertExecutionState(nes.nodeId, nes);
+    const nes = $nodeExecutionStates.get()[invocation_source_id];
+    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationError(nes, data);
+    if (updatedNodeExecutionState) {
+      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
+    }
+    // Clear canvas workflow integration processing state on error
+    if (data.origin === 'canvas_workflow_integration') {
+      dispatch(canvasWorkflowIntegrationProcessingCompleted());
     }
   });
 
-  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, finishedQueueItemIds);
+  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, completedInvocationKeysByItemId);
   socket.on('invocation_complete', onInvocationComplete);
 
   socket.on('model_load_started', (data) => {
@@ -178,6 +191,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const message = `Model load started: ${name} (${extras.join(', ')})`;
 
     log.debug({ data }, message);
+    $loadingModelsCount.set($loadingModelsCount.get() + 1);
   });
 
   socket.on('model_load_complete', (data) => {
@@ -192,6 +206,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const message = `Model load complete: ${name} (${extras.join(', ')})`;
 
     log.debug({ data }, message);
+    $loadingModelsCount.set(Math.max(0, $loadingModelsCount.get() - 1));
   });
 
   socket.on('download_started', (data) => {
@@ -382,6 +397,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const {
       item_id,
       status,
+      status_sequence,
       batch_status,
       error_type,
       error_message,
@@ -398,6 +414,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     dispatch(
       queueApi.util.updateQueryData('getQueueItem', item_id, (draft) => {
         draft.status = status;
+        draft.status_sequence = status_sequence;
         draft.started_at = started_at;
         draft.updated_at = updated_at;
         draft.completed_at = completed_at;
@@ -406,6 +423,26 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         draft.error_traceback = error_traceback;
       })
     );
+
+    // Optimistically update the listAllQueueItems cache for this destination so the canvas
+    // staging area immediately reflects status changes without waiting for a tag-based refetch
+    if (destination) {
+      dispatch(
+        queueApi.util.updateQueryData('listAllQueueItems', { destination }, (draft) => {
+          const item = draft.find((i) => i.item_id === item_id);
+          if (item) {
+            item.status = status;
+            item.status_sequence = status_sequence;
+            item.started_at = started_at;
+            item.updated_at = updated_at;
+            item.completed_at = completed_at;
+            item.error_type = error_type;
+            item.error_message = error_message;
+            item.error_traceback = error_traceback;
+          }
+        })
+      );
+    }
 
     // Invalidate caches for things we cannot easily update
     // Invalidate SessionQueueStatus to refetch with user-specific counts
@@ -440,6 +477,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       });
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       finishedQueueItemIds.set(item_id, true);
+      clearCompletedInvocationKeysForQueueItem(completedInvocationKeysByItemId, item_id);
       if (status === 'failed' && error_type) {
         toast({
           id: `INVOCATION_ERROR_${error_type}`,
@@ -831,19 +869,60 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug({ data }, 'Bulk gallery download ready');
     const { bulk_download_item_name } = data;
 
-    // TODO(psyche): This URL may break in in some environments (e.g. Nvidia workbench) but we need to test it first
+    // Dismiss the "preparing" toast (which uses a prefixed id to avoid the
+    // race condition where this socket event arrives before the Redux
+    // middleware processes the POST response).
+    toastApi.close(`preparing:${bulk_download_item_name}`);
+
+    // The GET endpoint requires authentication, so we use fetch() with the
+    // Authorization header rather than a plain <a download> link (which cannot
+    // carry headers).  After fetching the blob, we create a temporary object
+    // URL and trigger the browser's save dialog programmatically.
     const url = `/api/v1/images/download/${bulk_download_item_name}`;
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const handleDownload = () => {
+      fetch(url, { headers })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`Download failed: ${res.status}`);
+          }
+          return res.blob();
+        })
+        .then((blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = bulk_download_item_name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          // Delay revocation — the browser's save dialog is asynchronous,
+          // and revoking immediately would invalidate the URL before the
+          // download completes.
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+        })
+        .catch((err) => {
+          log.error({ err }, 'Bulk download fetch failed');
+          toast({
+            id: `error:${bulk_download_item_name}`,
+            title: t('gallery.bulkDownloadFailed'),
+            status: 'error',
+            description: String(err),
+          });
+        });
+    };
 
     toast({
       id: bulk_download_item_name,
-      title: t('gallery.bulkDownloadReady', 'Download ready'),
+      title: t('gallery.bulkDownloadReady'),
       status: 'success',
       description: (
-        <ExternalLink
-          label={t('gallery.clickToDownload', 'Click here to download')}
-          href={url}
-          download={bulk_download_item_name}
-        />
+        // eslint-disable-next-line react/jsx-no-bind -- not a component render; no re-render cost
+        <Text as="button" onClick={handleDownload} textDecoration="underline" cursor="pointer">
+          {t('gallery.clickToDownload')}
+        </Text>
       ),
       duration: null,
     });
@@ -853,6 +932,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.error({ data }, 'Bulk gallery download error');
 
     const { bulk_download_item_name, error } = data;
+
+    // Dismiss the "preparing" toast
+    toastApi.close(`preparing:${bulk_download_item_name}`);
 
     toast({
       id: bulk_download_item_name,

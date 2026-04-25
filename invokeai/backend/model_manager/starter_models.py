@@ -2,7 +2,20 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.model_manager.configs.external_api import (
+    ExternalApiModelDefaultSettings,
+    ExternalImageSize,
+    ExternalModelCapabilities,
+    ExternalModelPanelSchema,
+    ExternalResolutionPreset,
+)
+from invokeai.backend.model_manager.taxonomy import (
+    AnyVariant,
+    BaseModelType,
+    ModelFormat,
+    ModelType,
+    QwenImageVariantType,
+)
 
 
 class StarterModelWithoutDependencies(BaseModel):
@@ -12,7 +25,11 @@ class StarterModelWithoutDependencies(BaseModel):
     base: BaseModelType
     type: ModelType
     format: Optional[ModelFormat] = None
+    variant: Optional[AnyVariant] = None
     is_installed: bool = False
+    capabilities: ExternalModelCapabilities | None = None
+    default_settings: ExternalApiModelDefaultSettings | None = None
+    panel_schema: ExternalModelPanelSchema | None = None
     # allows us to track what models a user has installed across name changes within starter models
     # if you update a starter model name, please add the old one to this list for that starter model
     previous_names: list[str] = []
@@ -71,7 +88,7 @@ t5_base_encoder = StarterModel(
     name="t5_base_encoder",
     base=BaseModelType.Any,
     source="InvokeAI/t5-v1_1-xxl::bfloat16",
-    description="T5-XXL text encoder (used in FLUX pipelines). ~8GB",
+    description="T5-XXL text encoder (used in FLUX pipelines). ~9.5GB",
     type=ModelType.T5Encoder,
 )
 
@@ -156,7 +173,7 @@ flux_kontext_quantized = StarterModel(
     name="FLUX.1 Kontext dev (quantized)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/unsloth/FLUX.1-Kontext-dev-GGUF/resolve/main/flux1-kontext-dev-Q4_K_M.gguf",
-    description="FLUX.1 Kontext dev quantized (q4_k_m). Total size with dependencies: ~14GB",
+    description="FLUX.1 Kontext dev quantized (q4_k_m). Total size with dependencies: ~12GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
@@ -164,7 +181,7 @@ flux_krea = StarterModel(
     name="FLUX.1 Krea dev",
     base=BaseModelType.Flux,
     source="https://huggingface.co/InvokeAI/FLUX.1-Krea-dev/resolve/main/flux1-krea-dev.safetensors",
-    description="FLUX.1 Krea dev. Total size with dependencies: ~33GB",
+    description="FLUX.1 Krea dev. Total size with dependencies: ~29GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
@@ -172,7 +189,7 @@ flux_krea_quantized = StarterModel(
     name="FLUX.1 Krea dev (quantized)",
     base=BaseModelType.Flux,
     source="https://huggingface.co/InvokeAI/FLUX.1-Krea-dev-GGUF/resolve/main/flux1-krea-dev-Q4_K_M.gguf",
-    description="FLUX.1 Krea dev quantized (q4_k_m). Total size with dependencies: ~14GB",
+    description="FLUX.1 Krea dev quantized (q4_k_m). Total size with dependencies: ~12GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )
@@ -180,7 +197,7 @@ sd35_medium = StarterModel(
     name="SD3.5 Medium",
     base=BaseModelType.StableDiffusion3,
     source="stabilityai/stable-diffusion-3.5-medium",
-    description="Medium SD3.5 Model: ~15GB",
+    description="Medium SD3.5 Model: ~16GB",
     type=ModelType.Main,
     dependencies=[],
 )
@@ -188,7 +205,7 @@ sd35_large = StarterModel(
     name="SD3.5 Large",
     base=BaseModelType.StableDiffusion3,
     source="stabilityai/stable-diffusion-3.5-large",
-    description="Large SD3.5 Model: ~19G",
+    description="Large SD3.5 Model: ~28GB",
     type=ModelType.Main,
     dependencies=[],
 )
@@ -644,8 +661,140 @@ cogview4 = StarterModel(
     name="CogView4",
     base=BaseModelType.CogView4,
     source="THUDM/CogView4-6B",
-    description="The base CogView4 model (~29GB).",
+    description="The base CogView4 model (~31GB).",
     type=ModelType.Main,
+)
+# endregion
+
+# region Qwen Image Edit
+qwen_image_edit = StarterModel(
+    name="Qwen Image Edit 2511",
+    base=BaseModelType.QwenImage,
+    source="Qwen/Qwen-Image-Edit-2511",
+    description="Qwen Image Edit 2511 full diffusers model. Supports text-guided image editing with multiple reference images. (~40GB)",
+    type=ModelType.Main,
+    variant=QwenImageVariantType.Edit,
+)
+
+qwen_image_edit_gguf_q4_k_m = StarterModel(
+    name="Qwen Image Edit 2511 (Q4_K_M)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q4_K_M.gguf",
+    description="Qwen Image Edit 2511 - Q4_K_M quantized transformer. Good quality/size balance. (~13GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=QwenImageVariantType.Edit,
+)
+
+qwen_image_edit_gguf_q2_k = StarterModel(
+    name="Qwen Image Edit 2511 (Q2_K)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q2_K.gguf",
+    description="Qwen Image Edit 2511 - Q2_K heavily quantized transformer. Smallest size, lower quality. (~7.5GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=QwenImageVariantType.Edit,
+)
+
+qwen_image_edit_gguf_q6_k = StarterModel(
+    name="Qwen Image Edit 2511 (Q6_K)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q6_K.gguf",
+    description="Qwen Image Edit 2511 - Q6_K quantized transformer. Near-lossless quality. (~17GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=QwenImageVariantType.Edit,
+)
+
+qwen_image_edit_gguf_q8_0 = StarterModel(
+    name="Qwen Image Edit 2511 (Q8_0)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/unsloth/Qwen-Image-Edit-2511-GGUF/resolve/main/qwen-image-edit-2511-Q8_0.gguf",
+    description="Qwen Image Edit 2511 - Q8_0 quantized transformer. Highest quality quantization. (~22GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=QwenImageVariantType.Edit,
+)
+
+qwen_image_edit_lightning_4step = StarterModel(
+    name="Qwen Image Edit Lightning (4-step, bf16)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors",
+    description="Lightning distillation LoRA for Qwen Image Edit — enables generation in just 4 steps. "
+    "Settings: Steps=4, CFG=1, Shift Override=3.",
+    type=ModelType.LoRA,
+)
+
+qwen_image_edit_lightning_8step = StarterModel(
+    name="Qwen Image Edit Lightning (8-step, bf16)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/lightx2v/Qwen-Image-Edit-2511-Lightning/resolve/main/Qwen-Image-Edit-2511-Lightning-8steps-V1.0-bf16.safetensors",
+    description="Lightning distillation LoRA for Qwen Image Edit — enables generation in 8 steps with better quality. "
+    "Settings: Steps=8, CFG=1, Shift Override=3.",
+    type=ModelType.LoRA,
+)
+
+# Qwen Image (txt2img)
+qwen_image = StarterModel(
+    name="Qwen Image 2512",
+    base=BaseModelType.QwenImage,
+    source="Qwen/Qwen-Image-2512",
+    description="Qwen Image 2512 full diffusers model. High-quality text-to-image generation. (~40GB)",
+    type=ModelType.Main,
+)
+
+qwen_image_gguf_q4_k_m = StarterModel(
+    name="Qwen Image 2512 (Q4_K_M)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/unsloth/Qwen-Image-2512-GGUF/resolve/main/qwen-image-2512-Q4_K_M.gguf",
+    description="Qwen Image 2512 - Q4_K_M quantized transformer. Good quality/size balance. (~13GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+)
+
+qwen_image_gguf_q2_k = StarterModel(
+    name="Qwen Image 2512 (Q2_K)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/unsloth/Qwen-Image-2512-GGUF/resolve/main/qwen-image-2512-Q2_K.gguf",
+    description="Qwen Image 2512 - Q2_K heavily quantized transformer. Smallest size, lower quality. (~7.5GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+)
+
+qwen_image_gguf_q6_k = StarterModel(
+    name="Qwen Image 2512 (Q6_K)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/unsloth/Qwen-Image-2512-GGUF/resolve/main/qwen-image-2512-Q6_K.gguf",
+    description="Qwen Image 2512 - Q6_K quantized transformer. Near-lossless quality. (~17GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+)
+
+qwen_image_gguf_q8_0 = StarterModel(
+    name="Qwen Image 2512 (Q8_0)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/unsloth/Qwen-Image-2512-GGUF/resolve/main/qwen-image-2512-Q8_0.gguf",
+    description="Qwen Image 2512 - Q8_0 quantized transformer. Highest quality quantization. (~22GB)",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+)
+
+qwen_image_lightning_4step = StarterModel(
+    name="Qwen Image Lightning (4-step, V2.0, bf16)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/lightx2v/Qwen-Image-Lightning/resolve/main/Qwen-Image-Lightning-4steps-V2.0-bf16.safetensors",
+    description="Lightning distillation LoRA for Qwen Image — enables generation in just 4 steps. "
+    "Settings: Steps=4, CFG=1, Shift Override=3.",
+    type=ModelType.LoRA,
+)
+
+qwen_image_lightning_8step = StarterModel(
+    name="Qwen Image Lightning (8-step, V2.0, bf16)",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/lightx2v/Qwen-Image-Lightning/resolve/main/Qwen-Image-Lightning-8steps-V2.0-bf16.safetensors",
+    description="Lightning distillation LoRA for Qwen Image — enables generation in 8 steps with better quality. "
+    "Settings: Steps=8, CFG=1, Shift Override=3.",
+    type=ModelType.LoRA,
 )
 # endregion
 
@@ -695,7 +844,7 @@ flux2_vae = StarterModel(
     name="FLUX.2 VAE",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-4B::vae",
-    description="FLUX.2 VAE (16-channel, same architecture as FLUX.1 VAE). ~335MB",
+    description="FLUX.2 VAE (16-channel, same architecture as FLUX.1 VAE). ~168MB",
     type=ModelType.VAE,
 )
 
@@ -719,7 +868,7 @@ flux2_klein_4b = StarterModel(
     name="FLUX.2 Klein 4B (Diffusers)",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-4B",
-    description="FLUX.2 Klein 4B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~10GB",
+    description="FLUX.2 Klein 4B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~16GB",
     type=ModelType.Main,
 )
 
@@ -745,7 +894,7 @@ flux2_klein_9b = StarterModel(
     name="FLUX.2 Klein 9B (Diffusers)",
     base=BaseModelType.Flux2,
     source="black-forest-labs/FLUX.2-klein-9B",
-    description="FLUX.2 Klein 9B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~20GB",
+    description="FLUX.2 Klein 9B in Diffusers format - includes transformer, VAE and Qwen3 encoder. ~35GB",
     type=ModelType.Main,
 )
 
@@ -821,7 +970,7 @@ z_image_turbo = StarterModel(
     name="Z-Image Turbo",
     base=BaseModelType.ZImage,
     source="Tongyi-MAI/Z-Image-Turbo",
-    description="Z-Image Turbo - fast 6B parameter text-to-image model with 8 inference steps. Supports bilingual prompts (English & Chinese). ~30.6GB",
+    description="Z-Image Turbo - fast 6B parameter text-to-image model with 8 inference steps. Supports bilingual prompts (English & Chinese). ~33GB",
     type=ModelType.Main,
 )
 
@@ -859,6 +1008,256 @@ z_image_controlnet_tile = StarterModel(
     source="https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union-2.1/resolve/main/Z-Image-Turbo-Fun-Controlnet-Tile-2.1-8steps.safetensors",
     description="Dedicated Tile ControlNet for Z-Image Turbo. Useful for upscaling and adding detail. ~6.7GB",
     type=ModelType.ControlNet,
+)
+# endregion
+
+# region External API
+GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS = [
+    "1:1",
+    "1:4",
+    "1:8",
+    "2:3",
+    "3:2",
+    "3:4",
+    "4:1",
+    "4:3",
+    "4:5",
+    "5:4",
+    "8:1",
+    "9:16",
+    "16:9",
+    "21:9",
+]
+GEMINI_3_IMAGE_MAX_SIZE = ExternalImageSize(width=4096, height=4096)
+
+
+def _gemini_3_resolution_presets(
+    image_sizes: list[str],
+    aspect_ratios: list[str] | None = None,
+) -> list[ExternalResolutionPreset]:
+    """Build resolution presets for Gemini 3 models.
+
+    Each preset combines an aspect ratio with an image size preset (512/1K/2K/4K).
+    Pixel dimensions are approximations based on the preset name (longest side).
+    """
+    if aspect_ratios is None:
+        aspect_ratios = GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS
+    base_pixels = {"512": 512, "1K": 1024, "2K": 2048, "4K": 4096}
+    presets: list[ExternalResolutionPreset] = []
+    for image_size in image_sizes:
+        base = base_pixels[image_size]
+        for ratio_str in aspect_ratios:
+            w_part, h_part = (int(x) for x in ratio_str.split(":"))
+            if w_part >= h_part:
+                w = base
+                h = max(1, round(base * h_part / w_part))
+            else:
+                h = base
+                w = max(1, round(base * w_part / h_part))
+            presets.append(
+                ExternalResolutionPreset(
+                    label=f"{ratio_str} ({image_size}) — {w}\u00d7{h}",
+                    aspect_ratio=ratio_str,
+                    image_size=image_size,
+                    width=w,
+                    height=h,
+                )
+            )
+    return presets
+
+
+GEMINI_3_PRO_RESOLUTION_PRESETS = _gemini_3_resolution_presets(["1K", "2K", "4K"])
+GEMINI_3_1_FLASH_RESOLUTION_PRESETS = _gemini_3_resolution_presets(["512", "1K", "2K", "4K"])
+
+gemini_flash_image = StarterModel(
+    name="Gemini 2.5 Flash Image",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-2.5-flash-image",
+    description="Google Gemini 2.5 Flash image generation model (external API). Requires a configured Gemini API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_seed=True,
+        supports_reference_images=True,
+        max_images_per_request=1,
+        allowed_aspect_ratios=[
+            "1:1",
+            "2:3",
+            "3:2",
+            "3:4",
+            "4:3",
+            "4:5",
+            "5:4",
+            "9:16",
+            "16:9",
+            "21:9",
+        ],
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "2:3": ExternalImageSize(width=832, height=1248),
+            "3:2": ExternalImageSize(width=1248, height=832),
+            "3:4": ExternalImageSize(width=864, height=1184),
+            "4:3": ExternalImageSize(width=1184, height=864),
+            "4:5": ExternalImageSize(width=896, height=1152),
+            "5:4": ExternalImageSize(width=1152, height=896),
+            "9:16": ExternalImageSize(width=768, height=1344),
+            "16:9": ExternalImageSize(width=1344, height=768),
+            "21:9": ExternalImageSize(width=1536, height=672),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
+gemini_pro_image_preview = StarterModel(
+    name="Gemini 3 Pro Image Preview",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-3-pro-image-preview",
+    description="Google Gemini 3 Pro image generation preview model (external API). Supports up to 14 reference images, including up to 6 object references and up to 5 character references. Supports 1K/2K/4K resolution presets. Requires a configured Gemini API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_seed=True,
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=1,
+        max_image_size=GEMINI_3_IMAGE_MAX_SIZE,
+        allowed_aspect_ratios=GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS,
+        resolution_presets=GEMINI_3_PRO_RESOLUTION_PRESETS,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
+gemini_3_1_flash_image_preview = StarterModel(
+    name="Gemini 3.1 Flash Image Preview",
+    base=BaseModelType.External,
+    source="external://gemini/gemini-3.1-flash-image-preview",
+    description="Google Gemini 3.1 Flash image generation preview model (external API). Supports up to 14 reference images, including up to 10 object references and up to 4 character references. Supports 512/1K/2K/4K resolution presets. Requires a configured Gemini API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_seed=True,
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=1,
+        max_image_size=GEMINI_3_IMAGE_MAX_SIZE,
+        allowed_aspect_ratios=GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS,
+        resolution_presets=GEMINI_3_1_FLASH_RESOLUTION_PRESETS,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
+OPENAI_GPT_IMAGE_ASPECT_RATIOS = ["1:1", "3:2", "2:3"]
+OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES = {
+    "1:1": ExternalImageSize(width=1024, height=1024),
+    "3:2": ExternalImageSize(width=1536, height=1024),
+    "2:3": ExternalImageSize(width=1024, height=1536),
+}
+OPENAI_GPT_IMAGE_PANEL_SCHEMA = ExternalModelPanelSchema(
+    prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]
+)
+
+openai_gpt_image_1_5 = StarterModel(
+    name="GPT Image 1.5",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1.5",
+    description="OpenAI GPT-Image-1.5 image generation model. Fastest and most affordable GPT image model. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_gpt_image_1 = StarterModel(
+    name="GPT Image 1",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1",
+    description="OpenAI GPT-Image-1 image generation model. High quality image generation. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_gpt_image_1_mini = StarterModel(
+    name="GPT Image 1 Mini",
+    base=BaseModelType.External,
+    source="external://openai/gpt-image-1-mini",
+    description="OpenAI GPT-Image-1-Mini image generation model. Cost-efficient option, 80%% cheaper than GPT-Image-1. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_images_per_request=10,
+        allowed_aspect_ratios=OPENAI_GPT_IMAGE_ASPECT_RATIOS,
+        aspect_ratio_sizes=OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=OPENAI_GPT_IMAGE_PANEL_SCHEMA,
+)
+openai_dall_e_3 = StarterModel(
+    name="DALL-E 3",
+    base=BaseModelType.External,
+    source="external://openai/dall-e-3",
+    description="OpenAI DALL-E 3 image generation model. Supports vivid and natural styles. Only text-to-image, no editing. Requires a configured OpenAI API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        max_images_per_request=1,
+        allowed_aspect_ratios=["1:1", "7:4", "4:7"],
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "7:4": ExternalImageSize(width=1792, height=1024),
+            "4:7": ExternalImageSize(width=1024, height=1792),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+# DALL-E 2 removed — deprecated by OpenAI, shutdown May 12, 2026.
+# region Anima
+anima_qwen3_encoder = StarterModel(
+    name="Anima Qwen3 0.6B Text Encoder",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/text_encoders/qwen_3_06b_base.safetensors",
+    description="Qwen3 0.6B text encoder for Anima. ~1.2GB",
+    type=ModelType.Qwen3Encoder,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_vae = StarterModel(
+    name="Anima QwenImage VAE",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/vae/qwen_image_vae.safetensors",
+    description="QwenImage VAE for Anima (fine-tuned Wan 2.1 VAE, 16 latent channels). ~200MB",
+    type=ModelType.VAE,
+    format=ModelFormat.Checkpoint,
+)
+
+anima_preview3 = StarterModel(
+    name="Anima Preview 3",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files/diffusion_models/anima-preview3-base.safetensors",
+    description="Anima Preview 3 - 2B parameter anime-focused text-to-image model built on Cosmos Predict2 DiT. ~4.5GB",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    dependencies=[anima_qwen3_encoder, anima_vae, t5_base_encoder],
 )
 # endregion
 
@@ -948,6 +1347,20 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
     flux2_klein_qwen3_8b_encoder,
     cogview4,
+    qwen_image_edit,
+    qwen_image_edit_gguf_q2_k,
+    qwen_image_edit_gguf_q4_k_m,
+    qwen_image_edit_gguf_q6_k,
+    qwen_image_edit_gguf_q8_0,
+    qwen_image_edit_lightning_4step,
+    qwen_image_edit_lightning_8step,
+    qwen_image,
+    qwen_image_gguf_q2_k,
+    qwen_image_gguf_q4_k_m,
+    qwen_image_gguf_q6_k,
+    qwen_image_gguf_q8_0,
+    qwen_image_lightning_4step,
+    qwen_image_lightning_8step,
     flux_krea,
     flux_krea_quantized,
     z_image_turbo,
@@ -957,6 +1370,16 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
+    gemini_flash_image,
+    gemini_pro_image_preview,
+    gemini_3_1_flash_image_preview,
+    openai_gpt_image_1_5,
+    openai_gpt_image_1,
+    openai_gpt_image_1_mini,
+    openai_dall_e_3,
+    anima_preview3,
+    anima_qwen3_encoder,
+    anima_vae,
 ]
 
 sd1_bundle: list[StarterModel] = [
@@ -1025,12 +1448,34 @@ flux2_klein_bundle: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
 ]
 
+qwen_image_bundle: list[StarterModel] = [
+    qwen_image_edit,
+    qwen_image_edit_gguf_q4_k_m,
+    qwen_image_edit_gguf_q8_0,
+    qwen_image_edit_lightning_4step,
+    qwen_image_edit_lightning_8step,
+    qwen_image,
+    qwen_image_gguf_q4_k_m,
+    qwen_image_gguf_q8_0,
+    qwen_image_lightning_4step,
+    qwen_image_lightning_8step,
+]
+
+anima_bundle: list[StarterModel] = [
+    anima_preview3,
+    anima_qwen3_encoder,
+    anima_vae,
+    t5_base_encoder,
+]
+
 STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.StableDiffusion1: StarterModelBundle(name="Stable Diffusion 1.5", models=sd1_bundle),
     BaseModelType.StableDiffusionXL: StarterModelBundle(name="SDXL", models=sdxl_bundle),
     BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
     BaseModelType.Flux2: StarterModelBundle(name="FLUX.2 Klein", models=flux2_klein_bundle),
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
+    BaseModelType.QwenImage: StarterModelBundle(name="Qwen Image", models=qwen_image_bundle),
+    BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
 }
 
 assert len(STARTER_MODELS) == len({m.source for m in STARTER_MODELS}), "Duplicate starter models"

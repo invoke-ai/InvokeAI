@@ -5,6 +5,7 @@ import { Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useMiddleClickOpenInNewTab } from 'common/hooks/useMiddleClickOpenInNewTab';
 import { uniq } from 'es-toolkit';
 import { multipleImageDndSource, singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPreviewMultipleImage';
@@ -108,6 +109,25 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     if (!element) {
       return;
     }
+
+    const monitorBinding = monitorForElements({
+      // This is a "global" drag start event, meaning that it is called for all drag events.
+      onDragStart: ({ source }) => {
+        // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
+        // selection. This is called for all drag events.
+        if (
+          multipleImageDndSource.typeGuard(source.data) &&
+          source.data.payload.image_names.includes(imageDTO.image_name)
+        ) {
+          setIsDragging(true);
+        }
+      },
+      onDrop: () => {
+        // Always set the dragging state to false when a drop event occurs.
+        setIsDragging(false);
+      },
+    });
+
     return combine(
       firefoxDndFix(element),
       draggable({
@@ -153,23 +173,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
           }
         },
       }),
-      monitorForElements({
-        // This is a "global" drag start event, meaning that it is called for all drag events.
-        onDragStart: ({ source }) => {
-          // When we start dragging multiple images, set the dragging state to true if the dragged image is part of the
-          // selection. This is called for all drag events.
-          if (
-            multipleImageDndSource.typeGuard(source.data) &&
-            source.data.payload.image_names.includes(imageDTO.image_name)
-          ) {
-            setIsDragging(true);
-          }
-        },
-        onDrop: () => {
-          // Always set the dragging state to false when a drop event occurs.
-          setIsDragging(false);
-        },
-      })
+      monitorBinding
     );
   }, [imageDTO, store]);
 
@@ -184,6 +188,9 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
   }, []);
 
   const onClick = useMemo(() => buildOnClick(imageDTO.image_name, store.dispatch, store.getState), [imageDTO, store]);
+  useMiddleClickOpenInNewTab(ref, imageDTO.image_url, {
+    requireDirectTarget: true,
+  });
 
   const onDoubleClick = useCallback<MouseEventHandler<HTMLDivElement>>(() => {
     store.dispatch(imageToCompareChanged(null));
