@@ -30,6 +30,7 @@ const log = logger('system');
 const REGION_NAMES = [
   'launchpad',
   'viewer',
+  'stage',
   'gallery',
   'boards',
   'layers',

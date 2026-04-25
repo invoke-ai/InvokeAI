@@ -573,6 +573,10 @@
         "move": "Move",
         "useForPromptGeneration": "Use for Prompt Generation"
     },
+    "stageViewer": {
+      "gridView": "Grid View",
+      "linearView": "Linear View"
+    },
     "hotkeys": {
         "hotkeys": "Hotkeys",
         "searchHotkeys": "Search Hotkeys",
@@ -3203,7 +3207,8 @@
             "launchpad": "Launchpad",
             "workflowEditor": "Workflow Editor",
             "imageViewer": "Viewer",
-            "canvas": "Canvas"
+            "canvas": "Canvas",
+            "stageViewer": "Stage"
         },
         "launchpad": {
             "workflowsTitle": "Go deep with Workflows.",
