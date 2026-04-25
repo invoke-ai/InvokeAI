@@ -1,8 +1,7 @@
-"""Migration 30: Add image_subfolder column to images table.
+"""Migration 30: Add per-item queue status sequencing.
 
-This migration adds an image_subfolder column to the images table to support
-configurable image subfolder strategies (flat, date, type, hash).
-Existing images get an empty string (flat/root directory).
+This migration adds a `status_sequence` column to `session_queue` so queue item
+status updates can be ordered across asynchronous event and snapshot channels.
 """
 
 import sqlite3
@@ -11,29 +10,22 @@ from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import 
 
 
 class Migration30Callback:
-    """Migration to add image_subfolder column to images table."""
+    """Add a per-queue-item status sequence for cross-channel ordering."""
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
-        self._add_image_subfolder_column(cursor)
-
-    def _add_image_subfolder_column(self, cursor: sqlite3.Cursor) -> None:
-        """Add image_subfolder column to images table."""
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='images';")
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='session_queue';")
         if cursor.fetchone() is None:
             return
 
-        cursor.execute("PRAGMA table_info(images);")
+        cursor.execute("PRAGMA table_info(session_queue);")
         columns = [row[1] for row in cursor.fetchall()]
 
-        if "image_subfolder" not in columns:
-            cursor.execute("ALTER TABLE images ADD COLUMN image_subfolder TEXT NOT NULL DEFAULT '';")
+        if "status_sequence" not in columns:
+            cursor.execute("ALTER TABLE session_queue ADD COLUMN status_sequence INTEGER DEFAULT 0;")
+            cursor.execute("UPDATE session_queue SET status_sequence = 0 WHERE status_sequence IS NULL;")
 
 
 def build_migration_30() -> Migration:
-    """Builds the migration object for migrating from version 29 to version 30.
-
-    This migration adds an image_subfolder column to the images table.
-    """
     return Migration(
         from_version=29,
         to_version=30,
