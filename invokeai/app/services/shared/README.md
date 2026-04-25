@@ -96,7 +96,10 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
 ### 4.1 Data
 
 - `graph: Graph` - source graph for the run; treated as stable during normal execution.
-- `execution_graph: Graph` - materialized runtime nodes/edges.
+- `execution_graph: Graph` - materialized runtime nodes/edges. This is mutable runtime state, not an immutable audit
+  log. Lazy `If` pruning may remove unselected input edges during execution, so persisted failed/completed session
+  snapshots can contain a structurally pruned execution graph. Retry paths rebuild from `graph`, not from a previously
+  persisted `execution_graph`.
 - `executed: set[str]`, `executed_history: list[str]`.
 - `results: dict[str, AnyInvocationOutput]`, `errors: dict[str, str]`.
 - `prepared_source_mapping: dict[str, str]` - exec id -> source id.
@@ -179,9 +182,9 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
 - For **CollectInvocation**: gather all incoming `item` values into `collection`, sorting inputs by iteration path so
   collected results are stable across expanded iterations. Incoming `collection` values are merged first, then incoming
   `item` values are appended.
-- For **IfInvocation**: hydrate only `condition` and the selected branch input. If the selected branch's upstream exec
-  node was skipped and therefore produced no runtime output, the branch input is left at its default value (typically
-  `None`) instead of raising during hydration.
+- For **IfInvocation**: hydrate only `condition` and the selected branch input. As a defensive guard against
+  inconsistent runtime or deserialized session state, the runtime raises if the selected input edge points at an exec
+  node with no stored runtime output. In normal scheduling this path should be unreachable.
 - For all others: deep-copy each incoming edge's value into the destination field. This prevents cross-node mutation
   through shared references.
 
