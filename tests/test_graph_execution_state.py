@@ -158,6 +158,9 @@ def test_graph_state_resumes_partially_executed_session_after_json_round_trip():
 
     raw = state.model_dump_json(warnings=False, exclude_none=True)
     resumed = TypeAdapter(GraphExecutionState).validate_json(raw, strict=False)
+    registry = resumed._prepared_registry()
+
+    assert all(registry.get_iteration_path(exec_node_id) is not None for exec_node_id in resumed.prepared_source_mapping)
 
     executed_source_ids = execute_all_nodes(resumed)
 
@@ -167,6 +170,37 @@ def test_graph_state_resumes_partially_executed_session_after_json_round_trip():
 
     prepared_collect_id = next(iter(resumed.source_prepared_mapping["collect"]))
     assert resumed.results[prepared_collect_id].collection == [2, 3, 4, 5]
+
+
+def test_if_graph_state_resumes_resolved_branch_after_json_round_trip():
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="condition", value=True))
+    graph.add_node(PromptTestInvocation(id="true_value", prompt="true branch"))
+    graph.add_node(PromptTestInvocation(id="false_value", prompt="false branch"))
+    graph.add_node(IfInvocation(id="if"))
+    graph.add_node(PromptTestInvocation(id="selected_output"))
+
+    graph.add_edge(create_edge("condition", "value", "if", "condition"))
+    graph.add_edge(create_edge("true_value", "prompt", "if", "true_input"))
+    graph.add_edge(create_edge("false_value", "prompt", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "selected_output", "prompt"))
+
+    state = GraphExecutionState(graph=graph)
+
+    for _ in range(2):
+        invocation, output = invoke_next(state)
+        assert invocation is not None
+        assert output is not None
+
+    raw = state.model_dump_json(warnings=False, exclude_none=True)
+    resumed = TypeAdapter(GraphExecutionState).validate_json(raw, strict=False)
+
+    executed_source_ids = execute_all_nodes(resumed)
+
+    prepared_selected_output_id = next(iter(resumed.source_prepared_mapping["selected_output"]))
+    assert resumed.results[prepared_selected_output_id].prompt == "true branch"
+    assert set(executed_source_ids) == {"if", "selected_output"}
+    assert "false_value" not in executed_source_ids
 
 
 def test_graph_state_prepares_eagerly():

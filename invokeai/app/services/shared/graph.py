@@ -175,17 +175,7 @@ class _IfBranchScheduler:
         return not all(pid in self._state._resolved_if_exec_branches for pid in matching_prepared_if_ids)
 
     def _apply_condition_inputs(self, exec_node_id: str, node: IfInvocation) -> bool:
-        condition_edges = self._state.execution_graph._get_input_edges(exec_node_id, "condition")
-        if any(edge.source.node_id not in self._state.executed for edge in condition_edges):
-            return False
-
-        for edge in condition_edges:
-            setattr(
-                node,
-                edge.destination.field,
-                copydeep(getattr(self._state.results[edge.source.node_id], edge.source.field)),
-            )
-        return True
+        return self._state._apply_if_condition_inputs(exec_node_id, node)
 
     def _get_selected_branch_fields(self, node: IfInvocation) -> tuple[str, str]:
         selected_field = "true_input" if node.condition else "false_input"
@@ -1837,6 +1827,7 @@ class GraphExecutionState(BaseModel):
         for exec_node_id, source_node_id in self.prepared_source_mapping.items():
             metadata = registry.get_metadata(exec_node_id)
             metadata.source_node_id = source_node_id
+            metadata.iteration_path = self._get_iteration_path(exec_node_id)
             if exec_node_id in self.executed:
                 metadata.state = "executed" if exec_node_id in self.results else "skipped"
             elif self.indegree.get(exec_node_id) == 0:
@@ -1844,21 +1835,26 @@ class GraphExecutionState(BaseModel):
             else:
                 metadata.state = "pending"
 
+    def _apply_if_condition_inputs(self, exec_node_id: str, node: IfInvocation) -> bool:
+        condition_edges = self.execution_graph._get_input_edges(exec_node_id, "condition")
+        if any(edge.source.node_id not in self.executed for edge in condition_edges):
+            return False
+
+        for edge in condition_edges:
+            setattr(
+                node,
+                edge.destination.field,
+                copydeep(getattr(self.results[edge.source.node_id], edge.source.field)),
+            )
+        return True
+
     def _rehydrate_resolved_if_exec_branches(self) -> None:
         for exec_node_id, node in self.execution_graph.nodes.items():
             if not isinstance(node, IfInvocation):
                 continue
 
-            condition_edges = self.execution_graph._get_input_edges(exec_node_id, "condition")
-            if any(edge.source.node_id not in self.executed for edge in condition_edges):
+            if not self._apply_if_condition_inputs(exec_node_id, node):
                 continue
-
-            for edge in condition_edges:
-                setattr(
-                    node,
-                    edge.destination.field,
-                    copydeep(getattr(self.results[edge.source.node_id], edge.source.field)),
-                )
 
             self._resolved_if_exec_branches[exec_node_id] = "true_input" if node.condition else "false_input"
 
