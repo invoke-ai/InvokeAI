@@ -36,13 +36,13 @@ const nodeTypeDenylist = ['load_image', 'image'];
  *
  * @param getState The Redux getState function.
  * @param dispatch The Redux dispatch function.
- * @param completedInvocationKeys A listener-local set used to dedupe repeated invocation completion events and to
- * share completion knowledge with the other invocation event handlers.
+ * @param completedInvocationKeysByItemId A listener-local map used to dedupe repeated invocation completion events
+ * and to share completion knowledge with the other invocation event handlers.
  */
 export const buildOnInvocationComplete = (
   getState: AppGetState,
   dispatch: AppDispatch,
-  completedInvocationKeys: Set<string>
+  completedInvocationKeysByItemId: Map<number, Set<string>>
 ) => {
   const addImagesToGallery = async (data: S['InvocationCompleteEvent']) => {
     if (nodeTypeDenylist.includes(data.invocation.type)) {
@@ -246,7 +246,7 @@ export const buildOnInvocationComplete = (
     const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationComplete(
       nodeExecutionState,
       data,
-      completedInvocationKeys
+      completedInvocationKeysByItemId
     );
 
     if (nodeExecutionState && !updatedNodeExecutionState) {

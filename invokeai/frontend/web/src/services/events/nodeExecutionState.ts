@@ -2,9 +2,9 @@ import { deepClone } from 'common/util/deepClone';
 import type { NodeExecutionState } from 'features/nodes/types/invocation';
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import type { S } from 'services/api/types';
+import { hasCompletedInvocationKey, markInvocationAsCompleted } from 'services/events/invocationTracking';
 
-const getInvocationKey = (data: { item_id: number; invocation: { id: string } }) =>
-  `${data.item_id}:${data.invocation.id}`;
+type CompletedInvocationKeysByItemId = Map<number, Set<string>>;
 
 const getInitialNodeExecutionState = (nodeId: string): NodeExecutionState => ({
   nodeId,
@@ -18,9 +18,9 @@ const getInitialNodeExecutionState = (nodeId: string): NodeExecutionState => ({
 export const getUpdatedNodeExecutionStateOnInvocationStarted = (
   nodeExecutionState: NodeExecutionState | undefined,
   data: S['InvocationStartedEvent'],
-  completedInvocationKeys: Set<string>
+  completedInvocationKeysByItemId: CompletedInvocationKeysByItemId
 ) => {
-  if (completedInvocationKeys.has(getInvocationKey(data))) {
+  if (hasCompletedInvocationKey(completedInvocationKeysByItemId, data.item_id, data.invocation.id)) {
     return;
   }
 
@@ -33,9 +33,9 @@ export const getUpdatedNodeExecutionStateOnInvocationStarted = (
 export const getUpdatedNodeExecutionStateOnInvocationProgress = (
   nodeExecutionState: NodeExecutionState | undefined,
   data: S['InvocationProgressEvent'],
-  completedInvocationKeys: Set<string>
+  completedInvocationKeysByItemId: CompletedInvocationKeysByItemId
 ) => {
-  if (completedInvocationKeys.has(getInvocationKey(data))) {
+  if (hasCompletedInvocationKey(completedInvocationKeysByItemId, data.item_id, data.invocation.id)) {
     return;
   }
 
@@ -50,11 +50,9 @@ export const getUpdatedNodeExecutionStateOnInvocationProgress = (
 export const getUpdatedNodeExecutionStateOnInvocationComplete = (
   nodeExecutionState: NodeExecutionState | undefined,
   data: S['InvocationCompleteEvent'],
-  completedInvocationKeys: Set<string>
+  completedInvocationKeysByItemId: CompletedInvocationKeysByItemId
 ) => {
-  const completedInvocationKey = getInvocationKey(data);
-
-  if (completedInvocationKeys.has(completedInvocationKey)) {
+  if (hasCompletedInvocationKey(completedInvocationKeysByItemId, data.item_id, data.invocation.id)) {
     return;
   }
 
@@ -64,7 +62,7 @@ export const getUpdatedNodeExecutionStateOnInvocationComplete = (
     _nodeExecutionState.progress = 1;
   }
   _nodeExecutionState.outputs.push(data.result);
-  completedInvocationKeys.add(completedInvocationKey);
+  markInvocationAsCompleted(completedInvocationKeysByItemId, data.item_id, data.invocation.id);
 
   return _nodeExecutionState;
 };

@@ -111,7 +111,7 @@ const buildInvocationErrorEvent = (overrides: Partial<S['InvocationErrorEvent']>
 describe(getUpdatedNodeExecutionStateOnInvocationStarted.name, () => {
   it('creates an execution state when started arrives before initialization', () => {
     const event = buildInvocationStartedEvent();
-    const updated = getUpdatedNodeExecutionStateOnInvocationStarted(undefined, event, new Set<string>());
+    const updated = getUpdatedNodeExecutionStateOnInvocationStarted(undefined, event, new Map<number, Set<string>>());
 
     expect(updated?.nodeId).toBe(event.invocation_source_id);
     expect(updated?.status).toBe(zNodeStatus.enum.IN_PROGRESS);
@@ -122,7 +122,7 @@ describe(getUpdatedNodeExecutionStateOnInvocationStarted.name, () => {
     const updated = getUpdatedNodeExecutionStateOnInvocationStarted(
       buildNodeExecutionState(),
       buildInvocationStartedEvent(),
-      new Set<string>()
+      new Map<number, Set<string>>()
     );
 
     expect(updated?.status).toBe(zNodeStatus.enum.IN_PROGRESS);
@@ -133,7 +133,7 @@ describe(getUpdatedNodeExecutionStateOnInvocationStarted.name, () => {
     const updated = getUpdatedNodeExecutionStateOnInvocationStarted(
       buildNodeExecutionState({ status: zNodeStatus.enum.COMPLETED, progress: 1 }),
       event,
-      new Set([`${event.item_id}:${event.invocation.id}`])
+      new Map([[event.item_id, new Set([event.invocation.id])]])
     );
 
     expect(updated).toBeUndefined();
@@ -143,7 +143,7 @@ describe(getUpdatedNodeExecutionStateOnInvocationStarted.name, () => {
 describe(getUpdatedNodeExecutionStateOnInvocationProgress.name, () => {
   it('creates an execution state when progress arrives before initialization', () => {
     const event = buildInvocationProgressEvent();
-    const updated = getUpdatedNodeExecutionStateOnInvocationProgress(undefined, event, new Set<string>());
+    const updated = getUpdatedNodeExecutionStateOnInvocationProgress(undefined, event, new Map<number, Set<string>>());
 
     expect(updated?.nodeId).toBe(event.invocation_source_id);
     expect(updated?.status).toBe(zNodeStatus.enum.IN_PROGRESS);
@@ -156,7 +156,7 @@ describe(getUpdatedNodeExecutionStateOnInvocationProgress.name, () => {
     const updated = getUpdatedNodeExecutionStateOnInvocationProgress(
       buildNodeExecutionState(),
       event,
-      new Set<string>()
+      new Map<number, Set<string>>()
     );
 
     expect(updated?.status).toBe(zNodeStatus.enum.IN_PROGRESS);
@@ -169,7 +169,7 @@ describe(getUpdatedNodeExecutionStateOnInvocationProgress.name, () => {
     const updated = getUpdatedNodeExecutionStateOnInvocationProgress(
       buildNodeExecutionState({ status: zNodeStatus.enum.COMPLETED, progress: 1 }),
       event,
-      new Set([`${event.item_id}:${event.invocation.id}`])
+      new Map([[event.item_id, new Set([event.invocation.id])]])
     );
 
     expect(updated).toBeUndefined();
@@ -179,29 +179,29 @@ describe(getUpdatedNodeExecutionStateOnInvocationProgress.name, () => {
 describe(getUpdatedNodeExecutionStateOnInvocationComplete.name, () => {
   it('creates an execution state when completion arrives before initialization', () => {
     const event = buildInvocationCompleteEvent();
-    const completedInvocationKeys = new Set<string>();
-    const updated = getUpdatedNodeExecutionStateOnInvocationComplete(undefined, event, completedInvocationKeys);
+    const completedInvocationKeysByItemId = new Map<number, Set<string>>();
+    const updated = getUpdatedNodeExecutionStateOnInvocationComplete(undefined, event, completedInvocationKeysByItemId);
 
     expect(updated?.nodeId).toBe(event.invocation_source_id);
     expect(updated?.status).toBe(zNodeStatus.enum.COMPLETED);
     expect(updated?.outputs).toEqual([event.result]);
-    expect(completedInvocationKeys).toEqual(new Set([`${event.item_id}:${event.invocation.id}`]));
+    expect(completedInvocationKeysByItemId).toEqual(new Map([[event.item_id, new Set([event.invocation.id])]]));
   });
 
   it('records a completed invocation result once', () => {
     const event = buildInvocationCompleteEvent();
-    const completedInvocationKeys = new Set<string>();
+    const completedInvocationKeysByItemId = new Map<number, Set<string>>();
 
     const updated = getUpdatedNodeExecutionStateOnInvocationComplete(
       buildNodeExecutionState({ status: zNodeStatus.enum.IN_PROGRESS, progress: 0.5 }),
       event,
-      completedInvocationKeys
+      completedInvocationKeysByItemId
     );
 
     expect(updated?.status).toBe(zNodeStatus.enum.COMPLETED);
     expect(updated?.progress).toBe(1);
     expect(updated?.outputs).toEqual([event.result]);
-    expect(completedInvocationKeys).toEqual(new Set([`${event.item_id}:${event.invocation.id}`]));
+    expect(completedInvocationKeysByItemId).toEqual(new Map([[event.item_id, new Set([event.invocation.id])]]));
   });
 
   it('ignores duplicate completion events for the same invocation', () => {
@@ -209,7 +209,7 @@ describe(getUpdatedNodeExecutionStateOnInvocationComplete.name, () => {
     const updated = getUpdatedNodeExecutionStateOnInvocationComplete(
       buildNodeExecutionState({ status: zNodeStatus.enum.COMPLETED, progress: 1, outputs: [event.result] }),
       event,
-      new Set([`${event.item_id}:${event.invocation.id}`])
+      new Map([[event.item_id, new Set([event.invocation.id])]])
     );
 
     expect(updated).toBeUndefined();
@@ -224,17 +224,17 @@ describe(getUpdatedNodeExecutionStateOnInvocationComplete.name, () => {
       item_id: 2,
       result: { type: 'integer_output', value: 2 } as unknown as S['InvocationCompleteEvent']['result'],
     });
-    const completedInvocationKeys = new Set<string>();
+    const completedInvocationKeysByItemId = new Map<number, Set<string>>();
 
     const firstUpdate = getUpdatedNodeExecutionStateOnInvocationComplete(
       buildNodeExecutionState(),
       firstEvent,
-      completedInvocationKeys
+      completedInvocationKeysByItemId
     );
     const secondUpdate = getUpdatedNodeExecutionStateOnInvocationComplete(
       firstUpdate,
       secondEvent,
-      completedInvocationKeys
+      completedInvocationKeysByItemId
     );
 
     expect(secondUpdate?.outputs).toEqual([firstEvent.result, secondEvent.result]);

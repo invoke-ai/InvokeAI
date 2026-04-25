@@ -38,6 +38,10 @@ import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
 import {
+  clearCompletedInvocationKeysForQueueItem,
+  shouldIgnoreFinishedQueueItemInvocationEvent,
+} from 'services/events/invocationTracking';
+import {
   getUpdatedNodeExecutionStateOnInvocationError,
   getUpdatedNodeExecutionStateOnInvocationProgress,
   getUpdatedNodeExecutionStateOnInvocationStarted,
@@ -70,7 +74,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const finishedQueueItemIds = new LRUCache<number, boolean>({ max: 100 });
-  const completedInvocationKeys = new Set<string>();
+  const completedInvocationKeysByItemId = new Map<number, Set<string>>();
 
   socket.on('connect', () => {
     log.debug('Connected');
@@ -108,7 +112,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_started', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
+    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_started', finishedQueueItemIds, data.item_id)) {
       return;
     }
     const { invocation_source_id, invocation } = data;
@@ -117,7 +121,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationStarted(
       nes,
       data,
-      completedInvocationKeys
+      completedInvocationKeysByItemId
     );
     if (updatedNodeExecutionState) {
       upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
@@ -125,7 +129,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_progress', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
+    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_progress', finishedQueueItemIds, data.item_id)) {
       log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
       return;
     }
@@ -149,7 +153,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationProgress(
         nes,
         data,
-        completedInvocationKeys
+        completedInvocationKeysByItemId
       );
       if (updatedNodeExecutionState) {
         upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
@@ -158,10 +162,6 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   });
 
   socket.on('invocation_error', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
-      log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
-      return;
-    }
     const { invocation_source_id, invocation } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
     const nes = $nodeExecutionStates.get()[invocation_source_id];
@@ -175,7 +175,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
   });
 
-  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, completedInvocationKeys);
+  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, completedInvocationKeysByItemId);
   socket.on('invocation_complete', onInvocationComplete);
 
   socket.on('model_load_started', (data) => {
@@ -477,6 +477,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       });
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       finishedQueueItemIds.set(item_id, true);
+      clearCompletedInvocationKeysForQueueItem(completedInvocationKeysByItemId, item_id);
       if (status === 'failed' && error_type) {
         toast({
           id: `INVOCATION_ERROR_${error_type}`,
