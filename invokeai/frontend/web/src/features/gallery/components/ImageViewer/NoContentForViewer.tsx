@@ -177,7 +177,7 @@ const LowVRAMAlert = () => {
         <Trans
           i18nKey="newUserExperience.lowVRAMMode"
           components={{
-            LinkComponent: <ExternalLink href="https://invoke-ai.github.io/InvokeAI/features/low-vram/" />,
+            LinkComponent: <ExternalLink href="https://invoke.ai/configuration/low-vram-mode/" />,
           }}
         />
       </AlertDescription>

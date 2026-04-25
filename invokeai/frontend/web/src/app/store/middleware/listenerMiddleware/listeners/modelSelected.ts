@@ -7,10 +7,12 @@ import {
   animaQwen3EncoderModelSelected,
   animaT5EncoderModelSelected,
   animaVaeModelSelected,
+  aspectRatioIdChanged,
   kleinQwen3EncoderModelSelected,
   kleinVaeModelSelected,
   modelChanged,
   qwenImageComponentSourceSelected,
+  resolutionPresetSelected,
   setZImageScheduler,
   syncedToOptimalDimension,
   vaeSelected,
@@ -30,6 +32,7 @@ import {
 } from 'features/controlLayers/store/selectors';
 import {
   getEntityIdentifier,
+  isAspectRatioID,
   isFlux2ReferenceImageConfig,
   isQwenImageReferenceImageConfig,
 } from 'features/controlLayers/store/types';
@@ -59,7 +62,7 @@ import {
   selectZImageDiffusersModels,
 } from 'services/api/hooks/modelsByType';
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
-import { isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
+import { isExternalApiModelConfig, isFluxKontextModelConfig, isFluxReduxModelConfig } from 'services/api/types';
 
 const log = logger('models');
 
@@ -200,8 +203,10 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                 dispatch(
                   animaQwen3EncoderModelSelected({
                     key: qwen3Encoder.key,
+                    hash: qwen3Encoder.hash,
                     name: qwen3Encoder.name,
                     base: qwen3Encoder.base,
+                    type: qwen3Encoder.type,
                   })
                 );
               }
@@ -221,8 +226,10 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                 dispatch(
                   animaT5EncoderModelSelected({
                     key: t5Encoder.key,
+                    hash: t5Encoder.hash,
                     name: t5Encoder.name,
                     base: t5Encoder.base,
+                    type: t5Encoder.type,
                   })
                 );
               }
@@ -281,7 +288,7 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
           }
         }
 
-        if (SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
+        if (newModel.base !== 'external' && SUPPORTS_REF_IMAGES_BASE_MODELS.includes(newModel.base)) {
           // Handle incompatible reference image models - switch to first compatible model, with some smart logic
           // to choose the best available model based on the new main model.
           const allRefImageModels = selectGlobalRefImageModels(state).filter(({ base }) => base === newBase);
@@ -527,6 +534,34 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         if (!isStaging) {
           // Canvas tab only syncs if not staging
           dispatch(bboxSyncedToOptimalDimension());
+        }
+      }
+
+      // When switching to an external model, sync bbox to the model's first preset dimensions
+      if (newBase === 'external') {
+        const modelConfigsResult = selectModelConfigsQuery(getState());
+        if (modelConfigsResult.data) {
+          const newModelConfig = modelConfigsAdapterSelectors.selectById(modelConfigsResult.data, newModel.key);
+          if (newModelConfig && isExternalApiModelConfig(newModelConfig)) {
+            const { aspect_ratio_sizes, resolution_presets } = newModelConfig.capabilities;
+            if (resolution_presets && resolution_presets.length > 0) {
+              const firstPreset = resolution_presets[0]!;
+              dispatch(
+                resolutionPresetSelected({
+                  imageSize: firstPreset.image_size,
+                  aspectRatio: firstPreset.aspect_ratio,
+                  width: firstPreset.width,
+                  height: firstPreset.height,
+                })
+              );
+            } else if (aspect_ratio_sizes) {
+              const firstRatio = Object.keys(aspect_ratio_sizes)[0];
+              const firstSize = firstRatio ? aspect_ratio_sizes[firstRatio] : undefined;
+              if (firstRatio && firstSize && isAspectRatioID(firstRatio)) {
+                dispatch(aspectRatioIdChanged({ id: firstRatio, fixedSize: firstSize }));
+              }
+            }
+          }
         }
       }
     },
