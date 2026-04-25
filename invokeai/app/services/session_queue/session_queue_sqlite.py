@@ -317,6 +317,18 @@ class SqliteSessionQueue(SessionQueueBase):
         queue_item = self.get_queue_item(item_id)
         batch_status = self.get_batch_status(queue_id=queue_item.queue_id, batch_id=queue_item.batch_id)
         queue_status = self.get_queue_status(queue_id=queue_item.queue_id)
+
+        # get_queue_status embeds the currently-running item's identifiers (item_id, session_id,
+        # batch_id) into the SessionQueueStatus. The QueueItemStatusChangedEvent ships to
+        # user:{queue_item.user_id} and admin rooms; without this scrub, owner A would learn
+        # user B's identifiers whenever A's item changed status while B's item was the one in
+        # progress. Aggregate counts remain global (not user-sensitive).
+        current_item = self.get_current(queue_id=queue_item.queue_id)
+        if current_item is not None and current_item.user_id != queue_item.user_id:
+            queue_status = queue_status.model_copy(
+                update={"item_id": None, "session_id": None, "batch_id": None}
+            )
+
         self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
         return queue_item
 
