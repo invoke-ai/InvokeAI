@@ -34,8 +34,10 @@ CONFIG_SCHEMA_VERSION = "4.0.2"
 EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_gemini_api_key",
     "external_openai_api_key",
+    "external_seedream_api_key",
     "external_gemini_base_url",
     "external_openai_base_url",
+    "external_seedream_base_url",
 )
 
 
