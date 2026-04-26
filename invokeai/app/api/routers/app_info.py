@@ -99,6 +99,7 @@ class ExternalProviderConfigModel(BaseModel):
 EXTERNAL_PROVIDER_FIELDS: dict[str, tuple[str, str]] = {
     "gemini": ("external_gemini_api_key", "external_gemini_base_url"),
     "openai": ("external_openai_api_key", "external_openai_base_url"),
+    "seedream": ("external_seedream_api_key", "external_seedream_base_url"),
 }
 _EXTERNAL_PROVIDER_CONFIG_LOCK = Lock()
 

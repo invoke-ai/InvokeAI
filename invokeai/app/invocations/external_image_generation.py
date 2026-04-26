@@ -267,15 +267,58 @@ class GeminiImageGenerationInvocation(BaseExternalImageGenerationInvocation):
     mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
 
     temperature: float | None = InputField(default=None, ge=0.0, le=2.0, description="Sampling temperature")
+    thinking_level: Literal["minimal", "high"] | None = InputField(
+        default=None, description="Thinking level for image generation"
+    )
 
     def _build_provider_options(self) -> dict[str, Any] | None:
         options: dict[str, Any] = {}
         if self.temperature is not None:
             options["temperature"] = self.temperature
+        if self.thinking_level is not None:
+            options["thinking_level"] = self.thinking_level
         return options or None
 
     def _build_output_provider_metadata(self) -> dict[str, Any]:
         metadata: dict[str, Any] = {}
         if self.temperature is not None:
             metadata["gemini_temperature"] = self.temperature
+        if self.thinking_level is not None:
+            metadata["gemini_thinking_level"] = self.thinking_level
         return metadata
+
+
+@invocation(
+    "seedream_image_generation",
+    title="Seedream Image Generation",
+    tags=["external", "generation", "seedream"],
+    category="image",
+    version="1.0.0",
+)
+class SeedreamImageGenerationInvocation(BaseExternalImageGenerationInvocation):
+    """Generate images using a BytePlus Seedream model."""
+
+    provider_id = "seedream"
+
+    model: ModelIdentifierField = InputField(
+        description=FieldDescriptions.main_model,
+        ui_model_base=[BaseModelType.External],
+        ui_model_type=[ModelType.ExternalImageGenerator],
+        ui_model_format=[ModelFormat.ExternalApi],
+        ui_model_provider_id=["seedream"],
+    )
+
+    watermark: bool = InputField(default=False, description="Add watermark to generated images")
+    optimize_prompt: bool = InputField(default=False, description="Let the model optimize the prompt before generation")
+
+    def _build_provider_options(self) -> dict[str, Any]:
+        return {
+            "watermark": self.watermark,
+            "optimize_prompt": self.optimize_prompt,
+        }
+
+    def _build_output_provider_metadata(self) -> dict[str, Any]:
+        return {
+            "seedream_watermark": self.watermark,
+            "seedream_optimize_prompt": self.optimize_prompt,
+        }

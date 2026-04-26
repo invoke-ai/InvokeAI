@@ -1,0 +1,60 @@
+---
+title: BytePlus Seedream
+---
+
+# :material-image-sync-outline: BytePlus Seedream
+
+Invoke supports BytePlus's **Seedream** image generation family through the BytePlus Ark API. Seedream is a strong fit for 2K/4K generations and multi-reference image composition.
+
+## Getting an API Key
+
+1. Open the [BytePlus Console](https://console.byteplus.com/) and sign in.
+2. Enable the **Ark** (model serving) product.
+3. Create an API key with access to the Seedream models you plan to use.
+
+## Configuration
+
+Add your key to `api_keys.yaml` in your Invoke root directory:
+
+```yaml
+external_seedream_api_key: "your-seedream-api-key"
+
+# Optional — change only if you need a different regional endpoint
+external_seedream_base_url: "https://ark.ap-southeast.bytepluses.com"
+```
+
+Restart Invoke for the change to take effect.
+
+## Available Models
+
+| Model | Modes | Reference Images | Batch | Native Size |
+| --- | --- | --- | --- | --- |
+| **Seedream 5.0 Lite** | txt2img, img2img | up to 14 | up to 15 | 2K |
+| **Seedream 4.5** | txt2img, img2img | up to 14 | up to 15 | 2K |
+| **Seedream 4.0** | txt2img, img2img | up to 14 | up to 15 | 2K |
+| **Seedream 3.0 T2I** | txt2img only | — | 1 | 1K |
+
+The 4.x / 5.x models are batch-capable and accept up to 14 reference images per request. Seedream 3.0 T2I is single-image only but exposes a **seed** for reproducible generations.
+
+### Supported Aspect Ratios
+
+All Seedream models share the same aspect ratio set: `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `9:16`, `16:9`, `21:9`. The 4.x / 5.x models render at 2K; 3.0 T2I renders at 1K.
+
+## Provider-Specific Options
+
+Seedream exposes two provider-specific toggles in the parameters panel:
+
+- **Watermark** — When enabled, BytePlus adds a small watermark to the output. Off by default.
+- **Optimize Prompt** — When enabled, BytePlus rewrites your prompt server-side for better generation quality. Useful for short prompts; disable if you want the exact wording preserved.
+
+**Seed** and **guidance scale** are only sent for Seedream 3.0 models — the 4.x / 5.x family does not accept them.
+
+## Reference Images
+
+4.x and 5.x Seedream models accept up to 14 reference images alongside the prompt. Invoke's standard reference-image panel is used — drag images in, and they are forwarded as base64 PNGs to the API.
+
+## Tips
+
+- For multi-image composition (e.g. character + product), Seedream 4.5 is a good default.
+- When running large batches (`num_images > 1` on 4.x / 5.x), Invoke uses the `sequential_image_generation` API flag — each image is returned as it completes.
+- Set `external_seedream_base_url` if you need to route through a region-specific Ark endpoint.

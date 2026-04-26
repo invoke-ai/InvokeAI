@@ -25,6 +25,7 @@ import { assert } from 'tsafe';
 const EXTERNAL_PROVIDER_NODE_TYPES = {
   gemini: 'gemini_image_generation',
   openai: 'openai_image_generation',
+  seedream: 'seedream_image_generation',
 } as const;
 
 export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderReturn> => {
@@ -84,6 +85,12 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
     if (params.geminiTemperature !== null) {
       externalNode.temperature = params.geminiTemperature;
     }
+    if (params.geminiThinkingLevel) {
+      externalNode.thinking_level = params.geminiThinkingLevel;
+    }
+  } else if (model.provider_id === 'seedream') {
+    externalNode.watermark = params.seedreamWatermark;
+    externalNode.optimize_prompt = params.seedreamOptimizePrompt;
   }
   const externalInvocation = g.addNode(externalNode as AnyInvocation);
 
