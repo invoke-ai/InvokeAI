@@ -1,10 +1,11 @@
 import type { AnyModelVariant, BaseModelType, ModelFormat, ModelType } from 'features/nodes/types/common';
-import type { AnyModelConfig } from 'services/api/types';
 import {
+  type AnyModelConfig,
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
   isControlLoRAModelConfig,
   isControlNetModelConfig,
+  isExternalApiModelConfig,
   isFluxReduxModelConfig,
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
@@ -30,7 +31,7 @@ export type ModelCategoryData = {
   filter: (config: AnyModelConfig) => boolean;
 };
 
-export const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
+const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
   unknown: {
     category: 'unknown',
     i18nKey: 'common.unknown',
@@ -121,6 +122,11 @@ export const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
     i18nKey: 'modelManager.llavaOnevision',
     filter: isLLaVAModelConfig,
   },
+  external_image_generator: {
+    category: 'external_image_generator',
+    i18nKey: 'modelManager.externalImageGenerator',
+    filter: isExternalApiModelConfig,
+  },
 };
 
 export const MODEL_CATEGORIES_AS_LIST = objectEntries(MODEL_CATEGORIES).map(([category, { i18nKey, filter }]) => ({
@@ -144,6 +150,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   cogview4: 'red',
   'qwen-image': 'orange',
   'z-image': 'cyan',
+  external: 'orange',
   anima: 'invokePurple',
   unknown: 'red',
 };
@@ -169,6 +176,7 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   clip_embed: 'CLIP Embed',
   siglip: 'SigLIP',
   flux_redux: 'FLUX Redux',
+  external_image_generator: 'External Image Generator',
   unknown: 'Unknown',
 };
 
@@ -187,6 +195,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   cogview4: 'CogView4',
   'qwen-image': 'Qwen Image',
   'z-image': 'Z-Image',
+  external: 'External',
   anima: 'Anima',
   unknown: 'Unknown',
 };
@@ -206,6 +215,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   cogview4: 'CogView4',
   'qwen-image': 'QwenImg',
   'z-image': 'Z-Image',
+  external: 'External',
   anima: 'Anima',
   unknown: 'Unknown',
 };
@@ -237,6 +247,7 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   checkpoint: 'Checkpoint',
   lycoris: 'LyCORIS',
   onnx: 'ONNX',
+  external_api: 'External API',
   olive: 'Olive',
   embedding_file: 'Embedding (file)',
   embedding_folder: 'Embedding (folder)',
