@@ -104,8 +104,6 @@ class AlibabaCloudProvider(ExternalProvider):
             "prompt_extend": False,
             "watermark": False,
         }
-        if request.negative_prompt:
-            parameters["negative_prompt"] = request.negative_prompt
         if request.seed is not None:
             parameters["seed"] = request.seed
 
@@ -151,14 +149,10 @@ class AlibabaCloudProvider(ExternalProvider):
             "prompt_extend": False,
             "watermark": False,
         }
-        if request.negative_prompt:
-            parameters["negative_prompt"] = request.negative_prompt
         if request.seed is not None:
             parameters["seed"] = request.seed
 
         input_data: dict[str, object] = {"prompt": request.prompt}
-        if request.negative_prompt:
-            input_data["negative_prompt"] = request.negative_prompt
 
         payload: dict[str, object] = {
             "model": model_id,
