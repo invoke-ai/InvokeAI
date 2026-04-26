@@ -29,16 +29,18 @@ Restart Invoke for the change to take effect.
 
 | Model | Modes | Reference Images | Batch | Native Size |
 | --- | --- | --- | --- | --- |
+| **Seedream 5.0** | txt2img, img2img | up to 14 | up to 15 | 2K |
 | **Seedream 5.0 Lite** | txt2img, img2img | up to 14 | up to 15 | 2K |
 | **Seedream 4.5** | txt2img, img2img | up to 14 | up to 15 | 2K |
 | **Seedream 4.0** | txt2img, img2img | up to 14 | up to 15 | 2K |
-| **Seedream 3.0 T2I** | txt2img only | — | 1 | 1K |
 
-The 4.x / 5.x models are batch-capable and accept up to 14 reference images per request. Seedream 3.0 T2I is single-image only but exposes a **seed** for reproducible generations.
+The 4.x / 5.x models are batch-capable and accept up to 14 reference images per request.
+
+> **Note on model IDs:** BytePlus uses date-stamped model IDs (e.g. `seedream-5-0-260128`). When BytePlus releases a new dated revision, the starter model IDs in Invoke need to be updated. Seedream 3.0 T2I (`seedream-3-0-t2i-250415`) was deprecated by BytePlus and replaced by Seedream 4.0.
 
 ### Supported Aspect Ratios
 
-All Seedream models share the same aspect ratio set: `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `9:16`, `16:9`, `21:9`. The 4.x / 5.x models render at 2K; 3.0 T2I renders at 1K.
+All Seedream models share the same aspect ratio set: `1:1`, `2:3`, `3:2`, `3:4`, `4:3`, `9:16`, `16:9`, `21:9`, rendered at 2K.
 
 ## Provider-Specific Options
 
@@ -47,7 +49,7 @@ Seedream exposes two provider-specific toggles in the parameters panel:
 - **Watermark** — When enabled, BytePlus adds a small watermark to the output. Off by default.
 - **Optimize Prompt** — When enabled, BytePlus rewrites your prompt server-side for better generation quality. Useful for short prompts; disable if you want the exact wording preserved.
 
-**Seed** and **guidance scale** are only sent for Seedream 3.0 models — the 4.x / 5.x family does not accept them.
+**Seed** and **guidance scale** are not accepted by the 4.x / 5.x family.
 
 ## Reference Images
 

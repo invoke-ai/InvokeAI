@@ -1252,11 +1252,29 @@ SEEDREAM_1K_SIZES = {
     "21:9": ExternalImageSize(width=1568, height=672),
 }
 SEEDREAM_PANEL_SCHEMA = ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}])
+seedream_5_0 = StarterModel(
+    name="Seedream 5.0",
+    base=BaseModelType.External,
+    source="external://seedream/seedream-5-0-260128",
+    description="BytePlus Seedream 5.0 flagship image generation model (external API). Supports 2K and 4K resolutions, txt2img and img2img with multi-image reference input.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img", "img2img"],
+        supports_reference_images=True,
+        max_reference_images=14,
+        max_images_per_request=15,
+        allowed_aspect_ratios=SEEDREAM_ASPECT_RATIOS,
+        aspect_ratio_sizes=SEEDREAM_2K_SIZES,
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=SEEDREAM_PANEL_SCHEMA,
+)
 seedream_5_0_lite = StarterModel(
     name="Seedream 5.0 Lite",
     base=BaseModelType.External,
-    source="external://seedream/seedream-5-0-lite",
-    description="BytePlus Seedream 5.0 Lite image generation model (external API). Supports 2K and 3K resolutions, txt2img and img2img with multi-image reference input.",
+    source="external://seedream/seedream-5-0-lite-260128",
+    description="BytePlus Seedream 5.0 Lite image generation model (external API). Supports 2K and 4K resolutions, txt2img and img2img with multi-image reference input.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
@@ -1306,23 +1324,7 @@ seedream_4_0 = StarterModel(
     default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
     panel_schema=SEEDREAM_PANEL_SCHEMA,
 )
-seedream_3_0_t2i = StarterModel(
-    name="Seedream 3.0 T2I",
-    base=BaseModelType.External,
-    source="external://seedream/seedream-3-0-t2i-250415",
-    description="BytePlus Seedream 3.0 text-to-image model (external API). Supports seed and guidance scale.",
-    type=ModelType.ExternalImageGenerator,
-    format=ModelFormat.ExternalApi,
-    capabilities=ExternalModelCapabilities(
-        modes=["txt2img"],
-        supports_seed=True,
-        max_images_per_request=1,
-        allowed_aspect_ratios=SEEDREAM_ASPECT_RATIOS,
-        aspect_ratio_sizes=SEEDREAM_1K_SIZES,
-    ),
-    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
-    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}, {"name": "seed"}]),
-)
+# Seedream 3.0 T2I (seedream-3-0-t2i-250415) removed — deprecated by BytePlus, replaced by seedream-4-0-250828.
 
 # DALL-E 2 removed — deprecated by OpenAI, shutdown May 12, 2026.
 # region Anima
@@ -1471,10 +1473,10 @@ STARTER_MODELS: list[StarterModel] = [
     openai_gpt_image_1,
     openai_gpt_image_1_mini,
     openai_dall_e_3,
+    seedream_5_0,
     seedream_5_0_lite,
     seedream_4_5,
     seedream_4_0,
-    seedream_3_0_t2i,
     anima_preview3,
     anima_qwen3_encoder,
     anima_vae,

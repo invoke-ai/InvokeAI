@@ -4811,7 +4811,10 @@ export type components = {
              */
             type: "infill_cv2";
         };
-        /** CacheStats */
+        /**
+         * CacheStats
+         * @description Collect statistics on cache performance.
+         */
         CacheStats: {
             /**
              * Hits
@@ -26565,7 +26568,7 @@ export type components = {
             model?: components["schemas"]["ModelIdentifierField"] | null;
             /**
              * Mode
-             * @description Generation mode. Not all modes are supported by every model; unsupported modes raise at runtime.
+             * @description Generation mode.
              * @default txt2img
              * @enum {string}
              */

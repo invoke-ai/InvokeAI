@@ -293,7 +293,7 @@ class GeminiImageGenerationInvocation(BaseExternalImageGenerationInvocation):
     title="Seedream Image Generation",
     tags=["external", "generation", "seedream"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
 )
 class SeedreamImageGenerationInvocation(BaseExternalImageGenerationInvocation):
     """Generate images using a BytePlus Seedream model."""
@@ -307,6 +307,12 @@ class SeedreamImageGenerationInvocation(BaseExternalImageGenerationInvocation):
         ui_model_format=[ModelFormat.ExternalApi],
         ui_model_provider_id=["seedream"],
     )
+
+    # Seedream's API has only one endpoint and no inpaint support — mode is implicit
+    # from inputs (img2img happens automatically when init_image or reference_images
+    # are provided). Hide mode and mask_image since they have no effect.
+    mode: ExternalGenerationMode = InputField(default="txt2img", description="Generation mode.", ui_hidden=True)
+    mask_image: ImageField | None = InputField(default=None, description="Mask image for inpaint", ui_hidden=True)
 
     watermark: bool = InputField(default=False, description="Add watermark to generated images")
     optimize_prompt: bool = InputField(default=False, description="Let the model optimize the prompt before generation")
