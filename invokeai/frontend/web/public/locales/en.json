@@ -1266,6 +1266,7 @@
         "settings": "Settings",
         "simpleModelPlaceholder": "URL or path to a local file or diffusers folder",
         "source": "Source",
+        "sourceUrl": "Source URL",
         "sigLip": "SigLIP",
         "spandrelImageToImage": "Image to Image (Spandrel)",
         "starterBundles": "Starter Bundles",
