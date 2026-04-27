@@ -1,4 +1,5 @@
 import type { BoardId } from 'features/gallery/store/types';
+import { getDateFromVirtualBoardId, isVirtualBoardId } from 'features/gallery/store/types';
 import { t } from 'i18next';
 import { useListAllBoardsQuery } from 'services/api/endpoints/boards';
 
@@ -7,6 +8,9 @@ export const useBoardName = (board_id: BoardId) => {
     { include_archived: true },
     {
       selectFromResult: ({ data }) => {
+        if (isVirtualBoardId(board_id)) {
+          return { boardName: getDateFromVirtualBoardId(board_id) };
+        }
         const selectedBoard = data?.find((b) => b.board_id === board_id);
         const boardName = selectedBoard?.board_name || t('boards.uncategorized');
 
