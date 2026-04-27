@@ -2614,6 +2614,46 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/client_state/{queue_id}/get_keys_by_prefix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Client State Keys By Prefix
+         * @description Gets client state keys matching a prefix for the current user
+         */
+        get: operations["get_client_state_keys_by_prefix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/client_state/{queue_id}/delete_by_key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Client State By Key
+         * @description Deletes a specific client state key for the current user
+         */
+        post: operations["delete_client_state_by_key"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/client_state/{queue_id}/delete": {
         parameters: {
             query?: never;
@@ -36810,6 +36850,83 @@ export interface operations {
                 content: {
                     "application/json": string;
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_client_state_keys_by_prefix: {
+        parameters: {
+            query: {
+                /** @description Prefix to filter keys by */
+                prefix: string;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id (ignored, kept for backwards compatibility) */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_client_state_by_key: {
+        parameters: {
+            query: {
+                /** @description Key to delete */
+                key: string;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id (ignored, kept for backwards compatibility) */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Client state key deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

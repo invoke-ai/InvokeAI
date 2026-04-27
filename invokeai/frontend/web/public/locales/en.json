@@ -3125,6 +3125,26 @@
             "switchOnStartDesc": "Switch on start",
             "switchOnFinish": "On Finish",
             "switchOnFinishDesc": "Switch on finish"
+        },
+        "snapshot": {
+            "snapshots": "Save or Load Canvas Snapshot",
+            "saveSnapshot": "Save Snapshot",
+            "restoreSnapshot": "Restore Snapshot",
+            "snapshotNamePlaceholder": "Snapshot name",
+            "save": "Save",
+            "delete": "Delete",
+            "snapshotSaved": "Snapshot \"{{name}}\" saved",
+            "snapshotRestored": "Snapshot \"{{name}}\" restored",
+            "snapshotDeleted": "Snapshot \"{{name}}\" deleted",
+            "snapshotSaveFailed": "Failed to save snapshot",
+            "snapshotRestoreFailed": "Failed to restore snapshot",
+            "snapshotDeleteFailed": "Failed to delete snapshot",
+            "snapshotMissingImages_one": "{{count}} image referenced by this snapshot no longer exists and will appear as a placeholder",
+            "snapshotMissingImages_other": "{{count}} images referenced by this snapshot no longer exist and will appear as placeholders",
+            "snapshotIncompatible": "This snapshot was created with a different version and is no longer compatible",
+            "overwriteSnapshotTitle": "Overwrite snapshot?",
+            "overwriteSnapshotMessage": "A snapshot named \"{{name}}\" already exists. Overwrite it?",
+            "overwrite": "Overwrite"
         }
     },
     "upscaling": {
