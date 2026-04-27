@@ -121,6 +121,7 @@ export const zModelType = z.enum([
   'vae',
   'lora',
   'llava_onevision',
+  'text_llm',
   'control_lora',
   'controlnet',
   't2i_adapter',

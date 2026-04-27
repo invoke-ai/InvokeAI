@@ -82,6 +82,7 @@ class ModelType(str, Enum):
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
+    TextLLM = "text_llm"
     ExternalImageGenerator = "external_image_generator"
     Unknown = "unknown"
 
