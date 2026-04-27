@@ -25,7 +25,7 @@
     "typegen": "node scripts/typegen.js",
     "preview": "vite preview",
     "lint:knip": "knip --tags=-knipignore",
-    "lint:circular": "rev-dep circular --ignore-type-imports",
+    "lint:circular": "rev-dep circular --ignore-type-imports --algorithm=SCC",
     "lint:eslint": "eslint --max-warnings=0 .",
     "lint:prettier": "prettier --check .",
     "lint:tsc": "tsc --noEmit",
