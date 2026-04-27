@@ -151,11 +151,18 @@ export const useSubMenu = (): UseSubMenuReturn => {
   };
 };
 
-export const SubMenuButtonContent = ({ label }: { label: string }) => {
+export const SubMenuButtonContent = ({ label, value }: { label: string; value?: string }) => {
   return (
     <Flex w="full" h="full" flexDir="row" justifyContent="space-between" alignItems="center">
       <Text>{label}</Text>
-      <Icon as={PiCaretRightBold} />
+      <Flex alignItems="center" gap={2}>
+        {value !== undefined && (
+          <Text fontSize="sm" color="base.400">
+            {value}
+          </Text>
+        )}
+        <Icon as={PiCaretRightBold} />
+      </Flex>
     </Flex>
   );
 };

@@ -52,6 +52,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
     """Indicates the model is associated with Z-Image model architecture, including Z-Image-Turbo."""
+    External = "external"
+    """Indicates the model is hosted by an external provider."""
     QwenImage = "qwen-image"
     """Indicates the model is associated with Qwen Image Edit 2511 model architecture."""
     Anima = "anima"
@@ -80,6 +82,8 @@ class ModelType(str, Enum):
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
+    TextLLM = "text_llm"
+    ExternalImageGenerator = "external_image_generator"
     Unknown = "unknown"
 
 
@@ -128,7 +132,10 @@ class Flux2VariantType(str, Enum):
     """FLUX.2 model variants."""
 
     Klein4B = "klein_4b"
-    """Flux2 Klein 4B variant using Qwen3 4B text encoder."""
+    """Flux2 Klein 4B variant using Qwen3 4B text encoder (distilled)."""
+
+    Klein4BBase = "klein_4b_base"
+    """Flux2 Klein 4B Base variant - undistilled foundation model using Qwen3 4B text encoder."""
 
     Klein9B = "klein_9b"
     """Flux2 Klein 9B variant using Qwen3 8B text encoder (distilled)."""
@@ -187,6 +194,7 @@ class ModelFormat(str, Enum):
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
+    ExternalApi = "external_api"
     Unknown = "unknown"
 
 
@@ -215,6 +223,7 @@ class ModelSourceType(str, Enum):
     Path = "path"
     Url = "url"
     HFRepoID = "hf_repo_id"
+    External = "external"
 
 
 class FluxLoRAFormat(str, Enum):

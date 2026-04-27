@@ -1,13 +1,14 @@
 import { atom } from 'nanostores';
 
-type InstallModelsTabName = 'launchpad' | 'urlOrLocal' | 'huggingface' | 'scanFolder' | 'starterModels';
+type InstallModelsTabName = 'launchpad' | 'urlOrLocal' | 'huggingface' | 'external' | 'scanFolder' | 'starterModels';
 
 const TAB_TO_INDEX_MAP: Record<InstallModelsTabName, number> = {
   launchpad: 0,
   urlOrLocal: 1,
   huggingface: 2,
-  scanFolder: 3,
-  starterModels: 4,
+  external: 3,
+  scanFolder: 4,
+  starterModels: 5,
 };
 
 export const setInstallModelsTabByName = (tab: InstallModelsTabName) => {

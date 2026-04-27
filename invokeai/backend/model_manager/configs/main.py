@@ -81,8 +81,8 @@ class MainModelDefaultSettings(BaseModel):
                 return cls(steps=35, cfg_scale=4.5, width=1024, height=1024)
             case BaseModelType.Flux2:
                 # Different defaults based on variant
-                if variant == Flux2VariantType.Klein9BBase:
-                    # Undistilled base model needs more steps
+                if variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
+                    # Undistilled base models need more steps
                     return cls(steps=28, cfg_scale=1.0, width=1024, height=1024)
                 else:
                     # Distilled models (Klein 4B, Klein 9B) use fewer steps
@@ -160,17 +160,20 @@ def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
         ".lora_A.weight",
         ".lora_B.weight",
         ".dora_scale",
+        ".alpha",
     )
 
+    # First pass: check if any key has LoRA suffixes - if so, this is a LoRA not a main model
     for key in state_dict.keys():
         if isinstance(key, int):
             continue
-
-        # If we find any LoRA-specific keys, this is not a main model
         if key.endswith(lora_suffixes):
             return False
 
-        # Check for Z-Image specific key prefixes
+    # Second pass: check for Z-Image specific key parts
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
         # Handle both direct keys (cap_embedder.0.weight) and
         # ComfyUI-style keys (model.diffusion_model.cap_embedder.0.weight)
         key_parts = key.split(".")
@@ -386,6 +389,7 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
                     # Default to Klein9B - callers use filename heuristics to detect Klein9BBase
                     return Flux2VariantType.Klein9B
                 elif context_in_dim == KLEIN_4B_CONTEXT_DIM:
+                    # Default to Klein4B - callers use filename heuristics to detect Klein4BBase
                     return Flux2VariantType.Klein4B
                 elif context_in_dim > 4096:
                     # Unknown FLUX.2 variant, default to 4B
@@ -570,10 +574,12 @@ class Main_Checkpoint_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         if variant is None:
             raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
 
-        # Klein 9B Base and Klein 9B have identical architectures.
-        # Use filename heuristic to detect the Base (undistilled) variant.
+        # Base (undistilled) and distilled variants share identical architectures.
+        # Use filename heuristic to detect the Base variant.
         if variant == Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
             return Flux2VariantType.Klein9BBase
+        if variant == Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
 
         return variant
 
@@ -742,10 +748,12 @@ class Main_GGUF_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Ba
         if variant is None:
             raise NotAMatchError("unable to determine FLUX.2 model variant from state dict")
 
-        # Klein 9B Base and Klein 9B have identical architectures.
-        # Use filename heuristic to detect the Base (undistilled) variant.
+        # Base (undistilled) and distilled variants share identical architectures.
+        # Use filename heuristic to detect the Base variant.
         if variant == Flux2VariantType.Klein9B and _filename_suggests_base(mod.name):
             return Flux2VariantType.Klein9BBase
+        if variant == Flux2VariantType.Klein4B and _filename_suggests_base(mod.name):
+            return Flux2VariantType.Klein4BBase
 
         return variant
 
@@ -853,11 +861,10 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         """Determine the FLUX.2 variant from the transformer config.
 
         FLUX.2 Klein uses Qwen3 text encoder with larger joint_attention_dim:
-        - Klein 4B: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
+        - Klein 4B/4B Base: joint_attention_dim = 7680 (3×Qwen3-4B hidden size)
         - Klein 9B/9B Base: joint_attention_dim = 12288 (3×Qwen3-8B hidden size)
 
-        Klein 9B (distilled) and Klein 9B Base (undistilled) have identical architectures
-        and both have guidance_embeds=False. We use a filename heuristic to detect Base models.
+        Distilled and Base variants share identical architectures. We use a filename heuristic to detect Base models.
         """
         KLEIN_4B_CONTEXT_DIM = 7680  # 3 × 2560
         KLEIN_9B_CONTEXT_DIM = 12288  # 3 × 4096
@@ -872,6 +879,8 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
                 return Flux2VariantType.Klein9BBase
             return Flux2VariantType.Klein9B
         elif joint_attention_dim == KLEIN_4B_CONTEXT_DIM:
+            if _filename_suggests_base(mod.name):
+                return Flux2VariantType.Klein4BBase
             return Flux2VariantType.Klein4B
         elif joint_attention_dim > 4096:
             # Unknown FLUX.2 variant, default to 4B

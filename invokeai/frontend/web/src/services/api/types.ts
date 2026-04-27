@@ -43,6 +43,22 @@ export type InvocationJSONSchemaExtra = S['UIConfigBase'];
 
 // App Info
 export type AppVersion = S['AppVersion'];
+export type ExternalProviderStatus = {
+  provider_id: string;
+  configured: boolean;
+  message?: string | null;
+};
+export type ExternalProviderConfig = {
+  provider_id: string;
+  api_key_configured: boolean;
+  base_url?: string | null;
+  message?: string | null;
+};
+export type ExternalProviderConfigUpdate = {
+  api_key?: string;
+  base_url?: string | null;
+};
+export type UpdateModelBody = paths['/api/v2/models/i/{key}']['patch']['requestBody']['content']['application/json'];
 
 const zResourceOrigin = z.enum(['internal', 'external']);
 type ResourceOrigin = z.infer<typeof zResourceOrigin>;
@@ -77,38 +93,128 @@ export type BoardDTO = S['BoardDTO'];
 export type OffsetPaginatedResults_ImageDTO_ = S['OffsetPaginatedResults_ImageDTO_'];
 
 // Model Configs
-export type AnyModelConfig = S['AnyModelConfig'];
-export type MainModelConfig = Extract<S['AnyModelConfig'], { type: 'main' }>;
-type FLUXModelConfig = Extract<S['AnyModelConfig'], { type: 'main'; base: 'flux' }>;
-type FLUX2ModelConfig = Extract<S['AnyModelConfig'], { type: 'main'; base: 'flux2' }>;
+type InternalAnyModelConfig = S['AnyModelConfig'];
+export type MainModelConfig = Extract<InternalAnyModelConfig, { type: 'main' }>;
+type FLUXModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; base: 'flux' }>;
+type FLUX2ModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; base: 'flux2' }>;
 export type AnyFLUXModelConfig = FLUXModelConfig | FLUX2ModelConfig;
-export type ControlLoRAModelConfig = Extract<S['AnyModelConfig'], { type: 'control_lora' }>;
-export type LoRAModelConfig = Extract<S['AnyModelConfig'], { type: 'lora' }>;
-export type VAEModelConfig = Extract<S['AnyModelConfig'], { type: 'vae' }>;
-export type ControlNetModelConfig = Extract<S['AnyModelConfig'], { type: 'controlnet' }>;
-export type IPAdapterModelConfig = Extract<S['AnyModelConfig'], { type: 'ip_adapter' }>;
-export type T2IAdapterModelConfig = Extract<S['AnyModelConfig'], { type: 't2i_adapter' }>;
-export type CLIPLEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_embed'; variant: 'large' }>;
-export type CLIPGEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_embed'; variant: 'gigantic' }>;
-export type CLIPEmbedModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_embed' }>;
-export type LlavaOnevisionModelConfig = Extract<S['AnyModelConfig'], { type: 'llava_onevision' }>;
-export type T5EncoderModelConfig = Extract<S['AnyModelConfig'], { type: 't5_encoder' }>;
+export type ControlLoRAModelConfig = Extract<InternalAnyModelConfig, { type: 'control_lora' }>;
+export type LoRAModelConfig = Extract<InternalAnyModelConfig, { type: 'lora' }>;
+export type VAEModelConfig = Extract<InternalAnyModelConfig, { type: 'vae' }>;
+export type ControlNetModelConfig = Extract<InternalAnyModelConfig, { type: 'controlnet' }>;
+export type IPAdapterModelConfig = Extract<InternalAnyModelConfig, { type: 'ip_adapter' }>;
+export type T2IAdapterModelConfig = Extract<InternalAnyModelConfig, { type: 't2i_adapter' }>;
+export type CLIPLEmbedModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_embed'; variant: 'large' }>;
+export type CLIPGEmbedModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_embed'; variant: 'gigantic' }>;
+export type CLIPEmbedModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_embed' }>;
+export type LlavaOnevisionModelConfig = Extract<InternalAnyModelConfig, { type: 'llava_onevision' }>;
+export type TextLLMModelConfig = Extract<InternalAnyModelConfig, { type: 'text_llm' }>;
+export type T5EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 't5_encoder' }>;
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
-  S['AnyModelConfig'],
+  InternalAnyModelConfig,
   { type: 't5_encoder'; format: 'bnb_quantized_int8b' }
 >;
-export type Qwen3EncoderModelConfig = Extract<S['AnyModelConfig'], { type: 'qwen3_encoder' }>;
-export type SpandrelImageToImageModelConfig = Extract<S['AnyModelConfig'], { type: 'spandrel_image_to_image' }>;
-export type CheckpointModelConfig = Extract<S['AnyModelConfig'], { type: 'main'; format: 'checkpoint' }>;
-export type CLIPVisionModelConfig = Extract<S['AnyModelConfig'], { type: 'clip_vision' }>;
-export type SigLIPModelConfig = Extract<S['AnyModelConfig'], { type: 'siglip' }>;
-export type FLUXReduxModelConfig = Extract<S['AnyModelConfig'], { type: 'flux_redux' }>;
-type ApiModelConfig = Extract<S['AnyModelConfig'], { format: 'api' }>;
-type UnknownModelConfig = Extract<S['AnyModelConfig'], { type: 'unknown' }>;
+export type Qwen3EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'qwen3_encoder' }>;
+export type SpandrelImageToImageModelConfig = Extract<InternalAnyModelConfig, { type: 'spandrel_image_to_image' }>;
+export type CheckpointModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; format: 'checkpoint' }>;
+export type CLIPVisionModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_vision' }>;
+export type SigLIPModelConfig = Extract<InternalAnyModelConfig, { type: 'siglip' }>;
+export type FLUXReduxModelConfig = Extract<InternalAnyModelConfig, { type: 'flux_redux' }>;
+type ApiModelConfig = Extract<InternalAnyModelConfig, { format: 'api' }>;
+type UnknownModelConfig = Extract<InternalAnyModelConfig, { type: 'unknown' }>;
 export type FLUXKontextModelConfig = MainModelConfig;
 export type ChatGPT4oModelConfig = ApiModelConfig;
 export type Gemini2_5ModelConfig = ApiModelConfig;
 type SubmodelDefinition = S['SubmodelDefinition'];
+
+export type ExternalImageSize = {
+  width: number;
+  height: number;
+};
+
+type ExternalResolutionPreset = {
+  label: string;
+  aspect_ratio: string;
+  image_size: string;
+  width: number;
+  height: number;
+};
+
+export type ExternalModelCapabilities = {
+  modes: ('txt2img' | 'img2img' | 'inpaint')[];
+  supports_reference_images?: boolean;
+  supports_negative_prompt?: boolean;
+  supports_seed?: boolean;
+  supports_guidance?: boolean;
+  supports_steps?: boolean;
+  max_images_per_request?: number | null;
+  max_image_size?: ExternalImageSize | null;
+  allowed_aspect_ratios?: string[] | null;
+  aspect_ratio_sizes?: Record<string, ExternalImageSize> | null;
+  resolution_presets?: ExternalResolutionPreset[] | null;
+  max_reference_images?: number | null;
+  mask_format?: 'alpha' | 'binary' | 'none';
+  input_image_required_for?: ('txt2img' | 'img2img' | 'inpaint')[] | null;
+};
+
+export type ExternalApiModelDefaultSettings = {
+  width?: number | null;
+  height?: number | null;
+  steps?: number | null;
+  guidance?: number | null;
+  num_images?: number | null;
+};
+
+export type ExternalPanelControlName =
+  | 'negative_prompt'
+  | 'reference_images'
+  | 'dimensions'
+  | 'seed'
+  | 'steps'
+  | 'guidance';
+
+export type ExternalModelPanelControl = {
+  name: ExternalPanelControlName;
+  slider_min?: number | null;
+  slider_max?: number | null;
+  number_input_min?: number | null;
+  number_input_max?: number | null;
+  fine_step?: number | null;
+  coarse_step?: number | null;
+  marks?: number[] | null;
+};
+
+export type ExternalModelPanelSchema = {
+  prompts: ExternalModelPanelControl[];
+  image: ExternalModelPanelControl[];
+  generation: ExternalModelPanelControl[];
+};
+
+export type ExternalApiModelConfig = {
+  key: string;
+  hash: string;
+  path: string;
+  file_size: number;
+  name: string;
+  description: string | null;
+  source: string;
+  source_type: string;
+  source_api_response: JsonObject | null;
+  cover_image: string | null;
+  base: 'external';
+  type: 'external_image_generator';
+  format: 'external_api';
+  provider_id: string;
+  provider_model_id: string;
+  capabilities: ExternalModelCapabilities;
+  default_settings?: ExternalApiModelDefaultSettings | null;
+  panel_schema?: ExternalModelPanelSchema | null;
+  tags?: string[] | null;
+  is_default?: boolean;
+};
+export type AnyModelConfig = InternalAnyModelConfig;
+export type AnyModelConfigWithExternal = AnyModelConfig | ExternalApiModelConfig;
+export type MainOrExternalModelConfig = MainModelConfig | ExternalApiModelConfig;
 
 /**
  * Checks if a list of submodels contains any that match a given variant or type
@@ -225,6 +331,10 @@ export const isLLaVAModelConfig = (config: AnyModelConfig): config is LlavaOnevi
   return config.type === 'llava_onevision';
 };
 
+export const isTextLLMModelConfig = (config: AnyModelConfig): config is TextLLMModelConfig => {
+  return config.type === 'text_llm';
+};
+
 export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAdapterModelConfig => {
   return config.type === 't2i_adapter';
 };
@@ -301,6 +411,12 @@ export const isFluxReduxModelConfig = (config: AnyModelConfig): config is FLUXRe
   return config.type === 'flux_redux';
 };
 
+export const isExternalApiModelConfig = (
+  config: AnyModelConfigWithExternal | null | undefined
+): config is ExternalApiModelConfig => {
+  return !!config && (config as { format?: string }).format === 'external_api';
+};
+
 export const isUnknownModelConfig = (config: AnyModelConfig): config is UnknownModelConfig => {
   return config.type === 'unknown';
 };
@@ -311,6 +427,15 @@ export const isFluxKontextModelConfig = (config: AnyModelConfig): config is FLUX
 
 export const isNonRefinerMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base !== 'sdxl-refiner';
+};
+
+export const isMainOrExternalModelConfig = (
+  config: AnyModelConfigWithExternal
+): config is MainOrExternalModelConfig => {
+  if (isExternalApiModelConfig(config)) {
+    return true;
+  }
+  return isNonRefinerMainModelConfig(config);
 };
 
 export const isRefinerMainModelModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
@@ -337,6 +462,10 @@ export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config
   return config.type === 'main' && config.base === 'z-image' && config.format === 'diffusers';
 };
 
+export const isFlux2DiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'flux2' && config.format === 'diffusers';
+};
+
 export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'qwen-image' && config.format === 'diffusers';
 };
@@ -345,7 +474,15 @@ export const isTIModelConfig = (config: AnyModelConfig): config is MainModelConf
   return config.type === 'embedding';
 };
 
-export type ModelInstallJob = S['ModelInstallJob'];
+type ExternalModelInstallSource = {
+  type: 'external';
+  provider_id: string;
+  provider_model_id: string;
+};
+type ModelInstallSource = S['ModelInstallJob']['source'] | ExternalModelInstallSource;
+export type ModelInstallJob = Omit<S['ModelInstallJob'], 'source'> & {
+  source: ModelInstallSource;
+};
 export type ModelInstallStatus = S['InstallStatus'];
 
 // Graphs
