@@ -1,10 +1,14 @@
-import { Flex, Heading, Spacer, Text } from '@invoke-ai/ui-library';
+import { Flex, Heading, Link, Spacer, Text } from '@invoke-ai/ui-library';
 import { useIsModelManagerEnabled } from 'features/modelManagerV2/hooks/useIsModelManagerEnabled';
 import ModelImageUpload from 'features/modelManagerV2/subpanels/ModelPanel/Fields/ModelImageUpload';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AnyModelConfigWithExternal } from 'services/api/types';
+
+const isSafeUrl = (url: string): boolean => {
+  return url.startsWith('https://') || url.startsWith('http://');
+};
 
 type Props = PropsWithChildren<{
   modelConfig: AnyModelConfigWithExternal;
@@ -28,6 +32,14 @@ export const ModelHeader = memo(({ modelConfig, children }: Props) => {
         {modelConfig.source && (
           <Text variant="subtext" noOfLines={1} wordBreak="break-all">
             {t('modelManager.source')}: {modelConfig.source}
+          </Text>
+        )}
+        {'source_url' in modelConfig && modelConfig.source_url && isSafeUrl(modelConfig.source_url) && (
+          <Text variant="subtext" noOfLines={1} wordBreak="break-all">
+            {t('modelManager.sourceUrl')}:{' '}
+            <Link href={modelConfig.source_url} isExternal color="invokeBlue.300">
+              {modelConfig.source_url}
+            </Link>
           </Text>
         )}
         <Text noOfLines={3}>{modelConfig.description}</Text>
