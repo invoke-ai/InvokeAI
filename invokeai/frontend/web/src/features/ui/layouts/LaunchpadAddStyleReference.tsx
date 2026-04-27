@@ -45,7 +45,11 @@ export const LaunchpadAddStyleReference = memo((props: { extraAction?: () => voi
         <PiUploadBold />
         <input {...uploadApi.getUploadInputProps()} />
       </Flex>
-      <DndDropTarget dndTarget={addGlobalReferenceImageDndTarget} dndTargetData={dndTargetData} label="Drop" />
+      <DndDropTarget
+        dndTarget={addGlobalReferenceImageDndTarget}
+        dndTargetData={dndTargetData}
+        label={t('gallery.drop')}
+      />
     </LaunchpadButton>
   );
 });

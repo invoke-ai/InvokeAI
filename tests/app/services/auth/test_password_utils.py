@@ -1,6 +1,11 @@
 """Unit tests for password utilities."""
 
-from invokeai.app.services.auth.password_utils import hash_password, validate_password_strength, verify_password
+from invokeai.app.services.auth.password_utils import (
+    get_password_strength,
+    hash_password,
+    validate_password_strength,
+    verify_password,
+)
 
 
 class TestPasswordHashing:
@@ -221,6 +226,58 @@ class TestPasswordStrengthValidation:
 
         assert valid is True
         assert message == ""
+
+
+class TestGetPasswordStrength:
+    """Tests for get_password_strength function."""
+
+    def test_weak_password_too_short(self):
+        """Test that passwords shorter than 8 characters are 'weak'."""
+        assert get_password_strength("Ab1") == "weak"
+        assert get_password_strength("Ab1defg") == "weak"  # 7 chars
+        assert get_password_strength("") == "weak"
+
+    def test_moderate_password_missing_uppercase(self):
+        """Test that 8+ char passwords missing uppercase are 'moderate'."""
+        assert get_password_strength("lowercase1") == "moderate"
+
+    def test_moderate_password_missing_lowercase(self):
+        """Test that 8+ char passwords missing lowercase are 'moderate'."""
+        assert get_password_strength("UPPERCASE1") == "moderate"
+
+    def test_moderate_password_missing_digit(self):
+        """Test that 8+ char passwords missing digits are 'moderate'."""
+        assert get_password_strength("NoDigitsHere") == "moderate"
+
+    def test_moderate_password_only_lowercase_and_digit(self):
+        """Test that 8+ char passwords with only lowercase and digit are 'moderate'."""
+        assert get_password_strength("lowercase1") == "moderate"
+
+    def test_strong_password(self):
+        """Test that 8+ char passwords with upper, lower, and digit are 'strong'."""
+        assert get_password_strength("StrongPass1") == "strong"
+        assert get_password_strength("Pass123A") == "strong"
+
+    def test_strong_password_with_special_chars(self):
+        """Test that passwords meeting all requirements plus special chars are 'strong'."""
+        assert get_password_strength("Pass!@#$123") == "strong"
+
+    def test_exactly_8_characters_meeting_requirements(self):
+        """Test that exactly 8 characters meeting requirements is 'strong'."""
+        assert get_password_strength("Pass123A") == "strong"
+
+    def test_exactly_8_characters_missing_uppercase(self):
+        """Test that exactly 8 characters missing uppercase is 'moderate'."""
+        assert get_password_strength("pass123a") == "moderate"
+
+    def test_strength_progression(self):
+        """Test that strength improves as requirements are met."""
+        # Too short - weak
+        assert get_password_strength("Abc1") == "weak"
+        # Long enough but only lowercase - moderate
+        assert get_password_strength("abcdefgh") == "moderate"
+        # Meets all requirements - strong
+        assert get_password_strength("Abcdefg1") == "strong"
 
 
 class TestPasswordSecurityProperties:

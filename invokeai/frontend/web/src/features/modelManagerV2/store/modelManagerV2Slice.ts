@@ -7,7 +7,10 @@ import { zModelType } from 'features/nodes/types/common';
 import { assert } from 'tsafe';
 import z from 'zod';
 
-const zModelCategoryType = zModelType.exclude(['onnx']).or(z.literal('refiner'));
+const zModelCategoryType = zModelType
+  .exclude(['onnx'])
+  .or(z.literal('refiner'))
+  .or(z.literal('external_image_generator'));
 export type ModelCategoryType = z.infer<typeof zModelCategoryType>;
 
 const zFilterableModelType = zModelCategoryType.or(z.literal('missing'));
@@ -22,6 +25,10 @@ const zModelManagerState = z.object({
   scanPath: z.string().optional(),
   shouldInstallInPlace: z.boolean(),
   selectedModelKeys: z.array(z.string()),
+  orderBy: z
+    .enum(['default', 'name', 'type', 'base', 'size', 'created_at', 'updated_at', 'path', 'format'])
+    .default('name'),
+  sortDirection: z.enum(['asc', 'desc']).default('asc'),
 });
 
 type ModelManagerState = z.infer<typeof zModelManagerState>;
@@ -35,6 +42,8 @@ const getInitialState = (): ModelManagerState => ({
   scanPath: undefined,
   shouldInstallInPlace: true,
   selectedModelKeys: [],
+  orderBy: 'name',
+  sortDirection: 'asc',
 });
 
 const slice = createSlice({
@@ -74,6 +83,12 @@ const slice = createSlice({
     clearModelSelection: (state) => {
       state.selectedModelKeys = [];
     },
+    setOrderBy: (state, action: PayloadAction<ModelManagerState['orderBy']>) => {
+      state.orderBy = action.payload;
+    },
+    setSortDirection: (state, action: PayloadAction<ModelManagerState['sortDirection']>) => {
+      state.sortDirection = action.payload;
+    },
   },
 });
 
@@ -87,6 +102,8 @@ export const {
   modelSelectionChanged,
   toggleModelSelection,
   clearModelSelection,
+  setOrderBy,
+  setSortDirection,
 } = slice.actions;
 
 export const modelManagerSliceConfig: SliceConfig<typeof slice> = {
@@ -116,3 +133,5 @@ export const selectSearchTerm = createModelManagerSelector((mm) => mm.searchTerm
 export const selectFilteredModelType = createModelManagerSelector((mm) => mm.filteredModelType);
 export const selectShouldInstallInPlace = createModelManagerSelector((mm) => mm.shouldInstallInPlace);
 export const selectSelectedModelKeys = createModelManagerSelector((mm) => mm.selectedModelKeys);
+export const selectOrderBy = createModelManagerSelector((mm) => mm.orderBy);
+export const selectSortDirection = createModelManagerSelector((mm) => mm.sortDirection);

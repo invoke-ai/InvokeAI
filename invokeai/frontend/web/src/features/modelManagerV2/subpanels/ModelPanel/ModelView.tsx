@@ -6,18 +6,22 @@ import { LoRAModelDefaultSettings } from 'features/modelManagerV2/subpanels/Mode
 import { ModelConvertButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelConvertButton';
 import { ModelEditButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelEditButton';
 import { ModelHeader } from 'features/modelManagerV2/subpanels/ModelPanel/ModelHeader';
+import { ModelSettingsExportButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelSettingsExportButton';
+import { ModelSettingsImportButton } from 'features/modelManagerV2/subpanels/ModelPanel/ModelSettingsImportButton';
 import { TriggerPhrases } from 'features/modelManagerV2/subpanels/ModelPanel/TriggerPhrases';
 import { filesize } from 'filesize';
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import type {
-  AnyModelConfig,
-  CLIPEmbedModelConfig,
-  CLIPVisionModelConfig,
-  LlavaOnevisionModelConfig,
-  Qwen3EncoderModelConfig,
-  SigLIPModelConfig,
-  T5EncoderModelConfig,
+import {
+  type AnyModelConfigWithExternal,
+  type CLIPEmbedModelConfig,
+  type CLIPVisionModelConfig,
+  isExternalApiModelConfig,
+  type LlavaOnevisionModelConfig,
+  type Qwen3EncoderModelConfig,
+  type SigLIPModelConfig,
+  type T5EncoderModelConfig,
+  type TextLLMModelConfig,
 } from 'services/api/types';
 
 import { isExternalModel } from './isExternalModel';
@@ -34,21 +38,23 @@ type EncoderModelConfig =
   | Qwen3EncoderModelConfig
   | CLIPVisionModelConfig
   | SigLIPModelConfig
-  | LlavaOnevisionModelConfig;
+  | LlavaOnevisionModelConfig
+  | TextLLMModelConfig;
 
-const isEncoderModel = (modelConfig: AnyModelConfig): modelConfig is EncoderModelConfig => {
+const isEncoderModel = (modelConfig: AnyModelConfigWithExternal): modelConfig is EncoderModelConfig => {
   return (
     modelConfig.type === 'clip_embed' ||
     modelConfig.type === 't5_encoder' ||
     modelConfig.type === 'qwen3_encoder' ||
     modelConfig.type === 'clip_vision' ||
     modelConfig.type === 'siglip' ||
-    modelConfig.type === 'llava_onevision'
+    modelConfig.type === 'llava_onevision' ||
+    modelConfig.type === 'text_llm'
   );
 };
 
 type Props = {
-  modelConfig: AnyModelConfig;
+  modelConfig: AnyModelConfigWithExternal;
 };
 
 export const ModelView = memo(({ modelConfig }: Props) => {
@@ -88,6 +94,8 @@ export const ModelView = memo(({ modelConfig }: Props) => {
         {canManageModels && modelConfig.format === 'checkpoint' && modelConfig.type === 'main' && (
           <ModelConvertButton modelConfig={modelConfig} />
         )}
+        {withSettings && <ModelSettingsImportButton modelConfig={modelConfig} />}
+        {withSettings && <ModelSettingsExportButton modelConfig={modelConfig} />}
         {canManageModels && <ModelEditButton />}
         {canManageModels && <ModelDeleteButton modelConfig={modelConfig} />}
       </ModelHeader>
@@ -100,6 +108,12 @@ export const ModelView = memo(({ modelConfig }: Props) => {
             <ModelAttrView label={t('modelManager.modelFormat')} value={modelConfig.format} />
             <ModelAttrView label={t('modelManager.path')} value={modelConfig.path} />
             <ModelAttrView label={t('modelManager.fileSize')} value={filesize(modelConfig.file_size)} />
+            {isExternalApiModelConfig(modelConfig) && (
+              <>
+                <ModelAttrView label={t('modelManager.providerId')} value={modelConfig.provider_id} />
+                <ModelAttrView label={t('modelManager.providerModelId')} value={modelConfig.provider_model_id} />
+              </>
+            )}
             {'variant' in modelConfig && modelConfig.variant && (
               <ModelAttrView label={t('modelManager.variant')} value={modelConfig.variant} />
             )}

@@ -36,7 +36,7 @@ const ParamDynamicPromptsPreview = () => {
   if (isError) {
     return (
       <Flex w="full" h="full" layerStyle="second" alignItems="center" justifyContent="center" p={8}>
-        <IAINoContentFallback icon={PiWarningCircleBold} label="Problem generating prompts" />
+        <IAINoContentFallback icon={PiWarningCircleBold} label={t('dynamicPrompts.problemGeneratingPrompts')} />
       </Flex>
     );
   }

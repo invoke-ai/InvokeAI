@@ -12,12 +12,13 @@ help:
 	@echo "mypy-all                 Run mypy ignoring the config in pyproject.tom but still ignoring missing imports"
 	@echo "test                     Run the unit tests."
 	@echo "update-config-docstring  Update the app's config docstring so mkdocs can autogenerate it correctly."
-	@echo "frontend-install         Install the pnpm modules needed for the front end"
-	@echo "frontend-build           Build the frontend in order to run on localhost:9090"
+	@echo "frontend-install         Install the pnpm modules needed for the frontend"
+	@echo "frontend-build           Build the frontend for localhost:9090"
+	@echo "frontend-test            Run the frontend test suite once"
 	@echo "frontend-dev             Run the frontend in developer mode on localhost:5173"
 	@echo "frontend-typegen         Generate types for the frontend from the OpenAPI schema"
-	@echo "frontend-prettier        Format the frontend using lint:prettier"
-	@echo "wheel            	Build the wheel for the current version"
+	@echo "frontend-lint            Run frontend checks and fixable lint/format steps"
+	@echo "wheel                    Build the wheel for the current version"
 	@echo "tag-release              Tag the GitHub repository with the current version (use at release time only!)"
 	@echo "openapi                  Generate the OpenAPI schema for the app, outputting to stdout"
 	@echo "docs                     Serve the mkdocs site with live reload"
@@ -56,6 +57,10 @@ frontend-install:
 # Build the frontend
 frontend-build:
 	cd invokeai/frontend/web && pnpm build
+
+# Run the frontend test suite once
+frontend-test:
+	cd invokeai/frontend/web && pnpm run test:run
 
 # Run the frontend in dev mode
 frontend-dev:

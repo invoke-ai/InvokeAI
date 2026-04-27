@@ -219,6 +219,11 @@ class SessionQueueItem(BaseModel):
 
     item_id: int = Field(description="The identifier of the session queue item")
     status: QUEUE_ITEM_STATUS = Field(default="pending", description="The status of this queue item")
+    status_sequence: int | None = Field(
+        default=None,
+        # Fallback for rows serialized before migration_28 added the DB-level default of 0.
+        description="A monotonically increasing version for this queue item's visible status lifecycle",
+    )
     priority: int = Field(default=0, description="The priority of this queue item")
     batch_id: str = Field(description="The ID of the batch associated with this queue item")
     origin: str | None = Field(
@@ -304,12 +309,6 @@ class SessionQueueStatus(BaseModel):
     failed: int = Field(..., description="Number of queue items with status 'error'")
     canceled: int = Field(..., description="Number of queue items with status 'canceled'")
     total: int = Field(..., description="Total number of queue items")
-    user_pending: Optional[int] = Field(
-        default=None, description="Number of queue items with status 'pending' for the current user"
-    )
-    user_in_progress: Optional[int] = Field(
-        default=None, description="Number of queue items with status 'in_progress' for the current user"
-    )
 
 
 class SessionQueueCountsByDestination(BaseModel):

@@ -1,6 +1,11 @@
 import { IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
-import { selectHeight, selectWidth, sizeOptimized } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectHasFixedDimensionSizes,
+  selectHeight,
+  selectWidth,
+  sizeOptimized,
+} from 'features/controlLayers/store/paramsSlice';
 import { selectOptimalDimension } from 'features/controlLayers/store/selectors';
 import { getIsSizeTooLarge, getIsSizeTooSmall } from 'features/parameters/util/optimalDimension';
 import { memo, useCallback, useMemo } from 'react';
@@ -13,6 +18,7 @@ export const DimensionsSetOptimalSizeButton = memo(() => {
   const width = useAppSelector(selectWidth);
   const height = useAppSelector(selectHeight);
   const optimalDimension = useAppSelector(selectOptimalDimension);
+  const hasFixedSizes = useAppSelector(selectHasFixedDimensionSizes);
   const isSizeTooSmall = useMemo(
     () => getIsSizeTooSmall(width, height, optimalDimension),
     [height, width, optimalDimension]
@@ -43,6 +49,7 @@ export const DimensionsSetOptimalSizeButton = memo(() => {
       size="sm"
       icon={<PiSparkleFill />}
       colorScheme={isSizeTooSmall || isSizeTooLarge ? 'warning' : 'base'}
+      isDisabled={hasFixedSizes}
     />
   );
 });

@@ -12,7 +12,7 @@ import { assert } from 'tsafe';
 import { type Language, type SystemState, zSystemState } from './types';
 
 const getInitialState = (): SystemState => ({
-  _version: 2,
+  _version: 3,
   shouldConfirmOnDelete: true,
   shouldAntialiasProgressImage: false,
   shouldConfirmOnNewSession: true,
@@ -26,6 +26,8 @@ const getInitialState = (): SystemState => ({
   logNamespaces: [...zLogNamespace.options],
   shouldShowInvocationProgressDetail: false,
   shouldHighlightFocusedRegions: false,
+  shouldUseMiddleClickToOpenInNewTab: false,
+  prefersNumericAttentionWeights: false,
 });
 
 const slice = createSlice({
@@ -69,11 +71,17 @@ const slice = createSlice({
     shouldConfirmOnNewSessionToggled(state) {
       state.shouldConfirmOnNewSession = !state.shouldConfirmOnNewSession;
     },
+    setPrefersNumericAttentionStyle(state, action: PayloadAction<boolean>) {
+      state.prefersNumericAttentionWeights = action.payload;
+    },
     setShouldShowInvocationProgressDetail(state, action: PayloadAction<boolean>) {
       state.shouldShowInvocationProgressDetail = action.payload;
     },
     setShouldHighlightFocusedRegions(state, action: PayloadAction<boolean>) {
       state.shouldHighlightFocusedRegions = action.payload;
+    },
+    setShouldUseMiddleClickToOpenInNewTab(state, action: PayloadAction<boolean>) {
+      state.shouldUseMiddleClickToOpenInNewTab = action.payload;
     },
   },
 });
@@ -91,7 +99,9 @@ export const {
   setShouldEnableModelDescriptions,
   shouldConfirmOnNewSessionToggled,
   setShouldShowInvocationProgressDetail,
+  setPrefersNumericAttentionStyle,
   setShouldHighlightFocusedRegions,
+  setShouldUseMiddleClickToOpenInNewTab,
 } = slice.actions;
 
 export const systemSliceConfig: SliceConfig<typeof slice> = {
@@ -107,6 +117,10 @@ export const systemSliceConfig: SliceConfig<typeof slice> = {
       if (state._version === 1) {
         state.language = (state as SystemState).language.replace('_', '-');
         state._version = 2;
+      }
+      if (state._version === 2) {
+        state.shouldUseMiddleClickToOpenInNewTab = false;
+        state._version = 3;
       }
       return zSystemState.parse(state);
     },
@@ -135,6 +149,12 @@ export const selectSystemShouldEnableModelDescriptions = createSystemSelector(
 );
 export const selectSystemShouldEnableHighlightFocusedRegions = createSystemSelector(
   (system) => system.shouldHighlightFocusedRegions
+);
+export const selectSystemShouldUseMiddleClickToOpenInNewTab = createSystemSelector(
+  (system) => system.shouldUseMiddleClickToOpenInNewTab
+);
+export const selectSystemPrefersNumericAttentionWeights = createSystemSelector(
+  (system) => system.prefersNumericAttentionWeights
 );
 export const selectSystemShouldConfirmOnNewSession = createSystemSelector((system) => system.shouldConfirmOnNewSession);
 export const selectSystemShouldShowInvocationProgressDetail = createSystemSelector(

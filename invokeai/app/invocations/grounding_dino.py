@@ -24,7 +24,7 @@ GROUNDING_DINO_MODEL_IDS: dict[GroundingDinoModelKey, str] = {
     "grounding_dino",
     title="Grounding DINO (Text Prompt Object Detection)",
     tags=["prompt", "object detection"],
-    category="image",
+    category="segmentation",
     version="1.0.0",
 )
 class GroundingDinoInvocation(BaseInvocation):
