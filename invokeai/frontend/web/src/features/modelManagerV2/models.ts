@@ -235,6 +235,7 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   dev_fill: 'FLUX Dev - Fill',
   schnell: 'FLUX Schnell',
   klein_4b: 'FLUX.2 Klein 4B',
+  klein_4b_base: 'FLUX.2 Klein 4B Base',
   klein_9b: 'FLUX.2 Klein 9B',
   klein_9b_base: 'FLUX.2 Klein 9B Base',
   turbo: 'Z-Image Turbo',
