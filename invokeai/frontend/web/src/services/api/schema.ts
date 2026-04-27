@@ -4948,10 +4948,7 @@ export type components = {
              */
             type: "infill_cv2";
         };
-        /**
-         * CacheStats
-         * @description Collect statistics on cache performance.
-         */
+        /** CacheStats */
         CacheStats: {
             /**
              * Hits
