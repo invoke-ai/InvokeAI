@@ -97,6 +97,7 @@ from invokeai.backend.model_manager.configs.t2i_adapter import (
     T2IAdapter_Diffusers_SDXL_Config,
 )
 from invokeai.backend.model_manager.configs.t5_encoder import T5Encoder_BnBLLMint8_Config, T5Encoder_T5Encoder_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.configs.textual_inversion import (
     TI_File_SD1_Config,
     TI_File_SD2_Config,
@@ -269,6 +270,7 @@ AnyModelConfig = Annotated[
         Annotated[SigLIP_Diffusers_Config, SigLIP_Diffusers_Config.get_tag()],
         Annotated[FLUXRedux_Checkpoint_Config, FLUXRedux_Checkpoint_Config.get_tag()],
         Annotated[LlavaOnevision_Diffusers_Config, LlavaOnevision_Diffusers_Config.get_tag()],
+        Annotated[TextLLM_Diffusers_Config, TextLLM_Diffusers_Config.get_tag()],
         Annotated[ExternalApiModelConfig, ExternalApiModelConfig.get_tag()],
         # Unknown model (fallback)
         Annotated[Unknown_Config, Unknown_Config.get_tag()],
