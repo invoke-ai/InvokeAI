@@ -6,9 +6,7 @@ from torch import Tensor
 
 from invokeai.backend.flux.dype.base import (
     DyPEConfig,
-    compute_ntk_freqs,
     compute_vision_yarn_freqs,
-    compute_yarn_freqs,
 )
 
 
@@ -50,37 +48,15 @@ def rope_dype(
     if not dype_config.enable_dype or scale <= 1.0:
         return _rope_base(pos, dim, theta)
 
-    # Select method and compute frequencies
-    method = dype_config.method
-
-    if method == "vision_yarn":
-        cos, sin = compute_vision_yarn_freqs(
-            pos=pos,
-            dim=dim,
-            theta=theta,
-            scale_h=scale_h,
-            scale_w=scale_w,
-            current_sigma=current_sigma,
-            dype_config=dype_config,
-        )
-    elif method == "yarn":
-        cos, sin = compute_yarn_freqs(
-            pos=pos,
-            dim=dim,
-            theta=theta,
-            scale=scale,
-            current_sigma=current_sigma,
-            dype_config=dype_config,
-        )
-    elif method == "ntk":
-        cos, sin = compute_ntk_freqs(
-            pos=pos,
-            dim=dim,
-            theta=theta,
-            scale=scale,
-        )
-    else:  # "base"
-        return _rope_base(pos, dim, theta)
+    cos, sin = compute_vision_yarn_freqs(
+        pos=pos,
+        dim=dim,
+        theta=theta,
+        scale_h=scale_h,
+        scale_w=scale_w,
+        current_sigma=current_sigma,
+        dype_config=dype_config,
+    )
 
     # Construct rotation matrix from cos/sin
     # Output shape: (batch, seq_len, dim/2, 2, 2)
