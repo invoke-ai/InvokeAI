@@ -37,6 +37,31 @@ class ClientStatePersistenceABC(ABC):
         pass
 
     @abstractmethod
+    def get_keys_by_prefix(self, user_id: str, prefix: str) -> list[str]:
+        """
+        Get all keys matching a prefix for a user.
+
+        Args:
+            user_id (str): The user ID to get keys for.
+            prefix (str): The prefix to filter keys by.
+
+        Returns:
+            list[str]: A list of keys matching the prefix.
+        """
+        pass
+
+    @abstractmethod
+    def delete_by_key(self, user_id: str, key: str) -> None:
+        """
+        Delete a specific key-value pair for a user.
+
+        Args:
+            user_id (str): The user ID to delete state for.
+            key (str): The key to delete.
+        """
+        pass
+
+    @abstractmethod
     def delete(self, user_id: str) -> None:
         """
         Delete all client state for a user.

@@ -2660,7 +2660,9 @@
             "fitModeCover": "Copri",
             "smoothingMode": "Modalità di ricampionamento",
             "smoothingDesc": "Applica un ricampionamento di alta qualità lato backend alla conferma delle trasformazioni.",
-            "smoothing": "Smussamento"
+            "smoothing": "Smussamento",
+            "smoothingModeBilinear": "Bilineare",
+            "smoothingModeBicubic": "Bicubico"
         },
         "stagingArea": {
             "next": "Successiva",
