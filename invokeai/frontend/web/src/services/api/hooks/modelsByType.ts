@@ -24,6 +24,7 @@ import {
   isFluxReduxModelConfig,
   isFluxVAEModelConfig,
   isIPAdapterModelConfig,
+  isLLaVAModelConfig,
   isLoRAModelConfig,
   isMainOrExternalModelConfig,
   isQwen3EncoderModelConfig,
@@ -31,6 +32,7 @@ import {
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
+  isTextLLMModelConfig,
   isTIModelConfig,
   isVAEModelConfigOrSubmodel,
   isZImageDiffusersMainModelConfig,
@@ -146,3 +148,5 @@ export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMa
 export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
 export const selectT5EncoderModels = buildModelsSelector(isT5EncoderModelConfigOrSubmodel);
+export const useTextLLMModels = () => buildModelsHook(isTextLLMModelConfig)();
+export const useLlavaModels = () => buildModelsHook(isLLaVAModelConfig)();
