@@ -17,6 +17,7 @@ import {
   isSpandrelImageToImageModelConfig,
   isT2IAdapterModelConfig,
   isT5EncoderModelConfig,
+  isTextLLMModelConfig,
   isTIModelConfig,
   isUnknownModelConfig,
   isVAEModelConfig,
@@ -122,6 +123,11 @@ const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
     i18nKey: 'modelManager.llavaOnevision',
     filter: isLLaVAModelConfig,
   },
+  text_llm: {
+    category: 'text_llm',
+    i18nKey: 'modelManager.textLLM',
+    filter: isTextLLMModelConfig,
+  },
   external_image_generator: {
     category: 'external_image_generator',
     i18nKey: 'modelManager.externalImageGenerator',
@@ -176,6 +182,7 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   clip_embed: 'CLIP Embed',
   siglip: 'SigLIP',
   flux_redux: 'FLUX Redux',
+  text_llm: 'Text LLM',
   external_image_generator: 'External Image Generator',
   unknown: 'Unknown',
 };
