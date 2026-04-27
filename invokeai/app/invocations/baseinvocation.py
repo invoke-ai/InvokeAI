@@ -339,6 +339,32 @@ class InvocationRegistry:
         cls.get_invocation_typeadapter.cache_clear()
 
     @classmethod
+    def unregister_pack(cls, node_pack: str) -> list[str]:
+        """Unregisters all invocations and outputs belonging to a node pack.
+
+        Returns a list of the invocation types that were removed.
+        """
+        removed_types: list[str] = []
+
+        invocations_to_remove = {inv for inv in cls._invocation_classes if inv.UIConfig.node_pack == node_pack}
+        for inv in invocations_to_remove:
+            removed_types.append(inv.get_type())
+            cls._invocation_classes.discard(inv)
+
+        if invocations_to_remove:
+            cls.invalidate_invocation_typeadapter()
+
+        # Also remove any output classes from this pack's modules
+        outputs_to_remove = {out for out in cls._output_classes if out.__module__.split(".")[0] == node_pack}
+        for out in outputs_to_remove:
+            cls._output_classes.discard(out)
+
+        if outputs_to_remove:
+            cls.invalidate_output_typeadapter()
+
+        return removed_types
+
+    @classmethod
     def get_invocation_classes(cls) -> Iterable[type[BaseInvocation]]:
         """Gets all invocations, respecting the allowlist and denylist."""
         app_config = get_config()
