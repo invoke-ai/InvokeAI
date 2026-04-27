@@ -12,6 +12,7 @@ import {
   type ComparisonMode,
   type GalleryState,
   type GalleryView,
+  isVirtualBoardId,
   type OrderDir,
   zGalleryState,
 } from './types';
@@ -33,6 +34,8 @@ const getInitialState = (): GalleryState => ({
   comparisonMode: 'slider',
   comparisonFit: 'fill',
   shouldShowArchivedBoards: false,
+  showVirtualBoards: false,
+  virtualBoardsSectionOpen: true,
   boardsListOrderBy: 'created_at',
   boardsListOrderDir: 'DESC',
 });
@@ -103,6 +106,10 @@ const slice = createSlice({
         state.autoAddBoardId = 'none';
         return;
       }
+      // Virtual boards cannot be auto-add targets
+      if (isVirtualBoardId(action.payload)) {
+        return;
+      }
       state.autoAddBoardId = action.payload;
     },
     galleryViewChanged: (state, action: PayloadAction<GalleryView>) => {
@@ -126,6 +133,17 @@ const slice = createSlice({
     },
     shouldShowArchivedBoardsChanged: (state, action: PayloadAction<boolean>) => {
       state.shouldShowArchivedBoards = action.payload;
+    },
+    showVirtualBoardsChanged: (state, action: PayloadAction<boolean>) => {
+      state.showVirtualBoards = action.payload;
+      // If virtual boards are hidden and a virtual board is selected, reset to 'none'
+      if (!action.payload && isVirtualBoardId(state.selectedBoardId)) {
+        state.selectedBoardId = 'none';
+        state.selection = [];
+      }
+    },
+    virtualBoardsSectionOpenChanged: (state, action: PayloadAction<boolean>) => {
+      state.virtualBoardsSectionOpen = action.payload;
     },
     starredFirstChanged: (state, action: PayloadAction<boolean>) => {
       state.starredFirst = action.payload;
@@ -172,6 +190,8 @@ export const {
   orderDirChanged,
   starredFirstChanged,
   shouldShowArchivedBoardsChanged,
+  showVirtualBoardsChanged,
+  virtualBoardsSectionOpenChanged,
   searchTermChanged,
   boardsListOrderByChanged,
   boardsListOrderDirChanged,
@@ -188,6 +208,13 @@ export const gallerySliceConfig: SliceConfig<typeof slice> = {
       assert(isPlainObject(state));
       if (!('_version' in state)) {
         state._version = 1;
+      }
+      // Add virtual boards fields if missing (added in virtual boards feature)
+      if (!('showVirtualBoards' in state)) {
+        state.showVirtualBoards = false;
+      }
+      if (!('virtualBoardsSectionOpen' in state)) {
+        state.virtualBoardsSectionOpen = true;
       }
       return zGalleryState.parse(state);
     },
