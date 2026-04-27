@@ -1,6 +1,10 @@
+import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+import { reorderWithEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/util/reorder-with-edge';
 import { Button, Collapse, Divider, Flex, IconButton } from '@invoke-ai/ui-library';
-import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { RefImagePreview } from 'features/controlLayers/components/RefImage/RefImagePreview';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { RefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
@@ -9,15 +13,18 @@ import { useNewGlobalReferenceImageFromBbox } from 'features/controlLayers/hooks
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   refImageAdded,
+  refImagesReordered,
   selectIsRefImagePanelOpen,
   selectRefImageEntityIds,
   selectSelectedRefEntityId,
 } from 'features/controlLayers/store/refImagesSlice';
 import { imageDTOToCroppableImage } from 'features/controlLayers/store/util';
-import { addGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
+import { addGlobalReferenceImageDndTarget, singleRefImageDndSource } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
+import { triggerPostMoveFlash } from 'features/dnd/util';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiUploadBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
@@ -29,6 +36,69 @@ export const RefImageList = memo(() => {
   const ids = useAppSelector(selectRefImageEntityIds);
   const isPanelOpen = useAppSelector(selectIsRefImagePanelOpen);
   const selectedEntityId = useAppSelector(selectSelectedRefEntityId);
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    return monitorForElements({
+      canMonitor({ source }) {
+        return singleRefImageDndSource.typeGuard(source.data);
+      },
+      onDrop({ location, source }) {
+        const target = location.current.dropTargets[0];
+        if (!target) {
+          return;
+        }
+
+        const sourceData = source.data;
+        const targetData = target.data;
+
+        if (!singleRefImageDndSource.typeGuard(sourceData) || !singleRefImageDndSource.typeGuard(targetData)) {
+          return;
+        }
+
+        const indexOfSource = ids.indexOf(sourceData.payload.id);
+        const indexOfTarget = ids.indexOf(targetData.payload.id);
+
+        if (indexOfTarget < 0 || indexOfSource < 0) {
+          return;
+        }
+
+        if (indexOfSource === indexOfTarget) {
+          return;
+        }
+
+        const closestEdgeOfTarget = extractClosestEdge(targetData);
+
+        let edgeIndexDelta = 0;
+        if (closestEdgeOfTarget === 'right') {
+          edgeIndexDelta = 1;
+        } else if (closestEdgeOfTarget === 'left') {
+          edgeIndexDelta = -1;
+        }
+
+        if (indexOfSource === indexOfTarget + edgeIndexDelta) {
+          return;
+        }
+
+        const nextIds = reorderWithEdge({
+          list: ids,
+          startIndex: indexOfSource,
+          indexOfTarget,
+          closestEdgeOfTarget,
+          axis: 'horizontal',
+        });
+
+        flushSync(() => {
+          dispatch(refImagesReordered({ ids: nextIds }));
+        });
+
+        const element = document.querySelector(`[data-ref-image-id="${sourceData.payload.id}"]`);
+        if (element instanceof HTMLElement) {
+          triggerPostMoveFlash(element, colorTokenToCssVar('base.700'));
+        }
+      },
+    });
+  }, [dispatch, ids]);
 
   return (
     <Flex flexDir="column">
