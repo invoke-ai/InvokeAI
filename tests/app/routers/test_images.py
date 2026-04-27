@@ -125,3 +125,36 @@ def test_get_bulk_download_image_image_deleted_after_response(
     client.get("/api/v1/images/download/test.zip")
 
     assert not (tmp_path / "test.zip").exists()
+
+
+def test_search_image_names_endpoint(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    monkeypatch.setattr("invokeai.app.api.routers.images.ApiDependencies", MockApiDependencies(mock_invoker))
+
+    captured: dict[str, Any] = {}
+
+    def mock_get_image_names(**kwargs):
+        captured.update(kwargs)
+        return {"image_names": ["test.png"], "starred_count": 0, "total_count": 1}
+
+    monkeypatch.setattr(mock_invoker.services.images, "get_image_names", mock_get_image_names)
+
+    response = client.post(
+        "/api/v1/images/search/names",
+        json={
+            "file_name_term": "test",
+            "metadata_term": "prompt",
+            "width_min": 512,
+            "height_exact": 768,
+            "board_ids": ["none"],
+            "starred_mode": "only",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["image_names"] == ["test.png"]
+    assert captured["file_name_term"] == "test"
+    assert captured["metadata_term"] == "prompt"
+    assert captured["width_min"] == 512
+    assert captured["height_exact"] == 768
+    assert captured["board_ids"] == ["none"]
+    assert captured["starred_mode"] == "only"

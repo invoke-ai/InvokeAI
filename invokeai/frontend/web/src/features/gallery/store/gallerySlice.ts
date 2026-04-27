@@ -192,7 +192,6 @@ export const {
   shouldShowArchivedBoardsChanged,
   showVirtualBoardsChanged,
   virtualBoardsSectionOpenChanged,
-  searchTermChanged,
   boardsListOrderByChanged,
   boardsListOrderDirChanged,
 } = slice.actions;

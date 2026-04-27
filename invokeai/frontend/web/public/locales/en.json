@@ -986,6 +986,10 @@
             "starImage": {
                 "title": "Star/Unstar Image",
                 "desc": "Star or unstar the selected image."
+            },
+            "openSearch": {
+                "title": "Open Search Dialog",
+                "desc": "Open the image search dialog."
             }
         }
     },

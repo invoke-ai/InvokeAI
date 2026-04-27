@@ -20,6 +20,8 @@ const tagTypes = [
   'HFTokenStatus',
   'Image',
   'ImageNameList',
+  'ImageSearchNameList',
+  'ImageSearchList',
   'ImageList',
   'ImageMetadata',
   'ImageWorkflow',
