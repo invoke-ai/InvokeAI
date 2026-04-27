@@ -304,8 +304,8 @@ importers:
         specifier: ^3.5.3
         version: 3.6.2
       rev-dep:
-        specifier: ^2.11.0
-        version: 2.11.0
+        specifier: 2.13.1
+        version: 2.13.1
       rollup-plugin-visualizer:
         specifier: ^6.0.3
         version: 6.0.3(rollup@4.45.1)
@@ -1214,20 +1214,20 @@ packages:
       react-redux:
         optional: true
 
-  '@rev-dep/darwin-arm64@2.11.0':
-    resolution: {integrity: sha512-b11MhgNoCA7fdlC4hg9qEeUzgb3rPy4+XrJKBJeVfEzqym92Tzhmu4zvkdhZlRzJMOai2jwuMjoAiCyJP5/jfg==}
+  '@rev-dep/darwin-arm64@2.13.1':
+    resolution: {integrity: sha512-IoEydcaJdemD5gi+5xn0wqwzSlEZ1OAzd5+VGgrW5Ld7BF+dqtDAgIvx9HTYGzcwbbGMVx6KOlUF2A5xeDfNtA==}
     engines: {node: '>=18'}
     cpu: [arm64]
     os: [darwin]
 
-  '@rev-dep/linux-x64@2.11.0':
-    resolution: {integrity: sha512-W+SuSju07C6uWZ4PN2nsvmBqucs6xNibQGiELz96CeCGkVYWv1qgslT5UlVorwrnMHhkv5IuAsK9pBnbCaSUcw==}
+  '@rev-dep/linux-x64@2.13.1':
+    resolution: {integrity: sha512-UWKKi6rxJwqODxuLle6mZE2iED1jqJYC7fCB9+wIRQAnNsivMydqzKtXODGmsaxUQgwmyHr0qhOmNJr4w8Dk4Q==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [linux]
 
-  '@rev-dep/win32-x64@2.11.0':
-    resolution: {integrity: sha512-4dcDnI2KHC3u9wd5jM4TT4MhgePJxdJlSJ49X59xHVhtqHBZVsYa3vtAJ/iTjvaf1ccFRSv6ErKMGTtXkqZ8aA==}
+  '@rev-dep/win32-x64@2.13.1':
+    resolution: {integrity: sha512-sMTyxHdDLSXbIZvKsMjLN+X5GA45iXsWHmfoQNbuHa2hjPc7YxJ8fqapD8DJGjhp1RBmx3nXAIfBro0Gmh57lA==}
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
@@ -3593,8 +3593,8 @@ packages:
     resolution: {integrity: sha512-g6QUff04oZpHs0eG5p83rFLhHeV00ug/Yf9nZM6fLeUrPguBTkTQOdpAWWspMh55TZfVQDPaN3NQJfbVRAxdIw==}
     engines: {iojs: '>=1.0.0', node: '>=0.10.0'}
 
-  rev-dep@2.11.0:
-    resolution: {integrity: sha512-sezdnoZMXCZPSDaha6aaQASsGzzTu1oIs8qDn6Z4FVt7S5MGR4swJUDWYSUXSfCnnfNnklIJ0T0iAkCIjLZodw==}
+  rev-dep@2.13.1:
+    resolution: {integrity: sha512-ujX+Z+pgCUx0hXKqrim3+4lwUKjCI4hO4Lh0e7ILeE+fuOeaYT5OviMcEZwaKE3HXXNypXnUqHu9Lb7LA7CZSQ==}
     engines: {node: '>=18'}
     hasBin: true
 
@@ -5256,13 +5256,13 @@ snapshots:
       react: 18.3.1
       react-redux: 9.2.0(@types/react@18.3.23)(react@18.3.1)(redux@5.0.1)
 
-  '@rev-dep/darwin-arm64@2.11.0':
+  '@rev-dep/darwin-arm64@2.13.1':
     optional: true
 
-  '@rev-dep/linux-x64@2.11.0':
+  '@rev-dep/linux-x64@2.13.1':
     optional: true
 
-  '@rev-dep/win32-x64@2.11.0':
+  '@rev-dep/win32-x64@2.13.1':
     optional: true
 
   '@roarr/browser-log-writer@1.3.0':
@@ -7853,11 +7853,11 @@ snapshots:
 
   reusify@1.1.0: {}
 
-  rev-dep@2.11.0:
+  rev-dep@2.13.1:
     optionalDependencies:
-      '@rev-dep/darwin-arm64': 2.11.0
-      '@rev-dep/linux-x64': 2.11.0
-      '@rev-dep/win32-x64': 2.11.0
+      '@rev-dep/darwin-arm64': 2.13.1
+      '@rev-dep/linux-x64': 2.13.1
+      '@rev-dep/win32-x64': 2.13.1
 
   rfdc@1.4.1: {}
 

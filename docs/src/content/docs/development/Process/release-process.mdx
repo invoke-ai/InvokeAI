@@ -62,7 +62,7 @@ Next, these jobs run and must pass. They are the same jobs that are run for ever
 - **`python-tests`**: runs `pytest` on matrix of platforms
 - **`python-checks`**: runs `ruff` (format and lint)
 - **`frontend-tests`**: runs `vitest`
-- **`frontend-checks`**: runs `prettier` (format), `eslint` (lint), `dpdm` (circular refs), `tsc` (static type check) and `knip` (unused imports)
+- **`frontend-checks`**: runs `prettier` (format), `eslint` (lint), `lint:circular` (circular refs), `tsc` (static type check) and `knip` (unused imports)
 - **`typegen-checks`**: ensures the frontend and backend types are synced
 
 #### `build-wheel` Job
