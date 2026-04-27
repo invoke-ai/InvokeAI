@@ -4,29 +4,54 @@ title: Recall Parameters API
 
 ## Overview
 
-A new REST API endpoint has been added to the InvokeAI backend that allows programmatic updates to recallable parameters from another process. This enables external applications or scripts to modify frontend parameters like prompts, models, and step counts via HTTP requests.
+The Recall Parameters API is a REST endpoint on the InvokeAI backend that
+lets external processes set recallable generation parameters on the
+frontend. Supported parameters include:
 
-When parameters are updated via the API, the backend automatically broadcasts a WebSocket event to all connected frontend clients subscribed to that queue, causing them to update immediately.
+- Core text and numeric parameters (prompts, model, steps, CFG, dimensions, seed, ...)
+- LoRAs
+- Control Layers (ControlNet, T2I Adapter, Control LoRA) with optional control images
+- IP Adapters and FLUX Redux reference images with optional images
+- Model-free reference images (FLUX.2 Klein, FLUX Kontext, Qwen Image Edit)
+
+When parameters are updated via the API, the backend stores them in client
+state persistence for the target queue and broadcasts a `recall_parameters_updated`
+WebSocket event. Any frontend client subscribed to that queue applies the
+new values immediately — no manual reload required.
+
+Typical use cases:
+
+- An external image browser that wants to "recall" or "remix" the
+  generation parameters saved into a PNG's metadata.
+- A script that pre-populates parameters before the user runs generation.
+- Automated testing or batch workflows that want to reuse existing model
+  and adapter configurations.
 
 ## How It Works
 
-1. **API Request**: External application sends a POST request with parameters to update
-2. **Storage**: Parameters are stored in client state persistence, associated with a queue ID
-3. **Broadcast**: A WebSocket event (`recall_parameters_updated`) is emitted to all frontend clients listening to that queue
-4. **Frontend Update**: Connected frontend clients receive the event and can process the updated parameters
-5. **Immediate Display**: The frontend UI updates automatically with the new values
-
-This means if you have the InvokeAI frontend open in a browser, updating parameters via the API will instantly reflect on the screen without any manual action needed.
+1. **API request** — your client POSTs a JSON body of parameters to
+   `/api/v1/recall/{queue_id}`.
+2. **Storage** — non-null parameters are stored under
+   `recall_*` keys in the client state persistence service, scoped to the
+   given `queue_id`.
+3. **Resolution** — models are resolved from human-readable names to the
+   internal model keys used by the frontend, and image filenames are
+   validated against `{INVOKEAI_ROOT}/outputs/images`.
+4. **Broadcast** — a `recall_parameters_updated` event is emitted on the
+   websocket room for `queue_id`.
+5. **Frontend update** — any connected client subscribed to that queue
+   applies the update to its Redux store, so UI fields, LoRAs, control
+   layers, IP adapters, and reference images all populate immediately.
 
 ## Endpoint
 
-**Base URL**: `http://localhost:9090/api/v1/recall/{queue_id}`
+**Base URL:** `http://localhost:9090/api/v1/recall/{queue_id}`
 
-## POST - Update Recall Parameters
+The queue id is usually `default`.
 
-Updates recallable parameters for a given queue ID.
+### POST — Update Recall Parameters
 
-### Request
+Updates recallable parameters for the given `queue_id`.
 
 ```http
 POST /api/v1/recall/{queue_id}
@@ -44,11 +69,25 @@ Content-Type: application/json
 }
 ```
 
-The queue id is usually "default".
+All parameters are optional — only send the fields you want to update.
 
-### Parameters
+### GET — Retrieve Recall Parameters
 
-All parameters are optional. Only provide the parameters you want to update:
+```http
+GET /api/v1/recall/{queue_id}
+```
+
+```json
+{
+  "status": "success",
+  "queue_id": "queue_123",
+  "note": "Use the frontend to access stored recall parameters, or set specific parameters using POST"
+}
+```
+
+## Request Schema
+
+### Core parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -67,60 +106,130 @@ All parameters are optional. Only provide the parameters you want to update:
 | `width` | integer | Image width in pixels (≥64) |
 | `height` | integer | Image height in pixels (≥64) |
 | `seed` | integer | Random seed (≥0) |
-| `denoise_strength` | number | Denoising strength (0-1) |
-| `refiner_denoise_start` | number | Refiner denoising start (0-1) |
+| `denoise_strength` | number | Denoising strength (0–1) |
+| `refiner_denoise_start` | number | Refiner denoising start (0–1) |
 | `clip_skip` | integer | CLIP skip layers (≥0) |
 | `seamless_x` | boolean | Enable seamless X tiling |
 | `seamless_y` | boolean | Enable seamless Y tiling |
 | `refiner_positive_aesthetic_score` | number | Refiner positive aesthetic score |
 | `refiner_negative_aesthetic_score` | number | Refiner negative aesthetic score |
 
-### Response
+### Collection parameters
 
-```json
+```typescript
 {
-  "status": "success",
-  "queue_id": "queue_123",
-  "updated_count": 7,
-  "parameters": {
-    "positive_prompt": "a beautiful landscape",
-    "negative_prompt": "blurry, low quality",
-    "model": "sd-1.5",
-    "steps": 20,
-    "cfg_scale": 7.5,
-    "width": 512,
-    "height": 512,
-    "seed": 12345
-  }
+  // LoRAs
+  loras?: Array<{
+    model_name: string;     // LoRA model name
+    weight?: number;        // Default: 0.75, Range: -10 to 10
+    is_enabled?: boolean;   // Default: true
+  }>;
+
+  // Control Layers (ControlNet, T2I Adapter, Control LoRA)
+  control_layers?: Array<{
+    model_name: string;            // Control adapter model name
+    image_name?: string;           // Optional image filename from outputs/images
+    weight?: number;               // Default: 1.0, Range: -1 to 2
+    begin_step_percent?: number;   // Default: 0.0, Range: 0 to 1
+    end_step_percent?: number;     // Default: 1.0, Range: 0 to 1
+    control_mode?: "balanced" | "more_prompt" | "more_control"; // ControlNet only
+  }>;
+
+  // IP Adapters (includes FLUX Redux)
+  ip_adapters?: Array<{
+    model_name: string;            // IP Adapter / FLUX Redux model name
+    image_name?: string;           // Optional reference image filename from outputs/images
+    weight?: number;               // Default: 1.0, Range: -1 to 2
+    begin_step_percent?: number;   // Default: 0.0, Range: 0 to 1
+    end_step_percent?: number;     // Default: 1.0, Range: 0 to 1
+    method?: "full" | "style" | "composition"; // Default: "full"
+    image_influence?: "lowest" | "low" | "medium" | "high" | "highest"; // FLUX Redux only
+  }>;
+
+  // Model-free reference images (FLUX.2 Klein, FLUX Kontext, Qwen Image Edit)
+  reference_images?: Array<{
+    image_name: string;            // Reference image filename from outputs/images
+  }>;
 }
 ```
 
-## GET - Retrieve Recall Parameters
+## Model Name Resolution
 
-Retrieves metadata about stored recall parameters.
+The backend resolves model names to their internal keys:
 
-### Request
+1. **Main models** — resolved from the name to the model key.
+2. **LoRAs** — searched in the LoRA model database.
+3. **Control adapters** — tried in order: ControlNet → T2I Adapter → Control LoRA.
+4. **IP Adapters** — searched in the IP Adapter database; falls back to FLUX Redux.
 
-```http
-GET /api/v1/recall/{queue_id}
-```
+Models that cannot be resolved are skipped with a warning in the logs —
+the rest of the parameters are still applied.
 
-### Response
+## Image File Handling
 
-```json
-{
-  "status": "success",
-  "queue_id": "queue_123",
-  "note": "Use the frontend to access stored recall parameters, or set specific parameters using POST"
-}
-```
+When an `image_name` is supplied, the backend:
+
+1. Resolves `{INVOKEAI_ROOT}/outputs/images/{image_name}` via the image
+   files service (which also validates the path).
+2. Opens the image to extract width/height.
+3. Includes the image metadata in the event sent to the frontend.
+4. Logs whether the image was found.
+
+Images must be referenced by their filename as it appears in the
+outputs/images directory:
+
+- ✅ `"image_name": "example.png"`
+- ✅ `"image_name": "my_control_image_20240110.jpg"`
+- ❌ `"image_name": "outputs/images/example.png"` (no prefix)
+- ❌ `"image_name": "/full/path/to/example.png"` (no absolute paths)
+
+Missing images are logged as warnings but **do not** fail the request —
+remaining parameters are still applied.
+
+## Feature Details
+
+### LoRAs
+
+- Existing LoRAs are cleared before new ones are added.
+- Each LoRA's model config is fetched and applied with the specified weight.
+- LoRAs appear in the LoRA selector panel.
+
+### Control Layers
+
+- Fully supported with optional images from `outputs/images`.
+- Configuration includes model, weights, step percentages, control mode,
+  and an image reference.
+- Image availability is logged in the frontend console.
+
+### IP Adapters / FLUX Redux
+
+- Reference images loaded from `outputs/images` are validated and passed
+  through.
+- Configuration includes model, weights, step percentages, method, and an
+  image reference.
+- FLUX Redux uses `image_influence` instead of a numeric weight.
+
+### Model-free reference images
+
+Used by architectures that consume a reference image directly, with no
+separate adapter model:
+
+- **FLUX.2 Klein** — built-in reference image support.
+- **FLUX Kontext** — reference image associated with the main model.
+- **Qwen Image Edit** — reference image associated with the main model.
+
+Because there is no adapter model to resolve, these entries carry only
+`image_name`. When the frontend receives them, it picks the appropriate
+config flavor (`flux2_reference_image`, `flux_kontext_reference_image`,
+or `qwen_image_reference_image`) based on the currently-selected main
+model, matching the behavior of a manual drag-and-drop.
 
 ## Usage Examples
 
-### Using cURL
+### cURL
 
 ```bash
-# Update prompts and model
+# Core parameters
 curl -X POST http://localhost:9090/api/v1/recall/default \
   -H "Content-Type: application/json" \
   -d '{
@@ -130,81 +239,285 @@ curl -X POST http://localhost:9090/api/v1/recall/default \
     "steps": 30
   }'
 
-# Update just the seed
+# Just the seed
 curl -X POST http://localhost:9090/api/v1/recall/default \
   -H "Content-Type: application/json" \
   -d '{"seed": 99999}'
 ```
 
-### Using Python
+### LoRAs only
+
+```bash
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "loras": [
+      {"model_name": "add-detail-xl", "weight": 0.8, "is_enabled": true},
+      {"model_name": "sd_xl_offset_example-lora_1.0", "weight": 0.5}
+    ]
+  }'
+```
+
+### Control layers with an image
+
+```bash
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "control_layers": [
+      {
+        "model_name": "controlnet-canny-sdxl-1.0",
+        "image_name": "my_control_image.png",
+        "weight": 0.75,
+        "begin_step_percent": 0.0,
+        "end_step_percent": 0.8,
+        "control_mode": "balanced"
+      }
+    ]
+  }'
+```
+
+### IP adapters with a reference image
+
+```bash
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ip_adapters": [
+      {
+        "model_name": "ip-adapter-plus-face_sd15",
+        "image_name": "reference_face.png",
+        "weight": 0.7,
+        "method": "composition"
+      }
+    ]
+  }'
+```
+
+### Model-free reference images (FLUX.2 Klein / FLUX Kontext / Qwen Image Edit)
+
+```bash
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "FLUX.2 Klein",
+    "reference_images": [
+      {"image_name": "style_reference.png"}
+    ]
+  }'
+```
+
+### Complete configuration
+
+```bash
+curl -X POST http://localhost:9090/api/v1/recall/default \
+  -H "Content-Type: application/json" \
+  -d '{
+    "positive_prompt": "masterpiece, detailed photo with specific style",
+    "negative_prompt": "blurry, low quality",
+    "model": "FLUX Schnell",
+    "steps": 25,
+    "cfg_scale": 8.0,
+    "width": 1024,
+    "height": 768,
+    "seed": 42,
+    "loras": [
+      {"model_name": "add-detail-xl", "weight": 0.6}
+    ],
+    "control_layers": [
+      {
+        "model_name": "controlnet-depth-sdxl-1.0",
+        "image_name": "depth_map.png",
+        "weight": 1.0,
+        "end_step_percent": 0.7
+      }
+    ],
+    "ip_adapters": [
+      {
+        "model_name": "ip-adapter-plus-face_sd15",
+        "image_name": "style_reference.png",
+        "weight": 0.5,
+        "method": "style"
+      }
+    ]
+  }'
+```
+
+### Python
 
 ```python
 import requests
-import json
 
-# Configuration
 API_URL = "http://localhost:9090/api/v1/recall/default"
 
-# Update multiple parameters
 params = {
     "positive_prompt": "a serene forest",
     "negative_prompt": "people, buildings",
     "steps": 25,
     "cfg_scale": 7.0,
-    "seed": 42
+    "seed": 42,
 }
 
 response = requests.post(API_URL, json=params)
 result = response.json()
-
 print(f"Status: {result['status']}")
 print(f"Updated {result['updated_count']} parameters")
-print(json.dumps(result['parameters'], indent=2))
 ```
 
-### Using Node.js/JavaScript
+### JavaScript
 
 ```javascript
 const API_URL = 'http://localhost:9090/api/v1/recall/default';
 
-const params = {
-  positive_prompt: 'a beautiful sunset',
-  negative_prompt: 'blurry',
-  steps: 20,
-  width: 768,
-  height: 768,
-  seed: 12345
-};
-
 fetch(API_URL, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(params)
+  body: JSON.stringify({
+    positive_prompt: 'a beautiful sunset',
+    steps: 20,
+    width: 768,
+    height: 768,
+    seed: 12345,
+  }),
 })
-  .then(res => res.json())
-  .then(data => console.log(data));
+  .then((res) => res.json())
+  .then((data) => console.log(data));
+```
+
+## Response Format
+
+```json
+{
+  "status": "success",
+  "queue_id": "default",
+  "updated_count": 15,
+  "parameters": {
+    "positive_prompt": "...",
+    "steps": 25,
+    "loras": [
+      {"model_key": "abc123...", "weight": 0.6, "is_enabled": true}
+    ],
+    "control_layers": [
+      {
+        "model_key": "controlnet-xyz...",
+        "weight": 1.0,
+        "image": {"image_name": "depth_map.png", "width": 1024, "height": 768}
+      }
+    ],
+    "ip_adapters": [
+      {
+        "model_key": "ip-adapter-xyz...",
+        "weight": 0.5,
+        "image": {"image_name": "style_reference.png", "width": 1024, "height": 1024}
+      }
+    ],
+    "reference_images": [
+      {"image": {"image_name": "style_reference.png", "width": 1024, "height": 1024}}
+    ]
+  }
+}
+```
+
+## WebSocket Events
+
+Parameter updates emit a `recall_parameters_updated` event to the queue
+room. Connected frontend clients automatically:
+
+1. Apply standard parameters (prompts, steps, dimensions, etc.).
+2. Load and add LoRAs to the LoRA list.
+3. Apply control-layer configurations.
+4. Apply IP Adapter / FLUX Redux configurations with their images.
+5. Append model-free reference images, using the config flavor that
+   matches the currently-selected main model.
+
+## Error Handling
+
+- **400 Bad Request** — invalid parameters or parameter values.
+- **500 Internal Server Error** — server-side storage or retrieval failure.
+
+Errors include detailed messages. Missing images and unresolved model
+names are **not** errors — they are logged and the remaining parameters
+are still applied.
+
+## Logging
+
+### Backend
+
+```
+INFO: Resolved ControlNet model name 'controlnet-canny-sdxl-1.0' to key 'controlnet-xyz...'
+INFO: Found image file: depth_map.png (1024x768)
+INFO: Updated 12 recall parameters for queue default
+INFO: Resolved 1 LoRA(s)
+INFO: Resolved 1 control layer(s)
+INFO: Resolved 1 IP adapter(s)
+INFO: Resolved 1 reference image(s)
+```
+
+### Frontend
+
+Set `localStorage.ROARR_FILTER = 'debug'` in the browser to see all debug
+messages under the `events` namespace.
+
+```
+INFO: Applied 5 recall parameters to store
+INFO: Applied 1 IP adapter(s), replacing existing list
+INFO: Applied 1 model-free reference image(s)
+DEBUG: Built IP adapter ref image state: ip-adapter-xyz... (weight: 0.7)
+DEBUG: IP adapter image: outputs/images/depth_map.png (1024x768)
 ```
 
 ## Implementation Details
 
-- Parameters are stored in the client state persistence service, using keys prefixed with `recall_`
-- The parameters are associated with a `queue_id`, allowing multiple concurrent sessions to maintain separate parameter sets
-- Only non-null parameters are processed and stored
-- The endpoint provides validation for numeric ranges (e.g., steps ≥ 1, dimensions ≥ 64)
-- All parameter values are JSON-serialized for storage
-- When parameter values are changed, the backend generates a web sockets event that the frontend listens to.
+- Parameters are stored in the client state persistence service under
+  `recall_*` keys, scoped to the `queue_id`.
+- Numeric validation runs at the FastAPI layer (e.g. `steps ≥ 1`, `width ≥ 64`).
+- Only non-null parameters are processed, stored, and broadcast.
+- Model-key resolution runs **after** the raw parameters are stored, so
+  an unresolvable model name simply drops out of the broadcast but does
+  not corrupt the persisted state.
+- The broadcast payload contains resolved model keys and image metadata
+  (width/height) so the frontend can populate its store without extra
+  round-trips.
 
-## Integration with Frontend
+## Troubleshooting
 
-The stored parameters can be accessed by the frontend through the
-existing client state API or by implementing hooks that read from the
-recall parameter storage. This allows external applications to
-pre-populate generation parameters before the user initiates image
-generation.
+### Image not found
 
-## Error Handling
+If you see "Image file not found" in the logs:
 
-- **400 Bad Request**: Invalid parameters or parameter values
-- **500 Internal Server Error**: Server-side error storing or retrieving parameters
+1. Verify the filename matches exactly (case-sensitive).
+2. Ensure the image is in `{INVOKEAI_ROOT}/outputs/images/`.
+3. Check that the filename does not include the `outputs/images/` prefix.
 
-Errors include detailed messages explaining what went wrong.
+### Model not found
+
+If you see "Could not find model":
+
+1. Verify the model name matches exactly (case-sensitive).
+2. Ensure the model is installed.
+3. Check the name via the Models Manager panel.
+
+### Event not received
+
+1. Check the browser console for socket connection errors.
+2. Verify the `queue_id` matches the frontend's queue (usually `default`).
+3. Check backend logs for event emission errors.
+
+## Limitations
+
+- **Model availability** — models referenced in the payload must be installed.
+- **Image availability** — images must exist in `outputs/images`; remote
+  URLs are not supported.
+- **Canvas auto-layer creation** — control layers and IP adapters with
+  images populate the recall state, but creating a canvas layer from
+  them still happens through the UI.
+
+## Future enhancements
+
+Potential improvements not yet implemented:
+
+1. Auto-create canvas layers from control-layer images in the payload.
+2. Auto-create reference-image layers from IP Adapter images in the payload.
+3. Support remote image URLs in addition to local `outputs/images` filenames.
+4. Image upload capability (accept base64 or file upload directly via the API).
+5. Batch operations that target multiple `queue_id`s in a single request.
