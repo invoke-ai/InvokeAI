@@ -178,6 +178,7 @@ def enable_multiuser(monkeypatch: Any, mock_invoker: Invoker):
     monkeypatch.setattr("invokeai.app.api.routers.session_queue.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.recall_parameters.ApiDependencies", mock_deps)
     monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", mock_deps)
+    monkeypatch.setattr("invokeai.app.api.routers.custom_nodes.ApiDependencies", mock_deps)
     yield
 
 
@@ -1818,3 +1819,117 @@ class TestWebSocketAuth:
 
         rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
         assert "default" in rooms_emitted_to
+
+
+class TestCustomNodesAuthorization:
+    """Tests that custom_nodes endpoints enforce AdminUserOrDefault.
+
+    All four routes (list, install, uninstall, reload) should reject
+    unauthenticated callers and non-admin users in multiuser mode,
+    and succeed for admin callers.
+    """
+
+    # -- unauthenticated -------------------------------------------------------
+
+    def test_list_rejects_unauthenticated(self, client: TestClient, enable_multiuser: Any) -> None:
+        r = client.get("/api/v2/custom_nodes/")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_install_rejects_unauthenticated(self, client: TestClient, enable_multiuser: Any) -> None:
+        r = client.post("/api/v2/custom_nodes/install", json={"source": "https://example.com/repo.git"})
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_uninstall_rejects_unauthenticated(self, client: TestClient, enable_multiuser: Any) -> None:
+        r = client.delete("/api/v2/custom_nodes/some_pack")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_reload_rejects_unauthenticated(self, client: TestClient, enable_multiuser: Any) -> None:
+        r = client.post("/api/v2/custom_nodes/reload")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    # -- non-admin user --------------------------------------------------------
+
+    def test_list_rejects_non_admin(self, client: TestClient, user1_token: str) -> None:
+        r = client.get("/api/v2/custom_nodes/", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_install_rejects_non_admin(self, client: TestClient, user1_token: str) -> None:
+        r = client.post(
+            "/api/v2/custom_nodes/install",
+            json={"source": "https://example.com/repo.git"},
+            headers=_auth(user1_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_uninstall_rejects_non_admin(self, client: TestClient, user1_token: str) -> None:
+        r = client.delete("/api/v2/custom_nodes/some_pack", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_reload_rejects_non_admin(self, client: TestClient, user1_token: str) -> None:
+        r = client.post("/api/v2/custom_nodes/reload", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    # -- admin caller succeeds -------------------------------------------------
+
+    def test_list_allows_admin(self, client: TestClient, admin_token: str) -> None:
+        r = client.get("/api/v2/custom_nodes/", headers=_auth(admin_token))
+        assert r.status_code == status.HTTP_200_OK
+
+    def test_reload_allows_admin(self, client: TestClient, admin_token: str, monkeypatch: Any) -> None:
+        # Stub load_custom_nodes so it doesn't actually scan the filesystem
+        monkeypatch.setattr(
+            "invokeai.app.api.routers.custom_nodes.load_custom_nodes", lambda *a, **kw: None, raising=False
+        )
+        r = client.post("/api/v2/custom_nodes/reload", headers=_auth(admin_token))
+        assert r.status_code == status.HTTP_200_OK
+
+    def test_install_allows_admin(self, client: TestClient, admin_token: str, monkeypatch: Any, tmp_path: Any) -> None:
+        """Admin caller can successfully install a node pack (filesystem/subprocess mocked)."""
+        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._get_custom_nodes_path", lambda: tmp_path)
+
+        # Simulate a successful git clone by creating the target dir with __init__.py
+        def fake_git_clone(cmd: list[str], **kwargs: Any) -> MagicMock:
+            target_dir = tmp_path / "test-pack"
+            target_dir.mkdir(parents=True, exist_ok=True)
+            (target_dir / "__init__.py").touch()
+            result = MagicMock()
+            result.returncode = 0
+            return result
+
+        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes.subprocess.run", fake_git_clone)
+        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._load_node_pack", lambda *a, **kw: None)
+        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._import_workflows_from_pack", lambda *a, **kw: [])
+        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._write_pack_manifest", lambda *a, **kw: None)
+
+        r = client.post(
+            "/api/v2/custom_nodes/install",
+            json={"source": "https://example.com/test-pack.git"},
+            headers=_auth(admin_token),
+        )
+        assert r.status_code == status.HTTP_200_OK
+        data = r.json()
+        assert data["success"] is True
+        assert data["name"] == "test-pack"
+
+    def test_uninstall_allows_admin(
+        self, client: TestClient, admin_token: str, monkeypatch: Any, tmp_path: Any
+    ) -> None:
+        """Admin caller can successfully uninstall a node pack (filesystem mocked)."""
+        # Create a fake installed pack directory
+        pack_dir = tmp_path / "test-pack"
+        pack_dir.mkdir()
+        (pack_dir / "__init__.py").touch()
+
+        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._get_custom_nodes_path", lambda: tmp_path)
+        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._read_pack_manifest", lambda *a, **kw: [])
+        monkeypatch.setattr(
+            "invokeai.app.api.routers.custom_nodes.InvocationRegistry.unregister_pack",
+            lambda *a, **kw: [],
+        )
+        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._remove_workflows_by_ids", lambda *a, **kw: 0)
+
+        r = client.delete("/api/v2/custom_nodes/test-pack", headers=_auth(admin_token))
+        assert r.status_code == status.HTTP_200_OK
+        data = r.json()
+        assert data["success"] is True
+        assert data["name"] == "test-pack"
