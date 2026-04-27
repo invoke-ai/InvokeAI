@@ -62,6 +62,7 @@ const tagTypes = [
   'FetchOnReconnect',
   'ClientState',
   'UserList',
+  'CustomNodePacks',
   'VirtualBoards',
 ] as const;
 export type ApiTagDescription = TagDescription<(typeof tagTypes)[number]>;
