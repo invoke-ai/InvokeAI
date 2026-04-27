@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import type { IconType } from 'react-icons';
 import {
   PiBoundingBoxBold,
+  PiCircuitryBold,
   PiCubeBold,
   PiFlowArrowBold,
   PiFrameCornersBold,
@@ -25,6 +26,7 @@ const TAB_ICONS: Record<TabName, IconType> = {
   upscaling: PiFrameCornersBold,
   workflows: PiFlowArrowBold,
   models: PiCubeBold,
+  customNodes: PiCircuitryBold,
   queue: PiQueueBold,
 };
 

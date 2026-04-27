@@ -2697,6 +2697,95 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/custom_nodes/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Custom Node Packs
+         * @description Lists all installed custom node packs.
+         *
+         *     Admin-only: the response includes absolute filesystem paths, and non-admins have no
+         *     legitimate use for pack management data (install/uninstall/reload are also admin-only).
+         */
+        get: operations["list_custom_node_packs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/custom_nodes/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install Custom Node Pack
+         * @description Installs a custom node pack from a git URL by cloning it into the nodes directory.
+         */
+        post: operations["install_custom_node_pack"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/custom_nodes/{pack_name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Uninstall Custom Node Pack
+         * @description Uninstalls a custom node pack by removing its directory.
+         *
+         *     Note: A restart is required for the node removal to take full effect.
+         *     Installed nodes from the pack will remain registered until restart.
+         */
+        delete: operations["uninstall_custom_node_pack"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v2/custom_nodes/reload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reload Custom Nodes
+         * @description Triggers a reload of all custom nodes.
+         *
+         *     This re-scans the nodes directory and loads any new node packs.
+         *     Already loaded packs are skipped.
+         */
+        post: operations["reload_custom_nodes"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -15030,6 +15119,55 @@ export type components = {
             ui_model_provider_id: string[] | null;
         };
         /**
+         * InstallNodePackRequest
+         * @description Request to install a node pack from a git URL.
+         */
+        InstallNodePackRequest: {
+            /**
+             * Source
+             * @description Git URL of the node pack to install.
+             */
+            source: string;
+        };
+        /**
+         * InstallNodePackResponse
+         * @description Response after installing a node pack.
+         */
+        InstallNodePackResponse: {
+            /**
+             * Name
+             * @description The name of the installed node pack.
+             */
+            name: string;
+            /**
+             * Success
+             * @description Whether the installation was successful.
+             */
+            success: boolean;
+            /**
+             * Message
+             * @description Status message.
+             */
+            message: string;
+            /**
+             * Workflows Imported
+             * @description Number of workflows imported from the pack.
+             * @default 0
+             */
+            workflows_imported?: number;
+            /**
+             * Requires Dependencies
+             * @description Whether the pack ships a dependency manifest (requirements.txt or pyproject.toml) that the user must install manually following the pack's documentation.
+             * @default false
+             */
+            requires_dependencies?: boolean;
+            /**
+             * Dependency File
+             * @description Name of the detected dependency manifest file, if any.
+             */
+            dependency_file?: string | null;
+        };
+        /**
          * InstallStatus
          * @description State of an install job running in the background.
          * @enum {string}
@@ -23600,6 +23738,48 @@ export type components = {
             value: string | number | components["schemas"]["ImageField"];
         };
         /**
+         * NodePackInfo
+         * @description Information about an installed node pack.
+         */
+        NodePackInfo: {
+            /**
+             * Name
+             * @description The name of the node pack.
+             */
+            name: string;
+            /**
+             * Path
+             * @description The path to the node pack directory.
+             */
+            path: string;
+            /**
+             * Node Count
+             * @description The number of nodes in the pack.
+             */
+            node_count: number;
+            /**
+             * Node Types
+             * @description The invocation types provided by this node pack.
+             */
+            node_types: string[];
+        };
+        /**
+         * NodePackListResponse
+         * @description Response for listing installed node packs.
+         */
+        NodePackListResponse: {
+            /**
+             * Node Packs
+             * @description List of installed node packs.
+             */
+            node_packs: components["schemas"]["NodePackInfo"][];
+            /**
+             * Custom Nodes Path
+             * @description The configured custom nodes directory path.
+             */
+            custom_nodes_path: string;
+        };
+        /**
          * Create Latent Noise
          * @description Generates latent noise.
          */
@@ -29792,6 +29972,27 @@ export type components = {
              * @description Token to use when the URL matches the regex
              */
             token: string;
+        };
+        /**
+         * UninstallNodePackResponse
+         * @description Response after uninstalling a node pack.
+         */
+        UninstallNodePackResponse: {
+            /**
+             * Name
+             * @description The name of the uninstalled node pack.
+             */
+            name: string;
+            /**
+             * Success
+             * @description Whether the uninstall was successful.
+             */
+            success: boolean;
+            /**
+             * Message
+             * @description Status message.
+             */
+            message: string;
         };
         /**
          * Unknown_Config
@@ -37338,6 +37539,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_custom_node_packs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NodePackListResponse"];
+                };
+            };
+        };
+    };
+    install_custom_node_pack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InstallNodePackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InstallNodePackResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    uninstall_custom_node_pack: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                pack_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UninstallNodePackResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reload_custom_nodes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
         };
