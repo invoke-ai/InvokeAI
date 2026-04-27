@@ -402,7 +402,10 @@ def _get_first_scheduler_sigma(
             kwargs["mu"] = mu
         scheduler.set_timesteps(**kwargs)
     else:
-        scheduler.set_timesteps(num_inference_steps=len(sigmas) - 1, device="cpu")
+        kwargs = {"num_inference_steps": len(sigmas) - 1, "device": "cpu"}
+        if mu is not None and "mu" in set_timesteps_signature.parameters:
+            kwargs["mu"] = mu
+        scheduler.set_timesteps(**kwargs)
     return float(scheduler.sigmas[0])
 
 
@@ -512,6 +515,7 @@ def test_flux2_lcm_scheduler_setup_passes_mu():
         txt_ids=torch.zeros(1, 4, 4, dtype=torch.long),
         timesteps=[0.75, 0.5, 0.0],
         step_callback=lambda _: None,
+        guidance=1.0,
         cfg_scale=[1.0, 1.0],
         scheduler=scheduler,
         mu=0.42,
