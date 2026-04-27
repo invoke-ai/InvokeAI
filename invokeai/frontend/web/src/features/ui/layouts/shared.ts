@@ -13,6 +13,7 @@ export const LAYERS_PANEL_ID = 'layers';
 export const SETTINGS_PANEL_ID = 'settings';
 
 export const MODELS_PANEL_ID = 'models';
+export const CUSTOM_NODES_PANEL_ID = 'customNodes';
 export const QUEUE_PANEL_ID = 'queue';
 
 export const DOCKVIEW_TAB_ID = 'tab-default';
