@@ -9902,6 +9902,12 @@ export type components = {
              */
             negative_text_conditioning?: components["schemas"]["FluxConditioningField"] | null;
             /**
+             * Guidance
+             * @description Guidance strength for distilled guidance-embedding models. Inert for all current FLUX.2 Klein variants (their guidance_embeds weights are absent/zero); kept for node-graph compatibility and future guidance-embedded models.
+             * @default 4
+             */
+            guidance?: number;
+            /**
              * CFG Scale
              * @description Classifier-Free Guidance scale
              * @default 1
@@ -10331,7 +10337,7 @@ export type components = {
          * @description FLUX.2 model variants.
          * @enum {string}
          */
-        Flux2VariantType: "klein_4b" | "klein_9b" | "klein_9b_base";
+        Flux2VariantType: "klein_4b" | "klein_4b_base" | "klein_9b" | "klein_9b_base";
         /**
          * FluxConditioningCollectionOutput
          * @description Base class for nodes that output a collection of conditioning tensors
