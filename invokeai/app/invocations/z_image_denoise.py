@@ -23,6 +23,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.universal_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.z_image_control import ZImageControlField
 from invokeai.app.invocations.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -50,7 +51,7 @@ from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
     category="latents",
-    version="1.5.0",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
 class ZImageDenoiseInvocation(BaseInvocation):
@@ -62,6 +63,9 @@ class ZImageDenoiseInvocation(BaseInvocation):
     # If latents is provided, this means we are doing image-to-image.
     latents: Optional[LatentsField] = InputField(
         default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
+    noise: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.noise, input=Input.Connection
     )
     # denoise_mask is used for image-to-image inpainting. Only the masked region is modified.
     denoise_mask: Optional[DenoiseMaskField] = InputField(
@@ -348,22 +352,27 @@ class ZImageDenoiseInvocation(BaseInvocation):
         if init_latents is not None:
             init_latents = init_latents.to(device=device, dtype=inference_dtype)
 
-        # Generate initial noise
-        num_channels_latents = 16  # Z-Image uses 16 latent channels
-        noise = self._get_noise(
-            batch_size=1,
-            num_channels_latents=num_channels_latents,
-            height=self.height,
-            width=self.width,
-            dtype=inference_dtype,
-            device=device,
-            seed=self.seed,
-        )
+        # Generate initial noise.
+        # If noise will never be consumed, avoid validating/loading it.
+        should_ignore_noise = init_latents is not None and not self.add_noise and self.denoise_mask is None
+        noise: torch.Tensor | None
+        if should_ignore_noise:
+            noise = None
+        else:
+            noise = self._prepare_noise_tensor(context, inference_dtype, device)
 
         # Prepare input latent image
         if init_latents is not None:
             if self.add_noise:
-                # Noise the init_latents by the appropriate amount for the first timestep.
+                assert noise is not None
+                # Noise the init latents using the first sigma from the clipped
+                # InvokeAI schedule.
+                #
+                # Known limitation: if the selected scheduler later starts from a
+                # different first effective sigma/timestep than sigmas[0], the
+                # img2img preblend below may not match that scheduler exactly.
+                # This is an existing pipeline limitation and affects both
+                # internally generated noise and externally supplied noise.
                 s_0 = sigmas[0]
                 latents = s_0 * noise + (1.0 - s_0) * init_latents
             else:
@@ -371,6 +380,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
         else:
             if self.denoising_start > 1e-5:
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            assert noise is not None
             latents = noise
 
         # Short-circuit if no denoising steps
@@ -383,6 +393,7 @@ class ZImageDenoiseInvocation(BaseInvocation):
         if inpaint_mask is not None:
             if init_latents is None:
                 raise ValueError("Initial latents are required when using an inpaint mask (image-to-image inpainting)")
+            assert noise is not None
             inpaint_extension = RectifiedFlowInpaintExtension(
                 init_latents=init_latents,
                 inpaint_mask=inpaint_mask,
@@ -408,7 +419,9 @@ class ZImageDenoiseInvocation(BaseInvocation):
             if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
                 scheduler.set_timesteps(sigmas=sigmas, device=device)
             else:
-                # LCM or scheduler doesn't support custom sigmas - use num_inference_steps
+                # LCM or a scheduler without custom-sigma support computes its own
+                # schedule from num_inference_steps. That can diverge from sigmas[0]
+                # used in the img2img preblend above.
                 scheduler.set_timesteps(num_inference_steps=total_steps, device=device)
 
             # For Heun scheduler, the number of actual steps may differ
@@ -761,6 +774,24 @@ class ZImageDenoiseInvocation(BaseInvocation):
                     )
 
         return latents
+
+    def _prepare_noise_tensor(
+        self, context: InvocationContext, inference_dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        if self.noise is not None:
+            noise = context.tensors.load(self.noise.latents_name).to(device=device, dtype=inference_dtype)
+            validate_noise_tensor_shape(noise, "Z-Image", self.width, self.height)
+            return noise
+
+        return self._get_noise(
+            batch_size=1,
+            num_channels_latents=16,
+            height=self.height,
+            width=self.width,
+            dtype=inference_dtype,
+            device=device,
+            seed=self.seed,
+        )
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:

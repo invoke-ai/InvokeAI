@@ -442,6 +442,7 @@ class NewModelTextEncoderInvocation(BaseInvocation):
 class NewModelDenoiseInvocation(BaseInvocation):
     # Standard Fields
     latents: LatentsField | None = InputField(default=None)
+    noise: LatentsField | None = InputField(default=None)
     positive_conditioning: ConditioningField = InputField()
     negative_conditioning: ConditioningField | None = InputField(default=None)
 
@@ -453,6 +454,7 @@ class NewModelDenoiseInvocation(BaseInvocation):
     denoising_end: float = InputField(default=1.0, ge=0, le=1)
     steps: int = InputField(default=20, ge=1)
     cfg_scale: float = InputField(default=7.0)
+    add_noise: bool = InputField(default=True)
 
     # Image-to-Image / Inpainting
     denoise_mask: DenoiseMaskField | None = InputField(default=None)
@@ -461,16 +463,27 @@ class NewModelDenoiseInvocation(BaseInvocation):
     scheduler: Literal["euler", "heun", "lcm"] = InputField(default="euler")
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
-        # 1. Generate noise
-        noise = get_noise_newmodel(seed, height, width, ...)
+        # 1. Load or generate noise
+        if self.noise is not None:
+            noise = self._load_and_validate_noise(context)
+        else:
+            noise = get_noise_newmodel(seed, height, width, ...)
 
-        # 2. Pack latents (if needed)
-        x = pack_newmodel(latents)
-
-        # 3. Compute schedule
+        # 2. Compute schedule
         timesteps = get_schedule_newmodel(num_steps, denoising_start, denoising_end)
 
-        # 4. Denoising loop
+        # 3. Prepare init latents and img2img preblend
+        if latents is not None and self.add_noise:
+            x = noise * timesteps[0] + latents * (1.0 - timesteps[0])
+        elif latents is not None:
+            x = latents
+        else:
+            x = noise
+
+        # 4. Pack latents (if needed)
+        x = pack_newmodel(x)
+
+        # 5. Denoising loop
         x = denoise(
             model=transformer,
             x=x,
@@ -480,11 +493,18 @@ class NewModelDenoiseInvocation(BaseInvocation):
             inpaint_extension=inpaint_extension,  # For inpainting
         )
 
-        # 5. Unpack latents
+        # 6. Unpack latents
         latents = unpack_newmodel(x)
 
         return LatentsOutput(latents=latents)
 ```
+
+If the architecture supports external noise, the denoise invocation should
+accept an optional `noise: LatentsField` input and preserve the existing
+seed-driven path when it is not connected. Validate external noise against
+the architecture's expected rank, channel count, and spatial shape before
+using it. Existing workflows must continue to work unchanged when `noise` is
+left disconnected.
 
 ### 4.4 VAE Encode Invocation
 
@@ -536,6 +556,9 @@ class NewModelVaeDecodeInvocation(BaseInvocation):
 - [ ] Model loader invocation (`[newmodel]_model_loader.py`)
 - [ ] Text encoder invocation (`[newmodel]_text_encoder.py`)
 - [ ] Denoise invocation (`[newmodel]_denoise.py`)
+- [ ] Add optional `noise: LatentsField` when the architecture supports
+      external noise
+- [ ] Preserve the seed-driven fallback path when `noise` is not connected
 - [ ] VAE encode invocation (`[newmodel]_vae_encode.py`)
 - [ ] VAE decode invocation (`[newmodel]_vae_decode.py`)
 - [ ] Define output classes (e.g., `NewModelLoaderOutput`)
@@ -573,6 +596,11 @@ def get_noise_newmodel(
         device=device,
         dtype=dtype,
     )
+
+# If the architecture supports external noise, also extend
+# invokeai/app/invocations/universal_noise.py when the tensor contract can be
+# represented there. Only create a dedicated noise invocation when
+# Universal Noise cannot express the architecture cleanly.
 
 def pack_newmodel(x: torch.Tensor) -> torch.Tensor:
     """Pack latents for transformer input.
@@ -670,6 +698,13 @@ def denoise(
     return img
 ```
 
+If the architecture supports external noise, the denoise path should accept
+validated external noise without changing the legacy seed-driven behavior.
+Review img2img and inpaint preblend logic carefully when adding scheduler
+support. If the initial latent/noise mix is computed before
+`scheduler.set_timesteps()`, confirm that the preblend matches the
+scheduler's true first effective sigma or timestep.
+
 ### 5.3 Scheduler (if model-specific)
 
 **File:** `invokeai/backend/[newmodel]/schedulers.py` or use existing
@@ -690,11 +725,16 @@ NEWMODEL_SCHEDULER_MAP = {
 ### Backend Sampling and Denoise Checklist
 
 - [ ] Noise generation (`get_noise_newmodel()`)
+- [ ] Extend `invokeai/app/invocations/universal_noise.py` when the
+      architecture's noise tensor contract fits there
 - [ ] Pack/unpack functions (if transformer-based)
 - [ ] Schedule generation (`get_schedule_newmodel()`)
 - [ ] Position ID generation (if needed)
 - [ ] Implement denoise loop
+- [ ] Validate external noise shape and rank if the architecture supports it
 - [ ] Scheduler integration
+- [ ] Verify img2img and inpaint preblend parity with the scheduler's first
+      effective timestep or sigma
 - [ ] Inpaint extension integration
 - [ ] Progress callbacks
 
@@ -846,6 +886,11 @@ if (
   // Rectified flow models: denoising_start instead of noise
 }
 ```
+
+If the architecture supports external noise, do not require generated
+workflows to connect it. Keep the denoise node backward compatible by
+leaving `noise` disconnected unless the workflow explicitly needs external
+noise.
 
 ### Frontend Graph Building Checklist
 
@@ -1209,6 +1254,25 @@ export const NewModelSchedulerSelect = () => {
 - [ ] Frontend UI component
 - [ ] State management
 
+**External Noise:**
+- [ ] Add optional `noise: LatentsField` input to the denoise invocation
+- [ ] Validate external noise shape against the architecture's expected
+      latent shape
+- [ ] Preserve existing behavior when `noise` is not connected
+- [ ] Extend `Universal Noise` when the architecture's latent noise contract
+      can be represented there
+- [ ] Add a dedicated architecture-compatible noise invocation only when
+      `Universal Noise` cannot support the architecture cleanly
+
+If your model supports external noise, the denoise invocation should accept
+it as an optional input rather than replacing the existing seed-driven path.
+When possible, wire the architecture into `Universal Noise` instead of
+creating a separate noise node. Only create a dedicated noise invocation if
+the architecture has a noise tensor contract that `Universal Noise` cannot
+express cleanly. When external noise is connected, validate rank, channel
+count, and spatial shape before blending it with init latents or using it as
+the initial latent state.
+
 ---
 
 ## Summary: Minimal Integration
@@ -1239,6 +1303,11 @@ For a **minimal txt2img integration**, the following files are required:
 2. `src/features/nodes/util/graph/generation/addImageToImage.ts`
 3. `src/features/nodes/util/graph/generation/addInpaint.ts`
 4. `src/features/nodes/util/graph/generation/addOutpaint.ts`
+
+If the architecture supports external noise, also extend
+`invokeai/app/invocations/universal_noise.py` when possible and keep the
+denoise invocation's `noise` input optional so existing generated workflows
+continue to work without modification.
 
 ---
 
