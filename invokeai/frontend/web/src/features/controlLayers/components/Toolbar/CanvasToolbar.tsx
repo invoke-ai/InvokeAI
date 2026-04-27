@@ -16,6 +16,7 @@ import { CanvasToolbarRedoButton } from 'features/controlLayers/components/Toolb
 import { CanvasToolbarResetViewButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarResetViewButton';
 import { CanvasToolbarSaveToGalleryButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarSaveToGalleryButton';
 import { CanvasToolbarScale } from 'features/controlLayers/components/Toolbar/CanvasToolbarScale';
+import { CanvasToolbarSnapshotMenuButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarSnapshotMenuButton';
 import { CanvasToolbarUndoButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarUndoButton';
 import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanvasDeleteLayerHotkey';
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
@@ -77,6 +78,7 @@ export const CanvasToolbar = memo(() => {
       <Flex alignItems="center" h="full">
         <CanvasToolbarProjectMenuButton />
         <CanvasToolbarSaveToGalleryButton />
+        <CanvasToolbarSnapshotMenuButton />
         <CanvasToolbarUndoButton />
         <CanvasToolbarRedoButton />
         <CanvasToolbarNewSessionMenuButton />
