@@ -2706,21 +2706,23 @@ export type paths = {
          *     Args:
          *         queue_id: The queue ID to associate these parameters with
          *         parameters: The RecallParameter object containing the parameters to update
+         *         strict: When true, parameters not included in the request body are reset
+         *             to their defaults (cleared on the frontend).  Defaults to false,
+         *             which preserves the existing behaviour of only updating the
+         *             parameters that are explicitly provided.
          *
          *     Returns:
          *         A dictionary containing the updated parameters and status
          *
          *     Example:
-         *         POST /api/v1/recall/{queue_id}
+         *         POST /api/v1/recall/{queue_id}?strict=true
          *         {
          *             "positive_prompt": "a beautiful landscape",
          *             "model": "sd-1.5",
-         *             "steps": 20,
-         *             "cfg_scale": 7.5,
-         *             "width": 512,
-         *             "height": 512,
-         *             "seed": 12345
+         *             "steps": 20
          *         }
+         *         # In strict mode, all other parameters (reference_images, loras, etc.)
+         *         # are cleared.  In non-strict mode (default) they would be left as-is.
          */
         post: operations["update_recall_parameters"];
         delete?: never;
@@ -25409,6 +25411,11 @@ export type components = {
              * @description List of IP Adapters with their settings
              */
             ip_adapters?: components["schemas"]["IPAdapterRecallParameter"][] | null;
+            /**
+             * Reference Images
+             * @description List of model-free reference images for architectures that consume reference images directly (FLUX.2 Klein, FLUX Kontext, Qwen Image Edit). The frontend picks the correct config type based on the currently-selected main model.
+             */
+            reference_images?: components["schemas"]["ReferenceImageRecallParameter"][] | null;
         };
         /**
          * RecallParametersUpdatedEvent
@@ -25507,6 +25514,24 @@ export type components = {
              * @constant
              */
             type: "rectangle_mask";
+        };
+        /**
+         * ReferenceImageRecallParameter
+         * @description Global reference-image configuration for recall.
+         *
+         *     Used for reference images that feed directly into the main model rather
+         *     than through a separate IP-Adapter / ControlNet model — for example
+         *     FLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend
+         *     picks the correct config type (``flux2_reference_image`` /
+         *     ``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based
+         *     on the currently-selected main model.
+         */
+        ReferenceImageRecallParameter: {
+            /**
+             * Image Name
+             * @description The filename of the reference image in outputs/images
+             */
+            image_name: string;
         };
         /**
          * RemoteModelFile
@@ -37014,7 +37039,10 @@ export interface operations {
     };
     update_recall_parameters: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description When true, parameters not included in the request are reset to their defaults (cleared). */
+                strict?: boolean;
+            };
             header?: never;
             path: {
                 /** @description The queue id to perform this operation on */

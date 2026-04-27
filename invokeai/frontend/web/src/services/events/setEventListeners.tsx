@@ -4,6 +4,7 @@ import { socketConnected } from 'app/store/middleware/listenerMiddleware/listene
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, isNil, round } from 'es-toolkit/compat';
+import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
@@ -750,110 +751,182 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         }
       }
 
-      // Handle IP Adapters as Reference Images
-      if (data.parameters.ip_adapters !== undefined && Array.isArray(data.parameters.ip_adapters)) {
-        log.debug(`Processing ${data.parameters.ip_adapters.length} IP adapter(s)`);
+      // Handle IP Adapters and model-free reference images together.
+      //
+      // Both ip_adapters and reference_images feed into the same refImages
+      // Redux slice.  Previously they were dispatched as two independent
+      // Promise.all chains — the first with replace:true, the second with
+      // replace:false — which created a race: if a previous recall's
+      // reference-image promises were still in-flight they could resolve
+      // after the clear and re-append stale entries, doubling the list.
+      //
+      // Fix: collect every promise into a single array and dispatch exactly
+      // once with replace:true after all of them settle.
+      {
+        /* eslint-disable @typescript-eslint/no-explicit-any */
+        const ipAdaptersArr: any[] = Array.isArray(data.parameters.ip_adapters)
+          ? (data.parameters.ip_adapters as any[])
+          : [];
+        const refImagesArr: any[] = Array.isArray(data.parameters.reference_images)
+          ? (data.parameters.reference_images as any[])
+          : [];
+        /* eslint-enable @typescript-eslint/no-explicit-any */
 
-        // If the list is explicitly empty, clear existing reference images
-        if (data.parameters.ip_adapters.length === 0) {
-          dispatch(refImagesRecalled({ entities: [], replace: true }));
-          log.info('Cleared all IP adapter reference images');
-        } else {
-          // Build promises for all IP adapters, then dispatch once with replace: true
-          const ipAdapterPromises = data.parameters.ip_adapters
-            .filter((cfg) => cfg.model_key && typeof cfg.model_key === 'string')
-            .map(async (adapterConfig) => {
-              try {
-                const modelConfig = await dispatch(
-                  modelsApi.endpoints.getModelConfig.initiate(adapterConfig.model_key!)
-                ).unwrap();
+        const hasIpAdapters = data.parameters.ip_adapters !== undefined;
+        const hasRefImages = data.parameters.reference_images !== undefined;
 
-                // Pre-fetch the image DTO if an image is provided, to avoid validation errors
-                if (adapterConfig.image?.image_name) {
-                  try {
-                    await dispatch(imagesApi.endpoints.getImageDTO.initiate(adapterConfig.image.image_name)).unwrap();
-                  } catch (imageError) {
-                    log.warn(
-                      `Could not pre-fetch image ${adapterConfig.image.image_name}, continuing anyway: ${imageError}`
+        if (hasIpAdapters || hasRefImages) {
+          const allRefImagePromises: Promise<RefImageState | null>[] = [];
+
+          // --- IP Adapters ---
+          if (hasIpAdapters && ipAdaptersArr.length > 0) {
+            log.debug(`Processing ${ipAdaptersArr.length} IP adapter(s)`);
+
+            const ipAdapterPromises = ipAdaptersArr
+              .filter((cfg: any) => cfg.model_key && typeof cfg.model_key === 'string') // eslint-disable-line @typescript-eslint/no-explicit-any
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map(async (adapterConfig: any): Promise<RefImageState | null> => {
+                try {
+                  const modelConfig = await dispatch(
+                    modelsApi.endpoints.getModelConfig.initiate(adapterConfig.model_key!)
+                  ).unwrap();
+
+                  // Pre-fetch the image DTO if an image is provided, to avoid validation errors
+                  if (adapterConfig.image?.image_name) {
+                    try {
+                      await dispatch(imagesApi.endpoints.getImageDTO.initiate(adapterConfig.image.image_name)).unwrap();
+                    } catch (imageError) {
+                      log.warn(
+                        `Could not pre-fetch image ${adapterConfig.image.image_name}, continuing anyway: ${imageError}`
+                      );
+                    }
+                  }
+
+                  // Build RefImageState using helper function - supports both ip_adapter and flux_redux
+                  const imageData = adapterConfig.image
+                    ? {
+                        original: {
+                          image: {
+                            image_name: adapterConfig.image.image_name,
+                            width: adapterConfig.image.width ?? 512,
+                            height: adapterConfig.image.height ?? 512,
+                          },
+                        },
+                      }
+                    : null;
+
+                  const isFluxRedux = modelConfig.type === 'flux_redux';
+                  const refImageState = getReferenceImageState(`recalled-ref-image-${Date.now()}-${Math.random()}`, {
+                    isEnabled: true,
+                    config: isFluxRedux
+                      ? {
+                          type: 'flux_redux',
+                          image: imageData,
+                          model: {
+                            key: modelConfig.key,
+                            hash: modelConfig.hash,
+                            name: modelConfig.name,
+                            base: modelConfig.base,
+                            type: modelConfig.type,
+                          },
+                          imageInfluence: (adapterConfig.image_influence as FLUXReduxImageInfluence) || 'highest',
+                        }
+                      : {
+                          type: 'ip_adapter',
+                          image: imageData,
+                          model: {
+                            key: modelConfig.key,
+                            hash: modelConfig.hash,
+                            name: modelConfig.name,
+                            base: modelConfig.base,
+                            type: modelConfig.type,
+                          },
+                          weight: typeof adapterConfig.weight === 'number' ? adapterConfig.weight : 1.0,
+                          beginEndStepPct: [
+                            typeof adapterConfig.begin_step_percent === 'number' ? adapterConfig.begin_step_percent : 0,
+                            typeof adapterConfig.end_step_percent === 'number' ? adapterConfig.end_step_percent : 1,
+                          ] as [number, number],
+                          method: (adapterConfig.method as IPMethodV2) || 'full',
+                          clipVisionModel: 'ViT-H',
+                        },
+                  });
+
+                  if (isFluxRedux) {
+                    log.debug(`Built FLUX Redux ref image state: ${modelConfig.name}`);
+                  } else {
+                    log.debug(
+                      `Built IP adapter ref image state: ${modelConfig.name} (weight: ${typeof adapterConfig.weight === 'number' ? adapterConfig.weight : 1.0})`
                     );
                   }
+                  if (adapterConfig.image?.image_name) {
+                    log.debug(
+                      `IP adapter image: outputs/images/${adapterConfig.image.image_name} (${adapterConfig.image.width}x${adapterConfig.image.height})`
+                    );
+                  }
+
+                  return refImageState;
+                } catch (error) {
+                  log.error(`Failed to load IP adapter ${adapterConfig.model_key}: ${error}`);
+                  return null;
+                }
+              });
+
+            allRefImagePromises.push(...ipAdapterPromises);
+          }
+
+          // --- Model-free reference images (FLUX.2 Klein, FLUX Kontext, Qwen Image Edit) ---
+          // These feed the reference image directly into the main model rather than going
+          // through an IP Adapter, so the backend sends them without a model_key and we
+          // pick the right config type via getDefaultRefImageConfig() based on the main
+          // model that is currently selected in the UI.
+          if (hasRefImages && refImagesArr.length > 0) {
+            log.debug(`Processing ${refImagesArr.length} reference image(s)`);
+
+            const referenceImagePromises = refImagesArr
+              .filter((cfg: any) => cfg.image?.image_name && typeof cfg.image.image_name === 'string') // eslint-disable-line @typescript-eslint/no-explicit-any
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map(async (refConfig: any): Promise<RefImageState | null> => {
+                const imageName = refConfig.image.image_name as string;
+                try {
+                  // Pre-fetch the image DTO so ref image validation succeeds.
+                  await dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName)).unwrap();
+                } catch (imageError) {
+                  log.warn(`Could not pre-fetch reference image ${imageName}, continuing anyway: ${imageError}`);
                 }
 
-                // Build RefImageState using helper function - supports both ip_adapter and flux_redux
-                const imageData = adapterConfig.image
-                  ? {
-                      original: {
-                        image: {
-                          image_name: adapterConfig.image.image_name,
-                          width: adapterConfig.image.width ?? 512,
-                          height: adapterConfig.image.height ?? 512,
-                        },
-                      },
-                    }
-                  : null;
+                // Pick the config flavor (flux2 / flux_kontext / ip_adapter fallback) that
+                // matches the currently-selected main model.
+                const baseConfig = getDefaultRefImageConfig(getState);
+                const imageData = {
+                  original: {
+                    image: {
+                      image_name: imageName,
+                      width: typeof refConfig.image.width === 'number' ? refConfig.image.width : 512,
+                      height: typeof refConfig.image.height === 'number' ? refConfig.image.height : 512,
+                    },
+                  },
+                };
 
-                const isFluxRedux = modelConfig.type === 'flux_redux';
-                const refImageState = getReferenceImageState(`recalled-ref-image-${Date.now()}-${Math.random()}`, {
+                return getReferenceImageState(`recalled-ref-image-${Date.now()}-${Math.random()}`, {
                   isEnabled: true,
-                  config: isFluxRedux
-                    ? {
-                        type: 'flux_redux',
-                        image: imageData,
-                        model: {
-                          key: modelConfig.key,
-                          hash: modelConfig.hash,
-                          name: modelConfig.name,
-                          base: modelConfig.base,
-                          type: modelConfig.type,
-                        },
-                        imageInfluence: (adapterConfig.image_influence as FLUXReduxImageInfluence) || 'highest',
-                      }
-                    : {
-                        type: 'ip_adapter',
-                        image: imageData,
-                        model: {
-                          key: modelConfig.key,
-                          hash: modelConfig.hash,
-                          name: modelConfig.name,
-                          base: modelConfig.base,
-                          type: modelConfig.type,
-                        },
-                        weight: typeof adapterConfig.weight === 'number' ? adapterConfig.weight : 1.0,
-                        beginEndStepPct: [
-                          typeof adapterConfig.begin_step_percent === 'number' ? adapterConfig.begin_step_percent : 0,
-                          typeof adapterConfig.end_step_percent === 'number' ? adapterConfig.end_step_percent : 1,
-                        ] as [number, number],
-                        method: (adapterConfig.method as IPMethodV2) || 'full',
-                        clipVisionModel: 'ViT-H',
-                      },
+                  config: { ...baseConfig, image: imageData },
                 });
+              });
 
-                if (isFluxRedux) {
-                  log.debug(`Built FLUX Redux ref image state: ${modelConfig.name}`);
-                } else {
-                  log.debug(
-                    `Built IP adapter ref image state: ${modelConfig.name} (weight: ${typeof adapterConfig.weight === 'number' ? adapterConfig.weight : 1.0})`
-                  );
-                }
-                if (adapterConfig.image?.image_name) {
-                  log.debug(
-                    `IP adapter image: outputs/images/${adapterConfig.image.image_name} (${adapterConfig.image.width}x${adapterConfig.image.height})`
-                  );
-                }
+            allRefImagePromises.push(...referenceImagePromises);
+          }
 
-                return refImageState;
-              } catch (error) {
-                log.error(`Failed to load IP adapter ${adapterConfig.model_key}: ${error}`);
-                return null;
-              }
-            });
-
-          // Wait for all IP adapters to load, then dispatch with replace: true
-          Promise.all(ipAdapterPromises).then((refImageStates) => {
-            const validStates = refImageStates.filter((state): state is RefImageState => state !== null);
+          // Single dispatch after all IP adapter + reference image promises settle.
+          // Always replace:true so stale entries from a previous recall are cleared.
+          Promise.all(allRefImagePromises).then((results) => {
+            const validStates = results.filter((state): state is RefImageState => state !== null);
+            dispatch(refImagesRecalled({ entities: validStates, replace: true }));
             if (validStates.length > 0) {
-              dispatch(refImagesRecalled({ entities: validStates, replace: true }));
-              log.info(`Applied ${validStates.length} IP adapter(s), replacing existing list`);
+              log.info(
+                `Applied ${validStates.length} reference image(s) (IP adapters + model-free), replacing existing list`
+              );
+            } else {
+              log.info('Cleared all reference images');
             }
           });
         }
