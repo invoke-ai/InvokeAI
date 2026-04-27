@@ -157,6 +157,11 @@ export const buildOnInvocationComplete = (
     // Custom image search queries cannot be updated optimistically, invalidate to re-run in background.
     dispatch(imagesApi.util.invalidateTags([{ type: 'ImageSearchNameList', id: 'LIST' }]));
     dispatch(imagesApi.util.invalidateTags([{ type: 'ImageSearchList', id: 'LIST' }]));
+    // Exception: virtual board groupings aren't covered by the optimistic updates above, so
+    // their counts/cover thumbnails would otherwise lag behind until the next mutation.
+    if (Object.keys(boardTotalAdditions).length > 0) {
+      dispatch(imagesApi.util.invalidateTags(['VirtualBoards']));
+    }
 
     const autoSwitch = selectAutoSwitch(getState());
 
