@@ -379,6 +379,15 @@ const Guidance: SingleMetadataHandler<ParameterGuidance> = {
   [SingleMetadataKey]: true,
   type: 'Guidance',
   parse: (metadata, _store) => {
+    // Legacy FLUX.2 images may still carry a `guidance` field, but guidance_embeds
+    // is inert for all current Klein variants. Reject parsing for FLUX.2 metadata
+    // so the handler is skipped on both display and recall - avoids leaking a stale
+    // value into the shared guidance param (which is still used by FLUX.1).
+    const rawModel = getProperty(metadata, 'model');
+    const modelBase = (rawModel as { base?: unknown } | undefined)?.base;
+    if (modelBase === 'flux2') {
+      throw new Error('Guidance is not used for FLUX.2 Klein models.');
+    }
     const raw = getProperty(metadata, 'guidance');
     const parsed = zParameterGuidance.parse(raw);
     return Promise.resolve(parsed);
@@ -957,6 +966,9 @@ const VAEModel: SingleMetadataHandler<ParameterVAEModel> = {
     const parsed = await parseModelIdentifier(raw, store, 'vae');
     assert(parsed.type === 'vae');
     assert(isCompatibleWithMainModel(parsed, store));
+    // Z-Image and FLUX.2 Klein have dedicated VAE handlers; avoid rendering a duplicate row.
+    const base = selectBase(store.getState());
+    assert(base !== 'z-image' && base !== 'flux2', 'VAEModel handler does not apply to Z-Image or FLUX.2 Klein');
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
