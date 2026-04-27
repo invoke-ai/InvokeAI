@@ -1332,14 +1332,31 @@ class TestQueueStatusScoping:
         assert status_obj.session_id is None
         assert status_obj.batch_id is None
 
-    def test_session_queue_status_no_user_fields(self):
-        """SessionQueueStatus should not have user_pending/user_in_progress fields anymore.
-        Non-admin users now get their own counts in the main pending/in_progress fields."""
+    def test_session_queue_status_has_user_fields(self):
+        """SessionQueueStatus exposes user_pending/user_in_progress so the queue badge
+        can render an X/Y count (X = caller's jobs, Y = global total)."""
         from invokeai.app.services.session_queue.session_queue_common import SessionQueueStatus
 
         fields = set(SessionQueueStatus.model_fields.keys())
-        assert "user_pending" not in fields
-        assert "user_in_progress" not in fields
+        assert "user_pending" in fields
+        assert "user_in_progress" in fields
+
+        status_obj = SessionQueueStatus(
+            queue_id="default",
+            item_id=None,
+            session_id=None,
+            batch_id=None,
+            pending=5,
+            in_progress=1,
+            completed=0,
+            failed=0,
+            canceled=0,
+            total=6,
+            user_pending=2,
+            user_in_progress=1,
+        )
+        assert status_obj.user_pending == 2
+        assert status_obj.user_in_progress == 1
 
 
 # ===========================================================================
@@ -1707,8 +1724,11 @@ class TestWebSocketAuth:
         assert event.queue_id == "default"
 
     def test_queue_item_status_changed_routed_privately(self, socketio: Any) -> None:
-        """Verify that _handle_queue_event emits QueueItemStatusChangedEvent ONLY to
-        user:{user_id} and admin rooms, never to the queue_id room."""
+        """_handle_queue_event must emit the FULL QueueItemStatusChangedEvent only to the
+        owner's user room and the admin room. A sanitized companion (user_id="redacted",
+        identifiers stripped) is also emitted to the queue_id room so other users' UIs can
+        refresh, with the owner's and admins' sids in skip_sid so they don't get a duplicate
+        that would clobber their cache."""
         import asyncio
         from unittest.mock import AsyncMock
 
@@ -1757,20 +1777,60 @@ class TestWebSocketAuth:
             ),
         )
 
+        # Track owner sid so we can verify skip_sid is honored
+        socketio._socket_users["sid-owner"] = {"user_id": "owner-xyz", "is_admin": False}
+        socketio._socket_users["sid-admin"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-other"] = {"user_id": "other-user", "is_admin": False}
+
         mock_emit = AsyncMock()
         socketio._sio.emit = mock_emit
 
         asyncio.run(socketio._handle_queue_event(("queue_item_status_changed", event)))
 
-        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
-        assert "user:owner-xyz" in rooms_emitted_to
-        assert "admin" in rooms_emitted_to
-        # CRITICAL: must NOT emit to the queue_id room — that would leak to other users
-        assert "default" not in rooms_emitted_to
+        # Collect (room, payload, skip_sid) for each emit call
+        emits = [
+            (c.kwargs.get("room"), c.kwargs.get("data"), c.kwargs.get("skip_sid")) for c in mock_emit.call_args_list
+        ]
+
+        # Full event must go to owner room and admin room with original sensitive fields
+        owner_emits = [(p, s) for r, p, s in emits if r == "user:owner-xyz"]
+        admin_emits = [(p, s) for r, p, s in emits if r == "admin"]
+        assert len(owner_emits) == 1 and len(admin_emits) == 1
+        for payload, _ in owner_emits + admin_emits:
+            assert payload["user_id"] == "owner-xyz"
+            assert payload["batch_id"] == "batch-private"
+            assert payload["session_id"] == "sess-private"
+            assert payload["destination"] == "canvas"
+
+        # A sanitized companion event must go to the queue_id room with sensitive fields cleared
+        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        assert len(queue_emits) == 1, "expected exactly one sanitized emit to queue room"
+        sanitized_payload, skip_sid = queue_emits[0]
+        assert sanitized_payload["user_id"] == "redacted"
+        assert sanitized_payload["batch_id"] == "redacted"
+        assert sanitized_payload["session_id"] == "redacted"
+        assert sanitized_payload["origin"] is None
+        assert sanitized_payload["destination"] is None
+        assert sanitized_payload["error_type"] is None
+        assert sanitized_payload["batch_status"]["batch_id"] == "redacted"
+        assert sanitized_payload["batch_status"]["destination"] is None
+        assert sanitized_payload["queue_status"]["item_id"] is None
+        assert sanitized_payload["queue_status"]["batch_id"] is None
+        assert sanitized_payload["queue_status"]["user_pending"] is None
+        # Owner and admin sids must be skipped so they don't receive the duplicate
+        assert "sid-owner" in skip_sid
+        assert "sid-admin" in skip_sid
+        # Third-party user must NOT be skipped — they need the sanitized event
+        assert "sid-other" not in skip_sid
+        # Status (non-sensitive) is preserved so the non-owner UI knows what changed
+        assert sanitized_payload["status"] == "in_progress"
+        assert sanitized_payload["item_id"] == 1
 
     def test_batch_enqueued_routed_privately(self, socketio: Any) -> None:
-        """Verify that _handle_queue_event emits BatchEnqueuedEvent ONLY to
-        user:{user_id} and admin rooms, never to the queue_id room."""
+        """_handle_queue_event must emit the FULL BatchEnqueuedEvent only to the owner's
+        user room and the admin room. A sanitized companion (user_id="redacted", batch_id
+        and origin stripped) is also emitted to the queue_id room so other users' badge
+        totals refresh, with owner/admin sids in skip_sid."""
         import asyncio
         from unittest.mock import AsyncMock
 
@@ -1791,15 +1851,39 @@ class TestWebSocketAuth:
         )
         event = BatchEnqueuedEvent.build(enqueue_result, user_id="owner-zzz")
 
+        socketio._socket_users["sid-owner"] = {"user_id": "owner-zzz", "is_admin": False}
+        socketio._socket_users["sid-admin"] = {"user_id": "admin-1", "is_admin": True}
+        socketio._socket_users["sid-other"] = {"user_id": "other-user", "is_admin": False}
+
         mock_emit = AsyncMock()
         socketio._sio.emit = mock_emit
 
         asyncio.run(socketio._handle_queue_event(("batch_enqueued", event)))
 
-        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
-        assert "user:owner-zzz" in rooms_emitted_to
-        assert "admin" in rooms_emitted_to
-        assert "default" not in rooms_emitted_to
+        emits = [
+            (c.kwargs.get("room"), c.kwargs.get("data"), c.kwargs.get("skip_sid")) for c in mock_emit.call_args_list
+        ]
+
+        # Full event to owner + admin contains the real batch_id and origin
+        owner_emits = [(p, s) for r, p, s in emits if r == "user:owner-zzz"]
+        admin_emits = [(p, s) for r, p, s in emits if r == "admin"]
+        assert len(owner_emits) == 1 and len(admin_emits) == 1
+        for payload, _ in owner_emits + admin_emits:
+            assert payload["user_id"] == "owner-zzz"
+            assert payload["batch_id"] == "batch-pvt"
+            assert payload["origin"] == "workflows"
+
+        # Sanitized event to queue room: user/batch/origin redacted, owner+admin skipped
+        queue_emits = [(p, s) for r, p, s in emits if r == "default"]
+        assert len(queue_emits) == 1
+        sanitized_payload, skip_sid = queue_emits[0]
+        assert sanitized_payload["user_id"] == "redacted"
+        assert sanitized_payload["batch_id"] == "redacted"
+        assert sanitized_payload["origin"] is None
+        assert sanitized_payload["enqueued"] == 5  # count is non-sensitive
+        assert "sid-owner" in skip_sid
+        assert "sid-admin" in skip_sid
+        assert "sid-other" not in skip_sid
 
     def test_queue_cleared_still_broadcast(self, socketio: Any) -> None:
         """QueueClearedEvent does not carry user identity and should still be broadcast

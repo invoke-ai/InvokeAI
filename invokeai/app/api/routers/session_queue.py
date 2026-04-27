@@ -141,12 +141,11 @@ async def get_queue_item_ids(
     queue_id: str = Path(description="The queue id to perform this operation on"),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
 ) -> ItemIdsResult:
-    """Gets all queue item ids that match the given parameters. Non-admin users only see their own items."""
+    """Gets all queue item ids that match the given parameters. The IDs themselves are not sensitive;
+    per-item field redaction is performed when the items are fetched via list_all_queue_items or
+    get_queue_items_by_item_ids."""
     try:
-        user_id = None if current_user.is_admin else current_user.user_id
-        return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(
-            queue_id=queue_id, order_dir=order_dir, user_id=user_id
-        )
+        return ApiDependencies.invoker.services.session_queue.get_queue_item_ids(queue_id=queue_id, order_dir=order_dir)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error while listing all queue item ids: {e}")
 
@@ -436,10 +435,15 @@ async def get_queue_status(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id to perform this operation on"),
 ) -> SessionQueueAndProcessorStatus:
-    """Gets the status of the session queue. Non-admin users see only their own counts and cannot see current item details unless they own it."""
+    """Gets the status of the session queue. Returns global counts plus the calling user's own
+    pending/in_progress counts (so the UI can show an X/Y badge). Non-admin users cannot see the
+    current item's identifiers unless they own it."""
     try:
-        user_id = None if current_user.is_admin else current_user.user_id
-        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(queue_id, user_id=user_id)
+        queue = ApiDependencies.invoker.services.session_queue.get_queue_status(
+            queue_id,
+            user_id=current_user.user_id,
+            is_admin=current_user.is_admin,
+        )
         processor = ApiDependencies.invoker.services.session_processor.get_status()
         return SessionQueueAndProcessorStatus(queue=queue, processor=processor)
     except Exception as e:
