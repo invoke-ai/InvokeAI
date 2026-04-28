@@ -495,8 +495,8 @@ Next runtime work still needed:
 - decide whether parent resumption should remain immediate on child completion or become a more explicit scheduler step
 - decide whether `WorkflowCallQueueLifecycle` should remain a dedicated workflow-call runtime component or eventually
   fold into a more general queue scheduler/lifecycle layer
-- replace the current unsupported batch-special-node limitation by routing child execution through machinery that can
-  honor ordinary Invoke batch semantics
+- if support expands beyond the currently supported direct and generator-backed batch shapes, route those new child
+  workflow execution shapes through machinery that can honor ordinary Invoke batch semantics
 
 ## Suggested Runtime Components
 
@@ -604,9 +604,10 @@ Still needed in later increments:
 
 The next incremental step should be:
 
-- move the temporary attached-session processor path toward the intended first-class parent-child runtime model
-- keep that step test-first
-- preserve the current bounded nested-call runtime state while making return/resume behavior explicit
+- stop adding feature slices unless they close a concrete correctness gap or unlock a realistic user workflow
+- stabilize the current branch with review, targeted test runs, and cleanup of stale design-doc language
+- treat migration from `WorkflowCallQueueLifecycle` to a generalized parent/child queue lifecycle as a larger
+  architecture slice, not as small follow-on busywork
 
 The current branch is at the point where:
 
