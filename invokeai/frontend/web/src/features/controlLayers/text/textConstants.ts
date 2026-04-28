@@ -1,21 +1,11 @@
 import { z } from 'zod';
 
-const TEXT_FONT_IDS = [
-  'sans',
-  'serif',
-  'mono',
-  'rounded',
-  'script',
-  'humanist',
-  'slab',
-  'display',
-  'narrow',
-  'uiSerif',
-] as const;
-export const zTextFontId = z.enum(TEXT_FONT_IDS);
-export type TextFontId = z.infer<typeof zTextFontId>;
+export const zTextFontId = z.string().min(1);
+export type TextFontId = string;
 
-export const TEXT_FONT_STACKS: Array<{ id: TextFontId; label: string; stack: string }> = [
+type TextFontStack = { id: TextFontId; label: string; stack: string };
+
+export const TEXT_FONT_STACKS: Array<TextFontStack> = [
   {
     id: 'sans',
     label: 'Sans',
@@ -68,6 +58,19 @@ export const TEXT_FONT_STACKS: Array<{ id: TextFontId; label: string; stack: str
     stack: '"Iowan Old Style","Palatino","Book Antiqua","Times New Roman",serif',
   },
 ];
+
+let customTextFontStacks: Array<TextFontStack> = [];
+
+export const setCustomTextFontStacks = (fonts: Array<TextFontStack>) => {
+  customTextFontStacks = fonts;
+};
+
+const getAllTextFontStacks = (): Array<TextFontStack> => {
+  if (customTextFontStacks.length === 0) {
+    return TEXT_FONT_STACKS;
+  }
+  return [...customTextFontStacks, ...TEXT_FONT_STACKS];
+};
 
 export const TEXT_DEFAULT_FONT_ID: TextFontId = 'sans';
 export const TEXT_DEFAULT_FONT_SIZE = 48;
@@ -140,5 +143,6 @@ export const resolveAvailableFont = (stack: string): string => {
 };
 
 export const getFontStackById = (fontId: TextFontId): string => {
-  return TEXT_FONT_STACKS.find((font) => font.id === fontId)?.stack ?? TEXT_FONT_STACKS[0]?.stack ?? 'sans-serif';
+  const fonts = getAllTextFontStacks();
+  return fonts.find((font) => font.id === fontId)?.stack ?? TEXT_FONT_STACKS[0]?.stack ?? 'sans-serif';
 };

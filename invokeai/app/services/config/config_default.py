@@ -640,6 +640,17 @@ def get_config() -> InvokeAIAppConfig:
         default_config = DefaultInvokeAIAppConfig()
         default_config.write_file(config.config_file_path, as_example=False)
 
+    fonts_path = config.root_path / "Fonts"
+    fonts_path.mkdir(parents=True, exist_ok=True)
+    fonts_readme_path = fonts_path / "README.txt"
+    if not fonts_readme_path.exists():
+        with open(fonts_readme_path, "wt", encoding=locale.getpreferredencoding()) as f:
+            f.write(
+                "Custom fonts folder for InvokeAI text tools.\n\n"
+                "Place your font files in this folder (or subfolders).\n"
+                "Supported formats: .ttf, .otf, .woff, .woff2\n"
+            )
+
     api_keys_from_file = load_external_api_keys(config.api_keys_file_path)
     if api_keys_from_file:
         # API keys file should take precedence over invokeai.yaml, but not over environment variables.

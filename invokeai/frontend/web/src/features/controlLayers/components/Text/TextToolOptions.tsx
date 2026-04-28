@@ -2,6 +2,7 @@ import {
   Box,
   ButtonGroup,
   Combobox,
+  type ComboboxOption,
   CompositeSlider,
   Flex,
   IconButton,
@@ -18,6 +19,7 @@ import {
   Tooltip,
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import type { GroupBase } from 'chakra-react-select';
 import {
   selectTextAlignment,
   selectTextFontId,
@@ -34,6 +36,7 @@ import {
 } from 'features/controlLayers/store/canvasTextSlice';
 import {
   resolveAvailableFont,
+  setCustomTextFontStacks,
   TEXT_FONT_STACKS,
   TEXT_MAX_FONT_SIZE,
   TEXT_MIN_FONT_SIZE,
@@ -52,8 +55,16 @@ import {
   PiTextStrikethroughBold,
   PiTextUnderlineBold,
 } from 'react-icons/pi';
+import { useListUserFontsQuery } from 'services/api/endpoints/utilities';
 
 const formatSliderValue = (value: number) => String(value);
+const loadedUserFontFaces = new Set<string>();
+const truncateLabel = (value: string, maxLength: number = 36): string => {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 3)}...`;
+};
 
 export const TextToolOptions = () => {
   return (
@@ -71,16 +82,84 @@ const FontSelect = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const fontId = useAppSelector(selectTextFontId);
+  const { data: userFonts } = useListUserFontsQuery();
+  const userFontsLabel = t('controlLayers.text.customFonts', { defaultValue: 'User Fonts' });
+  const builtInFontsLabel = t('controlLayers.text.builtInFonts', { defaultValue: 'Built-in Fonts' });
+
+  useEffect(() => {
+    if (!userFonts || userFonts.length === 0) {
+      setCustomTextFontStacks([]);
+      return;
+    }
+    const customStacks = userFonts.map((font) => ({
+      id: font.id,
+      label: font.label,
+      stack: `"${font.family}",sans-serif`,
+    }));
+    setCustomTextFontStacks(customStacks);
+  }, [userFonts]);
+
+  useEffect(() => {
+    if (!userFonts || userFonts.length === 0 || typeof document === 'undefined' || typeof FontFace === 'undefined') {
+      return;
+    }
+    void Promise.all(
+      userFonts.flatMap((font) =>
+        font.faces.map(async (face) => {
+          const faceKey = `${font.family}|${face.weight}|${face.style}|${face.url}`;
+          if (loadedUserFontFaces.has(faceKey)) {
+            return;
+          }
+          try {
+            const fontFace = new FontFace(font.family, `url("${face.url}")`, {
+              weight: String(face.weight),
+              style: face.style,
+            });
+            await fontFace.load();
+            document.fonts.add(fontFace);
+            loadedUserFontFaces.add(faceKey);
+          } catch {
+            // Ignore failures and let browser fallback fonts render.
+          }
+        })
+      )
+    );
+  }, [userFonts]);
+
   const options = useMemo(() => {
-    return TEXT_FONT_STACKS.map(({ id, label, stack }) => {
-      const resolved = resolveAvailableFont(stack);
+    const customOptions: ComboboxOption[] = (userFonts ?? []).map((font) => {
       return {
-        value: id,
-        label: `${label} (${resolved})`,
+        value: font.id,
+        label: truncateLabel(font.label),
       };
     });
-  }, []);
-  const selectedOption = options.find((option) => option.value === fontId) ?? null;
+    const builtInOptions: ComboboxOption[] = TEXT_FONT_STACKS.map(({ id, label, stack }) => {
+      const resolved = resolveAvailableFont(stack);
+      const display = truncateLabel(`${label} (${resolved})`);
+      return {
+        value: id,
+        label: display,
+      };
+    });
+    if (customOptions.length === 0) {
+      return builtInOptions;
+    }
+    return [
+      {
+        label: userFontsLabel,
+        options: customOptions,
+      },
+      { label: builtInFontsLabel, options: builtInOptions },
+    ] as GroupBase<ComboboxOption>[];
+  }, [builtInFontsLabel, userFonts, userFontsLabel]);
+  const selectedOption = useMemo(() => {
+    const firstOption = options[0];
+    const flattened =
+      firstOption && 'options' in firstOption
+        ? (options as GroupBase<ComboboxOption>[]).flatMap((group) => group.options)
+        : (options as ComboboxOption[]);
+    return flattened.find((option) => option.value === fontId) ?? null;
+  }, [fontId, options]);
   const handleFontChange = useCallback(
     (option: { value: string } | null) => {
       if (!option) {
@@ -90,9 +169,23 @@ const FontSelect = () => {
     },
     [dispatch]
   );
+  const formatFontGroupLabel = useCallback(
+    (group: GroupBase<ComboboxOption>) => {
+      const isBuiltInGroup = group.label === builtInFontsLabel;
+      return (
+        <Flex w="full" flexDir="column" gap={1} py={1}>
+          {isBuiltInGroup && <Box borderTopWidth="1px" borderTopColor="base.500" opacity={0.85} />}
+          <Text fontSize="xs" fontWeight="semibold" color="base.400" textTransform="uppercase" letterSpacing="0.04em">
+            {group.label}
+          </Text>
+        </Flex>
+      );
+    },
+    [builtInFontsLabel]
+  );
 
   return (
-    <Flex w="200px" minW="200px" alignItems="center" gap={2}>
+    <Flex w="280px" minW="280px" alignItems="center" gap={2}>
       <Text fontSize="sm" lineHeight="1" whiteSpace="nowrap">
         {t('controlLayers.text.font')}
       </Text>
@@ -103,6 +196,7 @@ const FontSelect = () => {
         options={options}
         value={selectedOption}
         onChange={handleFontChange}
+        formatGroupLabel={formatFontGroupLabel}
       />
     </Flex>
   );
