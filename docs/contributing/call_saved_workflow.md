@@ -588,14 +588,15 @@ Already covered:
 - child `workflow_return` output is captured and becomes the parent `call_saved_workflow` output
 - child workflows without a `workflow_return` node fail cleanly when called
 - child execution events now include stable workflow-call relationship metadata on the child `SessionQueueItem`
+- parent-child resume and failure propagation through queue-visible child rows
+- nested runtime execution with bounded stack depth
+- direct and generator-backed batch-special child workflows through queue child-row expansion
+- compatibility metadata for required exposed inputs, missing/multiple returns, supported batch-to-return collection
+  shapes, and unsupported batch input wiring
 
 Still needed in later increments:
 
-- parent-child resume behavior once child execution is no longer an inline runner detail
-- child failure propagation into parent failure
-- nested runtime execution beyond a single attached child state
-- eventual support for child workflows that contain batch-special nodes, once child execution is run through the proper
-  batch/session path
+- focused coverage for any newly supported batch or generator shape when its contract changes
 - eventual migration from dedicated workflow-call queue lifecycle handling to a more general scheduler or
   queue-lifecycle model
 
