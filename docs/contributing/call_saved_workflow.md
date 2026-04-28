@@ -492,9 +492,11 @@ Current insertion points already used:
 
 Next runtime work still needed:
 
-- decide whether parent resumption should remain immediate on child completion or become a more explicit scheduler step
-- decide whether `WorkflowCallQueueLifecycle` should remain a dedicated workflow-call runtime component or eventually
-  fold into a more general queue scheduler/lifecycle layer
+- keep `WorkflowCallQueueLifecycle` as the bounded workflow-call lifecycle component for this PR
+  - the current workflow-call feature is the only caller of parent/child queue semantics
+  - replacing it with a generalized queue dependency scheduler now would add regression risk without unlocking a
+    concrete user workflow
+  - revisit only if another feature needs dependent queue items, richer retry/cancel policies, or resumable waits
 - if support expands beyond the currently supported direct and generator-backed batch shapes, route those new child
   workflow execution shapes through machinery that can honor ordinary Invoke batch semantics
 
@@ -597,8 +599,8 @@ Already covered:
 Still needed in later increments:
 
 - focused coverage for any newly supported batch or generator shape when its contract changes
-- eventual migration from dedicated workflow-call queue lifecycle handling to a more general scheduler or
-  queue-lifecycle model
+- possible migration from dedicated workflow-call queue lifecycle handling to a more general scheduler or
+  queue-lifecycle model only if another feature needs reusable dependent queue items
 
 ## Recommended Immediate Next Step
 

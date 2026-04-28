@@ -290,8 +290,9 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
 
 Current limitation:
 
-- Child workflow executions are now represented as first-class queue items, but parent resume/failure is still handled
-  by a dedicated workflow-call queue lifecycle component rather than a generalized queue scheduler contract.
+- Child workflow executions are now represented as first-class queue items. Parent resume/failure is intentionally
+  handled by a dedicated workflow-call queue lifecycle component for this PR because no other feature currently needs a
+  generalized dependent-queue scheduler.
 - Called workflows currently require exactly one valid `workflow_return` node to be callable at all.
 - Direct batch-special child workflows are now supported by expanding them into multiple child queue rows.
 - Batch outputs may feed `workflow_return.collection` directly; each expanded child receives a singleton collection and
