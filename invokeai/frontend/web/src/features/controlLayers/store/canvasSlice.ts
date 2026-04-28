@@ -70,7 +70,7 @@ import type {
   EntityLassoAddedPayload,
   EntityMovedToPayload,
   EntityRasterizedPayload,
-  EntityRectAddedPayload,
+  EntityShapeAddedPayload,
   IPMethodV2,
   T2IAdapterConfig,
   ZImageControlConfig,
@@ -1568,8 +1568,8 @@ const slice = createSlice({
         points: eraserLine.type === 'eraser_line' ? simplifyFlatNumbersArray(eraserLine.points) : eraserLine.points,
       });
     },
-    entityRectAdded: (state, action: PayloadAction<EntityRectAddedPayload>) => {
-      const { entityIdentifier, rect } = action.payload;
+    entityShapeAdded: (state, action: PayloadAction<EntityShapeAddedPayload>) => {
+      const { entityIdentifier, shape } = action.payload;
       const entity = selectEntity(state, entityIdentifier);
       if (!entity) {
         return;
@@ -1577,7 +1577,7 @@ const slice = createSlice({
 
       // TODO(psyche): If we add the object without splatting, the renderer will see it as the same object and not
       // re-render it (reference equality check). I don't like this behaviour.
-      entity.objects.push({ ...rect });
+      entity.objects.push({ ...shape });
     },
     entityLassoAdded: (state, action: PayloadAction<EntityLassoAddedPayload>) => {
       const { entityIdentifier, lasso } = action.payload;
@@ -1910,7 +1910,7 @@ export const {
   entityRasterized,
   entityBrushLineAdded,
   entityEraserLineAdded,
-  entityRectAdded,
+  entityShapeAdded,
   entityLassoAdded,
   entityGradientAdded,
   // Raster layer adjustments
@@ -2046,7 +2046,7 @@ export const canvasSliceConfig: SliceConfig<typeof slice> = {
 const doNotGroupMatcher = isAnyOf(
   entityBrushLineAdded,
   entityEraserLineAdded,
-  entityRectAdded,
+  entityShapeAdded,
   entityLassoAdded,
   entityGradientAdded
 );
