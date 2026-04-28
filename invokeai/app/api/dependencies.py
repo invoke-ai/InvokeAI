@@ -16,6 +16,9 @@ from invokeai.app.services.client_state_persistence.client_state_persistence_sql
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.download.download_default import DownloadQueueService
 from invokeai.app.services.events.events_fastapievents import FastAPIEventService
+from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
+from invokeai.app.services.external_generation.providers import GeminiProvider, OpenAIProvider
+from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
@@ -46,10 +49,12 @@ from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    AnimaConditioningInfo,
     BasicConditioningInfo,
     CogView4ConditioningInfo,
     ConditioningFieldData,
     FLUXConditioningInfo,
+    QwenImageConditioningInfo,
     SD3ConditioningInfo,
     SDXLConditioningInfo,
     ZImageConditioningInfo,
@@ -140,18 +145,29 @@ class ApiDependencies:
                     SD3ConditioningInfo,
                     CogView4ConditioningInfo,
                     ZImageConditioningInfo,
+                    QwenImageConditioningInfo,
+                    AnimaConditioningInfo,
                 ],
                 ephemeral=True,
             ),
         )
         download_queue_service = DownloadQueueService(app_config=configuration, event_bus=events)
-        model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
+        model_record_service = ModelRecordServiceSQL(db=db, logger=logger)
         model_manager = ModelManagerService.build_model_manager(
             app_config=configuration,
-            model_record_service=ModelRecordServiceSQL(db=db, logger=logger),
+            model_record_service=model_record_service,
             download_queue=download_queue_service,
             events=events,
         )
+        external_generation = ExternalGenerationService(
+            providers={
+                GeminiProvider.provider_id: GeminiProvider(app_config=configuration, logger=logger),
+                OpenAIProvider.provider_id: OpenAIProvider(app_config=configuration, logger=logger),
+            },
+            logger=logger,
+            record_store=model_record_service,
+        )
+        model_images_service = ModelImageFileStorageDisk(model_images_folder / "model_images")
         model_relationships = ModelRelationshipsService()
         model_relationship_records = SqliteModelRelationshipRecordStorage(db=db)
         names = SimpleNameService()
@@ -184,6 +200,7 @@ class ApiDependencies:
             model_relationships=model_relationships,
             model_relationship_records=model_relationship_records,
             download_queue=download_queue_service,
+            external_generation=external_generation,
             names=names,
             performance_statistics=performance_statistics,
             session_processor=session_processor,
@@ -200,6 +217,16 @@ class ApiDependencies:
         )
 
         ApiDependencies.invoker = Invoker(services)
+        configured_external_providers = {
+            provider_id
+            for provider_id, status in external_generation.get_provider_statuses().items()
+            if status.configured
+        }
+        sync_configured_external_starter_models(
+            configured_provider_ids=configured_external_providers,
+            model_manager=model_manager,
+            logger=logger,
+        )
         db.clean()
 
     @staticmethod

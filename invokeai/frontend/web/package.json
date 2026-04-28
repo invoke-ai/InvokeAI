@@ -66,6 +66,7 @@
     "i18next-http-backend": "^3.0.2",
     "idb-keyval": "6.2.1",
     "jsondiffpatch": "^0.7.3",
+    "jszip": "^3.10.1",
     "konva": "^9.3.22",
     "linkify-react": "^4.3.1",
     "linkifyjs": "^4.3.1",

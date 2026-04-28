@@ -1,9 +1,10 @@
-import { ExternalLink, Flex, Text } from '@invoke-ai/ui-library';
+import { Flex, Text } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import type { AppStore } from 'app/store/store';
 import { deepClone } from 'common/util/deepClone';
 import { forEach, isNil, round } from 'es-toolkit/compat';
+import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
 import { loraAllDeleted, loraRecalled } from 'features/controlLayers/store/lorasSlice';
@@ -28,7 +29,7 @@ import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks
 import { zNodeStatus } from 'features/nodes/types/invocation';
 import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
-import { toast } from 'features/toast/toast';
+import { toast, toastApi } from 'features/toast/toast';
 import { t } from 'i18next';
 import { LRUCache } from 'lru-cache';
 import { Trans } from 'react-i18next';
@@ -37,13 +38,22 @@ import { api, LIST_ALL_TAG, LIST_TAG } from 'services/api';
 import { imagesApi } from 'services/api/endpoints/images';
 import { modelsApi } from 'services/api/endpoints/models';
 import { queueApi } from 'services/api/endpoints/queue';
+import {
+  clearCompletedInvocationKeysForQueueItem,
+  shouldIgnoreFinishedQueueItemInvocationEvent,
+} from 'services/events/invocationTracking';
+import {
+  getUpdatedNodeExecutionStateOnInvocationError,
+  getUpdatedNodeExecutionStateOnInvocationProgress,
+  getUpdatedNodeExecutionStateOnInvocationStarted,
+} from 'services/events/nodeExecutionState';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
 
-import { $lastProgressEvent } from './stores';
+import { $lastProgressEvent, $loadingModelsCount } from './stores';
 
 const log = logger('events');
 
@@ -65,6 +75,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   // We can have race conditions where we receive a progress event for a queue item that has already finished. Easiest
   // way to handle this is to keep track of finished queue items in a cache and ignore progress events for those.
   const finishedQueueItemIds = new LRUCache<number, boolean>({ max: 100 });
+  const completedInvocationKeysByItemId = new Map<number, Set<string>>();
 
   socket.on('connect', () => {
     log.debug('Connected');
@@ -73,12 +84,14 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     socket.emit('subscribe_queue', { queue_id: 'default' });
     socket.emit('subscribe_bulk_download', { bulk_download_id: 'default' });
     $lastProgressEvent.set(null);
+    $loadingModelsCount.set(0);
   });
 
   socket.on('connect_error', (error) => {
     log.debug('Connect error');
     setIsConnected(false);
     $lastProgressEvent.set(null);
+    $loadingModelsCount.set(0);
     if (error && error.message) {
       const data: string | undefined = (error as unknown as { data: string | undefined }).data;
       if (data === 'ERR_UNAUTHENTICATED') {
@@ -95,28 +108,33 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
   socket.on('disconnect', () => {
     log.debug('Disconnected');
     $lastProgressEvent.set(null);
+    $loadingModelsCount.set(0);
     setIsConnected(false);
   });
 
   socket.on('invocation_started', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
+    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_started', finishedQueueItemIds, data.item_id)) {
       return;
     }
     const { invocation_source_id, invocation } = data;
     log.debug({ data } as JsonObject, `Invocation started (${invocation.type}, ${invocation_source_id})`);
-    const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-    if (nes) {
-      nes.status = zNodeStatus.enum.IN_PROGRESS;
-      upsertExecutionState(nes.nodeId, nes);
+    const nes = $nodeExecutionStates.get()[invocation_source_id];
+    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationStarted(
+      nes,
+      data,
+      completedInvocationKeysByItemId
+    );
+    if (updatedNodeExecutionState) {
+      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
     }
   });
 
   socket.on('invocation_progress', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
+    if (shouldIgnoreFinishedQueueItemInvocationEvent('invocation_progress', finishedQueueItemIds, data.item_id)) {
       log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
       return;
     }
-    const { invocation_source_id, invocation, image, origin, percentage, message } = data;
+    const { invocation_source_id, invocation, origin, percentage, message } = data;
 
     let _message = 'Invocation progress';
     if (message) {
@@ -132,34 +150,25 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     $lastProgressEvent.set(data);
 
     if (origin === 'workflows') {
-      const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-      if (nes) {
-        nes.status = zNodeStatus.enum.IN_PROGRESS;
-        nes.progress = percentage;
-        nes.progressImage = image ?? null;
-        upsertExecutionState(nes.nodeId, nes);
+      const nes = $nodeExecutionStates.get()[invocation_source_id];
+      const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationProgress(
+        nes,
+        data,
+        completedInvocationKeysByItemId
+      );
+      if (updatedNodeExecutionState) {
+        upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
       }
     }
   });
 
   socket.on('invocation_error', (data) => {
-    if (finishedQueueItemIds.has(data.item_id)) {
-      log.trace({ data } as JsonObject, `Received event for already-finished queue item ${data.item_id}`);
-      return;
-    }
-    const { invocation_source_id, invocation, error_type, error_message, error_traceback } = data;
+    const { invocation_source_id, invocation } = data;
     log.error({ data } as JsonObject, `Invocation error (${invocation.type}, ${invocation_source_id})`);
-    const nes = deepClone($nodeExecutionStates.get()[invocation_source_id]);
-    if (nes) {
-      nes.status = zNodeStatus.enum.FAILED;
-      nes.progress = null;
-      nes.progressImage = null;
-      nes.error = {
-        error_type,
-        error_message,
-        error_traceback,
-      };
-      upsertExecutionState(nes.nodeId, nes);
+    const nes = $nodeExecutionStates.get()[invocation_source_id];
+    const updatedNodeExecutionState = getUpdatedNodeExecutionStateOnInvocationError(nes, data);
+    if (updatedNodeExecutionState) {
+      upsertExecutionState(updatedNodeExecutionState.nodeId, updatedNodeExecutionState);
     }
     // Clear canvas workflow integration processing state on error
     if (data.origin === 'canvas_workflow_integration') {
@@ -167,7 +176,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     }
   });
 
-  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, finishedQueueItemIds);
+  const onInvocationComplete = buildOnInvocationComplete(getState, dispatch, completedInvocationKeysByItemId);
   socket.on('invocation_complete', onInvocationComplete);
 
   socket.on('model_load_started', (data) => {
@@ -183,6 +192,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const message = `Model load started: ${name} (${extras.join(', ')})`;
 
     log.debug({ data }, message);
+    $loadingModelsCount.set($loadingModelsCount.get() + 1);
   });
 
   socket.on('model_load_complete', (data) => {
@@ -197,6 +207,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const message = `Model load complete: ${name} (${extras.join(', ')})`;
 
     log.debug({ data }, message);
+    $loadingModelsCount.set(Math.max(0, $loadingModelsCount.get() - 1));
   });
 
   socket.on('download_started', (data) => {
@@ -387,6 +398,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     const {
       item_id,
       status,
+      status_sequence,
       batch_status,
       error_type,
       error_message,
@@ -403,6 +415,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     dispatch(
       queueApi.util.updateQueryData('getQueueItem', item_id, (draft) => {
         draft.status = status;
+        draft.status_sequence = status_sequence;
         draft.started_at = started_at;
         draft.updated_at = updated_at;
         draft.completed_at = completed_at;
@@ -420,6 +433,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
           const item = draft.find((i) => i.item_id === item_id);
           if (item) {
             item.status = status;
+            item.status_sequence = status_sequence;
             item.started_at = started_at;
             item.updated_at = updated_at;
             item.completed_at = completed_at;
@@ -464,6 +478,7 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
       });
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       finishedQueueItemIds.set(item_id, true);
+      clearCompletedInvocationKeysForQueueItem(completedInvocationKeysByItemId, item_id);
       if (status === 'failed' && error_type) {
         toast({
           id: `INVOCATION_ERROR_${error_type}`,
@@ -736,110 +751,182 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         }
       }
 
-      // Handle IP Adapters as Reference Images
-      if (data.parameters.ip_adapters !== undefined && Array.isArray(data.parameters.ip_adapters)) {
-        log.debug(`Processing ${data.parameters.ip_adapters.length} IP adapter(s)`);
+      // Handle IP Adapters and model-free reference images together.
+      //
+      // Both ip_adapters and reference_images feed into the same refImages
+      // Redux slice.  Previously they were dispatched as two independent
+      // Promise.all chains — the first with replace:true, the second with
+      // replace:false — which created a race: if a previous recall's
+      // reference-image promises were still in-flight they could resolve
+      // after the clear and re-append stale entries, doubling the list.
+      //
+      // Fix: collect every promise into a single array and dispatch exactly
+      // once with replace:true after all of them settle.
+      {
+        /* eslint-disable @typescript-eslint/no-explicit-any */
+        const ipAdaptersArr: any[] = Array.isArray(data.parameters.ip_adapters)
+          ? (data.parameters.ip_adapters as any[])
+          : [];
+        const refImagesArr: any[] = Array.isArray(data.parameters.reference_images)
+          ? (data.parameters.reference_images as any[])
+          : [];
+        /* eslint-enable @typescript-eslint/no-explicit-any */
 
-        // If the list is explicitly empty, clear existing reference images
-        if (data.parameters.ip_adapters.length === 0) {
-          dispatch(refImagesRecalled({ entities: [], replace: true }));
-          log.info('Cleared all IP adapter reference images');
-        } else {
-          // Build promises for all IP adapters, then dispatch once with replace: true
-          const ipAdapterPromises = data.parameters.ip_adapters
-            .filter((cfg) => cfg.model_key && typeof cfg.model_key === 'string')
-            .map(async (adapterConfig) => {
-              try {
-                const modelConfig = await dispatch(
-                  modelsApi.endpoints.getModelConfig.initiate(adapterConfig.model_key!)
-                ).unwrap();
+        const hasIpAdapters = data.parameters.ip_adapters !== undefined;
+        const hasRefImages = data.parameters.reference_images !== undefined;
 
-                // Pre-fetch the image DTO if an image is provided, to avoid validation errors
-                if (adapterConfig.image?.image_name) {
-                  try {
-                    await dispatch(imagesApi.endpoints.getImageDTO.initiate(adapterConfig.image.image_name)).unwrap();
-                  } catch (imageError) {
-                    log.warn(
-                      `Could not pre-fetch image ${adapterConfig.image.image_name}, continuing anyway: ${imageError}`
+        if (hasIpAdapters || hasRefImages) {
+          const allRefImagePromises: Promise<RefImageState | null>[] = [];
+
+          // --- IP Adapters ---
+          if (hasIpAdapters && ipAdaptersArr.length > 0) {
+            log.debug(`Processing ${ipAdaptersArr.length} IP adapter(s)`);
+
+            const ipAdapterPromises = ipAdaptersArr
+              .filter((cfg: any) => cfg.model_key && typeof cfg.model_key === 'string') // eslint-disable-line @typescript-eslint/no-explicit-any
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map(async (adapterConfig: any): Promise<RefImageState | null> => {
+                try {
+                  const modelConfig = await dispatch(
+                    modelsApi.endpoints.getModelConfig.initiate(adapterConfig.model_key!)
+                  ).unwrap();
+
+                  // Pre-fetch the image DTO if an image is provided, to avoid validation errors
+                  if (adapterConfig.image?.image_name) {
+                    try {
+                      await dispatch(imagesApi.endpoints.getImageDTO.initiate(adapterConfig.image.image_name)).unwrap();
+                    } catch (imageError) {
+                      log.warn(
+                        `Could not pre-fetch image ${adapterConfig.image.image_name}, continuing anyway: ${imageError}`
+                      );
+                    }
+                  }
+
+                  // Build RefImageState using helper function - supports both ip_adapter and flux_redux
+                  const imageData = adapterConfig.image
+                    ? {
+                        original: {
+                          image: {
+                            image_name: adapterConfig.image.image_name,
+                            width: adapterConfig.image.width ?? 512,
+                            height: adapterConfig.image.height ?? 512,
+                          },
+                        },
+                      }
+                    : null;
+
+                  const isFluxRedux = modelConfig.type === 'flux_redux';
+                  const refImageState = getReferenceImageState(`recalled-ref-image-${Date.now()}-${Math.random()}`, {
+                    isEnabled: true,
+                    config: isFluxRedux
+                      ? {
+                          type: 'flux_redux',
+                          image: imageData,
+                          model: {
+                            key: modelConfig.key,
+                            hash: modelConfig.hash,
+                            name: modelConfig.name,
+                            base: modelConfig.base,
+                            type: modelConfig.type,
+                          },
+                          imageInfluence: (adapterConfig.image_influence as FLUXReduxImageInfluence) || 'highest',
+                        }
+                      : {
+                          type: 'ip_adapter',
+                          image: imageData,
+                          model: {
+                            key: modelConfig.key,
+                            hash: modelConfig.hash,
+                            name: modelConfig.name,
+                            base: modelConfig.base,
+                            type: modelConfig.type,
+                          },
+                          weight: typeof adapterConfig.weight === 'number' ? adapterConfig.weight : 1.0,
+                          beginEndStepPct: [
+                            typeof adapterConfig.begin_step_percent === 'number' ? adapterConfig.begin_step_percent : 0,
+                            typeof adapterConfig.end_step_percent === 'number' ? adapterConfig.end_step_percent : 1,
+                          ] as [number, number],
+                          method: (adapterConfig.method as IPMethodV2) || 'full',
+                          clipVisionModel: 'ViT-H',
+                        },
+                  });
+
+                  if (isFluxRedux) {
+                    log.debug(`Built FLUX Redux ref image state: ${modelConfig.name}`);
+                  } else {
+                    log.debug(
+                      `Built IP adapter ref image state: ${modelConfig.name} (weight: ${typeof adapterConfig.weight === 'number' ? adapterConfig.weight : 1.0})`
                     );
                   }
+                  if (adapterConfig.image?.image_name) {
+                    log.debug(
+                      `IP adapter image: outputs/images/${adapterConfig.image.image_name} (${adapterConfig.image.width}x${adapterConfig.image.height})`
+                    );
+                  }
+
+                  return refImageState;
+                } catch (error) {
+                  log.error(`Failed to load IP adapter ${adapterConfig.model_key}: ${error}`);
+                  return null;
+                }
+              });
+
+            allRefImagePromises.push(...ipAdapterPromises);
+          }
+
+          // --- Model-free reference images (FLUX.2 Klein, FLUX Kontext, Qwen Image Edit) ---
+          // These feed the reference image directly into the main model rather than going
+          // through an IP Adapter, so the backend sends them without a model_key and we
+          // pick the right config type via getDefaultRefImageConfig() based on the main
+          // model that is currently selected in the UI.
+          if (hasRefImages && refImagesArr.length > 0) {
+            log.debug(`Processing ${refImagesArr.length} reference image(s)`);
+
+            const referenceImagePromises = refImagesArr
+              .filter((cfg: any) => cfg.image?.image_name && typeof cfg.image.image_name === 'string') // eslint-disable-line @typescript-eslint/no-explicit-any
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map(async (refConfig: any): Promise<RefImageState | null> => {
+                const imageName = refConfig.image.image_name as string;
+                try {
+                  // Pre-fetch the image DTO so ref image validation succeeds.
+                  await dispatch(imagesApi.endpoints.getImageDTO.initiate(imageName)).unwrap();
+                } catch (imageError) {
+                  log.warn(`Could not pre-fetch reference image ${imageName}, continuing anyway: ${imageError}`);
                 }
 
-                // Build RefImageState using helper function - supports both ip_adapter and flux_redux
-                const imageData = adapterConfig.image
-                  ? {
-                      original: {
-                        image: {
-                          image_name: adapterConfig.image.image_name,
-                          width: adapterConfig.image.width ?? 512,
-                          height: adapterConfig.image.height ?? 512,
-                        },
-                      },
-                    }
-                  : null;
+                // Pick the config flavor (flux2 / flux_kontext / ip_adapter fallback) that
+                // matches the currently-selected main model.
+                const baseConfig = getDefaultRefImageConfig(getState);
+                const imageData = {
+                  original: {
+                    image: {
+                      image_name: imageName,
+                      width: typeof refConfig.image.width === 'number' ? refConfig.image.width : 512,
+                      height: typeof refConfig.image.height === 'number' ? refConfig.image.height : 512,
+                    },
+                  },
+                };
 
-                const isFluxRedux = modelConfig.type === 'flux_redux';
-                const refImageState = getReferenceImageState(`recalled-ref-image-${Date.now()}-${Math.random()}`, {
+                return getReferenceImageState(`recalled-ref-image-${Date.now()}-${Math.random()}`, {
                   isEnabled: true,
-                  config: isFluxRedux
-                    ? {
-                        type: 'flux_redux',
-                        image: imageData,
-                        model: {
-                          key: modelConfig.key,
-                          hash: modelConfig.hash,
-                          name: modelConfig.name,
-                          base: modelConfig.base,
-                          type: modelConfig.type,
-                        },
-                        imageInfluence: (adapterConfig.image_influence as FLUXReduxImageInfluence) || 'highest',
-                      }
-                    : {
-                        type: 'ip_adapter',
-                        image: imageData,
-                        model: {
-                          key: modelConfig.key,
-                          hash: modelConfig.hash,
-                          name: modelConfig.name,
-                          base: modelConfig.base,
-                          type: modelConfig.type,
-                        },
-                        weight: typeof adapterConfig.weight === 'number' ? adapterConfig.weight : 1.0,
-                        beginEndStepPct: [
-                          typeof adapterConfig.begin_step_percent === 'number' ? adapterConfig.begin_step_percent : 0,
-                          typeof adapterConfig.end_step_percent === 'number' ? adapterConfig.end_step_percent : 1,
-                        ] as [number, number],
-                        method: (adapterConfig.method as IPMethodV2) || 'full',
-                        clipVisionModel: 'ViT-H',
-                      },
+                  config: { ...baseConfig, image: imageData },
                 });
+              });
 
-                if (isFluxRedux) {
-                  log.debug(`Built FLUX Redux ref image state: ${modelConfig.name}`);
-                } else {
-                  log.debug(
-                    `Built IP adapter ref image state: ${modelConfig.name} (weight: ${typeof adapterConfig.weight === 'number' ? adapterConfig.weight : 1.0})`
-                  );
-                }
-                if (adapterConfig.image?.image_name) {
-                  log.debug(
-                    `IP adapter image: outputs/images/${adapterConfig.image.image_name} (${adapterConfig.image.width}x${adapterConfig.image.height})`
-                  );
-                }
+            allRefImagePromises.push(...referenceImagePromises);
+          }
 
-                return refImageState;
-              } catch (error) {
-                log.error(`Failed to load IP adapter ${adapterConfig.model_key}: ${error}`);
-                return null;
-              }
-            });
-
-          // Wait for all IP adapters to load, then dispatch with replace: true
-          Promise.all(ipAdapterPromises).then((refImageStates) => {
-            const validStates = refImageStates.filter((state): state is RefImageState => state !== null);
+          // Single dispatch after all IP adapter + reference image promises settle.
+          // Always replace:true so stale entries from a previous recall are cleared.
+          Promise.all(allRefImagePromises).then((results) => {
+            const validStates = results.filter((state): state is RefImageState => state !== null);
+            dispatch(refImagesRecalled({ entities: validStates, replace: true }));
             if (validStates.length > 0) {
-              dispatch(refImagesRecalled({ entities: validStates, replace: true }));
-              log.info(`Applied ${validStates.length} IP adapter(s), replacing existing list`);
+              log.info(
+                `Applied ${validStates.length} reference image(s) (IP adapters + model-free), replacing existing list`
+              );
+            } else {
+              log.info('Cleared all reference images');
             }
           });
         }
@@ -855,19 +942,60 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.debug({ data }, 'Bulk gallery download ready');
     const { bulk_download_item_name } = data;
 
-    // TODO(psyche): This URL may break in in some environments (e.g. Nvidia workbench) but we need to test it first
+    // Dismiss the "preparing" toast (which uses a prefixed id to avoid the
+    // race condition where this socket event arrives before the Redux
+    // middleware processes the POST response).
+    toastApi.close(`preparing:${bulk_download_item_name}`);
+
+    // The GET endpoint requires authentication, so we use fetch() with the
+    // Authorization header rather than a plain <a download> link (which cannot
+    // carry headers).  After fetching the blob, we create a temporary object
+    // URL and trigger the browser's save dialog programmatically.
     const url = `/api/v1/images/download/${bulk_download_item_name}`;
+    const token = localStorage.getItem('auth_token');
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+    const handleDownload = () => {
+      fetch(url, { headers })
+        .then((res) => {
+          if (!res.ok) {
+            throw new Error(`Download failed: ${res.status}`);
+          }
+          return res.blob();
+        })
+        .then((blob) => {
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = bulk_download_item_name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          // Delay revocation — the browser's save dialog is asynchronous,
+          // and revoking immediately would invalidate the URL before the
+          // download completes.
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+        })
+        .catch((err) => {
+          log.error({ err }, 'Bulk download fetch failed');
+          toast({
+            id: `error:${bulk_download_item_name}`,
+            title: t('gallery.bulkDownloadFailed'),
+            status: 'error',
+            description: String(err),
+          });
+        });
+    };
 
     toast({
       id: bulk_download_item_name,
-      title: t('gallery.bulkDownloadReady', 'Download ready'),
+      title: t('gallery.bulkDownloadReady'),
       status: 'success',
       description: (
-        <ExternalLink
-          label={t('gallery.clickToDownload', 'Click here to download')}
-          href={url}
-          download={bulk_download_item_name}
-        />
+        // eslint-disable-next-line react/jsx-no-bind -- not a component render; no re-render cost
+        <Text as="button" onClick={handleDownload} textDecoration="underline" cursor="pointer">
+          {t('gallery.clickToDownload')}
+        </Text>
       ),
       duration: null,
     });
@@ -877,6 +1005,9 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     log.error({ data }, 'Bulk gallery download error');
 
     const { bulk_download_item_name, error } = data;
+
+    // Dismiss the "preparing" toast
+    toastApi.close(`preparing:${bulk_download_item_name}`);
 
     toast({
       id: bulk_download_item_name,

@@ -8,8 +8,10 @@ import {
   clearModelSelection,
   type FilterableModelType,
   selectFilteredModelType,
+  selectOrderBy,
   selectSearchTerm,
   selectSelectedModelKeys,
+  selectSortDirection,
   setSelectedModelKey,
 } from 'features/modelManagerV2/store/modelManagerV2Slice';
 import { memo, useCallback, useMemo, useState } from 'react';
@@ -39,6 +41,8 @@ const ModelList = () => {
   const dispatch = useAppDispatch();
   const filteredModelType = useAppSelector(selectFilteredModelType);
   const searchTerm = useAppSelector(selectSearchTerm);
+  const orderBy = useAppSelector(selectOrderBy);
+  const direction = useAppSelector(selectSortDirection);
   const selectedModelKeys = useAppSelector(selectSelectedModelKeys);
   const { t } = useTranslation();
   const toast = useToast();
@@ -47,7 +51,8 @@ const ModelList = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isReidentifying, setIsReidentifying] = useState(false);
 
-  const { data: allModelsData, isLoading: isLoadingAll } = useGetModelConfigsQuery();
+  const queryArgs = useMemo(() => ({ order_by: orderBy, direction: direction.toUpperCase() }), [orderBy, direction]);
+  const { data: allModelsData, isLoading: isLoadingAll } = useGetModelConfigsQuery(queryArgs);
   const { data: missingModelsData, isLoading: isLoadingMissing } = useGetMissingModelsQuery();
   const [bulkDeleteModels] = useBulkDeleteModelsMutation();
   const [bulkReidentifyModels] = useBulkReidentifyModelsMutation();
@@ -107,19 +112,15 @@ const ModelList = () => {
           id: 'BULK_DELETE_SUCCESS',
           title: t('modelManager.modelsDeleted', {
             count: result.deleted.length,
-            defaultValue: `Successfully deleted ${result.deleted.length} model(s)`,
           }),
           status: 'success',
         });
       } else if (result.deleted.length === 0) {
         toast({
           id: 'BULK_DELETE_FAILED',
-          title: t('modelManager.modelsDeleteFailed', {
-            defaultValue: 'Failed to delete models',
-          }),
+          title: t('modelManager.modelsDeleteFailed'),
           description: t('modelManager.someModelsFailedToDelete', {
             count: result.failed.length,
-            defaultValue: `${result.failed.length} model(s) could not be deleted`,
           }),
           status: 'error',
         });
@@ -127,13 +128,10 @@ const ModelList = () => {
         // Partial success
         toast({
           id: 'BULK_DELETE_PARTIAL',
-          title: t('modelManager.modelsDeletedPartial', {
-            defaultValue: 'Partially completed',
-          }),
+          title: t('modelManager.modelsDeletedPartial'),
           description: t('modelManager.someModelsDeleted', {
             deleted: result.deleted.length,
             failed: result.failed.length,
-            defaultValue: `${result.deleted.length} deleted, ${result.failed.length} failed`,
           }),
           status: 'warning',
         });
@@ -144,9 +142,7 @@ const ModelList = () => {
       log.error({ error: serializeError(err as Error) }, 'Bulk delete error');
       toast({
         id: 'BULK_DELETE_ERROR',
-        title: t('modelManager.modelsDeleteError', {
-          defaultValue: 'Error deleting models',
-        }),
+        title: t('modelManager.modelsDeleteError'),
         status: 'error',
       });
     } finally {

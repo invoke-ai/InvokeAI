@@ -11,6 +11,8 @@ import {
   ModalFooter,
   ModalHeader,
   ModalOverlay,
+  NumberInput,
+  NumberInputField,
   Switch,
   Text,
 } from '@invoke-ai/ui-library';
@@ -19,7 +21,9 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
 import { buildUseBoolean } from 'common/hooks/useBoolean';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { selectShouldUseCPUNoise, shouldUseCpuNoiseChanged } from 'features/controlLayers/store/paramsSlice';
+import { ExternalProviderStatusList } from 'features/system/components/SettingsModal/ExternalProviderStatusList';
 import { useRefreshAfterResetModal } from 'features/system/components/SettingsModal/RefreshAfterResetModal';
 import { SettingsDeveloperLogIsEnabled } from 'features/system/components/SettingsModal/SettingsDeveloperLogIsEnabled';
 import { SettingsDeveloperLogLevel } from 'features/system/components/SettingsModal/SettingsDeveloperLogLevel';
@@ -35,6 +39,7 @@ import {
   selectSystemShouldEnableInformationalPopovers,
   selectSystemShouldEnableModelDescriptions,
   selectSystemShouldShowInvocationProgressDetail,
+  selectSystemShouldUseMiddleClickToOpenInNewTab,
   selectSystemShouldUseNSFWChecker,
   selectSystemShouldUseWatermarker,
   setPrefersNumericAttentionStyle,
@@ -43,20 +48,30 @@ import {
   setShouldEnableModelDescriptions,
   setShouldHighlightFocusedRegions,
   setShouldShowInvocationProgressDetail,
+  setShouldUseMiddleClickToOpenInNewTab,
   shouldAntialiasProgressImageChanged,
   shouldConfirmOnNewSessionToggled,
   shouldUseNSFWCheckerChanged,
   shouldUseWatermarkerChanged,
 } from 'features/system/store/systemSlice';
+import { toast } from 'features/toast/toast';
 import { selectShouldShowProgressInViewer } from 'features/ui/store/uiSelectors';
 import { setShouldShowProgressInViewer } from 'features/ui/store/uiSlice';
-import type { ChangeEvent, ReactElement } from 'react';
-import { cloneElement, memo, useCallback, useEffect } from 'react';
+import type { ChangeEvent, KeyboardEvent, ReactElement } from 'react';
+import { cloneElement, memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useGetRuntimeConfigQuery, useUpdateRuntimeConfigMutation } from 'services/api/endpoints/appInfo';
 
 import { SettingsLanguageSelect } from './SettingsLanguageSelect';
 
 const [useSettingsModal] = buildUseBoolean(false);
+
+const formatOptionalInteger = (value: number | null | undefined) => {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value);
+};
 
 const SettingsModal = (props: { children: ReactElement }) => {
   const dispatch = useAppDispatch();
@@ -72,6 +87,10 @@ const SettingsModal = (props: { children: ReactElement }) => {
 
   const settingsModal = useSettingsModal();
   const refreshModal = useRefreshAfterResetModal();
+  const currentUser = useAppSelector(selectCurrentUser);
+  const { data: runtimeConfig } = useGetRuntimeConfigQuery();
+  const [updateRuntimeConfig, { isLoading: isUpdatingRuntimeConfig }] = useUpdateRuntimeConfigMutation();
+  const pendingMaxQueueHistoryRef = useRef<number | null | undefined>(undefined);
 
   const prefersNumericAttentionWeights = useAppSelector(selectSystemPrefersNumericAttentionWeights);
   const shouldUseCpuNoise = useAppSelector(selectShouldUseCPUNoise);
@@ -83,8 +102,13 @@ const SettingsModal = (props: { children: ReactElement }) => {
   const shouldEnableInformationalPopovers = useAppSelector(selectSystemShouldEnableInformationalPopovers);
   const shouldEnableModelDescriptions = useAppSelector(selectSystemShouldEnableModelDescriptions);
   const shouldHighlightFocusedRegions = useAppSelector(selectSystemShouldEnableHighlightFocusedRegions);
+  const shouldUseMiddleClickToOpenInNewTab = useAppSelector(selectSystemShouldUseMiddleClickToOpenInNewTab);
   const shouldConfirmOnNewSession = useAppSelector(selectSystemShouldConfirmOnNewSession);
   const shouldShowInvocationProgressDetail = useAppSelector(selectSystemShouldShowInvocationProgressDetail);
+  const maxQueueHistory = runtimeConfig?.config.max_queue_history ?? null;
+  const canEditRuntimeConfig = runtimeConfig ? !runtimeConfig.config.multiuser || currentUser?.is_admin : false;
+  const [maxQueueHistoryInput, setMaxQueueHistoryInput] = useState(formatOptionalInteger(maxQueueHistory));
+
   const onToggleConfirmOnNewSession = useCallback(() => {
     dispatch(shouldConfirmOnNewSessionToggled());
   }, [dispatch]);
@@ -96,11 +120,60 @@ const SettingsModal = (props: { children: ReactElement }) => {
     }
   }, [refetchIntermediatesCount, settingsModal.isTrue]);
 
+  useEffect(() => {
+    setMaxQueueHistoryInput(formatOptionalInteger(maxQueueHistory));
+  }, [maxQueueHistory]);
+
+  const commitMaxQueueHistory = useCallback(async () => {
+    if (!runtimeConfig || !canEditRuntimeConfig) {
+      return;
+    }
+
+    const trimmedValue = maxQueueHistoryInput.trim();
+    const parsedValue = trimmedValue === '' ? null : Number.parseInt(trimmedValue, 10);
+
+    if (parsedValue !== null && Number.isNaN(parsedValue)) {
+      setMaxQueueHistoryInput(formatOptionalInteger(maxQueueHistory));
+      return;
+    }
+
+    const normalizedValue = parsedValue === null ? null : Math.max(0, parsedValue);
+    const currentValue =
+      pendingMaxQueueHistoryRef.current === undefined ? maxQueueHistory : pendingMaxQueueHistoryRef.current;
+
+    if (normalizedValue === currentValue) {
+      setMaxQueueHistoryInput(formatOptionalInteger(currentValue));
+      return;
+    }
+
+    pendingMaxQueueHistoryRef.current = normalizedValue;
+    setMaxQueueHistoryInput(formatOptionalInteger(normalizedValue));
+
+    try {
+      await updateRuntimeConfig({ max_queue_history: normalizedValue }).unwrap();
+    } catch {
+      setMaxQueueHistoryInput(formatOptionalInteger(maxQueueHistory));
+      toast({
+        id: 'SETTINGS_MAX_QUEUE_HISTORY_SAVE_FAILED',
+        title: t('settings.maxQueueHistorySaveFailed'),
+        status: 'error',
+      });
+    } finally {
+      pendingMaxQueueHistoryRef.current = undefined;
+    }
+  }, [canEditRuntimeConfig, maxQueueHistory, maxQueueHistoryInput, runtimeConfig, t, updateRuntimeConfig]);
+
+  const handleCloseSettingsModal = useCallback(() => {
+    void commitMaxQueueHistory();
+    settingsModal.setFalse();
+  }, [commitMaxQueueHistory, settingsModal]);
+
   const handleClickResetWebUI = useCallback(() => {
+    void commitMaxQueueHistory();
     clearStorage();
     settingsModal.setFalse();
     refreshModal.setTrue();
-  }, [settingsModal, refreshModal]);
+  }, [commitMaxQueueHistory, refreshModal, settingsModal]);
 
   const handleChangeShouldConfirmOnDelete = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
@@ -165,6 +238,13 @@ const SettingsModal = (props: { children: ReactElement }) => {
     [dispatch]
   );
 
+  const handleChangeShouldUseMiddleClickToOpenInNewTab = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setShouldUseMiddleClickToOpenInNewTab(e.target.checked));
+    },
+    [dispatch]
+  );
+
   const handleChangePreferAttentionStyleNumeric = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       dispatch(setPrefersNumericAttentionStyle(e.target.checked));
@@ -172,12 +252,30 @@ const SettingsModal = (props: { children: ReactElement }) => {
     [dispatch]
   );
 
+  const handleChangeMaxQueueHistory = useCallback((valueAsString: string) => {
+    setMaxQueueHistoryInput(valueAsString);
+  }, []);
+
+  const handleBlurMaxQueueHistory = useCallback(() => {
+    void commitMaxQueueHistory();
+  }, [commitMaxQueueHistory]);
+
+  const handleKeyDownMaxQueueHistory = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        void commitMaxQueueHistory();
+        e.currentTarget.blur();
+      }
+    },
+    [commitMaxQueueHistory]
+  );
+
   return (
     <>
       {cloneElement(props.children, {
         onClick: settingsModal.setTrue,
       })}
-      <Modal isOpen={settingsModal.isTrue} onClose={settingsModal.setFalse} size="2xl" isCentered useInert={false}>
+      <Modal isOpen={settingsModal.isTrue} onClose={handleCloseSettingsModal} size="2xl" isCentered useInert={false}>
         <ModalOverlay />
         <ModalContent maxH="80vh" h="68rem">
           <ModalHeader bg="none">{t('common.settingsLabel')}</ModalHeader>
@@ -206,6 +304,25 @@ const SettingsModal = (props: { children: ReactElement }) => {
                       <FormLabel>{t('settings.enableInvisibleWatermark')}</FormLabel>
                       <Switch isChecked={shouldUseWatermarker} onChange={handleChangeShouldUseWatermarker} />
                     </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('settings.maxQueueHistory')}</FormLabel>
+                      <NumberInput
+                        min={0}
+                        step={1}
+                        value={maxQueueHistoryInput}
+                        onChange={handleChangeMaxQueueHistory}
+                        onBlur={handleBlurMaxQueueHistory}
+                        clampValueOnBlur={false}
+                        isDisabled={!runtimeConfig || !canEditRuntimeConfig || isUpdatingRuntimeConfig}
+                        w="8rem"
+                      >
+                        <NumberInputField onKeyDown={handleKeyDownMaxQueueHistory} />
+                      </NumberInput>
+                    </FormControl>
+                  </StickyScrollable>
+
+                  <StickyScrollable title={t('settings.models')}>
+                    <ExternalProviderStatusList />
                   </StickyScrollable>
 
                   <StickyScrollable title={t('settings.ui')}>
@@ -256,6 +373,13 @@ const SettingsModal = (props: { children: ReactElement }) => {
                       <Switch
                         isChecked={shouldHighlightFocusedRegions}
                         onChange={handleChangeShouldHighlightFocusedRegions}
+                      />
+                    </FormControl>
+                    <FormControl>
+                      <FormLabel>{t('settings.middleClickOpenInNewTab')}</FormLabel>
+                      <Switch
+                        isChecked={shouldUseMiddleClickToOpenInNewTab}
+                        onChange={handleChangeShouldUseMiddleClickToOpenInNewTab}
                       />
                     </FormControl>
                   </StickyScrollable>
