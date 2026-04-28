@@ -305,6 +305,40 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/utilities/fonts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List User Fonts */
+        get: operations["list_user_fonts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/utilities/fonts/{font_path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get User Font File */
+        get: operations["get_user_font_file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/utilities/expand-prompt": {
         parameters: {
             query?: never;
@@ -16160,14 +16194,14 @@ export type components = {
              * Convert Cache Dir
              * Format: path
              * @description Path to the converted models cache directory (DEPRECATED, but do not delete because it is needed for migration from previous versions).
-             * @default models/.convert_cache
+             * @default models\.convert_cache
              */
             convert_cache_dir?: string;
             /**
              * Download Cache Dir
              * Format: path
              * @description Path to the directory that contains dynamically downloaded models.
-             * @default models/.download_cache
+             * @default models\.download_cache
              */
             download_cache_dir?: string;
             /**
@@ -30200,6 +30234,37 @@ export type components = {
              */
             last_login_at?: string | null;
         };
+        /** UserFont */
+        UserFont: {
+            /** Id */
+            id: string;
+            /** Family */
+            family: string;
+            /** Label */
+            label: string;
+            /** Path */
+            path: string;
+            /** Url */
+            url: string;
+            /** Faces */
+            faces: components["schemas"]["UserFontFace"][];
+        };
+        /** UserFontFace */
+        UserFontFace: {
+            /** Path */
+            path: string;
+            /** Url */
+            url: string;
+            /** Weight */
+            weight: number;
+            /** Style */
+            style: string;
+        };
+        /** UserFontsResponse */
+        UserFontsResponse: {
+            /** Fonts */
+            fonts: components["schemas"]["UserFont"][];
+        };
         /**
          * UserProfileUpdateRequest
          * @description Request body for a user to update their own profile.
@@ -32523,6 +32588,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DynamicPromptsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_user_fonts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserFontsResponse"];
+                };
+            };
+        };
+    };
+    get_user_font_file: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                font_path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
