@@ -184,11 +184,11 @@ class _IfBranchScheduler:
 
     def _prune_unselected_if_inputs(self, exec_node_id: str, unselected_field: str) -> None:
         for edge in self._state.execution_graph._get_input_edges(exec_node_id, unselected_field):
-            if edge.source.node_id in self._state.executed:
-                continue
-            if self._state.indegree[exec_node_id] == 0:
-                raise RuntimeError(f"indegree underflow for {exec_node_id} when pruning {unselected_field}")
-            self._state.indegree[exec_node_id] -= 1
+            if edge.source.node_id not in self._state.executed:
+                if self._state.indegree[exec_node_id] == 0:
+                    raise RuntimeError(f"indegree underflow for {exec_node_id} when pruning {unselected_field}")
+                self._state.indegree[exec_node_id] -= 1
+            self._state.execution_graph.delete_edge(edge)
 
     def _apply_branch_resolution(
         self,
@@ -243,6 +243,10 @@ class _IfBranchScheduler:
         return False
 
     def mark_exec_node_skipped(self, exec_node_id: str) -> None:
+        state = self._state._get_prepared_exec_metadata(exec_node_id).state
+        if state in ("executed", "skipped"):
+            return
+
         self._state._remove_from_ready_queues(exec_node_id)
         self._state._set_prepared_exec_state(exec_node_id, "skipped")
         self._state.executed.add(exec_node_id)
@@ -356,7 +360,7 @@ class _ExecutionMaterializer:
     def _get_collect_iteration_mappings(self, parent_node_ids: list[str]) -> list[tuple[str, str]]:
         all_iteration_mappings: list[tuple[str, str]] = []
         for source_node_id in parent_node_ids:
-            prepared_nodes = self._state.source_prepared_mapping[source_node_id]
+            prepared_nodes = self._get_prepared_nodes_for_source(source_node_id)
             all_iteration_mappings.extend((source_node_id, prepared_id) for prepared_id in prepared_nodes)
         return all_iteration_mappings
 
@@ -414,7 +418,11 @@ class _ExecutionMaterializer:
         return [n for n in nx.ancestors(g, node_id) if isinstance(self._state.graph.get_node(n), IterateInvocation)]
 
     def _get_prepared_nodes_for_source(self, source_node_id: str) -> set[str]:
-        return self._state.source_prepared_mapping[source_node_id]
+        return {
+            exec_node_id
+            for exec_node_id in self._state.source_prepared_mapping[source_node_id]
+            if self._state._get_prepared_exec_metadata(exec_node_id).state != "skipped"
+        }
 
     def _get_parent_iterator_exec_nodes(
         self, source_node_id: str, graph: nx.DiGraph, prepared_iterator_nodes: list[str]
@@ -471,10 +479,15 @@ class _ExecutionMaterializer:
         prepared_iterator_nodes: list[str],
     ) -> Optional[str]:
         prepared_nodes = self._get_prepared_nodes_for_source(source_node_id)
-        if len(prepared_nodes) == 1:
+        if len(prepared_nodes) == 1 and not prepared_iterator_nodes:
             return next(iter(prepared_nodes))
 
         parent_iterators = self._get_parent_iterator_exec_nodes(source_node_id, graph, prepared_iterator_nodes)
+        if len(prepared_nodes) == 1:
+            prepared_node_id = next(iter(prepared_nodes))
+            if self._matches_parent_iterators(prepared_node_id, parent_iterators, execution_graph):
+                return prepared_node_id
+            return None
 
         direct_iterator_match = self._get_direct_prepared_iterator_match(
             prepared_nodes, prepared_iterator_nodes, parent_iterators, execution_graph
@@ -733,6 +746,12 @@ class _ExecutionRuntime:
     def _get_copied_result_value(self, edge: Edge) -> Any:
         return copydeep(getattr(self._state.results[edge.source.node_id], edge.source.field))
 
+    def _try_get_copied_result_value(self, edge: Edge) -> tuple[bool, Any]:
+        source_output = self._state.results.get(edge.source.node_id)
+        if source_output is None:
+            return False, None
+        return True, copydeep(getattr(source_output, edge.source.field))
+
     def _build_collect_collection(self, input_edges: list[Edge]) -> list[Any]:
         item_edges = self._sort_collect_input_edges(input_edges, ITEM_FIELD)
         collection_edges = self._sort_collect_input_edges(input_edges, COLLECTION_FIELD)
@@ -761,7 +780,20 @@ class _ExecutionRuntime:
     def _prepare_if_inputs(self, node: IfInvocation, input_edges: list[Edge]) -> None:
         selected_field = self._state._resolved_if_exec_branches.get(node.id)
         allowed_fields = {"condition", selected_field} if selected_field is not None else {"condition"}
-        self._set_node_inputs(node, input_edges, allowed_fields)
+
+        for edge in input_edges:
+            if edge.destination.field not in allowed_fields:
+                continue
+
+            found_value, copied_value = self._try_get_copied_result_value(edge)
+            if not found_value:
+                iteration_path = self._state._get_iteration_path(node.id)
+                raise RuntimeError(
+                    "IfInvocation selected input edge points at an exec node with no stored result output: "
+                    f"if_exec_id={node.id}, source_exec_id={edge.source.node_id}, iteration_path={iteration_path}"
+                )
+
+            setattr(node, edge.destination.field, copied_value)
 
     def _prepare_default_inputs(self, node: BaseInvocation, input_edges: list[Edge]) -> None:
         self._set_node_inputs(node, input_edges)

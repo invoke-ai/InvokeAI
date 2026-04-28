@@ -378,7 +378,16 @@
         "promptHistory": "Prompt History",
         "clearHistory": "Clear History",
         "usePrompt": "Use prompt",
-        "searchPrompts": "Search..."
+        "searchPrompts": "Search...",
+        "imageToPrompt": "Image to Prompt",
+        "selectVisionModel": "Select Vision Model...",
+        "changeImage": "Change Image",
+        "uploadImage": "Upload Image",
+        "generatePrompt": "Generate Prompt",
+        "expandPromptWithLLM": "Expand Prompt with LLM",
+        "expandPrompt": "Expand Prompt",
+        "selectTextLLM": "Select Text LLM...",
+        "expand": "Expand"
     },
     "queue": {
         "queue": "Queue",
@@ -1256,6 +1265,7 @@
         "settings": "Settings",
         "simpleModelPlaceholder": "URL or path to a local file or diffusers folder",
         "source": "Source",
+        "sourceUrl": "Source URL",
         "sigLip": "SigLIP",
         "spandrelImageToImage": "Image to Image (Spandrel)",
         "starterBundles": "Starter Bundles",
@@ -1284,6 +1294,7 @@
         },
         "controlLora": "Control LoRA",
         "llavaOnevision": "LLaVA OneVision",
+        "textLLM": "Text LLM",
         "syncModels": "Sync Models",
         "syncModelsTooltip": "Identify and remove unused model files in the InvokeAI root directory.",
         "syncModelsDirectory": "Synchronize Models Directory",
@@ -3111,6 +3122,26 @@
             "switchOnStartDesc": "Switch on start",
             "switchOnFinish": "On Finish",
             "switchOnFinishDesc": "Switch on finish"
+        },
+        "snapshot": {
+            "snapshots": "Save or Load Canvas Snapshot",
+            "saveSnapshot": "Save Snapshot",
+            "restoreSnapshot": "Restore Snapshot",
+            "snapshotNamePlaceholder": "Snapshot name",
+            "save": "Save",
+            "delete": "Delete",
+            "snapshotSaved": "Snapshot \"{{name}}\" saved",
+            "snapshotRestored": "Snapshot \"{{name}}\" restored",
+            "snapshotDeleted": "Snapshot \"{{name}}\" deleted",
+            "snapshotSaveFailed": "Failed to save snapshot",
+            "snapshotRestoreFailed": "Failed to restore snapshot",
+            "snapshotDeleteFailed": "Failed to delete snapshot",
+            "snapshotMissingImages_one": "{{count}} image referenced by this snapshot no longer exists and will appear as a placeholder",
+            "snapshotMissingImages_other": "{{count}} images referenced by this snapshot no longer exist and will appear as placeholders",
+            "snapshotIncompatible": "This snapshot was created with a different version and is no longer compatible",
+            "overwriteSnapshotTitle": "Overwrite snapshot?",
+            "overwriteSnapshotMessage": "A snapshot named \"{{name}}\" already exists. Overwrite it?",
+            "overwrite": "Overwrite"
         }
     },
     "upscaling": {
@@ -3197,6 +3228,8 @@
             "queue": "Queue",
             "upscaling": "Upscaling",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
+            "customNodes": "Nodes",
+            "customNodesTab": "$t(ui.tabs.customNodes) $t(common.tab)",
             "gallery": "Gallery"
         },
         "panels": {
@@ -3324,6 +3357,10 @@
     "whatsNew": {
         "whatsNewInInvoke": "What's New in Invoke",
         "items": [
+            "LLM Prompt Tools: Use local language models to expand prompts or generate prompts from images. Install a Text LLM model (e.g. Qwen2.5-1.5B-Instruct) to get started.",
+            "FLUX.2 Klein Support: InvokeAI now supports the new FLUX.2 Klein models (4B and 9B variants) with GGUF, FP8, and Diffusers formats. Features include txt2img, img2img, inpainting, and outpainting. See 'Starter Models' to get started.",
+            "DyPE support for FLUX models improves high-resolution  (>1536 px up to 4K) images. Go to the 'Advanced Options' section to activate.",
+            "Z-Image Turbo diversity: Active 'Seed Variance Enhancer' under 'Advanced Options' to add diversity to your ZiT gens.",
             "Multi-user mode supports multiple isolated users on the same server.",
             "Enhanced support for Z-Image and FLUX.2 Models.",
             "Multiple user interface enhancements and new canvas features."
@@ -3360,5 +3397,35 @@
                 "description": "Deep dive sessions exploring advanced Invoke features, creative workflows, and community discussions."
             }
         }
+    },
+    "customNodes": {
+        "title": "Custom Nodes",
+        "installTitle": "Install Node Pack",
+        "gitUrl": "Git Repository URL",
+        "gitUrlLabel": "Repository URL",
+        "gitUrlPlaceholder": "https://github.com/user/node-pack.git",
+        "install": "Install",
+        "installing": "Installing",
+        "installSuccess": "Node pack installed",
+        "installFailed": "Installation failed",
+        "installError": "An unexpected error occurred during installation.",
+        "securityWarning": "Custom nodes execute code on your system. Only install node packs from authors you trust. Malicious nodes could harm your system or compromise your data.",
+        "installDescription": "Clones the repository into your nodes directory. Workflow files (.json) are imported into your library. Python dependencies (requirements.txt or pyproject.toml) are NOT installed automatically — follow the node pack's documentation to install them manually.",
+        "dependenciesRequiredTitle": "Manual dependency install required",
+        "dependenciesRequiredDescription": "'{{name}}' includes a {{file}}. Follow the node pack's documentation to install its Python dependencies before using its nodes.",
+        "uninstall": "Uninstall",
+        "reload": "Reload",
+        "reloading": "Reloading",
+        "noNodePacks": "No custom node packs installed.",
+        "scanFolder": "Scan Folder",
+        "scanFolderDescription": "Node packs placed in the nodes directory are automatically detected at startup. Use the Reload button to detect newly added packs without restarting.",
+        "nodesDirectory": "Nodes directory",
+        "installQueue": "Install Log",
+        "queueEmpty": "No recent install activity.",
+        "name": "Name",
+        "message": "Message",
+        "nodeCount_one": "{{count}} node",
+        "nodeCount_other": "{{count}} nodes",
+        "uninstalled": "Uninstalled"
     }
 }
