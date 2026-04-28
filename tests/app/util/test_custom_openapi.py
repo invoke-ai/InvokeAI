@@ -62,10 +62,10 @@ def test_invocation_output_map_required_is_sorted(monkeypatch: object) -> None:
     assert required == ["a_type", "b_type"], f"Expected sorted required list, got: {required}"
 
 
-def test_path_defaults_are_normalized_to_forward_slashes(monkeypatch: object) -> None:
+def test_path_defaults_are_normalized_to_forward_slashes() -> None:
     schema = InvokeAIAppConfig.model_json_schema()
-
-    assert schema["properties"]["download_cache_dir"]["default"] == "models\\.download_cache"
+    schema["properties"]["convert_cache_dir"]["default"] = "models\\.convert_cache"
+    schema["properties"]["download_cache_dir"]["default"] = "models\\.download_cache"
 
     normalized_schema = normalize_path_defaults(schema)
 
