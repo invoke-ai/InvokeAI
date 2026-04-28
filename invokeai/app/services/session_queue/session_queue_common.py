@@ -51,7 +51,8 @@ class SessionQueueItemNotFoundError(ValueError):
 
 # region Batch
 
-BatchDataType = Union[StrictStr, float, int, ImageField]
+BatchScalarDataType = Union[StrictStr, float, int, ImageField]
+BatchDataType = Union[BatchScalarDataType, list[BatchScalarDataType]]
 
 
 class NodeFieldValue(BaseModel):

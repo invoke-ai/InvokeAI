@@ -2322,6 +2322,105 @@ def test_run_preserves_canceled_child_workflow_chain_without_failing_parent(
     assert events.errors == []
 
 
+def test_run_does_not_resume_canceled_parent_after_completed_child(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    lifecycle = WorkflowCallQueueLifecycle(runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+
+    session = GraphExecutionState(graph=graph)
+    invocation = session.next()
+    assert isinstance(invocation, CallSavedWorkflowInvocation)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+            "priority": 0,
+            "origin": None,
+            "destination": None,
+            "root_item_id": None,
+        },
+    )()
+
+    workflow_record = runner._services.workflow_records.get("workflow-a")
+    child_queue_item = runner.workflow_call_coordinator.begin_workflow_call_boundary(
+        invocation, queue_item, workflow_record
+    )
+    original_run = runner.run
+
+    def run_child_then_cancel_parent(queue_item):
+        original_run(queue_item)
+        session_queue.items[1].status = "canceled"
+
+    monkeypatch.setattr(runner, "run", run_child_then_cancel_parent)
+
+    lifecycle.run_queue_item(child_queue_item)
+
+    assert session_queue.items[1].status == "canceled"
+    assert session_queue.completed_item_ids == [child_queue_item.item_id]
+    assert session_queue.resumed_item_ids == []
+    assert [event for event in events.completed if event[0].get_type() == "call_saved_workflow"] == []
+
+
+def test_run_does_not_fail_canceled_parent_after_child_return_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    lifecycle = WorkflowCallQueueLifecycle(runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+
+    session = GraphExecutionState(graph=graph)
+    invocation = session.next()
+    assert isinstance(invocation, CallSavedWorkflowInvocation)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+            "priority": 0,
+            "origin": None,
+            "destination": None,
+            "root_item_id": None,
+        },
+    )()
+
+    workflow_record = runner._services.workflow_records.get("workflow-a")
+    child_queue_item = runner.workflow_call_coordinator.begin_workflow_call_boundary(
+        invocation, queue_item, workflow_record
+    )
+
+    def fail_child_after_parent_canceled(queue_item):
+        queue_item.status = "failed"
+        queue_item.error_message = "child failed after parent cancel"
+        session_queue.items[queue_item.item_id] = queue_item
+        session_queue.items[1].status = "canceled"
+
+    monkeypatch.setattr(runner, "run", fail_child_after_parent_canceled)
+
+    lifecycle.run_queue_item(child_queue_item)
+
+    assert session_queue.items[1].status == "canceled"
+    assert session_queue.failed_item_ids == []
+    assert session.errors == {}
+    assert [event for event in events.errors if event[1].get_type() == "call_saved_workflow"] == []
+
+
 def test_run_forwards_literal_dynamic_workflow_inputs_to_child_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
     session_queue = _DummySessionQueue()
     runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)

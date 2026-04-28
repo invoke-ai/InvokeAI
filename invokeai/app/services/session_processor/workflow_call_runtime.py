@@ -174,6 +174,8 @@ class WorkflowCallQueueLifecycle:
 
     def _resume_parent_from_completed_child(self, child_queue_item: SessionQueueItem) -> None:
         parent_queue_item = self._get_parent_queue_item(child_queue_item)
+        if parent_queue_item.status in ("completed", "failed", "canceled"):
+            return
         try:
             output = self.get_child_workflow_return_output(child_queue_item.session)
             should_resume_parent, aggregated_collection = (
@@ -212,6 +214,8 @@ class WorkflowCallQueueLifecycle:
 
     def _fail_parent_from_failed_child(self, child_queue_item: SessionQueueItem) -> None:
         parent_queue_item = self._get_parent_queue_item(child_queue_item)
+        if parent_queue_item.status in ("completed", "failed", "canceled"):
+            return
         waiting_frame = parent_queue_item.session.waiting_workflow_call
         if waiting_frame is None:
             raise ValueError("Parent queue item is missing workflow call waiting state.")

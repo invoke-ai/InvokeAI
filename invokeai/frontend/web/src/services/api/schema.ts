@@ -3657,7 +3657,7 @@ export type components = {
              * Items
              * @description The list of items to substitute into the node/field.
              */
-            items?: (string | number | components["schemas"]["ImageField"])[];
+            items?: (string | number | components["schemas"]["ImageField"] | (string | number | components["schemas"]["ImageField"])[])[];
         };
         /**
          * BatchEnqueuedEvent
@@ -23809,7 +23809,7 @@ export type components = {
              * Value
              * @description The value to substitute into the node/field.
              */
-            value: string | number | components["schemas"]["ImageField"];
+            value: string | number | components["schemas"]["ImageField"] | (string | number | components["schemas"]["ImageField"])[];
         };
         /**
          * NodePackInfo

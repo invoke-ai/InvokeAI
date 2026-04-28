@@ -112,6 +112,40 @@ def test_build_child_workflow_sessions_expands_direct_integer_batch() -> None:
     assert [child_session.graph.nodes["target"].value for child_session in child_sessions] == [2, 4, 6]
 
 
+def test_build_child_workflow_sessions_expands_direct_integer_batch_into_collection_input() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node(
+                "batch",
+                "integer_batch",
+                {"integers": {"value": [2, 4, 6]}, "batch_group_id": {"value": "None"}},
+            ),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-batch-return",
+                "type": "default",
+                "source": "batch",
+                "sourceHandle": "integers",
+                "target": "return",
+                "targetHandle": "collection",
+            },
+        ],
+    )
+
+    child_sessions = build_child_workflow_sessions(
+        parent_session=GraphExecutionState(graph=Graph()),
+        workflow=workflow,
+        workflow_inputs={},
+        call_frame=_call_frame(),
+        maximum_children=10,
+    )
+
+    assert len(child_sessions) == 3
+    assert [child_session.graph.nodes["return"].collection for child_session in child_sessions] == [[2], [4], [6]]
+
+
 def test_build_child_workflow_sessions_rejects_inaccessible_image_generator_board() -> None:
     workflow = _workflow_dump(
         nodes=[

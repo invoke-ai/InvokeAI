@@ -27,6 +27,14 @@ def test_run_preserves_canceled_child_workflow_chain_without_failing_parent(monk
     workflow_call_tests.test_run_preserves_canceled_child_workflow_chain_without_failing_parent(monkeypatch)
 
 
+def test_run_does_not_resume_canceled_parent_after_completed_child(monkeypatch) -> None:
+    workflow_call_tests.test_run_does_not_resume_canceled_parent_after_completed_child(monkeypatch)
+
+
+def test_run_does_not_fail_canceled_parent_after_child_return_error(monkeypatch) -> None:
+    workflow_call_tests.test_run_does_not_fail_canceled_parent_after_child_return_error(monkeypatch)
+
+
 def test_workflow_call_coordinator_builds_child_queue_item_with_relationship_metadata(monkeypatch) -> None:
     workflow_call_tests.test_workflow_call_coordinator_builds_child_queue_item_with_relationship_metadata(monkeypatch)
 
