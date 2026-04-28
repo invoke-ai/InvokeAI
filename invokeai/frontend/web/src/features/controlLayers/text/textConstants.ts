@@ -65,7 +65,7 @@ export const setCustomTextFontStacks = (fonts: Array<TextFontStack>) => {
   customTextFontStacks = fonts;
 };
 
-export const getAllTextFontStacks = (): Array<TextFontStack> => {
+const getAllTextFontStacks = (): Array<TextFontStack> => {
   if (customTextFontStacks.length === 0) {
     return TEXT_FONT_STACKS;
   }
