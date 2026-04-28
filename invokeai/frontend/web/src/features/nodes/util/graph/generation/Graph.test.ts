@@ -657,6 +657,7 @@ describe('Graph', () => {
           source: '/home/bat/invokeai-4.0.0/models/sdxl/main/stable-diffusion-xl-1.0-inpainting-0.1',
           source_type: 'path',
           source_api_response: null,
+          source_url: null,
           cover_image: null,
           type: 'main',
           trigger_phrases: null,

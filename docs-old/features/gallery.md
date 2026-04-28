@@ -34,6 +34,26 @@ The settings button opens a list of options.
 Below these two buttons, you'll see the Search Boards text entry area. You use this to search for specific boards by the name of the board.
 Next to it is the Add Board (+) button which lets you add new boards. Boards can be renamed by clicking on the name of the board under its thumbnail and typing in the new name.
 
+### Virtual Boards by Date
+
+In addition to the regular user-created boards, the Gallery can show **virtual boards** that group your images automatically by their creation date. Virtual boards are not stored in the database — they are computed on the fly from existing image metadata, so enabling or disabling them never moves or modifies your images.
+
+#### Enabling Virtual Boards
+
+Open the boards settings popover (the gear icon next to the boards search field) and toggle **Show Virtual Boards**. A new collapsible **By Date** section then appears in the boards list, with one entry per day on which images were generated (e.g. `2026-03-18`).
+
+Each virtual board entry shows:
+
+- a cover thumbnail (the most recent image of that day)
+- the number of generated **images** on that date
+- the number of uploaded **assets** on that date
+
+Selecting a virtual board filters the gallery to show only the images from that day. Search, category filters (Images / Assets), starred-first sorting and sort direction all work the same way as on regular boards.
+
+!!! note "Read-only"
+
+    Virtual boards are a view over your existing images. You cannot rename, delete or auto-assign to them, and images cannot be "moved into" a virtual board — they appear there automatically based on their creation date. To organize images permanently, use regular boards.
+
 ### Board Thumbnail Menu
 
 Each board has a context menu (ctrl+click / right-click).

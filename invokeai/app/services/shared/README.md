@@ -96,7 +96,10 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
 ### 4.1 Data
 
 - `graph: Graph` - source graph for the run; treated as stable during normal execution.
-- `execution_graph: Graph` - materialized runtime nodes/edges.
+- `execution_graph: Graph` - materialized runtime nodes/edges. This is mutable runtime state, not an immutable audit
+  log. Lazy `If` pruning may remove unselected input edges during execution, so persisted failed/completed session
+  snapshots can contain a structurally pruned execution graph. Retry paths rebuild from `graph`, not from a previously
+  persisted `execution_graph`.
 - `executed: set[str]`, `executed_history: list[str]`.
 - `results: dict[str, AnyInvocationOutput]`, `errors: dict[str, str]`.
 - `prepared_source_mapping: dict[str, str]` - exec id -> source id.
@@ -123,7 +126,8 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
 - `_PreparedExecRegistry` Owns the relationship between source graph nodes and prepared execution graph nodes, plus
   cached metadata such as iteration path and runtime state.
 - `_ExecutionMaterializer` Expands source graph nodes into concrete execution graph nodes when the scheduler runs out of
-  ready work.
+  ready work. When matching prepared parents for a downstream exec node, skipped prepared exec nodes are ignored and
+  cannot be selected as live inputs.
 - `_ExecutionScheduler` Owns indegree transitions, ready queues, class batching, and downstream release on completion.
 - `_ExecutionRuntime` Owns iteration-path lookup and input hydration for prepared exec nodes.
 - `_IfBranchScheduler` Applies lazy `If` semantics by deferring branch-local work until the condition is known, then
@@ -178,7 +182,9 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
 - For **CollectInvocation**: gather all incoming `item` values into `collection`, sorting inputs by iteration path so
   collected results are stable across expanded iterations. Incoming `collection` values are merged first, then incoming
   `item` values are appended.
-- For **IfInvocation**: hydrate only `condition` and the selected branch input.
+- For **IfInvocation**: hydrate only `condition` and the selected branch input. As a defensive guard against
+  inconsistent runtime or deserialized session state, the runtime raises if the selected input edge points at an exec
+  node with no stored runtime output. In normal scheduling this path should be unreachable.
 - For all others: deep-copy each incoming edge's value into the destination field. This prevents cross-node mutation
   through shared references.
 
@@ -191,7 +197,11 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
 - Once the prepared `If` node resolves its condition:
   - the selected branch is released
   - the unselected branch is marked skipped
+  - unselected input edges on the prepared `If` exec node are pruned from the execution graph so they no longer
+    participate in downstream indegree accounting
   - branch-exclusive ancestors of the unselected branch are never executed
+- Skipped branch-local exec nodes may still be treated as executed for scheduling purposes, but they do not create
+  entries in `results`.
 - Shared ancestors still execute if they are required by the selected branch or by any other live path in the graph.
 
 This behavior is implemented in the runtime scheduler, not in the invocation body itself.
