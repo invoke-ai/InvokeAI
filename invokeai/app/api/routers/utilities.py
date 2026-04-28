@@ -242,9 +242,7 @@ async def list_user_fonts() -> UserFontsResponse:
 
     fonts: list[UserFont] = []
     for _, candidates in sorted(family_candidates.items(), key=lambda kv: kv[0]):
-        _, selected_relative, selected_family, _, _ = min(
-            candidates, key=lambda c: _candidate_score(c[3], c[4], c[0])
-        )
+        _, selected_relative, selected_family, _, _ = min(candidates, key=lambda c: _candidate_score(c[3], c[4], c[0]))
         faces_by_variant: dict[tuple[int, str], tuple[Path, str, str, int, str]] = {}
         for candidate in candidates:
             variant_key = (candidate[3], candidate[4])
