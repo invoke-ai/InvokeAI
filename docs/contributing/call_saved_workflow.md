@@ -132,6 +132,8 @@ Implemented conversion helper:
   - the selected workflow must contain exactly one `workflow_return` node
   - connected batch child inputs produced by ordinary non-generator upstream nodes still fail early with a clear
     unsupported-feature error
+  - malformed batch input wiring, including multiple connected inputs to one batch field, is reported as
+    `unsupported_batch_input` compatibility rather than a generic unsupported-node failure
   - child workflows that mix supported batch nodes with unrelated generator nodes are currently rejected with a clear
     unsupported-feature error
   - unsupported callees are rejected before any child queue row is created
@@ -313,6 +315,8 @@ Current semantics:
 - grouped batch nodes zip by `batch_group_id`
 - the workflow call creates one child queue row per expanded batch session
 - supported generator value shapes are resolved into concrete batch items before queue batch expansion
+- batch outputs may feed `workflow_return.collection` directly; each expanded child receives a singleton collection, and
+  the parent still aggregates all returned child collections
 - parent resume waits for all child rows tied to that workflow call
 - parent return aggregation appends each child `workflow_return.collection` into one parent collection
 - if any child row fails, remaining sibling child rows are canceled and the parent call fails

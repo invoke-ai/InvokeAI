@@ -127,6 +127,22 @@ def _build_compatibility_workflow_inputs(workflow: dict[str, Any]) -> dict[str, 
     return workflow_inputs
 
 
+def _is_unsupported_batch_input_message(message: str) -> bool:
+    return any(
+        marker in message
+        for marker in (
+            "batch child workflow",
+            "batch group",
+            "batch input",
+            "batch inputs",
+            "batch node",
+            "batch-special child workflow nodes",
+            "connected batch",
+            "generator-backed batch",
+        )
+    )
+
+
 def get_workflow_call_compatibility(
     *,
     workflow: dict[str, Any],
@@ -174,7 +190,7 @@ def get_workflow_call_compatibility(
     except UnsupportedWorkflowNodeError as e:
         message = str(e)
         reason = WorkflowCallCompatibilityReason.UnsupportedNode
-        if "connected batch child workflow inputs" in message:
+        if _is_unsupported_batch_input_message(message):
             reason = WorkflowCallCompatibilityReason.UnsupportedBatchInput
         elif "exactly one workflow_return" in message:
             reason = WorkflowCallCompatibilityReason.MissingWorkflowReturn

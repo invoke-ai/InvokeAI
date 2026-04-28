@@ -191,6 +191,108 @@ def test_get_workflow_call_compatibility_reports_unsupported_connected_batch_inp
     assert "connected batch child workflow inputs" in (compatibility.message or "")
 
 
+def test_get_workflow_call_compatibility_allows_batch_directly_into_workflow_return_collection() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node(
+                "batch", "integer_batch", {"integers": {"value": [2, 4]}, "batch_group_id": {"value": "None"}}
+            ),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-batch-return",
+                "type": "default",
+                "source": "batch",
+                "sourceHandle": "integers",
+                "target": "return",
+                "targetHandle": "collection",
+            },
+        ],
+    )
+
+    compatibility = get_workflow_call_compatibility(
+        workflow=workflow,
+        workflow_id="workflow-a",
+        services=_services(),
+        user_id="user-1",
+        maximum_children=1000,
+    )
+
+    assert compatibility.is_callable is True
+    assert compatibility.reason is WorkflowCallCompatibilityReason.Ok
+    assert compatibility.message is None
+
+
+def test_get_workflow_call_compatibility_reports_multiple_batch_inputs_as_unsupported_batch_input() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node("source-a", "integer", {"value": {"value": 7}}),
+            _invocation_node("source-b", "integer", {"value": {"value": 8}}),
+            _invocation_node(
+                "batch", "integer_batch", {"integers": {"value": []}, "batch_group_id": {"value": "None"}}
+            ),
+            _invocation_node("target", "integer", {"value": {"value": 0}}),
+            _invocation_node("collect", "collect", {"collection": {"value": []}}),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-source-a-batch",
+                "type": "default",
+                "source": "source-a",
+                "sourceHandle": "value",
+                "target": "batch",
+                "targetHandle": "integers",
+            },
+            {
+                "id": "edge-source-b-batch",
+                "type": "default",
+                "source": "source-b",
+                "sourceHandle": "value",
+                "target": "batch",
+                "targetHandle": "integers",
+            },
+            {
+                "id": "edge-batch-target",
+                "type": "default",
+                "source": "batch",
+                "sourceHandle": "integers",
+                "target": "target",
+                "targetHandle": "value",
+            },
+            {
+                "id": "edge-target-collect",
+                "type": "default",
+                "source": "target",
+                "sourceHandle": "value",
+                "target": "collect",
+                "targetHandle": "item",
+            },
+            {
+                "id": "edge-collect-return",
+                "type": "default",
+                "source": "collect",
+                "sourceHandle": "collection",
+                "target": "return",
+                "targetHandle": "collection",
+            },
+        ],
+    )
+
+    compatibility = get_workflow_call_compatibility(
+        workflow=workflow,
+        workflow_id="workflow-a",
+        services=_services(),
+        user_id="user-1",
+        maximum_children=1000,
+    )
+
+    assert compatibility.is_callable is False
+    assert compatibility.reason is WorkflowCallCompatibilityReason.UnsupportedBatchInput
+    assert "multiple connected batch inputs" in (compatibility.message or "")
+
+
 def test_get_workflow_call_compatibility_allows_workflow_with_required_exposed_input() -> None:
     workflow = _workflow_dump(
         nodes=[
