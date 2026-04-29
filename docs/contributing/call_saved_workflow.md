@@ -406,6 +406,8 @@ Cancel behavior:
 - canceling a waiting parent cancels descendant child rows
 - canceling a child row cancels waiting ancestors
 - cancelation should stay cancelation; it should not be rewritten into ordinary failure semantics
+- startup recovery cancels any interrupted `in_progress` or `waiting` workflow-call chain, including pending descendants,
+  so a restart cannot leave a suspended parent waiting on a child row that will never report back
 
 Retry behavior:
 

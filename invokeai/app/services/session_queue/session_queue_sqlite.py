@@ -72,11 +72,33 @@ class SqliteSessionQueue(SessionQueueBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
+                SELECT item_id
+                FROM session_queue
+                WHERE status = 'in_progress'
+                   OR status = 'waiting';
+                """
+            )
+            interrupted_item_ids = [row[0] for row in cast(list[sqlite3.Row], cursor.fetchall())]
+        item_ids_to_cancel: set[int] = set()
+        for item_id in interrupted_item_ids:
+            item_ids_to_cancel.update(self._get_workflow_call_chain_item_ids(item_id))
+        if not item_ids_to_cancel:
+            return
+        with self._db.transaction() as cursor:
+            placeholders = ",".join("?" for _ in item_ids_to_cancel)
+            cursor.execute(
+                f"""--sql
                 UPDATE session_queue
                 SET status = 'canceled',
                     status_sequence = COALESCE(status_sequence, 0) + 1
-                WHERE status = 'in_progress';
-                """
+                WHERE item_id IN ({placeholders})
+                  AND (
+                    status = 'pending'
+                    OR status = 'in_progress'
+                    OR status = 'waiting'
+                  );
+                """,
+                tuple(item_ids_to_cancel),
             )
 
     def _prune_terminal_to_limit(self, queue_id: str, keep: int) -> int:

@@ -156,6 +156,7 @@ Workflow-call note:
   - child failure fails the waiting parent and can cascade upward through ancestors
   - failing child rows cancel their remaining workflow-call siblings before the parent is failed
   - cancelation is chain-aware across parents and children
+  - startup recovery cancels interrupted `in_progress` or `waiting` workflow-call chains, including pending descendants
   - deleting a workflow-call queue row currently deletes the whole parent/child chain rather than leaving orphaned rows
     behind
   - retry is root-oriented and should not be exposed directly on child queue rows in the UI

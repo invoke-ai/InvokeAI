@@ -261,6 +261,109 @@ def test_get_queue_status_counts_waiting_items(session_queue: SqliteSessionQueue
     assert queue_status.total == 1
 
 
+def test_startup_cancellation_cancels_waiting_workflow_call_chain(session_queue: SqliteSessionQueue) -> None:
+    parent_session = GraphExecutionState(graph=Graph())
+    child_session = GraphExecutionState(graph=Graph())
+    sibling_session = GraphExecutionState(graph=Graph())
+    batch_id = str(uuid.uuid4())
+
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id,
+                session,
+                session_id,
+                batch_id,
+                field_values,
+                priority,
+                workflow,
+                origin,
+                destination,
+                retried_from_item_id,
+                user_id,
+                status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "default",
+                parent_session.model_dump_json(warnings=False),
+                parent_session.id,
+                batch_id,
+                None,
+                0,
+                None,
+                None,
+                None,
+                None,
+                "user-1",
+                "waiting",
+            ),
+        )
+        parent_item_id = cursor.lastrowid
+        for child_status, session in (("in_progress", child_session), ("pending", sibling_session)):
+            cursor.execute(
+                """--sql
+                INSERT INTO session_queue (
+                    queue_id,
+                    session,
+                    session_id,
+                    batch_id,
+                    field_values,
+                    priority,
+                    workflow,
+                    origin,
+                    destination,
+                    retried_from_item_id,
+                    user_id,
+                    workflow_call_id,
+                    parent_item_id,
+                    parent_session_id,
+                    root_item_id,
+                    workflow_call_depth,
+                    status
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "default",
+                    session.model_dump_json(warnings=False),
+                    session.id,
+                    batch_id,
+                    None,
+                    0,
+                    None,
+                    None,
+                    None,
+                    None,
+                    "user-1",
+                    "workflow-call-1",
+                    parent_item_id,
+                    parent_session.id,
+                    parent_item_id,
+                    1,
+                    child_status,
+                ),
+            )
+
+    session_queue._set_in_progress_to_canceled()
+
+    assert session_queue.get_queue_item(parent_item_id).status == "canceled"
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            SELECT status
+            FROM session_queue
+            WHERE parent_item_id = ?
+            ORDER BY item_id ASC
+            """,
+            (parent_item_id,),
+        )
+        child_statuses = [row[0] for row in cursor.fetchall()]
+    assert child_statuses == ["canceled", "canceled"]
+
+
 def test_cancel_queue_item_cascades_from_waiting_parent_to_child_chain(session_queue: SqliteSessionQueue) -> None:
     parent_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
