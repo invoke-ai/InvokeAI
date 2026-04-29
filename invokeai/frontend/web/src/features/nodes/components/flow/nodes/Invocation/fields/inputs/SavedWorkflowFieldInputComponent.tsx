@@ -7,11 +7,12 @@ import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { SavedWorkflowFieldInputInstance, SavedWorkflowFieldInputTemplate } from 'features/nodes/types/field';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useListWorkflowsInfiniteInfiniteQuery } from 'services/api/endpoints/workflows';
+import { useGetWorkflowQuery, useListWorkflowsInfiniteInfiniteQuery } from 'services/api/endpoints/workflows';
 
 import {
   buildSavedWorkflowOptions,
   getSavedWorkflowDisplayState,
+  getSavedWorkflowListItemFromRecord,
   getSavedWorkflowSelectionOption,
   getSavedWorkflowSelectionState,
   MISSING_WORKFLOW_OPTION_VALUE,
@@ -44,9 +45,23 @@ const SavedWorkflowFieldInputComponent = (
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const { items, isLoading, isFetching } = useListWorkflowsInfiniteInfiniteQuery(queryArg, queryOptions);
+  const isSelectedWorkflowInList = useMemo(
+    () => items.some((workflow) => workflow.workflow_id === field.value),
+    [field.value, items]
+  );
+  const { data: selectedWorkflowRecord } = useGetWorkflowQuery(field.value, {
+    skip: !field.value || isSelectedWorkflowInList,
+  });
+  const selectedWorkflow = useMemo(
+    () => (selectedWorkflowRecord ? getSavedWorkflowListItemFromRecord(selectedWorkflowRecord) : undefined),
+    [selectedWorkflowRecord]
+  );
 
   const options = useMemo<ComboboxOption[]>(() => buildSavedWorkflowOptions(items), [items]);
-  const selectionState = useMemo(() => getSavedWorkflowSelectionState(items, field.value), [field.value, items]);
+  const selectionState = useMemo(
+    () => getSavedWorkflowSelectionState(items, field.value, selectedWorkflow),
+    [field.value, items, selectedWorkflow]
+  );
   const value = useMemo<ComboboxOption | null>(() => {
     const option = getSavedWorkflowSelectionOption(selectionState);
     if (option?.value === MISSING_WORKFLOW_OPTION_VALUE) {

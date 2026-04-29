@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildSavedWorkflowOptions,
   getSavedWorkflowDisplayState,
+  getSavedWorkflowListItemFromRecord,
   getSavedWorkflowSelectionOption,
   getSavedWorkflowSelectionState,
   MISSING_WORKFLOW_OPTION_VALUE,
@@ -103,6 +104,52 @@ describe('savedWorkflowFieldUtils', () => {
       selection: 'missing',
       statusLabelKey: 'nodes.savedWorkflowMissing',
       badges: [],
+      compatibilityMessage: null,
+    });
+  });
+
+  it('uses a fetched selected workflow when it is not present in the first list page', () => {
+    const selectedWorkflow = getSavedWorkflowListItemFromRecord({
+      workflow_id: 'workflow-z',
+      name: 'Zeta Workflow',
+      created_at: '',
+      updated_at: '',
+      opened_at: null,
+      user_id: 'user-z',
+      is_public: true,
+      thumbnail_url: null,
+      call_saved_workflow_compatibility: {
+        is_callable: true,
+        reason: 'ok',
+        message: null,
+      },
+      workflow: {
+        id: 'workflow-z',
+        name: 'Zeta Workflow',
+        author: '',
+        description: 'A workflow outside the first page',
+        version: '',
+        contact: '',
+        tags: 'paged',
+        notes: '',
+        exposedFields: [],
+        meta: {
+          category: 'user',
+          version: '1.0.0',
+        },
+        nodes: [],
+        edges: [],
+        form: null,
+      },
+    });
+
+    const selectionState = getSavedWorkflowSelectionState(workflows, 'workflow-z', selectedWorkflow);
+
+    expect(selectionState).toEqual({ status: 'selected', workflow: selectedWorkflow });
+    expect(getSavedWorkflowDisplayState(selectionState)).toEqual({
+      selection: 'selected',
+      statusLabelKey: null,
+      badges: ['shared'],
       compatibilityMessage: null,
     });
   });

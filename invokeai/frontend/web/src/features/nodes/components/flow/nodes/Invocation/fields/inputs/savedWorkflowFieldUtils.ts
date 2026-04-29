@@ -1,6 +1,6 @@
 import type { ComboboxOption } from '@invoke-ai/ui-library';
 import { getWorkflowCallCompatibilityState } from 'features/workflowLibrary/util/workflowCallCompatibility';
-import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
+import type { S, WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 export const MISSING_WORKFLOW_OPTION_VALUE = '__missing_workflow__';
 export type SavedWorkflowBadge = 'unsupported' | 'default' | 'shared';
@@ -20,7 +20,8 @@ export const buildSavedWorkflowOptions = (workflows: WorkflowRecordListItemWithT
 
 export const getSavedWorkflowSelectionState = (
   workflows: WorkflowRecordListItemWithThumbnailDTO[],
-  workflowId: string
+  workflowId: string,
+  selectedWorkflow?: WorkflowRecordListItemWithThumbnailDTO
 ): SavedWorkflowSelectionState => {
   if (!workflowId) {
     return { status: 'unselected' };
@@ -31,8 +32,29 @@ export const getSavedWorkflowSelectionState = (
     return { status: 'selected', workflow };
   }
 
+  if (selectedWorkflow?.workflow_id === workflowId) {
+    return { status: 'selected', workflow: selectedWorkflow };
+  }
+
   return { status: 'missing', workflowId };
 };
+
+export const getSavedWorkflowListItemFromRecord = (
+  workflow: S['WorkflowRecordWithThumbnailDTO']
+): WorkflowRecordListItemWithThumbnailDTO => ({
+  workflow_id: workflow.workflow_id,
+  name: workflow.name,
+  created_at: workflow.created_at,
+  updated_at: workflow.updated_at,
+  opened_at: workflow.opened_at,
+  user_id: workflow.user_id,
+  is_public: workflow.is_public,
+  description: workflow.workflow.description,
+  category: workflow.workflow.meta.category,
+  tags: workflow.workflow.tags,
+  thumbnail_url: workflow.thumbnail_url,
+  call_saved_workflow_compatibility: workflow.call_saved_workflow_compatibility,
+});
 
 export const getSavedWorkflowSelectionOption = (selectionState: SavedWorkflowSelectionState): ComboboxOption | null => {
   if (selectionState.status === 'unselected') {
