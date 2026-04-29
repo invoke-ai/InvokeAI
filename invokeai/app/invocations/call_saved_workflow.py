@@ -72,4 +72,4 @@ class CallSavedWorkflowInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> WorkflowReturnOutput:
         self.validate_selected_workflow(context)
 
-        return WorkflowReturnOutput(collection=[])
+        return WorkflowReturnOutput(values={})

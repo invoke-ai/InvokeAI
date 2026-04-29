@@ -66,11 +66,48 @@ def _build_workflow(edges: list[dict], nodes: list[dict]):
     }
 
 
+def _build_named_return_nodes():
+    return [
+        _build_workflow_node("return-value-1", "workflow_return_value", {"key": "result", "value": None}),
+        _build_workflow_node("return-collect-1", "collect", {"collection": []}),
+        _build_workflow_node("return-1", "workflow_return", {"values": []}),
+    ]
+
+
+def _build_named_return_edges(source: str, source_handle: str):
+    return [
+        {
+            "id": "edge-return-value",
+            "type": "default",
+            "source": source,
+            "sourceHandle": source_handle,
+            "target": "return-value-1",
+            "targetHandle": "value",
+        },
+        {
+            "id": "edge-return-collect",
+            "type": "default",
+            "source": "return-value-1",
+            "sourceHandle": "value",
+            "target": "return-collect-1",
+            "targetHandle": "item",
+        },
+        {
+            "id": "edge-return-values",
+            "type": "default",
+            "source": "return-collect-1",
+            "sourceHandle": "collection",
+            "target": "return-1",
+            "targetHandle": "values",
+        },
+    ]
+
+
 def test_build_graph_from_workflow_converts_invocation_nodes():
     workflow = _build_workflow(
         nodes=[
             _build_workflow_node("add-1", "add", {"a": 1, "b": 2}),
-            _build_workflow_node("return-1", "workflow_return", {"collection": []}),
+            _build_workflow_node("return-1", "workflow_return", {"values": []}),
         ],
         edges=[],
     )
@@ -91,7 +128,7 @@ def test_build_graph_from_workflow_flattens_connector_edges():
             _build_workflow_node("add-1", "add", {"a": 1, "b": 2}),
             _build_connector_node("connector-1"),
             _build_workflow_node("add-2", "add", {"a": 999, "b": 3}),
-            _build_workflow_node("return-1", "workflow_return", {"collection": []}),
+            *_build_named_return_nodes(),
         ],
         edges=[
             {
@@ -110,32 +147,29 @@ def test_build_graph_from_workflow_flattens_connector_edges():
                 "target": "add-2",
                 "targetHandle": "a",
             },
-            {
-                "id": "edge-3",
-                "type": "default",
-                "source": "add-2",
-                "sourceHandle": "value",
-                "target": "return-1",
-                "targetHandle": "collection",
-            },
+            *_build_named_return_edges("add-2", "value"),
         ],
     )
 
     graph = build_graph_from_workflow(workflow)
 
-    assert len(graph.edges) == 2
-    first_edge, second_edge = graph.edges
+    assert len(graph.edges) == 4
+    first_edge, second_edge, third_edge, fourth_edge = graph.edges
     assert first_edge.source.node_id == "add-1"
     assert first_edge.source.field == "value"
     assert first_edge.destination.node_id == "add-2"
     assert first_edge.destination.field == "a"
     assert second_edge.source.node_id == "add-2"
     assert second_edge.source.field == "value"
-    assert second_edge.destination.node_id == "return-1"
-    assert second_edge.destination.field == "collection"
+    assert second_edge.destination.node_id == "return-value-1"
+    assert second_edge.destination.field == "value"
+    assert third_edge.destination.node_id == "return-collect-1"
+    assert third_edge.destination.field == "item"
+    assert fourth_edge.destination.node_id == "return-1"
+    assert fourth_edge.destination.field == "values"
     assert graph.nodes["add-2"].a == 0
     assert graph.nodes["add-2"].b == 3
-    assert graph.nodes["return-1"].collection == []
+    assert graph.nodes["return-1"].values == []
 
 
 def test_build_graph_from_workflow_rejects_batch_special_nodes_with_clear_error():
@@ -161,8 +195,8 @@ def test_build_graph_from_workflow_rejects_workflows_without_workflow_return():
 def test_build_graph_from_workflow_rejects_workflows_with_multiple_workflow_return_nodes():
     workflow = _build_workflow(
         nodes=[
-            _build_workflow_node("return-1", "workflow_return", {"collection": []}),
-            _build_workflow_node("return-2", "workflow_return", {"collection": []}),
+            _build_workflow_node("return-1", "workflow_return", {"values": []}),
+            _build_workflow_node("return-2", "workflow_return", {"values": []}),
         ],
         edges=[],
     )

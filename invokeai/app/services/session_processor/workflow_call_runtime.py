@@ -185,12 +185,18 @@ class WorkflowCallQueueLifecycle:
             return
         try:
             output = self.get_child_workflow_return_output(child_queue_item.session)
-            should_resume_parent, aggregated_collection = (
+            should_resume_parent, aggregated_values = (
                 parent_queue_item.session.record_waiting_workflow_call_child_completion(
-                    child_queue_item.item_id, output.collection
+                    child_queue_item.item_id, output.values
                 )
             )
         except Exception as e:
+            workflow_call_execution = parent_queue_item.session.waiting_workflow_call_execution
+            if workflow_call_execution is not None:
+                self._session_runner._services.session_queue.cancel_workflow_call_children(
+                    workflow_call_execution.id,
+                    exclude_item_ids={child_queue_item.item_id},
+                )
             self.fail_waiting_workflow_call(parent_queue_item, str(e))
             parent_queue_item = self._session_runner._services.session_queue.get_queue_item(parent_queue_item.item_id)
             if getattr(parent_queue_item, "parent_item_id", None) is not None:
@@ -204,7 +210,7 @@ class WorkflowCallQueueLifecycle:
         parent_queue_item.session.waiting_workflow_call_child_session = child_queue_item.session
         waiting_invocation = self.get_waiting_workflow_call_invocation(parent_queue_item)
         parent_queue_item.session.end_waiting_on_workflow_call(status="completed")
-        parent_output = WorkflowReturnOutput(collection=aggregated_collection)
+        parent_output = WorkflowReturnOutput(values=aggregated_values)
         parent_queue_item.session.complete(waiting_invocation.id, parent_output)
         self._session_runner._on_after_run_node(waiting_invocation, parent_queue_item, parent_output)
         parent_queue_item = self._session_runner._services.session_queue.set_queue_item_session(

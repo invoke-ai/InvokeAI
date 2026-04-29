@@ -37,6 +37,55 @@ def _workflow_dump(
     edges: list[dict[str, Any]],
     exposed_fields: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
+    nodes = list(nodes)
+    edges = list(edges)
+    for node in list(nodes):
+        data = node.get("data", {})
+        if data.get("type") != "workflow_return":
+            continue
+        inputs = data.get("inputs", {})
+        if "collection" not in inputs:
+            continue
+
+        return_node_id = data["id"]
+        value_node_id = f"{return_node_id}-value"
+        collect_node_id = f"{return_node_id}-collect"
+        data["inputs"] = {"values": {"value": []}}
+        nodes.extend(
+            [
+                _invocation_node(
+                    value_node_id,
+                    "workflow_return_value",
+                    {"key": {"value": "result"}, "value": {"value": None}},
+                ),
+                _invocation_node(collect_node_id, "collect", {"collection": {"value": []}}),
+            ]
+        )
+        for edge in edges:
+            if edge.get("target") == return_node_id and edge.get("targetHandle") == "collection":
+                edge["target"] = value_node_id
+                edge["targetHandle"] = "value"
+        edges.extend(
+            [
+                {
+                    "id": f"edge-{value_node_id}-collect",
+                    "type": "default",
+                    "source": value_node_id,
+                    "sourceHandle": "value",
+                    "target": collect_node_id,
+                    "targetHandle": "item",
+                },
+                {
+                    "id": f"edge-{collect_node_id}-return",
+                    "type": "default",
+                    "source": collect_node_id,
+                    "sourceHandle": "collection",
+                    "target": return_node_id,
+                    "targetHandle": "values",
+                },
+            ]
+        )
+
     return {
         "name": "Child Workflow",
         "author": "Tester",
@@ -156,7 +205,7 @@ def test_build_child_workflow_session_results_preserves_batch_field_values() -> 
     ] == [[("target", "value", 2)], [("target", "value", 4)]]
 
 
-def test_build_child_workflow_sessions_expands_direct_integer_batch_into_collection_input() -> None:
+def test_build_child_workflow_sessions_expands_direct_integer_batch_into_named_return_value() -> None:
     workflow = _workflow_dump(
         nodes=[
             _invocation_node(
@@ -187,7 +236,7 @@ def test_build_child_workflow_sessions_expands_direct_integer_batch_into_collect
     )
 
     assert len(child_sessions) == 3
-    assert [child_session.graph.nodes["return"].collection for child_session in child_sessions] == [[2], [4], [6]]
+    assert [child_session.graph.nodes["return-value"].value for child_session in child_sessions] == [2, 4, 6]
 
 
 def test_build_child_workflow_sessions_rejects_inaccessible_image_generator_board() -> None:

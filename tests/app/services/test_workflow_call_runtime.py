@@ -67,6 +67,18 @@ def test_run_completes_call_saved_workflow_with_child_return_collection(monkeypa
     workflow_call_tests.test_run_completes_call_saved_workflow_with_child_return_collection(monkeypatch)
 
 
+def test_run_extracts_named_call_saved_workflow_return(monkeypatch) -> None:
+    workflow_call_tests.test_run_extracts_named_call_saved_workflow_return(monkeypatch)
+
+
+def test_workflow_call_batch_aggregation_rejects_inconsistent_return_keys() -> None:
+    workflow_call_tests.test_workflow_call_batch_aggregation_rejects_inconsistent_return_keys()
+
+
+def test_workflow_call_return_aggregation_failure_cancels_remaining_siblings(monkeypatch) -> None:
+    workflow_call_tests.test_workflow_call_return_aggregation_failure_cancels_remaining_siblings(monkeypatch)
+
+
 def test_run_fails_call_saved_workflow_when_child_has_no_workflow_return(monkeypatch) -> None:
     workflow_call_tests.test_run_fails_call_saved_workflow_when_child_has_no_workflow_return(monkeypatch)
 

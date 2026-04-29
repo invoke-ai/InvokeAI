@@ -302,8 +302,8 @@ Current limitation:
   generalized dependent-queue scheduler.
 - Called workflows currently require exactly one valid `workflow_return` node to be callable at all.
 - Direct batch-special child workflows are now supported by expanding them into multiple child queue rows.
-- Batch outputs may feed `workflow_return.collection` directly; each expanded child receives a singleton collection and
-  parent resume aggregates those child return collections.
+- Batch outputs may feed a named `workflow_return_value.value` directly. Parent resume aggregates named return maps as
+  `values: dict[str, list[Any]]`, and all rows in one batch call must return the same key set.
 - Generator-backed batch child workflows are now supported when the batch node is fed directly by a supported integer,
   float, string, or image generator.
 - Connected batch child inputs produced by ordinary non-generator upstream nodes are still rejected before any child

@@ -36,7 +36,8 @@ Implemented already in the branch:
 
 - A real invocation exists: `call_saved_workflow`.
 - A real return node exists: `workflow_return`.
-- `workflow_return` accepts a `list[Any]` collection input and returns that collection through a dedicated output.
+- Named returns exist through `workflow_return_value`, `workflow_return`, and caller-side `workflow_return_get`.
+- `workflow_return` accepts collected key/value return members and emits a named `values: dict[str, Any]` map.
 - Only one `workflow_return` node is allowed per workflow, enforced in both frontend validation and Python validation.
 - The frontend provides a saved-workflow picker using a reusable `SavedWorkflowField` UI type.
 - The node redraws dynamically based on the selected saved workflow's exposed form fields.
@@ -81,7 +82,7 @@ Implemented runtime scaffolding:
   - `WorkflowCallQueueLifecycle` handles queue-visible parent/child lifecycle:
     - run child queue items
     - resume waiting parents after child success
-    - complete the parent call node with the child `workflow_return` collection
+    - complete the parent call node with the child `workflow_return` values
     - fail suspended parents after child failure and cascade that failure upward through parent call chains
 - Child `SessionQueueItem` rows now carry explicit relationship metadata:
   - `workflow_call_id`
@@ -111,6 +112,7 @@ Implemented runtime scaffolding:
 - Queue lifecycle semantics now exist for workflow-call chains:
   - parent queue items are suspended in `waiting` while a child queue row runs
   - child success resumes the suspended parent and completes the parent call node with the child `workflow_return`
+    values
   - child failure fails the suspended parent and cascades upward through any waiting parent chain
   - canceling a parent cancels its descendant child chain
   - canceling a child cancels the waiting parent chain upward
@@ -337,10 +339,11 @@ Current semantics:
 - grouped batch nodes zip by `batch_group_id`
 - the workflow call creates one child queue row per expanded batch session
 - supported generator value shapes are resolved into concrete batch items before queue batch expansion
-- batch outputs may feed `workflow_return.collection` directly; each expanded child receives a singleton collection, and
-  the parent still aggregates all returned child collections
+- batch outputs may feed a named `workflow_return_value.value` directly; each expanded child returns one value for that
+  key
 - parent resume waits for all child rows tied to that workflow call
-- parent return aggregation appends each child `workflow_return.collection` into one parent collection
+- parent return aggregation produces `values: dict[str, list[Any]]`, where each key maps to one value per child row
+- all child rows in one batch call must return the same key set; mismatched keys fail the parent call clearly
 - if any child row fails, remaining sibling child rows are canceled and the parent call fails
 - generator-backed image batches must respect board access:
   - the caller may expand images from a board they own
@@ -381,9 +384,9 @@ Plain-English summary:
 1. Each child queue row keeps the substituted batch `field_values`, matching ordinary batch queue rows.
 1. Those child queue rows run independently.
 1. The parent does not resume until all child queue rows for that call have finished.
-1. Each child execution produces its own `workflow_return.collection`.
-1. The parent aggregates those returned collections into one combined collection.
-1. The `call_saved_workflow` node completes with that combined collection, and the parent workflow continues.
+1. Each child execution produces its own named `workflow_return.values` map.
+1. The parent aggregates those maps into `values: dict[str, list[Any]]`.
+1. The `call_saved_workflow` node completes with that named values map, and the parent workflow continues.
 
 Expansion rules:
 
@@ -413,14 +416,18 @@ Waiting and resume:
 
 Return aggregation:
 
-- each child queue row returns its own `workflow_return.collection`
-- the parent call node output is the aggregate of those child collections, in child-completion order
-- this is different from returning exactly one child collection unchanged
+- each child queue row returns its own named `workflow_return.values`
+- for batched calls, the parent call node output is `values: dict[str, list[Any]]`
+- all child rows in one batched call must return the same key set so each returned list is row-aligned
+- if one key should contain multiple images for a non-batch child, the child must collect those images into a single
+  list value before returning that key
 
 Sibling failure behavior:
 
 - if one child queue row in a batched workflow call fails, remaining sibling child rows for that same workflow call are
   canceled
+- if parent return aggregation rejects a completed child row, remaining sibling child rows for that same workflow call
+  are canceled
 - after sibling cancelation, the parent call fails
 - if that parent is itself a child of another workflow call, failure continues upward through the ancestor chain
 
@@ -446,26 +453,36 @@ Return values should be explicit.
 Recommended model:
 
 - introduce a workflow return node analogous in concept to Canvas Output
-- the child workflow declares what values it returns through that explicit node
-- the return node accepts a `list[Any]` collection input
+- the child workflow declares named return values through explicit key/value return members
+- each return member has a stable string key and a connected value
 - when the workflow is run independently, the return node has no caller-visible effect
-- when the workflow is run via `call_saved_workflow`, that collection becomes the return value of the call
-- `call_saved_workflow` should expose that collection as its return value in the first runtime version
+- when the workflow is run via `call_saved_workflow`, the named return map becomes the return value of the call
+- `call_saved_workflow` exposes that named return map to the parent workflow
 
 Only one workflow return node may exist per workflow. That rule should be enforced in both the frontend editor and in
 Python validation/runtime code.
 
 Do not infer child outputs from arbitrary terminal nodes. That is too ambiguous and too brittle.
 
-Current limitation:
+Named return contract:
 
-- returned values are anonymous collection items, not named return fields
-- the caller can consume the returned collection directly or pass it through built-in collection flow nodes such as
-  `iterate`
-- there is not currently a first-class key/value return contract where the called workflow returns named members and the
-  caller extracts a value by name
-- adding that would require a new explicit return interface and companion caller-side extraction nodes, rather than
-  relying on collection item ordering as an implicit API
+- the called workflow builds return members with a dedicated key/value node
+- `workflow_return` accepts a collection of those return members
+- non-batch execution rejects duplicate return keys
+- if a non-batch workflow needs to return multiple images under one key, the child workflow should collect those images
+  into one list value and return that list under the key
+- the caller extracts a named return value with a companion caller-side extraction node
+- missing keys should fail clearly unless the extraction node explicitly supports and receives a default value
+
+Batch return aggregation:
+
+- when a called workflow expands into multiple child queue rows, each child row produces its own named return map
+- the parent aggregates those child maps as `dict[str, list[Any]]`
+- each key maps to the list of values returned by completed child rows for that key
+- child rows are still aggregated in child-completion order unless a later contract explicitly requires stable input
+  order
+- duplicate keys within a single child return map are still invalid; repeated keys across batch children are the normal
+  aggregation path
 
 ### 6. Error Propagation
 
@@ -554,8 +571,8 @@ A dedicated runtime helper for this node type should be introduced. Responsibili
 A dedicated child-workflow return node should be introduced. Responsibilities:
 
 - define the return interface of the called workflow
-- accept a `list[Any]` collection input representing the workflow result
-- provide that collection back to the parent call site when invoked through `call_saved_workflow`
+- accept collected named key/value return members representing the workflow result
+- provide that named values map back to the parent call site when invoked through `call_saved_workflow`
 - remain inert from a caller perspective when the workflow is run independently
 - guarantee that only one such node exists per workflow
 - behave as a normal node in the editor, with singularity enforced by both frontend and Python validation/runtime code
@@ -578,13 +595,130 @@ frontend state.
 
 The intended runtime flow is:
 
-1. The child workflow computes the `workflow_return` node's collection input like any other node input.
-1. When the child reaches `workflow_return`, runtime captures the resolved collection value as the child workflow
+1. The child workflow computes named return members like ordinary node outputs.
+1. The child workflow collects those members into the `workflow_return` node.
+1. When the child reaches `workflow_return`, runtime captures the resolved named return map as the child workflow
    result.
 1. The child workflow result is stored in child execution state.
 1. That result is handed back to the suspended parent call frame.
-1. The parent `call_saved_workflow` node is completed with that returned collection.
+1. The parent `call_saved_workflow` node is completed with that returned named value map.
 1. The parent graph resumes.
+
+## Named Return Implementation Plan
+
+This is the next planned feature slice. Development should proceed test-first and keep documentation updated as each
+stage lands.
+
+### Stage 1: Backend Return Contract
+
+Status: implemented in backend invocation tests.
+
+Goal:
+
+- establish the named return data model and invocation primitives
+
+Contract:
+
+- `WorkflowReturnValueField` stores one `key: str` and one `value: Any`
+- `workflow_return_value` creates a single `WorkflowReturnValueField` from a key and connected value
+- `workflow_return` accepts a collection of `WorkflowReturnValueField` members
+- `WorkflowReturnOutput` exposes `values: dict[str, Any]`
+- duplicate keys in one non-batch `workflow_return` execution are invalid and must fail clearly
+
+Tests first:
+
+- `workflow_return_value` emits the requested key/value pair
+- `workflow_return` emits a named value map from one or more return members
+- duplicate keys in one `workflow_return` execution are rejected
+- empty returns are valid only if that remains an intentional callable-workflow contract
+
+### Stage 2: Caller-Side Extraction Primitive
+
+Status: implemented in backend invocation tests.
+
+Goal:
+
+- let the calling workflow extract a named return value without relying on collection position
+
+Contract:
+
+- `workflow_return_get` accepts the named return map and a key
+- `workflow_return_get` outputs the selected value as `Any`
+- missing keys fail clearly unless a later version intentionally adds default-value support
+
+Tests first:
+
+- extracting an existing key returns the stored value
+- extracting a missing key fails with a useful message
+- extracted `Any` values can feed typed downstream nodes through the existing connection compatibility rules
+
+### Stage 3: Runtime Propagation
+
+Status: implemented in backend runtime tests.
+
+Goal:
+
+- carry named return maps through queue-visible child execution and parent resume
+
+Contract:
+
+- non-batch child execution returns `values: dict[str, Any]`
+- `call_saved_workflow` exposes that map on its output
+- failed child execution behavior is unchanged
+- cancel/retry lifecycle behavior is unchanged
+
+Tests first:
+
+- a called workflow returning `{image: image_value}` completes the parent `call_saved_workflow` output with that key
+- a caller-side extraction node can consume that output after parent resume
+- missing or invalid `workflow_return` nodes still fail with the existing clear errors
+
+### Stage 4: Batch Return Aggregation
+
+Status: implemented in backend runtime tests.
+
+Goal:
+
+- define named returns for child workflows that expand into multiple queue rows
+
+Contract:
+
+- each child queue row produces one named return map
+- the parent aggregates child maps as `dict[str, list[Any]]`
+- each key maps to values returned by completed child rows for that key
+- all child rows in one batch call must return the same key set
+- repeated keys across child rows are expected
+- duplicate keys within one child row remain invalid
+- if a non-batch workflow wants multiple images under one key, it must collect those images into a single list value
+  before returning that key
+
+Tests first:
+
+- a batched child returning `{image: image_value}` from each child row produces `{image: [image_1, image_2, ...]}`
+- sibling failure still cancels remaining siblings and fails the parent
+- duplicate keys inside one child row are rejected rather than silently aggregated
+
+### Stage 5: Frontend Schema, UI, And Docs
+
+Status: partially implemented. Schema/type generation includes the backend nodes and fields; editor-specific UX cleanup
+is still pending.
+
+Goal:
+
+- make named returns usable and visible in the editor
+
+Contract:
+
+- generated schema/types include the new return field, return-value node, and extraction node
+- visible UI strings are localized through `en.json`
+- `call_saved_workflow` exposes the named return map output
+- users can wire that output to `workflow_return_get`
+
+Tests first:
+
+- frontend connection/type tests cover return-value collection wiring
+- frontend connection/type tests cover `call_saved_workflow.values -> workflow_return_get.values`
+- docs describe how a called workflow creates named returns and how a caller extracts them
 
 ## Frontend Responsibilities In The Long-Term Design
 
@@ -623,13 +757,15 @@ Already covered:
 - literal and connected dynamic call arguments are applied to the child graph at runtime
 - non-exposed dynamic call arguments are rejected at runtime
 - child `workflow_return` output is captured and becomes the parent `call_saved_workflow` output
+- named `workflow_return` values can be constructed, propagated to the parent, extracted by key, and batch-aggregated as
+  `dict[str, list[Any]]`
 - child workflows without a `workflow_return` node fail cleanly when called
 - child execution events now include stable workflow-call relationship metadata on the child `SessionQueueItem`
 - parent-child resume and failure propagation through queue-visible child rows
 - nested runtime execution with bounded stack depth
 - direct and generator-backed batch-special child workflows through queue child-row expansion
-- compatibility metadata for required exposed inputs, missing/multiple returns, supported batch-to-return collection
-  shapes, and unsupported batch input wiring
+- compatibility metadata for required exposed inputs, missing/multiple returns, supported named batch-return shapes, and
+  unsupported batch input wiring
 
 Still needed in later increments:
 

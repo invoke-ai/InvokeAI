@@ -10,6 +10,11 @@ from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvoca
 from invokeai.app.invocations.fields import InputField, OutputField
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.math import AddInvocation
+from invokeai.app.invocations.workflow_return import (
+    WorkflowReturnGetInvocation,
+    WorkflowReturnInvocation,
+    WorkflowReturnOutput,
+)
 from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
@@ -120,6 +125,61 @@ class _DummyWorkflowRecords:
         }
 
     @classmethod
+    def _return_value_nodes(
+        cls,
+        *,
+        key: str = "result",
+        value_node_id: str = "child-return-value",
+        collect_node_id: str = "child-return-collect",
+        return_node_id: str = "child-return",
+    ) -> list[dict[str, Any]]:
+        return [
+            cls._invocation_node(
+                value_node_id,
+                "workflow_return_value",
+                {"key": {"value": key}, "value": {"value": None}},
+            ),
+            cls._invocation_node(collect_node_id, "collect", {"collection": {"value": []}}),
+            cls._invocation_node(return_node_id, "workflow_return", {"values": {"value": []}}),
+        ]
+
+    @staticmethod
+    def _return_value_edges(
+        *,
+        source: str,
+        source_handle: str,
+        value_node_id: str = "child-return-value",
+        collect_node_id: str = "child-return-collect",
+        return_node_id: str = "child-return",
+    ) -> list[dict[str, str]]:
+        return [
+            {
+                "id": f"edge-{source}-return-value",
+                "type": "default",
+                "source": source,
+                "sourceHandle": source_handle,
+                "target": value_node_id,
+                "targetHandle": "value",
+            },
+            {
+                "id": f"edge-{value_node_id}-collect",
+                "type": "default",
+                "source": value_node_id,
+                "sourceHandle": "value",
+                "target": collect_node_id,
+                "targetHandle": "item",
+            },
+            {
+                "id": f"edge-{collect_node_id}-return",
+                "type": "default",
+                "source": collect_node_id,
+                "sourceHandle": "collection",
+                "target": return_node_id,
+                "targetHandle": "values",
+            },
+        ]
+
+    @classmethod
     def _workflow_dump(
         cls,
         *,
@@ -158,22 +218,9 @@ class _DummyWorkflowRecords:
                     "integer_collection",
                     {"collection": {"value": [3]}},
                 ),
-                self._invocation_node(
-                    "child-return",
-                    "workflow_return",
-                    {"collection": {"value": []}},
-                ),
+                *self._return_value_nodes(),
             ],
-            edges=[
-                {
-                    "id": "edge-default-return",
-                    "type": "default",
-                    "source": "child-collection",
-                    "sourceHandle": "collection",
-                    "target": "child-return",
-                    "targetHandle": "collection",
-                }
-            ],
+            edges=self._return_value_edges(source="child-collection", source_handle="collection"),
             exposed_fields=[{"nodeId": "child-add", "fieldName": self.exposed_field_name}],
         )
         if self.return_invalid_workflow:
@@ -214,11 +261,7 @@ class _DummyWorkflowRecords:
                         "integer_collection",
                         {"collection": {"value": [7]}},
                     ),
-                    self._invocation_node(
-                        "child-return",
-                        "workflow_return",
-                        {"collection": {"value": []}},
-                    ),
+                    *self._return_value_nodes(),
                 ],
                 edges=[
                     {
@@ -229,14 +272,7 @@ class _DummyWorkflowRecords:
                         "target": "child-add-2",
                         "targetHandle": "a",
                     },
-                    {
-                        "id": "edge-dependent-return",
-                        "type": "default",
-                        "source": "child-collection",
-                        "sourceHandle": "collection",
-                        "target": "child-return",
-                        "targetHandle": "collection",
-                    },
+                    *self._return_value_edges(source="child-collection", source_handle="collection"),
                 ],
             )
         elif workflow_id == "workflow-if":
@@ -258,11 +294,7 @@ class _DummyWorkflowRecords:
                             "false_input": {"value": 11},
                         },
                     ),
-                    self._invocation_node(
-                        "child-return",
-                        "workflow_return",
-                        {"collection": {"value": []}},
-                    ),
+                    *self._return_value_nodes(),
                 ],
                 edges=[
                     {
@@ -281,14 +313,7 @@ class _DummyWorkflowRecords:
                         "target": "child-if",
                         "targetHandle": "true_input",
                     },
-                    {
-                        "id": "edge-if-return",
-                        "type": "default",
-                        "source": "child-collection",
-                        "sourceHandle": "collection",
-                        "target": "child-return",
-                        "targetHandle": "collection",
-                    },
+                    *self._return_value_edges(source="child-collection", source_handle="collection"),
                 ],
             )
         elif workflow_id == "workflow-nested":
@@ -308,22 +333,19 @@ class _DummyWorkflowRecords:
                         "integer_collection",
                         {"collection": {"value": [4]}},
                     ),
-                    self._invocation_node(
-                        "nested-return",
-                        "workflow_return",
-                        {"collection": {"value": []}},
+                    *self._return_value_nodes(
+                        value_node_id="nested-return-value",
+                        collect_node_id="nested-return-collect",
+                        return_node_id="nested-return",
                     ),
                 ],
-                edges=[
-                    {
-                        "id": "edge-nested-return",
-                        "type": "default",
-                        "source": "nested-collection",
-                        "sourceHandle": "collection",
-                        "target": "nested-return",
-                        "targetHandle": "collection",
-                    }
-                ],
+                edges=self._return_value_edges(
+                    source="nested-collection",
+                    source_handle="collection",
+                    value_node_id="nested-return-value",
+                    collect_node_id="nested-return-collect",
+                    return_node_id="nested-return",
+                ),
             )
         elif workflow_id == "workflow-leaf":
             workflow_dump = self._workflow_dump(
@@ -334,22 +356,19 @@ class _DummyWorkflowRecords:
                         "integer_collection",
                         {"collection": {"value": [11]}},
                     ),
-                    self._invocation_node(
-                        "leaf-return",
-                        "workflow_return",
-                        {"collection": {"value": []}},
+                    *self._return_value_nodes(
+                        value_node_id="leaf-return-value",
+                        collect_node_id="leaf-return-collect",
+                        return_node_id="leaf-return",
                     ),
                 ],
-                edges=[
-                    {
-                        "id": "edge-leaf-return",
-                        "type": "default",
-                        "source": "leaf-collection",
-                        "sourceHandle": "collection",
-                        "target": "leaf-return",
-                        "targetHandle": "collection",
-                    }
-                ],
+                edges=self._return_value_edges(
+                    source="leaf-collection",
+                    source_handle="collection",
+                    value_node_id="leaf-return-value",
+                    collect_node_id="leaf-return-collect",
+                    return_node_id="leaf-return",
+                ),
             )
         elif workflow_id == "workflow-nested-no-return":
             workflow_dump = self._workflow_dump(
@@ -367,46 +386,65 @@ class _DummyWorkflowRecords:
                         "integer_collection",
                         {"collection": {"value": [4]}},
                     ),
-                    self._invocation_node(
-                        "nested-return",
-                        "workflow_return",
-                        {"collection": {"value": []}},
+                    *self._return_value_nodes(
+                        value_node_id="nested-return-value",
+                        collect_node_id="nested-return-collect",
+                        return_node_id="nested-return",
                     ),
                 ],
-                edges=[
-                    {
-                        "id": "edge-nested-return",
-                        "type": "default",
-                        "source": "nested-collection",
-                        "sourceHandle": "collection",
-                        "target": "nested-return",
-                        "targetHandle": "collection",
-                    }
-                ],
+                edges=self._return_value_edges(
+                    source="nested-collection",
+                    source_handle="collection",
+                    value_node_id="nested-return-value",
+                    collect_node_id="nested-return-collect",
+                    return_node_id="nested-return",
+                ),
             )
         elif workflow_id == "workflow-return":
             workflow_dump = self._workflow_dump(
                 nodes=[
                     self._invocation_node(
-                        "child-collection",
+                        "child-value",
                         "integer_collection",
                         {"collection": {"value": [7, 8]}},
                     ),
                     self._invocation_node(
+                        "child-return-value",
+                        "workflow_return_value",
+                        {"key": {"value": "numbers"}, "value": {"value": None}},
+                    ),
+                    self._invocation_node("child-return-collect", "collect", {"collection": {"value": []}}),
+                    self._invocation_node(
                         "child-return",
                         "workflow_return",
-                        {"collection": {"value": []}},
+                        {"values": {"value": []}},
                     ),
                 ],
                 edges=[
                     {
-                        "id": "edge-return-collection",
+                        "id": "edge-return-value",
                         "type": "default",
-                        "source": "child-collection",
+                        "source": "child-value",
+                        "sourceHandle": "collection",
+                        "target": "child-return-value",
+                        "targetHandle": "value",
+                    },
+                    {
+                        "id": "edge-return-collect",
+                        "type": "default",
+                        "source": "child-return-value",
+                        "sourceHandle": "value",
+                        "target": "child-return-collect",
+                        "targetHandle": "item",
+                    },
+                    {
+                        "id": "edge-return-values",
+                        "type": "default",
+                        "source": "child-return-collect",
                         "sourceHandle": "collection",
                         "target": "child-return",
-                        "targetHandle": "collection",
-                    }
+                        "targetHandle": "values",
+                    },
                 ],
             )
         elif workflow_id == "workflow-no-return":
@@ -436,8 +474,13 @@ class _DummyWorkflowRecords:
                         },
                     ),
                     self._invocation_node("child-int", "integer", {"value": {"value": 0}}),
-                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
-                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                    self._invocation_node(
+                        "child-return-value",
+                        "workflow_return_value",
+                        {"key": {"value": "number"}, "value": {"value": None}},
+                    ),
+                    self._invocation_node("child-return-collect", "collect", {"collection": {"value": []}}),
+                    self._invocation_node("child-return", "workflow_return", {"values": {"value": []}}),
                 ],
                 edges=[
                     {
@@ -449,20 +492,28 @@ class _DummyWorkflowRecords:
                         "targetHandle": "value",
                     },
                     {
-                        "id": "edge-int-collect",
+                        "id": "edge-int-return-value",
                         "type": "default",
                         "source": "child-int",
                         "sourceHandle": "value",
-                        "target": "child-collect",
+                        "target": "child-return-value",
+                        "targetHandle": "value",
+                    },
+                    {
+                        "id": "edge-return-value-collect",
+                        "type": "default",
+                        "source": "child-return-value",
+                        "sourceHandle": "value",
+                        "target": "child-return-collect",
                         "targetHandle": "item",
                     },
                     {
-                        "id": "edge-collect-return",
+                        "id": "edge-return-values",
                         "type": "default",
-                        "source": "child-collect",
+                        "source": "child-return-collect",
                         "sourceHandle": "collection",
                         "target": "child-return",
-                        "targetHandle": "collection",
+                        "targetHandle": "values",
                     },
                 ],
             )
@@ -486,8 +537,7 @@ class _DummyWorkflowRecords:
                         },
                     ),
                     self._invocation_node("child-add", "add", {"a": {"value": 0}, "b": {"value": 0}}),
-                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
-                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                    *self._return_value_nodes(),
                 ],
                 edges=[
                     {
@@ -507,21 +557,10 @@ class _DummyWorkflowRecords:
                         "targetHandle": "b",
                     },
                     {
-                        "id": "edge-group-collect",
-                        "type": "default",
-                        "source": "child-add",
-                        "sourceHandle": "value",
-                        "target": "child-collect",
-                        "targetHandle": "item",
+                        **self._return_value_edges(source="child-add", source_handle="value")[0],
+                        "id": "edge-group-return-value",
                     },
-                    {
-                        "id": "edge-group-return",
-                        "type": "default",
-                        "source": "child-collect",
-                        "sourceHandle": "collection",
-                        "target": "child-return",
-                        "targetHandle": "collection",
-                    },
+                    *self._return_value_edges(source="child-add", source_handle="value")[1:],
                 ],
             )
         elif workflow_id == "workflow-batch-cartesian":
@@ -544,8 +583,7 @@ class _DummyWorkflowRecords:
                         },
                     ),
                     self._invocation_node("child-add", "add", {"a": {"value": 0}, "b": {"value": 0}}),
-                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
-                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                    *self._return_value_nodes(),
                 ],
                 edges=[
                     {
@@ -564,22 +602,7 @@ class _DummyWorkflowRecords:
                         "target": "child-add",
                         "targetHandle": "b",
                     },
-                    {
-                        "id": "edge-cart-collect",
-                        "type": "default",
-                        "source": "child-add",
-                        "sourceHandle": "value",
-                        "target": "child-collect",
-                        "targetHandle": "item",
-                    },
-                    {
-                        "id": "edge-cart-return",
-                        "type": "default",
-                        "source": "child-collect",
-                        "sourceHandle": "collection",
-                        "target": "child-return",
-                        "targetHandle": "collection",
-                    },
+                    *self._return_value_edges(source="child-add", source_handle="value"),
                 ],
             )
         elif workflow_id == "workflow-batch-failure":
@@ -594,8 +617,7 @@ class _DummyWorkflowRecords:
                         },
                     ),
                     self._invocation_node("child-guard", "test_fail_on_integer", {"value": {"value": 0}}),
-                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
-                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                    *self._return_value_nodes(),
                 ],
                 edges=[
                     {
@@ -606,22 +628,7 @@ class _DummyWorkflowRecords:
                         "target": "child-guard",
                         "targetHandle": "value",
                     },
-                    {
-                        "id": "edge-failure-collect",
-                        "type": "default",
-                        "source": "child-guard",
-                        "sourceHandle": "value",
-                        "target": "child-collect",
-                        "targetHandle": "item",
-                    },
-                    {
-                        "id": "edge-failure-return",
-                        "type": "default",
-                        "source": "child-collect",
-                        "sourceHandle": "collection",
-                        "target": "child-return",
-                        "targetHandle": "collection",
-                    },
+                    *self._return_value_edges(source="child-guard", source_handle="value"),
                 ],
             )
         elif workflow_id == "workflow-batch-generator":
@@ -637,8 +644,7 @@ class _DummyWorkflowRecords:
                         },
                     ),
                     self._invocation_node("child-int", "integer", {"value": {"value": 0}}),
-                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
-                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                    *self._return_value_nodes(),
                 ],
                 edges=[
                     {
@@ -657,22 +663,7 @@ class _DummyWorkflowRecords:
                         "target": "child-int",
                         "targetHandle": "value",
                     },
-                    {
-                        "id": "edge-generator-collect",
-                        "type": "default",
-                        "source": "child-int",
-                        "sourceHandle": "value",
-                        "target": "child-collect",
-                        "targetHandle": "item",
-                    },
-                    {
-                        "id": "edge-generator-return",
-                        "type": "default",
-                        "source": "child-collect",
-                        "sourceHandle": "collection",
-                        "target": "child-return",
-                        "targetHandle": "collection",
-                    },
+                    *self._return_value_edges(source="child-int", source_handle="value"),
                 ],
             )
         elif workflow_id == "workflow-batch-generator-integer":
@@ -701,8 +692,7 @@ class _DummyWorkflowRecords:
                         },
                     ),
                     self._invocation_node("child-int", "integer", {"value": {"value": 0}}),
-                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
-                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                    *self._return_value_nodes(),
                 ],
                 edges=[
                     {
@@ -721,22 +711,7 @@ class _DummyWorkflowRecords:
                         "target": "child-int",
                         "targetHandle": "value",
                     },
-                    {
-                        "id": "edge-generator-collect",
-                        "type": "default",
-                        "source": "child-int",
-                        "sourceHandle": "value",
-                        "target": "child-collect",
-                        "targetHandle": "item",
-                    },
-                    {
-                        "id": "edge-generator-return",
-                        "type": "default",
-                        "source": "child-collect",
-                        "sourceHandle": "collection",
-                        "target": "child-return",
-                        "targetHandle": "collection",
-                    },
+                    *self._return_value_edges(source="child-int", source_handle="value"),
                 ],
             )
         elif workflow_id == "workflow-batch-generator-image":
@@ -764,8 +739,7 @@ class _DummyWorkflowRecords:
                         },
                     ),
                     self._invocation_node("child-image", "image", {"image": {"value": None}}),
-                    self._invocation_node("child-collect", "collect", {"collection": {"value": []}}),
-                    self._invocation_node("child-return", "workflow_return", {"collection": {"value": []}}),
+                    *self._return_value_nodes(),
                 ],
                 edges=[
                     {
@@ -784,22 +758,7 @@ class _DummyWorkflowRecords:
                         "target": "child-image",
                         "targetHandle": "image",
                     },
-                    {
-                        "id": "edge-generator-collect",
-                        "type": "default",
-                        "source": "child-image",
-                        "sourceHandle": "image",
-                        "target": "child-collect",
-                        "targetHandle": "item",
-                    },
-                    {
-                        "id": "edge-generator-return",
-                        "type": "default",
-                        "source": "child-collect",
-                        "sourceHandle": "collection",
-                        "target": "child-return",
-                        "targetHandle": "collection",
-                    },
+                    *self._return_value_edges(source="child-image", source_handle="image"),
                 ],
             )
 
@@ -1406,8 +1365,10 @@ def test_workflow_call_coordinator_suspends_parent_and_enqueues_child_queue_item
 
     graph = Graph()
     graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    graph.add_node(WorkflowReturnGetInvocation(id="get-return", key="result"))
     graph.add_node(IfInvocation(id="downstream-if", condition=True, false_input=0))
-    graph.add_edge(create_edge("call-node", "collection", "downstream-if", "true_input"))
+    graph.add_edge(create_edge("call-node", "values", "get-return", "values"))
+    graph.add_edge(create_edge("get-return", "value", "downstream-if", "true_input"))
 
     session = GraphExecutionState(graph=graph)
     queue_item = type(
@@ -1521,7 +1482,7 @@ def test_workflow_call_queue_lifecycle_resumes_parent_from_completed_child(
         output for invocation, _queue_item, output in events.completed if invocation.get_type() == "call_saved_workflow"
     ]
     assert len(parent_outputs) == 1
-    assert parent_outputs[0].collection == [3]
+    assert parent_outputs[0].values == {"result": [3]}
 
 
 def test_workflow_call_coordinator_cleans_up_enqueued_children_when_boundary_setup_fails(
@@ -1666,8 +1627,10 @@ def test_run_completes_call_saved_workflow_and_runs_downstream_nodes(
 
     graph = Graph()
     graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    graph.add_node(WorkflowReturnGetInvocation(id="get-return", key="result"))
     graph.add_node(IfInvocation(id="downstream-if", condition=True, false_input=0))
-    graph.add_edge(create_edge("call-node", "collection", "downstream-if", "true_input"))
+    graph.add_edge(create_edge("call-node", "values", "get-return", "values"))
+    graph.add_edge(create_edge("get-return", "value", "downstream-if", "true_input"))
 
     session = GraphExecutionState(graph=graph)
     queue_item = type(
@@ -1688,15 +1651,17 @@ def test_run_completes_call_saved_workflow_and_runs_downstream_nodes(
 
     assert not session.is_waiting_on_workflow_call()
     assert "downstream-if" in session.executed
-    assert len(events.started) == 5
     assert [invocation.get_type() for _queue_item, invocation in events.started] == [
         "call_saved_workflow",
         "add",
         "integer_collection",
+        "workflow_return_value",
+        "collect",
         "workflow_return",
+        "workflow_return_get",
         "if",
     ]
-    assert len(events.completed) == 5
+    assert len(events.completed) == 8
     parent_outputs = [
         output for invocation, _queue_item, output in events.completed if invocation.get_type() == "call_saved_workflow"
     ]
@@ -1704,7 +1669,7 @@ def test_run_completes_call_saved_workflow_and_runs_downstream_nodes(
         output for invocation, _queue_item, output in events.completed if invocation.get_type() == "if"
     ]
     assert len(parent_outputs) == 1
-    assert parent_outputs[0].collection == [3]
+    assert parent_outputs[0].values == {"result": [3]}
     assert len(downstream_outputs) == 1
     assert downstream_outputs[0].value == [3]
     assert events.errors == []
@@ -1790,7 +1755,7 @@ def test_run_executes_child_workflow_and_completes_parent_queue_item(monkeypatch
         output for invocation, _queue_item, output in events.completed if invocation.get_type() == "call_saved_workflow"
     ]
     assert len(parent_outputs) == 1
-    assert parent_outputs[0].collection == [3]
+    assert parent_outputs[0].values == {"result": [3]}
     assert events.errors == []
 
 
@@ -1830,10 +1795,46 @@ def test_run_completes_call_saved_workflow_with_child_return_collection(monkeypa
     ]
 
     assert len(child_return_outputs) == 1
-    assert child_return_outputs[0].collection == [7, 8]
+    assert child_return_outputs[0].values == {"numbers": [7, 8]}
     assert len(parent_outputs) == 1
-    assert parent_outputs[0].collection == [7, 8]
+    assert parent_outputs[0].values == {"numbers": [7, 8]}
     assert session_queue.completed_item_ids == [100, 1]
+    assert events.errors == []
+
+
+def test_run_extracts_named_call_saved_workflow_return(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    processor = DefaultSessionProcessor(session_runner=runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-return"))
+    graph.add_node(WorkflowReturnGetInvocation(id="get-return", key="numbers"))
+    graph.add_edge(create_edge("call-node", "values", "get-return", "values"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+        },
+    )()
+
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
+
+    extracted_outputs = [
+        output for invocation, _queue_item, output in events.completed if invocation.get_type() == "workflow_return_get"
+    ]
+
+    assert len(extracted_outputs) == 1
+    assert extracted_outputs[0].value == [7, 8]
     assert events.errors == []
 
 
@@ -1876,8 +1877,90 @@ def test_run_completes_call_saved_workflow_with_batched_child_returns(monkeypatc
     ] == [[("child-int", "value", 2)], [("child-int", "value", 4)], [("child-int", "value", 6)]]
     assert session_queue.completed_item_ids == [100, 101, 102, 1]
     assert len(parent_outputs) == 1
-    assert parent_outputs[0].collection == [2, 4, 6]
+    assert parent_outputs[0].values == {"number": [2, 4, 6]}
     assert events.errors == []
+
+
+def test_workflow_call_batch_aggregation_rejects_inconsistent_return_keys() -> None:
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    session = GraphExecutionState(graph=graph)
+    session.begin_waiting_on_workflow_call(
+        WorkflowCallFrame(
+            prepared_call_node_id="call-node",
+            source_call_node_id="call-node",
+            workflow_id="workflow-a",
+            depth=1,
+        )
+    )
+    session.waiting_workflow_call_execution.expected_child_count = 2
+
+    session.record_waiting_workflow_call_child_completion(100, {"image": "image-a"})
+
+    with pytest.raises(ValueError, match="returned different workflow return keys"):
+        session.record_waiting_workflow_call_child_completion(101, {"mask": "mask-a"})
+
+
+def test_workflow_call_return_aggregation_failure_cancels_remaining_siblings(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    lifecycle = WorkflowCallQueueLifecycle(runner)
+
+    parent_graph = Graph()
+    parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    parent_session = GraphExecutionState(graph=parent_graph)
+    parent_invocation = parent_session.next()
+    assert isinstance(parent_invocation, CallSavedWorkflowInvocation)
+    parent_session.begin_waiting_on_workflow_call(
+        parent_session.build_workflow_call_frame(parent_invocation.id, "workflow-a")
+    )
+    parent_session.waiting_workflow_call_execution.expected_child_count = 2
+    parent_session.record_waiting_workflow_call_child_completion(100, {"image": "image-a"})
+    workflow_call_id = parent_session.waiting_workflow_call_execution.id
+    parent_queue_item = SimpleNamespace(
+        item_id=1,
+        status="waiting",
+        session=parent_session,
+        session_id=parent_session.id,
+        user_id="user-1",
+        queue_id="default",
+        batch_id="batch-1",
+    )
+    session_queue.add_queue_item(parent_queue_item)
+
+    child_graph = Graph()
+    child_graph.add_node(WorkflowReturnInvocation(id="return"))
+    child_session = GraphExecutionState(graph=child_graph)
+    return_invocation = child_session.next()
+    assert isinstance(return_invocation, WorkflowReturnInvocation)
+    child_session.complete(return_invocation.id, WorkflowReturnOutput(values={"mask": "mask-a"}))
+    child_queue_item = SimpleNamespace(
+        item_id=101,
+        status="completed",
+        session=child_session,
+        session_id=child_session.id,
+        parent_item_id=1,
+        workflow_call_id=workflow_call_id,
+    )
+    sibling_queue_item = SimpleNamespace(
+        item_id=102,
+        status="pending",
+        session=GraphExecutionState(graph=Graph()),
+        session_id="sibling-session",
+        parent_item_id=1,
+        workflow_call_id=workflow_call_id,
+    )
+    session_queue.add_queue_item(child_queue_item)
+    session_queue.add_queue_item(sibling_queue_item)
+
+    lifecycle._resume_parent_from_completed_child(child_queue_item)
+
+    assert session_queue.failed_item_ids == [1]
+    assert session_queue.canceled_item_ids == [102]
+    assert len(events.errors) == 1
+    assert "different workflow return keys" in events.errors[0][3]
 
 
 def test_run_zips_grouped_batch_children(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1911,7 +1994,7 @@ def test_run_zips_grouped_batch_children(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert session_queue.enqueued_child_item_ids == [100, 101, 102]
     assert len(parent_outputs) == 1
-    assert parent_outputs[0].collection == [11, 22, 33]
+    assert parent_outputs[0].values == {"result": [11, 22, 33]}
 
 
 def test_run_expands_ungrouped_batch_children_as_cartesian_product(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1945,7 +2028,7 @@ def test_run_expands_ungrouped_batch_children_as_cartesian_product(monkeypatch: 
 
     assert session_queue.enqueued_child_item_ids == [100, 101, 102, 103]
     assert len(parent_outputs) == 1
-    assert parent_outputs[0].collection == [11, 21, 12, 22]
+    assert parent_outputs[0].values == {"result": [11, 21, 12, 22]}
 
 
 def test_run_fails_batched_child_workflow_and_cancels_remaining_siblings(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -2011,7 +2094,7 @@ def test_run_supports_generator_backed_integer_batched_child_workflow(monkeypatc
 
     assert session_queue.enqueued_child_item_ids == [100, 101, 102]
     assert len(parent_outputs) == 1
-    assert parent_outputs[0].collection == [2, 4, 6]
+    assert parent_outputs[0].values == {"result": [2, 4, 6]}
     assert events.errors == []
 
 
@@ -2046,7 +2129,7 @@ def test_run_supports_generator_backed_image_batched_child_workflow(monkeypatch:
 
     assert session_queue.enqueued_child_item_ids == [100, 101]
     assert len(parent_outputs) == 1
-    assert [item.image_name for item in parent_outputs[0].collection] == ["img-a", "img-b"]
+    assert [item.image_name for item in parent_outputs[0].values["result"]] == ["img-a", "img-b"]
     assert events.errors == []
 
 

@@ -100,9 +100,9 @@ class WorkflowCallExecution(BaseModel):
         default_factory=list,
         description="The child queue item ids whose workflow_return outputs have been aggregated.",
     )
-    aggregated_collection: list[Any] = Field(
-        default_factory=list,
-        description="The aggregated workflow_return collection accumulated from child executions.",
+    aggregated_values: dict[str, list[Any]] = Field(
+        default_factory=dict,
+        description="The aggregated workflow_return values accumulated from child executions.",
     )
 
 
@@ -2149,18 +2149,33 @@ class GraphExecutionState(BaseModel):
             )
 
     def record_waiting_workflow_call_child_completion(
-        self, child_item_id: int, output_collection: list[Any]
-    ) -> tuple[bool, list[Any]]:
+        self, child_item_id: int, output_values: dict[str, Any]
+    ) -> tuple[bool, dict[str, Any]]:
         if self.waiting_workflow_call_execution is None:
             raise ValueError("Execution state is not waiting on a workflow call.")
         if child_item_id not in self.waiting_workflow_call_execution.completed_child_item_ids:
+            if (
+                self.waiting_workflow_call_execution.expected_child_count > 1
+                and self.waiting_workflow_call_execution.completed_child_item_ids
+                and set(output_values.keys()) != set(self.waiting_workflow_call_execution.aggregated_values.keys())
+            ):
+                raise ValueError("Batched child workflows returned different workflow return keys.")
             self.waiting_workflow_call_execution.completed_child_item_ids.append(child_item_id)
-            self.waiting_workflow_call_execution.aggregated_collection.extend(output_collection)
+            for key, value in output_values.items():
+                self.waiting_workflow_call_execution.aggregated_values.setdefault(key, []).append(value)
         is_complete = (
             len(self.waiting_workflow_call_execution.completed_child_item_ids)
             >= self.waiting_workflow_call_execution.expected_child_count
         )
-        return is_complete, list(self.waiting_workflow_call_execution.aggregated_collection)
+        if self.waiting_workflow_call_execution.expected_child_count == 1:
+            return (
+                is_complete,
+                {key: values[0] for key, values in self.waiting_workflow_call_execution.aggregated_values.items()},
+            )
+        return (
+            is_complete,
+            {key: list(values) for key, values in self.waiting_workflow_call_execution.aggregated_values.items()},
+        )
 
     def end_waiting_on_workflow_call(
         self,

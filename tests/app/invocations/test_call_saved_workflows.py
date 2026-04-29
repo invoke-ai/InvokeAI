@@ -103,7 +103,7 @@ def test_call_saved_workflow_invocation_contract():
     output = invocation.invoke(build_context())
 
     assert isinstance(output, WorkflowReturnOutput)
-    assert output.collection == []
+    assert output.values == {}
 
 
 def test_call_saved_workflow_invocation_raises_when_workflow_id_is_empty():
@@ -164,7 +164,7 @@ def test_call_saved_workflow_invocation_allows_shared_workflow_for_non_owner():
         )
     )
 
-    assert output.collection == []
+    assert output.values == {}
 
 
 def test_call_saved_workflow_invocation_allows_default_workflow_for_non_owner():
@@ -186,7 +186,7 @@ def test_call_saved_workflow_invocation_allows_default_workflow_for_non_owner():
         )
     )
 
-    assert output.collection == []
+    assert output.values == {}
 
 
 def test_call_saved_workflow_invocation_allows_admin_to_access_private_workflow():
@@ -208,7 +208,7 @@ def test_call_saved_workflow_invocation_allows_admin_to_access_private_workflow(
         )
     )
 
-    assert output.collection == []
+    assert output.values == {}
 
 
 def test_call_saved_workflow_invocation_raises_when_private_workflow_user_record_is_missing():
@@ -247,26 +247,97 @@ def test_call_saved_workflow_invocation_schema_declares_saved_workflow_ui_type()
 
 
 def test_workflow_return_invocation_contract():
-    from invokeai.app.invocations.workflow_return import WorkflowReturnInvocation, WorkflowReturnOutput
+    from invokeai.app.invocations.workflow_return import (
+        WorkflowReturnInvocation,
+        WorkflowReturnOutput,
+        WorkflowReturnValueField,
+    )
 
-    invocation = WorkflowReturnInvocation(id="return-node", collection=["a", 1, {"x": True}])
+    invocation = WorkflowReturnInvocation(
+        id="return-node",
+        values=[
+            WorkflowReturnValueField(key="prompt", value="a"),
+            WorkflowReturnValueField(key="count", value=1),
+            WorkflowReturnValueField(key="metadata", value={"x": True}),
+        ],
+    )
 
     assert invocation.get_type() == "workflow_return"
 
     output = invocation.invoke(build_context())
 
     assert isinstance(output, WorkflowReturnOutput)
-    assert output.collection == ["a", 1, {"x": True}]
+    assert output.values == {"prompt": "a", "count": 1, "metadata": {"x": True}}
+    assert not hasattr(output, "collection")
 
 
-def test_workflow_return_invocation_schema_declares_collection_ui_type():
-    from invokeai.app.invocations.workflow_return import WorkflowReturnInvocation
+def test_workflow_return_value_invocation_contract():
+    from invokeai.app.invocations.workflow_return import WorkflowReturnValueField, WorkflowReturnValueInvocation
+
+    invocation = WorkflowReturnValueInvocation(id="return-value-node", key="image", value={"image_name": "image-a"})
+
+    output = invocation.invoke(build_context())
+
+    assert output.value == WorkflowReturnValueField(key="image", value={"image_name": "image-a"})
+
+
+def test_workflow_return_invocation_rejects_duplicate_keys():
+    from invokeai.app.invocations.workflow_return import WorkflowReturnInvocation, WorkflowReturnValueField
+
+    invocation = WorkflowReturnInvocation(
+        id="return-node",
+        values=[
+            WorkflowReturnValueField(key="image", value="image-a"),
+            WorkflowReturnValueField(key="image", value="image-b"),
+        ],
+    )
+
+    with pytest.raises(ValueError, match="Duplicate workflow return key 'image'"):
+        invocation.invoke(build_context())
+
+
+def test_workflow_return_get_invocation_contract():
+    from invokeai.app.invocations.workflow_return import WorkflowReturnGetInvocation
+
+    invocation = WorkflowReturnGetInvocation(id="return-get-node", values={"image": "image-a"}, key="image")
+
+    output = invocation.invoke(build_context())
+
+    assert output.value == "image-a"
+
+
+def test_workflow_return_get_invocation_rejects_missing_key():
+    from invokeai.app.invocations.workflow_return import WorkflowReturnGetInvocation
+
+    invocation = WorkflowReturnGetInvocation(id="return-get-node", values={"image": "image-a"}, key="mask")
+
+    with pytest.raises(ValueError, match="Workflow return key 'mask' was not found"):
+        invocation.invoke(build_context())
+
+
+def test_workflow_return_get_invocation_rejects_empty_key():
+    from invokeai.app.invocations.workflow_return import WorkflowReturnGetInvocation
+
+    invocation = WorkflowReturnGetInvocation(id="return-get-node", values={"image": "image-a"}, key=" ")
+
+    with pytest.raises(ValueError, match="Workflow return key must not be empty"):
+        invocation.invoke(build_context())
+
+
+def test_workflow_return_invocation_schema_declares_named_values_contract():
+    from invokeai.app.invocations.workflow_return import WorkflowReturnGetInvocation, WorkflowReturnInvocation
 
     schema = WorkflowReturnInvocation.model_json_schema()
-    collection = schema["properties"]["collection"]
+    assert "collection" not in schema["properties"]
+    values = schema["properties"]["values"]
 
-    assert collection["input"] == "any"
-    assert collection["ui_type"] == "CollectionField"
+    assert values["input"] == "any"
+    assert values["ui_type"] == "CollectionField"
+
+    get_schema = WorkflowReturnGetInvocation.model_json_schema()
+    get_values = get_schema["properties"]["values"]
+    assert get_values["input"] == "connection"
+    assert get_values["ui_type"] == "AnyField"
 
 
 def test_workflow_without_id_validator_rejects_duplicate_workflow_return_nodes():

@@ -44,6 +44,45 @@ def _workflow_dump(*, nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) 
     }
 
 
+def _return_nodes() -> list[dict[str, Any]]:
+    return [
+        _invocation_node(
+            "return-value", "workflow_return_value", {"key": {"value": "result"}, "value": {"value": None}}
+        ),
+        _invocation_node("return-collect", "collect", {"collection": {"value": []}}),
+        _invocation_node("return", "workflow_return", {"values": {"value": []}}),
+    ]
+
+
+def _return_edges(source: str, source_handle: str) -> list[dict[str, str]]:
+    return [
+        {
+            "id": "edge-return-value",
+            "type": "default",
+            "source": source,
+            "sourceHandle": source_handle,
+            "target": "return-value",
+            "targetHandle": "value",
+        },
+        {
+            "id": "edge-return-collect",
+            "type": "default",
+            "source": "return-value",
+            "sourceHandle": "value",
+            "target": "return-collect",
+            "targetHandle": "item",
+        },
+        {
+            "id": "edge-return-values",
+            "type": "default",
+            "source": "return-collect",
+            "sourceHandle": "collection",
+            "target": "return",
+            "targetHandle": "values",
+        },
+    ]
+
+
 def _services():
     return type(
         "Services",
@@ -83,18 +122,9 @@ def test_get_workflow_call_compatibility_returns_ok_for_simple_callable_workflow
     workflow = _workflow_dump(
         nodes=[
             _invocation_node("collection", "integer_collection", {"collection": {"value": [1]}}),
-            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+            *_return_nodes(),
         ],
-        edges=[
-            {
-                "id": "edge-return",
-                "type": "default",
-                "source": "collection",
-                "sourceHandle": "collection",
-                "target": "return",
-                "targetHandle": "collection",
-            }
-        ],
+        edges=_return_edges("collection", "collection"),
     )
 
     compatibility = get_workflow_call_compatibility(
@@ -129,8 +159,8 @@ def test_get_workflow_call_compatibility_reports_missing_workflow_return() -> No
 def test_get_workflow_call_compatibility_reports_multiple_workflow_return_nodes() -> None:
     workflow = _workflow_dump(
         nodes=[
-            _invocation_node("return-a", "workflow_return", {"collection": {"value": []}}),
-            _invocation_node("return-b", "workflow_return", {"collection": {"value": []}}),
+            _invocation_node("return-a", "workflow_return", {"values": {"value": []}}),
+            _invocation_node("return-b", "workflow_return", {"values": {"value": []}}),
         ],
         edges=[],
     )
@@ -157,7 +187,7 @@ def test_get_workflow_call_compatibility_reports_unsupported_connected_batch_inp
             ),
             _invocation_node("target", "integer", {"value": {"value": 0}}),
             _invocation_node("collect", "collect", {"collection": {"value": []}}),
-            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+            *_return_nodes(),
         ],
         edges=[
             {
@@ -184,14 +214,7 @@ def test_get_workflow_call_compatibility_reports_unsupported_connected_batch_inp
                 "target": "collect",
                 "targetHandle": "item",
             },
-            {
-                "id": "edge-collect-return",
-                "type": "default",
-                "source": "collect",
-                "sourceHandle": "collection",
-                "target": "return",
-                "targetHandle": "collection",
-            },
+            *_return_edges("collect", "collection"),
         ],
     )
 
@@ -208,13 +231,13 @@ def test_get_workflow_call_compatibility_reports_unsupported_connected_batch_inp
     assert "connected batch child workflow inputs" in (compatibility.message or "")
 
 
-def test_get_workflow_call_compatibility_allows_batch_directly_into_workflow_return_collection() -> None:
+def test_get_workflow_call_compatibility_allows_batch_returned_by_name() -> None:
     workflow = _workflow_dump(
         nodes=[
             _invocation_node(
                 "batch", "integer_batch", {"integers": {"value": [2, 4]}, "batch_group_id": {"value": "None"}}
             ),
-            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+            *_return_nodes(),
         ],
         edges=[
             {
@@ -222,9 +245,10 @@ def test_get_workflow_call_compatibility_allows_batch_directly_into_workflow_ret
                 "type": "default",
                 "source": "batch",
                 "sourceHandle": "integers",
-                "target": "return",
-                "targetHandle": "collection",
+                "target": "return-value",
+                "targetHandle": "value",
             },
+            *_return_edges("return-value", "value")[1:],
         ],
     )
 
@@ -258,7 +282,7 @@ def test_get_workflow_call_compatibility_can_skip_generator_expansion_for_list_v
                 },
             ),
             _invocation_node("batch", "image_batch", {"images": {"value": []}, "batch_group_id": {"value": "None"}}),
-            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+            *_return_nodes(),
         ],
         edges=[
             {
@@ -274,9 +298,10 @@ def test_get_workflow_call_compatibility_can_skip_generator_expansion_for_list_v
                 "type": "default",
                 "source": "batch",
                 "sourceHandle": "images",
-                "target": "return",
-                "targetHandle": "collection",
+                "target": "return-value",
+                "targetHandle": "value",
             },
+            *_return_edges("return-value", "value")[1:],
         ],
     )
 
@@ -304,7 +329,7 @@ def test_get_workflow_call_compatibility_reports_multiple_batch_inputs_as_unsupp
             ),
             _invocation_node("target", "integer", {"value": {"value": 0}}),
             _invocation_node("collect", "collect", {"collection": {"value": []}}),
-            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+            *_return_nodes(),
         ],
         edges=[
             {
@@ -339,14 +364,7 @@ def test_get_workflow_call_compatibility_reports_multiple_batch_inputs_as_unsupp
                 "target": "collect",
                 "targetHandle": "item",
             },
-            {
-                "id": "edge-collect-return",
-                "type": "default",
-                "source": "collect",
-                "sourceHandle": "collection",
-                "target": "return",
-                "targetHandle": "collection",
-            },
+            *_return_edges("collect", "collection"),
         ],
     )
 
@@ -368,7 +386,7 @@ def test_get_workflow_call_compatibility_allows_workflow_with_required_exposed_i
         nodes=[
             _invocation_node("target", "integer", {"value": {}}),
             _invocation_node("collect", "collect", {"collection": {"value": []}}),
-            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+            *_return_nodes(),
         ],
         edges=[
             {
@@ -379,14 +397,7 @@ def test_get_workflow_call_compatibility_allows_workflow_with_required_exposed_i
                 "target": "collect",
                 "targetHandle": "item",
             },
-            {
-                "id": "edge-collect-return",
-                "type": "default",
-                "source": "collect",
-                "sourceHandle": "collection",
-                "target": "return",
-                "targetHandle": "collection",
-            },
+            *_return_edges("collect", "collection"),
         ],
     )
     workflow["exposedFields"] = [{"nodeId": "target", "fieldName": "value"}]
@@ -409,7 +420,7 @@ def test_get_workflow_call_compatibility_allows_workflow_with_required_structure
         nodes=[
             _invocation_node("template", "prompt_template", {"style_preset": {}}),
             _invocation_node("collect", "collect", {"collection": {"value": []}}),
-            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+            *_return_nodes(),
         ],
         edges=[
             {
@@ -420,14 +431,7 @@ def test_get_workflow_call_compatibility_allows_workflow_with_required_structure
                 "target": "collect",
                 "targetHandle": "item",
             },
-            {
-                "id": "edge-collect-return",
-                "type": "default",
-                "source": "collect",
-                "sourceHandle": "collection",
-                "target": "return",
-                "targetHandle": "collection",
-            },
+            *_return_edges("collect", "collection"),
         ],
     )
     workflow["exposedFields"] = [{"nodeId": "template", "fieldName": "style_preset"}]
