@@ -11,25 +11,24 @@ import { useGetWorkflowQuery, useListWorkflowsInfiniteInfiniteQuery } from 'serv
 
 import {
   buildSavedWorkflowOptions,
+  getSavedWorkflowPickerOwnedQueryArg,
+  getSavedWorkflowPickerSharedQueryArg,
   getSavedWorkflowDisplayState,
   getSavedWorkflowListItemFromRecord,
   getSavedWorkflowSelectionOption,
   getSavedWorkflowSelectionState,
+  mergeSavedWorkflowPickerItems,
   MISSING_WORKFLOW_OPTION_VALUE,
+  shouldFetchNextSavedWorkflowPickerPage,
 } from './savedWorkflowFieldUtils';
 import type { FieldComponentProps } from './types';
 
-const queryArg = {
-  page: 0,
-  per_page: 50,
-  order_by: 'name',
-  direction: 'ASC',
-  categories: ['user', 'default'],
-  query: '',
-  tags: [],
-  has_been_opened: undefined,
-  is_public: undefined,
-} satisfies Parameters<typeof useListWorkflowsInfiniteInfiniteQuery>[0];
+const ownedQueryArg = getSavedWorkflowPickerOwnedQueryArg() satisfies Parameters<
+  typeof useListWorkflowsInfiniteInfiniteQuery
+>[0];
+const sharedQueryArg = getSavedWorkflowPickerSharedQueryArg() satisfies Parameters<
+  typeof useListWorkflowsInfiniteInfiniteQuery
+>[0];
 
 const queryOptions = {
   selectFromResult: ({ data, ...rest }) => ({
@@ -44,7 +43,21 @@ const SavedWorkflowFieldInputComponent = (
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
-  const { items, isLoading, isFetching } = useListWorkflowsInfiniteInfiniteQuery(queryArg, queryOptions);
+  const {
+    items: ownedItems,
+    isLoading: isOwnedLoading,
+    isFetching: isOwnedFetching,
+    hasNextPage: hasNextOwnedPage,
+    fetchNextPage: fetchNextOwnedPage,
+  } = useListWorkflowsInfiniteInfiniteQuery(ownedQueryArg, queryOptions);
+  const {
+    items: sharedItems,
+    isLoading: isSharedLoading,
+    isFetching: isSharedFetching,
+    hasNextPage: hasNextSharedPage,
+    fetchNextPage: fetchNextSharedPage,
+  } = useListWorkflowsInfiniteInfiniteQuery(sharedQueryArg, queryOptions);
+  const items = useMemo(() => mergeSavedWorkflowPickerItems(ownedItems, sharedItems), [ownedItems, sharedItems]);
   const isSelectedWorkflowInList = useMemo(
     () => items.some((workflow) => workflow.workflow_id === field.value),
     [field.value, items]
@@ -90,8 +103,29 @@ const SavedWorkflowFieldInputComponent = (
     },
     [dispatch, field.name, nodeId]
   );
+  const onMenuScrollToBottom = useCallback(() => {
+    if (
+      shouldFetchNextSavedWorkflowPickerPage({ hasNextPage: hasNextOwnedPage, isFetching: isOwnedFetching })
+    ) {
+      fetchNextOwnedPage();
+    }
+    if (
+      shouldFetchNextSavedWorkflowPickerPage({ hasNextPage: hasNextSharedPage, isFetching: isSharedFetching })
+    ) {
+      fetchNextSharedPage();
+    }
+  }, [
+    fetchNextOwnedPage,
+    fetchNextSharedPage,
+    hasNextOwnedPage,
+    hasNextSharedPage,
+    isOwnedFetching,
+    isSharedFetching,
+  ]);
 
   const noOptionsMessage = useCallback(() => t('nodes.noMatchingWorkflows'), [t]);
+  const isLoading = isOwnedLoading || isSharedLoading;
+  const isFetching = isOwnedFetching || isSharedFetching;
 
   return (
     <Flex flexDir="column" gap={1}>
@@ -100,6 +134,7 @@ const SavedWorkflowFieldInputComponent = (
         value={value}
         options={options}
         onChange={onChange}
+        onMenuScrollToBottom={onMenuScrollToBottom}
         placeholder={isLoading ? t('common.loading') : t('controlLayers.workflowIntegration.selectPlaceholder')}
         noOptionsMessage={noOptionsMessage}
         isClearable

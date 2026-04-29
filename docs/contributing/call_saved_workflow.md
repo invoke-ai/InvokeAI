@@ -290,6 +290,8 @@ The current queue-visible implementation uses the following lifecycle contract:
 - workflow live-update sockets join workflow event rooms in both authenticated multiuser mode and unauthenticated
   single-user mode; the frontend relies on those events to invalidate workflow library data and clear deleted saved
   workflow selections
+- the saved-workflow node picker queries owned/default workflows and public shared workflows separately, merges them by
+  workflow id, and fetches additional pages as the combobox menu reaches the end
 
 This is now part of the intended user-facing contract, even though the orchestration still lives in
 `WorkflowCallCoordinator`.

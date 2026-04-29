@@ -3,6 +3,7 @@ import { getWorkflowCallCompatibilityState } from 'features/workflowLibrary/util
 import type { S, WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 export const MISSING_WORKFLOW_OPTION_VALUE = '__missing_workflow__';
+export const SAVED_WORKFLOW_PICKER_PAGE_SIZE = 50;
 export type SavedWorkflowBadge = 'unsupported' | 'default' | 'shared';
 
 type SavedWorkflowSelectionState =
@@ -17,6 +18,50 @@ export const buildSavedWorkflowOptions = (workflows: WorkflowRecordListItemWithT
     isDisabled: workflow.call_saved_workflow_compatibility?.is_callable === false,
   }));
 };
+
+const baseSavedWorkflowPickerQueryArg = {
+  page: 0,
+  per_page: SAVED_WORKFLOW_PICKER_PAGE_SIZE,
+  order_by: 'name',
+  direction: 'ASC',
+  query: '',
+  tags: [],
+  has_been_opened: undefined,
+} as const;
+
+export const getSavedWorkflowPickerOwnedQueryArg = () => ({
+  ...baseSavedWorkflowPickerQueryArg,
+  categories: ['user', 'default'],
+  is_public: undefined,
+});
+
+export const getSavedWorkflowPickerSharedQueryArg = () => ({
+  ...baseSavedWorkflowPickerQueryArg,
+  categories: ['user'],
+  is_public: true,
+});
+
+export const mergeSavedWorkflowPickerItems = (
+  ...workflowLists: WorkflowRecordListItemWithThumbnailDTO[][]
+): WorkflowRecordListItemWithThumbnailDTO[] => {
+  const workflowsById = new Map<string, WorkflowRecordListItemWithThumbnailDTO>();
+  for (const workflows of workflowLists) {
+    for (const workflow of workflows) {
+      if (!workflowsById.has(workflow.workflow_id)) {
+        workflowsById.set(workflow.workflow_id, workflow);
+      }
+    }
+  }
+  return Array.from(workflowsById.values());
+};
+
+export const shouldFetchNextSavedWorkflowPickerPage = ({
+  hasNextPage,
+  isFetching,
+}: {
+  hasNextPage: boolean;
+  isFetching: boolean;
+}) => hasNextPage && !isFetching;
 
 export const getSavedWorkflowSelectionState = (
   workflows: WorkflowRecordListItemWithThumbnailDTO[],

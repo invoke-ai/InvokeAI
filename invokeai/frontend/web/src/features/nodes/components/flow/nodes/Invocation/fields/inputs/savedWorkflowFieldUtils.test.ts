@@ -3,11 +3,15 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildSavedWorkflowOptions,
+  getSavedWorkflowPickerOwnedQueryArg,
+  getSavedWorkflowPickerSharedQueryArg,
   getSavedWorkflowDisplayState,
   getSavedWorkflowListItemFromRecord,
   getSavedWorkflowSelectionOption,
   getSavedWorkflowSelectionState,
+  mergeSavedWorkflowPickerItems,
   MISSING_WORKFLOW_OPTION_VALUE,
+  shouldFetchNextSavedWorkflowPickerPage,
 } from './savedWorkflowFieldUtils';
 
 const workflows: WorkflowRecordListItemWithThumbnailDTO[] = [
@@ -152,5 +156,41 @@ describe('savedWorkflowFieldUtils', () => {
       badges: ['shared'],
       compatibilityMessage: null,
     });
+  });
+
+  it('queries owned/default workflows and shared public workflows separately', () => {
+    expect(getSavedWorkflowPickerOwnedQueryArg()).toMatchObject({
+      page: 0,
+      per_page: 50,
+      categories: ['user', 'default'],
+      is_public: undefined,
+    });
+    expect(getSavedWorkflowPickerSharedQueryArg()).toMatchObject({
+      page: 0,
+      per_page: 50,
+      categories: ['user'],
+      is_public: true,
+    });
+  });
+
+  it('merges paged owned and shared workflow picker results without duplicates', () => {
+    const sharedWorkflow = {
+      ...workflows[0],
+      workflow_id: 'workflow-shared',
+      name: 'Shared Workflow',
+      is_public: true,
+    };
+
+    expect(mergeSavedWorkflowPickerItems([workflows[0]], [workflows[1], sharedWorkflow], [workflows[0]])).toEqual([
+      workflows[0],
+      workflows[1],
+      sharedWorkflow,
+    ]);
+  });
+
+  it('fetches more workflow picker pages only when a query has another idle page', () => {
+    expect(shouldFetchNextSavedWorkflowPickerPage({ hasNextPage: true, isFetching: false })).toBe(true);
+    expect(shouldFetchNextSavedWorkflowPickerPage({ hasNextPage: false, isFetching: false })).toBe(false);
+    expect(shouldFetchNextSavedWorkflowPickerPage({ hasNextPage: true, isFetching: true })).toBe(false);
   });
 });
