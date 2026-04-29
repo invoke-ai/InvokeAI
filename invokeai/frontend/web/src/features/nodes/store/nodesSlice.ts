@@ -583,9 +583,22 @@ const slice = createSlice({
       }
 
       for (const { fieldName, fieldTemplate, label, description, initialValue } of fields) {
+        const existingTemplate = node.data.dynamicInputTemplates[fieldName];
         node.data.dynamicInputTemplates[fieldName] = fieldTemplate;
         const existing = node.data.inputs[fieldName];
         if (existing) {
+          if (
+            existingTemplate?.type.name !== fieldTemplate.type.name ||
+            existingTemplate?.type.cardinality !== fieldTemplate.type.cardinality ||
+            existingTemplate?.type.batch !== fieldTemplate.type.batch
+          ) {
+            const instance = buildFieldInputInstance(fieldName, fieldTemplate);
+            instance.label = label;
+            instance.description = description;
+            instance.value = initialValue;
+            node.data.inputs[fieldName] = instance;
+            continue;
+          }
           existing.label = label;
           existing.description = description;
           continue;

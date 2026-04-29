@@ -24,19 +24,20 @@ const baseSavedWorkflowPickerQueryArg = {
   per_page: SAVED_WORKFLOW_PICKER_PAGE_SIZE,
   order_by: 'name',
   direction: 'ASC',
-  query: '',
   tags: [] as string[],
   has_been_opened: undefined,
 } as const;
 
-export const getSavedWorkflowPickerOwnedQueryArg = () => ({
+export const getSavedWorkflowPickerOwnedQueryArg = (query = '') => ({
   ...baseSavedWorkflowPickerQueryArg,
+  query,
   categories: ['user', 'default'] as ('user' | 'default')[],
   is_public: undefined,
 });
 
-export const getSavedWorkflowPickerSharedQueryArg = () => ({
+export const getSavedWorkflowPickerSharedQueryArg = (query = '') => ({
   ...baseSavedWorkflowPickerQueryArg,
+  query,
   categories: ['user'] as ('user' | 'default')[],
   is_public: true,
 });

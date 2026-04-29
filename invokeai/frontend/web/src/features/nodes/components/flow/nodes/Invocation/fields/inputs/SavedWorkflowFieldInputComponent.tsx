@@ -5,7 +5,7 @@ import { useAppDispatch } from 'app/store/storeHooks';
 import { fieldStringValueChanged } from 'features/nodes/store/nodesSlice';
 import { NO_DRAG_CLASS, NO_WHEEL_CLASS } from 'features/nodes/types/constants';
 import type { SavedWorkflowFieldInputInstance, SavedWorkflowFieldInputTemplate } from 'features/nodes/types/field';
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetWorkflowQuery, useListWorkflowsInfiniteInfiniteQuery } from 'services/api/endpoints/workflows';
 
@@ -23,13 +23,6 @@ import {
 } from './savedWorkflowFieldUtils';
 import type { FieldComponentProps } from './types';
 
-const ownedQueryArg = getSavedWorkflowPickerOwnedQueryArg() satisfies Parameters<
-  typeof useListWorkflowsInfiniteInfiniteQuery
->[0];
-const sharedQueryArg = getSavedWorkflowPickerSharedQueryArg() satisfies Parameters<
-  typeof useListWorkflowsInfiniteInfiniteQuery
->[0];
-
 const queryOptions = {
   selectFromResult: ({ data, ...rest }) => ({
     items: data?.pages.flatMap(({ items }) => items) ?? EMPTY_ARRAY,
@@ -43,6 +36,22 @@ const SavedWorkflowFieldInputComponent = (
   const { nodeId, field } = props;
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const [workflowSearchQuery, setWorkflowSearchQuery] = useState('');
+  const deferredWorkflowSearchQuery = useDeferredValue(workflowSearchQuery);
+  const ownedQueryArg = useMemo(
+    () =>
+      getSavedWorkflowPickerOwnedQueryArg(deferredWorkflowSearchQuery) satisfies Parameters<
+        typeof useListWorkflowsInfiniteInfiniteQuery
+      >[0],
+    [deferredWorkflowSearchQuery]
+  );
+  const sharedQueryArg = useMemo(
+    () =>
+      getSavedWorkflowPickerSharedQueryArg(deferredWorkflowSearchQuery) satisfies Parameters<
+        typeof useListWorkflowsInfiniteInfiniteQuery
+      >[0],
+    [deferredWorkflowSearchQuery]
+  );
   const {
     items: ownedItems,
     isLoading: isOwnedLoading,
@@ -111,6 +120,10 @@ const SavedWorkflowFieldInputComponent = (
       fetchNextSharedPage();
     }
   }, [fetchNextOwnedPage, fetchNextSharedPage, hasNextOwnedPage, hasNextSharedPage, isOwnedFetching, isSharedFetching]);
+  const onInputChange = useCallback((inputValue: string) => {
+    setWorkflowSearchQuery(inputValue);
+    return inputValue;
+  }, []);
 
   const noOptionsMessage = useCallback(() => t('nodes.noMatchingWorkflows'), [t]);
   const isLoading = isOwnedLoading || isSharedLoading;
@@ -123,6 +136,7 @@ const SavedWorkflowFieldInputComponent = (
         value={value}
         options={options}
         onChange={onChange}
+        onInputChange={onInputChange}
         onMenuScrollToBottom={onMenuScrollToBottom}
         placeholder={isLoading ? t('common.loading') : t('controlLayers.workflowIntegration.selectPlaceholder')}
         noOptionsMessage={noOptionsMessage}

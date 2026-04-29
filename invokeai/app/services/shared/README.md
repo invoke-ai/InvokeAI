@@ -64,8 +64,12 @@ Runs a sequence of checks:
      `saved_workflow_input::{childNodeId}::{childFieldName}` as part of its temporary call-boundary contract.
    - Those handles are allowed through graph validation even though they are not static Python model fields on the
      invocation class.
-   - Runtime later validates them against the selected child workflow's exposed callable interface before applying
-     values to the child graph.
+  - Runtime later validates them against the selected child workflow's exposed callable interface before applying
+    values to the child graph.
+  - The editor preserves dynamic caller values only while the exposed field type remains compatible; type drift at the
+    same child node/field path resets to the selected workflow's current initial value.
+  - Saved-workflow picker search is server-backed so large workflow libraries do not require scrolling every page before
+    selecting a workflow by name.
 
 1. **Iterator / collector structure** Enforce special rules:
 

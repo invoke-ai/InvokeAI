@@ -103,6 +103,9 @@ Implemented runtime scaffolding:
   - literal dynamic values are serialized into a hidden `workflow_inputs` payload on the parent node at graph-build time
   - stale hidden `workflow_inputs` values from recalled graphs are ignored unless a matching current dynamic field
     exists
+  - existing dynamic input values are preserved across refresh only while the exposed field type remains compatible; if
+    the selected child workflow changes the exposed field type at the same node/field path, the caller input resets to
+    the child workflow's current initial value
   - connected dynamic values are accepted as special call-boundary edges and are resolved from parent results at runtime
   - both are validated against the child workflow's exposed form interface before being applied to the child graph
 - Queue lifecycle semantics now exist for workflow-call chains:
@@ -218,6 +221,9 @@ graph but are not exposed by the form are not part of the public call interface.
 ### 2. Input Arguments
 
 `CallSavedWorkflowInvocation` exposes dynamic inputs in the editor based on the selected workflow's callable interface.
+
+The saved-workflow picker sends typed search text to the workflow-list endpoint. This keeps large workflow libraries
+discoverable even when the desired workflow has not already been loaded into the combobox pages.
 
 Each dynamic input must have:
 
