@@ -165,6 +165,45 @@ describe('buildNodesGraph', () => {
     });
   });
 
+  it('does not serialize stale hidden saved workflow input values without matching dynamic fields', () => {
+    const state = nodesSliceConfig.getInitialState();
+    const node = buildNode(callSavedWorkflowTemplate);
+    node.data.inputs.workflow_inputs = {
+      name: 'workflow_inputs',
+      type: 'workflow_inputs',
+      value: {
+        ['saved_workflow_input::old-node::a']: 23,
+      },
+    } as never;
+    state.nodes.push(node);
+    const templatesWithWorkflowInputs = {
+      ...templates,
+      call_saved_workflow: {
+        ...callSavedWorkflowTemplate,
+        inputs: {
+          ...callSavedWorkflowTemplate.inputs,
+          workflow_inputs: buildDynamicIntegerTemplate('workflow_inputs'),
+        },
+      },
+    };
+
+    const rootState = {
+      nodes: {
+        past: [],
+        future: [],
+        present: state,
+      },
+      gallery: {
+        autoAddBoardId: 'none',
+      },
+    } as never;
+
+    const graph = buildNodesGraph(rootState, templatesWithWorkflowInputs);
+
+    expect(graph.nodes[node.id].workflow_id).toBe('');
+    expect(graph.nodes[node.id].workflow_inputs).toEqual({});
+  });
+
   it('flattens a single connector to one direct execution edge', () => {
     const source = buildNode(add);
     const target = buildNode(sub);

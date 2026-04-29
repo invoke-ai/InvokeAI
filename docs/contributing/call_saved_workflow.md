@@ -100,7 +100,8 @@ Implemented runtime scaffolding:
 - Parent queue items now enter a real `waiting` status while suspended on a child workflow execution.
 - `_on_after_run_session()` no longer completes queue items whose sessions are incomplete but waiting.
 - Dynamic call arguments now execute end-to-end in the current runner path:
-  - literal dynamic values are serialized into a hidden `workflow_inputs` payload on the parent node
+  - literal dynamic values are serialized into a hidden `workflow_inputs` payload on the parent node at graph-build time
+  - stale hidden `workflow_inputs` values from recalled graphs are ignored unless a matching current dynamic field exists
   - connected dynamic values are accepted as special call-boundary edges and are resolved from parent results at runtime
   - both are validated against the child workflow's exposed form interface before being applied to the child graph
 - Queue lifecycle semantics now exist for workflow-call chains:

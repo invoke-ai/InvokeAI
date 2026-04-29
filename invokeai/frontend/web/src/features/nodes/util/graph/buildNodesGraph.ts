@@ -65,6 +65,10 @@ export const buildNodesGraph = (state: RootState, templates: Templates): Require
     const transformedInputs = reduce(
       inputs,
       (inputsAccumulator, input, name) => {
+        if (type === 'call_saved_workflow' && name === 'workflow_inputs') {
+          return inputsAccumulator;
+        }
+
         if (type === 'call_saved_workflow' && name.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)) {
           const workflowInputs = {
             ...((inputsAccumulator['workflow_inputs'] as Record<string, unknown> | undefined) ?? {}),
@@ -89,6 +93,10 @@ export const buildNodesGraph = (state: RootState, templates: Templates): Require
       },
       {} as Record<Exclude<string, 'id' | 'type'>, unknown>
     );
+
+    if (type === 'call_saved_workflow' && transformedInputs['workflow_inputs'] === undefined) {
+      transformedInputs['workflow_inputs'] = {};
+    }
 
     // add reserved use_cache
     transformedInputs['use_cache'] = node.data.useCache;
