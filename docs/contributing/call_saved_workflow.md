@@ -457,6 +457,16 @@ Python validation/runtime code.
 
 Do not infer child outputs from arbitrary terminal nodes. That is too ambiguous and too brittle.
 
+Current limitation:
+
+- returned values are anonymous collection items, not named return fields
+- the caller can consume the returned collection directly or pass it through built-in collection flow nodes such as
+  `iterate`
+- there is not currently a first-class key/value return contract where the called workflow returns named members and the
+  caller extracts a value by name
+- adding that would require a new explicit return interface and companion caller-side extraction nodes, rather than
+  relying on collection item ordering as an implicit API
+
 ### 6. Error Propagation
 
 If child execution fails:
