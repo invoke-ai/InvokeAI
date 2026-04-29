@@ -2,8 +2,7 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import type { AppStore } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
-import { forEach, isNil, round } from 'es-toolkit/compat';
+import { isNil, round } from 'es-toolkit/compat';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
@@ -28,7 +27,6 @@ import { getControlLayerState, getReferenceImageState } from 'features/controlLa
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
 import { fieldValueReset } from 'features/nodes/store/nodesSlice';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
-import { zNodeStatus } from 'features/nodes/types/invocation';
 import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast, toastApi } from 'features/toast/toast';
@@ -45,6 +43,7 @@ import {
   shouldIgnoreFinishedQueueItemInvocationEvent,
 } from 'services/events/invocationTracking';
 import {
+  getResetNodeExecutionStatesOnQueueItemStarted,
   getUpdatedNodeExecutionStateOnInvocationError,
   getUpdatedNodeExecutionStateOnInvocationProgress,
   getUpdatedNodeExecutionStateOnInvocationStarted,
@@ -512,18 +511,14 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
 
     if (status === 'in_progress') {
-      forEach($nodeExecutionStates.get(), (nes) => {
-        if (!nes) {
-          return;
-        }
-        const clone = deepClone(nes);
-        clone.status = zNodeStatus.enum.PENDING;
-        clone.error = null;
-        clone.progress = null;
-        clone.progressImage = null;
-        clone.outputs = [];
-        $nodeExecutionStates.setKey(clone.nodeId, clone);
-      });
+      const nextNodeExecutionStates = getResetNodeExecutionStatesOnQueueItemStarted(
+        $nodeExecutionStates.get(),
+        item_id,
+        completedInvocationKeysByItemId
+      );
+      if (nextNodeExecutionStates) {
+        $nodeExecutionStates.set(nextNodeExecutionStates);
+      }
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       finishedQueueItemIds.set(item_id, true);
       clearCompletedInvocationKeysForQueueItem(completedInvocationKeysByItemId, item_id);

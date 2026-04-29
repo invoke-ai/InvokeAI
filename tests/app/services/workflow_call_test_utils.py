@@ -1692,6 +1692,53 @@ def test_run_completes_call_saved_workflow_and_runs_downstream_nodes(
     assert session_queue.resumed_item_ids == [1]
 
 
+def test_run_completes_parent_queue_item_when_return_get_is_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_queue = _DummySessionQueue()
+    runner, events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    processor = DefaultSessionProcessor(session_runner=runner)
+
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    graph.add_node(WorkflowReturnGetInvocation(id="get-return", key="result"))
+    graph.add_edge(create_edge("call-node", "values", "get-return", "values"))
+
+    session = GraphExecutionState(graph=graph)
+    queue_item = type(
+        "QueueItem",
+        (),
+        {
+            "item_id": 1,
+            "status": "in_progress",
+            "session": session,
+            "session_id": "session-id",
+            "user_id": "user-1",
+            "queue_id": "default",
+            "batch_id": "batch-1",
+        },
+    )()
+
+    _drain_workflow_call_queue(processor.session_runner.workflow_call_queue_lifecycle, session_queue, queue_item)
+
+    assert not session.is_waiting_on_workflow_call()
+    assert session.is_complete()
+    assert session_queue.get_queue_item(1).status == "completed"
+    assert session_queue.completed_item_ids == [100, 1]
+    assert session_queue.waiting_item_ids == [1]
+    assert session_queue.resumed_item_ids == [1]
+    assert [invocation.get_type() for _queue_item, invocation in events.started] == [
+        "call_saved_workflow",
+        "add",
+        "integer_collection",
+        "workflow_return_value",
+        "collect",
+        "workflow_return",
+        "workflow_return_get",
+    ]
+    assert events.errors == []
+
+
 def test_run_node_records_child_execution_state_for_call_saved_workflow(monkeypatch: pytest.MonkeyPatch) -> None:
     runner, events, _workflow_records = _build_workflow_runner(monkeypatch)
 

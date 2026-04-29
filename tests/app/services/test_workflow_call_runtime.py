@@ -59,6 +59,10 @@ def test_run_completes_call_saved_workflow_and_runs_downstream_nodes(monkeypatch
     workflow_call_tests.test_run_completes_call_saved_workflow_and_runs_downstream_nodes(monkeypatch)
 
 
+def test_run_completes_parent_queue_item_when_return_get_is_terminal(monkeypatch) -> None:
+    workflow_call_tests.test_run_completes_parent_queue_item_when_return_get_is_terminal(monkeypatch)
+
+
 def test_run_node_records_child_execution_state_for_call_saved_workflow(monkeypatch) -> None:
     workflow_call_tests.test_run_node_records_child_execution_state_for_call_saved_workflow(monkeypatch)
 
