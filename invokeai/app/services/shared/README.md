@@ -68,8 +68,8 @@ Runs a sequence of checks:
      values to the child graph.
    - The editor preserves dynamic caller values only while the exposed field type remains compatible; type drift at the
      same child node/field path resets to the selected workflow's current initial value.
-   - Saved-workflow picker search is server-backed so large workflow libraries do not require scrolling every page before
-     selecting a workflow by name.
+   - Saved-workflow picker search is server-backed so large workflow libraries do not require scrolling every page
+     before selecting a workflow by name.
 
 1. **Iterator / collector structure** Enforce special rules:
 
