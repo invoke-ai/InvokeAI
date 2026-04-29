@@ -1,6 +1,6 @@
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
-export type WorkflowCallCompatibilityState =
+type WorkflowCallCompatibilityState =
   | {
       isUnsupported: false;
       message: null;

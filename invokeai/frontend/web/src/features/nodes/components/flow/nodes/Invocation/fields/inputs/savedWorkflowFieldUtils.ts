@@ -3,8 +3,8 @@ import { getWorkflowCallCompatibilityState } from 'features/workflowLibrary/util
 import type { S, WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 export const MISSING_WORKFLOW_OPTION_VALUE = '__missing_workflow__';
-export const SAVED_WORKFLOW_PICKER_PAGE_SIZE = 50;
-export type SavedWorkflowBadge = 'unsupported' | 'default' | 'shared';
+const SAVED_WORKFLOW_PICKER_PAGE_SIZE = 50;
+type SavedWorkflowBadge = 'unsupported' | 'default' | 'shared';
 
 type SavedWorkflowSelectionState =
   | { status: 'unselected' }
@@ -120,7 +120,7 @@ export const getSavedWorkflowSelectionOption = (selectionState: SavedWorkflowSel
   };
 };
 
-export type SavedWorkflowDisplayState =
+type SavedWorkflowDisplayState =
   | {
       selection: 'unselected' | 'missing';
       statusLabelKey: 'nodes.savedWorkflowChoose' | 'nodes.savedWorkflowMissing';

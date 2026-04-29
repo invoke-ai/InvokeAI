@@ -1,7 +1,7 @@
 import { getWorkflowCallCompatibilityState } from 'features/workflowLibrary/util/workflowCallCompatibility';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
-export type WorkflowLibraryListItemState = {
+type WorkflowLibraryListItemState = {
   showUnsupportedBadge: boolean;
   unsupportedMessage: string | null;
   showSharedBadge: boolean;
