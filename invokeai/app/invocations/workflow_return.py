@@ -82,7 +82,7 @@ class WorkflowReturnValueInvocation(BaseInvocation):
 class WorkflowReturnInvocation(BaseInvocation):
     """Defines the explicit named result returned by a callable workflow."""
 
-    values: list[WorkflowReturnValueField] = InputField(
+    values: WorkflowReturnValueField | list[WorkflowReturnValueField] = InputField(
         default=[],
         description="The named values returned to a calling workflow.",
         title="Values",
@@ -91,7 +91,8 @@ class WorkflowReturnInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> WorkflowReturnOutput:
         named_values: dict[str, Any] = {}
-        for value in self.values:
+        return_values = self.values if isinstance(self.values, list) else [self.values]
+        for value in return_values:
             key = value.key.strip()
             if not key:
                 raise ValueError("Workflow return key must not be empty.")

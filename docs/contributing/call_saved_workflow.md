@@ -37,7 +37,8 @@ Implemented already in the branch:
 - A real invocation exists: `call_saved_workflow`.
 - A real return node exists: `workflow_return`.
 - Named returns exist through `workflow_return_value`, `workflow_return`, and caller-side `workflow_return_get`.
-- `workflow_return` accepts collected key/value return members and emits a named `values: dict[str, Any]` map.
+- `workflow_return` accepts one key/value return member directly or a collected list of return members, then emits a
+  named `values: dict[str, Any]` map.
 - Only one `workflow_return` node is allowed per workflow, enforced in both frontend validation and Python validation.
 - The frontend provides a saved-workflow picker using a reusable `SavedWorkflowField` UI type.
 - The node redraws dynamically based on the selected saved workflow's exposed form fields.
@@ -467,7 +468,8 @@ Do not infer child outputs from arbitrary terminal nodes. That is too ambiguous 
 Named return contract:
 
 - the called workflow builds return members with a dedicated key/value node
-- `workflow_return` accepts a collection of those return members
+- `workflow_return` accepts one return member directly, or a collected list of return members when the workflow returns
+  multiple named values
 - non-batch execution rejects duplicate return keys
 - if a non-batch workflow needs to return multiple images under one key, the child workflow should collect those images
   into one list value and return that list under the key
@@ -596,7 +598,8 @@ frontend state.
 The intended runtime flow is:
 
 1. The child workflow computes named return members like ordinary node outputs.
-1. The child workflow collects those members into the `workflow_return` node.
+1. The child workflow connects one return member directly to `workflow_return.values`, or collects multiple return
+   members and connects that list to `workflow_return.values`.
 1. When the child reaches `workflow_return`, runtime captures the resolved named return map as the child workflow
    result.
 1. The child workflow result is stored in child execution state.
@@ -621,7 +624,7 @@ Contract:
 
 - `WorkflowReturnValueField` stores one `key: str` and one `value: Any`
 - `workflow_return_value` creates a single `WorkflowReturnValueField` from a key and connected value
-- `workflow_return` accepts a collection of `WorkflowReturnValueField` members
+- `workflow_return` accepts either one `WorkflowReturnValueField` member or a list of `WorkflowReturnValueField` members
 - `WorkflowReturnOutput` exposes `values: dict[str, Any]`
 - duplicate keys in one non-batch `workflow_return` execution are invalid and must fail clearly
 
@@ -717,6 +720,7 @@ Contract:
 Tests first:
 
 - frontend connection/type tests cover return-value collection wiring
+- frontend connection/type tests cover wiring one `workflow_return_value.value` directly to `workflow_return.values`
 - frontend connection/type tests cover `call_saved_workflow.values -> workflow_return_get.values`
 - docs describe how a called workflow creates named returns and how a caller extracts them
 

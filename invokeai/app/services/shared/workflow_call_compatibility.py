@@ -194,8 +194,10 @@ def get_workflow_call_compatibility(
         reason = WorkflowCallCompatibilityReason.UnsupportedNode
         if _is_unsupported_batch_input_message(message):
             reason = WorkflowCallCompatibilityReason.UnsupportedBatchInput
-        elif "exactly one workflow_return" in message:
+        elif "exactly one workflow_return" in message and workflow_return_count == 0:
             reason = WorkflowCallCompatibilityReason.MissingWorkflowReturn
+        elif "exactly one workflow_return" in message:
+            reason = WorkflowCallCompatibilityReason.InvalidGraph
         return WorkflowCallCompatibility(
             is_callable=False,
             reason=reason,

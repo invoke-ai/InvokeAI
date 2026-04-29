@@ -301,6 +301,8 @@ Current limitation:
   handled by a dedicated workflow-call queue lifecycle component for this PR because no other feature currently needs a
   generalized dependent-queue scheduler.
 - Called workflows currently require exactly one valid `workflow_return` node to be callable at all.
+- A single `workflow_return_value.value` may connect directly to `workflow_return.values`; multiple named return members
+  should be collected and then connected to `workflow_return.values`.
 - Direct batch-special child workflows are now supported by expanding them into multiple child queue rows.
 - Batch outputs may feed a named `workflow_return_value.value` directly. Parent resume aggregates named return maps as
   `values: dict[str, list[Any]]`, and all rows in one batch call must return the same key set.

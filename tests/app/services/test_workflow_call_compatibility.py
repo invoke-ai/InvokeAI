@@ -140,6 +140,48 @@ def test_get_workflow_call_compatibility_returns_ok_for_simple_callable_workflow
     assert compatibility.message is None
 
 
+def test_get_workflow_call_compatibility_allows_single_return_value_connected_directly() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node("sum", "add", {"a": {"value": 1}, "b": {"value": 2}}),
+            _invocation_node(
+                "return-value", "workflow_return_value", {"key": {"value": "sum"}, "value": {"value": None}}
+            ),
+            _invocation_node("return", "workflow_return", {"values": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-sum-return-value",
+                "type": "default",
+                "source": "sum",
+                "sourceHandle": "value",
+                "target": "return-value",
+                "targetHandle": "value",
+            },
+            {
+                "id": "edge-return-value-return",
+                "type": "default",
+                "source": "return-value",
+                "sourceHandle": "value",
+                "target": "return",
+                "targetHandle": "values",
+            },
+        ],
+    )
+
+    compatibility = get_workflow_call_compatibility(
+        workflow=workflow,
+        workflow_id="workflow-a",
+        services=_services(),
+        user_id="user-1",
+        maximum_children=1000,
+    )
+
+    assert compatibility.is_callable is True
+    assert compatibility.reason is WorkflowCallCompatibilityReason.Ok
+    assert compatibility.message is None
+
+
 def test_get_workflow_call_compatibility_reports_missing_workflow_return() -> None:
     workflow = _workflow_dump(nodes=[_invocation_node("add", "add", {"a": {"value": 1}, "b": {"value": 2}})], edges=[])
 
@@ -176,6 +218,43 @@ def test_get_workflow_call_compatibility_reports_multiple_workflow_return_nodes(
     assert compatibility.is_callable is False
     assert compatibility.reason is WorkflowCallCompatibilityReason.MultipleWorkflowReturn
     assert compatibility.message == "The workflow must not contain more than one workflow_return node."
+
+
+def test_get_workflow_call_compatibility_does_not_report_present_malformed_workflow_return_as_missing() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            {
+                "id": "return",
+                "type": "invocation",
+                "position": {"x": 0, "y": 0},
+                "data": {
+                    "type": "workflow_return",
+                    "version": "1.0.0",
+                    "nodePack": "invokeai",
+                    "label": "",
+                    "notes": "",
+                    "isOpen": True,
+                    "isIntermediate": False,
+                    "useCache": True,
+                    "dynamicInputTemplates": {},
+                    "inputs": {"values": {"value": []}},
+                },
+            }
+        ],
+        edges=[],
+    )
+
+    compatibility = get_workflow_call_compatibility(
+        workflow=workflow,
+        workflow_id="workflow-a",
+        services=_services(),
+        user_id="user-1",
+        maximum_children=1000,
+    )
+
+    assert compatibility.is_callable is False
+    assert compatibility.reason is WorkflowCallCompatibilityReason.InvalidGraph
+    assert compatibility.message != "The workflow must contain exactly one workflow_return node."
 
 
 def test_get_workflow_call_compatibility_reports_unsupported_connected_batch_input() -> None:

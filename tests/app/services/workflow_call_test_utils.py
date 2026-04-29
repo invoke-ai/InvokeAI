@@ -1449,6 +1449,20 @@ def test_workflow_call_queue_lifecycle_leaves_non_call_workflows_on_normal_execu
     assert events.errors == []
 
 
+def test_default_session_processor_uses_runner_workflow_call_lifecycle(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_queue = _DummySessionQueue()
+    runner, _events, _workflow_records = _build_workflow_runner(monkeypatch, session_queue=session_queue)
+    processor = DefaultSessionProcessor(session_runner=runner)
+
+    queue_item = SimpleNamespace(item_id=1, session_id="session-id")
+    calls: list[object] = []
+    runner.workflow_call_queue_lifecycle.run_queue_item = calls.append
+
+    processor.workflow_call_queue_lifecycle.run_queue_item(queue_item)
+
+    assert calls == [queue_item]
+
+
 def test_workflow_call_queue_lifecycle_resumes_parent_from_completed_child(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

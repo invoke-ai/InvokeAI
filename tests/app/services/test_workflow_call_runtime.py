@@ -19,6 +19,10 @@ def test_workflow_call_queue_lifecycle_leaves_non_call_workflows_on_normal_execu
     )
 
 
+def test_default_session_processor_uses_runner_workflow_call_lifecycle(monkeypatch) -> None:
+    workflow_call_tests.test_default_session_processor_uses_runner_workflow_call_lifecycle(monkeypatch)
+
+
 def test_workflow_call_queue_lifecycle_resumes_parent_from_completed_child(monkeypatch) -> None:
     workflow_call_tests.test_workflow_call_queue_lifecycle_resumes_parent_from_completed_child(monkeypatch)
 

@@ -329,6 +329,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
         super().__init__()
 
         self.session_runner = session_runner if session_runner else DefaultSessionRunner()
+        self.workflow_call_queue_lifecycle = self.session_runner.workflow_call_queue_lifecycle
         self._on_non_fatal_processor_error_callbacks = on_non_fatal_processor_error_callbacks or []
         self._thread_limit = thread_limit
         self._polling_interval = polling_interval

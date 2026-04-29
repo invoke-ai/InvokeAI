@@ -31698,7 +31698,7 @@ export type components = {
              * @description The named values returned to a calling workflow.
              * @default []
              */
-            values?: components["schemas"]["WorkflowReturnValueField"][];
+            values?: components["schemas"]["WorkflowReturnValueField"] | components["schemas"]["WorkflowReturnValueField"][];
             /**
              * type
              * @default workflow_return

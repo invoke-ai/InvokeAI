@@ -271,6 +271,16 @@ def test_workflow_return_invocation_contract():
     assert not hasattr(output, "collection")
 
 
+def test_workflow_return_invocation_accepts_single_return_value():
+    from invokeai.app.invocations.workflow_return import WorkflowReturnInvocation, WorkflowReturnValueField
+
+    invocation = WorkflowReturnInvocation(id="return-node", values=WorkflowReturnValueField(key="sum", value=3))
+
+    output = invocation.invoke(build_context())
+
+    assert output.values == {"sum": 3}
+
+
 def test_workflow_return_value_invocation_contract():
     from invokeai.app.invocations.workflow_return import WorkflowReturnValueField, WorkflowReturnValueInvocation
 
