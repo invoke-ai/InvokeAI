@@ -10,7 +10,7 @@ These tests verify the security fixes for:
 
 import logging
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import status
@@ -1323,6 +1323,7 @@ class TestQueueStatusScoping:
             batch_id=None,
             pending=2,
             in_progress=0,
+            waiting=0,
             completed=1,
             failed=0,
             canceled=0,
@@ -1594,6 +1595,7 @@ class TestWebSocketAuth:
         from invokeai.app.services.users.users_common import UserCreateRequest
 
         mock_invoker.services.configuration.multiuser = True
+        socketio._sio.enter_room = AsyncMock()
 
         # Create the user in the database so the active-user check passes
         user = mock_invoker.services.users.create(
@@ -1739,6 +1741,7 @@ class TestWebSocketAuth:
                 destination="canvas",
                 pending=0,
                 in_progress=1,
+                waiting=0,
                 completed=0,
                 failed=0,
                 canceled=0,
@@ -1751,6 +1754,7 @@ class TestWebSocketAuth:
                 batch_id="batch-private",
                 pending=0,
                 in_progress=1,
+                waiting=0,
                 completed=0,
                 failed=0,
                 canceled=0,
@@ -1801,6 +1805,83 @@ class TestWebSocketAuth:
         assert "user:owner-zzz" in rooms_emitted_to
         assert "admin" in rooms_emitted_to
         assert "default" not in rooms_emitted_to
+
+    def test_queue_items_retried_event_carries_user_ids(self) -> None:
+        """QueueItemsRetriedEvent must carry owner identity so retry notifications are
+        routed privately instead of broadcast to all queue subscribers."""
+        from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
+        from invokeai.app.services.session_queue.session_queue_common import RetryItemsResult
+
+        retry_result = RetryItemsResult(queue_id="default", retried_item_ids=[10])
+        event = QueueItemsRetriedEvent.build(
+            retry_result, user_ids=["owner-123"], retried_item_ids_by_user={"owner-123": [10]}
+        )
+
+        assert event.user_ids == ["owner-123"]
+        assert event.retried_item_ids == [10]
+        assert event.retried_item_ids_by_user == {"owner-123": [10]}
+        assert event.queue_id == "default"
+
+    def test_queue_items_retried_routed_privately(self, socketio: Any) -> None:
+        """Verify that queue_items_retried is emitted only to owner/admin rooms."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
+        from invokeai.app.services.session_queue.session_queue_common import RetryItemsResult
+
+        event = QueueItemsRetriedEvent.build(
+            RetryItemsResult(queue_id="default", retried_item_ids=[10]),
+            user_ids=["owner-123", "owner-456"],
+            retried_item_ids_by_user={"owner-123": [10], "owner-456": []},
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_retried", event)))
+
+        rooms_emitted_to = [call.kwargs.get("room") for call in mock_emit.call_args_list]
+        assert "user:owner-123" in rooms_emitted_to
+        assert "user:owner-456" in rooms_emitted_to
+        assert "admin" in rooms_emitted_to
+        assert "default" not in rooms_emitted_to
+
+    def test_queue_items_retried_payload_is_filtered_per_owner_room(self, socketio: Any) -> None:
+        """Each owner room should only receive retry payload for that owner."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
+        from invokeai.app.services.session_queue.session_queue_common import RetryItemsResult
+
+        event = QueueItemsRetriedEvent.build(
+            RetryItemsResult(queue_id="default", retried_item_ids=[10, 20]),
+            user_ids=["owner-123", "owner-456"],
+            retried_item_ids_by_user={"owner-123": [10], "owner-456": [20]},
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("queue_items_retried", event)))
+
+        owner_123_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "user:owner-123"]
+        owner_456_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "user:owner-456"]
+        admin_calls = [call for call in mock_emit.call_args_list if call.kwargs.get("room") == "admin"]
+
+        assert len(owner_123_calls) == 1
+        assert len(owner_456_calls) == 1
+        assert len(admin_calls) == 1
+        assert owner_123_calls[0].kwargs["data"]["retried_item_ids"] == [10]
+        assert owner_123_calls[0].kwargs["data"]["user_ids"] == ["owner-123"]
+        assert owner_123_calls[0].kwargs["data"]["retried_item_ids_by_user"] == {"owner-123": [10]}
+        assert owner_456_calls[0].kwargs["data"]["retried_item_ids"] == [20]
+        assert owner_456_calls[0].kwargs["data"]["user_ids"] == ["owner-456"]
+        assert owner_456_calls[0].kwargs["data"]["retried_item_ids_by_user"] == {"owner-456": [20]}
+        assert admin_calls[0].kwargs["data"]["retried_item_ids"] == [10, 20]
+        assert admin_calls[0].kwargs["data"]["user_ids"] == ["owner-123", "owner-456"]
+        assert admin_calls[0].kwargs["data"]["retried_item_ids_by_user"] == {"owner-123": [10], "owner-456": [20]}
 
     def test_queue_cleared_still_broadcast(self, socketio: Any) -> None:
         """QueueClearedEvent does not carry user identity and should still be broadcast

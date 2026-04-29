@@ -16,6 +16,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     IsEmptyResult,
     IsFullResult,
     ItemIdsResult,
+    NodeFieldValue,
     PruneResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -95,6 +96,16 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def suspend_queue_item(self, item_id: int) -> SessionQueueItem:
+        """Suspends a session queue item while waiting on a child workflow execution."""
+        pass
+
+    @abstractmethod
+    def resume_queue_item(self, item_id: int) -> SessionQueueItem:
+        """Resumes a suspended session queue item by returning it to pending state."""
+        pass
+
+    @abstractmethod
     def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
         """Cancels a session queue item"""
         pass
@@ -102,6 +113,11 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def delete_queue_item(self, item_id: int) -> None:
         """Deletes a session queue item"""
+        pass
+
+    @abstractmethod
+    def delete_queue_items_by_id(self, item_ids: list[int]) -> None:
+        """Deletes session queue items by ID."""
         pass
 
     @abstractmethod
@@ -187,6 +203,23 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
         """Sets the session for a session queue item. Use this to update the session state."""
+        pass
+
+    @abstractmethod
+    def enqueue_workflow_call_child(
+        self,
+        parent_queue_item: SessionQueueItem,
+        child_session: GraphExecutionState,
+        field_values: list[NodeFieldValue] | None = None,
+    ) -> SessionQueueItem:
+        """Enqueues a child workflow execution linked to a suspended parent queue item."""
+        pass
+
+    @abstractmethod
+    def cancel_workflow_call_children(
+        self, workflow_call_id: str, exclude_item_ids: set[int] | None = None
+    ) -> list[int]:
+        """Cancels child workflow queue items for a workflow call without canceling the waiting parent chain."""
         pass
 
     @abstractmethod

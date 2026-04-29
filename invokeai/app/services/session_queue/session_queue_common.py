@@ -51,7 +51,8 @@ class SessionQueueItemNotFoundError(ValueError):
 
 # region Batch
 
-BatchDataType = Union[StrictStr, float, int, ImageField]
+BatchScalarDataType = Union[StrictStr, float, int, ImageField]
+BatchDataType = Union[BatchScalarDataType, list[BatchScalarDataType]]
 
 
 class NodeFieldValue(BaseModel):
@@ -172,7 +173,7 @@ class Batch(BaseModel):
 DEFAULT_QUEUE_ID = "default"
 SYSTEM_USER_ID = "system"  # Default user_id for system-generated queue items
 
-QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "completed", "failed", "canceled"]
+QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "waiting", "completed", "failed", "canceled"]
 
 
 class ItemIdsResult(BaseModel):
@@ -262,6 +263,21 @@ class SessionQueueItem(BaseModel):
     retried_from_item_id: Optional[int] = Field(
         default=None, description="The item_id of the queue item that this item was retried from"
     )
+    workflow_call_id: Optional[str] = Field(
+        default=None, description="The active workflow-call relationship id when this queue item is a child execution."
+    )
+    parent_item_id: Optional[int] = Field(
+        default=None, description="The parent queue item id when this queue item is a child workflow execution."
+    )
+    parent_session_id: Optional[str] = Field(
+        default=None, description="The parent session id when this queue item is a child workflow execution."
+    )
+    root_item_id: Optional[int] = Field(
+        default=None, description="The root queue item id for this workflow call chain, if any."
+    )
+    workflow_call_depth: Optional[int] = Field(
+        default=None, description="The 1-based workflow-call depth for this queue item when it is a child execution."
+    )
     session: GraphExecutionState = Field(description="The fully-populated session to be executed")
     workflow: Optional[WorkflowWithoutID] = Field(
         default=None, description="The workflow associated with this queue item"
@@ -305,6 +321,7 @@ class SessionQueueStatus(BaseModel):
     session_id: Optional[str] = Field(description="The current queue item's session id")
     pending: int = Field(..., description="Number of queue items with status 'pending'")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress'")
+    waiting: int = Field(..., description="Number of queue items with status 'waiting'")
     completed: int = Field(..., description="Number of queue items with status 'complete'")
     failed: int = Field(..., description="Number of queue items with status 'error'")
     canceled: int = Field(..., description="Number of queue items with status 'canceled'")
@@ -316,6 +333,7 @@ class SessionQueueCountsByDestination(BaseModel):
     destination: str = Field(..., description="The destination of queue items included in this status")
     pending: int = Field(..., description="Number of queue items with status 'pending' for the destination")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress' for the destination")
+    waiting: int = Field(..., description="Number of queue items with status 'waiting' for the destination")
     completed: int = Field(..., description="Number of queue items with status 'complete' for the destination")
     failed: int = Field(..., description="Number of queue items with status 'error' for the destination")
     canceled: int = Field(..., description="Number of queue items with status 'canceled' for the destination")
@@ -329,6 +347,7 @@ class BatchStatus(BaseModel):
     destination: str | None = Field(..., description="The destination of the batch")
     pending: int = Field(..., description="Number of queue items with status 'pending'")
     in_progress: int = Field(..., description="Number of queue items with status 'in_progress'")
+    waiting: int = Field(..., description="Number of queue items with status 'waiting'")
     completed: int = Field(..., description="Number of queue items with status 'complete'")
     failed: int = Field(..., description="Number of queue items with status 'error'")
     canceled: int = Field(..., description="Number of queue items with status 'canceled'")

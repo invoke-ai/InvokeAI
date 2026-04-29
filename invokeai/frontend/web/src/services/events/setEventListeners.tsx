@@ -2,8 +2,7 @@ import { Flex, Text } from '@invoke-ai/ui-library';
 import { logger } from 'app/logging/logger';
 import { socketConnected } from 'app/store/middleware/listenerMiddleware/listeners/socketConnected';
 import type { AppStore } from 'app/store/store';
-import { deepClone } from 'common/util/deepClone';
-import { forEach, isNil, round } from 'es-toolkit/compat';
+import { isNil, round } from 'es-toolkit/compat';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { allEntitiesDeleted, controlLayerRecalled } from 'features/controlLayers/store/canvasSlice';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
@@ -26,7 +25,8 @@ import type {
 } from 'features/controlLayers/store/types';
 import { getControlLayerState, getReferenceImageState } from 'features/controlLayers/store/util';
 import { $nodeExecutionStates, upsertExecutionState } from 'features/nodes/hooks/useNodeExecutionState';
-import { zNodeStatus } from 'features/nodes/types/invocation';
+import { fieldValueReset } from 'features/nodes/store/nodesSlice';
+import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { modelSelected } from 'features/parameters/store/actions';
 import ErrorToastDescription, { getTitle } from 'features/toast/ErrorToastDescription';
 import { toast, toastApi } from 'features/toast/toast';
@@ -43,6 +43,7 @@ import {
   shouldIgnoreFinishedQueueItemInvocationEvent,
 } from 'services/events/invocationTracking';
 import {
+  getResetNodeExecutionStatesOnQueueItemStarted,
   getUpdatedNodeExecutionStateOnInvocationError,
   getUpdatedNodeExecutionStateOnInvocationProgress,
   getUpdatedNodeExecutionStateOnInvocationStarted,
@@ -110,6 +111,52 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     $lastProgressEvent.set(null);
     $loadingModelsCount.set(0);
     setIsConnected(false);
+  });
+
+  const invalidateWorkflowLibrary = () => {
+    dispatch(
+      api.util.invalidateTags([
+        { type: 'Workflow', id: LIST_TAG },
+        'WorkflowTags',
+        'WorkflowTagCounts',
+        'WorkflowCategoryCounts',
+      ])
+    );
+  };
+
+  socket.on('workflow_created', (data) => {
+    log.debug({ data }, 'Workflow created');
+    invalidateWorkflowLibrary();
+  });
+
+  socket.on('workflow_updated', (data) => {
+    log.debug({ data }, 'Workflow updated');
+    invalidateWorkflowLibrary();
+  });
+
+  socket.on('workflow_deleted', (data) => {
+    log.debug({ data }, 'Workflow deleted');
+    invalidateWorkflowLibrary();
+
+    const nodes = selectNodesSlice(getState()).nodes;
+
+    for (const node of nodes) {
+      if (node.type !== 'invocation' || node.data.type !== 'call_saved_workflow') {
+        continue;
+      }
+
+      if (node.data.inputs.workflow_id?.value !== data.workflow_id) {
+        continue;
+      }
+
+      dispatch(
+        fieldValueReset({
+          nodeId: node.id,
+          fieldName: 'workflow_id',
+          value: '',
+        })
+      );
+    }
   });
 
   socket.on('invocation_started', (data) => {
@@ -464,18 +511,14 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
     dispatch(queueApi.util.invalidateTags(tagsToInvalidate));
 
     if (status === 'in_progress') {
-      forEach($nodeExecutionStates.get(), (nes) => {
-        if (!nes) {
-          return;
-        }
-        const clone = deepClone(nes);
-        clone.status = zNodeStatus.enum.PENDING;
-        clone.error = null;
-        clone.progress = null;
-        clone.progressImage = null;
-        clone.outputs = [];
-        $nodeExecutionStates.setKey(clone.nodeId, clone);
-      });
+      const nextNodeExecutionStates = getResetNodeExecutionStatesOnQueueItemStarted(
+        $nodeExecutionStates.get(),
+        item_id,
+        completedInvocationKeysByItemId
+      );
+      if (nextNodeExecutionStates) {
+        $nodeExecutionStates.set(nextNodeExecutionStates);
+      }
     } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
       finishedQueueItemIds.set(item_id, true);
       clearCompletedInvocationKeysForQueueItem(completedInvocationKeysByItemId, item_id);

@@ -40,6 +40,7 @@ export const buildInvocationNode = (position: XYPosition, template: InvocationTe
       useCache: template.useCache,
       nodePack: template.nodePack,
       inputs,
+      dynamicInputTemplates: {},
     },
   };
 

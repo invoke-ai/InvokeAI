@@ -4,6 +4,7 @@ import type { S } from 'services/api/types';
 import { describe, expect, it } from 'vitest';
 
 import {
+  getResetNodeExecutionStatesOnQueueItemStarted,
   getUpdatedNodeExecutionStateOnInvocationComplete,
   getUpdatedNodeExecutionStateOnInvocationError,
   getUpdatedNodeExecutionStateOnInvocationProgress,
@@ -107,6 +108,49 @@ const buildInvocationErrorEvent = (overrides: Partial<S['InvocationErrorEvent']>
     error_traceback: 'traceback',
     ...overrides,
   }) as S['InvocationErrorEvent'];
+
+describe(getResetNodeExecutionStatesOnQueueItemStarted.name, () => {
+  it('resets node execution states when a queue item starts for the first time', () => {
+    const updated = getResetNodeExecutionStatesOnQueueItemStarted(
+      {
+        'node-1': buildNodeExecutionState({
+          status: zNodeStatus.enum.COMPLETED,
+          progress: 1,
+          outputs: [{ type: 'integer_output', value: 3 } as unknown as S['InvocationCompleteEvent']['result']],
+        }),
+      },
+      1,
+      new Map()
+    );
+
+    expect(updated?.['node-1']).toEqual({
+      nodeId: 'node-1',
+      status: zNodeStatus.enum.PENDING,
+      progress: null,
+      progressImage: null,
+      outputs: [],
+      error: null,
+    });
+  });
+
+  it('does not reset node execution states when a workflow-call parent queue item resumes', () => {
+    const workflowReturnOutput = {
+      type: 'workflow_return_output',
+      values: { result: [3] },
+    } as unknown as S['InvocationCompleteEvent']['result'];
+    const existing = {
+      'call-node': buildNodeExecutionState({
+        nodeId: 'call-node',
+        status: zNodeStatus.enum.COMPLETED,
+        outputs: [workflowReturnOutput],
+      }),
+    };
+
+    const updated = getResetNodeExecutionStatesOnQueueItemStarted(existing, 1, new Map([[1, new Set(['call-node'])]]));
+
+    expect(updated).toBeUndefined();
+  });
+});
 
 describe(getUpdatedNodeExecutionStateOnInvocationStarted.name, () => {
   it('creates an execution state when started arrives before initialization', () => {
