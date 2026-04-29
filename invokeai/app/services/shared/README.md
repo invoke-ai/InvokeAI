@@ -310,10 +310,15 @@ Current limitation:
   queue row is created.
 - Workflow library API responses now include compatibility metadata so the frontend can disable unsupported callees
   before execution rather than failing only at runtime.
+- Workflow library list compatibility uses structural generator-backed batch validation so list and picker rendering do
+  not enumerate every image in board-backed generators; workflow detail and runtime execution still resolve real
+  generator values.
 - Batch-specific compatibility failures, including multiple connected inputs to one batch field, are reported as
   `unsupported_batch_input` rather than generic unsupported-node failures.
 - The workflow library list also surfaces that metadata as an informational unsupported state; workflows remain
   viewable/editable even when they are not currently callable by `call_saved_workflow`.
+- Single-user workflow CRUD socket events emit only to the admin room because every single-user socket already joins
+  that room, avoiding duplicate delivery through both `user:system` and `admin`.
 
 ## 8) Error Model (selected)
 

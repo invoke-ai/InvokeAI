@@ -97,6 +97,29 @@ async def test_private_workflow_event_is_emitted_only_to_owner_and_admin() -> No
 
 
 @pytest.mark.anyio
+async def test_single_user_workflow_event_is_emitted_once_to_admin_room(monkeypatch: pytest.MonkeyPatch) -> None:
+    socketio = SocketIO(FastAPI())
+    socketio._sio.emit = AsyncMock()
+    _patch_single_user_context(monkeypatch)
+
+    event_payload = SimpleNamespace(
+        __event_name__="workflow_created",
+        workflow_id="wf-1",
+        user_id="system",
+        is_public=False,
+        model_dump=lambda mode="json": {"workflow_id": "wf-1", "user_id": "system", "is_public": False},
+    )
+
+    await socketio._handle_workflow_event(("workflow_created", event_payload))
+
+    socketio._sio.emit.assert_awaited_once_with(
+        event="workflow_created",
+        data={"workflow_id": "wf-1", "user_id": "system", "is_public": False},
+        room="admin",
+    )
+
+
+@pytest.mark.anyio
 async def test_shared_workflow_event_is_emitted_to_shared_room() -> None:
     socketio = SocketIO(FastAPI())
     socketio._sio.emit = AsyncMock()

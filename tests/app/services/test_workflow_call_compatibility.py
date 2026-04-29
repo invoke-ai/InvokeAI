@@ -62,6 +62,23 @@ def _services():
     )()
 
 
+def _services_that_fail_on_image_enumeration():
+    def fail(*args: Any, **kwargs: Any) -> list[str]:
+        raise AssertionError("image names should not be enumerated for structural compatibility")
+
+    return type(
+        "Services",
+        (),
+        {
+            "board_images": type(
+                "BoardImages",
+                (),
+                {"get_all_board_image_names_for_board": staticmethod(fail)},
+            )(),
+        },
+    )()
+
+
 def test_get_workflow_call_compatibility_returns_ok_for_simple_callable_workflow() -> None:
     workflow = _workflow_dump(
         nodes=[
@@ -217,6 +234,59 @@ def test_get_workflow_call_compatibility_allows_batch_directly_into_workflow_ret
         services=_services(),
         user_id="user-1",
         maximum_children=1000,
+    )
+
+    assert compatibility.is_callable is True
+    assert compatibility.reason is WorkflowCallCompatibilityReason.Ok
+    assert compatibility.message is None
+
+
+def test_get_workflow_call_compatibility_can_skip_generator_expansion_for_list_views() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node(
+                "generator",
+                "image_generator",
+                {
+                    "generator": {
+                        "value": {
+                            "type": "image_generator_images_from_board",
+                            "board_id": "board-a",
+                            "category": "images",
+                        }
+                    }
+                },
+            ),
+            _invocation_node("batch", "image_batch", {"images": {"value": []}, "batch_group_id": {"value": "None"}}),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-generator-batch",
+                "type": "default",
+                "source": "generator",
+                "sourceHandle": "collection",
+                "target": "batch",
+                "targetHandle": "images",
+            },
+            {
+                "id": "edge-batch-return",
+                "type": "default",
+                "source": "batch",
+                "sourceHandle": "images",
+                "target": "return",
+                "targetHandle": "collection",
+            },
+        ],
+    )
+
+    compatibility = get_workflow_call_compatibility(
+        workflow=workflow,
+        workflow_id="workflow-a",
+        services=_services_that_fail_on_image_enumeration(),
+        user_id="user-1",
+        maximum_children=1000,
+        resolve_generator_items=False,
     )
 
     assert compatibility.is_callable is True

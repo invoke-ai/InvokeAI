@@ -215,6 +215,7 @@ async def list_workflows(
             services=ApiDependencies.invoker.services,
             user_id=current_user.user_id,
             maximum_children=ApiDependencies.invoker.services.configuration.max_queue_size,
+            resolve_generator_items=False,
         )
         workflows_with_thumbnails.append(
             WorkflowRecordListItemWithThumbnailDTO(

@@ -400,6 +400,10 @@ class SocketIO:
         event_name, event_data = event
         payload = event_data.model_dump(mode="json")
 
+        if not self._is_multiuser_enabled():
+            await self._sio.emit(event=event_name, data=payload, room="admin")
+            return
+
         await self._sio.emit(event=event_name, data=payload, room=f"user:{event_data.user_id}")
         await self._sio.emit(event=event_name, data=payload, room="admin")
 

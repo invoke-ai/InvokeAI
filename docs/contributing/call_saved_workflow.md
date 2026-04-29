@@ -147,6 +147,8 @@ Implemented conversion helper:
   - unsupported callees are rejected before any child queue row is created
 - Compatibility metadata is now exposed through workflow library API responses:
   - workflow list items and workflow detail responses include `call_saved_workflow_compatibility`
+  - workflow list items use structural generator-backed batch checks so list/picker rendering does not enumerate every
+    image in board-backed generators; workflow detail and runtime execution still resolve real generator values
   - the saved-workflow picker uses that metadata to disable unsupported workflows before execution
   - the picker still allows an already-selected unsupported workflow to render, with an explicit unsupported state and
     backend-provided reason message
@@ -302,7 +304,8 @@ The current queue-visible implementation uses the following lifecycle contract:
     must receive only the retry item ids for their own roots, while admins can still observe the full retried set
 - workflow live-update sockets join workflow event rooms in both authenticated multiuser mode and unauthenticated
   single-user mode; the frontend relies on those events to invalidate workflow library data and clear deleted saved
-  workflow selections
+  workflow selections; in single-user mode, workflow CRUD events emit only to the admin room to avoid duplicate delivery
+  to sockets that are also joined to `user:system`
 - the saved-workflow node picker queries owned/default workflows and public shared workflows separately, merges them by
   workflow id, and fetches additional pages as the combobox menu reaches the end
 

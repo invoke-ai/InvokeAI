@@ -405,6 +405,20 @@ def _resolve_generator_items(generator_node: Mapping[str, Any], services: Any, u
     raise UnsupportedWorkflowNodeError(f"Unsupported generator node type '{node_type}'")
 
 
+def _get_generator_placeholder_items(generator_node: Mapping[str, Any]) -> list[Any]:
+    generator_node_data = generator_node["data"]
+    node_type = generator_node_data.get("type")
+    if node_type == "integer_generator":
+        return [0]
+    if node_type == "float_generator":
+        return [0.0]
+    if node_type == "string_generator":
+        return [""]
+    if node_type == "image_generator":
+        return [ImageField(image_name="compatibility-placeholder")]
+    raise UnsupportedWorkflowNodeError(f"Unsupported generator node type '{node_type}'")
+
+
 def _get_outgoing_default_edges(
     node_id: str, source_handle: str, workflow_edges: Sequence[Mapping[str, Any]]
 ) -> list[Mapping[str, Any]]:
@@ -515,6 +529,7 @@ def build_batch_child_workflow_session_results(
     maximum_children: int,
     services: Any = None,
     user_id: str | None = None,
+    resolve_generator_items: bool = True,
 ) -> list[GraphExecutionState]:
     mutable_workflow = copy.deepcopy(workflow)
     apply_workflow_inputs_to_workflow(mutable_workflow, workflow_inputs)
@@ -546,11 +561,15 @@ def build_batch_child_workflow_session_results(
                     f"call_saved_workflow generator-backed batch child workflow is missing generator node '{generator_source_id}'"
                 )
             generator_node_type = generator_node["data"].get("type") if _is_invocation_node(generator_node) else None
-            if generator_node_type == "image_generator" and services is None:
+            if generator_node_type == "image_generator" and services is None and resolve_generator_items:
                 raise UnsupportedWorkflowNodeError(
                     "call_saved_workflow image-generator-backed batch child workflows require runtime services"
                 )
-            batch_items = _resolve_generator_items(generator_node, services, user_id)
+            batch_items = (
+                _resolve_generator_items(generator_node, services, user_id)
+                if resolve_generator_items
+                else _get_generator_placeholder_items(generator_node)
+            )
             used_generator_node_ids.add(generator_source_id)
             if not batch_items:
                 raise UnsupportedWorkflowNodeError(
@@ -609,6 +628,7 @@ def build_batch_child_workflow_sessions(
     maximum_children: int,
     services: Any = None,
     user_id: str | None = None,
+    resolve_generator_items: bool = True,
 ) -> list[GraphExecutionState]:
     return [
         child_result.session
@@ -620,6 +640,7 @@ def build_batch_child_workflow_sessions(
             maximum_children=maximum_children,
             services=services,
             user_id=user_id,
+            resolve_generator_items=resolve_generator_items,
         )
     ]
 
@@ -633,6 +654,7 @@ def build_child_workflow_session_results(
     maximum_children: int,
     services: Any = None,
     user_id: str | None = None,
+    resolve_generator_items: bool = True,
 ) -> list[WorkflowCallChildSessionResult]:
     if workflow_contains_supported_batch_nodes(workflow):
         return build_batch_child_workflow_session_results(
@@ -643,6 +665,7 @@ def build_child_workflow_session_results(
             maximum_children=maximum_children,
             services=services,
             user_id=user_id,
+            resolve_generator_items=resolve_generator_items,
         )
 
     mutable_workflow = copy.deepcopy(workflow)
@@ -661,6 +684,7 @@ def build_child_workflow_sessions(
     maximum_children: int,
     services: Any = None,
     user_id: str | None = None,
+    resolve_generator_items: bool = True,
 ) -> list[GraphExecutionState]:
     return [
         child_result.session
@@ -672,5 +696,6 @@ def build_child_workflow_sessions(
             maximum_children=maximum_children,
             services=services,
             user_id=user_id,
+            resolve_generator_items=resolve_generator_items,
         )
     ]

@@ -150,6 +150,7 @@ def get_workflow_call_compatibility(
     services: Any,
     user_id: str | None,
     maximum_children: int,
+    resolve_generator_items: bool = True,
 ) -> WorkflowCallCompatibility:
     workflow_return_count = _count_workflow_return_nodes(workflow)
     if workflow_return_count == 0:
@@ -180,6 +181,7 @@ def get_workflow_call_compatibility(
             maximum_children=maximum_children,
             services=services,
             user_id=user_id,
+            resolve_generator_items=resolve_generator_items,
         )
     except InvalidWorkflowInputError as e:
         return WorkflowCallCompatibility(
