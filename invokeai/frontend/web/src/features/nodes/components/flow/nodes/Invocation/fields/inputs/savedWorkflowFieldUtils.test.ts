@@ -3,10 +3,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildSavedWorkflowOptions,
-  getSavedWorkflowPickerOwnedQueryArg,
-  getSavedWorkflowPickerSharedQueryArg,
   getSavedWorkflowDisplayState,
   getSavedWorkflowListItemFromRecord,
+  getSavedWorkflowPickerOwnedQueryArg,
+  getSavedWorkflowPickerSharedQueryArg,
   getSavedWorkflowSelectionOption,
   getSavedWorkflowSelectionState,
   mergeSavedWorkflowPickerItems,
@@ -174,16 +174,21 @@ describe('savedWorkflowFieldUtils', () => {
   });
 
   it('merges paged owned and shared workflow picker results without duplicates', () => {
+    const ownedWorkflow = workflows[0];
+    const defaultWorkflow = workflows[1];
+    if (!ownedWorkflow || !defaultWorkflow) {
+      throw new Error('Expected workflow fixtures');
+    }
     const sharedWorkflow = {
-      ...workflows[0],
+      ...ownedWorkflow,
       workflow_id: 'workflow-shared',
       name: 'Shared Workflow',
       is_public: true,
     };
 
-    expect(mergeSavedWorkflowPickerItems([workflows[0]], [workflows[1], sharedWorkflow], [workflows[0]])).toEqual([
-      workflows[0],
-      workflows[1],
+    expect(mergeSavedWorkflowPickerItems([ownedWorkflow], [defaultWorkflow, sharedWorkflow], [ownedWorkflow])).toEqual([
+      ownedWorkflow,
+      defaultWorkflow,
       sharedWorkflow,
     ]);
   });

@@ -101,7 +101,8 @@ Implemented runtime scaffolding:
 - `_on_after_run_session()` no longer completes queue items whose sessions are incomplete but waiting.
 - Dynamic call arguments now execute end-to-end in the current runner path:
   - literal dynamic values are serialized into a hidden `workflow_inputs` payload on the parent node at graph-build time
-  - stale hidden `workflow_inputs` values from recalled graphs are ignored unless a matching current dynamic field exists
+  - stale hidden `workflow_inputs` values from recalled graphs are ignored unless a matching current dynamic field
+    exists
   - connected dynamic values are accepted as special call-boundary edges and are resolved from parent results at runtime
   - both are validated against the child workflow's exposed form interface before being applied to the child graph
 - Queue lifecycle semantics now exist for workflow-call chains:
@@ -413,8 +414,8 @@ Cancel behavior:
 - canceling a waiting parent cancels descendant child rows
 - canceling a child row cancels waiting ancestors
 - cancelation should stay cancelation; it should not be rewritten into ordinary failure semantics
-- startup recovery cancels any interrupted `in_progress` or `waiting` workflow-call chain, including pending descendants,
-  so a restart cannot leave a suspended parent waiting on a child row that will never report back
+- startup recovery cancels any interrupted `in_progress` or `waiting` workflow-call chain, including pending
+  descendants, so a restart cannot leave a suspended parent waiting on a child row that will never report back
 
 Retry behavior:
 

@@ -11,10 +11,10 @@ import { useGetWorkflowQuery, useListWorkflowsInfiniteInfiniteQuery } from 'serv
 
 import {
   buildSavedWorkflowOptions,
-  getSavedWorkflowPickerOwnedQueryArg,
-  getSavedWorkflowPickerSharedQueryArg,
   getSavedWorkflowDisplayState,
   getSavedWorkflowListItemFromRecord,
+  getSavedWorkflowPickerOwnedQueryArg,
+  getSavedWorkflowPickerSharedQueryArg,
   getSavedWorkflowSelectionOption,
   getSavedWorkflowSelectionState,
   mergeSavedWorkflowPickerItems,
@@ -104,24 +104,13 @@ const SavedWorkflowFieldInputComponent = (
     [dispatch, field.name, nodeId]
   );
   const onMenuScrollToBottom = useCallback(() => {
-    if (
-      shouldFetchNextSavedWorkflowPickerPage({ hasNextPage: hasNextOwnedPage, isFetching: isOwnedFetching })
-    ) {
+    if (shouldFetchNextSavedWorkflowPickerPage({ hasNextPage: hasNextOwnedPage, isFetching: isOwnedFetching })) {
       fetchNextOwnedPage();
     }
-    if (
-      shouldFetchNextSavedWorkflowPickerPage({ hasNextPage: hasNextSharedPage, isFetching: isSharedFetching })
-    ) {
+    if (shouldFetchNextSavedWorkflowPickerPage({ hasNextPage: hasNextSharedPage, isFetching: isSharedFetching })) {
       fetchNextSharedPage();
     }
-  }, [
-    fetchNextOwnedPage,
-    fetchNextSharedPage,
-    hasNextOwnedPage,
-    hasNextSharedPage,
-    isOwnedFetching,
-    isSharedFetching,
-  ]);
+  }, [fetchNextOwnedPage, fetchNextSharedPage, hasNextOwnedPage, hasNextSharedPage, isOwnedFetching, isSharedFetching]);
 
   const noOptionsMessage = useCallback(() => t('nodes.noMatchingWorkflows'), [t]);
   const isLoading = isOwnedLoading || isSharedLoading;

@@ -25,19 +25,19 @@ const baseSavedWorkflowPickerQueryArg = {
   order_by: 'name',
   direction: 'ASC',
   query: '',
-  tags: [],
+  tags: [] as string[],
   has_been_opened: undefined,
 } as const;
 
 export const getSavedWorkflowPickerOwnedQueryArg = () => ({
   ...baseSavedWorkflowPickerQueryArg,
-  categories: ['user', 'default'],
+  categories: ['user', 'default'] as ('user' | 'default')[],
   is_public: undefined,
 });
 
 export const getSavedWorkflowPickerSharedQueryArg = () => ({
   ...baseSavedWorkflowPickerQueryArg,
-  categories: ['user'],
+  categories: ['user'] as ('user' | 'default')[],
   is_public: true,
 });
 

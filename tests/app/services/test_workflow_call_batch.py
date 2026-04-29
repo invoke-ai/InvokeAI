@@ -148,7 +148,10 @@ def test_build_child_workflow_session_results_preserves_batch_field_values() -> 
 
     assert [result.session.graph.nodes["target"].value for result in child_results] == [2, 4]
     assert [
-        [(field_value.node_path, field_value.field_name, field_value.value) for field_value in result.field_values or []]
+        [
+            (field_value.node_path, field_value.field_name, field_value.value)
+            for field_value in result.field_values or []
+        ]
         for result in child_results
     ] == [[("target", "value", 2)], [("target", "value", 4)]]
 

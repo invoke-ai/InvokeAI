@@ -1868,7 +1868,10 @@ def test_run_completes_call_saved_workflow_with_batched_child_returns(monkeypatc
 
     assert session_queue.enqueued_child_item_ids == [100, 101, 102]
     assert [
-        [(field_value.node_path, field_value.field_name, field_value.value) for field_value in session_queue.items[item_id].field_values]
+        [
+            (field_value.node_path, field_value.field_name, field_value.value)
+            for field_value in session_queue.items[item_id].field_values
+        ]
         for item_id in session_queue.enqueued_child_item_ids
     ] == [[("child-int", "value", 2)], [("child-int", "value", 4)], [("child-int", "value", 6)]]
     assert session_queue.completed_item_ids == [100, 101, 102, 1]

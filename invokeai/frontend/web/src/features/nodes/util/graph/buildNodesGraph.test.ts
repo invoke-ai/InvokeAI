@@ -199,9 +199,10 @@ describe('buildNodesGraph', () => {
     } as never;
 
     const graph = buildNodesGraph(rootState, templatesWithWorkflowInputs);
+    const graphNode = graph.nodes[node.id] as { workflow_id: string; workflow_inputs: Record<string, unknown> };
 
-    expect(graph.nodes[node.id].workflow_id).toBe('');
-    expect(graph.nodes[node.id].workflow_inputs).toEqual({});
+    expect(graphNode.workflow_id).toBe('');
+    expect(graphNode.workflow_inputs).toEqual({});
   });
 
   it('flattens a single connector to one direct execution edge', () => {
