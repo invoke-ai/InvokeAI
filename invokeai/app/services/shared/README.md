@@ -155,7 +155,9 @@ Workflow-call note:
     nodes; the parent resumes only after all expected child rows complete
   - child failure fails the waiting parent and can cascade upward through ancestors
   - failing child rows cancel their remaining workflow-call siblings before the parent is failed
-  - cancelation is chain-aware across parents and children
+  - cancelation is chain-aware across parents and children, including nested descendants of batched siblings
+  - "all except current" queue actions preserve the active current item plus its workflow-call chain, while still
+    canceling or deleting unrelated waiting chains
   - startup recovery cancels interrupted `in_progress` or `waiting` workflow-call chains, including pending descendants
   - deleting a workflow-call queue row currently deletes the whole parent/child chain rather than leaving orphaned rows
     behind

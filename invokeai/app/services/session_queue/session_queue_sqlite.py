@@ -1,7 +1,7 @@
 import asyncio
 import json
 import sqlite3
-from typing import Optional, Union, cast
+from typing import Any, Optional, Union, cast
 
 from pydantic_core import to_jsonable_python
 
@@ -385,6 +385,12 @@ class SqliteSessionQueue(SessionQueueBase):
         deduped_chain_item_ids = list(dict.fromkeys(chain_item_ids))
         return deduped_chain_item_ids
 
+    def _get_current_workflow_call_chain_item_ids(self, queue_id: str) -> set[int]:
+        current_queue_item = self.get_current(queue_id)
+        if current_queue_item is None:
+            return set()
+        return set(self._get_workflow_call_chain_item_ids(current_queue_item.item_id))
+
     def is_empty(self, queue_id: str) -> IsEmptyResult:
         with self._db.transaction() as cursor:
             cursor.execute(
@@ -470,7 +476,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 )
                 {user_filter}
                 """
-            params = [queue_id]
+            params: list[Any] = [queue_id]
             if user_id is not None:
                 params.append(user_id)
 
@@ -678,18 +684,25 @@ class SqliteSessionQueue(SessionQueueBase):
         return DeleteByDestinationResult(deleted=count)
 
     def delete_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> DeleteAllExceptCurrentResult:
+        current_chain_item_ids = self._get_current_workflow_call_chain_item_ids(queue_id)
         with self._db.transaction() as cursor:
             # Build WHERE clause with optional user_id filter
             user_filter = "AND user_id = ?" if user_id is not None else ""
+            current_chain_filter = ""
+            if current_chain_item_ids:
+                placeholders = ", ".join(["?" for _ in current_chain_item_ids])
+                current_chain_filter = f"AND item_id NOT IN ({placeholders})"
             where = f"""--sql
                 WHERE
                   queue_id == ?
-                  AND status == 'pending'
+                  AND status IN ('pending', 'waiting')
                   {user_filter}
+                  {current_chain_filter}
                 """
-            params = [queue_id]
+            params: list[Any] = [queue_id]
             if user_id is not None:
                 params.append(user_id)
+            params.extend(current_chain_item_ids)
 
             cursor.execute(
                 f"""--sql
@@ -747,18 +760,25 @@ class SqliteSessionQueue(SessionQueueBase):
         return CancelByQueueIDResult(canceled=count)
 
     def cancel_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> CancelAllExceptCurrentResult:
+        current_chain_item_ids = self._get_current_workflow_call_chain_item_ids(queue_id)
         with self._db.transaction() as cursor:
             # Build WHERE clause with optional user_id filter
             user_filter = "AND user_id = ?" if user_id is not None else ""
+            current_chain_filter = ""
+            if current_chain_item_ids:
+                placeholders = ", ".join(["?" for _ in current_chain_item_ids])
+                current_chain_filter = f"AND item_id NOT IN ({placeholders})"
             where = f"""--sql
                 WHERE
                   queue_id == ?
-                  AND status == 'pending'
+                  AND status IN ('pending', 'waiting')
                   {user_filter}
+                  {current_chain_filter}
                 """
             params = [queue_id]
             if user_id is not None:
                 params.append(user_id)
+            params.extend(current_chain_item_ids)
 
             cursor.execute(
                 f"""--sql
@@ -895,6 +915,11 @@ class SqliteSessionQueue(SessionQueueBase):
                 (workflow_call_id,),
             )
             item_ids = [row[0] for row in cast(list[sqlite3.Row], cursor.fetchall())]
+        item_ids_with_descendants: list[int] = []
+        for item_id in item_ids:
+            item_ids_with_descendants.append(item_id)
+            item_ids_with_descendants.extend(self._get_workflow_call_descendant_ids(item_id))
+        item_ids = list(dict.fromkeys(item_ids_with_descendants))
         canceled_item_ids: list[int] = []
         for item_id in item_ids:
             if item_id in exclude_item_ids:

@@ -111,8 +111,11 @@ Implemented runtime scaffolding:
   - child failure fails the suspended parent and cascades upward through any waiting parent chain
   - canceling a parent cancels its descendant child chain
   - canceling a child cancels the waiting parent chain upward
+  - canceling remaining siblings after a batched child failure also cancels descendants of those sibling rows
   - deleting any queue row in a workflow-call chain deletes the full chain to avoid leaving orphaned parent or child
     rows behind
+  - `cancel_all_except_current` and `delete_all_except_current` preserve the active queue item plus its workflow-call
+    ancestors and descendants; unrelated waiting chains are still canceled or deleted
   - retry is root-oriented rather than child-oriented; child queue rows should not be directly retried from the UI
   - the current UI policy is:
     - child queue rows keep `Cancel`
@@ -282,6 +285,9 @@ The current queue-visible implementation uses the following lifecycle contract:
 - cancel operations are chain-aware:
   - canceling a waiting parent cancels descendants
   - canceling a child cancels waiting ancestors
+  - canceling batched siblings after one child fails includes nested descendants of those siblings
+  - bulk "all except current" actions preserve the active queue item and its parent/child chain, not just the single
+    `in_progress` row
 - retry operations are root-aware:
   - retrying a root queue item creates a new root execution
   - retrying a child queue item should be normalized to the root by backend code
