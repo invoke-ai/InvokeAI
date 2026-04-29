@@ -7,8 +7,8 @@ from invokeai.app.invocations.call_saved_workflow import (
     is_call_saved_workflow_dynamic_input,
 )
 from invokeai.app.invocations.workflow_return import WorkflowReturnOutput
-from invokeai.app.services.session_processor.workflow_call_batch import build_child_workflow_sessions
-from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+from invokeai.app.services.session_processor.workflow_call_batch import build_child_workflow_session_results
+from invokeai.app.services.session_queue.session_queue_common import NodeFieldValue, SessionQueueItem
 from invokeai.app.services.shared.graph import GraphExecutionState
 
 if TYPE_CHECKING:
@@ -36,7 +36,11 @@ class WorkflowCallCoordinator:
         return workflow_inputs
 
     @staticmethod
-    def build_child_queue_item(queue_item: SessionQueueItem, child_session: GraphExecutionState) -> SessionQueueItem:
+    def build_child_queue_item(
+        queue_item: SessionQueueItem,
+        child_session: GraphExecutionState,
+        field_values: list[NodeFieldValue] | None = None,
+    ) -> SessionQueueItem:
         workflow_call_execution = queue_item.session.waiting_workflow_call_execution
         if workflow_call_execution is None:
             raise ValueError("Parent queue item is missing active workflow call execution metadata.")
@@ -49,6 +53,7 @@ class WorkflowCallCoordinator:
             "parent_session_id": queue_item.session_id,
             "root_item_id": root_item_id,
             "workflow_call_depth": workflow_call_execution.depth,
+            "field_values": field_values,
         }
         if hasattr(queue_item, "model_copy"):
             return queue_item.model_copy(update=child_updates)
@@ -70,7 +75,7 @@ class WorkflowCallCoordinator:
 
         call_frame = queue_item.session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
         workflow_inputs = self._collect_call_saved_workflow_inputs(invocation, queue_item)
-        child_sessions = build_child_workflow_sessions(
+        child_session_results = build_child_workflow_session_results(
             parent_session=queue_item.session,
             workflow=workflow_record.workflow.model_dump(),
             workflow_inputs=workflow_inputs,
@@ -79,6 +84,7 @@ class WorkflowCallCoordinator:
             services=self._session_runner._services,
             user_id=getattr(queue_item, "user_id", None),
         )
+        child_sessions = [child_result.session for child_result in child_session_results]
         if len(child_sessions) > remaining_queue_capacity:
             raise ValueError("call_saved_workflow exceeds remaining queue capacity for child workflow executions")
         queue_item.session.begin_waiting_on_workflow_call(call_frame)
@@ -87,10 +93,11 @@ class WorkflowCallCoordinator:
         enqueued_child_item_ids: list[int] = []
         try:
             self._session_runner._services.session_queue.set_queue_item_session(queue_item.item_id, queue_item.session)
-            for child_session in child_sessions:
+            for child_result in child_session_results:
                 child_queue_item = self._session_runner._services.session_queue.enqueue_workflow_call_child(
                     parent_queue_item=queue_item,
-                    child_session=child_session,
+                    child_session=child_result.session,
+                    field_values=child_result.field_values,
                 )
                 enqueued_child_item_ids.append(child_queue_item.item_id)
             self._session_runner._services.session_queue.suspend_queue_item(queue_item.item_id)

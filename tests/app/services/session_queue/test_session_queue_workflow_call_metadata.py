@@ -7,7 +7,7 @@ import pytest
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.services.events.events_common import QueueItemsRetriedEvent, QueueItemStatusChangedEvent
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_common import SessionQueueItemNotFoundError
+from invokeai.app.services.session_queue.session_queue_common import NodeFieldValue, SessionQueueItemNotFoundError
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from tests.test_nodes import TestEventService
@@ -142,6 +142,63 @@ def test_enqueue_workflow_call_child_persists_pending_child_queue_item(session_q
     assert child_queue_item.root_item_id == parent_item_id
     assert child_queue_item.workflow_call_depth == 1
     assert child_queue_item.session_id == child_session.id
+
+
+def test_enqueue_workflow_call_child_persists_batch_field_values(session_queue: SqliteSessionQueue) -> None:
+    parent_graph = Graph()
+    parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))
+    parent_session = GraphExecutionState(graph=parent_graph)
+    invocation = parent_session.next()
+    assert isinstance(invocation, CallSavedWorkflowInvocation)
+
+    frame = parent_session.build_workflow_call_frame(invocation.id, invocation.workflow_id)
+    child_session = parent_session.create_child_workflow_execution_state(Graph(), frame)
+    parent_session.begin_waiting_on_workflow_call(frame)
+    parent_session.attach_waiting_workflow_call_child_session(child_session)
+
+    with session_queue._db.transaction() as cursor:
+        cursor.execute(
+            """--sql
+            INSERT INTO session_queue (
+                queue_id,
+                session,
+                session_id,
+                batch_id,
+                field_values,
+                priority,
+                workflow,
+                origin,
+                destination,
+                retried_from_item_id,
+                user_id,
+                status
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "default",
+                parent_session.model_dump_json(warnings=False),
+                parent_session.id,
+                str(uuid.uuid4()),
+                None,
+                0,
+                None,
+                None,
+                None,
+                None,
+                "user-1",
+                "in_progress",
+            ),
+        )
+        parent_item_id = cursor.lastrowid
+
+    child_queue_item = session_queue.enqueue_workflow_call_child(
+        parent_queue_item=session_queue.get_queue_item(parent_item_id),
+        child_session=child_session,
+        field_values=[NodeFieldValue(node_path="target", field_name="value", value=2)],
+    )
+
+    assert child_queue_item.field_values == [NodeFieldValue(node_path="target", field_name="value", value=2)]
 
 
 def test_suspend_and_enqueue_child_emit_waiting_then_pending_status_events(

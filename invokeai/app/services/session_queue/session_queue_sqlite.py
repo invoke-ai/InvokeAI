@@ -23,6 +23,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     IsEmptyResult,
     IsFullResult,
     ItemIdsResult,
+    NodeFieldValue,
     PruneResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -815,13 +816,17 @@ class SqliteSessionQueue(SessionQueueBase):
         return self.get_queue_item(item_id)
 
     def enqueue_workflow_call_child(
-        self, parent_queue_item: SessionQueueItem, child_session: GraphExecutionState
+        self,
+        parent_queue_item: SessionQueueItem,
+        child_session: GraphExecutionState,
+        field_values: list[NodeFieldValue] | None = None,
     ) -> SessionQueueItem:
         workflow_call_execution = parent_queue_item.session.waiting_workflow_call_execution
         if workflow_call_execution is None:
             raise ValueError("Parent queue item is missing active workflow call execution metadata.")
 
         session_json = child_session.model_dump_json(warnings=False, exclude_none=True)
+        field_values_json = json.dumps(field_values, default=to_jsonable_python) if field_values is not None else None
         root_item_id = parent_queue_item.root_item_id or parent_queue_item.item_id
 
         with self._db.transaction() as cursor:
@@ -853,7 +858,7 @@ class SqliteSessionQueue(SessionQueueBase):
                     session_json,
                     child_session.id,
                     parent_queue_item.batch_id,
-                    None,
+                    field_values_json,
                     parent_queue_item.priority,
                     None,
                     parent_queue_item.origin,

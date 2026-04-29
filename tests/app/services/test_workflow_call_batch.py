@@ -2,7 +2,10 @@ from typing import Any
 
 import pytest
 
-from invokeai.app.services.session_processor.workflow_call_batch import build_child_workflow_sessions
+from invokeai.app.services.session_processor.workflow_call_batch import (
+    build_child_workflow_session_results,
+    build_child_workflow_sessions,
+)
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, WorkflowCallFrame
 from invokeai.app.services.shared.workflow_graph_builder import UnsupportedWorkflowNodeError
 
@@ -110,6 +113,44 @@ def test_build_child_workflow_sessions_expands_direct_integer_batch() -> None:
 
     assert len(child_sessions) == 3
     assert [child_session.graph.nodes["target"].value for child_session in child_sessions] == [2, 4, 6]
+
+
+def test_build_child_workflow_session_results_preserves_batch_field_values() -> None:
+    workflow = _workflow_dump(
+        nodes=[
+            _invocation_node(
+                "batch",
+                "integer_batch",
+                {"integers": {"value": [2, 4]}, "batch_group_id": {"value": "None"}},
+            ),
+            _invocation_node("target", "integer", {"value": {"value": 0}}),
+            _invocation_node("return", "workflow_return", {"collection": {"value": []}}),
+        ],
+        edges=[
+            {
+                "id": "edge-batch-target",
+                "type": "default",
+                "source": "batch",
+                "sourceHandle": "integers",
+                "target": "target",
+                "targetHandle": "value",
+            }
+        ],
+    )
+
+    child_results = build_child_workflow_session_results(
+        parent_session=GraphExecutionState(graph=Graph()),
+        workflow=workflow,
+        workflow_inputs={},
+        call_frame=_call_frame(),
+        maximum_children=10,
+    )
+
+    assert [result.session.graph.nodes["target"].value for result in child_results] == [2, 4]
+    assert [
+        [(field_value.node_path, field_value.field_name, field_value.value) for field_value in result.field_values or []]
+        for result in child_results
+    ] == [[("target", "value", 2)], [("target", "value", 4)]]
 
 
 def test_build_child_workflow_sessions_expands_direct_integer_batch_into_collection_input() -> None:

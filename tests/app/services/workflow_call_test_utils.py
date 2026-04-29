@@ -1006,7 +1006,7 @@ class _DummySessionQueue:
             self.canceled_item_ids.append(item_id)
         return canceled_item_ids
 
-    def enqueue_workflow_call_child(self, parent_queue_item, child_session):
+    def enqueue_workflow_call_child(self, parent_queue_item, child_session, field_values=None):
         if self.fail_enqueue_after is not None and len(self.enqueued_child_item_ids) >= self.fail_enqueue_after:
             raise RuntimeError("Injected child enqueue failure")
         workflow_call_execution = parent_queue_item.session.waiting_workflow_call_execution
@@ -1026,6 +1026,7 @@ class _DummySessionQueue:
                 "origin": getattr(parent_queue_item, "origin", None),
                 "destination": getattr(parent_queue_item, "destination", None),
                 "priority": getattr(parent_queue_item, "priority", 0),
+                "field_values": field_values,
                 "workflow_call_id": workflow_call_execution.id if workflow_call_execution is not None else None,
                 "parent_item_id": parent_queue_item.item_id,
                 "parent_session_id": parent_queue_item.session_id,
@@ -1866,6 +1867,10 @@ def test_run_completes_call_saved_workflow_with_batched_child_returns(monkeypatc
     ]
 
     assert session_queue.enqueued_child_item_ids == [100, 101, 102]
+    assert [
+        [(field_value.node_path, field_value.field_name, field_value.value) for field_value in session_queue.items[item_id].field_values]
+        for item_id in session_queue.enqueued_child_item_ids
+    ] == [[("child-int", "value", 2)], [("child-int", "value", 4)], [("child-int", "value", 6)]]
     assert session_queue.completed_item_ids == [100, 101, 102, 1]
     assert len(parent_outputs) == 1
     assert parent_outputs[0].collection == [2, 4, 6]

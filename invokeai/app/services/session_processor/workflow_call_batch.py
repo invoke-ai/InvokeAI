@@ -4,6 +4,7 @@ import copy
 import json
 import random
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
@@ -14,6 +15,7 @@ from invokeai.app.services.image_records.image_records_common import ASSETS_CATE
 from invokeai.app.services.session_queue.session_queue_common import (
     Batch,
     BatchDatum,
+    NodeFieldValue,
     TooManySessionsError,
     calc_session_count,
     create_session_nfv_tuples,
@@ -42,6 +44,12 @@ SUPPORTED_BATCH_GROUP_IDS = {
     "Group 5",
 }
 CONNECTOR_INPUT_HANDLE = "in"
+
+
+@dataclass(frozen=True)
+class WorkflowCallChildSessionResult:
+    session: GraphExecutionState
+    field_values: list[NodeFieldValue] | None = None
 
 
 def _is_mapping(value: Any) -> bool:
@@ -498,7 +506,7 @@ def _resolve_batch_items_from_inputs(
     )
 
 
-def build_batch_child_workflow_sessions(
+def build_batch_child_workflow_session_results(
     *,
     parent_session: GraphExecutionState,
     workflow: Mapping[str, Any],
@@ -582,16 +590,17 @@ def build_batch_child_workflow_sessions(
     if calc_session_count(batch) > maximum_children:
         raise TooManySessionsError("call_saved_workflow exceeds remaining queue capacity for child workflow executions")
 
-    child_sessions: list[GraphExecutionState] = []
-    for session_id, session_json, _field_values_json in create_session_nfv_tuples(batch, maximum_children):
+    child_session_results: list[WorkflowCallChildSessionResult] = []
+    for session_id, session_json, field_values_json in create_session_nfv_tuples(batch, maximum_children):
         generated_session = GraphExecutionState.model_validate_json(session_json)
         child_session = parent_session.create_child_workflow_execution_state(generated_session.graph, call_frame)
         child_session.id = session_id
-        child_sessions.append(child_session)
-    return child_sessions
+        field_values = [NodeFieldValue.model_validate(field_value) for field_value in json.loads(field_values_json)]
+        child_session_results.append(WorkflowCallChildSessionResult(session=child_session, field_values=field_values))
+    return child_session_results
 
 
-def build_child_workflow_sessions(
+def build_batch_child_workflow_sessions(
     *,
     parent_session: GraphExecutionState,
     workflow: Mapping[str, Any],
@@ -601,8 +610,32 @@ def build_child_workflow_sessions(
     services: Any = None,
     user_id: str | None = None,
 ) -> list[GraphExecutionState]:
+    return [
+        child_result.session
+        for child_result in build_batch_child_workflow_session_results(
+            parent_session=parent_session,
+            workflow=workflow,
+            workflow_inputs=workflow_inputs,
+            call_frame=call_frame,
+            maximum_children=maximum_children,
+            services=services,
+            user_id=user_id,
+        )
+    ]
+
+
+def build_child_workflow_session_results(
+    *,
+    parent_session: GraphExecutionState,
+    workflow: Mapping[str, Any],
+    workflow_inputs: Mapping[str, Any],
+    call_frame: WorkflowCallFrame,
+    maximum_children: int,
+    services: Any = None,
+    user_id: str | None = None,
+) -> list[WorkflowCallChildSessionResult]:
     if workflow_contains_supported_batch_nodes(workflow):
-        return build_batch_child_workflow_sessions(
+        return build_batch_child_workflow_session_results(
             parent_session=parent_session,
             workflow=workflow,
             workflow_inputs=workflow_inputs,
@@ -615,4 +648,29 @@ def build_child_workflow_sessions(
     mutable_workflow = copy.deepcopy(workflow)
     apply_workflow_inputs_to_workflow(mutable_workflow, workflow_inputs)
     child_graph = build_graph_from_workflow(mutable_workflow)
-    return [parent_session.create_child_workflow_execution_state(child_graph, call_frame)]
+    child_session = parent_session.create_child_workflow_execution_state(child_graph, call_frame)
+    return [WorkflowCallChildSessionResult(session=child_session)]
+
+
+def build_child_workflow_sessions(
+    *,
+    parent_session: GraphExecutionState,
+    workflow: Mapping[str, Any],
+    workflow_inputs: Mapping[str, Any],
+    call_frame: WorkflowCallFrame,
+    maximum_children: int,
+    services: Any = None,
+    user_id: str | None = None,
+) -> list[GraphExecutionState]:
+    return [
+        child_result.session
+        for child_result in build_child_workflow_session_results(
+            parent_session=parent_session,
+            workflow=workflow,
+            workflow_inputs=workflow_inputs,
+            call_frame=call_frame,
+            maximum_children=maximum_children,
+            services=services,
+            user_id=user_id,
+        )
+    ]

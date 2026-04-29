@@ -362,6 +362,7 @@ Plain-English summary:
 1. The child workflow is inspected before execution.
 1. If the child contains supported batch inputs, that one call expands into multiple child executions instead of one.
 1. Each expanded child execution becomes its own queue row.
+1. Each child queue row keeps the substituted batch `field_values`, matching ordinary batch queue rows.
 1. Those child queue rows run independently.
 1. The parent does not resume until all child queue rows for that call have finished.
 1. Each child execution produces its own `workflow_return.collection`.

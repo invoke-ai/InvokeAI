@@ -16,6 +16,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     IsEmptyResult,
     IsFullResult,
     ItemIdsResult,
+    NodeFieldValue,
     PruneResult,
     RetryItemsResult,
     SessionQueueCountsByDestination,
@@ -206,7 +207,10 @@ class SessionQueueBase(ABC):
 
     @abstractmethod
     def enqueue_workflow_call_child(
-        self, parent_queue_item: SessionQueueItem, child_session: GraphExecutionState
+        self,
+        parent_queue_item: SessionQueueItem,
+        child_session: GraphExecutionState,
+        field_values: list[NodeFieldValue] | None = None,
     ) -> SessionQueueItem:
         """Enqueues a child workflow execution linked to a suspended parent queue item."""
         pass
