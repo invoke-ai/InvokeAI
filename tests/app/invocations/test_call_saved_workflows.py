@@ -303,6 +303,32 @@ def test_workflow_return_value_invocation_contract():
     assert output.value == WorkflowReturnValueField(key="image", value={"image_name": "image-a"})
 
 
+def test_workflow_return_value_field_survives_exclude_none_session_roundtrip():
+    from invokeai.app.invocations.workflow_return import (
+        WorkflowReturnInvocation,
+        WorkflowReturnValueField,
+        WorkflowReturnValueOutput,
+    )
+    from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+
+    graph = Graph()
+    graph.add_node(
+        WorkflowReturnInvocation(id="return-node", values=WorkflowReturnValueField(key="nullable", value=None))
+    )
+    session = GraphExecutionState(graph=graph)
+    session.execution_graph.add_node(
+        WorkflowReturnInvocation(id="return-node", values=WorkflowReturnValueField(key="nullable", value=None))
+    )
+    session.results["return-value-node"] = WorkflowReturnValueOutput(
+        value=WorkflowReturnValueField(key="nullable", value=None)
+    )
+
+    reloaded = GraphExecutionState.model_validate_json(session.model_dump_json(warnings=False, exclude_none=True))
+
+    assert reloaded.execution_graph.nodes["return-node"].values == WorkflowReturnValueField(key="nullable", value=None)
+    assert reloaded.results["return-value-node"].value == WorkflowReturnValueField(key="nullable", value=None)
+
+
 def test_workflow_return_invocation_rejects_duplicate_keys():
     from invokeai.app.invocations.workflow_return import WorkflowReturnInvocation, WorkflowReturnValueField
 

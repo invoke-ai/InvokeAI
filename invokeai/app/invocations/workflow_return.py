@@ -29,7 +29,7 @@ class WorkflowReturnValueField(BaseModel):
     """One named workflow return value."""
 
     key: str = Field(description="The workflow return key.")
-    value: Any = Field(description="The workflow return value.")
+    value: Any = Field(default=None, description="The workflow return value.")
 
 
 @invocation_output("workflow_return_value_output")

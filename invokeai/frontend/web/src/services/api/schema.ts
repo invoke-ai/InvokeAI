@@ -31739,8 +31739,9 @@ export type components = {
             /**
              * Value
              * @description The workflow return value.
+             * @default null
              */
-            value: unknown;
+            value?: unknown;
         };
         /**
          * Workflow Return Value
