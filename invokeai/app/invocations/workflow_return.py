@@ -86,7 +86,7 @@ class WorkflowReturnInvocation(BaseInvocation):
         default=[],
         description="The named values returned to a calling workflow.",
         title="Values",
-        ui_type=UIType._Collection,
+        input=Input.Connection,
     )
 
     def invoke(self, context: InvocationContext) -> WorkflowReturnOutput:

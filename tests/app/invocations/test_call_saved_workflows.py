@@ -281,6 +281,18 @@ def test_workflow_return_invocation_accepts_single_return_value():
     assert output.values == {"sum": 3}
 
 
+def test_workflow_return_values_schema_preserves_single_or_list_cardinality():
+    from invokeai.app.invocations.workflow_return import WorkflowReturnInvocation
+
+    values_schema = WorkflowReturnInvocation.model_json_schema()["properties"]["values"]
+
+    assert values_schema["anyOf"] == [
+        {"$ref": "#/$defs/WorkflowReturnValueField"},
+        {"items": {"$ref": "#/$defs/WorkflowReturnValueField"}, "type": "array"},
+    ]
+    assert values_schema.get("ui_type") != "CollectionField"
+
+
 def test_workflow_return_value_invocation_contract():
     from invokeai.app.invocations.workflow_return import WorkflowReturnValueField, WorkflowReturnValueInvocation
 
@@ -341,8 +353,8 @@ def test_workflow_return_invocation_schema_declares_named_values_contract():
     assert "collection" not in schema["properties"]
     values = schema["properties"]["values"]
 
-    assert values["input"] == "any"
-    assert values["ui_type"] == "CollectionField"
+    assert values["input"] == "connection"
+    assert "ui_type" not in values
 
     get_schema = WorkflowReturnGetInvocation.model_json_schema()
     get_values = get_schema["properties"]["values"]

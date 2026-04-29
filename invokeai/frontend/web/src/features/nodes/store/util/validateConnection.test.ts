@@ -159,6 +159,66 @@ const integerCollectionOutputTemplate: InvocationTemplate = {
   classification: 'stable',
 };
 
+const workflowReturnValueTemplate: InvocationTemplate = {
+  title: 'Workflow Return Value',
+  type: 'workflow_return_value',
+  version: '1.0.0',
+  tags: ['workflow', 'return', 'output'],
+  category: 'workflow',
+  description: 'Creates one named value for a callable workflow return.',
+  outputType: 'workflow_return_value_output',
+  inputs: {},
+  outputs: {
+    value: {
+      fieldKind: 'output',
+      name: 'value',
+      title: 'Return Value',
+      description: 'The named workflow return value.',
+      type: {
+        name: 'CollectionItemField',
+        cardinality: 'SINGLE',
+        batch: false,
+      },
+      ui_hidden: false,
+      ui_type: 'CollectionItemField',
+    },
+  },
+  useCache: false,
+  nodePack: 'invokeai',
+  classification: 'beta',
+};
+
+const workflowReturnTemplate: InvocationTemplate = {
+  title: 'Workflow Return',
+  type: 'workflow_return',
+  version: '1.0.0',
+  tags: ['workflow', 'return', 'output'],
+  category: 'workflow',
+  description: 'Defines the explicit named result returned by a callable workflow.',
+  outputType: 'workflow_return_output',
+  inputs: {
+    values: {
+      name: 'values',
+      title: 'Values',
+      required: false,
+      description: 'The named values returned to a calling workflow.',
+      fieldKind: 'input',
+      input: 'connection',
+      ui_hidden: false,
+      type: {
+        name: 'WorkflowReturnValueField',
+        cardinality: 'SINGLE_OR_COLLECTION',
+        batch: false,
+      },
+      default: undefined,
+    },
+  },
+  outputs: {},
+  useCache: false,
+  nodePack: 'invokeai',
+  classification: 'beta',
+};
+
 const buildConnectorNode = (id: string) => ({
   id,
   type: 'connector' as const,
@@ -265,6 +325,25 @@ describe(validateConnection.name, () => {
       targetHandle: 'saved_workflow_input::node-1::a',
     };
     const r = validateConnection(c, nextState.nodes, [], templates, null);
+    expect(r).toEqual(null);
+  });
+
+  it('accepts a single workflow return value connected directly to workflow_return values', () => {
+    const sourceNode = buildNode(workflowReturnValueTemplate);
+    const targetNode = buildNode(workflowReturnTemplate);
+    const c = { source: sourceNode.id, sourceHandle: 'value', target: targetNode.id, targetHandle: 'values' };
+
+    const r = validateConnection(
+      c,
+      [sourceNode, targetNode],
+      [],
+      {
+        workflow_return_value: workflowReturnValueTemplate,
+        workflow_return: workflowReturnTemplate,
+      },
+      null
+    );
+
     expect(r).toEqual(null);
   });
 
