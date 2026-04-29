@@ -15,6 +15,7 @@ import {
   getSavedWorkflowDynamicEdgeIdsToRemove,
   getSavedWorkflowDynamicFields,
   getSavedWorkflowFormFieldData,
+  shouldSyncSavedWorkflowDynamicFields,
 } from './callSavedWorkflowFormUtils';
 
 type WorkflowResponse =
@@ -88,6 +89,30 @@ const buildWorkflowResponse = (overrides?: {
   }) as WorkflowResponse;
 
 describe('callSavedWorkflowFormUtils', () => {
+  it('does not sync dynamic fields while a selected saved workflow is still loading', () => {
+    expect(
+      shouldSyncSavedWorkflowDynamicFields({
+        workflowId: 'workflow-1',
+        workflow: undefined,
+      })
+    ).toBe(false);
+  });
+
+  it('syncs dynamic fields when no workflow is selected or when the selected workflow is loaded', () => {
+    expect(
+      shouldSyncSavedWorkflowDynamicFields({
+        workflowId: '',
+        workflow: undefined,
+      })
+    ).toBe(true);
+    expect(
+      shouldSyncSavedWorkflowDynamicFields({
+        workflowId: 'workflow-1',
+        workflow: buildWorkflowResponse(),
+      })
+    ).toBe(true);
+  });
+
   it('returns the stored form when it is non-empty and valid', () => {
     const form = getDefaultForm();
     const heading = buildHeading('Workflow Inputs');

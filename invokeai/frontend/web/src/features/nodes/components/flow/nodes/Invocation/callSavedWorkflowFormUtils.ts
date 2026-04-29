@@ -248,6 +248,16 @@ export const getSavedWorkflowDynamicFields = (
   return dynamicFields;
 };
 
+export const shouldSyncSavedWorkflowDynamicFields = ({
+  workflowId,
+  workflow,
+}: {
+  workflowId: string | null | undefined;
+  workflow: WorkflowResponse | undefined;
+}): boolean => {
+  return !workflowId || Boolean(workflow);
+};
+
 export const getSavedWorkflowDynamicEdgeIdsToRemove = ({
   nodeId,
   fields,

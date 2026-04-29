@@ -18,7 +18,11 @@ import { memo, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetWorkflowQuery } from 'services/api/endpoints/workflows';
 
-import { getSavedWorkflowDynamicEdgeIdsToRemove, getSavedWorkflowDynamicFields } from './callSavedWorkflowFormUtils';
+import {
+  getSavedWorkflowDynamicEdgeIdsToRemove,
+  getSavedWorkflowDynamicFields,
+  shouldSyncSavedWorkflowDynamicFields,
+} from './callSavedWorkflowFormUtils';
 
 const bodySx: SystemStyleObject = {
   flexDirection: 'column',
@@ -56,6 +60,7 @@ const CallSavedWorkflowNode = ({ nodeId, isOpen }: Props) => {
     skip: !workflowIdField.value,
   });
 
+  const shouldSyncDynamicFields = shouldSyncSavedWorkflowDynamicFields({ workflowId: workflowIdField.value, workflow });
   const dynamicFields = useMemo(() => getSavedWorkflowDynamicFields(workflow, templates), [templates, workflow]);
   const edgeIdsToRemove = useMemo(
     () =>
@@ -75,12 +80,15 @@ const CallSavedWorkflowNode = ({ nodeId, isOpen }: Props) => {
   const lastSyncKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!shouldSyncDynamicFields) {
+      return;
+    }
     if (lastSyncKeyRef.current === syncKey) {
       return;
     }
     lastSyncKeyRef.current = syncKey;
     dispatch(callSavedWorkflowDynamicFieldsChanged({ nodeId, fields: dynamicFields, edgeIdsToRemove }));
-  }, [dispatch, dynamicFields, edgeIdsToRemove, nodeId, syncKey]);
+  }, [dispatch, dynamicFields, edgeIdsToRemove, nodeId, shouldSyncDynamicFields, syncKey]);
 
   return (
     <>
