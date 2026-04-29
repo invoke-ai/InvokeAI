@@ -22,6 +22,11 @@ def _patch_multiuser_context(monkeypatch: pytest.MonkeyPatch, *, user_id: str, i
     )
 
 
+def _patch_single_user_context(monkeypatch: pytest.MonkeyPatch) -> None:
+    invoker = SimpleNamespace(services=SimpleNamespace(configuration=SimpleNamespace(multiuser=False)))
+    monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
+
+
 @pytest.mark.anyio
 async def test_authenticated_user_joins_workflow_rooms_on_connect(monkeypatch: pytest.MonkeyPatch) -> None:
     socketio = SocketIO(FastAPI())
@@ -45,6 +50,20 @@ async def test_admin_joins_admin_room_on_connect(monkeypatch: pytest.MonkeyPatch
 
     assert accepted is True
     socketio._sio.enter_room.assert_any_call("sid-1", "user:admin-1")
+    socketio._sio.enter_room.assert_any_call("sid-1", "workflows:shared")
+    socketio._sio.enter_room.assert_any_call("sid-1", "admin")
+
+
+@pytest.mark.anyio
+async def test_single_user_socket_joins_workflow_rooms_on_connect(monkeypatch: pytest.MonkeyPatch) -> None:
+    socketio = SocketIO(FastAPI())
+    socketio._sio.enter_room = AsyncMock()
+    _patch_single_user_context(monkeypatch)
+
+    accepted = await socketio._handle_connect("sid-1", {}, None)
+
+    assert accepted is True
+    socketio._sio.enter_room.assert_any_call("sid-1", "user:system")
     socketio._sio.enter_room.assert_any_call("sid-1", "workflows:shared")
     socketio._sio.enter_room.assert_any_call("sid-1", "admin")
 

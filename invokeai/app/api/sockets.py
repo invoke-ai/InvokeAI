@@ -195,6 +195,9 @@ class SocketIO:
             "is_admin": True,
         }
         logger.debug(f"Socket {sid} connected as system admin (single-user mode)")
+        await self._sio.enter_room(sid, "user:system")
+        await self._sio.enter_room(sid, "workflows:shared")
+        await self._sio.enter_room(sid, "admin")
         return True
 
     @staticmethod

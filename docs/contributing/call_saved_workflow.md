@@ -286,6 +286,9 @@ The current queue-visible implementation uses the following lifecycle contract:
   - child queue rows should not expose direct retry affordances in the UI
   - retry websocket delivery is owner-scoped; when an admin retries roots owned by multiple users, each non-admin user
     must receive only the retry item ids for their own roots, while admins can still observe the full retried set
+- workflow live-update sockets join workflow event rooms in both authenticated multiuser mode and unauthenticated
+  single-user mode; the frontend relies on those events to invalidate workflow library data and clear deleted saved
+  workflow selections
 
 This is now part of the intended user-facing contract, even though the orchestration still lives in
 `WorkflowCallCoordinator`.
