@@ -5,7 +5,17 @@ import type { WorkflowV3 } from 'features/nodes/types/workflow';
 import { getDefaultForm } from 'features/nodes/types/workflow';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('app/logging/logger', () => ({
+  logger: () => ({
+    trace: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }),
+}));
 
 //TODO(psyche): Test workflow validation for form builder fields
 describe('validateWorkflow', () => {
