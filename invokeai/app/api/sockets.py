@@ -260,20 +260,37 @@ class SocketIO:
     async def _handle_unsub_bulk_download(self, sid: str, data: Any) -> None:
         await self._sio.leave_room(sid, BulkDownloadSubscriptionEvent(**data).bulk_download_id)
 
+    def _owner_and_admin_sids(self, owner_user_id: str) -> list[str]:
+        """Sids belonging to the event's owner or to any admin.
+
+        Used as `skip_sid` when broadcasting a sanitized companion event to the queue room,
+        so the owner and admins (who already received the full event) don't get a second
+        copy that would clobber their cache with redacted values.
+        """
+        return [
+            sid
+            for sid, info in self._socket_users.items()
+            if info.get("user_id") == owner_user_id or info.get("is_admin")
+        ]
+
     async def _handle_queue_event(self, event: FastAPIEvent[QueueEventBase]):
         """Handle queue events with user isolation.
 
-        All queue item events (invocation events AND QueueItemStatusChangedEvent) are
-        private to the owning user and admins. They carry unsanitized user_id, batch_id,
-        session_id, origin, destination and error metadata, and must never be broadcast
-        to the whole queue room — otherwise any other authenticated subscriber could
-        observe cross-user queue activity.
+        Queue events split into two routing paths:
 
-        RecallParametersUpdatedEvent is also private to the owner + admins.
+        1. The owner and admins receive the full unsanitized event in their `user:{id}` /
+           `admin` rooms. The full payload may include batch_id, session_id, origin,
+           destination, error metadata, etc.
 
-        BatchEnqueuedEvent carries the enqueuing user's batch_id/origin/counts and
-        is also routed privately. QueueClearedEvent is the only queue event that
-        is still broadcast to the whole queue room.
+        2. For events that other authenticated users need to know about so their queue list
+           and badge counts stay in sync (QueueItemStatusChangedEvent and BatchEnqueuedEvent),
+           a sanitized companion event is also emitted to the full queue room with the
+           owner's and admins' sids in `skip_sid`. The companion uses `user_id="redacted"`
+           as a sentinel so the frontend handler knows to do tag invalidation only and skip
+           per-session side effects.
+
+        InvocationEventBase events stay private (owner + admins only). RecallParametersUpdatedEvent
+        is also private. QueueClearedEvent has no user identity and is broadcast to the queue room.
 
         IMPORTANT: Check InvocationEventBase BEFORE QueueItemEventBase since InvocationEventBase
         inherits from QueueItemEventBase. The order of isinstance checks matters!
@@ -302,10 +319,51 @@ class SocketIO:
 
                 logger.debug(f"Emitted private invocation event {event_name} to user room {user_room} and admin room")
 
-            # Other queue item events (QueueItemStatusChangedEvent) carry unsanitized
-            # user_id, batch_id, session_id, origin, destination and error metadata.
-            # They are private to the owning user + admins — never broadcast to the
-            # full queue room.
+            # QueueItemStatusChangedEvent: full to owner+admin, sanitized to everyone else in
+            # the queue room so their queue list, badge, and item caches refresh.
+            elif isinstance(event_data, QueueItemStatusChangedEvent):
+                user_room = f"user:{event_data.user_id}"
+                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
+                await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
+
+                sanitized = event_data.model_copy(
+                    update={
+                        "user_id": "redacted",
+                        "batch_id": "redacted",
+                        "session_id": "redacted",
+                        "origin": None,
+                        "destination": None,
+                        "error_type": None,
+                        "error_message": None,
+                        "error_traceback": None,
+                    }
+                )
+                # Strip identifying fields out of the embedded batch_status / queue_status too.
+                sanitized.batch_status = sanitized.batch_status.model_copy(
+                    update={"batch_id": "redacted", "origin": None, "destination": None}
+                )
+                sanitized.queue_status = sanitized.queue_status.model_copy(
+                    update={
+                        "item_id": None,
+                        "session_id": None,
+                        "batch_id": None,
+                        "user_pending": None,
+                        "user_in_progress": None,
+                    }
+                )
+                await self._sio.emit(
+                    event=event_name,
+                    data=sanitized.model_dump(mode="json"),
+                    room=event_data.queue_id,
+                    skip_sid=self._owner_and_admin_sids(event_data.user_id),
+                )
+
+                logger.debug(
+                    f"Emitted queue_item_status_changed: full to {user_room}+admin, sanitized to queue {event_data.queue_id}"
+                )
+
+            # Other queue item events (currently none beyond QueueItemStatusChangedEvent that
+            # carry user_id) stay private to owner + admins.
             elif isinstance(event_data, QueueItemEventBase) and hasattr(event_data, "user_id"):
                 user_room = f"user:{event_data.user_id}"
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
@@ -320,14 +378,25 @@ class SocketIO:
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
                 logger.debug(f"Emitted private recall_parameters_updated event to user room {user_room} and admin room")
 
-            # BatchEnqueuedEvent carries the enqueuing user's batch_id, origin, and
-            # enqueued counts. Route it privately to the owner + admins so other
-            # users do not observe cross-user batch activity.
+            # BatchEnqueuedEvent: full to owner+admin, sanitized to everyone else in the queue
+            # room so their badge total and queue list pick up the new items.
             elif isinstance(event_data, BatchEnqueuedEvent):
                 user_room = f"user:{event_data.user_id}"
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room=user_room)
                 await self._sio.emit(event=event_name, data=event_data.model_dump(mode="json"), room="admin")
-                logger.debug(f"Emitted private batch_enqueued event to user room {user_room} and admin room")
+
+                sanitized = event_data.model_copy(
+                    update={"user_id": "redacted", "batch_id": "redacted", "origin": None}
+                )
+                await self._sio.emit(
+                    event=event_name,
+                    data=sanitized.model_dump(mode="json"),
+                    room=event_data.queue_id,
+                    skip_sid=self._owner_and_admin_sids(event_data.user_id),
+                )
+                logger.debug(
+                    f"Emitted batch_enqueued: full to {user_room}+admin, sanitized to queue {event_data.queue_id}"
+                )
 
             else:
                 # For remaining queue events (e.g. QueueClearedEvent) that do not

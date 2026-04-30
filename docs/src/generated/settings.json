@@ -576,6 +576,20 @@
     },
     {
       "category": "GENERATION",
+      "default": "round_robin",
+      "description": "Session queue mode. Use 'FIFO' for traditional first-in-first-out, or 'round_robin' to serve each user's jobs in turn. In single-user mode, FIFO is always used regardless of this setting.",
+      "env_var": "INVOKEAI_SESSION_QUEUE_MODE",
+      "literal_values": [
+        "FIFO",
+        "round_robin"
+      ],
+      "name": "session_queue_mode",
+      "required": false,
+      "type": "typing.Literal['FIFO', 'round_robin']",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
       "default": false,
       "description": "Empties session queue on startup. If true, disables `max_queue_history`.",
       "env_var": "INVOKEAI_CLEAR_QUEUE_ON_STARTUP",
