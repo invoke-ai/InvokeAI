@@ -83,11 +83,6 @@ export default defineConfig({
           autogenerate: { directory: 'features' },
         },
         {
-          label: 'Workflows',
-          autogenerate: { directory: 'workflows' },
-          collapsed: true,
-        },
-        {
           label: 'Development',
           autogenerate: { directory: 'development', collapsed: true },
           collapsed: true,
