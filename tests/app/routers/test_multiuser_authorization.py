@@ -1576,11 +1576,15 @@ class TestWebSocketAuth:
         import asyncio
 
         mock_invoker.services.configuration.multiuser = False
+        socketio._sio.enter_room = AsyncMock()
 
         result = asyncio.run(socketio._handle_connect("sid-single-1", environ={}, auth=None))
         assert result is True
         assert socketio._socket_users["sid-single-1"]["user_id"] == "system"
         assert socketio._socket_users["sid-single-1"]["is_admin"] is True
+        socketio._sio.enter_room.assert_any_call("sid-single-1", "user:system")
+        socketio._sio.enter_room.assert_any_call("sid-single-1", "workflows:shared")
+        socketio._sio.enter_room.assert_any_call("sid-single-1", "admin")
 
     def test_connect_accepted_with_valid_token_in_multiuser_mode(
         self,

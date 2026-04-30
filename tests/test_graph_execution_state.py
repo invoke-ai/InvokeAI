@@ -287,7 +287,7 @@ def test_graph_attach_waiting_workflow_call_child_sessions_tracks_fan_out_metada
     assert child_b.workflow_call_parent is not None
 
 
-def test_graph_record_waiting_workflow_call_child_completion_aggregates_collections():
+def test_graph_record_waiting_workflow_call_child_completion_aggregates_named_values():
     parent = GraphExecutionState(graph=Graph())
     parent.execution_graph.add_node(AddInvocation(id="prepared-parent", a=1, b=2))
     parent.prepared_source_mapping["prepared-parent"] = "source-parent"
@@ -299,13 +299,17 @@ def test_graph_record_waiting_workflow_call_child_completion_aggregates_collecti
     parent.begin_waiting_on_workflow_call(frame)
     parent.attach_waiting_workflow_call_child_sessions([child_a, child_b])
 
-    is_complete, aggregated_collection = parent.record_waiting_workflow_call_child_completion(101, [1, 2])
+    is_complete, aggregated_values = parent.record_waiting_workflow_call_child_completion(
+        101, {"sum": 3, "images": "image-a"}
+    )
     assert is_complete is False
-    assert aggregated_collection == [1, 2]
+    assert aggregated_values == {"sum": [3], "images": ["image-a"]}
 
-    is_complete, aggregated_collection = parent.record_waiting_workflow_call_child_completion(102, [3])
+    is_complete, aggregated_values = parent.record_waiting_workflow_call_child_completion(
+        102, {"sum": 7, "images": "image-b"}
+    )
     assert is_complete is True
-    assert aggregated_collection == [1, 2, 3]
+    assert aggregated_values == {"sum": [3, 7], "images": ["image-a", "image-b"]}
     assert parent.waiting_workflow_call_execution is not None
     assert parent.waiting_workflow_call_execution.completed_child_item_ids == [101, 102]
 
