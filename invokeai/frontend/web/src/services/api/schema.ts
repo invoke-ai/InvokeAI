@@ -4690,6 +4690,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -4770,6 +4775,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -4947,6 +4957,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -6492,6 +6507,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -6715,6 +6735,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -6788,6 +6813,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -6863,6 +6893,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -6936,6 +6971,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -7021,6 +7061,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -7095,6 +7140,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -7165,6 +7215,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -7237,6 +7292,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -7307,6 +7367,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -8983,6 +9048,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -9311,6 +9381,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -12634,6 +12709,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -12701,6 +12781,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -12770,6 +12855,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -12838,6 +12928,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -12905,6 +13000,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -12976,6 +13076,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -13045,6 +13150,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -17448,6 +17558,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -17751,6 +17866,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -17829,6 +17949,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -17905,6 +18030,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -17980,6 +18110,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -18054,6 +18189,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -18132,6 +18272,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -18212,6 +18357,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -18286,6 +18436,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -18364,6 +18519,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -18444,6 +18604,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -18518,6 +18683,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -18594,6 +18764,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -18668,6 +18843,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -18747,6 +18927,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -18823,6 +19008,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -18897,6 +19087,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19243,6 +19438,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -19330,6 +19530,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -19412,6 +19617,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19497,6 +19707,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -19577,6 +19792,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19660,6 +19880,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -19742,6 +19967,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -19823,6 +20053,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -19909,6 +20144,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -19990,6 +20230,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -20069,6 +20314,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20151,6 +20401,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -20232,6 +20487,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -20309,6 +20569,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20389,6 +20654,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -20467,6 +20737,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20552,6 +20827,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -20630,6 +20910,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20713,6 +20998,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -20793,6 +21083,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -20878,6 +21173,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -20962,6 +21262,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -21045,6 +21350,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -23235,6 +23545,11 @@ export type components = {
              */
             source_api_response?: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page)
+             */
+            source_url?: string | null;
+            /**
              * Name
              * @description Name of the model.
              */
@@ -24470,6 +24785,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -24552,6 +24872,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -24638,6 +24963,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -27336,6 +27666,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -27537,6 +27872,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -28387,6 +28727,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -28457,6 +28802,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -28544,6 +28894,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -28620,6 +28975,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -28705,6 +29065,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -28772,6 +29137,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -28841,6 +29211,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -28908,6 +29283,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -28977,6 +29357,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -29044,6 +29429,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -29179,6 +29569,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -29661,6 +30056,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -29945,6 +30345,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -30017,6 +30422,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30094,6 +30504,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -30166,6 +30581,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30240,6 +30660,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -30312,6 +30737,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
@@ -30389,6 +30819,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -30459,6 +30894,11 @@ export type components = {
              */
             source_api_response: string | null;
             /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
+            /**
              * Cover Image
              * @description Url for image to preview model
              */
@@ -30528,6 +30968,11 @@ export type components = {
              * @description The original API response from the source, as stringified JSON.
              */
             source_api_response: string | null;
+            /**
+             * Source Url
+             * @description Optional URL for the model (e.g. download page or model page).
+             */
+            source_url: string | null;
             /**
              * Cover Image
              * @description Url for image to preview model
