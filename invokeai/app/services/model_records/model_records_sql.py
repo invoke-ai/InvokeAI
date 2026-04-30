@@ -187,10 +187,7 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 # Qwen3 encoder to a Text LLM keeps format=qwen3_encoder, which has no matching discriminator
                 # under text_llm). If the initial validation fails and the type changed, retry with stale
                 # format/variant fields stripped so the new class can apply its own defaults.
-                type_changed = (
-                    "type" in changes.model_fields_set
-                    and changes.type != record.type
-                )
+                type_changed = "type" in changes.model_fields_set and changes.type != record.type
                 try:
                     record = ModelConfigFactory.from_dict(record_as_dict)
                 except ValidationError:
