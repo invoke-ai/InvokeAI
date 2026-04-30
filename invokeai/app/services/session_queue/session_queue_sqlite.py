@@ -903,7 +903,7 @@ class SqliteSessionQueue(SessionQueueBase):
 
         queue_item = self.get_queue_item(item_id)
         batch_status = self.get_batch_status(queue_id=queue_item.queue_id, batch_id=queue_item.batch_id)
-        queue_status = self.get_queue_status(queue_id=queue_item.queue_id)
+        queue_status = self.get_queue_status(queue_id=queue_item.queue_id, acting_user_id=queue_item.user_id)
         self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
         return queue_item
 
