@@ -4,6 +4,7 @@ description: How to authenticate and interact with the InvokeAI API in multi-use
 sidebar:
   order: 5
 ---
+import { Steps } from '@astrojs/starlight/components'
 
 ## Overview
 
@@ -33,10 +34,12 @@ When multi-user mode is enabled, all API endpoints (except `/api/v1/auth/setup` 
 
 **Authentication Process:**
 
+<Steps>
 1. **Obtain Token**: POST credentials to `/api/v1/auth/login`
 2. **Store Token**: Save the JWT token securely
 3. **Use Token**: Include token in `Authorization` header for all requests
 4. **Refresh**: Re-authenticate when token expires
+</Steps>
 
 :::note[Single-User Mode]
 When running in single-user mode (`multiuser: false`), authentication endpoints are not available and authentication headers are not required.
@@ -1221,9 +1224,8 @@ cors_origins:
 
 ## Additional Resources
 
-- [User Guide](/features/multi-user/user-guide/) — For end users
-- [Administrator Guide](/features/multi-user/admin-guide/) — For administrators
-- [Multi-User Specification](/features/multi-user/specification/) — Technical details
+- [User Guide](./user-guide/) — For end users
+- [Administrator Guide](./admin-guide/) — For administrators
 - [GitHub Repository](https://github.com/invoke-ai/InvokeAI) — Source code
 
 ---

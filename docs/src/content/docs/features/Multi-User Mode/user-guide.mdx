@@ -4,6 +4,7 @@ description: How to use InvokeAI in multi-user mode as an end user.
 sidebar:
   order: 3
 ---
+import { Steps } from '@astrojs/starlight/components'
 
 ## Overview
 
@@ -46,6 +47,7 @@ If you're the first person to access a fresh InvokeAI installation in multi-user
 
 Now:
 
+<Steps>
 1. Enter your email address (this will be your login name)
 2. Create a display name (this will be the name other users see)
 3. Choose a strong password that meets the requirements:
@@ -55,6 +57,7 @@ Now:
     - Contains numbers
 4. Confirm your password
 5. Click **Create Administrator Account**
+</Steps>
 
 You'll now be taken to a login screen and can enter the credentials you just created.
 
@@ -74,43 +77,12 @@ This will take you to the User Management screen...
 
 The User Management screen also allows you to:
 
+<Steps>
 1. Temporarily change a user's status to Inactive, preventing them from logging in to Invoke.
 2. Edit a user (by clicking on the pencil icon) to change the user's display name or password.
 3. Permanently delete a user.
 4. Grant a user Administrator privileges.
-
-### Command-line User Management Scripts
-
-Administrators can also use a series of command-line scripts to add, modify, or delete users. If you use the launcher, click the ">" icon to enter the command-line interface. Otherwise, if you are a native command-line user, activate the InvokeAI environment from your terminal.
-
-The commands are named:
-
-- **invoke-useradd** — add a user
-- **invoke-usermod** — modify a user
-- **invoke-userdel** — delete a user
-- **invoke-userlist** — list all users
-
-Pass the `--help` argument to get the usage of each script. For example:
-
-```bash
-> invoke-useradd --help
-usage: invoke-useradd [-h] [--root ROOT] [--email EMAIL] [--password PASSWORD] [--name NAME] [--admin]
-
-Add a user to the InvokeAI database
-
-options:
-  -h, --help            show this help message and exit
-  --root ROOT, -r ROOT  Path to the InvokeAI root directory. If omitted, the root is resolved in this order: the $INVOKEAI_ROOT environment
-                        variable, the active virtual environment's parent directory, or $HOME/invokeai.
-  --email EMAIL, -e EMAIL
-                        User email address
-  --password PASSWORD, -p PASSWORD
-                        User password
-  --name NAME, -n NAME  User display name (optional)
-  --admin, -a           Make user an administrator
-
-If no arguments are provided, the script will run in interactive mode.
-```
+</Steps>
 
 ---
 
@@ -281,9 +253,11 @@ These settings are stored per-user and won't affect other users.
 
 **Possible Causes:**
 
+<Steps>
 1. **Filter Applied:** Check if a filter is hiding content
 2. **Wrong User:** Ensure you're logged in with the correct account
 3. **Archived Board:** Check the "Show Archived" option
+</Steps>
 
 **Solution:**
 
@@ -342,7 +316,7 @@ Yes. You can mark any workflow as shared (public), which makes it visible to all
 
 ### Can I use the API with multi-user mode?
 
-Yes, but you'll need to authenticate with a JWT token. See the [API Guide](/features/multi-user/api-guide/) for details.
+Yes, but you'll need to authenticate with a JWT token. See the [API Guide](./api-guide/) for details.
 
 ### What happens if I forget my password?
 
@@ -385,6 +359,5 @@ When reporting an issue, include:
 
 ## Additional Resources
 
-- [Administrator Guide](/features/multi-user/admin-guide/) — For administrators managing users and the system
-- [API Guide](/features/multi-user/api-guide/) — For developers using the InvokeAI API
-- [Multi-User Specification](/features/multi-user/specification/) — Technical details about the feature
+- [Administrator Guide](./admin-guide/) — For administrators managing users and the system
+- [API Guide](./api-guide/) — For developers using the InvokeAI API
