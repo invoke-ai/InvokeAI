@@ -47,6 +47,7 @@ from pathlib import Path
 from typing import List, Optional, Union
 
 import pydantic
+from pydantic import ValidationError
 
 from invokeai.app.services.model_records.model_records_base import (
     DuplicateModelException,
@@ -59,8 +60,33 @@ from invokeai.app.services.model_records.model_records_base import (
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+
+
+def _construct_config_for_type(fields: dict, target_type: ModelType) -> AnyModelConfig:
+    """Try every config class whose `type` default matches `target_type` and return the first that validates.
+
+    Used when changing a model's type via the update endpoint: the existing record's `format`/`variant`
+    fields belong to the old class and may not have a discriminator match in the new type space, so we
+    fall back to constructing each candidate class directly with whatever fields it accepts.
+    """
+    last_error: Exception | None = None
+    for candidate_class in Config_Base.CONFIG_CLASSES:
+        type_field = candidate_class.model_fields.get("type")
+        if type_field is None or type_field.default != target_type:
+            continue
+        try:
+            return candidate_class(**fields)  # type: ignore[return-value]
+        except ValidationError as e:
+            last_error = e
+    if last_error is not None:
+        raise last_error
+    raise ValidationError.from_exception_data(
+        f"No model config class found for type={target_type!r}",
+        line_errors=[],
+    )
 
 
 class ModelRecordServiceSQL(ModelRecordServiceBase):
@@ -154,8 +180,27 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
                 for field_name in changes.model_fields_set:
                     record_as_dict[field_name] = getattr(changes, field_name)
 
-                # 3. Attempt to create a new model config from the updated dict
-                record = ModelConfigFactory.from_dict(record_as_dict)
+                # 3. Attempt to create a new model config from the updated dict.
+                #
+                # When the model type is being changed, the previous record's `format` and `variant` likely
+                # belong to the old config class and won't validate against the new one (e.g. switching a
+                # Qwen3 encoder to a Text LLM keeps format=qwen3_encoder, which has no matching discriminator
+                # under text_llm). If the initial validation fails and the type changed, retry with stale
+                # format/variant fields stripped so the new class can apply its own defaults.
+                type_changed = (
+                    "type" in changes.model_fields_set
+                    and changes.type != record.type
+                )
+                try:
+                    record = ModelConfigFactory.from_dict(record_as_dict)
+                except ValidationError:
+                    if not type_changed:
+                        raise
+                    fallback_dict = dict(record_as_dict)
+                    for stale_field in ("format", "variant"):
+                        if stale_field not in changes.model_fields_set:
+                            fallback_dict.pop(stale_field, None)
+                    record = _construct_config_for_type(fallback_dict, changes.type)
 
                 # If we get this far, the updated model config is valid, so we can save it to the database.
                 json_serialized = record.model_dump_json()
