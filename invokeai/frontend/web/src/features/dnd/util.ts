@@ -1,7 +1,6 @@
 import type { GetOffsetFn } from '@atlaskit/pragmatic-drag-and-drop/dist/types/public-utils/element/custom-native-drag-preview/types';
 import type { Input } from '@atlaskit/pragmatic-drag-and-drop/types';
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { noop } from 'es-toolkit/compat';
 import type { CSSProperties } from 'react';
 
 /**
@@ -47,12 +46,12 @@ export function triggerPostMoveFlash(element: HTMLElement, backgroundColor: CSSP
 }
 
 /**
- * Firefox has a bug where input or textarea elements with draggable parents do not allow selection of their text.
+ * Some browsers have a bug where input or textarea elements with draggable parents do not allow selection of their text.
  *
  * This helper function implements a workaround by setting the draggable attribute to false when the mouse is over a
  * input or textarea child of the draggable. It reverts the attribute on mouse out.
  *
- * The fix is only applied for Firefox, and should be used in every `pragmatic-drag-and-drop` `draggable`.
+ * The fix should be used in every `pragmatic-drag-and-drop` `draggable`.
  *
  * See:
  * - https://github.com/atlassian/pragmatic-drag-and-drop/issues/111
@@ -66,7 +65,7 @@ export function triggerPostMoveFlash(element: HTMLElement, backgroundColor: CSSP
  *     return;
  *   }
  *   return combine(
- *     firefoxDndFix(element),
+ *     dndInputFix(element),
  *     // The rest of the draggable setup is the same
  *     draggable({
  *       element,
@@ -77,11 +76,7 @@ export function triggerPostMoveFlash(element: HTMLElement, backgroundColor: CSSP
  * @param element The draggable element
  * @returns A cleanup function that removes the event listeners
  */
-export const firefoxDndFix = (element: HTMLElement): (() => void) => {
-  if (!navigator.userAgent.includes('Firefox')) {
-    return noop;
-  }
-
+export const dndInputFix = (element: HTMLElement): (() => void) => {
   const abortController = new AbortController();
 
   element.addEventListener(

@@ -6,7 +6,7 @@ import { useMiddleClickOpenInNewTab } from 'common/hooks/useMiddleClickOpenInNew
 import { singleImageDndSource } from 'features/dnd/dnd';
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
 import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
-import { firefoxDndFix } from 'features/dnd/util';
+import { dndInputFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
 import { forwardRef, memo, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
@@ -40,7 +40,7 @@ export const DndImage = memo(
         return;
       }
       return combine(
-        firefoxDndFix(element),
+        dndInputFix(element),
         draggable({
           element,
           getInitialData: () => singleImageDndSource.getData({ imageDTO }, imageDTO.image_name),
