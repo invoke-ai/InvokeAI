@@ -46,9 +46,9 @@ export function triggerPostMoveFlash(element: HTMLElement, backgroundColor: CSSP
 }
 
 /**
- * Some browsers have a bug where input or textarea elements with draggable parents do not allow selection of their text.
+ * There is a bug where input or textarea elements with draggable parents do not allow selection of their text.
  *
- * This helper function implements a workaround by setting the draggable attribute to false when the mouse is over a
+ * This helper function implements a workaround by setting the draggable attribute to false when the mouse is over an
  * input or textarea child of the draggable. It reverts the attribute on mouse out.
  *
  * The fix should be used in every `pragmatic-drag-and-drop` `draggable`.
