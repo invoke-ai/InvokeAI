@@ -6,6 +6,7 @@ import type {
   GetQueueItemIdsArgs,
   GetQueueItemIdsResult,
 } from 'services/api/types';
+import { getQueueStatusWithObservedEvents } from 'services/events/queueStatusEvents';
 import stableHash from 'stable-hash';
 import type { Param0 } from 'tsafe';
 
@@ -152,6 +153,9 @@ export const queueApi = api.injectEndpoints({
         url: buildQueueUrl('status'),
         method: 'GET',
       }),
+      transformResponse: (
+        response: paths['/api/v1/queue/{queue_id}/status']['get']['responses']['200']['content']['application/json']
+      ) => getQueueStatusWithObservedEvents(response),
       providesTags: ['SessionQueueStatus', 'FetchOnReconnect'],
     }),
     getBatchStatus: build.query<

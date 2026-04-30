@@ -50,6 +50,7 @@ import {
 } from 'services/events/nodeExecutionState';
 import { buildOnInvocationComplete } from 'services/events/onInvocationComplete';
 import { buildOnModelInstallError, DiscordLink, GitHubIssuesLink } from 'services/events/onModelInstallError';
+import { getUpdatedQueueStatusOnQueueItemStatusChanged } from 'services/events/queueStatusEvents';
 import type { ClientToServerEvents, ServerToClientEvents } from 'services/events/types';
 import type { Socket } from 'socket.io-client';
 import type { JsonObject } from 'type-fest';
@@ -491,6 +492,11 @@ export const setEventListeners = ({ socket, store, setIsConnected }: SetEventLis
         })
       );
     }
+    dispatch(
+      queueApi.util.updateQueryData('getQueueStatus', undefined, (draft) =>
+        getUpdatedQueueStatusOnQueueItemStatusChanged(draft, data)
+      )
+    );
 
     // Invalidate caches for things we cannot easily update
     // Invalidate SessionQueueStatus to refetch with user-specific counts
