@@ -70,6 +70,7 @@ const NodeWrapper = (props: NodeWrapperProps) => {
       onMouseOut={mouseOverNode.handleMouseOut}
       className={DRAG_HANDLE_CLASSNAME}
       sx={containerSx}
+      borderRadius="base"
       width={width || NODE_WIDTH}
       opacity={opacity}
       data-is-selected={selected}
