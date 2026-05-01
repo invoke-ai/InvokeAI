@@ -105,12 +105,12 @@ export const GenerationSettingsAccordion = memo(() => {
                   !isZImage &&
                   !isQwenImage &&
                   !isAnima && <ParamScheduler />}
-                {!isExternal && isFLUX && <ParamFluxScheduler />}
+                {!isExternal && (isFLUX || isFlux2) && <ParamFluxScheduler />}
                 {!isExternal && isZImage && <ParamZImageScheduler />}
                 {!isExternal && isAnima && <ParamAnimaScheduler />}
                 {modelSupportsSteps && <ParamSteps />}
                 {isExternal && modelSupportsGuidance && <ParamGuidance />}
-                {!isExternal && (isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && (
+                {!isExternal && isFLUX && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && (
                   <ParamGuidance />
                 )}
                 {!isExternal && !isFLUX && !isFlux2 && <ParamCFGScale />}

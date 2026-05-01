@@ -73,8 +73,20 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def get_queue_status(self, queue_id: str, user_id: Optional[str] = None) -> SessionQueueStatus:
-        """Gets the status of the queue. If user_id is provided, also includes user-specific counts."""
+    def get_queue_status(
+        self,
+        queue_id: str,
+        user_id: Optional[str] = None,
+        acting_user_id: Optional[str] = None,
+    ) -> SessionQueueStatus:
+        """Gets the status of the queue. If user_id is provided, also includes user-specific counts.
+
+        acting_user_id is independent of user_id and controls only current-item redaction:
+        when set, the returned status omits item_id/session_id/batch_id unless the
+        currently-running item belongs to acting_user_id. The redaction is decided from the
+        same get_current() snapshot used to embed those identifiers, so it cannot race against
+        a concurrent state change.
+        """
         pass
 
     @abstractmethod
