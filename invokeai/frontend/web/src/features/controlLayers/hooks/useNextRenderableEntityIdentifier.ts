@@ -5,10 +5,13 @@ import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types'
 import { getEntityIdentifier } from 'features/controlLayers/store/types';
 import { useMemo } from 'react';
 
-export const useEntityIdentifierBelowThisOne = <T extends CanvasEntityIdentifier>(entityIdentifier: T): T | null => {
+export const useEntityIdentifierBelowThisOne = <T extends CanvasEntityIdentifier>(entityIdentifier: T | null): T | null => {
   const selector = useMemo(
     () =>
       createMemoizedSelector(selectCanvasSlice, (canvas) => {
+        if (entityIdentifier === null) {
+          return null;
+        }
         const nextEntity = selectEntityIdentifierBelowThisOne(canvas, entityIdentifier);
         if (!nextEntity) {
           return null;
