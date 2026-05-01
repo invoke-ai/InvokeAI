@@ -388,7 +388,7 @@ const TextEditor = ({
       const modifierPressed = syncModifierState(event);
       if (!modifierPressed) {
         if (canvasManager.tool.$tool.get() !== 'text') {
-          canvasManager.tool.$tool.set('text');
+          canvasManager.tool.setBaseTool('text');
         }
         return;
       }
@@ -406,7 +406,7 @@ const TextEditor = ({
       setIsDragging(true);
       event.currentTarget.setPointerCapture(event.pointerId);
     },
-    [anchor, canvasManager.tool.$tool, getStagePoint, syncModifierState]
+    [anchor, canvasManager.tool, getStagePoint, syncModifierState]
   );
 
   const handleBorderPointerDown = useCallback(

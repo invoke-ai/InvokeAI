@@ -1,27 +1,18 @@
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { useCallback, useEffect, useRef } from 'react';
-
-import { beginBboxToolHotkeyPress, endBboxToolHotkeyPress, type BboxToolHotkeyPressedState } from './bboxToolHotkey';
+import { useCallback, useEffect } from 'react';
 
 export const useCanvasSelectBboxToolHotkey = () => {
   useAssertSingleton(useCanvasSelectBboxToolHotkey.name);
   const canvasManager = useCanvasManager();
-  const pressedStateRef = useRef<BboxToolHotkeyPressedState | null>(null);
 
   const onKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.repeat) {
         return;
       }
-
-      const started = beginBboxToolHotkeyPress(canvasManager.tool.$tool.get(), Date.now());
-      pressedStateRef.current = started.pressedState;
-
-      if (started.nextTool) {
-        canvasManager.tool.$tool.set(started.nextTool);
-      }
+      canvasManager.tool.onBboxToolHotkeyDown(event);
     },
     [canvasManager]
   );
@@ -31,43 +22,16 @@ export const useCanvasSelectBboxToolHotkey = () => {
       if (event.repeat) {
         return;
       }
-
-      const ended = endBboxToolHotkeyPress({
-        currentTool: canvasManager.tool.$tool.get(),
-        pressedState: pressedStateRef.current,
-        releasedAt: Date.now(),
-      });
-
-      pressedStateRef.current = null;
-
-      if (ended.revertToTool) {
-        canvasManager.tool.$tool.set(ended.revertToTool);
-      }
+      canvasManager.tool.onBboxToolHotkeyUp(event);
     },
     [canvasManager]
   );
 
-  const onWindowBlur = useCallback(() => {
-    const pressedState = pressedStateRef.current;
-
-    if (!pressedState) {
-      return;
-    }
-
-    pressedStateRef.current = null;
-
-    if (canvasManager.tool.$tool.get() === 'bbox') {
-      canvasManager.tool.$tool.set(pressedState.previousTool);
-    }
-  }, [canvasManager]);
-
   useEffect(() => {
-    window.addEventListener('blur', onWindowBlur);
-
     return () => {
-      window.removeEventListener('blur', onWindowBlur);
+      canvasManager.tool.clearBboxToolHotkey();
     };
-  }, [onWindowBlur]);
+  }, [canvasManager]);
 
   useRegisteredHotkeys({
     id: 'selectBboxTool',
