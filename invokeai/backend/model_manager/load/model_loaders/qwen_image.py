@@ -7,7 +7,10 @@ import torch
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import Main_GGUF_QwenImage_Config
-from invokeai.backend.model_manager.configs.qwen_vl_encoder import QwenVLEncoder_Diffusers_Config
+from invokeai.backend.model_manager.configs.qwen_vl_encoder import (
+    QwenVLEncoder_Checkpoint_Config,
+    QwenVLEncoder_Diffusers_Config,
+)
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
@@ -214,3 +217,161 @@ class QwenVLEncoderLoader(ModelLoader):
             f"Only Tokenizer and TextEncoder submodels are supported. "
             f"Received: {submodel_type.value if submodel_type else 'None'}"
         )
+
+
+@ModelLoaderRegistry.register(
+    base=BaseModelType.Any, type=ModelType.QwenVLEncoder, format=ModelFormat.Checkpoint
+)
+class QwenVLEncoderCheckpointLoader(ModelLoader):
+    """Loads a single-file Qwen2.5-VL encoder checkpoint (e.g. ComfyUI fp8_scaled).
+
+    The checkpoint bundles the language model and the visual tower into one
+    safetensors file. Tokenizer + processor are pulled from HuggingFace
+    (`Qwen/Qwen2.5-VL-7B-Instruct`) on first use, with offline cache fallback.
+    """
+
+    DEFAULT_HF_REPO = "Qwen/Qwen2.5-VL-7B-Instruct"
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, QwenVLEncoder_Checkpoint_Config):
+            raise TypeError(f"Expected QwenVLEncoder_Checkpoint_Config, got {type(config).__name__}.")
+
+        match submodel_type:
+            case SubModelType.Tokenizer:
+                return self._load_tokenizer_with_offline_fallback()
+            case SubModelType.TextEncoder:
+                return self._load_text_encoder_from_singlefile(config)
+
+        raise ValueError(
+            f"Only Tokenizer and TextEncoder submodels are supported. "
+            f"Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_tokenizer_with_offline_fallback(self) -> AnyModel:
+        from transformers import AutoTokenizer
+
+        try:
+            return AutoTokenizer.from_pretrained(self.DEFAULT_HF_REPO, local_files_only=True)
+        except OSError:
+            return AutoTokenizer.from_pretrained(self.DEFAULT_HF_REPO)
+
+    def _load_text_encoder_from_singlefile(self, config: QwenVLEncoder_Checkpoint_Config) -> AnyModel:
+        from safetensors.torch import load_file
+        from transformers import AutoConfig, Qwen2_5_VLForConditionalGeneration
+
+        from invokeai.backend.util.logging import InvokeAILogger
+
+        logger = InvokeAILogger.get_logger(self.__class__.__name__)
+
+        model_path = Path(config.path)
+
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        sd = load_file(str(model_path))
+
+        # Dequantize ComfyUI-style fp8 weights (weight + weight_scale pairs).
+        # Same scheme as Z-Image's Qwen3 single-file loader.
+        weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(".weight_scale")]
+        dequantized_count = 0
+        for scale_key in weight_scale_keys:
+            weight_key = scale_key.replace(".weight_scale", ".weight")
+            if weight_key not in sd:
+                continue
+            weight = sd[weight_key]
+            scale = sd[scale_key]
+            weight_float = weight.float()
+            scale_float = scale.float()
+            if scale_float.shape != weight_float.shape and scale_float.numel() > 1:
+                # Block-wise quantization: expand scale along mismatching dim
+                for dim in range(len(weight_float.shape)):
+                    if dim < len(scale_float.shape) and scale_float.shape[dim] != weight_float.shape[dim]:
+                        block_size = weight_float.shape[dim] // scale_float.shape[dim]
+                        if block_size > 1:
+                            scale_float = scale_float.repeat_interleave(block_size, dim=dim)
+            sd[weight_key] = weight_float * scale_float
+            dequantized_count += 1
+
+        if dequantized_count > 0:
+            logger.info(f"Dequantized {dequantized_count} ComfyUI-quantized weights")
+
+        # Strip ComfyUI quantization metadata (weight_scale, comfy_quant.*, scaled_fp8)
+        keys_to_drop = [
+            k
+            for k in sd.keys()
+            if isinstance(k, str)
+            and (k.endswith(".weight_scale") or "comfy_quant" in k or k == "scaled_fp8")
+        ]
+        for k in keys_to_drop:
+            del sd[k]
+
+        # Cast to compute dtype (skip integer/index tensors)
+        for k in list(sd.keys()):
+            if sd[k].is_floating_point():
+                sd[k] = sd[k].to(model_dtype)
+
+        # Fetch the architecture config from HuggingFace (small, ~5KB).
+        # Offline fallback: tries cache first, downloads only if missing.
+        try:
+            qwen_config = AutoConfig.from_pretrained(self.DEFAULT_HF_REPO, local_files_only=True)
+        except OSError:
+            qwen_config = AutoConfig.from_pretrained(self.DEFAULT_HF_REPO)
+        qwen_config.torch_dtype = model_dtype
+
+        new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
+        self._ram_cache.make_room(new_sd_size)
+
+        with accelerate.init_empty_weights():
+            model = Qwen2_5_VLForConditionalGeneration(qwen_config)
+
+        # Load weights; allow missing keys for tied lm_head and re-initialised buffers.
+        load_result = model.load_state_dict(sd, strict=False, assign=True)
+        if load_result.unexpected_keys:
+            logger.warning(
+                f"{len(load_result.unexpected_keys)} unexpected keys in checkpoint, "
+                f"first 5: {load_result.unexpected_keys[:5]}"
+            )
+
+        # Tie lm_head ↔ embed_tokens if config requires it and lm_head wasn't loaded
+        if getattr(qwen_config, "tie_word_embeddings", False):
+            try:
+                if hasattr(model, "lm_head") and model.lm_head.weight.is_meta:
+                    model.lm_head.weight = model.model.embed_tokens.weight
+                else:
+                    model.tie_weights()
+            except AttributeError:
+                model.tie_weights()
+
+        # Re-initialise any leftover meta buffers (RoPE inv_freq etc.)
+        for name, buffer in list(model.named_buffers()):
+            if not buffer.is_meta:
+                continue
+            parts = name.rsplit(".", 1)
+            if len(parts) == 2:
+                parent = model.get_submodule(parts[0])
+                buffer_name = parts[1]
+            else:
+                parent = model
+                buffer_name = name
+            # Replace meta buffer with a real (zero) tensor of the same shape; the model
+            # will recompute or refill these as needed at first forward pass.
+            try:
+                shape = buffer.shape
+                parent.register_buffer(
+                    buffer_name, torch.zeros(shape, dtype=model_dtype), persistent=False
+                )
+            except Exception:
+                logger.warning(f"Could not re-initialise meta buffer {name}")
+
+        meta_params = [name for name, p in model.named_parameters() if p.is_meta]
+        if meta_params:
+            raise RuntimeError(
+                f"Failed to load all parameters from checkpoint. Meta tensors remain: {meta_params[:5]}"
+            )
+
+        model.eval()
+        return model

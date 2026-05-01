@@ -3,11 +3,12 @@ from typing import Any, Literal, Self
 
 from pydantic import Field
 
-from invokeai.backend.model_manager.configs.base import Config_Base
+from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
     NotAMatchError,
     raise_for_override_fields,
     raise_if_not_dir,
+    raise_if_not_file,
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
@@ -16,6 +17,20 @@ _RECOGNIZED_TEXT_ENCODER_CLASSES = {
     "Qwen2_5_VLForConditionalGeneration",
     "Qwen2VLForConditionalGeneration",
 }
+
+
+def _looks_like_qwen_vl_state_dict(state_dict: dict) -> bool:
+    """A Qwen2.5-VL/Qwen2-VL checkpoint must have both LM weights and a visual
+    tower — that's what distinguishes it from text-only Qwen3/Qwen2 encoders."""
+    has_lm = any(
+        isinstance(k, str) and (k == "model.embed_tokens.weight" or k.startswith("model.layers."))
+        for k in state_dict.keys()
+    )
+    has_vision = any(
+        isinstance(k, str) and (k.startswith("visual.patch_embed.") or k.startswith("visual.blocks."))
+        for k in state_dict.keys()
+    )
+    return has_lm and has_vision
 
 
 class QwenVLEncoder_Diffusers_Config(Config_Base):
@@ -81,5 +96,35 @@ class QwenVLEncoder_Diffusers_Config(Config_Base):
                 f"text_encoder class is {sorted(candidates) or 'unknown'}, "
                 f"expected one of {sorted(_RECOGNIZED_TEXT_ENCODER_CLASSES)}"
             )
+
+        return cls(**override_fields)
+
+
+class QwenVLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
+    """Configuration for single-file Qwen2.5-VL encoder checkpoints (safetensors).
+
+    This matches ComfyUI-style consolidated single-file encoders such as
+    `qwen_2.5_vl_7b_fp8_scaled.safetensors`, which bundle the language model
+    and the visual tower into one file (typically with FP8 + per-tensor
+    `weight_scale` ComfyUI quantization).
+
+    The matching tokenizer + processor are pulled from HuggingFace
+    (`Qwen/Qwen2.5-VL-7B-Instruct`) on first use and cached for offline use.
+    """
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.QwenVLEncoder] = Field(default=ModelType.QwenVLEncoder)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+
+        if not _looks_like_qwen_vl_state_dict(state_dict):
+            raise NotAMatchError("state dict does not look like a Qwen2.5-VL/Qwen2-VL checkpoint")
 
         return cls(**override_fields)
