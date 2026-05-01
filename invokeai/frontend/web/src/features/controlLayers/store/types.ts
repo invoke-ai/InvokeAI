@@ -815,6 +815,8 @@ export const zParamsState = z.object({
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
+  qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint
+  qwenImageQwenVLEncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone Qwen2.5-VL encoder
   qwenImageQuantization: z.enum(['none', 'int8', 'nf4']), // BitsAndBytes quantization for Qwen VL encoder
   qwenImageShift: z.number().nullable(), // Sigma schedule shift override (e.g. 3.0 for Lightning LoRAs)
   // Z-Image Seed Variance Enhancer settings
@@ -894,6 +896,8 @@ export const getInitialParamsState = (): ParamsState => ({
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
   qwenImageComponentSource: null,
+  qwenImageVaeModel: null,
+  qwenImageQwenVLEncoderModel: null,
   qwenImageQuantization: 'none' as const,
   qwenImageShift: null,
   zImageSeedVarianceEnabled: false,

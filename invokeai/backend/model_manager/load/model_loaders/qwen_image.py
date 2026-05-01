@@ -7,6 +7,7 @@ import torch
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import Main_GGUF_QwenImage_Config
+from invokeai.backend.model_manager.configs.qwen_vl_encoder import QwenVLEncoder_Diffusers_Config
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
@@ -175,3 +176,41 @@ class QwenImageGGUFCheckpointModel(ModelLoader):
 
         model.load_state_dict(sd, strict=False, assign=True)
         return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.QwenVLEncoder, format=ModelFormat.QwenVLEncoder)
+class QwenVLEncoderLoader(ModelLoader):
+    """Loads a standalone Qwen2.5-VL encoder (text_encoder/ + tokenizer/ + processor/)."""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, QwenVLEncoder_Diffusers_Config):
+            raise TypeError(f"Expected QwenVLEncoder_Diffusers_Config, got {type(config).__name__}.")
+
+        from transformers import AutoTokenizer, Qwen2_5_VLForConditionalGeneration
+
+        model_path = Path(config.path)
+
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        match submodel_type:
+            case SubModelType.Tokenizer:
+                tokenizer_path = model_path / "tokenizer"
+                return AutoTokenizer.from_pretrained(str(tokenizer_path), local_files_only=True)
+            case SubModelType.TextEncoder:
+                encoder_path = model_path / "text_encoder"
+                return Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                    str(encoder_path),
+                    torch_dtype=model_dtype,
+                    low_cpu_mem_usage=True,
+                    local_files_only=True,
+                )
+
+        raise ValueError(
+            f"Only Tokenizer and TextEncoder submodels are supported. "
+            f"Received: {submodel_type.value if submodel_type else 'None'}"
+        )

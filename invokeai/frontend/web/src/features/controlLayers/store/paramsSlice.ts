@@ -265,6 +265,23 @@ const slice = createSlice({
       }
       state.qwenImageComponentSource = result.data;
     },
+    qwenImageVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.qwenImageVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageVaeModel = result.data;
+    },
+    qwenImageQwenVLEncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.qwenImageQwenVLEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageQwenVLEncoderModel = result.data;
+    },
     qwenImageQuantizationChanged: (state, action: PayloadAction<'none' | 'int8' | 'nf4'>) => {
       state.qwenImageQuantization = action.payload;
     },
@@ -577,6 +594,8 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
+  newState.qwenImageVaeModel = oldState.qwenImageVaeModel;
+  newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
   newState.qwenImageQuantization = oldState.qwenImageQuantization;
   newState.qwenImageShift = oldState.qwenImageShift;
   return newState;
@@ -627,6 +646,8 @@ export const {
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
   qwenImageComponentSourceSelected,
+  qwenImageVaeModelSelected,
+  qwenImageQwenVLEncoderModelSelected,
   qwenImageQuantizationChanged,
   qwenImageShiftChanged,
   setClipSkip,
@@ -736,6 +757,8 @@ export const selectAnimaScheduler = createParamsSelector((params) => params.anim
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
+export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);
+export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);
 export const selectQwenImageQuantization = createParamsSelector((params) => params.qwenImageQuantization);
 export const selectQwenImageShift = createParamsSelector((params) => params.qwenImageShift);
 

@@ -29,6 +29,8 @@ import {
   isMainOrExternalModelConfig,
   isQwen3EncoderModelConfig,
   isQwenImageDiffusersMainModelConfig,
+  isQwenImageVAEModelConfig,
+  isQwenVLEncoderModelConfig,
   isRefinerMainModelModelConfig,
   isSpandrelImageToImageModelConfig,
   isT5EncoderModelConfigOrSubmodel,
@@ -106,6 +108,8 @@ export const useAnimaQwen3EncoderModels = () => buildModelsHook(isAnimaQwen3Enco
 export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
 export const useFlux2DiffusersModels = () => buildModelsHook(isFlux2DiffusersMainModelConfig)();
 export const useQwenImageDiffusersModels = () => buildModelsHook(isQwenImageDiffusersMainModelConfig)();
+export const useQwenImageVAEModels = () => buildModelsHook(isQwenImageVAEModelConfig)();
+export const useQwenVLEncoderModels = () => buildModelsHook(isQwenVLEncoderModelConfig)();
 export const useQwen3EncoderModels = () => buildModelsHook(isQwen3EncoderModelConfig)();
 export const useGlobalReferenceImageModels = buildModelsHook(
   (config) => isIPAdapterModelConfig(config) || isFluxReduxModelConfig(config) || isFluxKontextModelConfig(config)
