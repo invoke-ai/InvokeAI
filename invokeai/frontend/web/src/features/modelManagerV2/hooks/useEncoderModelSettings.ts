@@ -7,6 +7,7 @@ import type {
   Qwen3EncoderModelConfig,
   SigLIPModelConfig,
   T5EncoderModelConfig,
+  TextLLMModelConfig,
 } from 'services/api/types';
 
 type EncoderModelConfig =
@@ -15,7 +16,8 @@ type EncoderModelConfig =
   | Qwen3EncoderModelConfig
   | CLIPVisionModelConfig
   | SigLIPModelConfig
-  | LlavaOnevisionModelConfig;
+  | LlavaOnevisionModelConfig
+  | TextLLMModelConfig;
 
 export const useEncoderModelSettings = (modelConfig: EncoderModelConfig) => {
   const encoderModelSettingsDefaults = useMemo<EncoderModelSettingsFormData>(() => {
