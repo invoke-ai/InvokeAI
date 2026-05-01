@@ -771,7 +771,7 @@
                 "desc": "Reset the selected layer. Only applies to Inpaint Mask and Regional Guidance."
             },
             "mergeDown": {
-                "title": "Merge Down",
+                "title": "Merge Layer Down",
                 "desc": "Merge the selected layer into the layer directly below it."
             },
             "mergeVisible": {
