@@ -1162,7 +1162,7 @@ alibabacloud_qwen_image_2_pro = StarterModel(
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
         modes=["txt2img"],
-        supports_negative_prompt=True,
+        supports_negative_prompt=False,
         supports_seed=True,
         max_images_per_request=4,
         allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
@@ -1186,7 +1186,7 @@ alibabacloud_qwen_image_2 = StarterModel(
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
         modes=["txt2img"],
-        supports_negative_prompt=True,
+        supports_negative_prompt=False,
         supports_seed=True,
         max_images_per_request=4,
         allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
@@ -1210,7 +1210,7 @@ alibabacloud_qwen_image_max = StarterModel(
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
         modes=["txt2img"],
-        supports_negative_prompt=True,
+        supports_negative_prompt=False,
         supports_seed=True,
         max_images_per_request=4,
         allowed_aspect_ratios=QWEN_IMAGE_MAX_ALLOWED_ASPECT_RATIOS,
@@ -1234,7 +1234,7 @@ alibabacloud_wan26_t2i = StarterModel(
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
         modes=["txt2img"],
-        supports_negative_prompt=True,
+        supports_negative_prompt=False,
         supports_seed=True,
         max_images_per_request=4,
         allowed_aspect_ratios=WAN_V2_ALLOWED_ASPECT_RATIOS,
@@ -1253,12 +1253,13 @@ alibabacloud_qwen_image_edit_max = StarterModel(
     name="Qwen Image Edit Max",
     base=BaseModelType.External,
     source="external://alibabacloud/qwen-image-edit-max",
-    description="Alibaba Cloud Qwen Image Edit Max model (external API). Image editing with industrial design and geometric reasoning. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
+    description="Alibaba Cloud Qwen Image Edit Max model (external API). Image editing with industrial design and geometric reasoning, driven by up to 3 reference images. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
-        modes=["img2img"],
-        supports_negative_prompt=True,
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_reference_images=True,
         supports_seed=True,
         max_images_per_request=4,
         allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
@@ -1271,7 +1272,7 @@ alibabacloud_qwen_image_edit_max = StarterModel(
         },
     ),
     default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
-    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
 )
 OPENAI_GPT_IMAGE_ASPECT_RATIOS = ["1:1", "3:2", "2:3"]
 OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES = {

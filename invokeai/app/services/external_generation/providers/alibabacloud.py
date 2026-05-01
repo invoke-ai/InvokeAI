@@ -22,31 +22,21 @@ _SYNC_MODELS = {
     "qwen-image-2.0",
     "qwen-image-max",
     "wan2.6-t2i",
-    "wan2.6-image",
     "qwen-image-edit-max",
 }
 
-# Models that use the async image-generation endpoint with flat prompt format
-_ASYNC_MODELS = {
-    "qwen-image-plus",
-    "qwen-image",
-    "qwen-image-edit-plus",
-    "qwen-image-edit",
-    "wan2.5-t2i-preview",
-    "wan2.2-t2i-flash",
-    "wanx2.0-t2i-turbo",
-}
-
-# Models that support image editing (accept input images)
-_EDIT_MODELS = {
-    "wan2.6-image",
-    "qwen-image-edit-max",
-    "qwen-image-edit-plus",
-    "qwen-image-edit",
-}
+# Models that use the async image-generation endpoint with flat prompt format.
+# Currently no shipped starter model uses this path, but it is retained because
+# users may install custom external models via `external://alibabacloud/<model_id>`.
+_ASYNC_MODELS: set[str] = set()
 
 _TASK_POLL_INTERVAL = 5  # seconds
 _TASK_POLL_TIMEOUT = 300  # seconds
+_DOWNLOAD_TIMEOUT = 60  # seconds
+_DOWNLOAD_MAX_BYTES = 32 * 1024 * 1024  # 32 MiB safety cap on image downloads
+_RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
+_MAX_RETRIES = 2  # total attempts = 1 + _MAX_RETRIES
+_RETRY_BACKOFF_BASE = 2.0  # seconds
 
 
 class AlibabaCloudProvider(ExternalProvider):
@@ -70,10 +60,13 @@ class AlibabaCloudProvider(ExternalProvider):
         }
         size = f"{request.width}*{request.height}"
 
-        if model_id in _SYNC_MODELS or model_id not in _ASYNC_MODELS:
+        if model_id in _SYNC_MODELS:
             return self._generate_sync(request, base_url, headers, model_id, size)
-        else:
+        if model_id in _ASYNC_MODELS:
             return self._generate_async(request, base_url, headers, model_id, size)
+        raise ExternalProviderRequestError(
+            f"Unknown DashScope model_id '{model_id}'. Add it to _SYNC_MODELS or _ASYNC_MODELS in alibabacloud.py."
+        )
 
     def _generate_sync(
         self,
@@ -88,11 +81,8 @@ class AlibabaCloudProvider(ExternalProvider):
 
         content: list[dict[str, str]] = []
 
-        # Add init image for editing
-        if request.init_image is not None and model_id in _EDIT_MODELS:
-            content.append({"image": f"data:image/png;base64,{encode_image_base64(request.init_image)}"})
-
-        # Add reference images
+        # Reference images: DashScope multimodal accepts up to 3 input images for the
+        # qwen-image-edit family; we let the API surface its own limit if exceeded.
         for ref in request.reference_images:
             content.append({"image": f"data:image/png;base64,{encode_image_base64(ref.image)}"})
 
@@ -120,8 +110,7 @@ class AlibabaCloudProvider(ExternalProvider):
             "parameters": parameters,
         }
 
-        response = requests.post(endpoint, headers=headers, json=payload, timeout=120)
-
+        response = self._post_with_retry(endpoint, headers=headers, json=payload, timeout=120, label="DashScope sync")
         if not response.ok:
             raise ExternalProviderRequestError(
                 f"DashScope request failed with status {response.status_code} for model '{model_id}': {response.text}"
@@ -160,8 +149,9 @@ class AlibabaCloudProvider(ExternalProvider):
             "parameters": parameters,
         }
 
-        response = requests.post(endpoint, headers=async_headers, json=payload, timeout=60)
-
+        response = self._post_with_retry(
+            endpoint, headers=async_headers, json=payload, timeout=60, label="DashScope async submit"
+        )
         if not response.ok:
             raise ExternalProviderRequestError(
                 f"DashScope async request failed with status {response.status_code} for model '{model_id}': {response.text}"
@@ -188,15 +178,15 @@ class AlibabaCloudProvider(ExternalProvider):
         """Poll an async task until completion."""
         task_url = f"{base_url}/api/v1/tasks/{task_id}"
         start_time = time.monotonic()
+        poll_headers = {"Authorization": headers["Authorization"]}
+        first_poll = True
 
         while True:
             elapsed = time.monotonic() - start_time
             if elapsed > _TASK_POLL_TIMEOUT:
                 raise ExternalProviderRequestError(f"DashScope task {task_id} timed out after {_TASK_POLL_TIMEOUT}s")
 
-            time.sleep(_TASK_POLL_INTERVAL)
-
-            response = requests.get(task_url, headers={"Authorization": headers["Authorization"]}, timeout=30)
+            response = self._get_with_retry(task_url, headers=poll_headers, timeout=30, label="DashScope task poll")
             if not response.ok:
                 raise ExternalProviderRequestError(
                     f"DashScope task poll failed with status {response.status_code}: {response.text}"
@@ -206,13 +196,18 @@ class AlibabaCloudProvider(ExternalProvider):
             output = data.get("output", {})
             status = output.get("task_status")
 
+            if first_poll:
+                self._logger.info("DashScope task %s submitted (status=%s)", task_id, status)
+                first_poll = False
+
             if status == "SUCCEEDED":
                 return self._parse_async_response(output, request, request_id)
-            elif status in ("FAILED", "UNKNOWN"):
+            if status in ("FAILED", "UNKNOWN"):
                 message = output.get("message", "Unknown error")
                 raise ExternalProviderRequestError(f"DashScope task {task_id} failed: {message}")
 
             self._logger.debug("DashScope task %s status: %s (%.0fs elapsed)", task_id, status, elapsed)
+            time.sleep(_TASK_POLL_INTERVAL)
 
     def _parse_sync_response(
         self,
@@ -276,6 +271,7 @@ class AlibabaCloudProvider(ExternalProvider):
             if isinstance(url, str) and url:
                 pil_image = self._download_image(url)
                 images.append(ExternalGeneratedImage(image=pil_image, seed=request.seed))
+                continue
             b64_image = result.get("b64_image")
             if isinstance(b64_image, str) and b64_image:
                 pil_image = decode_image_base64(b64_image)
@@ -292,10 +288,125 @@ class AlibabaCloudProvider(ExternalProvider):
         )
 
     def _download_image(self, url: str) -> PILImageType:
-        """Download an image from a URL and return it as a PIL Image."""
-        response = requests.get(url, timeout=60)
-        if not response.ok:
-            raise ExternalProviderRequestError(
-                f"Failed to download image from DashScope (status {response.status_code})"
-            )
-        return Image.open(io.BytesIO(response.content)).convert("RGB")
+        """Download an image from a URL and return it as a PIL Image, with a size cap."""
+        try:
+            response = requests.get(url, timeout=_DOWNLOAD_TIMEOUT, stream=True)
+        except requests.RequestException as exc:
+            raise ExternalProviderRequestError(f"Failed to download image from DashScope: {exc}") from exc
+
+        with response:
+            if not response.ok:
+                raise ExternalProviderRequestError(
+                    f"Failed to download image from DashScope (status {response.status_code})"
+                )
+
+            content_length = response.headers.get("Content-Length")
+            if content_length is not None:
+                try:
+                    if int(content_length) > _DOWNLOAD_MAX_BYTES:
+                        raise ExternalProviderRequestError(
+                            f"DashScope image exceeds {_DOWNLOAD_MAX_BYTES} byte cap (Content-Length={content_length})"
+                        )
+                except ValueError:
+                    pass
+
+            buffer = bytearray()
+            for chunk in response.iter_content(chunk_size=64 * 1024):
+                if not chunk:
+                    continue
+                buffer.extend(chunk)
+                if len(buffer) > _DOWNLOAD_MAX_BYTES:
+                    raise ExternalProviderRequestError(
+                        f"DashScope image exceeds {_DOWNLOAD_MAX_BYTES} byte cap"
+                    )
+
+        return Image.open(io.BytesIO(bytes(buffer))).convert("RGB")
+
+    def _post_with_retry(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str],
+        json: dict,
+        timeout: int,
+        label: str,
+    ) -> requests.Response:
+        return self._request_with_retry("POST", url, headers=headers, json=json, timeout=timeout, label=label)
+
+    def _get_with_retry(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str],
+        timeout: int,
+        label: str,
+    ) -> requests.Response:
+        return self._request_with_retry("GET", url, headers=headers, timeout=timeout, label=label)
+
+    def _request_with_retry(
+        self,
+        method: str,
+        url: str,
+        *,
+        headers: dict[str, str],
+        timeout: int,
+        label: str,
+        json: dict | None = None,
+    ) -> requests.Response:
+        """Issue a request with limited retries on transient failures (429/5xx, network errors).
+
+        Honors `Retry-After` for 429 responses when present. Non-retryable errors
+        (4xx other than 429, parse failures) are returned to the caller, which is
+        responsible for raising a meaningful ExternalProviderRequestError.
+        """
+        last_exc: Exception | None = None
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                if method == "POST":
+                    response = requests.post(url, headers=headers, json=json, timeout=timeout)
+                else:
+                    response = requests.get(url, headers=headers, timeout=timeout)
+            except requests.RequestException as exc:
+                last_exc = exc
+                if attempt >= _MAX_RETRIES:
+                    raise ExternalProviderRequestError(f"{label} network error: {exc}") from exc
+                delay = _RETRY_BACKOFF_BASE * (2**attempt)
+                self._logger.warning(
+                    "%s network error on attempt %d/%d: %s — retrying in %.1fs",
+                    label,
+                    attempt + 1,
+                    _MAX_RETRIES + 1,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
+                continue
+
+            if response.status_code in _RETRY_STATUS_CODES and attempt < _MAX_RETRIES:
+                delay = self._retry_delay(response, attempt)
+                self._logger.warning(
+                    "%s got status %d on attempt %d/%d — retrying in %.1fs",
+                    label,
+                    response.status_code,
+                    attempt + 1,
+                    _MAX_RETRIES + 1,
+                    delay,
+                )
+                time.sleep(delay)
+                continue
+
+            return response
+
+        # Unreachable: the loop either returns a response or raises.
+        assert last_exc is not None
+        raise ExternalProviderRequestError(f"{label} failed after retries: {last_exc}") from last_exc
+
+    @staticmethod
+    def _retry_delay(response: requests.Response, attempt: int) -> float:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after:
+            try:
+                return max(0.0, float(retry_after))
+            except ValueError:
+                pass
+        return _RETRY_BACKOFF_BASE * (2**attempt)
