@@ -219,9 +219,7 @@ class QwenVLEncoderLoader(ModelLoader):
         )
 
 
-@ModelLoaderRegistry.register(
-    base=BaseModelType.Any, type=ModelType.QwenVLEncoder, format=ModelFormat.Checkpoint
-)
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.QwenVLEncoder, format=ModelFormat.Checkpoint)
 class QwenVLEncoderCheckpointLoader(ModelLoader):
     """Loads a single-file Qwen2.5-VL encoder checkpoint (e.g. ComfyUI fp8_scaled).
 
@@ -303,8 +301,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         keys_to_drop = [
             k
             for k in sd.keys()
-            if isinstance(k, str)
-            and (k.endswith(".weight_scale") or "comfy_quant" in k or k == "scaled_fp8")
+            if isinstance(k, str) and (k.endswith(".weight_scale") or "comfy_quant" in k or k == "scaled_fp8")
         ]
         for k in keys_to_drop:
             del sd[k]
@@ -361,17 +358,13 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
             # will recompute or refill these as needed at first forward pass.
             try:
                 shape = buffer.shape
-                parent.register_buffer(
-                    buffer_name, torch.zeros(shape, dtype=model_dtype), persistent=False
-                )
+                parent.register_buffer(buffer_name, torch.zeros(shape, dtype=model_dtype), persistent=False)
             except Exception:
                 logger.warning(f"Could not re-initialise meta buffer {name}")
 
         meta_params = [name for name, p in model.named_parameters() if p.is_meta]
         if meta_params:
-            raise RuntimeError(
-                f"Failed to load all parameters from checkpoint. Meta tensors remain: {meta_params[:5]}"
-            )
+            raise RuntimeError(f"Failed to load all parameters from checkpoint. Meta tensors remain: {meta_params[:5]}")
 
         model.eval()
         return model
