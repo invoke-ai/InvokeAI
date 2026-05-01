@@ -316,7 +316,14 @@ class SqliteSessionQueue(SessionQueueBase):
 
         queue_item = self.get_queue_item(item_id)
         batch_status = self.get_batch_status(queue_id=queue_item.queue_id, batch_id=queue_item.batch_id)
-        queue_status = self.get_queue_status(queue_id=queue_item.queue_id)
+        # The QueueItemStatusChangedEvent ships to user:{queue_item.user_id} and admin rooms.
+        # acting_user_id ensures the embedded current-item identifiers are redacted when the
+        # in-progress item belongs to someone else, while leaving aggregate counts global.
+        # Doing this inside get_queue_status guarantees the redaction decision and the
+        # embedded identifiers come from the same get_current() snapshot — eliminating the
+        # race where a second read could find None and skip scrubbing stale identifiers.
+        queue_status = self.get_queue_status(queue_id=queue_item.queue_id, acting_user_id=queue_item.user_id)
+
         self.__invoker.services.events.emit_queue_item_status_changed(queue_item, batch_status, queue_status)
         return queue_item
 
@@ -846,7 +853,12 @@ class SqliteSessionQueue(SessionQueueBase):
 
         return ItemIdsResult(item_ids=item_ids, total_count=len(item_ids))
 
-    def get_queue_status(self, queue_id: str, user_id: Optional[str] = None) -> SessionQueueStatus:
+    def get_queue_status(
+        self,
+        queue_id: str,
+        user_id: Optional[str] = None,
+        acting_user_id: Optional[str] = None,
+    ) -> SessionQueueStatus:
         with self._db.transaction() as cursor:
             # When user_id is provided (non-admin), only count that user's items
             if user_id is not None:
@@ -875,8 +887,16 @@ class SqliteSessionQueue(SessionQueueBase):
         total = sum(row[1] or 0 for row in counts_result)
         counts: dict[str, int] = {row[0]: row[1] for row in counts_result}
 
-        # For non-admin users, hide current item details if they don't own it
-        show_current_item = current_item is not None and (user_id is None or current_item.user_id == user_id)
+        # Redaction is decided from the same current_item snapshot used to embed identifiers,
+        # so a concurrent transition (e.g. B finishing while A's status changes) cannot leave
+        # stale identifiers in the result. user_id (count filter) and acting_user_id
+        # (redaction) are independent: callers that need global counts but per-user redaction
+        # pass only acting_user_id; non-admin API callers pass user_id and inherit the same
+        # redaction by default.
+        owner_user_id = user_id if acting_user_id is None else acting_user_id
+        show_current_item = current_item is not None and (
+            owner_user_id is None or current_item.user_id == owner_user_id
+        )
 
         return SessionQueueStatus(
             queue_id=queue_id,
