@@ -6,7 +6,6 @@ import type { SystemStyleObject } from '@invoke-ai/ui-library';
 export const containerSx: SystemStyleObject = {
   h: 'full',
   position: 'relative',
-  borderRadius: 'inherit',
   transitionProperty: 'none',
   cursor: 'grab',
   '--border-color': 'var(--invoke-colors-base-500)',
