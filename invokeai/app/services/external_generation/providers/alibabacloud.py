@@ -316,9 +316,7 @@ class AlibabaCloudProvider(ExternalProvider):
                     continue
                 buffer.extend(chunk)
                 if len(buffer) > _DOWNLOAD_MAX_BYTES:
-                    raise ExternalProviderRequestError(
-                        f"DashScope image exceeds {_DOWNLOAD_MAX_BYTES} byte cap"
-                    )
+                    raise ExternalProviderRequestError(f"DashScope image exceeds {_DOWNLOAD_MAX_BYTES} byte cap")
 
         return Image.open(io.BytesIO(bytes(buffer))).convert("RGB")
 
