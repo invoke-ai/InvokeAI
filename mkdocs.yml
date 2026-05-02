@@ -142,6 +142,7 @@ nav:
       - Database: 'features/database.md'
       - Gallery: 'features/gallery.md'
       - Hot Keys: 'features/hotkeys.md'
+      - Tiled Upscaling: 'features/upscaling.md'
       - External Models:
           - Overview: 'features/external-models/index.md'
           - Google Gemini: 'features/external-models/gemini.md'

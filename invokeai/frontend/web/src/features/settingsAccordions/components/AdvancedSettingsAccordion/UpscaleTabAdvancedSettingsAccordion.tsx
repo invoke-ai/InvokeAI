@@ -2,7 +2,14 @@ import { Flex, StandaloneAccordion } from '@invoke-ai/ui-library';
 import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectIsFLUX, selectIsSD3, selectParamsSlice, selectVAEKey } from 'features/controlLayers/store/paramsSlice';
+import {
+  selectIsFLUX,
+  selectIsSD3,
+  selectIsZImage,
+  selectParamsSlice,
+  selectVAEKey,
+} from 'features/controlLayers/store/paramsSlice';
+import ParamZImageModelSelects from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
 import { ParamSeed } from 'features/parameters/components/Seed/ParamSeed';
 import ParamTileControlNetModel from 'features/parameters/components/Upscale/ParamTileControlNetModel';
 import ParamTileOverlap from 'features/parameters/components/Upscale/ParamTileOverlap';
@@ -20,6 +27,7 @@ export const UpscaleTabAdvancedSettingsAccordion = memo(() => {
   const { currentData: vaeConfig } = useGetModelConfigQuery(vaeKey ?? skipToken);
   const isFLUX = useAppSelector(selectIsFLUX);
   const isSD3 = useAppSelector(selectIsSD3);
+  const isZImage = useAppSelector(selectIsZImage);
 
   const selectBadges = useMemo(
     () =>
@@ -71,9 +79,9 @@ export const UpscaleTabAdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        <Flex gap={4} w="full">
-          {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
-          {!isFLUX && !isSD3 && <ParamVAEPrecision />}
+        <Flex gap={4} w="full" flexDir={isZImage ? 'column' : 'row'}>
+          {isZImage ? <ParamZImageModelSelects /> : isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
+          {!isFLUX && !isSD3 && !isZImage && <ParamVAEPrecision />}
         </Flex>
         <ParamSeed />
         <ParamTileControlNetModel />

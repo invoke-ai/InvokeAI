@@ -2,13 +2,26 @@ import { logger } from 'app/logging/logger';
 import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import { buildFluxMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildFluxMultidiffusionUpscaleGraph';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
+import { buildZImageMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildZImageMultidiffusionUpscaleGraph';
 import { useCallback } from 'react';
 import { enqueueMutationFixedCacheKeyOptions, queueApi } from 'services/api/endpoints/queue';
 
 const log = logger('generation');
+
+const buildUpscaleGraph = (state: ReturnType<AppStore['getState']>, base: string) => {
+  switch (base) {
+    case 'flux':
+      return buildFluxMultidiffusionUpscaleGraph(state);
+    case 'z-image':
+      return buildZImageMultidiffusionUpscaleGraph(state);
+    default:
+      return buildMultidiffusionUpscaleGraph(state);
+  }
+};
 
 const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   const { dispatch, getState } = store;
@@ -22,7 +35,7 @@ const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   }
   const base = model.base;
 
-  const { g, seed, positivePrompt } = await buildMultidiffusionUpscaleGraph(state);
+  const { g, seed, positivePrompt } = await buildUpscaleGraph(state, base);
 
   const batchConfig = prepareLinearUIBatch({
     state,
