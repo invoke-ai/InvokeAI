@@ -3,6 +3,7 @@ import type { AppStore } from 'app/store/store';
 import { useAppStore } from 'app/store/storeHooks';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { buildFluxMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildFluxMultidiffusionUpscaleGraph';
+import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildMultidiffusionUpscaleGraph';
 import { buildZImageMultidiffusionUpscaleGraph } from 'features/nodes/util/graph/buildZImageMultidiffusionUpscaleGraph';
@@ -39,7 +40,7 @@ const enqueueUpscaling = async (store: AppStore, prepend: boolean) => {
   const batchConfig = prepareLinearUIBatch({
     state,
     g,
-    base,
+    base: base as BaseModelType,
     prepend,
     seedNode: seed,
     positivePromptNode: positivePrompt,

@@ -97,6 +97,7 @@ export const zBaseModelType = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'external',
   'anima',
   'unknown',
 ]);
@@ -120,6 +121,7 @@ export const zModelType = z.enum([
   'vae',
   'lora',
   'llava_onevision',
+  'text_llm',
   'control_lora',
   'controlnet',
   't2i_adapter',
@@ -133,6 +135,7 @@ export const zModelType = z.enum([
   'clip_embed',
   'siglip',
   'flux_redux',
+  'external_image_generator',
   'unknown',
 ]);
 export type ModelType = z.infer<typeof zModelType>;
@@ -155,7 +158,7 @@ export const zSubModelType = z.enum([
 export const zClipVariantType = z.enum(['large', 'gigantic']);
 export const zModelVariantType = z.enum(['normal', 'inpaint', 'depth']);
 export const zFluxVariantType = z.enum(['dev', 'dev_fill', 'schnell']);
-export const zFlux2VariantType = z.enum(['klein_4b', 'klein_9b', 'klein_9b_base']);
+export const zFlux2VariantType = z.enum(['klein_4b', 'klein_4b_base', 'klein_9b', 'klein_9b_base']);
 export const zZImageVariantType = z.enum(['turbo', 'zbase']);
 const zQwenImageVariantType = z.enum(['generate', 'edit']);
 export const zQwen3VariantType = z.enum(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
@@ -184,6 +187,7 @@ export const zModelFormat = z.enum([
   'bnb_quantized_int8b',
   'bnb_quantized_nf4b',
   'gguf_quantized',
+  'external_api',
   'unknown',
 ]);
 export type ModelFormat = z.infer<typeof zModelFormat>;
@@ -197,6 +201,17 @@ export const zModelIdentifierField = z.object({
   submodel_type: zSubModelType.nullish(),
 });
 export type ModelIdentifierField = z.infer<typeof zModelIdentifierField>;
+
+// Frontend-only identifier for external API models (not part of the backend schema)
+export const zExternalModelIdentifierField = z.object({
+  key: z.string().min(1),
+  hash: z.string().min(1),
+  name: z.string().min(1),
+  base: z.literal('external'),
+  type: z.literal('external_image_generator'),
+  submodel_type: zSubModelType.nullish(),
+});
+
 // #endregion
 
 // #region Control Adapters

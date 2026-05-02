@@ -1,10 +1,11 @@
 import type { AnyModelVariant, BaseModelType, ModelFormat, ModelType } from 'features/nodes/types/common';
-import type { AnyModelConfig } from 'services/api/types';
 import {
+  type AnyModelConfig,
   isCLIPEmbedModelConfig,
   isCLIPVisionModelConfig,
   isControlLoRAModelConfig,
   isControlNetModelConfig,
+  isExternalApiModelConfig,
   isFluxReduxModelConfig,
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
@@ -16,6 +17,7 @@ import {
   isSpandrelImageToImageModelConfig,
   isT2IAdapterModelConfig,
   isT5EncoderModelConfig,
+  isTextLLMModelConfig,
   isTIModelConfig,
   isUnknownModelConfig,
   isVAEModelConfig,
@@ -30,7 +32,7 @@ export type ModelCategoryData = {
   filter: (config: AnyModelConfig) => boolean;
 };
 
-export const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
+const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
   unknown: {
     category: 'unknown',
     i18nKey: 'common.unknown',
@@ -121,6 +123,16 @@ export const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
     i18nKey: 'modelManager.llavaOnevision',
     filter: isLLaVAModelConfig,
   },
+  text_llm: {
+    category: 'text_llm',
+    i18nKey: 'modelManager.textLLM',
+    filter: isTextLLMModelConfig,
+  },
+  external_image_generator: {
+    category: 'external_image_generator',
+    i18nKey: 'modelManager.externalImageGenerator',
+    filter: isExternalApiModelConfig,
+  },
 };
 
 export const MODEL_CATEGORIES_AS_LIST = objectEntries(MODEL_CATEGORIES).map(([category, { i18nKey, filter }]) => ({
@@ -144,6 +156,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   cogview4: 'red',
   'qwen-image': 'orange',
   'z-image': 'cyan',
+  external: 'orange',
   anima: 'invokePurple',
   unknown: 'red',
 };
@@ -169,6 +182,8 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   clip_embed: 'CLIP Embed',
   siglip: 'SigLIP',
   flux_redux: 'FLUX Redux',
+  text_llm: 'Text LLM',
+  external_image_generator: 'External Image Generator',
   unknown: 'Unknown',
 };
 
@@ -187,6 +202,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   cogview4: 'CogView4',
   'qwen-image': 'Qwen Image',
   'z-image': 'Z-Image',
+  external: 'External',
   anima: 'Anima',
   unknown: 'Unknown',
 };
@@ -206,6 +222,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   cogview4: 'CogView4',
   'qwen-image': 'QwenImg',
   'z-image': 'Z-Image',
+  external: 'External',
   anima: 'Anima',
   unknown: 'Unknown',
 };
@@ -218,6 +235,7 @@ export const MODEL_VARIANT_TO_LONG_NAME: Record<AnyModelVariant, string> = {
   dev_fill: 'FLUX Dev - Fill',
   schnell: 'FLUX Schnell',
   klein_4b: 'FLUX.2 Klein 4B',
+  klein_4b_base: 'FLUX.2 Klein 4B Base',
   klein_9b: 'FLUX.2 Klein 9B',
   klein_9b_base: 'FLUX.2 Klein 9B Base',
   turbo: 'Z-Image Turbo',
@@ -237,6 +255,7 @@ export const MODEL_FORMAT_TO_LONG_NAME: Record<ModelFormat, string> = {
   checkpoint: 'Checkpoint',
   lycoris: 'LyCORIS',
   onnx: 'ONNX',
+  external_api: 'External API',
   olive: 'Olive',
   embedding_file: 'Embedding (file)',
   embedding_folder: 'Embedding (folder)',
