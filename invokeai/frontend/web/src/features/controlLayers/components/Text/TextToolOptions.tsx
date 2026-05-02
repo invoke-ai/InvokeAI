@@ -20,6 +20,7 @@ import {
 } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import type { GroupBase } from 'chakra-react-select';
+import { selectAuthToken } from 'features/auth/store/authSlice';
 import {
   selectTextAlignment,
   selectTextFontId,
@@ -35,6 +36,8 @@ import {
   textUnderlineToggled,
 } from 'features/controlLayers/store/canvasTextSlice';
 import {
+  getTextFontStack,
+  isCustomTextFontId,
   resolveAvailableFont,
   setCustomTextFontStacks,
   TEXT_FONT_STACKS,
@@ -42,8 +45,9 @@ import {
   TEXT_MIN_FONT_SIZE,
   type TextFontId,
 } from 'features/controlLayers/text/textConstants';
+import { buildCustomTextFontStacks, syncUserFontFaces } from 'features/controlLayers/text/textUserFonts';
 import type { FocusEvent, KeyboardEvent, MouseEvent } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   PiCaretDownBold,
@@ -58,7 +62,6 @@ import {
 import { useListUserFontsQuery } from 'services/api/endpoints/utilities';
 
 const formatSliderValue = (value: number) => String(value);
-const loadedUserFontFaces = new Set<string>();
 const truncateLabel = (value: string, maxLength: number = 36): string => {
   if (value.length <= maxLength) {
     return value;
@@ -82,49 +85,58 @@ const FontSelect = () => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const fontId = useAppSelector(selectTextFontId);
+  const authToken = useAppSelector(selectAuthToken);
   const { data: userFonts } = useListUserFontsQuery();
-  const userFontsLabel = t('controlLayers.text.customFonts', { defaultValue: 'User Fonts' });
-  const builtInFontsLabel = t('controlLayers.text.builtInFonts', { defaultValue: 'Built-in Fonts' });
+  const loadedUserFontFacesRef = useRef<Map<string, FontFace>>(new Map());
+  const userFontsLabel = t('controlLayers.text.customFonts');
+  const builtInFontsLabel = t('controlLayers.text.builtInFonts');
+  const missingFontLabel = t('controlLayers.text.missingFont');
+  const customFontStacks = useMemo(() => buildCustomTextFontStacks(userFonts ?? []), [userFonts]);
 
   useEffect(() => {
-    if (!userFonts || userFonts.length === 0) {
-      setCustomTextFontStacks([]);
-      return;
-    }
-    const customStacks = userFonts.map((font) => ({
-      id: font.id,
-      label: font.label,
-      stack: `"${font.family}",sans-serif`,
-    }));
-    setCustomTextFontStacks(customStacks);
-  }, [userFonts]);
+    setCustomTextFontStacks(customFontStacks);
+  }, [customFontStacks]);
 
   useEffect(() => {
-    if (!userFonts || userFonts.length === 0 || typeof document === 'undefined' || typeof FontFace === 'undefined') {
+    if (!isCustomTextFontId(fontId) || !userFonts || userFonts.length === 0) {
       return;
     }
-    void Promise.all(
-      userFonts.flatMap((font) =>
-        font.faces.map(async (face) => {
-          const faceKey = `${font.family}|${face.weight}|${face.style}|${face.url}`;
-          if (loadedUserFontFaces.has(faceKey)) {
-            return;
-          }
-          try {
-            const fontFace = new FontFace(font.family, `url("${face.url}")`, {
-              weight: String(face.weight),
-              style: face.style,
-            });
-            await fontFace.load();
-            document.fonts.add(fontFace);
-            loadedUserFontFaces.add(faceKey);
-          } catch {
-            // Ignore failures and let browser fallback fonts render.
-          }
-        })
-      )
-    );
-  }, [userFonts]);
+    const hasExactUserFont = userFonts.some((font) => font.id === fontId);
+    if (hasExactUserFont) {
+      return;
+    }
+    const resolvedFont = getTextFontStack(fontId);
+    if (resolvedFont && resolvedFont.id !== fontId) {
+      dispatch(textFontChanged(resolvedFont.id));
+    }
+  }, [dispatch, fontId, userFonts]);
+
+  useEffect(() => {
+    if (typeof document === 'undefined' || typeof FontFace === 'undefined') {
+      return;
+    }
+    let isCancelled = false;
+
+    void (async () => {
+      await syncUserFontFaces({
+        fonts: userFonts ?? [],
+        token: authToken,
+        loadedFontFaces: loadedUserFontFacesRef.current,
+        fontFaceSet: document.fonts,
+        fontFaceCtor: FontFace,
+        fetchFn: fetch,
+      });
+
+      if (!isCancelled) {
+        // Trigger downstream re-measurement once font availability has changed.
+        setCustomTextFontStacks([...customFontStacks]);
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [authToken, customFontStacks, userFonts]);
 
   const options = useMemo(() => {
     const customOptions: ComboboxOption[] = (userFonts ?? []).map((font) => {
@@ -158,8 +170,18 @@ const FontSelect = () => {
       firstOption && 'options' in firstOption
         ? (options as GroupBase<ComboboxOption>[]).flatMap((group) => group.options)
         : (options as ComboboxOption[]);
-    return flattened.find((option) => option.value === fontId) ?? null;
-  }, [fontId, options]);
+    const existingOption = flattened.find((option) => option.value === fontId) ?? null;
+    if (existingOption) {
+      return existingOption;
+    }
+    if (isCustomTextFontId(fontId) && !getTextFontStack(fontId)) {
+      return {
+        value: fontId,
+        label: `${missingFontLabel} (${truncateLabel(fontId.slice(5))})`,
+      };
+    }
+    return null;
+  }, [fontId, missingFontLabel, options]);
   const handleFontChange = useCallback(
     (option: { value: string } | null) => {
       if (!option) {

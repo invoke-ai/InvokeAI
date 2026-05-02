@@ -2686,6 +2686,7 @@
             "alignRight": "Align Right",
             "customFonts": "User Fonts",
             "builtInFonts": "Built-in Fonts",
+            "missingFont": "Missing Font",
             "px": "px"
         },
         "newCanvasFromImage": "New Canvas from Image",

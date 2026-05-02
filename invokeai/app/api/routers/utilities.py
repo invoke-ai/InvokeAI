@@ -17,6 +17,7 @@ from pyparsing import ParseException
 from starlette.responses import FileResponse
 from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
+from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
@@ -91,7 +92,23 @@ async def parse_dynamicprompts(
 
 def _get_fonts_dir() -> Path:
     root = ApiDependencies.invoker.services.configuration.root_path
-    return (root / "Fonts").resolve()
+    return root / "Fonts"
+
+
+def _path_has_symlink_component(path: Path, boundary: Path) -> bool:
+    current = path
+    boundary = boundary.absolute()
+    try:
+        current.absolute().relative_to(boundary)
+    except ValueError:
+        return True
+
+    while True:
+        if current.exists() and current.is_symlink():
+            return True
+        if current == boundary:
+            return False
+        current = current.parent
 
 
 def _get_name_table_value(font: TTFont, name_ids: tuple[int, ...]) -> str | None:
@@ -133,6 +150,7 @@ def _infer_font_weight(style_name: str, file_stem: str, weight_class: int | None
         return weight_class
 
     combined = _normalize_variant_text(f"{style_name} {file_stem}")
+    # Ordering matters: more specific keywords must be matched before "bold".
     weight_keywords = [
         (("thin", "hairline"), 100),
         (("extra light", "ultra light", "extralight", "ultralight"), 200),
@@ -216,19 +234,41 @@ def _get_font_metadata(font_file: Path) -> tuple[str, str, int, str]:
         )
 
 
+def _resolve_font_request_path(font_path: str) -> Path:
+    fonts_dir = _get_fonts_dir()
+    if not fonts_dir.exists() or not fonts_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Font file not found")
+
+    requested = (fonts_dir / font_path).absolute()
+    if _path_has_symlink_component(requested, fonts_dir):
+        raise HTTPException(status_code=400, detail="Invalid font path")
+
+    resolved_fonts_dir = fonts_dir.resolve()
+    resolved_requested = requested.resolve()
+
+    try:
+        resolved_requested.relative_to(resolved_fonts_dir)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="Invalid font path") from e
+
+    return resolved_requested
+
+
 @utilities_router.get(
     "/fonts",
     operation_id="list_user_fonts",
     responses={200: {"model": UserFontsResponse}},
 )
-async def list_user_fonts() -> UserFontsResponse:
+async def list_user_fonts(_current_user: CurrentUserOrDefault) -> UserFontsResponse:
     fonts_dir = _get_fonts_dir()
-    if not fonts_dir.exists() or not fonts_dir.is_dir():
+    if not fonts_dir.exists() or not fonts_dir.is_dir() or fonts_dir.is_symlink():
         return UserFontsResponse(fonts=[])
 
     family_candidates: dict[str, list[tuple[Path, str, str, int, str]]] = {}
     # key -> [(font_file, relative, family, weight, style)]
     for font_file in sorted(fonts_dir.rglob("*")):
+        if _path_has_symlink_component(font_file.absolute(), fonts_dir):
+            continue
         if not font_file.is_file() or font_file.suffix.lower() not in SUPPORTED_FONT_EXTENSIONS:
             continue
         relative = font_file.relative_to(fonts_dir).as_posix()
@@ -266,7 +306,7 @@ async def list_user_fonts() -> UserFontsResponse:
 
         fonts.append(
             UserFont(
-                id=f"user:{selected_family.strip().lower()}",
+                id=f"user:{selected_relative}",
                 family=selected_family,
                 label=selected_family,
                 path=selected_relative,
@@ -282,15 +322,8 @@ async def list_user_fonts() -> UserFontsResponse:
     "/fonts/{font_path:path}",
     operation_id="get_user_font_file",
 )
-async def get_user_font_file(font_path: str) -> FileResponse:
-    fonts_dir = _get_fonts_dir()
-    requested = (fonts_dir / font_path).resolve()
-
-    try:
-        requested.relative_to(fonts_dir)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail="Invalid font path") from e
-
+async def get_user_font_file(font_path: str, _current_user: CurrentUserOrDefault) -> FileResponse:
+    requested = _resolve_font_request_path(font_path)
     if not requested.exists() or not requested.is_file():
         raise HTTPException(status_code=404, detail="Font file not found")
 

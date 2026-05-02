@@ -2,14 +2,14 @@ import type { paths } from 'services/api/schema';
 
 import { api, buildV1Url } from '..';
 
-type UserFontFace = {
+export type UserFontFace = {
   path: string;
   url: string;
   weight: number;
   style: 'normal' | 'italic';
 };
 
-type UserFont = {
+export type UserFont = {
   id: string;
   family: string;
   label: string;

@@ -1,3 +1,4 @@
+import { atom } from 'nanostores';
 import { z } from 'zod';
 
 export const zTextFontId = z.string().min(1);
@@ -59,13 +60,18 @@ export const TEXT_FONT_STACKS: Array<TextFontStack> = [
   },
 ];
 
-let customTextFontStacks: Array<TextFontStack> = [];
+export const $customTextFontStacks = atom<Array<TextFontStack>>([]);
 
 export const setCustomTextFontStacks = (fonts: Array<TextFontStack>) => {
-  customTextFontStacks = fonts;
+  $customTextFontStacks.set(fonts);
+};
+
+export const subscribeToCustomTextFontStacks = (listener: (fonts: readonly TextFontStack[]) => void) => {
+  return $customTextFontStacks.listen((fonts) => listener(fonts));
 };
 
 const getAllTextFontStacks = (): Array<TextFontStack> => {
+  const customTextFontStacks = $customTextFontStacks.get();
   if (customTextFontStacks.length === 0) {
     return TEXT_FONT_STACKS;
   }
@@ -142,7 +148,21 @@ export const resolveAvailableFont = (stack: string): string => {
   return fontCandidates[0] ?? 'sans-serif';
 };
 
-export const getFontStackById = (fontId: TextFontId): string => {
+export const isCustomTextFontId = (fontId: TextFontId): boolean => fontId.startsWith('user:');
+
+export const getTextFontStack = (fontId: TextFontId): TextFontStack | undefined => {
   const fonts = getAllTextFontStacks();
-  return fonts.find((font) => font.id === fontId)?.stack ?? TEXT_FONT_STACKS[0]?.stack ?? 'sans-serif';
+  const exactMatch = fonts.find((font) => font.id === fontId);
+  if (exactMatch) {
+    return exactMatch;
+  }
+  if (!isCustomTextFontId(fontId)) {
+    return undefined;
+  }
+  const legacyFamilyId = fontId.slice(5).trim().toLowerCase();
+  return fonts.find((font) => font.label.trim().toLowerCase() === legacyFamilyId);
+};
+
+export const getFontStackById = (fontId: TextFontId): string => {
+  return getTextFontStack(fontId)?.stack ?? TEXT_FONT_STACKS[0]?.stack ?? 'sans-serif';
 };
