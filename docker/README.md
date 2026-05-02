@@ -22,6 +22,19 @@ docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/inv
 docker run --device /dev/kfd --device /dev/dri --publish 9090:9090 ghcr.io/invoke-ai/invokeai:main-rocm
 ```
 
+**Linux ARM64 / aarch64 (Raspberry Pi, SBCs) — build from source:**
+
+No pre-built image is available for Linux ARM64. PyTorch does not publish `+cpu` wheels for `aarch64` on the pytorch.org wheel index, so a dedicated `Dockerfile.arm64` is provided. It patches the dependency resolution to install torch from PyPI (which does ship `linux_aarch64` wheels) and builds the image locally.
+
+```bash
+# From the repo root
+docker build -f docker/Dockerfile.arm64 -t invokeai:arm64 .
+docker run --publish 9090:9090 --volume /your/data/path:/invokeai invokeai:arm64
+```
+
+> [!NOTE]
+> The build takes 10–20 minutes on a modern SBC. Running local diffusion models without a GPU is very slow; this setup works best with API-backed models (GPT Image, Gemini, etc.) that offload generation to an external provider.
+
 Open `http://localhost:9090` in your browser once the container finishes booting, install some models, and generate away!
 
 ### Data persistence
@@ -88,7 +101,7 @@ The runtime directory (holding models and outputs) will be created in the locati
 
 - Linux is *recommended* for GPU support in Docker.
 - WSL2 is *required* for Windows.
-- only `x86_64` architecture is supported.
+- `x86_64` is supported via the official images. `linux/aarch64` is supported by building from source with `docker/Dockerfile.arm64`.
 
 The Docker daemon on the system must be already set up to use the GPU. In case of Linux, this involves installing `nvidia-docker-runtime` and configuring the `nvidia` runtime as default. Steps will be different for AMD. Please see Docker/NVIDIA/AMD documentation for the most up-to-date instructions for using your GPU with Docker.
 
