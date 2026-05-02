@@ -108,6 +108,7 @@ export type CLIPLEmbedModelConfig = Extract<InternalAnyModelConfig, { type: 'cli
 export type CLIPGEmbedModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_embed'; variant: 'gigantic' }>;
 export type CLIPEmbedModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_embed' }>;
 export type LlavaOnevisionModelConfig = Extract<InternalAnyModelConfig, { type: 'llava_onevision' }>;
+export type TextLLMModelConfig = Extract<InternalAnyModelConfig, { type: 'text_llm' }>;
 export type T5EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 't5_encoder' }>;
 export type T5EncoderBnbQuantizedLlmInt8bModelConfig = Extract<
   InternalAnyModelConfig,
@@ -330,6 +331,10 @@ export const isLLaVAModelConfig = (config: AnyModelConfig): config is LlavaOnevi
   return config.type === 'llava_onevision';
 };
 
+export const isTextLLMModelConfig = (config: AnyModelConfig): config is TextLLMModelConfig => {
+  return config.type === 'text_llm';
+};
+
 export const isT2IAdapterModelConfig = (config: AnyModelConfig): config is T2IAdapterModelConfig => {
   return config.type === 't2i_adapter';
 };
@@ -455,6 +460,10 @@ export const isFluxFillMainModelModelConfig = (config: AnyModelConfig): config i
 
 export const isZImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
   return config.type === 'main' && config.base === 'z-image' && config.format === 'diffusers';
+};
+
+export const isFlux2DiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
+  return config.type === 'main' && config.base === 'flux2' && config.format === 'diffusers';
 };
 
 export const isQwenImageDiffusersMainModelConfig = (config: AnyModelConfig): config is MainModelConfig => {
