@@ -1,11 +1,12 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { getIsCanvasMergeVisibleHotkeyEnabled } from 'features/controlLayers/hooks/canvasMergeHotkeyUtils';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useVisibleEntityCountByType } from 'features/controlLayers/hooks/useVisibleEntityCountByType';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 
 export const useCanvasMergeVisibleHotkey = () => {
   useAssertSingleton(useCanvasMergeVisibleHotkey.name);
@@ -13,26 +14,22 @@ export const useCanvasMergeVisibleHotkey = () => {
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const isBusy = useCanvasIsBusy();
   const visibleEntityCount = useVisibleEntityCountByType(selectedEntityIdentifier?.type ?? 'raster_layer');
+  const isMergeInFlightRef = useRef(false);
 
   const mergeVisible = useCallback(() => {
-    if (!selectedEntityIdentifier) {
+    if (!selectedEntityIdentifier || isMergeInFlightRef.current) {
       return;
     }
-    canvasManager.compositor.mergeVisibleOfType(selectedEntityIdentifier.type);
+    isMergeInFlightRef.current = true;
+    void canvasManager.compositor.mergeVisibleOfType(selectedEntityIdentifier.type).finally(() => {
+      isMergeInFlightRef.current = false;
+    });
   }, [canvasManager.compositor, selectedEntityIdentifier]);
 
-  const isEnabled = useMemo(() => {
-    if (!selectedEntityIdentifier) {
-      return false;
-    }
-    if (visibleEntityCount <= 1) {
-      return false;
-    }
-    if (isBusy) {
-      return false;
-    }
-    return true;
-  }, [isBusy, selectedEntityIdentifier, visibleEntityCount]);
+  const isEnabled = useMemo(
+    () => getIsCanvasMergeVisibleHotkeyEnabled(selectedEntityIdentifier, visibleEntityCount, isBusy),
+    [isBusy, selectedEntityIdentifier, visibleEntityCount]
+  );
 
   useRegisteredHotkeys({
     id: 'mergeVisible',

@@ -1,11 +1,12 @@
 import { useAppSelector } from 'app/store/storeHooks';
 import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
+import { getIsCanvasMergeDownHotkeyEnabled } from 'features/controlLayers/hooks/canvasMergeHotkeyUtils';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIdentifierBelowThisOne } from 'features/controlLayers/hooks/useNextRenderableEntityIdentifier';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 
 export const useCanvasMergeDownHotkey = () => {
   useAssertSingleton(useCanvasMergeDownHotkey.name);
@@ -13,23 +14,24 @@ export const useCanvasMergeDownHotkey = () => {
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
   const entityIdentifierBelowThisOne = useEntityIdentifierBelowThisOne(selectedEntityIdentifier);
   const isBusy = useCanvasIsBusy();
+  const isMergeInFlightRef = useRef(false);
 
   const mergeDown = useCallback(() => {
-    if (!selectedEntityIdentifier || !entityIdentifierBelowThisOne) {
+    if (!selectedEntityIdentifier || !entityIdentifierBelowThisOne || isMergeInFlightRef.current) {
       return;
     }
-    canvasManager.compositor.mergeByEntityIdentifiers([entityIdentifierBelowThisOne, selectedEntityIdentifier], true);
+    isMergeInFlightRef.current = true;
+    void canvasManager.compositor
+      .mergeByEntityIdentifiers([entityIdentifierBelowThisOne, selectedEntityIdentifier], true)
+      .finally(() => {
+        isMergeInFlightRef.current = false;
+      });
   }, [canvasManager.compositor, entityIdentifierBelowThisOne, selectedEntityIdentifier]);
 
-  const isEnabled = useMemo(() => {
-    if (!selectedEntityIdentifier || !entityIdentifierBelowThisOne) {
-      return false;
-    }
-    if (isBusy) {
-      return false;
-    }
-    return true;
-  }, [entityIdentifierBelowThisOne, isBusy, selectedEntityIdentifier]);
+  const isEnabled = useMemo(
+    () => getIsCanvasMergeDownHotkeyEnabled(selectedEntityIdentifier, entityIdentifierBelowThisOne, isBusy),
+    [entityIdentifierBelowThisOne, isBusy, selectedEntityIdentifier]
+  );
 
   useRegisteredHotkeys({
     id: 'mergeDown',
