@@ -30,6 +30,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import Qwen3EncoderField, T5EncoderField
 from invokeai.app.invocations.primitives import AnimaConditioningOutput
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_QWEN3_PREFIX
@@ -39,7 +40,6 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
 )
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger(__name__)
@@ -133,9 +133,7 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             device = text_encoder.device
 
             # Apply LoRA models to the text encoder
-            lora_dtype = TorchDevice.resolve_model_precision(
-                get_config().anima_precision, device
-            )
+            lora_dtype = TorchDevice.resolve_model_precision(get_config().anima_precision, device)
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=text_encoder,
