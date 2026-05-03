@@ -39,6 +39,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
 )
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger(__name__)
@@ -132,7 +133,9 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             device = text_encoder.device
 
             # Apply LoRA models to the text encoder
-            lora_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+            lora_dtype = TorchDevice.resolve_model_precision(
+                get_config().anima_precision, device
+            )
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=text_encoder,
