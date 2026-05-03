@@ -20,6 +20,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.app.services.config.config_default import get_config
 
 logger = InvokeAILogger.get_logger(__name__)
 
@@ -107,9 +108,11 @@ class AnimaCheckpointModel(ModelLoader):
                 image_model="anima",
             )
 
-        # Determine safe dtype
+        # Determine dtype, respecting the user's anima_precision override
         target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        model_dtype = TorchDevice.resolve_model_precision(
+            get_config().anima_precision, target_device
+        )
 
         # Handle memory management
         new_sd_size = sum(ten.nelement() * model_dtype.itemsize for ten in sd.values())
