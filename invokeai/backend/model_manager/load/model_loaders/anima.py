@@ -67,10 +67,12 @@ class AnimaCheckpointModel(ModelLoader):
         # Load the state dict from safetensors
         sd = load_file(model_path)
 
-        # Strip the `net.` prefix that all Anima checkpoint keys have
-        # e.g., "net.blocks.0.self_attn.q_proj.weight" -> "blocks.0.self_attn.q_proj.weight"
+        # Handle different checkpoint packaging formats:
+        # - Official format: keys prefixed with `net.` (e.g. `net.blocks.0...`)
+        # - ComfyUI bundled format: transformer keys prefixed with `model.diffusion_model.`
+        #   alongside `first_stage_model.*` (VAE) and `cond_stage_model.*` (text encoder)
         prefix_to_strip = None
-        for prefix in ["net."]:
+        for prefix in ["model.diffusion_model.", "net."]:
             if any(k.startswith(prefix) for k in sd.keys() if isinstance(k, str)):
                 prefix_to_strip = prefix
                 break
@@ -80,8 +82,7 @@ class AnimaCheckpointModel(ModelLoader):
             for key, value in sd.items():
                 if isinstance(key, str) and key.startswith(prefix_to_strip):
                     stripped_sd[key[len(prefix_to_strip) :]] = value
-                else:
-                    stripped_sd[key] = value
+                # Skip non-transformer keys from bundled checkpoints (VAE, text encoder)
             sd = stripped_sd
 
         # Create an empty AnimaTransformer with Anima's default architecture parameters
