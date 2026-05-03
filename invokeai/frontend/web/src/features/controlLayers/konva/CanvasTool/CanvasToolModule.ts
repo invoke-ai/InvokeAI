@@ -5,8 +5,10 @@ import { CanvasBrushToolModule } from 'features/controlLayers/konva/CanvasTool/C
 import { CanvasColorPickerToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasColorPickerToolModule';
 import { CanvasEraserToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasEraserToolModule';
 import { CanvasGradientToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasGradientToolModule';
+import { CanvasLassoToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasLassoToolModule';
 import { CanvasMoveToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasMoveToolModule';
 import { CanvasRectToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasRectToolModule';
+import { CanvasTextToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasTextToolModule';
 import { CanvasViewToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasViewToolModule';
 import {
   calculateNewBrushSizeFromWheelDelta,
@@ -37,6 +39,7 @@ Konva.dragButtons = [0];
 const KEY_ESCAPE = 'Escape';
 const KEY_SPACE = ' ';
 const KEY_ALT = 'Alt';
+const CODE_SPACE = 'Space';
 
 type CanvasToolModuleConfig = {
   BRUSH_SPACING_TARGET_SCALE: number;
@@ -61,11 +64,13 @@ export class CanvasToolModule extends CanvasModuleBase {
     brush: CanvasBrushToolModule;
     eraser: CanvasEraserToolModule;
     rect: CanvasRectToolModule;
+    lasso: CanvasLassoToolModule;
     gradient: CanvasGradientToolModule;
     colorPicker: CanvasColorPickerToolModule;
     bbox: CanvasBboxToolModule;
     view: CanvasViewToolModule;
     move: CanvasMoveToolModule;
+    text: CanvasTextToolModule;
   };
 
   /**
@@ -119,9 +124,11 @@ export class CanvasToolModule extends CanvasModuleBase {
       brush: new CanvasBrushToolModule(this),
       eraser: new CanvasEraserToolModule(this),
       rect: new CanvasRectToolModule(this),
+      lasso: new CanvasLassoToolModule(this),
       gradient: new CanvasGradientToolModule(this),
       colorPicker: new CanvasColorPickerToolModule(this),
       bbox: new CanvasBboxToolModule(this),
+      text: new CanvasTextToolModule(this),
       view: new CanvasViewToolModule(this),
       move: new CanvasMoveToolModule(this),
     };
@@ -134,16 +141,29 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.konva.group.add(this.tools.brush.konva.group);
     this.konva.group.add(this.tools.eraser.konva.group);
     this.konva.group.add(this.tools.colorPicker.konva.group);
+    this.konva.group.add(this.tools.text.konva.group);
     this.konva.group.add(this.tools.bbox.konva.group);
+    this.konva.group.add(this.tools.lasso.konva.group);
 
     this.subscriptions.add(this.manager.stage.$stageAttrs.listen(this.render));
     this.subscriptions.add(this.manager.$isBusy.listen(this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSettingsSlice, this.render));
     this.subscriptions.add(this.manager.stateApi.createStoreSubscription(selectCanvasSlice, this.render));
     this.subscriptions.add(
-      this.$tool.listen(() => {
-        // On tool switch, reset mouse state
-        this.manager.tool.$isPrimaryPointerDown.set(false);
+      this.$tool.listen((tool, previousTool) => {
+        // Preserve pointer state during temporary view switching so lasso sessions can freeze/resume on space.
+        const shouldPreservePointerState =
+          this.$toolBuffer.get() === 'lasso' &&
+          this.tools.lasso.hasActiveSession() &&
+          ((previousTool === 'lasso' && tool === 'view') || (previousTool === 'view' && tool === 'lasso'));
+
+        if (!shouldPreservePointerState) {
+          // On tool switch, reset mouse state
+          this.manager.tool.$isPrimaryPointerDown.set(false);
+        }
+
+        this.tools.lasso.onToolChanged();
+        void this.tools.text.onToolChanged();
         this.render();
       })
     );
@@ -182,6 +202,10 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.tools.bbox.syncCursorStyle();
     } else if (tool === 'colorPicker') {
       this.tools.colorPicker.syncCursorStyle();
+    } else if (tool === 'text') {
+      this.tools.text.syncCursorStyle();
+    } else if (tool === 'lasso') {
+      this.tools.lasso.syncCursorStyle();
     } else if (selectedEntityAdapter) {
       if (selectedEntityAdapter.$isDisabled.get()) {
         stage.setCursor('not-allowed');
@@ -213,7 +237,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.tools.brush.render();
     this.tools.eraser.render();
     this.tools.colorPicker.render();
+    this.tools.text.render();
     this.tools.bbox.render();
+    this.tools.lasso.render();
   };
 
   syncCursorPositions = () => {
@@ -225,6 +251,19 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     this.$cursorPos.set({ relative, absolute });
+  };
+
+  syncCursorPositionsFromWindowEvent = (e: PointerEvent): boolean => {
+    this.konva.stage.setPointersPositions(e);
+    const relative = this.konva.stage.getRelativePointerPosition();
+    const absolute = this.konva.stage.getPointerPosition();
+
+    if (!relative || !absolute) {
+      return false;
+    }
+
+    this.$cursorPos.set({ relative, absolute });
+    return true;
   };
 
   getClip = (
@@ -266,6 +305,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('pointermove', this.onWindowPointerMove);
     window.addEventListener('pointerup', this.onWindowPointerUp);
     window.addEventListener('blur', this.onWindowBlur);
 
@@ -281,6 +321,7 @@ export class CanvasToolModule extends CanvasModuleBase {
 
       window.removeEventListener('keydown', this.onKeyDown);
       window.removeEventListener('keyup', this.onKeyUp);
+      window.removeEventListener('pointermove', this.onWindowPointerMove);
       window.removeEventListener('pointerup', this.onWindowPointerUp);
       window.removeEventListener('blur', this.onWindowBlur);
     };
@@ -295,6 +336,31 @@ export class CanvasToolModule extends CanvasModuleBase {
    * @returns Whether the user is allowed to draw on the canvas.
    */
   getCanDraw = (): boolean => {
+    const tool = this.$tool.get();
+    if (tool === 'text') {
+      if (this.manager.$isBusy.get()) {
+        return false;
+      }
+
+      if (this.manager.stage.getIsDragging()) {
+        return false;
+      }
+
+      return true;
+    }
+
+    if (tool === 'lasso') {
+      if (this.manager.$isBusy.get()) {
+        return false;
+      }
+
+      if (this.manager.stage.getIsDragging()) {
+        return false;
+      }
+
+      return true;
+    }
+
     if (this.manager.stateApi.getRenderedEntityCount() === 0) {
       return false;
     }
@@ -354,6 +420,8 @@ export class CanvasToolModule extends CanvasModuleBase {
         await this.tools.brush.onStagePointerEnter(e);
       } else if (tool === 'eraser') {
         await this.tools.eraser.onStagePointerEnter(e);
+      } else if (tool === 'text') {
+        await this.tools.text.onStagePointerEnter(e);
       }
     } finally {
       this.render();
@@ -384,8 +452,12 @@ export class CanvasToolModule extends CanvasModuleBase {
         await this.tools.eraser.onStagePointerDown(e);
       } else if (tool === 'rect') {
         await this.tools.rect.onStagePointerDown(e);
+      } else if (tool === 'lasso') {
+        await this.tools.lasso.onStagePointerDown(e);
       } else if (tool === 'gradient') {
         await this.tools.gradient.onStagePointerDown(e);
+      } else if (tool === 'text') {
+        await this.tools.text.onStagePointerDown(e);
       }
     } finally {
       this.render();
@@ -416,6 +488,8 @@ export class CanvasToolModule extends CanvasModuleBase {
         this.tools.eraser.onStagePointerUp(e);
       } else if (tool === 'rect') {
         this.tools.rect.onStagePointerUp(e);
+      } else if (tool === 'lasso') {
+        void this.tools.lasso.onStagePointerUp(e);
       } else if (tool === 'gradient') {
         this.tools.gradient.onStagePointerUp(e);
       }
@@ -437,6 +511,8 @@ export class CanvasToolModule extends CanvasModuleBase {
 
       if (tool === 'colorPicker') {
         this.tools.colorPicker.onStagePointerMove(e);
+      } else if (tool === 'text') {
+        this.tools.text.onStagePointerMove(e);
       }
 
       if (!this.getCanDraw()) {
@@ -449,8 +525,12 @@ export class CanvasToolModule extends CanvasModuleBase {
         await this.tools.eraser.onStagePointerMove(e);
       } else if (tool === 'rect') {
         await this.tools.rect.onStagePointerMove(e);
+      } else if (tool === 'lasso') {
+        await this.tools.lasso.onStagePointerMove(e);
       } else if (tool === 'gradient') {
         await this.tools.gradient.onStagePointerMove(e);
+      } else if (tool === 'text') {
+        // Already handled above
       } else {
         this.manager.stateApi.getSelectedEntityAdapter()?.bufferRenderer.clearBuffer();
       }
@@ -531,11 +611,47 @@ export class CanvasToolModule extends CanvasModuleBase {
   onWindowPointerUp = (_: PointerEvent) => {
     try {
       this.$isPrimaryPointerDown.set(false);
+      void this.tools.lasso.onWindowPointerUp();
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
       if (selectedEntity && selectedEntity.bufferRenderer.hasBuffer() && !this.manager.$isBusy.get()) {
         selectedEntity.bufferRenderer.commitBuffer();
       }
+    } finally {
+      this.render();
+    }
+  };
+
+  onWindowPointerMove = (e: PointerEvent) => {
+    const target = e.target;
+    if (target instanceof Node && this.manager.stage.container.contains(target)) {
+      return;
+    }
+
+    if (this.$tool.get() !== 'lasso') {
+      return;
+    }
+
+    if (!this.getCanDraw()) {
+      return;
+    }
+
+    if (!this.$isPrimaryPointerDown.get()) {
+      return;
+    }
+
+    if (!this.tools.lasso.hasActiveSession()) {
+      return;
+    }
+
+    try {
+      this.$lastPointerType.set(e.pointerType);
+
+      if (!this.syncCursorPositionsFromWindowEvent(e)) {
+        return;
+      }
+
+      this.tools.lasso.onWindowPointerMove(e);
     } finally {
       this.render();
     }
@@ -550,7 +666,13 @@ export class CanvasToolModule extends CanvasModuleBase {
   };
 
   onKeyDown = (e: KeyboardEvent) => {
+    const isSpaceKey = e.key === KEY_SPACE || e.code === CODE_SPACE;
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      return;
+    }
+    // Suppress canvas key handlers while an uncommitted text session is active.
+    const hasActiveTextSession = this.tools.text.$session.get() !== null;
+    if (hasActiveTextSession) {
       return;
     }
 
@@ -566,6 +688,9 @@ export class CanvasToolModule extends CanvasModuleBase {
     if (e.key === KEY_ESCAPE) {
       // Cancel shape drawing on escape
       e.preventDefault();
+      if (this.$tool.get() === 'lasso') {
+        this.tools.lasso.reset();
+      }
       const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
       if (
         selectedEntity &&
@@ -578,19 +703,27 @@ export class CanvasToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (e.key === KEY_SPACE) {
+    if (isSpaceKey) {
       // Select the view tool on space key down
       e.preventDefault();
-      this.$toolBuffer.set(this.$tool.get());
-      this.$tool.set('view');
+      e.stopPropagation();
+      const currentTool = this.$tool.get();
+      this.$toolBuffer.set(currentTool);
       this.manager.stateApi.$spaceKey.set(true);
-      this.$cursorPos.set(null);
+      this.$tool.set('view');
+      if (currentTool === 'lasso' && this.tools.lasso.hasActiveSession() && this.$isPrimaryPointerDown.get()) {
+        // Start panning immediately if user is already drawing with freehand lasso.
+        this.manager.stage.startDragging();
+      } else {
+        this.$cursorPos.set(null);
+      }
       return;
     }
 
     if (e.key === KEY_ALT) {
       // Select the color picker on alt key down
       e.preventDefault();
+      e.stopPropagation();
       this.$toolBuffer.set(this.$tool.get());
       this.$tool.set('colorPicker');
     }
@@ -604,10 +737,16 @@ export class CanvasToolModule extends CanvasModuleBase {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return;
     }
+    // Suppress canvas key handlers while an uncommitted text session is active.
+    const hasActiveTextSession = this.tools.text.$session.get() !== null;
+    if (hasActiveTextSession) {
+      return;
+    }
 
-    if (e.key === KEY_SPACE) {
+    if (e.key === KEY_SPACE || e.code === CODE_SPACE) {
       // Revert the tool to the previous tool on space key up
       e.preventDefault();
+      e.stopPropagation();
       this.revertToolBuffer();
       this.manager.stateApi.$spaceKey.set(false);
       return;
@@ -616,6 +755,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     if (e.key === KEY_ALT) {
       // Revert the tool to the previous tool on alt key up
       e.preventDefault();
+      e.stopPropagation();
       this.revertToolBuffer();
       return;
     }
@@ -645,6 +785,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         eraser: this.tools.eraser.repr(),
         colorPicker: this.tools.colorPicker.repr(),
         rect: this.tools.rect.repr(),
+        lasso: this.tools.lasso.repr(),
         gradient: this.tools.gradient.repr(),
         bbox: this.tools.bbox.repr(),
         view: this.tools.view.repr(),

@@ -15,8 +15,10 @@ export type ImageOutputNodes =
   | 'flux2_vae_decode'
   | 'sd3_l2i'
   | 'cogview4_l2i'
+  | 'qwen_image_l2i'
   | 'z_image_l2i'
-  | 'ernie_image_vae_decode';
+  | 'ernie_image_vae_decode'
+  | 'anima_l2i';
 
 export type LatentToImageNodes =
   | 'l2i'
@@ -24,8 +26,10 @@ export type LatentToImageNodes =
   | 'flux2_vae_decode'
   | 'sd3_l2i'
   | 'cogview4_l2i'
+  | 'qwen_image_l2i'
   | 'z_image_l2i'
-  | 'ernie_image_vae_decode';
+  | 'ernie_image_vae_decode'
+  | 'anima_l2i';
 
 export type ImageToLatentsNodes =
   | 'i2l'
@@ -33,8 +37,10 @@ export type ImageToLatentsNodes =
   | 'flux2_vae_encode'
   | 'sd3_i2l'
   | 'cogview4_i2l'
+  | 'qwen_image_i2l'
   | 'z_image_i2l'
-  | 'ernie_image_vae_encode';
+  | 'ernie_image_vae_encode'
+  | 'anima_i2l';
 
 export type DenoiseLatentsNodes =
   | 'denoise_latents'
@@ -42,8 +48,10 @@ export type DenoiseLatentsNodes =
   | 'flux2_denoise'
   | 'sd3_denoise'
   | 'cogview4_denoise'
+  | 'qwen_image_denoise'
   | 'z_image_denoise'
-  | 'ernie_image_denoise';
+  | 'ernie_image_denoise'
+  | 'anima_denoise';
 
 export type MainModelLoaderNodes =
   | 'main_model_loader'
@@ -52,8 +60,10 @@ export type MainModelLoaderNodes =
   | 'flux2_klein_model_loader'
   | 'sd3_model_loader'
   | 'cogview4_model_loader'
+  | 'qwen_image_model_loader'
   | 'z_image_model_loader'
-  | 'ernie_image_model_loader';
+  | 'ernie_image_model_loader'
+  | 'anima_model_loader';
 
 export type VaeSourceNodes = 'seamless' | 'vae_loader';
 

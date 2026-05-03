@@ -15,6 +15,7 @@ from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
 from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import SD3ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX
@@ -29,7 +30,7 @@ SD3_T5_MAX_SEQ_LEN = 256
     "sd3_text_encoder",
     title="Prompt - SD3",
     tags=["prompt", "conditioning", "sd3"],
-    category="conditioning",
+    category="prompt",
     version="1.0.1",
 )
 class Sd3TextEncoderInvocation(BaseInvocation):
@@ -101,7 +102,8 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         ):
             context.util.signal_progress("Running T5 encoder")
             assert isinstance(t5_text_encoder, T5EncoderModel)
-            assert isinstance(t5_tokenizer, T5Tokenizer)
+            assert isinstance(t5_tokenizer, (T5Tokenizer, T5TokenizerFast))
+            t5_device = get_effective_device(t5_text_encoder)
 
             text_inputs = t5_tokenizer(
                 prompt,
@@ -124,7 +126,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
                     f" {max_seq_len} tokens: {removed_text}"
                 )
 
-            prompt_embeds = t5_text_encoder(text_input_ids.to(t5_text_encoder.device))[0]
+            prompt_embeds = t5_text_encoder(text_input_ids.to(t5_device))[0]
 
         assert isinstance(prompt_embeds, torch.Tensor)
         return prompt_embeds
@@ -143,6 +145,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
             context.util.signal_progress("Running CLIP encoder")
             assert isinstance(clip_text_encoder, (CLIPTextModel, CLIPTextModelWithProjection))
             assert isinstance(clip_tokenizer, CLIPTokenizer)
+            clip_device = get_effective_device(clip_text_encoder)
 
             clip_text_encoder_config = clip_text_encoder_info.config
             assert clip_text_encoder_config is not None
@@ -186,9 +189,7 @@ class Sd3TextEncoderInvocation(BaseInvocation):
                     "The following part of your input was truncated because CLIP can only handle sequences up to"
                     f" {tokenizer_max_length} tokens: {removed_text}"
                 )
-            prompt_embeds = clip_text_encoder(
-                input_ids=text_input_ids.to(clip_text_encoder.device), output_hidden_states=True
-            )
+            prompt_embeds = clip_text_encoder(input_ids=text_input_ids.to(clip_device), output_hidden_states=True)
             pooled_prompt_embeds = prompt_embeds[0]
             prompt_embeds = prompt_embeds.hidden_states[-2]
 

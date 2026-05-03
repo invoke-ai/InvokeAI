@@ -1,13 +1,16 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
-import { Badge, Flex, Icon, Image, Spacer, Text } from '@invoke-ai/ui-library';
+import { Badge, Flex, Icon, Image, Spacer, Switch, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { selectCurrentUser } from 'features/auth/store/authSlice';
 import { selectWorkflowId } from 'features/nodes/store/selectors';
 import { workflowModeChanged } from 'features/nodes/store/workflowLibrarySlice';
 import { useLoadWorkflowWithDialog } from 'features/workflowLibrary/components/LoadWorkflowConfirmationAlertDialog';
 import InvokeLogo from 'public/assets/images/invoke-symbol-wht-lrg.svg';
-import { memo, useCallback, useMemo } from 'react';
+import { type ChangeEvent, memo, type MouseEvent, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiImage } from 'react-icons/pi';
+import { useGetSetupStatusQuery } from 'services/api/endpoints/auth';
+import { useUpdateWorkflowIsPublicMutation } from 'services/api/endpoints/workflows';
 import type { WorkflowRecordListItemWithThumbnailDTO } from 'services/api/types';
 
 import { DeleteWorkflow } from './WorkflowLibraryListItemActions/DeleteWorkflow';
@@ -33,11 +36,25 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const workflowId = useAppSelector(selectWorkflowId);
+  const currentUser = useAppSelector(selectCurrentUser);
+  const { data: setupStatus } = useGetSetupStatusQuery();
   const loadWorkflowWithDialog = useLoadWorkflowWithDialog();
 
   const isActive = useMemo(() => {
     return workflowId === workflow.workflow_id;
   }, [workflowId, workflow.workflow_id]);
+
+  const isOwner = useMemo(() => {
+    return currentUser !== null && workflow.user_id === currentUser.user_id;
+  }, [currentUser, workflow.user_id]);
+
+  const canEditOrDelete = useMemo(() => {
+    // In single-user (legacy) mode, all workflows are editable — no concept of ownership.
+    if (!setupStatus?.multiuser_enabled) {
+      return true;
+    }
+    return isOwner || (currentUser?.is_admin ?? false);
+  }, [setupStatus?.multiuser_enabled, isOwner, currentUser]);
 
   const tags = useMemo(() => {
     if (!workflow.tags) {
@@ -102,6 +119,18 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
                   {t('workflows.opened')}
                 </Badge>
               )}
+              {setupStatus?.multiuser_enabled && workflow.is_public && workflow.category !== 'default' && (
+                <Badge
+                  color="invokeGreen.400"
+                  borderColor="invokeGreen.700"
+                  borderWidth={1}
+                  bg="transparent"
+                  flexShrink={0}
+                  variant="subtle"
+                >
+                  {t('workflows.shared')}
+                </Badge>
+              )}
               {workflow.category === 'default' && (
                 <Image
                   src={InvokeLogo}
@@ -137,12 +166,13 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
             </Text>
           )}
           <Spacer />
+          {setupStatus?.multiuser_enabled && canEditOrDelete && <ShareWorkflowToggle workflow={workflow} />}
           {workflow.category === 'default' && <ViewWorkflow workflowId={workflow.workflow_id} />}
           {workflow.category !== 'default' && (
             <>
-              <EditWorkflow workflowId={workflow.workflow_id} />
+              {canEditOrDelete && <EditWorkflow workflowId={workflow.workflow_id} />}
               <DownloadWorkflow workflowId={workflow.workflow_id} />
-              <DeleteWorkflow workflowId={workflow.workflow_id} />
+              {canEditOrDelete && <DeleteWorkflow workflowId={workflow.workflow_id} />}
             </>
           )}
         </Flex>
@@ -151,6 +181,35 @@ export const WorkflowListItem = memo(({ workflow }: { workflow: WorkflowRecordLi
   );
 });
 WorkflowListItem.displayName = 'WorkflowListItem';
+
+const ShareWorkflowToggle = memo(({ workflow }: { workflow: WorkflowRecordListItemWithThumbnailDTO }) => {
+  const { t } = useTranslation();
+  const [updateIsPublic, { isLoading }] = useUpdateWorkflowIsPublicMutation();
+
+  const handleChange = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      e.stopPropagation();
+      updateIsPublic({ workflow_id: workflow.workflow_id, is_public: e.target.checked });
+    },
+    [updateIsPublic, workflow.workflow_id]
+  );
+
+  const handleClick = useCallback((e: MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
+  return (
+    <Tooltip label={t('workflows.shareWorkflow')}>
+      <Flex alignItems="center" gap={1} onClick={handleClick}>
+        <Text variant="subtext" fontSize="xs">
+          {t('workflows.shared')}
+        </Text>
+        <Switch size="sm" isChecked={workflow.is_public} onChange={handleChange} isDisabled={isLoading} />
+      </Flex>
+    </Tooltip>
+  );
+});
+ShareWorkflowToggle.displayName = 'ShareWorkflowToggle';
 
 const UserThumbnailFallback = memo(() => {
   return (

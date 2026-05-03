@@ -40,9 +40,9 @@ if _HAS_LCM:
     FLUX_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler
 
 
-# Z-Image scheduler types (same schedulers as Flux, both use Flow Matching)
-# Note: Z-Image-Turbo is optimized for ~8 steps with Euler, but other schedulers
-# can be used for experimentation.
+# Z-Image scheduler types (Flow Matching schedulers)
+# Note: Z-Image-Turbo is optimized for ~8 steps with Euler, LCM can also work.
+# Z-Image Base (undistilled) should only use Euler or Heun (LCM not supported for undistilled models).
 ZIMAGE_SCHEDULER_NAME_VALUES = Literal["euler", "heun", "lcm"]
 
 # Human-readable labels for the UI
@@ -52,7 +52,7 @@ ZIMAGE_SCHEDULER_LABELS: dict[str, str] = {
     "lcm": "LCM",
 }
 
-# Mapping from scheduler names to scheduler classes (same as Flux)
+# Mapping from scheduler names to scheduler classes
 ZIMAGE_SCHEDULER_MAP: dict[str, Type[SchedulerMixin]] = {
     "euler": FlowMatchEulerDiscreteScheduler,
     "heun": FlowMatchHeunDiscreteScheduler,
@@ -79,3 +79,23 @@ ERNIE_IMAGE_SCHEDULER_MAP: dict[str, Type[SchedulerMixin]] = {
 
 if _HAS_LCM:
     ERNIE_IMAGE_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler
+
+
+# Anima scheduler types (same Flow Matching schedulers as Flux/Z-Image)
+# Anima uses rectified flow with shift=3.0 and multiplier=1000.
+# Recommended: 30 steps with Euler, CFG 4-5.
+ANIMA_SCHEDULER_NAME_VALUES = Literal["euler", "heun", "lcm"]
+
+ANIMA_SCHEDULER_LABELS: dict[str, str] = {
+    "euler": "Euler",
+    "heun": "Heun (2nd order)",
+    "lcm": "LCM",
+}
+
+ANIMA_SCHEDULER_MAP: dict[str, Type[SchedulerMixin]] = {
+    "euler": FlowMatchEulerDiscreteScheduler,
+    "heun": FlowMatchHeunDiscreteScheduler,
+}
+
+if _HAS_LCM:
+    ANIMA_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler

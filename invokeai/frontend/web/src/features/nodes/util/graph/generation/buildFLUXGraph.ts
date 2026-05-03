@@ -10,7 +10,9 @@ import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlic
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { isFlux2ReferenceImageConfig, isFluxKontextReferenceImageConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
-import { zImageField } from 'features/nodes/types/common';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
+import { zImageField, zModelIdentifierField } from 'features/nodes/types/common';
+import { addFlux2KleinLoRAs } from 'features/nodes/util/graph/generation/addFlux2KleinLoRAs';
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addFLUXReduxes } from 'features/nodes/util/graph/generation/addFLUXRedux';
@@ -25,8 +27,10 @@ import { Graph } from 'features/nodes/util/graph/generation/Graph';
 import { selectCanvasOutputFields } from 'features/nodes/util/graph/graphBuilderUtils';
 import type { GraphBuilderArg, GraphBuilderReturn, ImageOutputNodes } from 'features/nodes/util/graph/types';
 import { UnsupportedGenerationModeError } from 'features/nodes/util/graph/types';
+import { isFlux2KleinQwen3Compatible } from 'features/parameters/util/flux2Klein';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { t } from 'i18next';
+import { selectFlux2DiffusersModels } from 'services/api/hooks/modelsByType';
 import type { Invocation } from 'services/api/types';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
@@ -140,7 +144,23 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
 
   if (isFlux2) {
     // Flux2 Klein: Use Qwen3-based model loader, text encoder, and dedicated denoise node
-    // VAE and Qwen3 encoder can be extracted from the main Diffusers model or selected separately
+    // VAE and Qwen3 encoder can be extracted from the main Diffusers model or selected separately.
+    // For non-diffusers main models, find a diffusers flux2 model to use as the source for VAE/encoder.
+    let qwen3SourceModel: ModelIdentifierField | undefined;
+    if (model.format !== 'diffusers' && (!kleinVaeModel || !kleinQwen3EncoderModel)) {
+      const diffusersModels = selectFlux2DiffusersModels(state);
+      // Prefer a diffusers model that shares the same Qwen3 encoder (e.g. klein_9b and klein_9b_base both use qwen3_8b).
+      // Fall back to any diffusers model if only the VAE is needed.
+      const modelVariant = 'variant' in model ? model.variant : undefined;
+      const variantMatch = diffusersModels.find(
+        (m) => 'variant' in m && isFlux2KleinQwen3Compatible(m.variant, modelVariant)
+      );
+      const sourceModel = variantMatch ?? (kleinQwen3EncoderModel ? diffusersModels[0] : undefined);
+      if (sourceModel) {
+        qwen3SourceModel = zModelIdentifierField.parse(sourceModel);
+      }
+    }
+
     modelLoader = g.addNode({
       type: 'flux2_klein_model_loader',
       id: getPrefixedId('flux2_klein_model_loader'),
@@ -148,6 +168,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       // Optional: Use separately selected VAE and Qwen3 encoder models
       vae_model: kleinVaeModel ?? undefined,
       qwen3_encoder_model: kleinQwen3EncoderModel ?? undefined,
+      qwen3_source_model: qwen3SourceModel ?? undefined,
     });
 
     posCond = g.addNode({
@@ -159,6 +180,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       type: 'flux2_denoise',
       id: getPrefixedId('flux2_denoise'),
       num_steps: steps,
+      scheduler: fluxScheduler,
     });
 
     // Klein: Connect Qwen3 encoder outputs
@@ -227,6 +249,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     const flux2Metadata: Record<string, unknown> = {
       model: Graph.getModelMetadataField(model),
       steps,
+      scheduler: fluxScheduler,
     };
     if (kleinVaeModel) {
       flux2Metadata.vae = kleinVaeModel;
@@ -259,6 +282,9 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     const flux2Denoise = denoise as Invocation<'flux2_denoise'>;
     const flux2ModelLoader = modelLoader as Invocation<'flux2_klein_model_loader'>;
     const flux2L2i = l2i as Invocation<'flux2_vae_decode'>;
+    const flux2Cond = posCond as Invocation<'flux2_klein_text_encoder'>;
+
+    addFlux2KleinLoRAs(state, g, flux2Denoise, flux2ModelLoader, flux2Cond);
 
     // FLUX.2 Klein has built-in multi-reference image editing - no separate model needed
     const validFlux2RefImageConfigs = selectRefImagesSlice(state)
@@ -267,10 +293,7 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
       .filter((entity) => getGlobalReferenceImageWarnings(entity, model).length === 0);
 
     if (validFlux2RefImageConfigs.length > 0) {
-      const flux2KontextCollect = g.addNode({
-        type: 'collect',
-        id: getPrefixedId('flux2_kontext_collect'),
-      });
+      let prevCollect: Invocation<'collect'> | null = null;
       for (const { config } of validFlux2RefImageConfigs) {
         // FLUX.2 uses the same flux_kontext node - it just packages the image
         const kontextConditioning = g.addNode({
@@ -278,9 +301,18 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
           id: getPrefixedId('flux_kontext'),
           image: zImageField.parse(config.image?.crop?.image ?? config.image?.original.image),
         });
-        g.addEdge(kontextConditioning, 'kontext_cond', flux2KontextCollect, 'item');
+        const collectNode = g.addNode({
+          type: 'collect',
+          id: getPrefixedId('flux2_kontext_collect'),
+        });
+        g.addEdge(kontextConditioning, 'kontext_cond', collectNode, 'item');
+        if (prevCollect !== null) {
+          g.addEdge(prevCollect, 'collection', collectNode, 'collection');
+        }
+        prevCollect = collectNode;
       }
-      g.addEdge(flux2KontextCollect, 'collection', flux2Denoise, 'kontext_conditioning');
+      assert(prevCollect !== null);
+      g.addEdge(prevCollect, 'collection', flux2Denoise, 'kontext_conditioning');
 
       g.upsertMetadata({ ref_images: validFlux2RefImageConfigs }, 'merge');
     }

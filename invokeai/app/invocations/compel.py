@@ -19,6 +19,7 @@ from invokeai.app.invocations.model import CLIPField
 from invokeai.app.invocations.primitives import ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.ti_utils import generate_ti_list
+from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -42,7 +43,7 @@ from invokeai.backend.util.devices import TorchDevice
     "compel",
     title="Prompt - SD1.5",
     tags=["prompt", "compel"],
-    category="conditioning",
+    category="prompt",
     version="1.2.1",
 )
 class CompelInvocation(BaseInvocation):
@@ -103,7 +104,7 @@ class CompelInvocation(BaseInvocation):
                 textual_inversion_manager=ti_manager,
                 dtype_for_device_getter=TorchDevice.choose_torch_dtype,
                 truncate_long_prompts=False,
-                device=text_encoder.device,  # Use the device the model is actually on
+                device=get_effective_device(text_encoder),
                 split_long_text_mode=SplitLongTextMode.SENTENCES,
             )
 
@@ -212,7 +213,7 @@ class SDXLPromptInvocationBase:
                 truncate_long_prompts=False,  # TODO:
                 returned_embeddings_type=ReturnedEmbeddingsType.PENULTIMATE_HIDDEN_STATES_NON_NORMALIZED,  # TODO: clip skip
                 requires_pooled=get_pooled,
-                device=text_encoder.device,  # Use the device the model is actually on
+                device=get_effective_device(text_encoder),
                 split_long_text_mode=SplitLongTextMode.SENTENCES,
             )
 
@@ -247,7 +248,7 @@ class SDXLPromptInvocationBase:
     "sdxl_compel_prompt",
     title="Prompt - SDXL",
     tags=["sdxl", "compel", "prompt"],
-    category="conditioning",
+    category="prompt",
     version="1.2.1",
 )
 class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
@@ -341,7 +342,7 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
     "sdxl_refiner_compel_prompt",
     title="Prompt - SDXL Refiner",
     tags=["sdxl", "compel", "prompt"],
-    category="conditioning",
+    category="prompt",
     version="1.1.2",
 )
 class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
@@ -390,7 +391,7 @@ class CLIPSkipInvocationOutput(BaseInvocationOutput):
     "clip_skip",
     title="Apply CLIP Skip - SD1.5, SDXL",
     tags=["clipskip", "clip", "skip"],
-    category="conditioning",
+    category="prompt",
     version="1.1.1",
 )
 class CLIPSkipInvocation(BaseInvocation):

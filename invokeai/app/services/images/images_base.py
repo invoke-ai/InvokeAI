@@ -55,6 +55,7 @@ class ImageServiceABC(ABC):
         metadata: Optional[str] = None,
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
         pass
@@ -125,6 +126,8 @@ class ImageServiceABC(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageDTO]:
         """Gets a paginated list of image DTOs with starred images first when starred_first=True."""
         pass
@@ -140,8 +143,8 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def get_intermediates_count(self) -> int:
-        """Gets the number of intermediate images."""
+    def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
+        """Gets the number of intermediate images. If user_id is provided, only counts that user's intermediates."""
         pass
 
     @abstractmethod
@@ -159,6 +162,8 @@ class ImageServiceABC(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
     ) -> ImageNamesResult:
         """Gets ordered list of image names with metadata for optimistic updates."""
         pass

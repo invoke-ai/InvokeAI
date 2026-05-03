@@ -85,7 +85,7 @@ const RgbaColorPicker = (props: Props) => {
               h={10}
               whiteSpace="nowrap"
               onClick={onToggleMode}
-              aria-label="Toggle RGB/HEX"
+              aria-label={t('common.toggleRgbHex')}
             >
               RGB
             </Button>
@@ -144,12 +144,12 @@ const RgbaColorPicker = (props: Props) => {
               h={10}
               whiteSpace="nowrap"
               onClick={onToggleMode}
-              aria-label="Toggle RGB/HEX"
+              aria-label={t('common.toggleRgbHex')}
             >
               HEX
             </Button>
             <FormControl gap={0}>
-              <FormLabel>{t('common.hex', { defaultValue: 'Hex' })}</FormLabel>
+              <FormLabel>{t('common.hex')}</FormLabel>
               <Input value={hex} onChange={onChangeHex} placeholder="#RRGGBB or #RRGGBBAA" w="10rem" />
             </FormControl>
             <FormControl gap={0}>

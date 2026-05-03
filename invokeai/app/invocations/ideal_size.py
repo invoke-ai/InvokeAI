@@ -21,6 +21,7 @@ class IdealSizeOutput(BaseInvocationOutput):
     "ideal_size",
     title="Ideal Size - SD1.5, SDXL",
     tags=["latents", "math", "ideal_size"],
+    category="latents",
     version="1.0.6",
 )
 class IdealSizeInvocation(BaseInvocation):

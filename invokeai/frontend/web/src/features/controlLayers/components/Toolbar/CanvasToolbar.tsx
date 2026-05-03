@@ -1,17 +1,22 @@
 import { Box, Divider, Flex } from '@invoke-ai/ui-library';
 import { CanvasSettingsPopover } from 'features/controlLayers/components/Settings/CanvasSettingsPopover';
+import { TextToolOptions } from 'features/controlLayers/components/Text/TextToolOptions';
 import { useToolIsSelected } from 'features/controlLayers/components/Tool/hooks';
 import { ToolFillColorPicker } from 'features/controlLayers/components/Tool/ToolFillColorPicker';
 import { ToolGradientClipToggle } from 'features/controlLayers/components/Tool/ToolGradientClipToggle';
 import { ToolGradientModeToggle } from 'features/controlLayers/components/Tool/ToolGradientModeToggle';
+import { ToolLassoModeToggle } from 'features/controlLayers/components/Tool/ToolLassoModeToggle';
+import { ToolOptionsRowContainer } from 'features/controlLayers/components/Tool/ToolOptionsRowContainer';
 import { ToolWidthPicker } from 'features/controlLayers/components/Tool/ToolWidthPicker';
 import { CanvasToolbarFitBboxToLayersButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToLayersButton';
 import { CanvasToolbarFitBboxToMasksButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarFitBboxToMasksButton';
 import { CanvasToolbarNewSessionMenuButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarNewSessionMenuButton';
+import { CanvasToolbarProjectMenuButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarProjectMenuButton';
 import { CanvasToolbarRedoButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarRedoButton';
 import { CanvasToolbarResetViewButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarResetViewButton';
 import { CanvasToolbarSaveToGalleryButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarSaveToGalleryButton';
 import { CanvasToolbarScale } from 'features/controlLayers/components/Toolbar/CanvasToolbarScale';
+import { CanvasToolbarSnapshotMenuButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarSnapshotMenuButton';
 import { CanvasToolbarUndoButton } from 'features/controlLayers/components/Toolbar/CanvasToolbarUndoButton';
 import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanvasDeleteLayerHotkey';
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
@@ -28,10 +33,12 @@ import { memo, useMemo } from 'react';
 export const CanvasToolbar = memo(() => {
   const isBrushSelected = useToolIsSelected('brush');
   const isEraserSelected = useToolIsSelected('eraser');
+  const isTextSelected = useToolIsSelected('text');
+  const isLassoSelected = useToolIsSelected('lasso');
   const isGradientSelected = useToolIsSelected('gradient');
   const showToolWithPicker = useMemo(() => {
-    return isBrushSelected || isEraserSelected;
-  }, [isBrushSelected, isEraserSelected]);
+    return !isTextSelected && (isBrushSelected || isEraserSelected);
+  }, [isBrushSelected, isEraserSelected, isTextSelected]);
 
   useCanvasResetLayerHotkey();
   useCanvasDeleteLayerHotkey();
@@ -46,7 +53,7 @@ export const CanvasToolbar = memo(() => {
 
   return (
     <Flex w="full" gap={2} alignItems="center" px={2}>
-      <Flex alignItems="center" h="full" flexGrow={1}>
+      <ToolOptionsRowContainer gap={4} alignItems="center" h="full">
         <ToolFillColorPicker />
         {isGradientSelected && (
           <Box ms={2} mt="-2px" display="flex" alignItems="center" gap={2}>
@@ -54,8 +61,13 @@ export const CanvasToolbar = memo(() => {
             <ToolGradientModeToggle />
           </Box>
         )}
-        {showToolWithPicker && <ToolWidthPicker />}
-      </Flex>
+        {isLassoSelected && (
+          <Box ms={2} mt="-2px" display="flex" alignItems="center" gap={2}>
+            <ToolLassoModeToggle />
+          </Box>
+        )}
+        {isTextSelected ? <TextToolOptions /> : showToolWithPicker && <ToolWidthPicker />}
+      </ToolOptionsRowContainer>
       <Flex alignItems="center" h="full">
         <CanvasToolbarScale />
         <CanvasToolbarResetViewButton />
@@ -64,7 +76,9 @@ export const CanvasToolbar = memo(() => {
       </Flex>
       <Divider orientation="vertical" />
       <Flex alignItems="center" h="full">
+        <CanvasToolbarProjectMenuButton />
         <CanvasToolbarSaveToGalleryButton />
+        <CanvasToolbarSnapshotMenuButton />
         <CanvasToolbarUndoButton />
         <CanvasToolbarRedoButton />
         <CanvasToolbarNewSessionMenuButton />

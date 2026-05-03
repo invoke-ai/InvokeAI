@@ -49,8 +49,8 @@ from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer
     "z_image_denoise",
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
-    category="image",
-    version="1.4.0",
+    category="latents",
+    version="1.5.0",
     classification=Classification.Prototype,
 )
 class ZImageDenoiseInvocation(BaseInvocation):
@@ -104,11 +104,20 @@ class ZImageDenoiseInvocation(BaseInvocation):
         description=FieldDescriptions.vae + " Required for control conditioning.",
         input=Input.Connection,
     )
+    # Shift override for the sigma schedule. If None, shift is auto-calculated from image dimensions.
+    shift: Optional[float] = InputField(
+        default=None,
+        ge=0.0,
+        description="Override the timestep shift (mu) for the sigma schedule. "
+        "Leave blank to auto-calculate based on image dimensions (recommended). "
+        "Lower values (~0.5) produce less noise shifting, higher values (~1.15) produce more.",
+        title="Shift",
+    )
     # Scheduler selection for the denoising process
     scheduler: ZIMAGE_SCHEDULER_NAME_VALUES = InputField(
         default="euler",
-        description="Scheduler (sampler) for the denoising process. Euler is the default and recommended for "
-        "Z-Image-Turbo. Heun is 2nd-order (better quality, 2x slower). LCM is optimized for few steps.",
+        description="Scheduler (sampler) for the denoising process. Euler is the default and recommended. "
+        "Heun is 2nd-order (better quality, 2x slower). LCM works with Turbo only (not Base).",
         ui_choice_labels=ZIMAGE_SCHEDULER_LABELS,
     )
 
@@ -225,34 +234,36 @@ class ZImageDenoiseInvocation(BaseInvocation):
         """Calculate timestep shift based on image sequence length.
 
         Based on diffusers ZImagePipeline.calculate_shift method.
-        """
-        m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
-        b = base_shift - m * base_image_seq_len
-        mu = image_seq_len * m + b
-        return mu
-
-    def _get_sigmas(self, mu: float, num_steps: int) -> list[float]:
-        """Generate sigma schedule with time shift.
-
-        Based on FlowMatchEulerDiscreteScheduler with shift.
-        Generates num_steps + 1 sigma values (including terminal 0.0).
+        Returns a linear shift value (exp(mu) from the original formula).
         """
         import math
 
-        def time_shift(mu: float, sigma: float, t: float) -> float:
-            """Apply time shift to a single timestep value."""
+        m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
+        b = base_shift - m * base_image_seq_len
+        mu = image_seq_len * m + b
+        # Convert from exponential mu to linear shift value
+        return math.exp(mu)
+
+    def _get_sigmas(self, shift: float, num_steps: int) -> list[float]:
+        """Generate sigma schedule with linear time shift.
+
+        Uses linear time shift: shift / (shift + (1/t - 1)).
+        The shift value is used directly as a multiplier.
+        Generates num_steps + 1 sigma values (including terminal 0.0).
+        """
+
+        def time_shift(shift: float, t: float) -> float:
+            """Apply linear time shift to a single timestep value."""
             if t <= 0:
                 return 0.0
             if t >= 1:
                 return 1.0
-            return math.exp(mu) / (math.exp(mu) + (1 / t - 1) ** sigma)
+            return shift / (shift + (1 / t - 1))
 
-        # Generate linearly spaced values from 1 to 0 (excluding endpoints for safety)
-        # then apply time shift
         sigmas = []
         for i in range(num_steps + 1):
             t = 1.0 - i / num_steps  # Goes from 1.0 to 0.0
-            sigma = time_shift(mu, 1.0, t)
+            sigma = time_shift(shift, t)
             sigmas.append(sigma)
 
         return sigmas
@@ -313,11 +324,14 @@ class ZImageDenoiseInvocation(BaseInvocation):
             # Concatenate all negative embeddings
             neg_prompt_embeds = torch.cat([tc.prompt_embeds for tc in neg_text_conditionings], dim=0)
 
-        # Calculate shift based on image sequence length
-        mu = self._calculate_shift(img_seq_len)
+        # Calculate shift based on image sequence length, or use override
+        if self.shift is not None:
+            shift = self.shift
+        else:
+            shift = self._calculate_shift(img_seq_len)
 
         # Generate sigma schedule with time shift
-        sigmas = self._get_sigmas(mu, self.steps)
+        sigmas = self._get_sigmas(shift, self.steps)
 
         # Apply denoising_start and denoising_end clipping
         if self.denoising_start > 0 or self.denoising_end < 1:
@@ -387,12 +401,11 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 num_train_timesteps=1000,
                 shift=1.0,
             )
-            # Set timesteps - LCM should use num_inference_steps (it has its own sigma schedule),
+            # Set timesteps - LCM uses its own sigma schedule (num_inference_steps),
             # while other schedulers can use custom sigmas if supported
             is_lcm = self.scheduler == "lcm"
             set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
             if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
-                # Convert sigmas list to tensor for scheduler
                 scheduler.set_timesteps(sigmas=sigmas, device=device)
             else:
                 # LCM or scheduler doesn't support custom sigmas - use num_inference_steps
@@ -644,10 +657,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
                                     ),
                                 )
                     else:
-                        # For LCM and other first-order schedulers
+                        # For first-order schedulers (Euler, LCM)
                         user_step += 1
-                        # Only call step_callback if we haven't exceeded total_steps
-                        # (LCM scheduler may have more internal steps than user-facing steps)
                         if user_step <= total_steps:
                             pbar.update(1)
                             step_callback(

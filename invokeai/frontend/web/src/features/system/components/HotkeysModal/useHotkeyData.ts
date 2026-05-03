@@ -1,4 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import { useIsUncommittedCanvasTextSessionActive } from 'features/controlLayers/hooks/useIsUncommittedCanvasTextSessionActive';
 import { selectCustomHotkeys } from 'features/system/store/hotkeysSlice';
 import { useMemo } from 'react';
 import { type HotkeyCallback, type Options, useHotkeys } from 'react-hotkeys-hook';
@@ -117,6 +118,7 @@ export const useHotkeyData = (): HotkeysData => {
     addHotkey('canvas', 'selectEraserTool', ['e']);
     addHotkey('canvas', 'selectMoveTool', ['v']);
     addHotkey('canvas', 'selectRectTool', ['u']);
+    addHotkey('canvas', 'selectLassoTool', ['l']);
     addHotkey('canvas', 'selectViewTool', ['h']);
     addHotkey('canvas', 'selectColorPickerTool', ['i']);
     addHotkey('canvas', 'setFillColorsToDefault', ['d']);
@@ -241,6 +243,7 @@ type UseRegisteredHotkeysArg = {
  * A wrapper around `useHotkeys` that adds a handler for a registered hotkey.
  */
 export const useRegisteredHotkeys = ({ id, category, callback, options, dependencies }: UseRegisteredHotkeysArg) => {
+  const isUncommittedCanvasTextSessionActive = useIsUncommittedCanvasTextSessionActive();
   const hotkeysData = useHotkeyData();
   const data = useMemo(() => {
     const _data = hotkeysData[category].hotkeys[id];
@@ -261,7 +264,23 @@ export const useRegisteredHotkeys = ({ id, category, callback, options, dependen
     } satisfies Options;
   }, [data.isEnabled, options]);
 
-  return useHotkeys(data.hotkeys, callback, _options, dependencies);
+  const _optionsWithCanvasTextGuard = useMemo(() => {
+    return {
+      ..._options,
+      enabled: (event, hotkeysEvent) => {
+        // Suppress all registered hotkeys while text editing is still uncommitted.
+        if (isUncommittedCanvasTextSessionActive()) {
+          return false;
+        }
+        if (typeof _options.enabled === 'function') {
+          return _options.enabled(event, hotkeysEvent);
+        }
+        return _options.enabled ?? true;
+      },
+    } satisfies Options;
+  }, [_options, isUncommittedCanvasTextSessionActive]);
+
+  return useHotkeys(data.hotkeys, callback, _optionsWithCanvasTextGuard, dependencies);
 };
 
 /*

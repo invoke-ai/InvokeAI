@@ -36,8 +36,10 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool) -> Coroutine[Any, Any, EnqueueBatchResult]:
-        """Enqueues all permutations of a batch for execution."""
+    def enqueue_batch(
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+    ) -> Coroutine[Any, Any, EnqueueBatchResult]:
+        """Enqueues all permutations of a batch for execution for a specific user."""
         pass
 
     @abstractmethod
@@ -51,13 +53,13 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def clear(self, queue_id: str) -> ClearResult:
-        """Deletes all session queue items"""
+    def clear(self, queue_id: str, user_id: Optional[str] = None) -> ClearResult:
+        """Deletes all session queue items. If user_id is provided, only clears items owned by that user."""
         pass
 
     @abstractmethod
-    def prune(self, queue_id: str) -> PruneResult:
-        """Deletes all completed and errored session queue items"""
+    def prune(self, queue_id: str, user_id: Optional[str] = None) -> PruneResult:
+        """Deletes all completed and errored session queue items. If user_id is provided, only prunes items owned by that user."""
         pass
 
     @abstractmethod
@@ -71,18 +73,32 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def get_queue_status(self, queue_id: str) -> SessionQueueStatus:
-        """Gets the status of the queue"""
+    def get_queue_status(
+        self,
+        queue_id: str,
+        user_id: Optional[str] = None,
+        acting_user_id: Optional[str] = None,
+    ) -> SessionQueueStatus:
+        """Gets the status of the queue. If user_id is provided, also includes user-specific counts.
+
+        acting_user_id is independent of user_id and controls only current-item redaction:
+        when set, the returned status omits item_id/session_id/batch_id unless the
+        currently-running item belongs to acting_user_id. The redaction is decided from the
+        same get_current() snapshot used to embed those identifiers, so it cannot race against
+        a concurrent state change.
+        """
         pass
 
     @abstractmethod
-    def get_counts_by_destination(self, queue_id: str, destination: str) -> SessionQueueCountsByDestination:
-        """Gets the counts of queue items by destination"""
+    def get_counts_by_destination(
+        self, queue_id: str, destination: str, user_id: Optional[str] = None
+    ) -> SessionQueueCountsByDestination:
+        """Gets the counts of queue items by destination. If user_id is provided, only counts that user's items."""
         pass
 
     @abstractmethod
-    def get_batch_status(self, queue_id: str, batch_id: str) -> BatchStatus:
-        """Gets the status of a batch"""
+    def get_batch_status(self, queue_id: str, batch_id: str, user_id: Optional[str] = None) -> BatchStatus:
+        """Gets the status of a batch. If user_id is provided, only counts that user's items."""
         pass
 
     @abstractmethod
@@ -108,18 +124,24 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_by_batch_ids(self, queue_id: str, batch_ids: list[str]) -> CancelByBatchIDsResult:
-        """Cancels all queue items with matching batch IDs"""
+    def cancel_by_batch_ids(
+        self, queue_id: str, batch_ids: list[str], user_id: Optional[str] = None
+    ) -> CancelByBatchIDsResult:
+        """Cancels all queue items with matching batch IDs. If user_id is provided, only cancels items owned by that user."""
         pass
 
     @abstractmethod
-    def cancel_by_destination(self, queue_id: str, destination: str) -> CancelByDestinationResult:
-        """Cancels all queue items with the given batch destination"""
+    def cancel_by_destination(
+        self, queue_id: str, destination: str, user_id: Optional[str] = None
+    ) -> CancelByDestinationResult:
+        """Cancels all queue items with the given batch destination. If user_id is provided, only cancels items owned by that user."""
         pass
 
     @abstractmethod
-    def delete_by_destination(self, queue_id: str, destination: str) -> DeleteByDestinationResult:
-        """Deletes all queue items with the given batch destination"""
+    def delete_by_destination(
+        self, queue_id: str, destination: str, user_id: Optional[str] = None
+    ) -> DeleteByDestinationResult:
+        """Deletes all queue items with the given batch destination. If user_id is provided, only deletes items owned by that user."""
         pass
 
     @abstractmethod
@@ -128,13 +150,13 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_all_except_current(self, queue_id: str) -> CancelAllExceptCurrentResult:
-        """Cancels all queue items except in-progress items"""
+    def cancel_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> CancelAllExceptCurrentResult:
+        """Cancels all queue items except in-progress items. If user_id is provided, only cancels items owned by that user."""
         pass
 
     @abstractmethod
-    def delete_all_except_current(self, queue_id: str) -> DeleteAllExceptCurrentResult:
-        """Deletes all queue items except in-progress items"""
+    def delete_all_except_current(self, queue_id: str, user_id: Optional[str] = None) -> DeleteAllExceptCurrentResult:
+        """Deletes all queue items except in-progress items. If user_id is provided, only deletes items owned by that user."""
         pass
 
     @abstractmethod
@@ -164,8 +186,9 @@ class SessionQueueBase(ABC):
         self,
         queue_id: str,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        user_id: Optional[str] = None,
     ) -> ItemIdsResult:
-        """Gets all queue item ids that match the given parameters"""
+        """Gets all queue item ids that match the given parameters. If user_id is provided, only returns items for that user."""
         pass
 
     @abstractmethod

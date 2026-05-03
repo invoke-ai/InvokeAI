@@ -2,7 +2,9 @@ import { NUMPY_RAND_MAX } from 'app/constants';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { buildZodTypeGuard } from 'common/util/zodUtils';
 import {
+  zAnimaSchedulerField,
   zErnieImageSchedulerField,
+  zExternalModelIdentifierField,
   zFluxDypeExponentField,
   zFluxDypePresetField,
   zFluxDypeScaleField,
@@ -86,6 +88,11 @@ export const [zParameterErnieImageScheduler, isParameterErnieImageScheduler] =
 export type ParameterErnieImageScheduler = z.infer<typeof zParameterErnieImageScheduler>;
 // #endregion
 
+// #region Anima Scheduler
+export const [zParameterAnimaScheduler, isParameterAnimaScheduler] = buildParameter(zAnimaSchedulerField);
+export type ParameterAnimaScheduler = z.infer<typeof zParameterAnimaScheduler>;
+// #endregion
+
 // #region Flux DyPE Preset
 export const [zParameterFluxDypePreset, isParameterFluxDypePreset] = buildParameter(zFluxDypePresetField);
 export type ParameterFluxDypePreset = z.infer<typeof zParameterFluxDypePreset>;
@@ -122,7 +129,7 @@ export const isParameterHeight = isParameterImageDimension;
 // #endregion
 
 // #region Model
-export const zParameterModel = zModelIdentifierField;
+export const zParameterModel = z.union([zModelIdentifierField, zExternalModelIdentifierField]);
 export type ParameterModel = z.infer<typeof zParameterModel>;
 // #endregion
 

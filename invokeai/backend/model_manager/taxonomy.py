@@ -54,6 +54,12 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with Z-Image model architecture, including Z-Image-Turbo."""
     ErnieImage = "ernie-image"
     """Indicates the model is associated with Baidu ERNIE-Image, including ERNIE-Image-Turbo."""
+    External = "external"
+    """Indicates the model is hosted by an external provider."""
+    QwenImage = "qwen-image"
+    """Indicates the model is associated with Qwen Image Edit 2511 model architecture."""
+    Anima = "anima"
+    """Indicates the model is associated with Anima model architecture (Cosmos Predict2 DiT + LLM Adapter)."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -79,6 +85,8 @@ class ModelType(str, Enum):
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
     PromptEnhancer = "prompt_enhancer"
+    TextLLM = "text_llm"
+    ExternalImageGenerator = "external_image_generator"
     Unknown = "unknown"
 
 
@@ -129,13 +137,36 @@ class Flux2VariantType(str, Enum):
     """FLUX.2 model variants."""
 
     Klein4B = "klein_4b"
-    """Flux2 Klein 4B variant using Qwen3 4B text encoder."""
+    """Flux2 Klein 4B variant using Qwen3 4B text encoder (distilled)."""
+
+    Klein4BBase = "klein_4b_base"
+    """Flux2 Klein 4B Base variant - undistilled foundation model using Qwen3 4B text encoder."""
 
     Klein9B = "klein_9b"
     """Flux2 Klein 9B variant using Qwen3 8B text encoder (distilled)."""
 
     Klein9BBase = "klein_9b_base"
     """Flux2 Klein 9B Base variant - undistilled foundation model using Qwen3 8B text encoder."""
+
+
+class ZImageVariantType(str, Enum):
+    """Z-Image model variants."""
+
+    Turbo = "turbo"
+    """Z-Image Turbo - distilled model optimized for 8 steps, no CFG support."""
+
+    ZBase = "zbase"
+    """Z-Image Base - undistilled foundation model with full CFG and negative prompt support."""
+
+
+class QwenImageVariantType(str, Enum):
+    """Qwen Image model variants."""
+
+    Generate = "generate"
+    """Qwen Image - text-to-image generation model."""
+
+    Edit = "edit"
+    """Qwen Image Edit - image editing model with reference image support."""
 
 
 class Qwen3VariantType(str, Enum):
@@ -146,6 +177,9 @@ class Qwen3VariantType(str, Enum):
 
     Qwen3_8B = "qwen3_8b"
     """Qwen3 8B text encoder (hidden_size=4096). Used by FLUX.2 Klein 9B."""
+
+    Qwen3_06B = "qwen3_06b"
+    """Qwen3 0.6B text encoder (hidden_size=1024). Used by Anima."""
 
 
 class ModelFormat(str, Enum):
@@ -165,6 +199,7 @@ class ModelFormat(str, Enum):
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
+    ExternalApi = "external_api"
     Unknown = "unknown"
 
 
@@ -193,6 +228,7 @@ class ModelSourceType(str, Enum):
     Path = "path"
     Url = "url"
     HFRepoID = "hf_repo_id"
+    External = "external"
 
 
 class FluxLoRAFormat(str, Enum):
@@ -204,9 +240,33 @@ class FluxLoRAFormat(str, Enum):
     Control = "flux.control"
     AIToolkit = "flux.aitoolkit"
     XLabs = "flux.xlabs"
+    BflPeft = "flux.bfl_peft"
+    OneTrainerBfl = "flux.onetrainer_bfl"
 
 
-AnyVariant: TypeAlias = Union[ModelVariantType, ClipVariantType, FluxVariantType, Flux2VariantType, Qwen3VariantType]
+AnyVariant: TypeAlias = Union[
+    ModelVariantType,
+    ClipVariantType,
+    FluxVariantType,
+    Flux2VariantType,
+    ZImageVariantType,
+    QwenImageVariantType,
+    Qwen3VariantType,
+]
 variant_type_adapter = TypeAdapter[
-    ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | Qwen3VariantType
-](ModelVariantType | ClipVariantType | FluxVariantType | Flux2VariantType | Qwen3VariantType)
+    ModelVariantType
+    | ClipVariantType
+    | FluxVariantType
+    | Flux2VariantType
+    | ZImageVariantType
+    | QwenImageVariantType
+    | Qwen3VariantType
+](
+    ModelVariantType
+    | ClipVariantType
+    | FluxVariantType
+    | Flux2VariantType
+    | ZImageVariantType
+    | QwenImageVariantType
+    | Qwen3VariantType
+)
