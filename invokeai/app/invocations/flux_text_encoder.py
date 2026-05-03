@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from typing import Iterator, Literal, Optional, Tuple, Union
+from typing import Iterator, Literal, Optional, Tuple
 
 import torch
 from transformers import CLIPTextModel, CLIPTokenizer, T5EncoderModel, T5Tokenizer

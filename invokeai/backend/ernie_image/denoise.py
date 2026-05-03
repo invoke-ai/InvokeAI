@@ -84,11 +84,7 @@ def denoise(
 
             img = scheduler.step(model_output=pred, timestep=timestep, sample=img).prev_sample
 
-            t_prev = (
-                scheduler.sigmas[step_index + 1].item()
-                if step_index + 1 < len(scheduler.sigmas)
-                else 0.0
-            )
+            t_prev = scheduler.sigmas[step_index + 1].item() if step_index + 1 < len(scheduler.sigmas) else 0.0
             if inpaint_extension is not None:
                 img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
 

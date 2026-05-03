@@ -8,7 +8,6 @@ from typing import List
 
 import torch
 
-
 # Latent channels of the ERNIE-Image VAE (AutoencoderKLFlux2). The transformer's
 # `in_channels` is this value times 4 (after a 2x2 patchify).
 LATENT_CHANNELS: int = 32
@@ -50,8 +49,7 @@ def pad_text(
         )
 
     normalized = [
-        th.squeeze(1).to(device).to(dtype) if th.dim() == 3 else th.to(device).to(dtype)
-        for th in text_hiddens
+        th.squeeze(1).to(device).to(dtype) if th.dim() == 3 else th.to(device).to(dtype) for th in text_hiddens
     ]
     lens = torch.tensor([t.shape[0] for t in normalized], device=device, dtype=torch.long)
     t_max = int(lens.max().item())
@@ -64,9 +62,7 @@ def pad_text(
 def get_schedule(num_steps: int, denoising_start: float = 0.0, denoising_end: float = 1.0) -> torch.Tensor:
     """Linear sigma schedule from 1.0 -> 0.0, same convention as the upstream pipeline."""
     if not 0.0 <= denoising_start < denoising_end <= 1.0:
-        raise ValueError(
-            f"Invalid denoising window: start={denoising_start}, end={denoising_end}"
-        )
+        raise ValueError(f"Invalid denoising window: start={denoising_start}, end={denoising_end}")
     sigmas = torch.linspace(1.0, 0.0, num_steps + 1)
     start = int(num_steps * denoising_start)
     end = int(num_steps * denoising_end)

@@ -8,6 +8,7 @@ from transformers import (
     CLIPTokenizer,
     T5EncoderModel,
     T5Tokenizer,
+    T5TokenizerFast,
 )
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation

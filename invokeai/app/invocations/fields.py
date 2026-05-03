@@ -370,7 +370,6 @@ class AnimaConditioningField(BaseModel):
     )
 
 
-
 class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 

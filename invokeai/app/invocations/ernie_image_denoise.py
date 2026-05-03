@@ -130,9 +130,7 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
             scheduler = scheduler_cls()
 
             def _step_callback(state: PipelineIntermediateState) -> None:
-                context.util.signal_progress(
-                    f"ERNIE-Image step {state.step}/{state.total_steps}"
-                )
+                context.util.signal_progress(f"ERNIE-Image step {state.step}/{state.total_steps}")
 
             img = ernie_denoise(
                 model=transformer,
