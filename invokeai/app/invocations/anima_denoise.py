@@ -54,6 +54,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, Range
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.app.services.config.config_default import get_config
 
 # Anima uses 8x spatial compression (VAE downsamples by 2^3)
 ANIMA_LATENT_SCALE_FACTOR = 8
@@ -395,7 +396,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         device = TorchDevice.choose_torch_device()
-        inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+        inference_dtype = TorchDevice.resolve_model_precision(
+            get_config().anima_precision, device
+        )
 
         if self.denoising_start >= self.denoising_end:
             raise ValueError(
