@@ -52,6 +52,8 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
     """Indicates the model is associated with Z-Image model architecture, including Z-Image-Turbo."""
+    ErnieImage = "ernie-image"
+    """Indicates the model is associated with Baidu ERNIE-Image, including ERNIE-Image-Turbo."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -76,6 +78,7 @@ class ModelType(str, Enum):
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
     LlavaOnevision = "llava_onevision"
+    PromptEnhancer = "prompt_enhancer"
     Unknown = "unknown"
 
 
@@ -90,6 +93,8 @@ class SubModelType(str, Enum):
     Tokenizer = "tokenizer"
     Tokenizer2 = "tokenizer_2"
     Tokenizer3 = "tokenizer_3"
+    PromptEnhancer = "pe"
+    PromptEnhancerTokenizer = "pe_tokenizer"
     VAE = "vae"
     VAEDecoder = "vae_decoder"
     VAEEncoder = "vae_encoder"

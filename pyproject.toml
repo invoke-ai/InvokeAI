@@ -36,7 +36,7 @@ dependencies = [
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
   "compel==2.1.1",
-  "diffusers[torch]==0.36.0",
+  "diffusers[torch]==0.38.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",
@@ -125,6 +125,10 @@ dependencies = [
 # This prevents conflicts with opencv-contrib-python, which Invoke requires.
 # Force transformers>=5.1.0 past compel==2.1.1's ~=4.25 (<5.0) constraint.
 override-dependencies = ["opencv-python; sys_platform=='never'", "transformers>=5.1.0"]
+# diffusers 0.38.0 hard-pins safetensors>=0.8.0-rc.0 (an upstream-side prerelease
+# requirement). Until a diffusers 0.38.x patch releases with a stable safetensors
+# floor, we have to allow that one prerelease through resolution.
+prerelease = "allow"
 conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
 index-strategy = "unsafe-best-match"
 

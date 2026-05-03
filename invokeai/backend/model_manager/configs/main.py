@@ -68,6 +68,10 @@ class MainModelDefaultSettings(BaseModel):
                 return cls(width=1024, height=1024)
             case BaseModelType.ZImage:
                 return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
+            case BaseModelType.ErnieImage:
+                # Standard ERNIE-Image defaults; Turbo variant uses fewer steps and CFG=1.0,
+                # which the user can adjust after install.
+                return cls(steps=50, cfg_scale=4.0, width=1024, height=1024)
             case BaseModelType.Flux2:
                 # Different defaults based on variant
                 if variant == Flux2VariantType.Klein9BBase:
@@ -125,6 +129,35 @@ def _has_main_keys(state_dict: dict[str | int, Any]) -> bool:
             # careful to avoid false positives on XLabs FLUX IP-Adapter models.
             return True
     return False
+
+
+def _has_ernie_image_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains ERNIE-Image transformer keys."""
+    ernie_specific_keys = {
+        "x_embedder",
+        "text_proj",
+        "adaLN_modulation",
+    }
+
+    lora_suffixes = (
+        ".lora_down.weight",
+        ".lora_up.weight",
+        ".lora_A.weight",
+        ".lora_B.weight",
+        ".dora_scale",
+    )
+
+    matched: set[str] = set()
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        if key.endswith(lora_suffixes):
+            return False
+        for part in key.split("."):
+            if part in ernie_specific_keys:
+                matched.add(part)
+    # Require all three to be present to disambiguate from other DiTs
+    return matched == ernie_specific_keys
 
 
 def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -1163,3 +1196,53 @@ class Main_GGUF_ZImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_B
         has_ggml_tensors = _has_ggml_tensors(mod.load_state_dict())
         if not has_ggml_tensors:
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
+class Main_Diffusers_ErnieImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for ERNIE-Image diffusers models (ERNIE-Image, ERNIE-Image-Turbo)."""
+
+    base: Literal[BaseModelType.ErnieImage] = Field(BaseModelType.ErnieImage)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {"ErnieImagePipeline"},
+        )
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+        )
+
+
+class Main_Checkpoint_ErnieImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for ERNIE-Image single-file checkpoint models."""
+
+    base: Literal[BaseModelType.ErnieImage] = Field(default=BaseModelType.ErnieImage)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_ernie_image_model(mod)
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_ernie_image_model(cls, mod: ModelOnDisk) -> None:
+        if not _has_ernie_image_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like an ERNIE-Image model")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        if _has_ggml_tensors(mod.load_state_dict()):
+            raise NotAMatchError("state dict looks like GGUF quantized")

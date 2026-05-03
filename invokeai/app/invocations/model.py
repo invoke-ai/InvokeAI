@@ -80,6 +80,20 @@ class Qwen3EncoderField(BaseModel):
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
+class Mistral3EncoderField(BaseModel):
+    """Field for Mistral3 text encoder used by ERNIE-Image models."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
+class PromptEnhancerField(BaseModel):
+    """Field for the optional ERNIE-Image prompt-enhancer (Ministral3ForCausalLM)."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load PE tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load PE causal-LM submodel")
+
+
 class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')

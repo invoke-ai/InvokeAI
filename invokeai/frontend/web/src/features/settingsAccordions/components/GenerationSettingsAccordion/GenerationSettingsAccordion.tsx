@@ -7,6 +7,7 @@ import { selectLoRAsSlice } from 'features/controlLayers/store/lorasSlice';
 import {
   selectFluxDypePreset,
   selectIsCogView4,
+  selectIsErnieImage,
   selectIsFLUX,
   selectIsFlux2,
   selectIsSD3,
@@ -15,6 +16,8 @@ import {
 import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
+import ParamErnieImagePromptEnhancer from 'features/parameters/components/Core/ParamErnieImagePromptEnhancer';
+import ParamErnieImageScheduler from 'features/parameters/components/Core/ParamErnieImageScheduler';
 import ParamFluxDypeExponent from 'features/parameters/components/Core/ParamFluxDypeExponent';
 import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDypePreset';
 import ParamFluxDypeScale from 'features/parameters/components/Core/ParamFluxDypeScale';
@@ -44,6 +47,7 @@ export const GenerationSettingsAccordion = memo(() => {
   const isSD3 = useAppSelector(selectIsSD3);
   const isCogView4 = useAppSelector(selectIsCogView4);
   const isZImage = useAppSelector(selectIsZImage);
+  const isErnieImage = useAppSelector(selectIsErnieImage);
   const fluxDypePreset = useAppSelector(selectFluxDypePreset);
 
   const selectBadges = useMemo(
@@ -82,9 +86,11 @@ export const GenerationSettingsAccordion = memo(() => {
         <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
           <Flex gap={4} flexDir="column" pb={4}>
             <FormControlGroup formLabelProps={formLabelProps}>
-              {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && <ParamScheduler />}
+              {!isFLUX && !isFlux2 && !isSD3 && !isCogView4 && !isZImage && !isErnieImage && <ParamScheduler />}
               {isFLUX && <ParamFluxScheduler />}
               {isZImage && <ParamZImageScheduler />}
+              {isErnieImage && <ParamErnieImageScheduler />}
+              {isErnieImage && <ParamErnieImagePromptEnhancer />}
               <ParamSteps />
               {(isFLUX || isFlux2) && modelConfig && !isFluxFillMainModelModelConfig(modelConfig) && <ParamGuidance />}
               {!isFLUX && !isFlux2 && <ParamCFGScale />}

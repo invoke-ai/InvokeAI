@@ -785,16 +785,17 @@ diffusers.models.controlnets.controlnet.ControlNetModel = ControlNetModel
 # NOTE: with this patch, torch.compile crashes on 2.0 torch(already fixed in nightly)
 # https://github.com/huggingface/diffusers/pull/4315
 # https://github.com/huggingface/diffusers/blob/main/src/diffusers/models/lora.py#L96C18-L96C18
+from diffusers.models.lora import LoRACompatibleConv
+
+
 def new_LoRACompatibleConv_forward(self, hidden_states, scale: float = 1.0):
     if self.lora_layer is None:
-        return super(diffusers.models.lora.LoRACompatibleConv, self).forward(hidden_states)
+        return super(LoRACompatibleConv, self).forward(hidden_states)
     else:
-        return super(diffusers.models.lora.LoRACompatibleConv, self).forward(hidden_states) + (
-            scale * self.lora_layer(hidden_states)
-        )
+        return super(LoRACompatibleConv, self).forward(hidden_states) + (scale * self.lora_layer(hidden_states))
 
 
-diffusers.models.lora.LoRACompatibleConv.forward = new_LoRACompatibleConv_forward
+LoRACompatibleConv.forward = new_LoRACompatibleConv_forward
 
 try:
     import xformers

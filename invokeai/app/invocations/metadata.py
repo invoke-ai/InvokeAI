@@ -166,6 +166,10 @@ GENERATION_MODES = Literal[
     "z_image_img2img",
     "z_image_inpaint",
     "z_image_outpaint",
+    "ernie_image_txt2img",
+    "ernie_image_img2img",
+    "ernie_image_inpaint",
+    "ernie_image_outpaint",
 ]
 
 

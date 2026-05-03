@@ -17,6 +17,7 @@ from invokeai.app.invocations.fields import (
     ColorField,
     ConditioningField,
     DenoiseMaskField,
+    ErnieImageConditioningField,
     FieldDescriptions,
     FluxConditioningField,
     ImageField,
@@ -471,6 +472,17 @@ class ZImageConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "ZImageConditioningOutput":
         return cls(conditioning=ZImageConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("ernie_image_conditioning_output")
+class ErnieImageConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output an ERNIE-Image text conditioning tensor."""
+
+    conditioning: ErnieImageConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "ErnieImageConditioningOutput":
+        return cls(conditioning=ErnieImageConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("conditioning_output")

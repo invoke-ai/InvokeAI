@@ -213,7 +213,8 @@ export const isMainModelWithoutUnet = (modelLoader: Invocation<MainModelLoaderNo
     modelLoader.type === 'flux2_klein_model_loader' ||
     modelLoader.type === 'sd3_model_loader' ||
     modelLoader.type === 'cogview4_model_loader' ||
-    modelLoader.type === 'z_image_model_loader'
+    modelLoader.type === 'z_image_model_loader' ||
+    modelLoader.type === 'ernie_image_model_loader'
   );
 };
 

@@ -340,6 +340,12 @@ class ZImageConditioningField(BaseModel):
     )
 
 
+class ErnieImageConditioningField(BaseModel):
+    """An ERNIE-Image conditioning tensor primitive value."""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
 class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 

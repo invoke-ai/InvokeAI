@@ -143,6 +143,7 @@ export const MODEL_BASE_TO_COLOR: Record<BaseModelType, string> = {
   flux2: 'gold',
   cogview4: 'red',
   'z-image': 'cyan',
+  'ernie-image': 'pink',
   unknown: 'red',
 };
 
@@ -167,6 +168,7 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   clip_embed: 'CLIP Embed',
   siglip: 'SigLIP',
   flux_redux: 'FLUX Redux',
+  prompt_enhancer: 'Prompt Enhancer',
   unknown: 'Unknown',
 };
 
@@ -184,6 +186,7 @@ export const MODEL_BASE_TO_LONG_NAME: Record<BaseModelType, string> = {
   flux2: 'FLUX.2',
   cogview4: 'CogView4',
   'z-image': 'Z-Image',
+  'ernie-image': 'ERNIE-Image',
   unknown: 'Unknown',
 };
 
@@ -201,6 +204,7 @@ export const MODEL_BASE_TO_SHORT_NAME: Record<BaseModelType, string> = {
   flux2: 'FLUX.2',
   cogview4: 'CogView4',
   'z-image': 'Z-Image',
+  'ernie-image': 'ERNIE-Image',
   unknown: 'Unknown',
 };
 

@@ -60,3 +60,22 @@ ZIMAGE_SCHEDULER_MAP: dict[str, Type[SchedulerMixin]] = {
 
 if _HAS_LCM:
     ZIMAGE_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler
+
+
+# ERNIE-Image schedulers (also Flow Matching). Standard ERNIE-Image runs 50 steps
+# with CFG 4.0, ERNIE-Image-Turbo runs 8 steps with CFG 1.0.
+ERNIE_IMAGE_SCHEDULER_NAME_VALUES = Literal["euler", "heun", "lcm"]
+
+ERNIE_IMAGE_SCHEDULER_LABELS: dict[str, str] = {
+    "euler": "Euler",
+    "heun": "Heun (2nd order)",
+    "lcm": "LCM",
+}
+
+ERNIE_IMAGE_SCHEDULER_MAP: dict[str, Type[SchedulerMixin]] = {
+    "euler": FlowMatchEulerDiscreteScheduler,
+    "heun": FlowMatchHeunDiscreteScheduler,
+}
+
+if _HAS_LCM:
+    ERNIE_IMAGE_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler

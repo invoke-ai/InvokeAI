@@ -71,6 +71,9 @@ export const zFluxSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Z-Image scheduler options (Flow Matching schedulers, same as Flux)
 export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 
+// ERNIE-Image scheduler options (Flow Matching schedulers, same as Flux/Z-Image)
+export const zErnieImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
+
 // Flux DyPE (Dynamic Position Extrapolation) preset options for high-resolution generation
 export const zFluxDypePresetField = z.enum(['off', 'manual', 'auto', 'area', '4k']);
 
@@ -93,10 +96,21 @@ export const zBaseModelType = z.enum([
   'flux2',
   'cogview4',
   'z-image',
+  'ernie-image',
   'unknown',
 ]);
 export type BaseModelType = z.infer<typeof zBaseModelType>;
-export const zMainModelBase = z.enum(['sd-1', 'sd-2', 'sd-3', 'sdxl', 'flux', 'flux2', 'cogview4', 'z-image']);
+export const zMainModelBase = z.enum([
+  'sd-1',
+  'sd-2',
+  'sd-3',
+  'sdxl',
+  'flux',
+  'flux2',
+  'cogview4',
+  'z-image',
+  'ernie-image',
+]);
 type MainModelBase = z.infer<typeof zMainModelBase>;
 export const isMainModelBase = (base: unknown): base is MainModelBase => zMainModelBase.safeParse(base).success;
 export const zModelType = z.enum([
@@ -117,6 +131,7 @@ export const zModelType = z.enum([
   'clip_embed',
   'siglip',
   'flux_redux',
+  'prompt_enhancer',
   'unknown',
 ]);
 export type ModelType = z.infer<typeof zModelType>;
@@ -129,6 +144,8 @@ export const zSubModelType = z.enum([
   'tokenizer',
   'tokenizer_2',
   'tokenizer_3',
+  'pe',
+  'pe_tokenizer',
   'vae',
   'vae_decoder',
   'vae_encoder',
