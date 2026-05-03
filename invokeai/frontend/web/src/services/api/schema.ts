@@ -16352,6 +16352,13 @@ export type components = {
              */
             precision?: "auto" | "float16" | "bfloat16" | "float32";
             /**
+             * Anima Precision
+             * @description Floating point precision for the Anima model. `auto` selects bfloat16 where supported (the historical default). Set to `float32` if Anima inference is unexpectedly slow on your device — notably Apple Silicon (MPS), where bfloat16 is supported but slow.
+             * @default auto
+             * @enum {string}
+             */
+            anima_precision?: "auto" | "bfloat16" | "float32";
+            /**
              * Sequential Guidance
              * @description Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
              * @default false
