@@ -38,8 +38,14 @@ import {
   setGuidance,
   setHrfEnabled,
   setHrfLatentInterpolationMode,
+  setHrfMethod,
   setHrfScale,
   setHrfStrength,
+  setHrfStructure,
+  setHrfTileControlNetModel,
+  setHrfTileOverlap,
+  setHrfTileSize,
+  setHrfUpscaleModel,
   setImg2imgStrength,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
@@ -67,6 +73,7 @@ import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
 import type {
   CanvasMetadata,
   HrfLatentInterpolationMode,
+  HrfMethod as HrfMethodType,
   LoRA,
   RefImageState,
 } from 'features/controlLayers/store/types';
@@ -74,6 +81,7 @@ import {
   zCanvasMetadata,
   zCanvasReferenceImageState_OLD,
   zHrfLatentInterpolationMode,
+  zHrfMethod,
   zRefImageState,
 } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField, ModelType } from 'features/nodes/types/common';
@@ -641,17 +649,20 @@ const HrfEnabled: SingleMetadataHandler<boolean> = {
   ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
 };
 
-const HrfMethod: UnrecallableMetadataHandler<string> = {
-  [UnrecallableMetadataKey]: true,
+const HrfMethod: SingleMetadataHandler<HrfMethodType> = {
+  [SingleMetadataKey]: true,
   type: 'HrfMethod',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'hrf_method');
-    const parsed = z.string().parse(raw);
+    const parsed = zHrfMethod.parse(raw);
     return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfMethod(value));
   },
   i18nKey: 'hrf.metadata.method',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: UnrecallableMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
+  ValueComponent: ({ value }: SingleMetadataValueProps<HrfMethodType>) => <MetadataPrimitiveValue value={value} />,
 };
 
 const HrfStrength: SingleMetadataHandler<ParameterStrength> = {
@@ -702,6 +713,88 @@ const HrfLatentInterpolationModeMetadata: SingleMetadataHandler<HrfLatentInterpo
   ValueComponent: ({ value }: SingleMetadataValueProps<HrfLatentInterpolationMode>) => (
     <MetadataPrimitiveValue value={value} />
   ),
+};
+
+const HrfUpscaleModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfUpscaleModel',
+  parse: (metadata, store) => {
+    const raw = getProperty(metadata, 'hrf_upscale_model');
+    return parseModelIdentifier(raw, store, 'spandrel_image_to_image');
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfUpscaleModel(value));
+  },
+  i18nKey: 'hrf.metadata.upscaleModel',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+
+const HrfTileControlNetModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfTileControlNetModel',
+  parse: (metadata, store) => {
+    const raw = getProperty(metadata, 'hrf_tile_controlnet_model');
+    return parseModelIdentifier(raw, store, 'controlnet');
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfTileControlNetModel(value));
+  },
+  i18nKey: 'hrf.metadata.tileControlNetModel',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+
+const HrfStructure: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfStructure',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_structure');
+    const parsed = z.number().min(-10).max(10).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfStructure(value));
+  },
+  i18nKey: 'hrf.metadata.structure',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+
+const HrfTileSize: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfTileSize',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_tile_size');
+    const parsed = z.number().int().min(8).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfTileSize(value));
+  },
+  i18nKey: 'hrf.metadata.tileSize',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+
+const HrfTileOverlap: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfTileOverlap',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_tile_overlap');
+    const parsed = z.number().int().min(8).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfTileOverlap(value));
+  },
+  i18nKey: 'hrf.metadata.tileOverlap',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion High Resolution Fix
 
@@ -1621,6 +1714,11 @@ export const ImageMetadataHandlers = {
   HrfStrength,
   HrfScale,
   HrfLatentInterpolationMode: HrfLatentInterpolationModeMetadata,
+  HrfUpscaleModel,
+  HrfTileControlNetModel,
+  HrfStructure,
+  HrfTileSize,
+  HrfTileOverlap,
   SeamlessX,
   SeamlessY,
   RefinerModel,

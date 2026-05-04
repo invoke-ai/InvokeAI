@@ -1,19 +1,43 @@
 import type { RootState } from 'app/store/store';
+import type { HrfMethod } from 'features/controlLayers/store/types';
 import { describe, expect, it } from 'vitest';
 
 import { addHighResFix } from './addHighResFix';
 import { Graph } from './Graph';
 
-const buildState = (overrides?: { base?: string; hrfEnabled?: boolean; refinerModel?: unknown }): RootState =>
+const buildState = (overrides?: {
+  base?: string;
+  hrfEnabled?: boolean;
+  hrfMethod?: HrfMethod;
+  refinerModel?: unknown;
+}): RootState =>
   ({
     ui: { activeTab: 'generate' },
     params: {
-      model: { key: 'model', name: 'model', base: overrides?.base ?? 'sdxl', type: 'main' },
+      model: { key: 'model', hash: 'model-hash', name: 'model', base: overrides?.base ?? 'sdxl', type: 'main' },
       dimensions: { width: 512, height: 512 },
       hrfEnabled: overrides?.hrfEnabled ?? true,
+      hrfMethod: overrides?.hrfMethod ?? 'latent',
       hrfScale: 2,
       hrfStrength: 0.35,
       hrfLatentInterpolationMode: 'bilinear',
+      hrfUpscaleModel: {
+        key: 'upscale',
+        hash: 'upscale-hash',
+        name: 'upscale',
+        base: 'any',
+        type: 'spandrel_image_to_image',
+      },
+      hrfTileControlNetModel: {
+        key: 'tile',
+        hash: 'tile-hash',
+        name: 'tile',
+        base: overrides?.base ?? 'sdxl',
+        type: 'controlnet',
+      },
+      hrfStructure: 0,
+      hrfTileSize: 1024,
+      hrfTileOverlap: 128,
       optimizedDenoisingEnabled: true,
       refinerModel: overrides?.refinerModel ?? null,
     },
@@ -23,6 +47,11 @@ const buildClassicGraph = () => {
   const g = new Graph('test_graph');
   const seed = g.addNode({ id: 'seed', type: 'integer' });
   const noise = g.addNode({ id: 'noise', type: 'noise', use_cpu: true, width: 512, height: 512 });
+  const modelLoader = g.addNode({
+    id: 'model_loader',
+    type: 'sdxl_model_loader',
+    model: { key: 'model', hash: 'model-hash', name: 'model', base: 'sdxl', type: 'main' },
+  });
   const denoise = g.addNode({
     id: 'denoise',
     type: 'denoise_latents',
@@ -34,9 +63,11 @@ const buildClassicGraph = () => {
 
   g.addEdge(seed, 'value', noise, 'seed');
   g.addEdge(noise, 'noise', denoise, 'noise');
+  g.addEdge(modelLoader, 'unet', denoise, 'unet');
+  g.addEdge(modelLoader, 'vae', l2i, 'vae');
   g.addEdge(denoise, 'latents', l2i, 'latents');
 
-  return { g, seed, noise, denoise, l2i };
+  return { g, seed, noise, modelLoader, denoise, l2i };
 };
 
 const addSDXLConditioning = (g: Graph, denoise: ReturnType<typeof buildClassicGraph>['denoise']) => {
@@ -192,6 +223,122 @@ describe('addHighResFix', () => {
     expect(graph.edges).not.toContainEqual({
       source: { node_id: posCollect.id, field: 'collection' },
       destination: { node_id: hrfDenoise.id, field: 'positive_conditioning' },
+    });
+  });
+
+  it('reroutes SDXL txt2img graphs through an upscale model, tiled encode, and tiled second pass', () => {
+    const { g, seed, noise, denoise, l2i } = buildClassicGraph();
+    addSDXLConditioning(g, denoise);
+
+    addHighResFix({
+      g,
+      state: buildState({ hrfMethod: 'upscale_model' }),
+      generationMode: 'txt2img',
+      denoise,
+      l2i,
+      noise,
+      seed,
+    });
+
+    const graph = g.getGraph();
+    const nodes = Object.values(graph.nodes);
+    const intermediateL2i = nodes.find((node) => node.id.startsWith('hrf_intermediate_l2i'));
+    const spandrel = nodes.find((node) => node.type === 'spandrel_image_to_image_autoscale');
+    const unsharp = nodes.find((node) => node.type === 'unsharp_mask');
+    const i2l = nodes.find((node) => node.id.startsWith('hrf_i2l'));
+    const tiledDenoise = nodes.find((node) => node.type === 'tiled_multi_diffusion_denoise_latents');
+
+    if (!intermediateL2i || !spandrel || !unsharp || !i2l || !tiledDenoise) {
+      throw new Error('Expected upscale-model HRF nodes');
+    }
+
+    expect(nodes.some((node) => node.type === 'lresize')).toBe(false);
+    expect(intermediateL2i).toMatchObject({ type: 'l2i', is_intermediate: true });
+    expect(spandrel).toMatchObject({
+      type: 'spandrel_image_to_image_autoscale',
+      image_to_image_model: { key: 'upscale' },
+      scale: 2,
+      tile_size: 1024,
+      fit_to_multiple_of_8: true,
+    });
+    expect(i2l).toMatchObject({ type: 'i2l', tiled: true, tile_size: 1024 });
+    expect(l2i).toMatchObject({ type: 'l2i', tiled: true, tile_size: 1024 });
+    expect(tiledDenoise).toMatchObject({
+      type: 'tiled_multi_diffusion_denoise_latents',
+      tile_height: 1024,
+      tile_width: 1024,
+      tile_overlap: 128,
+      denoising_start: 0.65,
+      denoising_end: 1,
+    });
+    expect(graph.edges).not.toContainEqual({
+      source: { node_id: 'denoise', field: 'latents' },
+      destination: { node_id: 'l2i', field: 'latents' },
+    });
+    expect(graph.edges).toContainEqual({
+      source: { node_id: 'denoise', field: 'latents' },
+      destination: { node_id: intermediateL2i.id, field: 'latents' },
+    });
+    expect(graph.edges).toContainEqual({
+      source: { node_id: tiledDenoise.id, field: 'latents' },
+      destination: { node_id: 'l2i', field: 'latents' },
+    });
+    expect(g.getMetadataNode()).toMatchObject({
+      hrf_enabled: true,
+      hrf_method: 'upscale_model',
+      hrf_upscale_model: { key: 'upscale' },
+      hrf_tile_controlnet_model: { key: 'tile' },
+      hrf_structure: 0,
+      hrf_tile_size: 1024,
+      hrf_tile_overlap: 128,
+    });
+  });
+
+  it('uses a regular second denoise for upscale-model HRF when reference image adapters are connected', () => {
+    const { g, seed, noise, denoise, l2i } = buildClassicGraph();
+    addSDXLConditioning(g, denoise);
+
+    const ipAdapter = g.addNode({
+      id: 'ip_adapter',
+      type: 'ip_adapter',
+      weight: 1,
+      method: 'full',
+      ip_adapter_model: { key: 'ip', hash: 'ip-hash', name: 'ip', base: 'sdxl', type: 'ip_adapter' },
+      clip_vision_model: 'ViT-H',
+      begin_step_percent: 0,
+      end_step_percent: 1,
+      image: { image_name: 'test' },
+    });
+    const ipAdapterCollector = g.addNode({ id: 'ip_adapter_collector', type: 'collect' });
+    g.addEdge(ipAdapter, 'ip_adapter', ipAdapterCollector, 'item');
+    g.addEdge(ipAdapterCollector, 'collection', denoise, 'ip_adapter');
+
+    addHighResFix({
+      g,
+      state: buildState({ hrfMethod: 'upscale_model' }),
+      generationMode: 'txt2img',
+      denoise,
+      l2i,
+      noise,
+      seed,
+    });
+
+    const graph = g.getGraph();
+    const nodes = Object.values(graph.nodes);
+    const classicHrfDenoise = nodes.find((node) => node.id.startsWith('hrf_denoise_latents'));
+
+    if (!classicHrfDenoise) {
+      throw new Error('Expected classic HRF denoise node');
+    }
+
+    expect(nodes.some((node) => node.type === 'tiled_multi_diffusion_denoise_latents')).toBe(false);
+    expect(graph.edges).toContainEqual({
+      source: { node_id: ipAdapterCollector.id, field: 'collection' },
+      destination: { node_id: classicHrfDenoise.id, field: 'ip_adapter' },
+    });
+    expect(graph.edges).toContainEqual({
+      source: { node_id: classicHrfDenoise.id, field: 'latents' },
+      destination: { node_id: 'l2i', field: 'latents' },
     });
   });
 });

@@ -59,6 +59,31 @@ const externalModel = {
   format: 'external_api',
 } as unknown as MainOrExternalModelConfig;
 
+const sdxlModel = {
+  key: 'sdxl',
+  hash: 'h',
+  name: 'SDXL',
+  base: 'sdxl',
+  type: 'main',
+  format: 'checkpoint',
+} as unknown as MainModelConfig;
+
+const upscaleModel = {
+  key: 'upscale',
+  hash: 'h',
+  name: 'Upscale',
+  base: 'any',
+  type: 'spandrel_image_to_image',
+};
+
+const tileControlNetModel = {
+  key: 'tile',
+  hash: 'h',
+  name: 'Tile ControlNet',
+  base: 'sdxl',
+  type: 'controlnet',
+};
+
 const baseDynamicPrompts: DynamicPromptsState = {
   _version: 1,
   maxPrompts: 100,
@@ -80,6 +105,9 @@ const baseParams = {
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
   hrfEnabled: false,
+  hrfMethod: 'latent',
+  hrfUpscaleModel: null,
+  hrfTileControlNetModel: null,
   refinerModel: null,
 } as unknown as ParamsState;
 
@@ -90,6 +118,9 @@ const buildGenerateTabArg = (overrides: {
   kleinVaeModel?: unknown;
   kleinQwen3EncoderModel?: unknown;
   hrfEnabled?: boolean;
+  hrfMethod?: ParamsState['hrfMethod'];
+  hrfUpscaleModel?: unknown;
+  hrfTileControlNetModel?: unknown;
   refinerModel?: unknown;
   hasFlux2DiffusersVaeSource?: boolean;
   hasFlux2DiffusersQwen3Source?: boolean;
@@ -101,6 +132,9 @@ const buildGenerateTabArg = (overrides: {
     kleinVaeModel: overrides.kleinVaeModel ?? null,
     kleinQwen3EncoderModel: overrides.kleinQwen3EncoderModel ?? null,
     hrfEnabled: overrides.hrfEnabled ?? false,
+    hrfMethod: overrides.hrfMethod ?? 'latent',
+    hrfUpscaleModel: overrides.hrfUpscaleModel ?? null,
+    hrfTileControlNetModel: overrides.hrfTileControlNetModel ?? null,
     refinerModel: overrides.refinerModel ?? null,
   } as unknown as ParamsState,
   refImages: baseRefImages,
@@ -158,6 +192,15 @@ const hasHrfExternalReason = (reasons: { content: string }[]) =>
 
 const hasHrfRefinerReason = (reasons: { content: string }[]) =>
   reasons.some((r) => r.content.includes('hrfRefinerUnsupported'));
+
+const hasHrfUpscaleModelBaseReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfUpscaleModelBaseUnsupported'));
+
+const hasHrfUpscaleModelMissingReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfUpscaleModelMissing'));
+
+const hasHrfTileControlNetMissingReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfTileControlNetModelMissing'));
 
 // --- Tests ---
 
@@ -254,6 +297,42 @@ describe('High Resolution Fix readiness checks - generate tab', () => {
       buildGenerateTabArg({ hrfEnabled: true, refinerModel: { key: 'refiner' } })
     );
     expect(hasHrfRefinerReason(reasons)).toBe(true);
+  });
+
+  it('errors when upscale-model HRF is enabled for unsupported model bases', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({
+        model: flux2DiffusersModel,
+        hrfEnabled: true,
+        hrfMethod: 'upscale_model',
+        hrfUpscaleModel: upscaleModel,
+        hrfTileControlNetModel: tileControlNetModel,
+      })
+    );
+    expect(hasHrfUpscaleModelBaseReason(reasons)).toBe(true);
+  });
+
+  it('errors when upscale-model HRF is missing required models', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({ model: sdxlModel, hrfEnabled: true, hrfMethod: 'upscale_model' })
+    );
+    expect(hasHrfUpscaleModelMissingReason(reasons)).toBe(true);
+    expect(hasHrfTileControlNetMissingReason(reasons)).toBe(true);
+  });
+
+  it('does not error when upscale-model HRF has required SDXL models', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({
+        model: sdxlModel,
+        hrfEnabled: true,
+        hrfMethod: 'upscale_model',
+        hrfUpscaleModel: upscaleModel,
+        hrfTileControlNetModel: tileControlNetModel,
+      })
+    );
+    expect(hasHrfUpscaleModelBaseReason(reasons)).toBe(false);
+    expect(hasHrfUpscaleModelMissingReason(reasons)).toBe(false);
+    expect(hasHrfTileControlNetMissingReason(reasons)).toBe(false);
   });
 });
 

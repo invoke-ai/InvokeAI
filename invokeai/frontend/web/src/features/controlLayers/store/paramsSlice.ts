@@ -10,6 +10,7 @@ import { logout } from 'features/auth/store/authSlice';
 import type {
   AspectRatioID,
   HrfLatentInterpolationMode,
+  HrfMethod,
   InfillMethod,
   ParamsState,
   RgbaColor,
@@ -27,7 +28,7 @@ import {
   SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS,
   SUPPORTS_REF_IMAGES_BASE_MODELS,
 } from 'features/modelManagerV2/models';
-import type { BaseModelType } from 'features/nodes/types/common';
+import type { BaseModelType, ModelIdentifierField } from 'features/nodes/types/common';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -45,13 +46,14 @@ import type {
   ParameterPrecision,
   ParameterScheduler,
   ParameterSDXLRefinerModel,
+  ParameterSpandrelImageToImageModel,
   ParameterT5EncoderModel,
   ParameterVAEModel,
 } from 'features/parameters/types/parameterSchemas';
 import { getExternalPanelControl, hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import type { AnyModelConfigWithExternal } from 'services/api/types';
+import type { AnyModelConfigWithExternal, ControlNetModelConfig } from 'services/api/types';
 import { isExternalApiModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
 
@@ -124,6 +126,9 @@ const slice = createSlice({
     setHrfEnabled: (state, action: PayloadAction<boolean>) => {
       state.hrfEnabled = action.payload && !state.refinerModel;
     },
+    setHrfMethod: (state, action: PayloadAction<HrfMethod>) => {
+      state.hrfMethod = action.payload;
+    },
     setHrfScale: (state, action: PayloadAction<number>) => {
       state.hrfScale = action.payload;
     },
@@ -132,6 +137,27 @@ const slice = createSlice({
     },
     setHrfLatentInterpolationMode: (state, action: PayloadAction<HrfLatentInterpolationMode>) => {
       state.hrfLatentInterpolationMode = action.payload;
+    },
+    setHrfUpscaleModel: (state, action: PayloadAction<ParameterSpandrelImageToImageModel | null>) => {
+      const result = zParamsState.shape.hrfUpscaleModel.safeParse(action.payload);
+      if (result.success) {
+        state.hrfUpscaleModel = result.data;
+      }
+    },
+    setHrfTileControlNetModel: (state, action: PayloadAction<ControlNetModelConfig | ModelIdentifierField | null>) => {
+      const result = zParamsState.shape.hrfTileControlNetModel.safeParse(action.payload);
+      if (result.success) {
+        state.hrfTileControlNetModel = result.data;
+      }
+    },
+    setHrfStructure: (state, action: PayloadAction<number>) => {
+      state.hrfStructure = action.payload;
+    },
+    setHrfTileSize: (state, action: PayloadAction<number>) => {
+      state.hrfTileSize = action.payload;
+    },
+    setHrfTileOverlap: (state, action: PayloadAction<number>) => {
+      state.hrfTileOverlap = action.payload;
     },
     setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
       state.seamlessXAxis = action.payload;
@@ -640,9 +666,15 @@ export const {
   setImg2imgStrength,
   setOptimizedDenoisingEnabled,
   setHrfEnabled,
+  setHrfMethod,
   setHrfScale,
   setHrfStrength,
   setHrfLatentInterpolationMode,
+  setHrfUpscaleModel,
+  setHrfTileControlNetModel,
+  setHrfStructure,
+  setHrfTileSize,
+  setHrfTileOverlap,
   setSeamlessXAxis,
   setSeamlessYAxis,
   setShouldRandomizeSeed,
@@ -733,6 +765,17 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.hrfLatentInterpolationMode = 'bicubic';
       }
 
+      if (state._version === 3) {
+        // v3 -> v4, add Generate tab upscale-model high resolution fix settings
+        state._version = 4;
+        state.hrfMethod = 'latent';
+        state.hrfUpscaleModel = null;
+        state.hrfTileControlNetModel = null;
+        state.hrfStructure = 0;
+        state.hrfTileSize = 1024;
+        state.hrfTileOverlap = 128;
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -800,9 +843,15 @@ export const selectInfillColorValue = createParamsSelector((params) => params.in
 export const selectImg2imgStrength = createParamsSelector((params) => params.img2imgStrength);
 export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => params.optimizedDenoisingEnabled);
 export const selectHrfEnabled = createParamsSelector((params) => params.hrfEnabled);
+export const selectHrfMethod = createParamsSelector((params) => params.hrfMethod);
 export const selectHrfScale = createParamsSelector((params) => params.hrfScale);
 export const selectHrfStrength = createParamsSelector((params) => params.hrfStrength);
 export const selectHrfLatentInterpolationMode = createParamsSelector((params) => params.hrfLatentInterpolationMode);
+export const selectHrfUpscaleModel = createParamsSelector((params) => params.hrfUpscaleModel);
+export const selectHrfTileControlNetModel = createParamsSelector((params) => params.hrfTileControlNetModel);
+export const selectHrfStructure = createParamsSelector((params) => params.hrfStructure);
+export const selectHrfTileSize = createParamsSelector((params) => params.hrfTileSize);
+export const selectHrfTileOverlap = createParamsSelector((params) => params.hrfTileOverlap);
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
 export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');
@@ -893,6 +942,12 @@ export const selectModelSupportsHrf = createSelector(selectModel, (model) => {
     return false;
   }
   return true;
+});
+export const selectModelSupportsHrfUpscaleModel = createSelector(selectModel, (model) => {
+  if (!model) {
+    return false;
+  }
+  return model.base === 'sd-1' || model.base === 'sdxl';
 });
 export const selectSeedControl = createSelector(selectModelConfig, (modelConfig) => {
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {

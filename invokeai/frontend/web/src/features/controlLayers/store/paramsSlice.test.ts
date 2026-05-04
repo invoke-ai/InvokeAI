@@ -12,6 +12,7 @@ import {
   selectModelSupportsDimensions,
   selectModelSupportsGuidance,
   selectModelSupportsHrf,
+  selectModelSupportsHrfUpscaleModel,
   selectModelSupportsNegativePrompt,
   selectModelSupportsRefImages,
   selectModelSupportsSeed,
@@ -147,5 +148,26 @@ describe('paramsSlice selectors for external models', () => {
 describe('paramsSlice HRF selectors', () => {
   it('rounds final dimensions down to the model grid', () => {
     expect(selectHrfFinalDimensions.resultFunc(513, 512, 1.5, 'flux')).toEqual({ width: 768, height: 768 });
+  });
+
+  it('supports upscale-model HRF only for SD1.5 and SDXL models', () => {
+    expect(
+      selectModelSupportsHrfUpscaleModel.resultFunc({
+        key: 'sdxl',
+        hash: 'h',
+        name: 'SDXL',
+        base: 'sdxl',
+        type: 'main',
+      })
+    ).toBe(true);
+    expect(
+      selectModelSupportsHrfUpscaleModel.resultFunc({
+        key: 'flux',
+        hash: 'h',
+        name: 'FLUX',
+        base: 'flux',
+        type: 'main',
+      })
+    ).toBe(false);
   });
 });

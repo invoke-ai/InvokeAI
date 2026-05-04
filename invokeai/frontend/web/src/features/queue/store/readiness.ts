@@ -365,6 +365,19 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     if (params.refinerModel) {
       reasons.push({ content: i18n.t('parameters.invoke.hrfRefinerUnsupported') });
     }
+    if (params.hrfMethod === 'upscale_model') {
+      if (model && !isExternalApiModelConfig(model) && !['sd-1', 'sdxl'].includes(model.base)) {
+        reasons.push({ content: i18n.t('parameters.invoke.hrfUpscaleModelBaseUnsupported') });
+      }
+      if (!params.hrfUpscaleModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.hrfUpscaleModelMissing') });
+      }
+      if (!params.hrfTileControlNetModel) {
+        reasons.push({ content: i18n.t('parameters.invoke.hrfTileControlNetModelMissing') });
+      } else if (model && !isExternalApiModelConfig(model) && params.hrfTileControlNetModel.base !== model.base) {
+        reasons.push({ content: i18n.t('parameters.invoke.hrfTileControlNetModelMissing') });
+      }
+    }
   }
 
   return reasons;

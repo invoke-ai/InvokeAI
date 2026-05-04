@@ -254,11 +254,31 @@ class CoreMetadataInvocation(BaseInvocation):
     )
     hrf_scale: Optional[float] = InputField(
         default=None,
-        description="The high resolution fix latent upscale factor.",
+        description="The high resolution fix upscale factor.",
     )
     hrf_latent_interpolation_mode: Optional[str] = InputField(
         default=None,
         description="The latent interpolation mode used in the high resolution fix upscale pass.",
+    )
+    hrf_upscale_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The Spandrel upscale model used in the high resolution fix upscale pass.",
+    )
+    hrf_tile_controlnet_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The tile ControlNet model used in the high resolution fix upscale pass.",
+    )
+    hrf_structure: Optional[float] = InputField(
+        default=None,
+        description="The high resolution fix tile ControlNet structure value.",
+    )
+    hrf_tile_size: Optional[int] = InputField(
+        default=None,
+        description="The high resolution fix tiled processing tile size.",
+    )
+    hrf_tile_overlap: Optional[int] = InputField(
+        default=None,
+        description="The high resolution fix tiled processing tile overlap.",
     )
 
     # SDXL

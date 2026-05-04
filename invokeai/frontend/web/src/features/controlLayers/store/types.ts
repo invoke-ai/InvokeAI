@@ -23,6 +23,7 @@ import {
   zParameterScheduler,
   zParameterSDXLRefinerModel,
   zParameterSeed,
+  zParameterSpandrelImageToImageModel,
   zParameterSteps,
   zParameterStrength,
   zParameterT5EncoderModel,
@@ -751,8 +752,11 @@ export type InfillMethod = z.infer<typeof zInfillMethod>;
 export const zHrfLatentInterpolationMode = z.enum(['nearest', 'bilinear', 'bicubic', 'area', 'nearest-exact']);
 export type HrfLatentInterpolationMode = z.infer<typeof zHrfLatentInterpolationMode>;
 
+export const zHrfMethod = z.enum(['latent', 'upscale_model']);
+export type HrfMethod = z.infer<typeof zHrfMethod>;
+
 export const zParamsState = z.object({
-  _version: z.literal(3),
+  _version: z.literal(4),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -768,9 +772,15 @@ export const zParamsState = z.object({
   img2imgStrength: zParameterStrength,
   optimizedDenoisingEnabled: z.boolean(),
   hrfEnabled: z.boolean(),
+  hrfMethod: zHrfMethod,
   hrfScale: z.number().min(1).max(8),
   hrfStrength: zParameterStrength,
   hrfLatentInterpolationMode: zHrfLatentInterpolationMode,
+  hrfUpscaleModel: zParameterSpandrelImageToImageModel.nullable(),
+  hrfTileControlNetModel: zModelIdentifierField.nullable(),
+  hrfStructure: z.number().min(-10).max(10),
+  hrfTileSize: z.number().int().min(8),
+  hrfTileOverlap: z.number().int().min(8),
   iterations: z.number(),
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
@@ -840,7 +850,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 3,
+  _version: 4,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -856,9 +866,15 @@ export const getInitialParamsState = (): ParamsState => ({
   img2imgStrength: 0.75,
   optimizedDenoisingEnabled: true,
   hrfEnabled: false,
+  hrfMethod: 'latent',
   hrfScale: 2,
   hrfStrength: 0.45,
   hrfLatentInterpolationMode: 'bicubic',
+  hrfUpscaleModel: null,
+  hrfTileControlNetModel: null,
+  hrfStructure: 0,
+  hrfTileSize: 1024,
+  hrfTileOverlap: 128,
   iterations: 1,
   scheduler: 'dpmpp_3m_k',
   fluxScheduler: 'euler',

@@ -7693,7 +7693,7 @@ export type components = {
             hrf_strength?: number | null;
             /**
              * Hrf Scale
-             * @description The high resolution fix latent upscale factor.
+             * @description The high resolution fix upscale factor.
              * @default null
              */
             hrf_scale?: number | null;
@@ -7703,6 +7703,36 @@ export type components = {
              * @default null
              */
             hrf_latent_interpolation_mode?: string | null;
+            /**
+             * Hrf Upscale Model
+             * @description The Spandrel upscale model used in the high resolution fix upscale pass.
+             * @default null
+             */
+            hrf_upscale_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Hrf Tile Controlnet Model
+             * @description The tile ControlNet model used in the high resolution fix upscale pass.
+             * @default null
+             */
+            hrf_tile_controlnet_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Hrf Structure
+             * @description The high resolution fix tile ControlNet structure value.
+             * @default null
+             */
+            hrf_structure?: number | null;
+            /**
+             * Hrf Tile Size
+             * @description The high resolution fix tiled processing tile size.
+             * @default null
+             */
+            hrf_tile_size?: number | null;
+            /**
+             * Hrf Tile Overlap
+             * @description The high resolution fix tiled processing tile overlap.
+             * @default null
+             */
+            hrf_tile_overlap?: number | null;
             /**
              * Positive Style Prompt
              * @description The positive style prompt parameter

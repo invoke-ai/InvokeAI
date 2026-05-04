@@ -357,6 +357,7 @@
         "upscaleMethod": "Upscale Method",
         "latentInterpolationMode": "Latent Interpolation",
         "latent": "Latent",
+        "upscaleModelMethod": "Upscale Model",
         "nearest": "Nearest",
         "bilinear": "Bilinear",
         "bicubic": "Bicubic",
@@ -367,7 +368,12 @@
             "strength": "High Resolution Fix Strength",
             "method": "High Resolution Fix Method",
             "scale": "High Resolution Fix Scale",
-            "latentInterpolationMode": "High Resolution Fix Latent Interpolation"
+            "latentInterpolationMode": "High Resolution Fix Latent Interpolation",
+            "upscaleModel": "High Resolution Fix Upscale Model",
+            "tileControlNetModel": "High Resolution Fix Tile ControlNet",
+            "structure": "High Resolution Fix Structure",
+            "tileSize": "High Resolution Fix Tile Size",
+            "tileOverlap": "High Resolution Fix Tile Overlap"
         }
     },
     "prompt": {
@@ -1689,6 +1695,9 @@
             "incompatibleLoRAs": "Incompatible LoRA(s) added",
             "hrfExternalModelUnsupported": "High Resolution Fix is not supported for external models",
             "hrfRefinerUnsupported": "High Resolution Fix is not supported when SDXL Refiner is enabled",
+            "hrfUpscaleModelBaseUnsupported": "High Resolution Fix with an upscale model is supported for SD1.5 and SDXL models only",
+            "hrfUpscaleModelMissing": "High Resolution Fix needs an upscale model",
+            "hrfTileControlNetModelMissing": "High Resolution Fix needs a tile ControlNet model",
             "canvasIsFiltering": "Canvas is busy (filtering)",
             "canvasIsTransforming": "Canvas is busy (transforming)",
             "canvasIsRasterizing": "Canvas is busy (rasterizing)",
