@@ -111,7 +111,8 @@ const cloneSDXLCompelPromptForFinalDimensions = (
 const cloneSDXLConditioningForFinalDimensions = (
   g: Graph,
   sourceNodeId: string,
-  finalDimensions: { width: number; height: number }
+  finalDimensions: { width: number; height: number },
+  outputType: 'collection' | 'single'
 ) => {
   const sourceNode = g.getNode(sourceNodeId);
 
@@ -130,7 +131,26 @@ const cloneSDXLConditioningForFinalDimensions = (
   const hasSDXLConditioning = itemEdges.some((edge) => g.getNode(edge.source.node_id).type === 'sdxl_compel_prompt');
 
   if (!hasSDXLConditioning) {
+    if (outputType === 'single' && itemEdges.length === 1) {
+      return { nodeId: itemEdges[0]!.source.node_id, field: itemEdges[0]!.source.field };
+    }
+
     return null;
+  }
+
+  if (outputType === 'single') {
+    if (itemEdges.length !== 1) {
+      return null;
+    }
+
+    const edge = itemEdges[0]!;
+    const itemNode = g.getNode(edge.source.node_id);
+    const source =
+      itemNode.type === 'sdxl_compel_prompt'
+        ? cloneSDXLCompelPromptForFinalDimensions(g, itemNode, finalDimensions)
+        : itemNode;
+
+    return { nodeId: source.id, field: edge.source.field };
   }
 
   const collect = g.addNode({
@@ -170,7 +190,12 @@ const copyDenoiseInputs = (
     }
 
     const finalSizeConditioning = ['positive_conditioning', 'negative_conditioning'].includes(edge.destination.field)
-      ? cloneSDXLConditioningForFinalDimensions(g, edge.source.node_id, finalDimensions)
+      ? cloneSDXLConditioningForFinalDimensions(
+          g,
+          edge.source.node_id,
+          finalDimensions,
+          to.type === 'tiled_multi_diffusion_denoise_latents' ? 'single' : 'collection'
+        )
       : null;
 
     g.addEdgeFromObj({
@@ -200,50 +225,48 @@ const copyInputEdges = (g: Graph, from: AnyInvocation, to: AnyInvocation, skippe
 const hasUnsupportedTiledDenoiseInputs = (g: Graph, denoise: Invocation<'denoise_latents'>) => {
   return g.getEdgesTo(denoise).some((edge) => {
     const field = edge.destination.field;
-    return !SKIPPED_DENOISE_INPUT_FIELDS.has(field) && !TILED_DENOISE_INPUT_FIELDS.has(field);
+    if (SKIPPED_DENOISE_INPUT_FIELDS.has(field)) {
+      return false;
+    }
+
+    if (!TILED_DENOISE_INPUT_FIELDS.has(field)) {
+      return true;
+    }
+
+    if (['positive_conditioning', 'negative_conditioning'].includes(field)) {
+      const sourceNode = g.getNode(edge.source.node_id);
+      if (sourceNode.type === 'collect') {
+        const itemEdges = g.getEdgesTo(sourceNode).filter((itemEdge) => itemEdge.destination.field === 'item');
+        return itemEdges.length !== 1;
+      }
+    }
+
+    return false;
   });
 };
 
-const addTileControlNets = (
+const addTileControlNet = (
   g: Graph,
   hrfDenoise: AnyInvocation,
   imageSource: Invocation<'unsharp_mask'>,
   tileControlNetModel: NonNullable<ReturnType<typeof selectParamsSlice>['hrfTileControlNetModel']>,
-  structure: number
+  structure: number,
+  tileControlEnd: number
 ) => {
-  const controlNet1 = g.addNode({
-    id: getPrefixedId('hrf_controlnet_1'),
+  const controlNet = g.addNode({
+    id: getPrefixedId('hrf_controlnet'),
     type: 'controlnet',
     control_model: tileControlNetModel,
     control_mode: 'balanced',
     resize_mode: 'just_resize',
     control_weight: (structure + 10) * 0.0325 + 0.3,
     begin_step_percent: 0,
-    end_step_percent: (structure + 10) * 0.025 + 0.3,
+    end_step_percent: tileControlEnd,
   });
 
-  const controlNet2 = g.addNode({
-    id: getPrefixedId('hrf_controlnet_2'),
-    type: 'controlnet',
-    control_model: tileControlNetModel,
-    control_mode: 'balanced',
-    resize_mode: 'just_resize',
-    control_weight: ((structure + 10) * 0.0325 + 0.15) * 0.45,
-    begin_step_percent: (structure + 10) * 0.025 + 0.3,
-    end_step_percent: 0.85,
-  });
-
-  const controlNetCollector = g.addNode({
-    type: 'collect',
-    id: getPrefixedId('hrf_controlnet_collector'),
-  });
-
-  g.addEdge(imageSource, 'image', controlNet1, 'image');
-  g.addEdge(imageSource, 'image', controlNet2, 'image');
-  g.addEdge(controlNet1, 'control', controlNetCollector, 'item');
-  g.addEdge(controlNet2, 'control', controlNetCollector, 'item');
+  g.addEdge(imageSource, 'image', controlNet, 'image');
   g.addEdgeFromObj({
-    source: { node_id: controlNetCollector.id, field: 'collection' },
+    source: { node_id: controlNet.id, field: 'control' },
     destination: { node_id: hrfDenoise.id, field: 'control' },
   });
 };
@@ -392,7 +415,14 @@ const addUpscaleModelHighResFix = ({ g, state, denoise, l2i, noise, seed }: AddH
     finalDimensions,
     useClassicDenoise ? undefined : TILED_DENOISE_INPUT_FIELDS
   );
-  addTileControlNets(g, hrfDenoise, unsharpMask, params.hrfTileControlNetModel, params.hrfStructure);
+  addTileControlNet(
+    g,
+    hrfDenoise,
+    unsharpMask,
+    params.hrfTileControlNetModel,
+    params.hrfStructure,
+    params.hrfTileControlEnd
+  );
 
   g.deleteEdgesTo(l2i, ['latents']);
   g.addEdge(denoise, 'latents', intermediateL2i, 'latents');
@@ -431,6 +461,7 @@ const addUpscaleModelHighResFix = ({ g, state, denoise, l2i, noise, seed }: AddH
     hrf_upscale_model: params.hrfUpscaleModel,
     hrf_tile_controlnet_model: params.hrfTileControlNetModel,
     hrf_structure: params.hrfStructure,
+    hrf_tile_control_end: params.hrfTileControlEnd,
     hrf_tile_size: params.hrfTileSize,
     hrf_tile_overlap: params.hrfTileOverlap,
   });

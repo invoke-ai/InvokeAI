@@ -272,6 +272,10 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The high resolution fix tile ControlNet structure value.",
     )
+    hrf_tile_control_end: Optional[float] = InputField(
+        default=None,
+        description="The high resolution fix tile ControlNet end step percentage.",
+    )
     hrf_tile_size: Optional[int] = InputField(
         default=None,
         description="The high resolution fix tiled processing tile size.",

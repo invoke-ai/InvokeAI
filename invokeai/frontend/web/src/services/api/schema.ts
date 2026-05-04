@@ -7722,6 +7722,12 @@ export type components = {
              */
             hrf_structure?: number | null;
             /**
+             * Hrf Tile Control End
+             * @description The high resolution fix tile ControlNet end step percentage.
+             * @default null
+             */
+            hrf_tile_control_end?: number | null;
+            /**
              * Hrf Tile Size
              * @description The high resolution fix tiled processing tile size.
              * @default null

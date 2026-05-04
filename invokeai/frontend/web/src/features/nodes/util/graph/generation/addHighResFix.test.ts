@@ -36,6 +36,7 @@ const buildState = (overrides?: {
         type: 'controlnet',
       },
       hrfStructure: 0,
+      hrfTileControlEnd: 0.2,
       hrfTileSize: 1024,
       hrfTileOverlap: 128,
       optimizedDenoisingEnabled: true,
@@ -247,8 +248,9 @@ describe('addHighResFix', () => {
     const unsharp = nodes.find((node) => node.type === 'unsharp_mask');
     const i2l = nodes.find((node) => node.id.startsWith('hrf_i2l'));
     const tiledDenoise = nodes.find((node) => node.type === 'tiled_multi_diffusion_denoise_latents');
+    const tileControlNet = nodes.find((node) => node.id.startsWith('hrf_controlnet'));
 
-    if (!intermediateL2i || !spandrel || !unsharp || !i2l || !tiledDenoise) {
+    if (!intermediateL2i || !spandrel || !unsharp || !i2l || !tiledDenoise || !tileControlNet) {
       throw new Error('Expected upscale-model HRF nodes');
     }
 
@@ -271,6 +273,22 @@ describe('addHighResFix', () => {
       denoising_start: 0.65,
       denoising_end: 1,
     });
+    expect(tileControlNet).toMatchObject({
+      type: 'controlnet',
+      begin_step_percent: 0,
+      end_step_percent: 0.2,
+    });
+    expect(graph.edges).toContainEqual({
+      source: { node_id: tileControlNet.id, field: 'control' },
+      destination: { node_id: tiledDenoise.id, field: 'control' },
+    });
+    const positiveConditioningEdge = graph.edges.find(
+      (edge) => edge.destination.node_id === tiledDenoise.id && edge.destination.field === 'positive_conditioning'
+    );
+    if (!positiveConditioningEdge) {
+      throw new Error('Expected positive conditioning edge');
+    }
+    expect(graph.nodes[positiveConditioningEdge.source.node_id]?.type).not.toBe('collect');
     expect(graph.edges).not.toContainEqual({
       source: { node_id: 'denoise', field: 'latents' },
       destination: { node_id: 'l2i', field: 'latents' },
@@ -289,6 +307,7 @@ describe('addHighResFix', () => {
       hrf_upscale_model: { key: 'upscale' },
       hrf_tile_controlnet_model: { key: 'tile' },
       hrf_structure: 0,
+      hrf_tile_control_end: 0.2,
       hrf_tile_size: 1024,
       hrf_tile_overlap: 128,
     });

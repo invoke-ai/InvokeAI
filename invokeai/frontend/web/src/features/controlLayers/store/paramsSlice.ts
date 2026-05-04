@@ -153,6 +153,9 @@ const slice = createSlice({
     setHrfStructure: (state, action: PayloadAction<number>) => {
       state.hrfStructure = action.payload;
     },
+    setHrfTileControlEnd: (state, action: PayloadAction<number>) => {
+      state.hrfTileControlEnd = action.payload;
+    },
     setHrfTileSize: (state, action: PayloadAction<number>) => {
       state.hrfTileSize = action.payload;
     },
@@ -673,6 +676,7 @@ export const {
   setHrfUpscaleModel,
   setHrfTileControlNetModel,
   setHrfStructure,
+  setHrfTileControlEnd,
   setHrfTileSize,
   setHrfTileOverlap,
   setSeamlessXAxis,
@@ -776,6 +780,12 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.hrfTileOverlap = 128;
       }
 
+      if (state._version === 4) {
+        // v4 -> v5, add explicit Generate tab HRF Tile ControlNet timing
+        state._version = 5;
+        state.hrfTileControlEnd = 0.2;
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -850,6 +860,7 @@ export const selectHrfLatentInterpolationMode = createParamsSelector((params) =>
 export const selectHrfUpscaleModel = createParamsSelector((params) => params.hrfUpscaleModel);
 export const selectHrfTileControlNetModel = createParamsSelector((params) => params.hrfTileControlNetModel);
 export const selectHrfStructure = createParamsSelector((params) => params.hrfStructure);
+export const selectHrfTileControlEnd = createParamsSelector((params) => params.hrfTileControlEnd);
 export const selectHrfTileSize = createParamsSelector((params) => params.hrfTileSize);
 export const selectHrfTileOverlap = createParamsSelector((params) => params.hrfTileOverlap);
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);

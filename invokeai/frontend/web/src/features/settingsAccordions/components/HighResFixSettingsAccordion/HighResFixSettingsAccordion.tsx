@@ -29,6 +29,7 @@ import {
   selectHrfScale,
   selectHrfStrength,
   selectHrfStructure,
+  selectHrfTileControlEnd,
   selectHrfTileControlNetModel,
   selectHrfTileOverlap,
   selectHrfTileSize,
@@ -41,6 +42,7 @@ import {
   setHrfScale,
   setHrfStrength,
   setHrfStructure,
+  setHrfTileControlEnd,
   setHrfTileControlNetModel,
   setHrfTileOverlap,
   setHrfTileSize,
@@ -88,6 +90,16 @@ const STRUCTURE_CONSTRAINTS = {
   numberInputMax: 10,
   coarseStep: 1,
   fineStep: 1,
+};
+
+const TILE_CONTROL_END_CONSTRAINTS = {
+  initial: 0.2,
+  sliderMin: 0,
+  sliderMax: 1,
+  numberInputMin: 0,
+  numberInputMax: 1,
+  coarseStep: 0.01,
+  fineStep: 0.01,
 };
 
 const TILE_SIZE_CONSTRAINTS = {
@@ -491,6 +503,52 @@ const ParamHrfStructure = memo(() => {
 
 ParamHrfStructure.displayName = 'ParamHrfStructure';
 
+const ParamHrfTileControlEnd = memo(() => {
+  const dispatch = useAppDispatch();
+  const tileControlEnd = useAppSelector(selectHrfTileControlEnd);
+  const { t } = useTranslation();
+
+  const onChange = useCallback(
+    (v: number) => {
+      dispatch(setHrfTileControlEnd(v));
+    },
+    [dispatch]
+  );
+
+  return (
+    <FormControl>
+      <InformationalPopover feature="paramDenoisingStrength">
+        <FormLabel>{t('hrf.tileControlEnd')}</FormLabel>
+      </InformationalPopover>
+      <CompositeSlider
+        value={tileControlEnd}
+        defaultValue={TILE_CONTROL_END_CONSTRAINTS.initial}
+        min={TILE_CONTROL_END_CONSTRAINTS.sliderMin}
+        max={TILE_CONTROL_END_CONSTRAINTS.sliderMax}
+        step={TILE_CONTROL_END_CONSTRAINTS.coarseStep}
+        fineStep={TILE_CONTROL_END_CONSTRAINTS.fineStep}
+        onChange={onChange}
+        marks={[
+          TILE_CONTROL_END_CONSTRAINTS.sliderMin,
+          TILE_CONTROL_END_CONSTRAINTS.initial,
+          TILE_CONTROL_END_CONSTRAINTS.sliderMax,
+        ]}
+      />
+      <CompositeNumberInput
+        value={tileControlEnd}
+        defaultValue={TILE_CONTROL_END_CONSTRAINTS.initial}
+        min={TILE_CONTROL_END_CONSTRAINTS.numberInputMin}
+        max={TILE_CONTROL_END_CONSTRAINTS.numberInputMax}
+        step={TILE_CONTROL_END_CONSTRAINTS.coarseStep}
+        fineStep={TILE_CONTROL_END_CONSTRAINTS.fineStep}
+        onChange={onChange}
+      />
+    </FormControl>
+  );
+});
+
+ParamHrfTileControlEnd.displayName = 'ParamHrfTileControlEnd';
+
 const ParamHrfTileSize = memo(() => {
   const dispatch = useAppDispatch();
   const tileSize = useAppSelector(selectHrfTileSize);
@@ -613,6 +671,7 @@ export const HighResFixSettingsAccordion = memo(() => {
                 <ParamHrfUpscaleModel />
                 <ParamHrfTileControlNetModel />
                 <ParamHrfStructure />
+                <ParamHrfTileControlEnd />
                 <ParamHrfTileSize />
                 <ParamHrfTileOverlap />
               </>

@@ -42,6 +42,7 @@ import {
   setHrfScale,
   setHrfStrength,
   setHrfStructure,
+  setHrfTileControlEnd,
   setHrfTileControlNetModel,
   setHrfTileOverlap,
   setHrfTileSize,
@@ -761,6 +762,22 @@ const HrfStructure: SingleMetadataHandler<number> = {
     store.dispatch(setHrfStructure(value));
   },
   i18nKey: 'hrf.metadata.structure',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+
+const HrfTileControlEnd: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfTileControlEnd',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_tile_control_end');
+    const parsed = z.number().min(0).max(1).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfTileControlEnd(value));
+  },
+  i18nKey: 'hrf.metadata.tileControlEnd',
   LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
 };
@@ -1717,6 +1734,7 @@ export const ImageMetadataHandlers = {
   HrfUpscaleModel,
   HrfTileControlNetModel,
   HrfStructure,
+  HrfTileControlEnd,
   HrfTileSize,
   HrfTileOverlap,
   SeamlessX,

@@ -756,7 +756,7 @@ export const zHrfMethod = z.enum(['latent', 'upscale_model']);
 export type HrfMethod = z.infer<typeof zHrfMethod>;
 
 export const zParamsState = z.object({
-  _version: z.literal(4),
+  _version: z.literal(5),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -779,6 +779,7 @@ export const zParamsState = z.object({
   hrfUpscaleModel: zParameterSpandrelImageToImageModel.nullable(),
   hrfTileControlNetModel: zModelIdentifierField.nullable(),
   hrfStructure: z.number().min(-10).max(10),
+  hrfTileControlEnd: z.number().min(0).max(1),
   hrfTileSize: z.number().int().min(8),
   hrfTileOverlap: z.number().int().min(8),
   iterations: z.number(),
@@ -850,7 +851,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 4,
+  _version: 5,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -873,6 +874,7 @@ export const getInitialParamsState = (): ParamsState => ({
   hrfUpscaleModel: null,
   hrfTileControlNetModel: null,
   hrfStructure: 0,
+  hrfTileControlEnd: 0.2,
   hrfTileSize: 1024,
   hrfTileOverlap: 128,
   iterations: 1,
