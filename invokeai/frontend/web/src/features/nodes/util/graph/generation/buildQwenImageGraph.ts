@@ -7,6 +7,7 @@ import { isQwenImageReferenceImageConfig } from 'features/controlLayers/store/ty
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import { zImageField } from 'features/nodes/types/common';
+import { addHighResFix } from 'features/nodes/util/graph/generation/addHighResFix';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -277,6 +278,17 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     g.upsertMetadata({ generation_mode: 'qwen_image_outpaint' });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
+  }
+
+  if (generationMode === 'txt2img' && selectActiveTab(state) === 'generate') {
+    canvasOutput = addHighResFix({
+      g,
+      state,
+      generationMode,
+      denoise,
+      l2i,
+      seed,
+    });
   }
 
   if (state.system.shouldUseNSFWChecker) {

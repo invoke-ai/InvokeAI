@@ -12,7 +12,7 @@ vi.mock('i18next', () => ({
 
 import type { ParamsState, RefImagesState } from 'features/controlLayers/store/types';
 import type { DynamicPromptsState } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import type { MainModelConfig } from 'services/api/types';
+import type { MainModelConfig, MainOrExternalModelConfig } from 'services/api/types';
 
 import { getReasonsWhyCannotEnqueueCanvasTab, getReasonsWhyCannotEnqueueGenerateTab } from './readiness';
 
@@ -50,6 +50,14 @@ const flux2GGUF9BModel = {
 
 const kleinVaeModel = { key: 'vae', name: 'VAE', base: 'flux2', type: 'vae' };
 const kleinQwen3Model = { key: 'qwen3', name: 'Qwen3', base: 'flux2', type: 'qwen3_encoder' };
+const externalModel = {
+  key: 'external',
+  hash: 'h',
+  name: 'External',
+  base: 'external',
+  type: 'external_image_generator',
+  format: 'external_api',
+} as unknown as MainOrExternalModelConfig;
 
 const baseDynamicPrompts: DynamicPromptsState = {
   _version: 1,
@@ -71,14 +79,18 @@ const baseParams = {
   positivePrompt: 'test',
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
+  hrfEnabled: false,
+  refinerModel: null,
 } as unknown as ParamsState;
 
 // --- Helpers ---
 
 const buildGenerateTabArg = (overrides: {
-  model?: MainModelConfig | null;
+  model?: MainOrExternalModelConfig | null;
   kleinVaeModel?: unknown;
   kleinQwen3EncoderModel?: unknown;
+  hrfEnabled?: boolean;
+  refinerModel?: unknown;
   hasFlux2DiffusersVaeSource?: boolean;
   hasFlux2DiffusersQwen3Source?: boolean;
 }) => ({
@@ -88,6 +100,8 @@ const buildGenerateTabArg = (overrides: {
     ...baseParams,
     kleinVaeModel: overrides.kleinVaeModel ?? null,
     kleinQwen3EncoderModel: overrides.kleinQwen3EncoderModel ?? null,
+    hrfEnabled: overrides.hrfEnabled ?? false,
+    refinerModel: overrides.refinerModel ?? null,
   } as unknown as ParamsState,
   refImages: baseRefImages,
   loras: [],
@@ -138,6 +152,12 @@ const hasFlux2VaeReason = (reasons: { content: string }[]) =>
 
 const hasFlux2Qwen3Reason = (reasons: { content: string }[]) =>
   reasons.some((r) => r.content.includes('noFlux2KleinQwen3EncoderModelSelected'));
+
+const hasHrfExternalReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfExternalModelUnsupported'));
+
+const hasHrfRefinerReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfRefinerUnsupported'));
 
 // --- Tests ---
 
@@ -218,6 +238,22 @@ describe('FLUX.2 Klein readiness checks – generate tab', () => {
     );
     expect(hasFlux2VaeReason(reasons)).toBe(false);
     expect(hasFlux2Qwen3Reason(reasons)).toBe(false);
+  });
+});
+
+describe('High Resolution Fix readiness checks - generate tab', () => {
+  it('errors when HRF is enabled for external models', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({ model: externalModel, hrfEnabled: true })
+    );
+    expect(hasHrfExternalReason(reasons)).toBe(true);
+  });
+
+  it('errors when HRF is enabled with SDXL Refiner', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({ hrfEnabled: true, refinerModel: { key: 'refiner' } })
+    );
+    expect(hasHrfRefinerReason(reasons)).toBe(true);
   });
 });
 

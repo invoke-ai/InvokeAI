@@ -358,6 +358,15 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     });
   }
 
+  if (params.hrfEnabled) {
+    if (params.model?.base === 'external' || (model && isExternalApiModelConfig(model))) {
+      reasons.push({ content: i18n.t('parameters.invoke.hrfExternalModelUnsupported') });
+    }
+    if (params.refinerModel) {
+      reasons.push({ content: i18n.t('parameters.invoke.hrfRefinerUnsupported') });
+    }
+  }
+
   return reasons;
 };
 const getReasonsWhyCannotEnqueueWorkflowsTab = async (arg: {

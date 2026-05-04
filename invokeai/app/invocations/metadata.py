@@ -252,6 +252,14 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The high resolution fix img2img strength used in the upscale pass.",
     )
+    hrf_scale: Optional[float] = InputField(
+        default=None,
+        description="The high resolution fix latent upscale factor.",
+    )
+    hrf_latent_interpolation_mode: Optional[str] = InputField(
+        default=None,
+        description="The latent interpolation mode used in the high resolution fix upscale pass.",
+    )
 
     # SDXL
     positive_style_prompt: Optional[str] = InputField(

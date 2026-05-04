@@ -16,6 +16,7 @@ import { addFlux2KleinLoRAs } from 'features/nodes/util/graph/generation/addFlux
 import { addFLUXFill } from 'features/nodes/util/graph/generation/addFLUXFill';
 import { addFLUXLoRAs } from 'features/nodes/util/graph/generation/addFLUXLoRAs';
 import { addFLUXReduxes } from 'features/nodes/util/graph/generation/addFLUXRedux';
+import { addHighResFix } from 'features/nodes/util/graph/generation/addHighResFix';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -581,6 +582,17 @@ export const buildFLUXGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
   }
 
   // TODO: Add FLUX Reduxes to denoise node like we do for ipa
+
+  if (generationMode === 'txt2img' && selectActiveTab(state) === 'generate') {
+    canvasOutput = addHighResFix({
+      g,
+      state,
+      generationMode,
+      denoise,
+      l2i,
+      seed,
+    });
+  }
 
   if (state.system.shouldUseNSFWChecker) {
     canvasOutput = addNSFWChecker(g, canvasOutput);

@@ -36,6 +36,10 @@ import {
   setFluxDypeScale,
   setFluxScheduler,
   setGuidance,
+  setHrfEnabled,
+  setHrfLatentInterpolationMode,
+  setHrfScale,
+  setHrfStrength,
   setImg2imgStrength,
   setRefinerCFGScale,
   setRefinerNegativeAestheticScore,
@@ -60,8 +64,18 @@ import {
   zImageVaeModelSelected,
 } from 'features/controlLayers/store/paramsSlice';
 import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
-import type { CanvasMetadata, LoRA, RefImageState } from 'features/controlLayers/store/types';
-import { zCanvasMetadata, zCanvasReferenceImageState_OLD, zRefImageState } from 'features/controlLayers/store/types';
+import type {
+  CanvasMetadata,
+  HrfLatentInterpolationMode,
+  LoRA,
+  RefImageState,
+} from 'features/controlLayers/store/types';
+import {
+  zCanvasMetadata,
+  zCanvasReferenceImageState_OLD,
+  zHrfLatentInterpolationMode,
+  zRefImageState,
+} from 'features/controlLayers/store/types';
 import type { ModelIdentifierField, ModelType } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifier } from 'features/nodes/types/v2/common';
@@ -609,6 +623,87 @@ const DenoisingStrength: SingleMetadataHandler<ParameterStrength> = {
   ValueComponent: ({ value }: SingleMetadataValueProps<ParameterStrength>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion DenoisingStrength
+
+//#region High Resolution Fix
+const HrfEnabled: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfEnabled',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_enabled');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfEnabled(value));
+  },
+  i18nKey: 'hrf.metadata.enabled',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+
+const HrfMethod: UnrecallableMetadataHandler<string> = {
+  [UnrecallableMetadataKey]: true,
+  type: 'HrfMethod',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_method');
+    const parsed = z.string().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  i18nKey: 'hrf.metadata.method',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: UnrecallableMetadataValueProps<string>) => <MetadataPrimitiveValue value={value} />,
+};
+
+const HrfStrength: SingleMetadataHandler<ParameterStrength> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfStrength',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_strength');
+    const parsed = zParameterStrength.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfStrength(value));
+  },
+  i18nKey: 'hrf.metadata.strength',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterStrength>) => <MetadataPrimitiveValue value={value} />,
+};
+
+const HrfScale: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfScale',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_scale');
+    const parsed = z.number().min(1).max(8).parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfScale(value));
+  },
+  i18nKey: 'hrf.metadata.scale',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+
+const HrfLatentInterpolationModeMetadata: SingleMetadataHandler<HrfLatentInterpolationMode> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfLatentInterpolationMode',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_latent_interpolation_mode');
+    const parsed = zHrfLatentInterpolationMode.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfLatentInterpolationMode(value));
+  },
+  i18nKey: 'hrf.metadata.latentInterpolationMode',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<HrfLatentInterpolationMode>) => (
+    <MetadataPrimitiveValue value={value} />
+  ),
+};
+//#endregion High Resolution Fix
 
 //#region SeamlessX
 const SeamlessX: SingleMetadataHandler<ParameterSeamlessX> = {
@@ -1521,6 +1616,11 @@ export const ImageMetadataHandlers = {
   Seed,
   Steps,
   DenoisingStrength,
+  HrfEnabled,
+  HrfMethod,
+  HrfStrength,
+  HrfScale,
+  HrfLatentInterpolationMode: HrfLatentInterpolationModeMetadata,
   SeamlessX,
   SeamlessY,
   RefinerModel,

@@ -7,7 +7,13 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
 import { logout } from 'features/auth/store/authSlice';
-import type { AspectRatioID, InfillMethod, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import type {
+  AspectRatioID,
+  HrfLatentInterpolationMode,
+  InfillMethod,
+  ParamsState,
+  RgbaColor,
+} from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
   DEFAULT_ASPECT_RATIO_CONFIG,
@@ -115,6 +121,18 @@ const slice = createSlice({
     setOptimizedDenoisingEnabled: (state, action: PayloadAction<boolean>) => {
       state.optimizedDenoisingEnabled = action.payload;
     },
+    setHrfEnabled: (state, action: PayloadAction<boolean>) => {
+      state.hrfEnabled = action.payload && !state.refinerModel;
+    },
+    setHrfScale: (state, action: PayloadAction<number>) => {
+      state.hrfScale = action.payload;
+    },
+    setHrfStrength: (state, action: PayloadAction<number>) => {
+      state.hrfStrength = action.payload;
+    },
+    setHrfLatentInterpolationMode: (state, action: PayloadAction<HrfLatentInterpolationMode>) => {
+      state.hrfLatentInterpolationMode = action.payload;
+    },
     setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
       state.seamlessXAxis = action.payload;
     },
@@ -135,6 +153,10 @@ const slice = createSlice({
       }
       const model = result.data;
       state.model = model;
+
+      if (model?.base === 'external') {
+        state.hrfEnabled = false;
+      }
 
       // If the model base changes (e.g. SD1.5 -> SDXL), we need to change a few things
       if (model === null || previousModel?.base === model.base) {
@@ -313,6 +335,9 @@ const slice = createSlice({
         return;
       }
       state.refinerModel = result.data;
+      if (state.refinerModel) {
+        state.hrfEnabled = false;
+      }
     },
     setRefinerSteps: (state, action: PayloadAction<number>) => {
       state.refinerSteps = action.payload;
@@ -614,6 +639,10 @@ export const {
   setSeed,
   setImg2imgStrength,
   setOptimizedDenoisingEnabled,
+  setHrfEnabled,
+  setHrfScale,
+  setHrfStrength,
+  setHrfLatentInterpolationMode,
   setSeamlessXAxis,
   setSeamlessYAxis,
   setShouldRandomizeSeed,
@@ -695,6 +724,15 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.positivePromptHistory = [];
       }
 
+      if (state._version === 2) {
+        // v2 -> v3, add Generate tab high resolution fix settings
+        state._version = 3;
+        state.hrfEnabled = false;
+        state.hrfScale = 2;
+        state.hrfStrength = 0.45;
+        state.hrfLatentInterpolationMode = 'bicubic';
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -761,6 +799,10 @@ export const selectInfillPatchmatchDownscaleSize = createParamsSelector(
 export const selectInfillColorValue = createParamsSelector((params) => params.infillColorValue);
 export const selectImg2imgStrength = createParamsSelector((params) => params.img2imgStrength);
 export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => params.optimizedDenoisingEnabled);
+export const selectHrfEnabled = createParamsSelector((params) => params.hrfEnabled);
+export const selectHrfScale = createParamsSelector((params) => params.hrfScale);
+export const selectHrfStrength = createParamsSelector((params) => params.hrfStrength);
+export const selectHrfLatentInterpolationMode = createParamsSelector((params) => params.hrfLatentInterpolationMode);
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
 export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');
@@ -843,6 +885,15 @@ export const selectModelSupportsDimensions = createSelector(selectModel, selectM
   }
   return true;
 });
+export const selectModelSupportsHrf = createSelector(selectModel, (model) => {
+  if (!model) {
+    return false;
+  }
+  if (model.base === 'external') {
+    return false;
+  }
+  return true;
+});
 export const selectSeedControl = createSelector(selectModelConfig, (modelConfig) => {
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
     return getExternalPanelControl(modelConfig, 'image', 'seed');
@@ -889,6 +940,19 @@ export const selectRefinerSteps = createParamsSelector((params) => params.refine
 
 export const selectWidth = createParamsSelector((params) => params.dimensions.width);
 export const selectHeight = createParamsSelector((params) => params.dimensions.height);
+export const selectHrfFinalDimensions = createSelector(
+  selectWidth,
+  selectHeight,
+  selectHrfScale,
+  selectBase,
+  (width, height, hrfScale, base) => {
+    const gridSize = getGridSize(base as BaseModelType | undefined);
+    return {
+      width: Math.max(roundDownToMultiple(width * hrfScale, gridSize), 64),
+      height: Math.max(roundDownToMultiple(height * hrfScale, gridSize), 64),
+    };
+  }
+);
 export const selectAspectRatioID = createParamsSelector((params) => params.dimensions.aspectRatio.id);
 export const selectAspectRatioValue = createParamsSelector((params) => params.dimensions.aspectRatio.value);
 export const selectAspectRatioIsLocked = createParamsSelector((params) => params.dimensions.aspectRatio.isLocked);

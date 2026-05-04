@@ -8,8 +8,10 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  selectHrfFinalDimensions,
   selectModelSupportsDimensions,
   selectModelSupportsGuidance,
+  selectModelSupportsHrf,
   selectModelSupportsNegativePrompt,
   selectModelSupportsRefImages,
   selectModelSupportsSeed,
@@ -129,5 +131,21 @@ describe('paramsSlice selectors for external models', () => {
     expect(selectModelSupportsSeed.resultFunc(model, config)).toBe(false);
     expect(selectModelSupportsSteps.resultFunc(model)).toBe(false);
     expect(selectModelSupportsDimensions.resultFunc(model, config)).toBe(true);
+  });
+
+  it('returns false for HRF support on external models', () => {
+    const config = createExternalConfig({
+      modes: ['txt2img'],
+      supports_reference_images: false,
+    });
+    const model = buildExternalModelIdentifier(config);
+
+    expect(selectModelSupportsHrf.resultFunc(model)).toBe(false);
+  });
+});
+
+describe('paramsSlice HRF selectors', () => {
+  it('rounds final dimensions down to the model grid', () => {
+    expect(selectHrfFinalDimensions.resultFunc(513, 512, 1.5, 'flux')).toEqual({ width: 768, height: 768 });
   });
 });

@@ -352,11 +352,22 @@
     "hrf": {
         "hrf": "High Resolution Fix",
         "enableHrf": "Enable High Resolution Fix",
+        "scale": "Scale",
+        "strength": "Denoise Strength",
         "upscaleMethod": "Upscale Method",
+        "latentInterpolationMode": "Latent Interpolation",
+        "latent": "Latent",
+        "nearest": "Nearest",
+        "bilinear": "Bilinear",
+        "bicubic": "Bicubic",
+        "area": "Area",
+        "nearestExact": "Nearest Exact",
         "metadata": {
             "enabled": "High Resolution Fix Enabled",
             "strength": "High Resolution Fix Strength",
-            "method": "High Resolution Fix Method"
+            "method": "High Resolution Fix Method",
+            "scale": "High Resolution Fix Scale",
+            "latentInterpolationMode": "High Resolution Fix Latent Interpolation"
         }
     },
     "prompt": {
@@ -1676,6 +1687,8 @@
             "modelIncompatibleScaledBboxHeight": "Scaled bbox height is {{height}} but {{model}} requires multiple of {{multiple}}",
             "fluxModelMultipleControlLoRAs": "Can only use 1 Control LoRA at a time",
             "incompatibleLoRAs": "Incompatible LoRA(s) added",
+            "hrfExternalModelUnsupported": "High Resolution Fix is not supported for external models",
+            "hrfRefinerUnsupported": "High Resolution Fix is not supported when SDXL Refiner is enabled",
             "canvasIsFiltering": "Canvas is busy (filtering)",
             "canvasIsTransforming": "Canvas is busy (transforming)",
             "canvasIsRasterizing": "Canvas is busy (rasterizing)",

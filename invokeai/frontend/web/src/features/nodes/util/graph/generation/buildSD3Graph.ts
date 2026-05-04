@@ -2,6 +2,7 @@ import { logger } from 'app/logging/logger';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata } from 'features/controlLayers/store/selectors';
+import { addHighResFix } from 'features/nodes/util/graph/generation/addHighResFix';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -167,6 +168,17 @@ export const buildSD3Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     g.upsertMetadata({ generation_mode: 'sd3_outpaint' });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
+  }
+
+  if (generationMode === 'txt2img' && selectActiveTab(state) === 'generate') {
+    canvasOutput = addHighResFix({
+      g,
+      state,
+      generationMode,
+      denoise,
+      l2i,
+      seed,
+    });
   }
 
   if (state.system.shouldUseNSFWChecker) {

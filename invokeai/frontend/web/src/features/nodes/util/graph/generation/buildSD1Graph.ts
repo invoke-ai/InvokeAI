@@ -4,9 +4,9 @@ import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { addControlNets, addT2IAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
+import { addHighResFix } from 'features/nodes/util/graph/generation/addHighResFix';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
-// import { addHRF } from 'features/nodes/util/graph/generation/addHRF';
 import { addIPAdapters } from 'features/nodes/util/graph/generation/addIPAdapters';
 import { addLoRAs } from 'features/nodes/util/graph/generation/addLoRAs';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -303,6 +303,18 @@ export const buildSD1Graph = async (arg: GraphBuilderArg): Promise<GraphBuilderR
     g.addEdge(ipAdapterCollect, 'collection', denoise, 'ip_adapter');
   } else {
     g.deleteNode(ipAdapterCollect.id);
+  }
+
+  if (generationMode === 'txt2img' && selectActiveTab(state) === 'generate') {
+    canvasOutput = addHighResFix({
+      g,
+      state,
+      generationMode,
+      denoise,
+      l2i,
+      noise,
+      seed,
+    });
   }
 
   if (state.system.shouldUseNSFWChecker) {

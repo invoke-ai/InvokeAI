@@ -748,8 +748,11 @@ const zPositivePromptHistory = z
 export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile']);
 export type InfillMethod = z.infer<typeof zInfillMethod>;
 
+export const zHrfLatentInterpolationMode = z.enum(['nearest', 'bilinear', 'bicubic', 'area', 'nearest-exact']);
+export type HrfLatentInterpolationMode = z.infer<typeof zHrfLatentInterpolationMode>;
+
 export const zParamsState = z.object({
-  _version: z.literal(2),
+  _version: z.literal(3),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -764,6 +767,10 @@ export const zParamsState = z.object({
   guidance: zParameterGuidance,
   img2imgStrength: zParameterStrength,
   optimizedDenoisingEnabled: z.boolean(),
+  hrfEnabled: z.boolean(),
+  hrfScale: z.number().min(1).max(8),
+  hrfStrength: zParameterStrength,
+  hrfLatentInterpolationMode: zHrfLatentInterpolationMode,
   iterations: z.number(),
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
@@ -833,7 +840,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 2,
+  _version: 3,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -848,6 +855,10 @@ export const getInitialParamsState = (): ParamsState => ({
   guidance: 4,
   img2imgStrength: 0.75,
   optimizedDenoisingEnabled: true,
+  hrfEnabled: false,
+  hrfScale: 2,
+  hrfStrength: 0.45,
+  hrfLatentInterpolationMode: 'bicubic',
   iterations: 1,
   scheduler: 'dpmpp_3m_k',
   fluxScheduler: 'euler',

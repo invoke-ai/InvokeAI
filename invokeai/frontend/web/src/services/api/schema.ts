@@ -7692,6 +7692,18 @@ export type components = {
              */
             hrf_strength?: number | null;
             /**
+             * Hrf Scale
+             * @description The high resolution fix latent upscale factor.
+             * @default null
+             */
+            hrf_scale?: number | null;
+            /**
+             * Hrf Latent Interpolation Mode
+             * @description The latent interpolation mode used in the high resolution fix upscale pass.
+             * @default null
+             */
+            hrf_latent_interpolation_mode?: string | null;
+            /**
              * Positive Style Prompt
              * @description The positive style prompt parameter
              * @default null
