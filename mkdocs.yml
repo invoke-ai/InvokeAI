@@ -134,7 +134,9 @@ nav:
       - Contributing Nodes: 'nodes/contributingNodes.md'
       - Migrating from v3 to v4: 'nodes/NODES_MIGRATION_V3_V4.md'
       - Invocation API: 'nodes/invocation-api.md'
-  - Configuration: 'configuration.md'
+  - Configuration:
+      - Overview: 'configuration.md'
+      - Object Storage (S3-Compatible): 'configuration/object-storage.md'
   - Features:
       - LLM Prompt Tools: 'features/prompt-tools.md'
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'

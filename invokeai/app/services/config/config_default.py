@@ -161,6 +161,11 @@ class InvokeAIAppConfig(BaseSettings):
     style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
     workflow_thumbnails_dir: Path = Field(default=Path("workflow_thumbnails"), description="Path to directory for workflow thumbnails.")
 
+    # STORAGE
+    storage_backend:               Literal["disk", "s3"] = Field(default="disk",  description='Backend for storing generated images. "disk" uses the local filesystem; "s3" uses any S3-compatible object store (AWS S3, Backblaze B2, etc.).')
+    s3_bucket:           Optional[str] = Field(default=None,                      description='Bucket name for the s3 storage backend. Required when storage_backend="s3".')
+    s3_endpoint_url:     Optional[str] = Field(default=None,                      description='Endpoint URL for the s3 storage backend. Leave unset to talk to AWS S3; set to a provider-specific URL (e.g. https://s3.us-west-004.backblazeb2.com for Backblaze B2) for any other S3-compatible store.')
+
     # LOGGING
     log_handlers:             list[str] = Field(default=["console"],        description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".')
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
