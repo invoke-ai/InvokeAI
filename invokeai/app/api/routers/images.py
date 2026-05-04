@@ -1,10 +1,13 @@
 import io
 import json
+import pathlib
 import traceback
-from typing import ClassVar, Optional
+from typing import BinaryIO, ClassVar, Iterator, Optional
+from urllib.parse import quote
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, model_validator
@@ -22,10 +25,12 @@ from invokeai.app.api.routers._access import (
     assert_image_read_access as _assert_image_read_access,
 )
 from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageNamesResult,
     ImageRecordChanges,
+    ImageRecordNotFoundException,
     ResourceOrigin,
 )
 from invokeai.app.services.images.images_common import (
@@ -45,6 +50,65 @@ images_router = APIRouter(prefix="/v1/images", tags=["images"])
 
 # images are immutable; set a high max-age
 IMAGE_MAX_AGE = 31536000
+
+
+_IMAGE_STREAM_CHUNK_SIZE = 256 * 1024
+
+
+def _iter_and_close(stream: BinaryIO) -> Iterator[bytes]:
+    """Yield a binary stream in chunks, always closing it when finished."""
+    try:
+        while chunk := stream.read(_IMAGE_STREAM_CHUNK_SIZE):
+            yield chunk
+    finally:
+        stream.close()
+
+
+def _inline_content_disposition(filename: str) -> str:
+    """Build a safe ``inline`` Content-Disposition value.
+
+    Mirrors Starlette's FileResponse logic: a plain token is quoted directly,
+    otherwise RFC 5987 ``filename*`` percent-encoding is used. This also
+    neutralizes header-injection vectors (embedded quotes, CR/LF) in the name.
+    """
+    # safe="" so "/" is percent-encoded too; a path-like name must not slip into
+    # the quoted filename="..." branch.
+    quoted = quote(filename, safe="")
+    if quoted == filename:
+        return f'inline; filename="{filename}"'
+    return f"inline; filename*=utf-8''{quoted}"
+
+
+async def _serve_image(image_name: str, *, thumbnail: bool, media_type: str, filename: Optional[str]) -> Response:
+    """Serve an image (or thumbnail) without buffering the whole payload in memory.
+
+    Uses ``FileResponse`` (sendfile streaming) when the backend exposes a real
+    local path; otherwise streams the backend's ``open_stream()`` in chunks and
+    closes it afterward. Works for any backend (disk or S3). Blocking lookups
+    run in a threadpool so the event loop is not blocked.
+    """
+    images = ApiDependencies.invoker.services.images
+    headers = {"Cache-Control": f"max-age={IMAGE_MAX_AGE}"}
+    if filename is not None:
+        # One Content-Disposition for both backends (disk FileResponse and S3
+        # streaming), so the same filename yields an identical header.
+        headers["Content-Disposition"] = _inline_content_disposition(filename)
+
+    def _existing_local_path() -> Optional[pathlib.Path]:
+        # Resolve the backend's local path and confirm it exists, all inside the
+        # threadpool so no filesystem I/O runs on the event loop.
+        path = images.get_local_path(image_name, thumbnail)
+        # is_file() (not exists()) so a directory path never reaches FileResponse.
+        return path if path is not None and path.is_file() else None
+
+    local_path = await run_in_threadpool(_existing_local_path)
+    if local_path is not None:
+        return FileResponse(local_path, media_type=media_type, headers=headers)
+    stream = await run_in_threadpool(images.open_stream, image_name, thumbnail)
+    # Single close path: _iter_and_close's finally runs on normal completion and on
+    # disconnect (the send error closes the generator). Starlette skips background on
+    # disconnect, so a BackgroundTask would only double-close the normal path.
+    return StreamingResponse(_iter_and_close(stream), media_type=media_type, headers=headers)
 
 
 class ResizeToDimensions(BaseModel):
@@ -354,14 +418,8 @@ async def get_image_full(
     providing security through unguessability.
     """
     try:
-        path = ApiDependencies.invoker.services.images.get_path(image_name)
-        with open(path, "rb") as f:
-            content = f.read()
-        response = Response(content, media_type="image/png")
-        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
-        response.headers["Content-Disposition"] = f'inline; filename="{image_name}"'
-        return response
-    except Exception:
+        return await _serve_image(image_name, thumbnail=False, media_type="image/png", filename=image_name)
+    except (ImageFileNotFoundException, ImageRecordNotFoundException):
         raise HTTPException(status_code=404)
 
 
@@ -387,13 +445,8 @@ async def get_image_thumbnail(
     providing security through unguessability.
     """
     try:
-        path = ApiDependencies.invoker.services.images.get_path(image_name, thumbnail=True)
-        with open(path, "rb") as f:
-            content = f.read()
-        response = Response(content, media_type="image/webp")
-        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
-        return response
-    except Exception:
+        return await _serve_image(image_name, thumbnail=True, media_type="image/webp", filename=None)
+    except (ImageFileNotFoundException, ImageRecordNotFoundException):
         raise HTTPException(status_code=404)
 
 

@@ -1,0 +1,65 @@
+# Manual S3-compatible (Backblaze B2 / AWS S3) integration tests.
+#
+# Runs the real-bucket tests in tests/integration against an ACTUAL S3-compatible
+# object store, using credentials from repository secrets. This is intentionally
+# NOT part of normal PR CI: it is opt-in (workflow_dispatch) so it can be run on
+# demand before taking the S3 image-storage backend out of draft, or before a
+# release.
+#
+# Required repository secrets (a Backblaze B2 test bucket can be provided for this):
+#   CI_TEST_S3_BUCKET             e.g. invokeai-ci
+#   CI_TEST_S3_ENDPOINT_URL       e.g. https://s3.us-west-004.backblazeb2.com (leave empty for AWS S3)
+#   CI_TEST_S3_REGION             e.g. us-west-004
+#   CI_TEST_S3_ACCESS_KEY_ID      B2 keyID (or AWS access key id)
+#   CI_TEST_S3_SECRET_ACCESS_KEY  B2 applicationKey (or AWS secret access key)
+#
+# Without the secrets the tests skip cleanly, so this workflow is safe to merge
+# before a bucket is provisioned.
+
+name: 's3 integration'
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  s3-integration:
+    name: 's3 integration (real bucket)'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PIP_USE_PEP517: '1'
+      UV_SYSTEM_PYTHON: 1
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: setup uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          version: '0.6.10'
+          enable-cache: true
+          python-version: '3.11'
+
+      - name: setup python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: install dependencies
+        env:
+          UV_INDEX: 'https://download.pytorch.org/whl/cpu'
+        run: uv pip install --editable ".[test,s3]"
+
+      - name: run s3 integration tests
+        env:
+          CI_TEST_S3_BUCKET: ${{ secrets.CI_TEST_S3_BUCKET }}
+          CI_TEST_S3_ENDPOINT_URL: ${{ secrets.CI_TEST_S3_ENDPOINT_URL }}
+          CI_TEST_S3_REGION: ${{ secrets.CI_TEST_S3_REGION }}
+          CI_TEST_S3_ACCESS_KEY_ID: ${{ secrets.CI_TEST_S3_ACCESS_KEY_ID }}
+          CI_TEST_S3_SECRET_ACCESS_KEY: ${{ secrets.CI_TEST_S3_SECRET_ACCESS_KEY }}
+        run: pytest -m s3_integration tests/integration/test_image_files_s3_real.py -v

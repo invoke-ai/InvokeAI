@@ -1,4 +1,5 @@
-from typing import Optional
+from pathlib import Path
+from typing import BinaryIO, Optional
 
 from PIL.Image import Image as PILImageType
 
@@ -138,6 +139,31 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting image file")
             raise e
+
+    def get_bytes(self, image_name: str, thumbnail: bool = False) -> bytes:
+        try:
+            record = self.__invoker.services.image_records.get(image_name)
+            return self.__invoker.services.image_files.get_bytes(
+                image_name, thumbnail, image_subfolder=record.image_subfolder
+            )
+        except ImageFileNotFoundException:
+            self.__invoker.services.logger.error(f"Image file not found for {image_name!r} (thumbnail={thumbnail})")
+            raise
+        except Exception:
+            self.__invoker.services.logger.error(f"Problem getting image file {image_name!r} (thumbnail={thumbnail})")
+            raise
+
+    def get_local_path(self, image_name: str, thumbnail: bool = False) -> Optional[Path]:
+        record = self.__invoker.services.image_records.get(image_name)
+        return self.__invoker.services.image_files.get_local_path(
+            image_name, thumbnail, image_subfolder=record.image_subfolder
+        )
+
+    def open_stream(self, image_name: str, thumbnail: bool = False) -> BinaryIO:
+        record = self.__invoker.services.image_records.get(image_name)
+        return self.__invoker.services.image_files.open_stream(
+            image_name, thumbnail, image_subfolder=record.image_subfolder
+        )
 
     def get_record(self, image_name: str) -> ImageRecord:
         try:
