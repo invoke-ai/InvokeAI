@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Literal, Optional
 
 import yaml
-from pydantic import BaseModel, Field, PrivateAttr, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 import invokeai.configs as model_configs
@@ -174,6 +174,12 @@ class InvokeAIAppConfig(BaseSettings):
     style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
     workflow_thumbnails_dir: Path = Field(default=Path("workflow_thumbnails"), description="Path to directory for workflow thumbnails.")
 
+    # STORAGE
+    storage_backend:               Literal["disk", "s3"] = Field(default="disk",  description='Backend for storing generated images. "disk" uses the local filesystem; "s3" uses any S3-compatible object store (AWS S3, Backblaze B2, etc.).')
+    s3_bucket:           Optional[str] = Field(default=None, validate_default=True, description='Bucket name for the s3 storage backend. Required when storage_backend="s3".')
+    s3_endpoint_url:     Optional[str] = Field(default=None,                      description='Endpoint URL for the s3 storage backend. Leave unset to talk to AWS S3; set to a provider-specific URL (e.g. https://s3.us-west-004.backblazeb2.com for Backblaze B2) for any other S3-compatible store.')
+    s3_region:           Optional[str] = Field(default=None,                      description='Region name for the s3 storage backend. Optional; if unset, the standard AWS region resolution applies (AWS_REGION / AWS_DEFAULT_REGION / AWS config). For Backblaze B2, set the region embedded in your endpoint, e.g. us-west-004.')
+
     # LOGGING
     log_handlers:             list[str] = Field(default=["console"],        description='Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".')
     # note - would be better to read the log_format values from logging.py, but this creates circular dependencies issues
@@ -259,6 +265,22 @@ class InvokeAIAppConfig(BaseSettings):
     # fmt: on
 
     model_config = SettingsConfigDict(env_prefix="INVOKEAI_", env_ignore_empty=True)
+
+    @field_validator("s3_bucket")
+    @classmethod
+    def _validate_s3_bucket(cls, v: Optional[str], info: ValidationInfo) -> Optional[str]:
+        """Require a bucket when `storage_backend == "s3"`.
+
+        Validated on `s3_bucket` (with `validate_default=True`) so the error is
+        attributed to that field and fires even when the bucket is omitted. Surfaces
+        the misconfiguration at load time rather than as a deeper error during
+        `dependencies.initialize()`. INVOKEAI_S3_BUCKET feeds the same field.
+        """
+        if info.data.get("storage_backend") == "s3" and not (v and v.strip()):
+            raise ValueError(
+                'storage_backend="s3" requires `s3_bucket` to be set (or the INVOKEAI_S3_BUCKET environment variable).'
+            )
+        return v
 
     def update_config(self, config: dict[str, Any] | InvokeAIAppConfig, clobber: bool = True) -> None:
         """Updates the config, overwriting existing values.

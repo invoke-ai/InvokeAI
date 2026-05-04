@@ -16565,6 +16565,28 @@ export type components = {
              */
             workflow_thumbnails_dir?: string;
             /**
+             * Storage Backend
+             * @description Backend for storing generated images. "disk" uses the local filesystem; "s3" uses any S3-compatible object store (AWS S3, Backblaze B2, etc.).
+             * @default disk
+             * @enum {string}
+             */
+            storage_backend?: "disk" | "s3";
+            /**
+             * S3 Bucket
+             * @description Bucket name for the s3 storage backend. Required when storage_backend="s3".
+             */
+            s3_bucket?: string | null;
+            /**
+             * S3 Endpoint Url
+             * @description Endpoint URL for the s3 storage backend. Leave unset to talk to AWS S3; set to a provider-specific URL (e.g. https://s3.us-west-004.backblazeb2.com for Backblaze B2) for any other S3-compatible store.
+             */
+            s3_endpoint_url?: string | null;
+            /**
+             * S3 Region
+             * @description Region name for the s3 storage backend. Optional; if unset, the standard AWS region resolution applies (AWS_REGION / AWS_DEFAULT_REGION / AWS config). For Backblaze B2, set the region embedded in your endpoint, e.g. us-west-004.
+             */
+            s3_region?: string | null;
+            /**
              * Log Handlers
              * @description Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
              * @default [

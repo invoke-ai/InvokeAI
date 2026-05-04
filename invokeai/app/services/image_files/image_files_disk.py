@@ -11,6 +11,7 @@ from invokeai.app.services.image_files.image_files_common import (
     ImageFileDeleteException,
     ImageFileNotFoundException,
     ImageFileSaveException,
+    validate_subfolder,
 )
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
@@ -55,6 +56,20 @@ class DiskImageFileStorage(ImageFileStorageBase):
             image = Image.open(image_path)
             self.__set_cache(image_path, image)
             return image
+        except FileNotFoundError as e:
+            raise ImageFileNotFoundException from e
+
+    def get_bytes(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> bytes:
+        """Return the raw bytes for an image (or its thumbnail).
+
+        Mirrors :meth:`S3CompatibleImageFileStorage.get_bytes` so that
+        HTTP image-serving routes can read bytes uniformly without
+        special-casing per-backend ``get_path`` shapes.
+        """
+        try:
+            image_path = self.get_path(image_name, thumbnail=thumbnail, image_subfolder=image_subfolder)
+            with open(image_path, "rb") as f:
+                return f.read()
         except FileNotFoundError as e:
             raise ImageFileNotFoundException from e
 
@@ -139,7 +154,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
         # Build the full path with optional subfolder
         if image_subfolder:
-            self._validate_subfolder(image_subfolder)
+            validate_subfolder(image_subfolder)
             image_path = base_folder / image_subfolder / basename
         else:
             image_path = base_folder / basename
@@ -153,21 +168,8 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
         return resolved_image_path
 
-    @staticmethod
-    def _validate_subfolder(subfolder: str) -> None:
-        """Validates a subfolder path to prevent directory traversal while allowing controlled subdirectories."""
-        if not subfolder:
-            return
-        if "\\" in subfolder:
-            raise ValueError("Backslashes not allowed in subfolder path")
-        if subfolder.startswith("/"):
-            raise ValueError("Absolute paths not allowed in subfolder path")
-        parts = subfolder.split("/")
-        for part in parts:
-            if part == "..":
-                raise ValueError("Parent directory references not allowed in subfolder path")
-            if part == "":
-                raise ValueError("Empty path segments not allowed in subfolder path")
+    def get_local_path(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
+        return self.get_path(image_name, thumbnail=thumbnail, image_subfolder=image_subfolder)
 
     def validate_path(self, path: Union[str, Path]) -> bool:
         """Validates the path given for an image or thumbnail."""

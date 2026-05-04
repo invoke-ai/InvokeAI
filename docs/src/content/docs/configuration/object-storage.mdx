@@ -1,0 +1,196 @@
+---
+title: Object Storage (S3-Compatible)
+sidebar:
+  order: 4
+---
+
+import { Aside, Tabs, TabItem } from '@astrojs/starlight/components'
+
+InvokeAI can store generated images in any S3-compatible object store
+instead of the local filesystem. This is intended for **multi-user and
+hosted Invoke deployments** where the application server is ephemeral
+(containers, autoscaled instances, Kubernetes pods) and image artifacts
+need to live somewhere durable and shared across replicas.
+
+The implementation lives in
+`invokeai/app/services/image_files/image_files_s3.py` and works with
+AWS S3, [Backblaze B2](https://www.backblaze.com/cloud-storage), and
+any other provider that speaks the S3 API.
+
+<Aside type="note" title="Image files only — latents and presigned-URL delivery are follow-ups">
+This release covers image files (`ImageFileStorageBase`). Latents
+serialization (`ObjectSerializerBase`) and presigned-URL frontend
+delivery (`UrlServiceBase`) still use the disk backend; both are
+tracked as separate follow-up PRs.
+</Aside>
+
+## When to use object storage
+
+Use the S3 backend when **any** of these apply:
+
+- You're running InvokeAI behind a load balancer with more than one
+  replica — they need to share a single image gallery.
+- Your application servers are ephemeral and a local volume would not
+  persist across restarts.
+- You want to back up, version, or apply lifecycle rules to generated
+  images using your object-store provider's tooling.
+- You're hosting a multi-tenant Invoke instance and want to keep
+  artifacts off the application server entirely.
+
+For a single-user desktop install, **stay on the disk backend** — it's
+simpler, faster, and benefits from an in-process LRU cache.
+
+## Selecting the backend
+
+The backend is selected by the `storage_backend` setting. Like all
+`InvokeAIAppConfig` fields (`s3_bucket`, `s3_endpoint_url`, `s3_region`, ...),
+it can be set in `invokeai.yaml` or via the equivalent `INVOKEAI_`-prefixed
+environment variable:
+
+```sh
+# Default; uses local filesystem under the InvokeAI root
+INVOKEAI_STORAGE_BACKEND=disk
+
+# Use any S3-compatible bucket
+INVOKEAI_STORAGE_BACKEND=s3
+```
+
+When `s3` is selected, the variables in the next section are required.
+
+<Aside type="note" title="Install the s3 extra">
+  The S3 backend depends on `boto3`, which is an optional dependency. Install it with the `s3` extra: `pip install "invokeai[s3]"` (or `uv pip install "invokeai[s3]"`). Without it, selecting `storage_backend=s3` raises an `ImportError` at startup.
+</Aside>
+
+## Required configuration
+
+| Variable                      | Required | Description                                                                                  |
+| ----------------------------- | :------: | -------------------------------------------------------------------------------------------- |
+| `INVOKEAI_S3_BUCKET`          |   yes    | Bucket / container name. Must already exist; InvokeAI does not create it.                    |
+| `INVOKEAI_S3_ENDPOINT_URL`    |  *see*   | Provider endpoint. Required for non-AWS providers (e.g. B2's `https://s3.us-west-004.backblazeb2.com`). Omit to talk to AWS S3.   |
+| `INVOKEAI_S3_REGION`          |    no    | Region name. If unset, boto3's normal resolution applies (`AWS_REGION` / `AWS_DEFAULT_REGION` / AWS config). Some S3-compatible providers require a specific region for signing (e.g. B2's `us-west-004`). |
+
+### Credentials
+
+Credentials follow boto3's standard chain: `AWS_ACCESS_KEY_ID` and
+`AWS_SECRET_ACCESS_KEY`, instance profiles, IRSA, `~/.aws/credentials`,
+etc. For Backblaze deployments there's a convenience mapping — see
+below.
+
+## Backblaze B2
+
+InvokeAI honors the standard B2 environment variable names so you can
+use the same credentials you'd give any other B2 tool. If
+`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are unset and these are
+present, they are mapped onto the AWS names when the boto3 client is
+constructed (the process environment is **not** mutated).
+
+```sh
+INVOKEAI_STORAGE_BACKEND=s3
+INVOKEAI_S3_BUCKET=my-invokeai-images
+INVOKEAI_S3_ENDPOINT_URL=https://s3.us-west-004.backblazeb2.com
+INVOKEAI_S3_REGION=us-west-004
+
+B2_APPLICATION_KEY_ID=000xxxxxxxxxxxxxxxxxxxxx
+B2_APPLICATION_KEY=K000xxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+The endpoint shown above (`s3.us-west-004.backblazeb2.com`) is the
+default for B2 buckets in the `us-west-004` region — replace
+`us-west-004` with whichever region your bucket lives in. You can find
+the exact endpoint on the bucket's detail page in the B2 console.
+
+<Aside type="tip" title="Application keys, not master keys">
+Create a B2 **application key** scoped to just the bucket InvokeAI
+will use. This limits blast radius if the credentials leak.
+</Aside>
+
+## Other providers
+
+<Tabs syncKey="objectStorageProvider">
+  <TabItem label="AWS S3" icon="cloud-download">
+```sh
+INVOKEAI_STORAGE_BACKEND=s3
+INVOKEAI_S3_BUCKET=my-invokeai-images
+INVOKEAI_S3_REGION=us-east-1
+# Endpoint URL omitted: boto3 talks to AWS by default.
+# Credentials via instance profile, IRSA, or AWS_ACCESS_KEY_ID/SECRET.
+```
+  </TabItem>
+  <TabItem label="Backblaze B2" icon="cloud-download">
+```sh
+INVOKEAI_STORAGE_BACKEND=s3
+INVOKEAI_S3_BUCKET=my-invokeai-images
+INVOKEAI_S3_ENDPOINT_URL=https://s3.us-west-004.backblazeb2.com
+INVOKEAI_S3_REGION=us-west-004
+B2_APPLICATION_KEY_ID=...
+B2_APPLICATION_KEY=...
+```
+  </TabItem>
+</Tabs>
+
+Other S3-compatible providers work the same way: set
+`INVOKEAI_S3_ENDPOINT_URL` to their endpoint and supply the appropriate
+`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`.
+
+## Object layout
+
+Inside the bucket, InvokeAI uses two prefixes that mirror the on-disk
+layout so the database's image-name references continue to resolve
+unambiguously:
+
+```
+<bucket>/
+  images/<image-name>.png
+  thumbnails/<image-name>.webp
+```
+
+When `image_subfolder_strategy` is configured (e.g. `date`, `type`, or
+`hash`), the S3 backend mirrors the on-disk layout and inserts the same
+subfolder into both prefixes, e.g. `images/<subfolder>/<image-name>.png`
+and `thumbnails/<subfolder>/<image-name>.webp`.
+
+InvokeAI also writes per-object user-metadata (`invokeai-metadata`,
+`invokeai-workflow`, `invokeai-graph`) so workflow and graph lookups
+can be served by a cheap `HEAD` request without downloading the full
+PNG.
+
+## Performance trade-offs
+
+<Aside type="note" title="Known trade-off: first-byte latency">
+The disk backend keeps recently-accessed images in an in-process LRU
+cache, so re-reads are essentially free. The S3 backend is currently
+**stateless** — every read goes to the object store, which means
+first-byte latency is meaningfully higher than disk, especially for
+gallery scrolls that touch many thumbnails.
+
+This is by design for the initial release: it keeps the implementation
+small and avoids cache-coherency bugs across replicas. A read-through
+local cache is a planned follow-up, gated on profiling.
+</Aside>
+
+In practice this is not a problem for most multi-user deployments —
+the frontend already paginates the gallery and modern object stores
+are fast enough to keep the UI responsive. Single-user desktop
+installs should not switch to S3 just for the architectural symmetry;
+the disk backend is faster for that case.
+
+## Operational notes
+
+- **Bucket pre-creation.** The bucket must exist before InvokeAI
+  starts. The application does not create it and will fail loudly on
+  first write if the bucket is missing.
+- **Credential rotation.** Restart the Invoke process to pick up new
+  credentials — the boto3 client is built once at startup.
+- **Versioned buckets (B2).** B2 buckets retain prior object versions
+  by default. Use a lifecycle rule to age out hidden versions if you
+  don't want deleted images to linger.
+- **Server-side encryption / object lock.** Configure these on the
+  bucket itself; InvokeAI passes uploads through unchanged.
+
+## Follow-ups
+
+The current scaffold covers image files only. Latents serialization
+and presigned-URL frontend delivery (so browsers fetch directly from
+the bucket) are tracked as separate follow-ups; until those land,
+deployments using the S3 image backend will still have the application
+server proxy image bytes to the browser.

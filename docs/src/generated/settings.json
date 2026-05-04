@@ -230,6 +230,53 @@
       "validation": {}
     },
     {
+      "category": "STORAGE",
+      "default": "disk",
+      "description": "Backend for storing generated images. \"disk\" uses the local filesystem; \"s3\" uses any S3-compatible object store (AWS S3, Backblaze B2, etc.).",
+      "env_var": "INVOKEAI_STORAGE_BACKEND",
+      "literal_values": [
+        "disk",
+        "s3"
+      ],
+      "name": "storage_backend",
+      "required": false,
+      "type": "typing.Literal['disk', 's3']",
+      "validation": {}
+    },
+    {
+      "category": "STORAGE",
+      "default": null,
+      "description": "Bucket name for the s3 storage backend. Required when storage_backend=\"s3\".",
+      "env_var": "INVOKEAI_S3_BUCKET",
+      "literal_values": [],
+      "name": "s3_bucket",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "STORAGE",
+      "default": null,
+      "description": "Endpoint URL for the s3 storage backend. Leave unset to talk to AWS S3; set to a provider-specific URL (e.g. https://s3.us-west-004.backblazeb2.com for Backblaze B2) for any other S3-compatible store.",
+      "env_var": "INVOKEAI_S3_ENDPOINT_URL",
+      "literal_values": [],
+      "name": "s3_endpoint_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "STORAGE",
+      "default": null,
+      "description": "Region name for the s3 storage backend. Optional; if unset, the standard AWS region resolution applies (AWS_REGION / AWS_DEFAULT_REGION / AWS config). For Backblaze B2, set the region embedded in your endpoint, e.g. us-west-004.",
+      "env_var": "INVOKEAI_S3_REGION",
+      "literal_values": [],
+      "name": "s3_region",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
       "category": "LOGGING",
       "default": [
         "console"
