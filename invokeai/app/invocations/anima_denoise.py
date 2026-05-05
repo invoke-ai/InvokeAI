@@ -549,7 +549,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         # Initialize diffusers scheduler if not using built-in Euler
         scheduler: SchedulerMixin | None = None
-        use_scheduler = self.scheduler != "euler"
+        is_builtin_euler = self.scheduler == "euler"
+        is_euler_ancestral = self.scheduler == "euler_a"
+        use_scheduler = not (is_builtin_euler or is_euler_ancestral)
 
         if use_scheduler:
             scheduler_class, scheduler_kwargs = ANIMA_SCHEDULER_MAP[self.scheduler]
@@ -716,6 +718,63 @@ class AnimaDenoiseInvocation(BaseInvocation):
                                 )
                             )
                 pbar.close()
+            elif is_euler_ancestral:
+                # Custom rectified-flow ancestral Euler. Math lives in
+                # _anima_euler_ancestral_step (unit-tested in test_anima_schedulers.py).
+                for step_idx in tqdm(range(total_steps), desc="Denoising (Anima euler_a)"):
+                    sigma_curr = sigmas[step_idx]
+                    sigma_prev = sigmas[step_idx + 1]
+
+                    timestep = torch.tensor(
+                        [sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
+                    ).expand(latents.shape[0])
+
+                    noise_pred_cond = _run_transformer(pos_context, latents, timestep).float()
+
+                    if do_cfg and neg_context is not None:
+                        noise_pred_uncond = _run_transformer(neg_context, latents, timestep).float()
+                        noise_pred = noise_pred_uncond + self.guidance_scale * (
+                            noise_pred_cond - noise_pred_uncond
+                        )
+                    else:
+                        noise_pred = noise_pred_cond
+
+                    fresh_noise = torch.randn(
+                        latents.shape,
+                        device=latents.device,
+                        dtype=latents.dtype,
+                        generator=step_generator,
+                    )
+
+                    latents_dtype = latents.dtype
+                    latents = latents.to(dtype=torch.float32)
+                    latents = _anima_euler_ancestral_step(
+                        latents=latents,
+                        v=noise_pred,
+                        sigma_curr=sigma_curr,
+                        sigma_prev=sigma_prev,
+                        noise=fresh_noise.to(dtype=torch.float32),
+                        eta=1.0,
+                        s_noise=1.0,
+                    )
+                    latents = latents.to(dtype=latents_dtype)
+
+                    if inpaint_extension is not None:
+                        latents_4d = latents.squeeze(2)
+                        latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(
+                            latents_4d, sigma_prev
+                        )
+                        latents = latents_4d.unsqueeze(2)
+
+                    step_callback(
+                        PipelineIntermediateState(
+                            step=step_idx + 1,
+                            order=1,
+                            total_steps=total_steps,
+                            timestep=int(sigma_curr * 1000),
+                            latents=latents.squeeze(2),
+                        ),
+                    )
             else:
                 # Built-in Euler implementation (default for Anima)
                 for step_idx in tqdm(range(total_steps), desc="Denoising (Anima)"):

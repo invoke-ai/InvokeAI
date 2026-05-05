@@ -74,10 +74,11 @@ if _HAS_LCM:
 # Fixed shift factor for the Anima rectified-flow noise schedule.
 ANIMA_SHIFT = 3.0
 
-ANIMA_SCHEDULER_NAME_VALUES = Literal["euler", "heun", "dpmpp_2m", "dpmpp_2m_sde", "lcm"]
+ANIMA_SCHEDULER_NAME_VALUES = Literal["euler", "euler_a", "heun", "dpmpp_2m", "dpmpp_2m_sde", "lcm"]
 
 ANIMA_SCHEDULER_LABELS: dict[str, str] = {
     "euler": "Euler",
+    "euler_a": "Euler Ancestral",
     "heun": "Heun (2nd order)",
     "dpmpp_2m": "DPM++ 2M",
     "dpmpp_2m_sde": "DPM++ 2M SDE",
