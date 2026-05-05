@@ -126,18 +126,19 @@ def _anima_euler_ancestral_step(
 ) -> torch.Tensor:
     """One ancestral Euler step for rectified-flow models.
 
-    Algorithm (under CONST / flow-matching parameterization, mirrors
-    LTXEulerAncestralRFScheduler in diffusers main):
+    Algorithm (under CONST / flow-matching parameterization, with structure
+    inspired by LTXEulerAncestralRFScheduler in diffusers main):
 
         x0       = latents - sigma_curr * v                      # denoised reconstruction
         sigma_up = eta * sigma_prev * sqrt(max(1 - (sigma_prev / sigma_curr)^2, 0))
         sigma_dn = sqrt(max(sigma_prev^2 - sigma_up^2, 0))
-        x_prev   = (1 - sigma_dn) * x0 + sigma_dn * (latents - x0) / sigma_curr
-                   + s_noise * sigma_up * noise
+        direction = (latents - x0) / sigma_curr                  # equals v under flow matching
+        x_prev   = x0 + sigma_dn * direction + s_noise * sigma_up * noise
 
     With eta=0, sigma_up=0 and sigma_dn=sigma_prev, recovering the deterministic
-    Euler step `latents + (sigma_prev - sigma_curr) * v`. At the terminal step
-    (sigma_prev == 0), sigma_up is also 0 — no spurious noise injection.
+    Euler step `latents + (sigma_prev - sigma_curr) * v` exactly:
+    `x0 + sigma_prev * v = (latents - sigma_curr * v) + sigma_prev * v`. At the
+    terminal step (sigma_prev == 0), sigma_up is also 0 — no spurious noise.
 
     Args:
         latents:    Current latents x_t. Shape [B, C, T, H, W] for Anima.
