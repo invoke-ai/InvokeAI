@@ -138,7 +138,8 @@ def _anima_euler_ancestral_step(
     With eta=0, sigma_up=0 and sigma_dn=sigma_prev, recovering the deterministic
     Euler step `latents + (sigma_prev - sigma_curr) * v` exactly:
     `x0 + sigma_prev * v = (latents - sigma_curr * v) + sigma_prev * v`. At the
-    terminal step (sigma_prev == 0), sigma_up is also 0 — no spurious noise.
+    terminal step (sigma_prev == 0) the early-return guard short-circuits to
+    the deterministic Euler step directly — no spurious noise injection.
 
     Args:
         latents:    Current latents x_t. Shape [B, C, T, H, W] for Anima.

@@ -8,6 +8,7 @@ from invokeai.backend.flux.schedulers import (
     ANIMA_SCHEDULER_MAP,
     ANIMA_SCHEDULER_NAME_VALUES,
 )
+from invokeai.app.invocations.anima_denoise import _anima_euler_ancestral_step
 
 
 def test_anima_scheduler_map_entries_are_class_kwargs_tuples():
@@ -111,9 +112,6 @@ def test_anima_literal_covers_every_map_key():
         assert name in literal_values, f"{name} is in the map but missing from the Literal"
 
 
-from invokeai.app.invocations.anima_denoise import _anima_euler_ancestral_step
-
-
 def _deterministic_euler_step(latents, v, sigma_curr, sigma_prev):
     """Reference deterministic Euler step (matches the built-in Euler loop)."""
     return latents + (sigma_prev - sigma_curr) * v
@@ -152,6 +150,8 @@ def test_anima_euler_ancestral_step_eta_one_differs_from_deterministic():
 
 
 def test_anima_euler_ancestral_step_preserves_shape_and_dtype():
+    """Output must have the same shape and dtype as the input latents — no
+    silent dtype promotion (e.g., float32 → float64) and no shape changes."""
     latents = torch.randn(1, 16, 1, 8, 8, dtype=torch.float32)
     v = torch.randn_like(latents)
     noise = torch.randn_like(latents)
