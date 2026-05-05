@@ -2,12 +2,12 @@ import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import {
+  zParameterAnimaScheduler,
   zParameterCanvasCoherenceMode,
   zParameterCFGRescaleMultiplier,
   zParameterCFGScale,
   zParameterCLIPEmbedModel,
   zParameterCLIPGEmbedModel,
-  zParameterAnimaScheduler,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
   zParameterFluxDypeExponent,
