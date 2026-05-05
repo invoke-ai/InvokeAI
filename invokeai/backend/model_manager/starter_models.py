@@ -1011,6 +1011,30 @@ z_image_controlnet_tile = StarterModel(
 )
 # endregion
 
+# region ERNIE-Image
+ernie_image = StarterModel(
+    name="ERNIE-Image",
+    base=BaseModelType.ErnieImage,
+    source="baidu/ERNIE-Image",
+    description=(
+        "Baidu ERNIE-Image: 8B single-stream DiT with Mistral3 text encoder, AutoencoderKLFlux2 VAE, "
+        "and bundled Ministral3 prompt enhancer. Defaults to 50 steps with CFG 4.0."
+    ),
+    type=ModelType.Main,
+)
+
+ernie_image_turbo = StarterModel(
+    name="ERNIE-Image Turbo",
+    base=BaseModelType.ErnieImage,
+    source="baidu/ERNIE-Image-Turbo",
+    description=(
+        "ERNIE-Image-Turbo: distilled variant of ERNIE-Image. Same architecture as ERNIE-Image but "
+        "tuned for fast inference at 8 steps with CFG disabled (1.0)."
+    ),
+    type=ModelType.Main,
+)
+# endregion
+
 # region External API
 GEMINI_3_IMAGE_ALLOWED_ASPECT_RATIOS = [
     "1:1",
@@ -1370,6 +1394,8 @@ STARTER_MODELS: list[StarterModel] = [
     z_image_qwen3_encoder_quantized,
     z_image_controlnet_union,
     z_image_controlnet_tile,
+    ernie_image,
+    ernie_image_turbo,
     gemini_flash_image,
     gemini_pro_image_preview,
     gemini_3_1_flash_image_preview,
@@ -1448,6 +1474,11 @@ flux2_klein_bundle: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
 ]
 
+ernie_image_bundle: list[StarterModel] = [
+    ernie_image_turbo,
+    ernie_image,
+]
+
 qwen_image_bundle: list[StarterModel] = [
     qwen_image_edit,
     qwen_image_edit_gguf_q4_k_m,
@@ -1474,6 +1505,7 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.Flux: StarterModelBundle(name="FLUX.1 dev", models=flux_bundle),
     BaseModelType.Flux2: StarterModelBundle(name="FLUX.2 Klein", models=flux2_klein_bundle),
     BaseModelType.ZImage: StarterModelBundle(name="Z-Image Turbo", models=zimage_bundle),
+    BaseModelType.ErnieImage: StarterModelBundle(name="ERNIE-Image", models=ernie_image_bundle),
     BaseModelType.QwenImage: StarterModelBundle(name="Qwen Image", models=qwen_image_bundle),
     BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
 }

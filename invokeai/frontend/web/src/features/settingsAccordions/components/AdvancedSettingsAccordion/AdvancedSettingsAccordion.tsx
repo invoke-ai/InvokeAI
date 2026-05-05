@@ -5,6 +5,7 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
   selectIsAnima,
+  selectIsErnieImage,
   selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
@@ -25,6 +26,7 @@ import ParamQwenImageComponentSourceSelect from 'features/parameters/components/
 import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
+import ParamErnieImagePromptEnhancer from 'features/parameters/components/Core/ParamErnieImagePromptEnhancer';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
 import ParamSeamlessYAxis from 'features/parameters/components/Seamless/ParamSeamlessYAxis';
 import ParamColorCompensation from 'features/parameters/components/VAEModel/ParamColorCompensation';
@@ -54,6 +56,7 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isExternal = useAppSelector(selectIsExternal);
   const isQwenImage = useAppSelector(selectIsQwenImage);
   const isAnima = useAppSelector(selectIsAnima);
+  const isErnieImage = useAppSelector(selectIsErnieImage);
 
   const selectBadges = useMemo(
     () =>
@@ -107,13 +110,13 @@ export const AdvancedSettingsAccordion = memo(() => {
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && (
+        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && !isErnieImage && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
           </Flex>
         )}
-        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && (
+        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && !isErnieImage && (
           <>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamClipSkip />
@@ -164,6 +167,11 @@ export const AdvancedSettingsAccordion = memo(() => {
         {isAnima && (
           <FormControlGroup>
             <ParamAnimaModelSelect />
+          </FormControlGroup>
+        )}
+        {isErnieImage && (
+          <FormControlGroup formLabelProps={formLabelProps}>
+            <ParamErnieImagePromptEnhancer />
           </FormControlGroup>
         )}
       </Flex>

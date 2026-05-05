@@ -35,8 +35,8 @@ dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
-  "compel==2.1.1",
-  "diffusers[torch]==0.37.0",
+  "compel @ git+https://github.com/Cstannahill/compel5.git@chore/transformers5-diffusers-smoke",
+  "diffusers[torch]==0.38.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model
   "numpy<2.0.0",
@@ -49,7 +49,7 @@ dependencies = [
   "torch~=2.7.0",                         # torch and related dependencies are loosely pinned, will respect requirement of `diffusers[torch]`
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
   "torchvision",
-  "transformers>=4.56.0",
+  "transformers>=5.1.0",
 
   # Core application dependencies, pinned for reproducible builds.
   "fastapi-events",
@@ -127,7 +127,12 @@ dependencies = [
 [tool.uv]
 # Prevent opencv-python from ever being chosen during dependency resolution.
 # This prevents conflicts with opencv-contrib-python, which Invoke requires.
-override-dependencies = ["opencv-python; sys_platform=='never'"]
+# Force transformers>=5.1.0 past compel==2.1.1's ~=4.25 (<5.0) constraint.
+override-dependencies = ["opencv-python; sys_platform=='never'", "transformers>=5.1.0"]
+# diffusers 0.38.0 hard-pins safetensors>=0.8.0-rc.0 (an upstream-side prerelease
+# requirement). Until a diffusers 0.38.x patch releases with a stable safetensors
+# floor, we have to allow that one prerelease through resolution.
+prerelease = "allow"
 conflicts = [[{ extra = "cpu" }, { extra = "cuda" }, { extra = "rocm" }]]
 index-strategy = "unsafe-best-match"
 

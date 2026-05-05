@@ -89,6 +89,12 @@ const slice = createSlice({
     setZImageScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
       state.zImageScheduler = action.payload;
     },
+    setErnieImageScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
+      state.ernieImageScheduler = action.payload;
+    },
+    setErnieImageUsePromptEnhancer: (state, action: PayloadAction<boolean>) => {
+      state.ernieImageUsePromptEnhancer = action.payload;
+    },
     setZImageShift: (state, action: PayloadAction<number | null>) => {
       state.zImageShift = action.payload;
     },
@@ -602,6 +608,8 @@ export const {
   setFluxDypeScale,
   setFluxDypeExponent,
   setZImageScheduler,
+  setErnieImageScheduler,
+  setErnieImageUsePromptEnhancer,
   setZImageShift,
   setZImageSeedVarianceEnabled,
   setZImageSeedVarianceStrength,
@@ -707,6 +715,7 @@ export const selectIsCogView4 = createParamsSelector((params) => params.model?.b
 export const selectIsZImage = createParamsSelector((params) => params.model?.base === 'z-image');
 export const selectIsAnima = createParamsSelector((params) => params.model?.base === 'anima');
 export const selectIsFlux2 = createParamsSelector((params) => params.model?.base === 'flux2');
+export const selectIsErnieImage = createParamsSelector((params) => params.model?.base === 'ernie-image');
 export const selectIsExternal = createParamsSelector((params) => params.model?.base === 'external');
 export const selectIsQwenImage = createParamsSelector((params) => params.model?.base === 'qwen-image');
 export const selectIsFluxKontext = createParamsSelector((params) => {
@@ -851,6 +860,8 @@ export const selectFluxDypePreset = createParamsSelector((params) => params.flux
 export const selectFluxDypeScale = createParamsSelector((params) => params.fluxDypeScale);
 export const selectFluxDypeExponent = createParamsSelector((params) => params.fluxDypeExponent);
 export const selectZImageScheduler = createParamsSelector((params) => params.zImageScheduler);
+export const selectErnieImageScheduler = createParamsSelector((params) => params.ernieImageScheduler);
+export const selectErnieImageUsePromptEnhancer = createParamsSelector((params) => params.ernieImageUsePromptEnhancer);
 export const selectZImageShift = createParamsSelector((params) => params.zImageShift);
 export const selectZImageSeedVarianceEnabled = createParamsSelector((params) => params.zImageSeedVarianceEnabled);
 export const selectZImageSeedVarianceStrength = createParamsSelector((params) => params.zImageSeedVarianceStrength);

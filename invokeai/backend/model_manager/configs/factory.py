@@ -62,6 +62,7 @@ from invokeai.backend.model_manager.configs.lora import (
 from invokeai.backend.model_manager.configs.main import (
     Main_BnBNF4_FLUX_Config,
     Main_Checkpoint_Anima_Config,
+    Main_Checkpoint_ErnieImage_Config,
     Main_Checkpoint_Flux2_Config,
     Main_Checkpoint_FLUX_Config,
     Main_Checkpoint_SD1_Config,
@@ -70,6 +71,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXLRefiner_Config,
     Main_Checkpoint_ZImage_Config,
     Main_Diffusers_CogView4_Config,
+    Main_Diffusers_ErnieImage_Config,
     Main_Diffusers_Flux2_Config,
     Main_Diffusers_FLUX_Config,
     Main_Diffusers_QwenImage_Config,
@@ -169,6 +171,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_CogView4_Config, Main_Diffusers_CogView4_Config.get_tag()],
         Annotated[Main_Diffusers_QwenImage_Config, Main_Diffusers_QwenImage_Config.get_tag()],
         Annotated[Main_Diffusers_ZImage_Config, Main_Diffusers_ZImage_Config.get_tag()],
+        Annotated[Main_Diffusers_ErnieImage_Config, Main_Diffusers_ErnieImage_Config.get_tag()],
         # Main (Pipeline) - checkpoint format
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -180,6 +183,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_FLUX_Config, Main_Checkpoint_FLUX_Config.get_tag()],
         Annotated[Main_Checkpoint_ZImage_Config, Main_Checkpoint_ZImage_Config.get_tag()],
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
+        Annotated[Main_Checkpoint_ErnieImage_Config, Main_Checkpoint_ErnieImage_Config.get_tag()],
         # Main (Pipeline) - quantized formats
         # IMPORTANT: FLUX.2 must be checked BEFORE FLUX.1 because FLUX.2 has specific validation
         # that will reject FLUX.1 models, but FLUX.1 validation may incorrectly match FLUX.2 models
@@ -538,9 +542,10 @@ class ModelConfigFactory:
         # Now do any post-processing needed for specific model types/bases/etc.
         match config.type:
             case ModelType.Main:
-                # Pass variant if available (e.g., for Flux2 models)
+                # Pass variant if available (e.g., for Flux2 models). Name is used to detect
+                # ERNIE-Image-Turbo since it doesn't have a distinct variant on the config.
                 variant = getattr(config, "variant", None)
-                config.default_settings = MainModelDefaultSettings.from_base(config.base, variant)
+                config.default_settings = MainModelDefaultSettings.from_base(config.base, variant, config.name)
             case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
                 config.default_settings = ControlAdapterDefaultSettings.from_model_name(config.name)
             case ModelType.LoRA:

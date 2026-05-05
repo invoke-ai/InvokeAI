@@ -74,6 +74,9 @@ export const zZImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 // Anima scheduler options (same flow-matching schedulers, defined separately to avoid coupling)
 export const zAnimaSchedulerField = z.enum(['euler', 'heun', 'lcm']);
 
+// ERNIE-Image scheduler options (Flow Matching schedulers, same as Flux/Z-Image)
+export const zErnieImageSchedulerField = z.enum(['euler', 'heun', 'lcm']);
+
 // Flux DyPE (Dynamic Position Extrapolation) preset options for high-resolution generation
 export const zFluxDypePresetField = z.enum(['off', 'manual', 'auto', 'area', '4k']);
 
@@ -97,6 +100,7 @@ export const zBaseModelType = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'ernie-image',
   'external',
   'anima',
   'unknown',
@@ -112,6 +116,7 @@ export const zMainModelBase = z.enum([
   'cogview4',
   'qwen-image',
   'z-image',
+  'ernie-image',
   'anima',
 ]);
 type MainModelBase = z.infer<typeof zMainModelBase>;
@@ -135,6 +140,7 @@ export const zModelType = z.enum([
   'clip_embed',
   'siglip',
   'flux_redux',
+  'prompt_enhancer',
   'external_image_generator',
   'unknown',
 ]);
@@ -148,6 +154,8 @@ export const zSubModelType = z.enum([
   'tokenizer',
   'tokenizer_2',
   'tokenizer_3',
+  'pe',
+  'pe_tokenizer',
   'vae',
   'vae_decoder',
   'vae_encoder',

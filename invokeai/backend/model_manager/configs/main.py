@@ -60,6 +60,7 @@ class MainModelDefaultSettings(BaseModel):
         cls,
         base: BaseModelType,
         variant: Flux2VariantType | FluxVariantType | ModelVariantType | ZImageVariantType | None = None,
+        name: str | None = None,
     ) -> Self | None:
         match base:
             case BaseModelType.StableDiffusion1:
@@ -77,6 +78,12 @@ class MainModelDefaultSettings(BaseModel):
                 else:
                     # Turbo (distilled) uses fewer steps, no CFG
                     return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
+            case BaseModelType.ErnieImage:
+                # ERNIE-Image-Turbo (distilled) uses fewer steps and CFG=1.0; detect via name
+                # since we don't model a Turbo variant on the config.
+                if name and "turbo" in name.lower():
+                    return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
+                return cls(steps=50, cfg_scale=4.0, width=1024, height=1024)
             case BaseModelType.Anima:
                 return cls(steps=35, cfg_scale=4.5, width=1024, height=1024)
             case BaseModelType.Flux2:
@@ -138,6 +145,35 @@ def _has_main_keys(state_dict: dict[str | int, Any]) -> bool:
             # careful to avoid false positives on XLabs FLUX IP-Adapter models.
             return True
     return False
+
+
+def _has_ernie_image_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains ERNIE-Image transformer keys."""
+    ernie_specific_keys = {
+        "x_embedder",
+        "text_proj",
+        "adaLN_modulation",
+    }
+
+    lora_suffixes = (
+        ".lora_down.weight",
+        ".lora_up.weight",
+        ".lora_A.weight",
+        ".lora_B.weight",
+        ".dora_scale",
+    )
+
+    matched: set[str] = set()
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        if key.endswith(lora_suffixes):
+            return False
+        for part in key.split("."):
+            if part in ernie_specific_keys:
+                matched.add(part)
+    # Require all three to be present to disambiguate from other DiTs
+    return matched == ernie_specific_keys
 
 
 def _has_z_image_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -1368,6 +1404,43 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         return cls(**override_fields, variant=explicit_variant)
 
 
+def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains Anima model keys.
+
+    Anima models are identified by the presence of `llm_adapter` keys
+    (unique to Anima - the LLM Adapter that bridges Qwen3 text encoder to the Cosmos DiT)
+    alongside Cosmos Predict2 DiT keys (blocks, t_embedder, x_embedder, final_layer).
+
+    The checkpoint keys may have a `net.` prefix (e.g. `net.llm_adapter.`, `net.blocks.`).
+    """
+    has_llm_adapter = False
+    has_cosmos_dit = False
+
+    cosmos_prefixes = (
+        "blocks.",
+        "t_embedder.",
+        "x_embedder.",
+        "final_layer.",
+        "net.blocks.",
+        "net.t_embedder.",
+        "net.x_embedder.",
+        "net.final_layer.",
+    )
+
+    for key in state_dict.keys():
+        if isinstance(key, int):
+            continue
+        if key.startswith("llm_adapter.") or key.startswith("net.llm_adapter."):
+            has_llm_adapter = True
+        for prefix in cosmos_prefixes:
+            if key.startswith(prefix):
+                has_cosmos_dit = True
+        if has_llm_adapter and has_cosmos_dit:
+            return True
+
+    return False
+
+
 class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Anima single-file checkpoint models (safetensors).
 
@@ -1393,3 +1466,53 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         has_anima_keys = _has_anima_keys(mod.load_state_dict())
         if not has_anima_keys:
             raise NotAMatchError("state dict does not look like an Anima model")
+
+
+class Main_Diffusers_ErnieImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for ERNIE-Image diffusers models (ERNIE-Image, ERNIE-Image-Turbo)."""
+
+    base: Literal[BaseModelType.ErnieImage] = Field(BaseModelType.ErnieImage)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        raise_for_class_name(
+            common_config_paths(mod.path),
+            {"ErnieImagePipeline"},
+        )
+
+        repo_variant = override_fields.get("repo_variant") or cls._get_repo_variant_or_raise(mod)
+
+        return cls(
+            **override_fields,
+            repo_variant=repo_variant,
+        )
+
+
+class Main_Checkpoint_ErnieImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for ERNIE-Image single-file checkpoint models."""
+
+    base: Literal[BaseModelType.ErnieImage] = Field(default=BaseModelType.ErnieImage)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        cls._validate_looks_like_ernie_image_model(mod)
+        cls._validate_does_not_look_like_gguf_quantized(mod)
+
+        return cls(**override_fields)
+
+    @classmethod
+    def _validate_looks_like_ernie_image_model(cls, mod: ModelOnDisk) -> None:
+        if not _has_ernie_image_keys(mod.load_state_dict()):
+            raise NotAMatchError("state dict does not look like an ERNIE-Image model")
+
+    @classmethod
+    def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
+        if _has_ggml_tensors(mod.load_state_dict()):
+            raise NotAMatchError("state dict looks like GGUF quantized")
