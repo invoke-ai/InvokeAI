@@ -1,4 +1,18 @@
-"""ER-SDE (Extended Reverse-time SDE) solver for rectified-flow models.
+"""ER-SDE rectified-flow stepper — internal reference and parity oracle.
+
+Production ER-SDE for both rectified-flow and VP-SDE models lives in
+``invokeai.backend.rectified_flow.er_sde_scheduler.ERSDEScheduler``,
+which is registered in ``ANIMA_SCHEDULER_MAP`` (rectified-flow regime)
+and ``SCHEDULER_MAP`` for SD/SDXL (VP-SDE regime).
+
+This module is the original pure-function rectified-flow port. It is kept
+as:
+
+* The parity oracle for the scheduler — see
+  ``tests/backend/rectified_flow/test_er_sde_scheduler_anima_parity.py``.
+  If the scheduler ever drifts, this is the comparison point.
+* A self-contained mathematical reference for the rectified-flow algebra.
+  No external state, no dependencies beyond ``torch``/``math``.
 
 Implements the multistep Taylor-expansion solver from:
 
