@@ -181,6 +181,50 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
   });
 
   describe('HRF LoRAs', () => {
+    it('parses dedicated HRF LoRAs against the image metadata model base', async () => {
+      currentBase = 'sd-1';
+      const mainModel = fakeModel('main', 'sdxl');
+      const hrfLora = fakeModel('lora', 'sdxl');
+      resolvedModels = {
+        [hrfLora.key]: hrfLora,
+      };
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.HrfLoRAs.parse(
+        {
+          model: mainModel,
+          hrf_loras: [{ model: hrfLora, weight: 0.6 }],
+        },
+        store
+      );
+
+      expect(parsed).toEqual([
+        expect.objectContaining({ model: expect.objectContaining({ key: hrfLora.key }), weight: 0.6 }),
+      ]);
+    });
+
+    it('filters HRF LoRAs that do not match the metadata HRF model base', async () => {
+      currentBase = 'sdxl';
+      const mainModel = fakeModel('main', 'sdxl');
+      const hrfModel = fakeModel('main', 'sd-1');
+      const hrfLora = fakeModel('lora', 'sdxl');
+      resolvedModels = {
+        [hrfLora.key]: hrfLora,
+      };
+      const store = makeStore();
+
+      const parsed = await ImageMetadataHandlers.HrfLoRAs.parse(
+        {
+          model: mainModel,
+          hrf_model: hrfModel,
+          hrf_loras: [{ model: hrfLora, weight: 0.6 }],
+        },
+        store
+      );
+
+      expect(parsed).toEqual([]);
+    });
+
     it('recalls dedicated HRF LoRAs after the recalled main model changes base', async () => {
       currentBase = 'sd-1';
       const mainModel = fakeModel('main', 'sdxl');

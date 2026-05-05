@@ -216,8 +216,8 @@ describe('addHighResFix', () => {
       destination: { node_id: 'l2i', field: 'latents' },
     });
     expect(g.getMetadataNode()).toMatchObject({
-      width: 1024,
-      height: 1024,
+      width: 512,
+      height: 512,
       hrf_enabled: true,
       hrf_method: 'latent',
       hrf_strength: 0.35,
@@ -451,7 +451,18 @@ describe('addHighResFix', () => {
       source: { node_id: tiledDenoise.id, field: 'latents' },
       destination: { node_id: 'l2i', field: 'latents' },
     });
+    const metadataNode = g.getMetadataNode();
+    expect(graph.edges).not.toContainEqual({
+      source: { node_id: spandrel.id, field: 'width' },
+      destination: { node_id: metadataNode.id, field: 'width' },
+    });
+    expect(graph.edges).not.toContainEqual({
+      source: { node_id: spandrel.id, field: 'height' },
+      destination: { node_id: metadataNode.id, field: 'height' },
+    });
     expect(g.getMetadataNode()).toMatchObject({
+      width: 512,
+      height: 512,
       hrf_enabled: true,
       hrf_method: 'upscale_model',
       hrf_upscale_model: { key: 'upscale' },

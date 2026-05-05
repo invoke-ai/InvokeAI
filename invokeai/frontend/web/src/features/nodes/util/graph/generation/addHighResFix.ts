@@ -667,8 +667,8 @@ const addLatentHighResFix = ({
   }
 
   g.upsertMetadata({
-    width: finalDimensions.width,
-    height: finalDimensions.height,
+    width: params.dimensions.width,
+    height: params.dimensions.height,
     hrf_enabled: true,
     hrf_method: 'latent',
     hrf_strength: params.hrfStrength,
@@ -815,8 +815,8 @@ const addUpscaleModelHighResFix = ({ g, state, denoise, l2i, noise, seed }: AddH
   });
 
   g.upsertMetadata({
-    width: finalDimensions.width,
-    height: finalDimensions.height,
+    width: params.dimensions.width,
+    height: params.dimensions.height,
     hrf_enabled: true,
     hrf_method: 'upscale_model',
     hrf_strength: params.hrfStrength,
@@ -832,8 +832,6 @@ const addUpscaleModelHighResFix = ({ g, state, denoise, l2i, noise, seed }: AddH
     hrf_lora_mode: params.hrfLoraMode,
     hrf_loras: getHrfLoRAMetadata(state),
   });
-  g.addEdgeToMetadata(spandrelAutoscale, 'width', 'width');
-  g.addEdgeToMetadata(spandrelAutoscale, 'height', 'height');
 
   return l2i;
 };

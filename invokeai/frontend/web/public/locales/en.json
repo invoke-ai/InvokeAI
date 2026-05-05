@@ -350,8 +350,9 @@
         "options_withCount_other": "{{count}} options"
     },
     "hrf": {
-        "hrf": "Hi-Res Fix",
-        "enableHrf": "Enable High Resolution Fix",
+        "hrf": "Upscale",
+        "enableHrf": "Enable",
+        "enableUpscale": "Enable Upscale",
         "scale": "Scale",
         "strength": "Denoise Strength",
         "upscaleMethod": "Upscale Method",

@@ -240,7 +240,7 @@ const ParamHrfEnabled = memo(() => {
       <InformationalPopover feature="paramHrf">
         <FormLabel m={0}>{t('hrf.enableHrf')}</FormLabel>
       </InformationalPopover>
-      <Switch isChecked={enabled} onChange={onChange} />
+      <Switch aria-label={t('hrf.enableUpscale')} isChecked={enabled} onChange={onChange} />
     </FormControl>
   );
 });
@@ -785,6 +785,7 @@ const ParamHrfModel = memo(() => {
         modelConfigs={modelConfigs}
         selectedModelConfig={selectedModelConfig ?? undefined}
         onChange={onChange}
+        grouped
         allowEmpty
         placeholder={t('hrf.reuseGenerateModel')}
         noOptionsText={currentBaseModel ? t('hrf.noCompatibleModels') : t('models.selectModel')}
@@ -1015,7 +1016,6 @@ HrfLoRAContent.displayName = 'HrfLoRAContent';
 export const HighResFixSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const badges = useAppSelector(selectBadges);
-  const enabled = useAppSelector(selectHrfEnabled);
   const method = useAppSelector(selectHrfMethod);
   const modelSupportsHrf = useAppSelector(selectModelSupportsHrf);
   const isRefinerModelSelected = useAppSelector(selectIsRefinerModelSelected);
@@ -1037,50 +1037,44 @@ export const HighResFixSettingsAccordion = memo(() => {
 
   return (
     <StandaloneAccordion label={t('hrf.hrf')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
-      <Flex px={4} pt={4} pb={enabled ? 0 : 4} w="full" h="full" flexDir="column" gap={4}>
+      <Flex px={4} pt={4} pb={0} w="full" h="full" flexDir="column" gap={4}>
         <FormControlGroup formLabelProps={formLabelProps} formControlProps={formControlProps}>
           <ParamHrfEnabled />
-          {enabled && (
+          <ParamHrfMethod />
+          <ParamHrfScale />
+          <ParamHrfStrength />
+          {parsedMethod === 'upscale_model' && (
             <>
-              <ParamHrfMethod />
-              <ParamHrfScale />
-              <ParamHrfStrength />
-              {parsedMethod === 'upscale_model' && (
-                <>
-                  <ParamHrfUpscaleModel />
-                  <ParamHrfTileControlNetModel />
-                </>
-              )}
+              <ParamHrfUpscaleModel />
+              <ParamHrfTileControlNetModel />
             </>
           )}
         </FormControlGroup>
       </Flex>
-      {enabled && (
-        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
-          <Flex gap={4} flexDir="column" px={4} pb={4}>
-            <FormControlGroup formLabelProps={formLabelProps} formControlProps={formControlProps}>
-              {parsedMethod === 'latent' && <ParamHrfLatentInterpolationMode />}
-              {parsedMethod === 'upscale_model' && (
-                <>
-                  <ParamHrfTileControlWeight />
-                  <ParamHrfTileControlEnd />
-                  <ParamHrfTileSize />
-                  <ParamHrfTileOverlap />
-                  <ParamHrfModel />
-                  <ParamHrfLoraMode />
-                  <ParamHrfSteps />
-                </>
-              )}
-            </FormControlGroup>
-            {parsedMethod === 'upscale_model' && hrfLoraMode === 'dedicated' && (
+      <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
+        <Flex gap={4} flexDir="column" px={4} pb={4}>
+          <FormControlGroup formLabelProps={formLabelProps} formControlProps={formControlProps}>
+            {parsedMethod === 'latent' && <ParamHrfLatentInterpolationMode />}
+            {parsedMethod === 'upscale_model' && (
               <>
-                <ParamHrfLoraSelect />
-                <HrfLoRAList />
+                <ParamHrfTileControlWeight />
+                <ParamHrfTileControlEnd />
+                <ParamHrfTileSize />
+                <ParamHrfTileOverlap />
+                <ParamHrfModel />
+                <ParamHrfLoraMode />
+                <ParamHrfSteps />
               </>
             )}
-          </Flex>
-        </Expander>
-      )}
+          </FormControlGroup>
+          {parsedMethod === 'upscale_model' && hrfLoraMode === 'dedicated' && (
+            <>
+              <ParamHrfLoraSelect />
+              <HrfLoRAList />
+            </>
+          )}
+        </Flex>
+      </Expander>
     </StandaloneAccordion>
   );
 });

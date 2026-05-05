@@ -44,8 +44,8 @@ export const ParametersPanelGenerate = memo(() => {
             <Flex gap={2} flexDirection="column" h="full" w="full">
               <Prompts />
               <GenerateTabImageSettingsAccordion />
-              <HighResFixSettingsAccordion />
               <GenerationSettingsAccordion />
+              <HighResFixSettingsAccordion />
               {isSDXL && <RefinerSettingsAccordion />}
               {!isCogview4 && !isExternal && <AdvancedSettingsAccordion />}
               {isExternal && <ExternalSettingsAccordion />}

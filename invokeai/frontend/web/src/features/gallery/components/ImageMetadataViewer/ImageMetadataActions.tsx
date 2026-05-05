@@ -57,8 +57,14 @@ export const ImageMetadataActions = memo((props: Props) => {
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.HrfUpscaleModel} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.HrfTileControlNetModel} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.HrfStructure} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.HrfTileControlWeight} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.HrfTileControlEnd} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.HrfTileSize} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.HrfTileOverlap} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.HrfSteps} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.HrfModel} />
+      <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.HrfLoraMode} />
+      <CollectionMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.HrfLoRAs} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.SeamlessX} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.SeamlessY} />
       <SingleMetadataDatum metadata={metadata} handler={ImageMetadataHandlers.RefinerModel} />

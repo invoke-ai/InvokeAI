@@ -1537,13 +1537,14 @@ const HrfLoRAs: CollectionMetadataHandler<LoRA[]> = {
     assert(isArray(rawArray));
 
     const loras: LoRA[] = [];
+    const effectiveHrfBase = getHrfLoRACompatibilityBase(metadata, store);
 
     for (const rawItem of rawArray) {
       try {
         const rawIdentifier = getProperty(rawItem, 'model');
         const identifier = await parseModelIdentifier(rawIdentifier, store, 'lora');
         assert(identifier.type === 'lora');
-        assert(isCompatibleWithMainModel(identifier, store));
+        assert(isCompatibleWithBase(identifier, effectiveHrfBase));
 
         const weight = getProperty(rawItem, 'weight');
 
@@ -2226,11 +2227,41 @@ const parseModelIdentifier = async (raw: unknown, store: AppStore, type: ModelTy
 };
 
 const isCompatibleWithMainModel = (candidate: ModelIdentifierField, store: AppStore) => {
-  const base = selectBase(store.getState());
+  return isCompatibleWithBase(candidate, selectBase(store.getState()));
+};
+
+const isCompatibleWithBase = (candidate: ModelIdentifierField, base: string | null | undefined) => {
   if (!base) {
     return true;
   }
   return candidate.base === base;
+};
+
+const getMetadataModelBase = (metadata: unknown, path: string): string | null => {
+  const raw = getProperty(metadata, path);
+  if (!raw) {
+    return null;
+  }
+
+  const identifierResult = zModelIdentifierField.safeParse(raw);
+  if (identifierResult.success) {
+    return identifierResult.data.base;
+  }
+
+  const oldIdentifierResult = zModelIdentifier.safeParse(raw);
+  if (oldIdentifierResult.success) {
+    return oldIdentifierResult.data.base_model;
+  }
+
+  return null;
+};
+
+const getHrfLoRACompatibilityBase = (metadata: unknown, store: AppStore): string | null | undefined => {
+  return (
+    getMetadataModelBase(metadata, 'hrf_model') ??
+    getMetadataModelBase(metadata, 'model') ??
+    selectBase(store.getState())
+  );
 };
 
 const throwIfImageDoesNotExist = async (name: string, store: AppStore): Promise<void> => {
