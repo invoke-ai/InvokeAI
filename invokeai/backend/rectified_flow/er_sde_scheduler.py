@@ -36,11 +36,9 @@ from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import torch
-
 from diffusers.configuration_utils import ConfigMixin, register_to_config
 from diffusers.schedulers.scheduling_utils import KarrasDiffusionSchedulers, SchedulerMixin, SchedulerOutput
 from diffusers.utils.torch_utils import randn_tensor
-
 
 # Number of sample points for the left Riemann sums approximating the
 # Taylor-extension integrals. Matches the reference impl's nums_intergrate=100.
@@ -53,7 +51,7 @@ def _fn(x: float) -> float:
     Mirrors ``customized_func(..., func_type=7)`` in the reference impl —
     the variant the paper recommends and tests for fast (~20 NFE) sampling.
     """
-    return x * (math.exp(x ** 0.3) + 10.0)
+    return x * (math.exp(x**0.3) + 10.0)
 
 
 def _integral_one_over_fn(lambda_next: float, lambda_curr: float) -> float:
@@ -142,9 +140,7 @@ class ERSDEScheduler(SchedulerMixin, ConfigMixin):
             raise ValueError(f"solver_order must be 1, 2, or 3, got {solver_order}")
         if prediction_type == "flow_prediction" and not use_flow_sigmas:
             # Not strictly invalid, but almost certainly a misconfiguration.
-            raise ValueError(
-                "prediction_type='flow_prediction' requires use_flow_sigmas=True (rectified-flow regime)."
-            )
+            raise ValueError("prediction_type='flow_prediction' requires use_flow_sigmas=True (rectified-flow regime).")
 
         # VP-SDE noise schedule (only used when use_flow_sigmas=False).
         if trained_betas is not None:
@@ -152,9 +148,7 @@ class ERSDEScheduler(SchedulerMixin, ConfigMixin):
         elif beta_schedule == "linear":
             self.betas = torch.linspace(beta_start, beta_end, num_train_timesteps, dtype=torch.float32)
         elif beta_schedule == "scaled_linear":
-            self.betas = (
-                torch.linspace(beta_start ** 0.5, beta_end ** 0.5, num_train_timesteps, dtype=torch.float32) ** 2
-            )
+            self.betas = torch.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype=torch.float32) ** 2
         elif beta_schedule == "squaredcos_cap_v2":
             # Glide cosine schedule.
             betas = []
@@ -245,9 +239,7 @@ class ERSDEScheduler(SchedulerMixin, ConfigMixin):
         """
         n_set = sum(x is not None for x in (num_inference_steps, timesteps, sigmas))
         if n_set != 1:
-            raise ValueError(
-                "Must pass exactly one of `num_inference_steps`, `timesteps`, or `sigmas`."
-            )
+            raise ValueError("Must pass exactly one of `num_inference_steps`, `timesteps`, or `sigmas`.")
 
         if sigmas is not None:
             if isinstance(sigmas, torch.Tensor):
@@ -399,7 +391,7 @@ class ERSDEScheduler(SchedulerMixin, ConfigMixin):
 
         # Stochastic noise std (paper appendix eq. for ER-SDE_5 variance).
         # ``inner`` can underflow to tiny negatives by roundoff; clip.
-        inner = lambda_next ** 2 - lambda_curr ** 2 * r_fn ** 2
+        inner = lambda_next**2 - lambda_curr**2 * r_fn**2
         if inner < 0.0:
             inner = 0.0
         noise_std = math.sqrt(inner) * alpha_next
@@ -512,7 +504,9 @@ class ERSDEScheduler(SchedulerMixin, ConfigMixin):
 
     # ---- Public step ----------------------------------------------------------
 
-    def scale_model_input(self, sample: torch.Tensor, timestep: Optional[Union[int, torch.Tensor]] = None) -> torch.Tensor:
+    def scale_model_input(
+        self, sample: torch.Tensor, timestep: Optional[Union[int, torch.Tensor]] = None
+    ) -> torch.Tensor:
         """No-op (matches ``FlowMatchEulerDiscreteScheduler``)."""
         return sample
 
@@ -526,9 +520,7 @@ class ERSDEScheduler(SchedulerMixin, ConfigMixin):
     ) -> Union[SchedulerOutput, Tuple]:
         """Predict the sample at the next timestep using one ER-SDE step."""
         if self.num_inference_steps is None:
-            raise ValueError(
-                "num_inference_steps is None — call `set_timesteps` before calling `step`."
-            )
+            raise ValueError("num_inference_steps is None — call `set_timesteps` before calling `step`.")
         if self.step_index is None:
             self._init_step_index(timestep)
 

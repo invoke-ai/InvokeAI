@@ -40,9 +40,7 @@ def test_anima_er_sde_set_timesteps_accepts_sigmas():
     cls, kwargs = ANIMA_SCHEDULER_MAP["er_sde"]
     scheduler = cls(num_train_timesteps=1000, **kwargs)
     sig = inspect.signature(scheduler.set_timesteps)
-    assert "sigmas" in sig.parameters, (
-        "ERSDEScheduler.set_timesteps must accept sigmas= for Anima compatibility"
-    )
+    assert "sigmas" in sig.parameters, "ERSDEScheduler.set_timesteps must accept sigmas= for Anima compatibility"
 
 
 def test_anima_er_sde_set_timesteps_with_pre_shifted_sigmas():

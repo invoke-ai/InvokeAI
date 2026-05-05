@@ -11,7 +11,6 @@ import torch
 
 from invokeai.backend.rectified_flow.er_sde_scheduler import ERSDEScheduler
 
-
 # --- Construction ----------------------------------------------------------------
 
 
@@ -141,13 +140,9 @@ def test_multistep_ramp_engages_higher_orders() -> None:
     # deterministic order-1 trajectory after multiple steps — the higher-order Taylor
     # terms have to actually contribute.
     sigmas = [0.95, 0.7, 0.5, 0.3, 0.0]
-    sched_d3 = ERSDEScheduler(
-        prediction_type="flow_prediction", use_flow_sigmas=True, solver_order=3, stochastic=False
-    )
+    sched_d3 = ERSDEScheduler(prediction_type="flow_prediction", use_flow_sigmas=True, solver_order=3, stochastic=False)
     sched_d3.set_timesteps(sigmas=sigmas)
-    sched_d1 = ERSDEScheduler(
-        prediction_type="flow_prediction", use_flow_sigmas=True, solver_order=1, stochastic=False
-    )
+    sched_d1 = ERSDEScheduler(prediction_type="flow_prediction", use_flow_sigmas=True, solver_order=1, stochastic=False)
     sched_d1.set_timesteps(sigmas=sigmas)
 
     torch.manual_seed(42)
@@ -171,12 +166,8 @@ def test_multistep_ramp_engages_higher_orders() -> None:
 def test_stochastic_and_deterministic_diverge() -> None:
     """Same seed; stochastic=True vs False must produce visibly different trajectories."""
     sigmas = [0.95, 0.7, 0.5, 0.3, 0.0]
-    sched_s = ERSDEScheduler(
-        prediction_type="flow_prediction", use_flow_sigmas=True, solver_order=2, stochastic=True
-    )
-    sched_d = ERSDEScheduler(
-        prediction_type="flow_prediction", use_flow_sigmas=True, solver_order=2, stochastic=False
-    )
+    sched_s = ERSDEScheduler(prediction_type="flow_prediction", use_flow_sigmas=True, solver_order=2, stochastic=True)
+    sched_d = ERSDEScheduler(prediction_type="flow_prediction", use_flow_sigmas=True, solver_order=2, stochastic=False)
     sched_s.set_timesteps(sigmas=sigmas)
     sched_d.set_timesteps(sigmas=sigmas)
 
