@@ -775,6 +775,14 @@
                 "title": "Reset Layer",
                 "desc": "Reset the selected layer. Only applies to Inpaint Mask and Regional Guidance."
             },
+            "mergeDown": {
+                "title": "Merge Layer Down",
+                "desc": "Merge the selected layer into the layer directly below it."
+            },
+            "mergeVisible": {
+                "title": "Merge All Visible Layers",
+                "desc": "Merge all visible layers of the selected layer type."
+            },
             "undo": {
                 "title": "Undo",
                 "desc": "Undo the last canvas action."
