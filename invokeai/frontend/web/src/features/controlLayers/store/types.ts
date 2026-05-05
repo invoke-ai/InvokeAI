@@ -7,6 +7,7 @@ import {
   zParameterCFGScale,
   zParameterCLIPEmbedModel,
   zParameterCLIPGEmbedModel,
+  zParameterAnimaScheduler,
   zParameterCLIPLEmbedModel,
   zParameterControlLoRAModel,
   zParameterFluxDypeExponent,
@@ -809,7 +810,7 @@ export const zParamsState = z.object({
   animaVaeModel: zParameterVAEModel.nullable(), // Optional: Separate QwenImage/FLUX VAE for Anima
   animaQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 0.6B Encoder for Anima
   animaT5EncoderModel: zModelIdentifierField.nullable(), // T5-XXL tokenizer for Anima LLM Adapter
-  animaScheduler: z.enum(['euler', 'heun', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde', 'lcm']).default('euler'),
+  animaScheduler: zParameterAnimaScheduler,
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
