@@ -566,7 +566,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
         else:
             num_scheduler_steps = total_steps
 
-        step_generator = torch.Generator(device=device).manual_seed(self.seed)
+        step_generator: torch.Generator | None = None
+        if use_scheduler or is_euler_ancestral:
+            step_generator = torch.Generator(device=device).manual_seed(self.seed)
 
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
