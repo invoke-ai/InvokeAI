@@ -60,6 +60,7 @@ class MainModelDefaultSettings(BaseModel):
         cls,
         base: BaseModelType,
         variant: Flux2VariantType | FluxVariantType | ModelVariantType | ZImageVariantType | None = None,
+        name: str | None = None,
     ) -> Self | None:
         match base:
             case BaseModelType.StableDiffusion1:
@@ -78,8 +79,10 @@ class MainModelDefaultSettings(BaseModel):
                     # Turbo (distilled) uses fewer steps, no CFG
                     return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
             case BaseModelType.ErnieImage:
-                # Standard ERNIE-Image defaults; Turbo variant uses fewer steps and CFG=1.0,
-                # which the user can adjust after install.
+                # ERNIE-Image-Turbo (distilled) uses fewer steps and CFG=1.0; detect via name
+                # since we don't model a Turbo variant on the config.
+                if name and "turbo" in name.lower():
+                    return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
                 return cls(steps=50, cfg_scale=4.0, width=1024, height=1024)
             case BaseModelType.Anima:
                 return cls(steps=35, cfg_scale=4.5, width=1024, height=1024)

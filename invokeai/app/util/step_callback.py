@@ -270,6 +270,11 @@ def diffusion_step_callback(
         # Anima uses Wan 2.1 VAE with 16 latent channels
         latent_rgb_factors = ANIMA_LATENT_RGB_FACTORS
         latent_rgb_bias = ANIMA_LATENT_RGB_BIAS
+    elif base_model == BaseModelType.ErnieImage:
+        # ERNIE-Image uses AutoencoderKLFlux2 (same as FLUX.2) with 32 latent channels.
+        # The denoise loop unpatches before previewing, so factors apply directly.
+        latent_rgb_factors = FLUX2_LATENT_RGB_FACTORS
+        latent_rgb_bias = FLUX2_LATENT_RGB_BIAS
     else:
         raise ValueError(f"Unsupported base model: {base_model}")
 

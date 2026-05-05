@@ -35,7 +35,7 @@ dependencies = [
   # Core generation dependencies, pinned for reproducible builds.
   "accelerate",
   "bitsandbytes; sys_platform!='darwin'",
-  "compel==2.1.1",
+  "compel @ git+https://github.com/Cstannahill/compel5.git@chore/transformers5-diffusers-smoke",
   "diffusers[torch]==0.38.0",
   "gguf",
   "mediapipe==0.10.14",                   # needed for "mediapipeface" controlnet model

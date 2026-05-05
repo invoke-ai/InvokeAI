@@ -21,6 +21,7 @@ from invokeai.backend.flux.schedulers import (
     ERNIE_IMAGE_SCHEDULER_MAP,
     ERNIE_IMAGE_SCHEDULER_NAME_VALUES,
 )
+from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ErnieImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
@@ -130,7 +131,7 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
             scheduler = scheduler_cls()
 
             def _step_callback(state: PipelineIntermediateState) -> None:
-                context.util.signal_progress(f"ERNIE-Image step {state.step}/{state.total_steps}")
+                context.util.sd_step_callback(state, BaseModelType.ErnieImage)
 
             img = ernie_denoise(
                 model=transformer,

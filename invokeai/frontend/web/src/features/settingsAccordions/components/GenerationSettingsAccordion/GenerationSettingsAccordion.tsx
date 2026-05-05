@@ -22,7 +22,6 @@ import { LoRAList } from 'features/lora/components/LoRAList';
 import LoRASelect from 'features/lora/components/LoRASelect';
 import ParamAnimaScheduler from 'features/parameters/components/Core/ParamAnimaScheduler';
 import ParamCFGScale from 'features/parameters/components/Core/ParamCFGScale';
-import ParamErnieImagePromptEnhancer from 'features/parameters/components/Core/ParamErnieImagePromptEnhancer';
 import ParamErnieImageScheduler from 'features/parameters/components/Core/ParamErnieImageScheduler';
 import ParamFluxDypeExponent from 'features/parameters/components/Core/ParamFluxDypeExponent';
 import ParamFluxDypePreset from 'features/parameters/components/Core/ParamFluxDypePreset';
@@ -113,7 +112,6 @@ export const GenerationSettingsAccordion = memo(() => {
                 {!isExternal && (isFLUX || isFlux2) && <ParamFluxScheduler />}
                 {!isExternal && isZImage && <ParamZImageScheduler />}
                 {!isExternal && isErnieImage && <ParamErnieImageScheduler />}
-                {!isExternal && isErnieImage && <ParamErnieImagePromptEnhancer />}
                 {!isExternal && isAnima && <ParamAnimaScheduler />}
                 {modelSupportsSteps && <ParamSteps />}
                 {isExternal && modelSupportsGuidance && <ParamGuidance />}

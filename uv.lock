@@ -129,6 +129,70 @@ wheels = [
 ]
 
 [[package]]
+name = "appnope"
+version = "0.1.4"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/1de/3860566df9caf/appnope-0.1.4.tar.gz", hash = "sha256:1de3860566df9caf38f01f86f65e0e13e379af54f9e4bee1e66b48f2efffd1ee" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/502/575ee11cd7a28/appnope-0.1.4-py2.py3-none-any.whl", hash = "sha256:502575ee11cd7a28c0205f379b525beefebab9d161b7c964670864014ed7213c" },
+]
+
+[[package]]
+name = "argon2-cffi"
+version = "25.1.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "argon2-cffi-bindings" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/694/ae5cc8a42f4c4/argon2_cffi-25.1.0.tar.gz", hash = "sha256:694ae5cc8a42f4c4e2bf2ca0e64e51e23a040c6a517a85074683d3959e1346c1" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/fdc/8b074db390fcc/argon2_cffi-25.1.0-py3-none-any.whl", hash = "sha256:fdc8b074db390fccb6eb4a3604ae7231f219aa669a2652e0f20e16ba513d5741" },
+]
+
+[[package]]
+name = "argon2-cffi-bindings"
+version = "25.1.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "cffi" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/b95/7f3e6ea4d55d8/argon2_cffi_bindings-25.1.0.tar.gz", hash = "sha256:b957f3e6ea4d55d820e40ff76f450952807013d361a65d7f28acc0acbf29229d" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/aec/ba1723ae35330/argon2_cffi_bindings-25.1.0-cp39-abi3-macosx_10_9_universal2.whl", hash = "sha256:aecba1723ae35330a008418a91ea6cfcedf6d31e5fbaa056a166462ff066d500" },
+    { url = "http://cm3588:3141/root/pypi/+f/263/0b6240b495dfa/argon2_cffi_bindings-25.1.0-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:2630b6240b495dfab90aebe159ff784d08ea999aa4b0d17efa734055a07d2f44" },
+    { url = "http://cm3588:3141/root/pypi/+f/7ae/f0c91e2c0fbca/argon2_cffi_bindings-25.1.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:7aef0c91e2c0fbca6fc68e7555aa60ef7008a739cbe045541e438373bc54d2b0" },
+    { url = "http://cm3588:3141/root/pypi/+f/1e0/21e87faa76ae0/argon2_cffi_bindings-25.1.0-cp39-abi3-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:1e021e87faa76ae0d413b619fe2b65ab9a037f24c60a1e6cc43457ae20de6dc6" },
+    { url = "http://cm3588:3141/root/pypi/+f/d3e/924cfc503018a/argon2_cffi_bindings-25.1.0-cp39-abi3-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:d3e924cfc503018a714f94a49a149fdc0b644eaead5d1f089330399134fa028a" },
+    { url = "http://cm3588:3141/root/pypi/+f/c87/b72589133f034/argon2_cffi_bindings-25.1.0-cp39-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:c87b72589133f0346a1cb8d5ecca4b933e3c9b64656c9d175270a000e73b288d" },
+    { url = "http://cm3588:3141/root/pypi/+f/1db/89609c06afa1a/argon2_cffi_bindings-25.1.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:1db89609c06afa1a214a69a462ea741cf735b29a57530478c06eb81dd403de99" },
+    { url = "http://cm3588:3141/root/pypi/+f/473/bcb5f82924b1b/argon2_cffi_bindings-25.1.0-cp39-abi3-win32.whl", hash = "sha256:473bcb5f82924b1becbb637b63303ec8d10e84c8d241119419897a26116515d2" },
+    { url = "http://cm3588:3141/root/pypi/+f/a98/cd7d17e9f7ce2/argon2_cffi_bindings-25.1.0-cp39-abi3-win_amd64.whl", hash = "sha256:a98cd7d17e9f7ce244c0803cad3c23a7d379c301ba618a5fa76a67d116618b98" },
+    { url = "http://cm3588:3141/root/pypi/+f/b0f/dbcf513833809/argon2_cffi_bindings-25.1.0-cp39-abi3-win_arm64.whl", hash = "sha256:b0fdbcf513833809c882823f98dc2f931cf659d9a1429616ac3adebb49f5db94" },
+]
+
+[[package]]
+name = "arrow"
+version = "1.4.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "python-dateutil" },
+    { name = "tzdata" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/ed0/cc050e98001b8/arrow-1.4.0.tar.gz", hash = "sha256:ed0cc050e98001b8779e84d461b0098c4ac597e88704a655582b21d116e526d7" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/749/f0769958ebdc7/arrow-1.4.0-py3-none-any.whl", hash = "sha256:749f0769958ebdc79c173ff0b0670d59051a535fa26e8eba02953dc19eb43205" },
+]
+
+[[package]]
+name = "asttokens"
+version = "3.0.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/71a/4ee5de0bde6a3/asttokens-3.0.1.tar.gz", hash = "sha256:71a4ee5de0bde6a31d64f6b13f2293ac190344478f081c3d1bccfcf5eacb0cb7" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/15a/3ebc0f43c2d0a/asttokens-3.0.1-py3-none-any.whl", hash = "sha256:15a3ebc0f43c2d0a50eeafea25e19046c68398e487b9f1f5b517f7c0f40f976a" },
+]
+
+[[package]]
 name = "attrs"
 version = "25.3.0"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -189,6 +253,19 @@ wheels = [
 ]
 
 [[package]]
+name = "beautifulsoup4"
+version = "4.14.3"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "soupsieve" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/629/2b1c5186d356b/beautifulsoup4-4.14.3.tar.gz", hash = "sha256:6292b1c5186d356bba669ef9f7f051757099565ad9ada5dd630bd9de5fa7fb86" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/091/8bfe44902e6ad/beautifulsoup4-4.14.3-py3-none-any.whl", hash = "sha256:0918bfe44902e6ad8d57732ba310582e98da931428d231a5ecb9e7c703a735bb" },
+]
+
+[[package]]
 name = "bidict"
 version = "0.23.1"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -244,6 +321,23 @@ wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/212/40932fc914fd7/blake3-1.0.5-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:21240932fc914fd719e2d33297f29742c28a31d8a96cb666ec4679bf2c35aa48" },
     { url = "http://cm3588:3141/root/pypi/+f/cba/3e6d12bd310b5/blake3-1.0.5-cp312-cp312-win32.whl", hash = "sha256:cba3e6d12bd310b5ff4970daddd7e77a0ca383678e1f0a1ec414d4c7cb083f9d" },
     { url = "http://cm3588:3141/root/pypi/+f/adb/54b8bfe4fb2e8/blake3-1.0.5-cp312-cp312-win_amd64.whl", hash = "sha256:adb54b8bfe4fb2e8106b3a1bddc3614d2de555d2b657861068160176ff723eb0" },
+]
+
+[[package]]
+name = "bleach"
+version = "6.3.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "webencodings" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/6f3/b91b1c0a02bb9/bleach-6.3.0.tar.gz", hash = "sha256:6f3b91b1c0a02bb9a78b5a454c92506aa0fdf197e1d5e114d2e00c6f64306d22" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/fe1/0ec77c93ddf3d/bleach-6.3.0-py3-none-any.whl", hash = "sha256:fe10ec77c93ddf3d13a73b035abaac7a9f5e436513864ccdad516693213c65d6" },
+]
+
+[package.optional-dependencies]
+css = [
+    { name = "tinycss2" },
 ]
 
 [[package]]
@@ -442,21 +536,27 @@ wheels = [
 ]
 
 [[package]]
-name = "compel"
-version = "2.1.1"
+name = "comm"
+version = "0.2.3"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/2dc/8048c10962d55/comm-0.2.3.tar.gz", hash = "sha256:2dc8048c10962d55d7ad693be1e7045d891b7ce8d999c97963a5e3e99c055971" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/c61/5d91d75f7f04f/comm-0.2.3-py3-none-any.whl", hash = "sha256:c615d91d75f7f04f095b30d1c1711babd43bdc6419c1be9886a85f2f4e489417" },
+]
+
+[[package]]
+name = "compel"
+version = "2.3.1"
+source = { git = "https://github.com/Cstannahill/compel5.git?rev=chore%2Ftransformers5-diffusers-smoke#2c84cb1d2e533dd0feea36d32874ed2f3a70775f" }
 dependencies = [
     { name = "diffusers" },
+    { name = "notebook" },
     { name = "pyparsing" },
     { name = "torch", version = "2.7.1", source = { registry = "http://cm3588:3141/root/pypi/+simple/" }, marker = "(extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-cuda' and extra != 'extra-8-invokeai-rocm')" },
     { name = "torch", version = "2.7.1+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "extra == 'extra-8-invokeai-cpu' or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
     { name = "torch", version = "2.7.1+cu128", source = { registry = "https://download.pytorch.org/whl/cu128" }, marker = "extra == 'extra-8-invokeai-cuda' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm')" },
     { name = "torch", version = "2.7.1+rocm6.3", source = { registry = "https://download.pytorch.org/whl/rocm6.3" }, marker = "(extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra != 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (extra != 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm')" },
     { name = "transformers" },
-]
-sdist = { url = "http://cm3588:3141/root/pypi/+f/9a2/01819723193a0/compel-2.1.1.tar.gz", hash = "sha256:9a201819723193a0b3ef5c090a150e64b4ef5e01715262dce723ebd32b22df7c" }
-wheels = [
-    { url = "http://cm3588:3141/root/pypi/+f/576/bf2760f54654a/compel-2.1.1-py3-none-any.whl", hash = "sha256:576bf2760f54654a6fb1262b3ce632986b9940150d4b0c59ca0cf2ef6e6265a7" },
 ]
 
 [[package]]
@@ -581,6 +681,41 @@ wheels = [
 ]
 
 [[package]]
+name = "debugpy"
+version = "1.8.20"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/55b/c8701714969f1/debugpy-1.8.20.tar.gz", hash = "sha256:55bc8701714969f1ab89a6d5f2f3d40c36f91b2cbe2f65d98bf8196f6a6a2c33" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/ead/a6042ad88fa15/debugpy-1.8.20-cp311-cp311-macosx_15_0_universal2.whl", hash = "sha256:eada6042ad88fa1571b74bd5402ee8b86eded7a8f7b827849761700aff171f1b" },
+    { url = "http://cm3588:3141/root/pypi/+f/7de/0b7dfeedc5044/debugpy-1.8.20-cp311-cp311-manylinux_2_34_x86_64.whl", hash = "sha256:7de0b7dfeedc504421032afba845ae2a7bcc32ddfb07dae2c3ca5442f821c344" },
+    { url = "http://cm3588:3141/root/pypi/+f/773/e839380cf459c/debugpy-1.8.20-cp311-cp311-win32.whl", hash = "sha256:773e839380cf459caf73cc533ea45ec2737a5cc184cf1b3b796cd4fd98504fec" },
+    { url = "http://cm3588:3141/root/pypi/+f/1f7/650546e0eded1/debugpy-1.8.20-cp311-cp311-win_amd64.whl", hash = "sha256:1f7650546e0eded1902d0f6af28f787fa1f1dbdbc97ddabaf1cd963a405930cb" },
+    { url = "http://cm3588:3141/root/pypi/+f/4ae/3135e2089905a/debugpy-1.8.20-cp312-cp312-macosx_15_0_universal2.whl", hash = "sha256:4ae3135e2089905a916909ef31922b2d733d756f66d87345b3e5e52b7a55f13d" },
+    { url = "http://cm3588:3141/root/pypi/+f/88f/47850a4284b88/debugpy-1.8.20-cp312-cp312-manylinux_2_34_x86_64.whl", hash = "sha256:88f47850a4284b88bd2bfee1f26132147d5d504e4e86c22485dfa44b97e19b4b" },
+    { url = "http://cm3588:3141/root/pypi/+f/405/7ac68f892064e/debugpy-1.8.20-cp312-cp312-win32.whl", hash = "sha256:4057ac68f892064e5f98209ab582abfee3b543fb55d2e87610ddc133a954d390" },
+    { url = "http://cm3588:3141/root/pypi/+f/a1a/8f851e7cf1713/debugpy-1.8.20-cp312-cp312-win_amd64.whl", hash = "sha256:a1a8f851e7cf171330679ef6997e9c579ef6dd33c9098458bd9986a0f4ca52e3" },
+    { url = "http://cm3588:3141/root/pypi/+f/5be/9bed9ae3be006/debugpy-1.8.20-py2.py3-none-any.whl", hash = "sha256:5be9bed9ae3be00665a06acaa48f8329d2b9632f15fd09f6a9a8c8d9907e54d7" },
+]
+
+[[package]]
+name = "decorator"
+version = "5.2.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/65f/266143752f734/decorator-5.2.1.tar.gz", hash = "sha256:65f266143752f734b0a7cc83c46f4618af75b8c5911b00ccb61d0ac9b6da0360" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/d31/6bb415a2d9e2d/decorator-5.2.1-py3-none-any.whl", hash = "sha256:d316bb415a2d9e2d2b3abcc4084c6502fc09240e292cd76a76afc106a1c8e04a" },
+]
+
+[[package]]
+name = "defusedxml"
+version = "0.8.0rc2"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/138/c7d540a787751/defusedxml-0.8.0rc2.tar.gz", hash = "sha256:138c7d540a78775182206c7c97fe65b246a2f40b29471e1a2f1b0da76e7a3942" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/1c8/12964311154c3/defusedxml-0.8.0rc2-py2.py3-none-any.whl", hash = "sha256:1c812964311154c3bf4aaf3bc1443b31ee13530b7f255eaaa062c0553c76103d" },
+]
+
+[[package]]
 name = "deprecated"
 version = "1.2.18"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -695,6 +830,24 @@ wheels = [
 ]
 
 [[package]]
+name = "entrypoints"
+version = "0.4"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/b70/6eddaa9218a19/entrypoints-0.4.tar.gz", hash = "sha256:b706eddaa9218a19ebcd67b56818f05bb27589b1ca9e8d797b74affad4ccacd4" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/f17/4b5ff827504fd/entrypoints-0.4-py3-none-any.whl", hash = "sha256:f174b5ff827504fd3cd97cc3f8649f3693f51538c7e4bdf3ef002c8429d42f9f" },
+]
+
+[[package]]
+name = "executing"
+version = "2.2.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/363/2cc370565f664/executing-2.2.1.tar.gz", hash = "sha256:3632cc370565f6648cc328b32435bd120a1e4ebb20c77e3fdde9a13cd1e533c4" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/760/643d3452b4d77/executing-2.2.1-py2.py3-none-any.whl", hash = "sha256:760643d3452b4d777d295bb167ccc74c64a81df23fb5e08eff250c425a4b2017" },
+]
+
+[[package]]
 name = "faker"
 version = "37.4.0"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -727,6 +880,15 @@ source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
 sdist = { url = "http://cm3588:3141/root/pypi/+f/b5a/c5cfa4f12b741/fastapi_events-0.12.2.tar.gz", hash = "sha256:b5ac5cfa4f12b74195b4280acc12298d50cecc32708116755baeb2f943032d26" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/949/9927efac5ee74/fastapi_events-0.12.2-py3-none-any.whl", hash = "sha256:9499927efac5ee74d647c7bd7fb1ee46a6288705a0aae7128b21a3662da20981" },
+]
+
+[[package]]
+name = "fastjsonschema"
+version = "2.21.2"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/b1e/b43748041c880/fastjsonschema-2.21.2.tar.gz", hash = "sha256:b1eb43748041c880796cd077f1a07c3d94e93ae84bba5ed36800a33554ae05de" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/1c7/97122d0a86c5c/fastjsonschema-2.21.2-py3-none-any.whl", hash = "sha256:1c797122d0a86c5cace2e54bf4e819c36223b552017172f32c5c024a6b77e463" },
 ]
 
 [[package]]
@@ -770,6 +932,15 @@ wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/26e/c05319353842d/fonttools-4.58.5-cp312-cp312-win32.whl", hash = "sha256:26ec05319353842d127bd02516eacb25b97ca83966e40e9ad6fab85cab0576f4" },
     { url = "http://cm3588:3141/root/pypi/+f/778/a632e538f82c1/fonttools-4.58.5-cp312-cp312-win_amd64.whl", hash = "sha256:778a632e538f82c1920579c0c01566a8f83dc24470c96efbf2fbac698907f569" },
     { url = "http://cm3588:3141/root/pypi/+f/e48/a487ed24d9b61/fonttools-4.58.5-py3-none-any.whl", hash = "sha256:e48a487ed24d9b611c5c4b25db1e50e69e9854ca2670e39a3486ffcd98863ec4" },
+]
+
+[[package]]
+name = "fqdn"
+version = "1.5.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/105/ed3677e767fb5/fqdn-1.5.1.tar.gz", hash = "sha256:105ed3677e767fb5ca086a0c1f4bb66ebc3c100be518f0e0d755d9eae164d89f" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/3a1/79af3761e4df6/fqdn-1.5.1-py3-none-any.whl", hash = "sha256:3a179af3761e4df6eb2e026ff9e1a3033d3587bf980a0b1b2e1e5d08d7358014" },
 ]
 
 [[package]]
@@ -1137,7 +1308,7 @@ requires-dist = [
     { name = "bcrypt", specifier = "<4.0.0" },
     { name = "bitsandbytes", marker = "sys_platform != 'darwin'" },
     { name = "blake3" },
-    { name = "compel", specifier = "==2.1.1" },
+    { name = "compel", git = "https://github.com/Cstannahill/compel5.git?rev=chore%2Ftransformers5-diffusers-smoke" },
     { name = "deprecated" },
     { name = "diffusers", extras = ["torch"], specifier = "==0.38.0" },
     { name = "dnspython" },
@@ -1211,6 +1382,86 @@ requires-dist = [
     { name = "xformers", marker = "sys_platform != 'darwin' and extra == 'xformers'", specifier = ">=0.0.28.post1" },
 ]
 provides-extras = ["xformers", "cpu", "cuda", "rocm", "onnx", "onnx-cuda", "onnx-directml", "dist", "docs", "dev", "test"]
+
+[[package]]
+name = "ipykernel"
+version = "6.29.5"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "appnope", marker = "sys_platform == 'darwin' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
+    { name = "comm" },
+    { name = "debugpy" },
+    { name = "ipython" },
+    { name = "jupyter-client" },
+    { name = "jupyter-core" },
+    { name = "matplotlib-inline" },
+    { name = "nest-asyncio" },
+    { name = "packaging" },
+    { name = "psutil" },
+    { name = "pyzmq" },
+    { name = "tornado" },
+    { name = "traitlets" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/f09/3a22c4a40f882/ipykernel-6.29.5.tar.gz", hash = "sha256:f093a22c4a40f8828f8e330a9c297cb93dcab13bd9678ded6de8e5cf81c56215" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/afd/b66ba5aa354b0/ipykernel-6.29.5-py3-none-any.whl", hash = "sha256:afdb66ba5aa354b09b91379bac28ae4afebbb30e8b39510c9690afb7a10421b5" },
+]
+
+[[package]]
+name = "ipython"
+version = "9.13.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
+    { name = "decorator" },
+    { name = "ipython-pygments-lexers" },
+    { name = "jedi" },
+    { name = "matplotlib-inline" },
+    { name = "pexpect", marker = "(sys_platform != 'emscripten' and sys_platform != 'win32') or (sys_platform == 'emscripten' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform == 'emscripten' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'emscripten' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'win32' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform == 'win32' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'win32' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
+    { name = "prompt-toolkit" },
+    { name = "psutil" },
+    { name = "pygments" },
+    { name = "stack-data" },
+    { name = "traitlets" },
+    { name = "typing-extensions", marker = "python_full_version < '3.12' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/7e8/34b6afc99f020/ipython-9.13.0.tar.gz", hash = "sha256:7e834b6afc99f020e3f05966ced34792f40267d64cb1ea9043886dab0dde5967" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/57f/9d4639e20818d/ipython-9.13.0-py3-none-any.whl", hash = "sha256:57f9d4639e20818d328d287c7b549af3d05f12486ea8f2e7f73e52a36ec4d201" },
+]
+
+[[package]]
+name = "ipython-genutils"
+version = "0.2.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/eb2/e116e75ecef9d/ipython_genutils-0.2.0.tar.gz", hash = "sha256:eb2e116e75ecef9d4d228fdc66af54269afa26ab4463042e33785b887c628ba8" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/72d/d37233799e619/ipython_genutils-0.2.0-py2.py3-none-any.whl", hash = "sha256:72dd37233799e619666c9f639a9da83c34013a73e8bbc79a7a6348d93c61fab8" },
+]
+
+[[package]]
+name = "ipython-pygments-lexers"
+version = "1.1.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "pygments" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/09c/0138009e56b68/ipython_pygments_lexers-1.1.1.tar.gz", hash = "sha256:09c0138009e56b6854f9535736f4171d855c8c08a563a0dcd8022f78355c7e81" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/a94/62224a505ade1/ipython_pygments_lexers-1.1.1-py3-none-any.whl", hash = "sha256:a9462224a505ade19a605f71f8fa63c2048833ce50abc86768a0d81d876dc81c" },
+]
+
+[[package]]
+name = "isoduration"
+version = "20.11.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "arrow" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/ac2/f901513793527/isoduration-20.11.0.tar.gz", hash = "sha256:ac2f9015137935279eac671f94f89eb00584f940f5dc49462a0c4ee692ba1bd9" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/b29/04c2a4228c3d4/isoduration-20.11.0-py3-none-any.whl", hash = "sha256:b2904c2a4228c3d44f409c8ae8e2370eb21a26f7ac2ec5446df141dde3452042" },
+]
 
 [[package]]
 name = "jaraco-classes"
@@ -1330,6 +1581,157 @@ wheels = [
 ]
 
 [[package]]
+name = "jsonpointer"
+version = "3.1.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/0b8/01c7db33a9040/jsonpointer-3.1.1.tar.gz", hash = "sha256:0b801c7db33a904024f6004d526dcc53bbb8a4a0f4e32bfd10beadf60adf1900" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/8ff/8b95779d071ba/jsonpointer-3.1.1-py3-none-any.whl", hash = "sha256:8ff8b95779d071ba472cf5bc913028df06031797532f08a7d5b602d8b2a488ca" },
+]
+
+[[package]]
+name = "jsonschema"
+version = "4.26.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "attrs" },
+    { name = "jsonschema-specifications" },
+    { name = "referencing" },
+    { name = "rpds-py" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/0c2/6707e2efad8aa/jsonschema-4.26.0.tar.gz", hash = "sha256:0c26707e2efad8aa1bfc5b7ce170f3fccc2e4918ff85989ba9ffa9facb2be326" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/d48/9f15263b8d200/jsonschema-4.26.0-py3-none-any.whl", hash = "sha256:d489f15263b8d200f8387e64b4c3a75f06629559fb73deb8fdfb525f2dab50ce" },
+]
+
+[package.optional-dependencies]
+format-nongpl = [
+    { name = "fqdn" },
+    { name = "idna" },
+    { name = "isoduration" },
+    { name = "jsonpointer" },
+    { name = "rfc3339-validator" },
+    { name = "rfc3986-validator" },
+    { name = "rfc3987-syntax" },
+    { name = "uri-template" },
+    { name = "webcolors" },
+]
+
+[[package]]
+name = "jsonschema-specifications"
+version = "2025.9.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "referencing" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/b54/0987f239e7456/jsonschema_specifications-2025.9.1.tar.gz", hash = "sha256:b540987f239e745613c7a9176f3edb72b832a4ac465cf02712288397832b5e8d" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/988/02fee3a11ee76/jsonschema_specifications-2025.9.1-py3-none-any.whl", hash = "sha256:98802fee3a11ee76ecaca44429fda8a41bff98b00a0f2838151b113f210cc6fe" },
+]
+
+[[package]]
+name = "jupyter-client"
+version = "7.4.9"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "entrypoints" },
+    { name = "jupyter-core" },
+    { name = "nest-asyncio" },
+    { name = "python-dateutil" },
+    { name = "pyzmq" },
+    { name = "tornado" },
+    { name = "traitlets" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/52b/e28e04171f07a/jupyter_client-7.4.9.tar.gz", hash = "sha256:52be28e04171f07aed8f20e1616a5a552ab9fee9cbbe6c1896ae170c3880d392" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/214/668aaea208195/jupyter_client-7.4.9-py3-none-any.whl", hash = "sha256:214668aaea208195f4c13d28eb272ba79f945fc0cf3f11c7092c20b2ca1980e7" },
+]
+
+[[package]]
+name = "jupyter-core"
+version = "5.9.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "platformdirs" },
+    { name = "traitlets" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/4d0/9aaff303b9566/jupyter_core-5.9.1.tar.gz", hash = "sha256:4d09aaff303b9566c3ce657f580bd089ff5c91f5f89cf7d8846c3cdf465b5508" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/ebf/87fdc6073d142/jupyter_core-5.9.1-py3-none-any.whl", hash = "sha256:ebf87fdc6073d142e114c72c9e29a9d7ca03fad818c5d300ce2adc1fb0743407" },
+]
+
+[[package]]
+name = "jupyter-events"
+version = "0.12.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "jsonschema", extra = ["format-nongpl"] },
+    { name = "packaging" },
+    { name = "python-json-logger" },
+    { name = "pyyaml" },
+    { name = "referencing" },
+    { name = "rfc3339-validator" },
+    { name = "rfc3986-validator" },
+    { name = "traitlets" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/faf/f25f772183357/jupyter_events-0.12.1.tar.gz", hash = "sha256:faff25f77218335752f35f23c5fe6e4a392a7bd99a5939ccb9b8fbf594636cf3" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/c36/6585253f537a6/jupyter_events-0.12.1-py3-none-any.whl", hash = "sha256:c366585253f537a627da52fa7ca7410c5b5301fe893f511e7b077c2d93ec8bcf" },
+]
+
+[[package]]
+name = "jupyter-server"
+version = "2.18.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "anyio" },
+    { name = "argon2-cffi" },
+    { name = "jinja2" },
+    { name = "jupyter-client" },
+    { name = "jupyter-core" },
+    { name = "jupyter-events" },
+    { name = "jupyter-server-terminals" },
+    { name = "nbconvert" },
+    { name = "nbformat" },
+    { name = "overrides", marker = "python_full_version < '3.12' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
+    { name = "packaging" },
+    { name = "prometheus-client" },
+    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu') or (os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cuda') or (os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra != 'extra-8-invokeai-rocm') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (os_name != 'nt' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (os_name != 'nt' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
+    { name = "pyzmq" },
+    { name = "send2trash" },
+    { name = "terminado" },
+    { name = "tornado" },
+    { name = "traitlets" },
+    { name = "websocket-client" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/568/b27bce4320a53/jupyter_server-2.18.0.tar.gz", hash = "sha256:568b27bce4320a53c3eebf1bdcbee9acf48a8ab7f66ec83d900ca9909d4fb770" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/69a/5397a039d689d/jupyter_server-2.18.0-py3-none-any.whl", hash = "sha256:69a5397a039d689da81a45955f9b23e95ee167f6d8a8d64372fb616f2aac650a" },
+]
+
+[[package]]
+name = "jupyter-server-terminals"
+version = "0.5.4"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu') or (os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cuda') or (os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra != 'extra-8-invokeai-rocm') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (os_name != 'nt' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (os_name != 'nt' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
+    { name = "terminado" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/bbd/a128ed41d0be9/jupyter_server_terminals-0.5.4.tar.gz", hash = "sha256:bbda128ed41d0be9020349f9f1f2a4ab9952a73ed5f5ac9f1419794761fb87f5" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/55b/e353fc74a80bc/jupyter_server_terminals-0.5.4-py3-none-any.whl", hash = "sha256:55be353fc74a80bc7f3b20e6be50a55a61cd525626f578dcb66a5708e2007d14" },
+]
+
+[[package]]
+name = "jupyterlab-pygments"
+version = "0.3.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/721/aca4d9029252b/jupyterlab_pygments-0.3.0.tar.gz", hash = "sha256:721aca4d9029252b11cfa9d185e5b5af4d54772bb8072f9b7036f4170054d35d" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/841/a89020971da1d/jupyterlab_pygments-0.3.0-py3-none-any.whl", hash = "sha256:841a89020971da1d8693f1a99997aefc5dc424bb1b251fd6322462a1b8842780" },
+]
+
+[[package]]
 name = "jurigged"
 version = "0.6.1"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -1398,6 +1800,15 @@ wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/085/940635c626973/kiwisolver-1.4.8-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:085940635c62697391baafaaeabdf3dd7a6c3643577dde337f4d66eba021b2b8" },
     { url = "http://cm3588:3141/root/pypi/+f/01c/3d31902c7db5f/kiwisolver-1.4.8-cp312-cp312-win_amd64.whl", hash = "sha256:01c3d31902c7db5fb6182832713d3b4122ad9317c2c5877d0539227d96bb2e50" },
     { url = "http://cm3588:3141/root/pypi/+f/a3c/44cb68861de93/kiwisolver-1.4.8-cp312-cp312-win_arm64.whl", hash = "sha256:a3c44cb68861de93f0c4a8175fbaa691f0aa22550c331fefef02b618a9dcb476" },
+]
+
+[[package]]
+name = "lark"
+version = "1.3.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/b42/6a7a6d6d53189/lark-1.3.1.tar.gz", hash = "sha256:b426a7a6d6d53189d318f2b6236ab5d6429eaf09259f1ca33eb716eed10d2905" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/c62/9b661023a014c/lark-1.3.1-py3-none-any.whl", hash = "sha256:c629b661023a014c37da873b4ff58a817398d12635d3bbb2c5a03be7fe5d1e12" },
 ]
 
 [[package]]
@@ -1503,6 +1914,18 @@ wheels = [
 ]
 
 [[package]]
+name = "matplotlib-inline"
+version = "0.2.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "traitlets" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/e1e/e949c340d771f/matplotlib_inline-0.2.1.tar.gz", hash = "sha256:e1ee949c340d771fc39e241ea75683deb94762c8fa5f2927ec57c83c4dffa9fe" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/d56/ce5156ba6085e/matplotlib_inline-0.2.1-py3-none-any.whl", hash = "sha256:d56ce5156ba6085e00a9d54fead6ed29a9c47e215cd1bba2e976ef39f5710a76" },
+]
+
+[[package]]
 name = "mdurl"
 version = "0.1.2"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -1547,6 +1970,15 @@ source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
 sdist = { url = "http://cm3588:3141/root/pypi/+f/009/6d52e9dad9939/mergedeep-1.3.4.tar.gz", hash = "sha256:0096d52e9dad9939c3d975a774666af186eda617e6ca84df4c94dec30004f2a8" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/707/75750742b25c0/mergedeep-1.3.4-py3-none-any.whl", hash = "sha256:70775750742b25c0d8f36c55aed03d24c3384d17c951b3175d898bd778ef0307" },
+]
+
+[[package]]
+name = "mistune"
+version = "3.2.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/7c8/e5501d38bac15/mistune-3.2.1.tar.gz", hash = "sha256:7c8e5501d38bac1582e067e46c8343f17d57ea1aaa735823f3aba1fd59c88a28" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/78c/db0ba5e938053/mistune-3.2.1-py3-none-any.whl", hash = "sha256:78cdb0ba5e938053ccf63651b352508d2efa9411dc8810bfb05f2dc5140c0048" },
 ]
 
 [[package]]
@@ -1768,6 +2200,85 @@ wheels = [
 ]
 
 [[package]]
+name = "nbclassic"
+version = "1.3.3"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "ipykernel" },
+    { name = "ipython-genutils" },
+    { name = "nest-asyncio" },
+    { name = "notebook-shim" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/434/228763f8cee75/nbclassic-1.3.3.tar.gz", hash = "sha256:434228763f8cee754318cd6dfa42370db191af630dabab8e30bafc8c1aa3eee6" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/dce/e5149aa6aa018/nbclassic-1.3.3-py3-none-any.whl", hash = "sha256:dcee5149aa6aa01846c7458d6394b29b325213b5e118ee14c80d689122e0e4f2" },
+]
+
+[[package]]
+name = "nbclient"
+version = "0.10.4"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "jupyter-client" },
+    { name = "jupyter-core" },
+    { name = "nbformat" },
+    { name = "traitlets" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/1e5/4091b16e6da39/nbclient-0.10.4.tar.gz", hash = "sha256:1e54091b16e6da39e297b0ece3e10f6f29f4ac4e8ee515d29f8a7099bd6553c9" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/916/2df5a7373d70d/nbclient-0.10.4-py3-none-any.whl", hash = "sha256:9162df5a7373d70d606527300a95a975a47c137776cd942e52d9c7e29ff83440" },
+]
+
+[[package]]
+name = "nbconvert"
+version = "7.17.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "beautifulsoup4" },
+    { name = "bleach", extra = ["css"] },
+    { name = "defusedxml" },
+    { name = "jinja2" },
+    { name = "jupyter-core" },
+    { name = "jupyterlab-pygments" },
+    { name = "markupsafe" },
+    { name = "mistune" },
+    { name = "nbclient" },
+    { name = "nbformat" },
+    { name = "packaging" },
+    { name = "pandocfilters" },
+    { name = "pygments" },
+    { name = "traitlets" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/34d/0d0a7e73ce3cb/nbconvert-7.17.1.tar.gz", hash = "sha256:34d0d0a7e73ce3cbab6c5aae8f4f468797280b01fd8bd2ca746da8569eddd7d2" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/aa8/5c087b435e7bf/nbconvert-7.17.1-py3-none-any.whl", hash = "sha256:aa85c087b435e7bf1ffd03319f658e285f2b89eccab33bc1ba7025495ab3e7c8" },
+]
+
+[[package]]
+name = "nbformat"
+version = "5.10.4"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "fastjsonschema" },
+    { name = "jsonschema" },
+    { name = "jupyter-core" },
+    { name = "traitlets" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/322/168b14f937a5d/nbformat-5.10.4.tar.gz", hash = "sha256:322168b14f937a5d11362988ecac2a4952d3d8e3a2cbeb2319584631226d5b3a" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/3b4/8d6c8fbca4b29/nbformat-5.10.4-py3-none-any.whl", hash = "sha256:3b48d6c8fbca4b299bf3982ea7db1af21580e4fec269ad087b9e81588891200b" },
+]
+
+[[package]]
+name = "nest-asyncio"
+version = "1.6.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/6f1/72d5449aca15a/nest_asyncio-1.6.0.tar.gz", hash = "sha256:6f172d5449aca15afd6c646851f4e31e02c598d553a667e38cafa997cfec55fe" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/87a/f6efd6b5e897c/nest_asyncio-1.6.0-py3-none-any.whl", hash = "sha256:87af6efd6b5e897c81050477ef65c62e2b2f35d51703cae01aff2905b1852e1c" },
+]
+
+[[package]]
 name = "networkx"
 version = "3.5"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -1805,6 +2316,45 @@ source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
 sdist = { url = "http://cm3588:3141/root/pypi/+f/6ec/12890a2dab794/nodeenv-1.9.1.tar.gz", hash = "sha256:6ec12890a2dab7946721edbfbcd91f3319c6ccc9aec47be7c7e6b7011ee6645f" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/ba1/1c9782d29c27c/nodeenv-1.9.1-py2.py3-none-any.whl", hash = "sha256:ba11c9782d29c27c70ffbdda2d7415098754709be8a7056d79a737cd901155c9" },
+]
+
+[[package]]
+name = "notebook"
+version = "6.5.7"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "argon2-cffi" },
+    { name = "ipykernel" },
+    { name = "ipython-genutils" },
+    { name = "jinja2" },
+    { name = "jupyter-client" },
+    { name = "jupyter-core" },
+    { name = "nbclassic" },
+    { name = "nbconvert" },
+    { name = "nbformat" },
+    { name = "nest-asyncio" },
+    { name = "prometheus-client" },
+    { name = "pyzmq" },
+    { name = "send2trash" },
+    { name = "terminado" },
+    { name = "tornado" },
+    { name = "traitlets" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/04e/b9011dfac634f/notebook-6.5.7.tar.gz", hash = "sha256:04eb9011dfac634fbd4442adaf0a8c27cd26beef831fe1d19faf930c327768e4" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/a6a/fa9a4ff4d149a/notebook-6.5.7-py3-none-any.whl", hash = "sha256:a6afa9a4ff4d149a0771ff8b8c881a7a73b3835f9add0606696d6e9d98ac1cd0" },
+]
+
+[[package]]
+name = "notebook-shim"
+version = "0.2.4"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "jupyter-server" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/b4b/2cfa1b65d9830/notebook_shim-0.2.4.tar.gz", hash = "sha256:b4b2cfa1b65d98307ca24361f5b30fe785b53c3fd07b7a47e89acb5e6ac638cb" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/411/a5be4e9dc882a/notebook_shim-0.2.4-py3-none-any.whl", hash = "sha256:411a5be4e9dc882a074ccbcae671eda64cceb068767e9a3419096986560e1cef" },
 ]
 
 [[package]]
@@ -2336,6 +2886,15 @@ wheels = [
 ]
 
 [[package]]
+name = "overrides"
+version = "7.7.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/551/58fa3d93b98cc/overrides-7.7.0.tar.gz", hash = "sha256:55158fa3d93b98cc75299b1e67078ad9003ca27945c76162c1c0766d6f91820a" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/c7e/d9d062f78b8e4/overrides-7.7.0-py3-none-any.whl", hash = "sha256:c7ed9d062f78b8e4c1a7b70bd8796b35ead4d9f510227ef9c5dc7626c60d7e49" },
+]
+
+[[package]]
 name = "ovld"
 version = "0.5.6"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -2360,6 +2919,15 @@ source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
 sdist = { url = "http://cm3588:3141/root/pypi/+f/22b/d083ab41e1a8b/paginate-0.5.7.tar.gz", hash = "sha256:22bd083ab41e1a8b4f3690544afb2c60c25e5c9a63a30fa2f483f6c60c8e5945" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/b88/5e2af73abcf01/paginate-0.5.7-py2.py3-none-any.whl", hash = "sha256:b885e2af73abcf01d9559fd5216b57ef722f8c42affbb63942377668e35c7591" },
+]
+
+[[package]]
+name = "pandocfilters"
+version = "1.5.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/002/b4a555ee4ebc0/pandocfilters-1.5.1.tar.gz", hash = "sha256:002b4a555ee4ebc03f8b66307e287fa492e4a77b4ea14d3f934328297bb4939e" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/93b/e382804a9cdb0/pandocfilters-1.5.1-py2.py3-none-any.whl", hash = "sha256:93be382804a9cdb0a7267585f157e5d1731bbe5545a85b268d6f5fe6232de2bc" },
 ]
 
 [[package]]
@@ -2392,6 +2960,18 @@ source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
 sdist = { url = "http://cm3588:3141/root/pypi/+f/a48/2d51503a1ab33/pathspec-0.12.1.tar.gz", hash = "sha256:a482d51503a1ab33b1c67a6c3813a26953dbdc71c31dacaef9a838c4e29f5712" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/a0d/503e138a4c123/pathspec-0.12.1-py3-none-any.whl", hash = "sha256:a0d503e138a4c123b27490a4f7beda6a01c6f288df0e4a8b79c7eb0dc7b4cc08" },
+]
+
+[[package]]
+name = "pexpect"
+version = "4.9.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "ptyprocess" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/ee7/d41123f3c9911/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/723/6d1e080e4936b/pexpect-4.9.0-py2.py3-none-any.whl", hash = "sha256:7236d1e080e4936be2dc3e326cec0af72acf9212a7e1d060210e70a47e253523" },
 ]
 
 [[package]]
@@ -2527,6 +3107,15 @@ wheels = [
 ]
 
 [[package]]
+name = "prometheus-client"
+version = "0.25.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/5e3/73b75c31afb3c/prometheus_client-0.25.0.tar.gz", hash = "sha256:5e373b75c31afb3c86f1a52fa1ad470c9aace18082d39ec0d2f918d11cc9ba28" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/d5a/ec89e349a6ec2/prometheus_client-0.25.0-py3-none-any.whl", hash = "sha256:d5aec89e349a6ec230805d0df882f3807f74fd6c1a2fa86864e3c2279059fed1" },
+]
+
+[[package]]
 name = "prompt-toolkit"
 version = "3.0.51"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -2568,6 +3157,15 @@ wheels = [
 ]
 
 [[package]]
+name = "ptyprocess"
+version = "0.7.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/5c5/d0a3b48ceee0b/ptyprocess-0.7.0.tar.gz", hash = "sha256:5c5d0a3b48ceee0b48485e0c26037c0acd7d29765ca3fbb5cb3831d347423220" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/4b4/1f3967fce3af5/ptyprocess-0.7.0-py2.py3-none-any.whl", hash = "sha256:4b41f3967fce3af57cc7e94b888626c18bf37a083e3651ca8feeb66d492fef35" },
+]
+
+[[package]]
 name = "pudb"
 version = "2025.1"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -2581,6 +3179,15 @@ dependencies = [
 sdist = { url = "http://cm3588:3141/root/pypi/+f/a52/8b29c69ce8b18/pudb-2025.1.tar.gz", hash = "sha256:a528b29c69ce8b182a337872c5f046071f6d68d3415c6d7bf53bd27c264f58d0" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/f64/2d42e6054c992/pudb-2025.1-py3-none-any.whl", hash = "sha256:f642d42e6054c992b43c463742650aa879fe290d7d7ffdeb21f7d00dc4587a21" },
+]
+
+[[package]]
+name = "pure-eval"
+version = "0.2.3"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/5f4/e983f40564c57/pure_eval-0.2.3.tar.gz", hash = "sha256:5f4e983f40564c576c7c8635ae88db5956bb2229d7e9237d03b3c0b0190eaf42" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/1db/8e35b67b3d218/pure_eval-0.2.3-py3-none-any.whl", hash = "sha256:1db8e35b67b3d218d818ae653e27f06c3aa420901fa7b081ca98cbedc874e0d0" },
 ]
 
 [[package]]
@@ -2861,6 +3468,15 @@ cryptography = [
 ]
 
 [[package]]
+name = "python-json-logger"
+version = "4.1.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/b39/6b9e3ed782b09/python_json_logger-4.1.0.tar.gz", hash = "sha256:b396b9e3ed782b09ff9d6e4f1683d46c83ad0d35d2e407c09a9ebbf038f88195" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/132/994765cf75bf4/python_json_logger-4.1.0-py3-none-any.whl", hash = "sha256:132994765cf75bf44554be9aa49b06ef2345d23661a96720262716438141b6b2" },
+]
+
+[[package]]
 name = "python-multipart"
 version = "0.0.20"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -2966,6 +3582,18 @@ wheels = [
 ]
 
 [[package]]
+name = "pywinpty"
+version = "3.0.3"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/523/441dc34d231fb/pywinpty-3.0.3.tar.gz", hash = "sha256:523441dc34d231fb361b4b00f8c99d3f16de02f5005fd544a0183112bcc22412" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/dff/25a9a6435f527/pywinpty-3.0.3-cp311-cp311-win_amd64.whl", hash = "sha256:dff25a9a6435f527d7c65608a7e62783fc12076e7d44487a4911ee91be5a8ac8" },
+    { url = "http://cm3588:3141/root/pypi/+f/fbc/1e230e5b193ee/pywinpty-3.0.3-cp311-cp311-win_arm64.whl", hash = "sha256:fbc1e230e5b193eef4431cba3f39996a288f9958f9c9f092c8a961d930ee8f68" },
+    { url = "http://cm3588:3141/root/pypi/+f/c90/81df0e49ffa86/pywinpty-3.0.3-cp312-cp312-win_amd64.whl", hash = "sha256:c9081df0e49ffa86d15db4a6ba61530630e48707f987df42c9d3313537e81fc0" },
+    { url = "http://cm3588:3141/root/pypi/+f/15e/79d870e18b678/pywinpty-3.0.3-cp312-cp312-win_arm64.whl", hash = "sha256:15e79d870e18b678fb8a5a6105fd38496b55697c66e6fc0378236026bc4d59e9" },
+]
+
+[[package]]
 name = "pyyaml"
 version = "6.0.2"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -3004,6 +3632,42 @@ wheels = [
 ]
 
 [[package]]
+name = "pyzmq"
+version = "27.1.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "cffi", marker = "implementation_name == 'pypy' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/ac0/765e3d44455ad/pyzmq-27.1.0.tar.gz", hash = "sha256:ac0765e3d44455adb6ddbf4417dcce460fc40a05978c08efdf2948072f6db540" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/226/b091818d461a3/pyzmq-27.1.0-cp311-cp311-macosx_10_15_universal2.whl", hash = "sha256:226b091818d461a3bef763805e75685e478ac17e9008f49fce2d3e52b3d58b86" },
+    { url = "http://cm3588:3141/root/pypi/+f/079/0a0161c281ca9/pyzmq-27.1.0-cp311-cp311-manylinux2014_i686.manylinux_2_17_i686.whl", hash = "sha256:0790a0161c281ca9723f804871b4027f2e8b5a528d357c8952d08cd1a9c15581" },
+    { url = "http://cm3588:3141/root/pypi/+f/c89/5a6f35476b0c3/pyzmq-27.1.0-cp311-cp311-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c895a6f35476b0c3a54e3eb6ccf41bf3018de937016e6e18748317f25d4e925f" },
+    { url = "http://cm3588:3141/root/pypi/+f/5bb/f8d3630bf9655/pyzmq-27.1.0-cp311-cp311-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5bbf8d3630bf96550b3be8e1fc0fea5cbdc8d5466c1192887bd94869da17a63e" },
+    { url = "http://cm3588:3141/root/pypi/+f/15c/8bd0fe0dabf80/pyzmq-27.1.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:15c8bd0fe0dabf808e2d7a681398c4e5ded70a551ab47482067a572c054c8e2e" },
+    { url = "http://cm3588:3141/root/pypi/+f/baf/cb3dd171b4ae9/pyzmq-27.1.0-cp311-cp311-musllinux_1_2_i686.whl", hash = "sha256:bafcb3dd171b4ae9f19ee6380dfc71ce0390fefaf26b504c0e5f628d7c8c54f2" },
+    { url = "http://cm3588:3141/root/pypi/+f/e82/9529fcaa09937/pyzmq-27.1.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:e829529fcaa09937189178115c49c504e69289abd39967cd8a4c215761373394" },
+    { url = "http://cm3588:3141/root/pypi/+f/6df/079c47d5902af/pyzmq-27.1.0-cp311-cp311-win32.whl", hash = "sha256:6df079c47d5902af6db298ec92151db82ecb557af663098b92f2508c398bb54f" },
+    { url = "http://cm3588:3141/root/pypi/+f/190/cbf120fbc0fc4/pyzmq-27.1.0-cp311-cp311-win_amd64.whl", hash = "sha256:190cbf120fbc0fc4957b56866830def56628934a9d112aec0e2507aa6a032b97" },
+    { url = "http://cm3588:3141/root/pypi/+f/eca/6b47df11a132d/pyzmq-27.1.0-cp311-cp311-win_arm64.whl", hash = "sha256:eca6b47df11a132d1745eb3b5b5e557a7dae2c303277aa0e69c6ba91b8736e07" },
+    { url = "http://cm3588:3141/root/pypi/+f/452/631b640340c92/pyzmq-27.1.0-cp312-abi3-macosx_10_15_universal2.whl", hash = "sha256:452631b640340c928fa343801b0d07eb0c3789a5ffa843f6e1a9cee0ba4eb4fc" },
+    { url = "http://cm3588:3141/root/pypi/+f/1c1/79799b118e554/pyzmq-27.1.0-cp312-abi3-manylinux2014_i686.manylinux_2_17_i686.whl", hash = "sha256:1c179799b118e554b66da67d88ed66cd37a169f1f23b5d9f0a231b4e8d44a113" },
+    { url = "http://cm3588:3141/root/pypi/+f/383/7439b7f99e603/pyzmq-27.1.0-cp312-abi3-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:3837439b7f99e60312f0c926a6ad437b067356dc2bc2ec96eb395fd0fe804233" },
+    { url = "http://cm3588:3141/root/pypi/+f/43a/d9a73e3da1fab/pyzmq-27.1.0-cp312-abi3-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:43ad9a73e3da1fab5b0e7e13402f0b2fb934ae1c876c51d0afff0e7c052eca31" },
+    { url = "http://cm3588:3141/root/pypi/+f/0de/3028d69d4cdc4/pyzmq-27.1.0-cp312-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:0de3028d69d4cdc475bfe47a6128eb38d8bc0e8f4d69646adfbcd840facbac28" },
+    { url = "http://cm3588:3141/root/pypi/+f/cf4/4a7763aea9298/pyzmq-27.1.0-cp312-abi3-musllinux_1_2_i686.whl", hash = "sha256:cf44a7763aea9298c0aa7dbf859f87ed7012de8bda0f3977b6fb1d96745df856" },
+    { url = "http://cm3588:3141/root/pypi/+f/f30/f395a9e6fbca1/pyzmq-27.1.0-cp312-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:f30f395a9e6fbca195400ce833c731e7b64c3919aa481af4d88c3759e0cb7496" },
+    { url = "http://cm3588:3141/root/pypi/+f/250/e5436a4ba1388/pyzmq-27.1.0-cp312-abi3-win32.whl", hash = "sha256:250e5436a4ba13885494412b3da5d518cd0d3a278a1ae640e113c073a5f88edd" },
+    { url = "http://cm3588:3141/root/pypi/+f/9ce/490cf1d2ca2ad/pyzmq-27.1.0-cp312-abi3-win_amd64.whl", hash = "sha256:9ce490cf1d2ca2ad84733aa1d69ce6855372cb5ce9223802450c9b2a7cba0ccf" },
+    { url = "http://cm3588:3141/root/pypi/+f/75a/2f36223f0d535/pyzmq-27.1.0-cp312-abi3-win_arm64.whl", hash = "sha256:75a2f36223f0d535a0c919e23615fc85a1e23b71f40c7eb43d7b1dedb4d8f15f" },
+    { url = "http://cm3588:3141/root/pypi/+f/187/70c8d35637153/pyzmq-27.1.0-pp311-pypy311_pp73-macosx_10_15_x86_64.whl", hash = "sha256:18770c8d3563715387139060d37859c02ce40718d1faf299abddcdcc6a649066" },
+    { url = "http://cm3588:3141/root/pypi/+f/ac2/5465d42f92e99/pyzmq-27.1.0-pp311-pypy311_pp73-manylinux2014_i686.manylinux_2_17_i686.whl", hash = "sha256:ac25465d42f92e990f8d8b0546b01c391ad431c3bf447683fdc40565941d0604" },
+    { url = "http://cm3588:3141/root/pypi/+f/53b/40f8ae006f273/pyzmq-27.1.0-pp311-pypy311_pp73-manylinux_2_26_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:53b40f8ae006f2734ee7608d59ed661419f087521edbfc2149c3932e9c14808c" },
+    { url = "http://cm3588:3141/root/pypi/+f/f60/5d884e7c8be8f/pyzmq-27.1.0-pp311-pypy311_pp73-manylinux_2_26_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f605d884e7c8be8fe1aa94e0a783bf3f591b84c24e4bc4f3e7564c82ac25e271" },
+    { url = "http://cm3588:3141/root/pypi/+f/c9f/7f6e13dff2e44/pyzmq-27.1.0-pp311-pypy311_pp73-win_amd64.whl", hash = "sha256:c9f7f6e13dff2e44a6afeaf2cf54cee5929ad64afaf4d40b50f93c58fc687355" },
+]
+
+[[package]]
 name = "readme-renderer"
 version = "44.0"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -3015,6 +3679,20 @@ dependencies = [
 sdist = { url = "http://cm3588:3141/root/pypi/+f/871/2034eabbfa680/readme_renderer-44.0.tar.gz", hash = "sha256:8712034eabbfa6805cacf1402b4eeb2a73028f72d1166d6f5cb7f9c047c5d1e1" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/2fb/ca89b81a08526/readme_renderer-44.0-py3-none-any.whl", hash = "sha256:2fbca89b81a08526aadf1357a8c2ae889ec05fb03f5da67f9769c9a592166151" },
+]
+
+[[package]]
+name = "referencing"
+version = "0.37.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "attrs" },
+    { name = "rpds-py" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/44a/efc3142c5b842/referencing-0.37.0.tar.gz", hash = "sha256:44aefc3142c5b842538163acb373e24cce6632bd54bdb01b21ad5863489f50d8" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/381/329a9f99628c9/referencing-0.37.0-py3-none-any.whl", hash = "sha256:381329a9f99628c9069361716891d34ad94af76e461dcb0335825aecc7692231" },
 ]
 
 [[package]]
@@ -3095,12 +3773,45 @@ wheels = [
 ]
 
 [[package]]
+name = "rfc3339-validator"
+version = "0.1.4"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "six" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/138/a2abdf93304ad/rfc3339_validator-0.1.4.tar.gz", hash = "sha256:138a2abdf93304ad60530167e51d2dfb9549521a836871b88d7f4695d0022f6b" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/24f/6ec1eda14ef82/rfc3339_validator-0.1.4-py2.py3-none-any.whl", hash = "sha256:24f6ec1eda14ef823da9e36ec7113124b39c04d50a4d3d3a3c2859577e7791fa" },
+]
+
+[[package]]
 name = "rfc3986"
 version = "2.0.0"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
 sdist = { url = "http://cm3588:3141/root/pypi/+f/97a/acf9dbd4bfd82/rfc3986-2.0.0.tar.gz", hash = "sha256:97aacf9dbd4bfd829baad6e6309fa6573aaf1be3f6fa735c8ab05e46cecb261c" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/50b/1502b60e289cb/rfc3986-2.0.0-py2.py3-none-any.whl", hash = "sha256:50b1502b60e289cb37883f3dfd34532b8873c7de9f49bb546641ce9cbd256ebd" },
+]
+
+[[package]]
+name = "rfc3986-validator"
+version = "0.1.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/3d4/4bde7921b3b9e/rfc3986_validator-0.1.1.tar.gz", hash = "sha256:3d44bde7921b3b9ec3ae4e3adca370438eccebc676456449b145d533b240d055" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/2f2/35c432ef45997/rfc3986_validator-0.1.1-py2.py3-none-any.whl", hash = "sha256:2f235c432ef459970b4306369336b9d5dbdda31b510ca1e327636e01f528bfa9" },
+]
+
+[[package]]
+name = "rfc3987-syntax"
+version = "1.1.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "lark" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/717/a62cbf33cffdd/rfc3987_syntax-1.1.0.tar.gz", hash = "sha256:717a62cbf33cffdd16dfa3a497d81ce48a660ea691b1ddd7be710c22f00b4a0d" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/6c3/d97604e4c5ce9/rfc3987_syntax-1.1.0-py3-none-any.whl", hash = "sha256:6c3d97604e4c5ce9f714898e05401a0445a641cfa276432b0a648c80856f6a3f" },
 ]
 
 [[package]]
@@ -3114,6 +3825,56 @@ dependencies = [
 sdist = { url = "http://cm3588:3141/root/pypi/+f/82f/1bc23a6a21ebc/rich-14.0.0.tar.gz", hash = "sha256:82f1bc23a6a21ebca4ae0c45af9bdbc492ed20231dcb63f297d6d1021a9d5725" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/1c9/491e1951aac09/rich-14.0.0-py3-none-any.whl", hash = "sha256:1c9491e1951aac09caffd42f448ee3d04e58923ffe14993f6e83068dc395d7e0" },
+]
+
+[[package]]
+name = "rpds-py"
+version = "0.30.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/dd8/ff7cf90014af0/rpds_py-0.30.0.tar.gz", hash = "sha256:dd8ff7cf90014af0c0f787eea34794ebf6415242ee1d6fa91eaba725cc441e84" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/a2b/ffea6a4ca9f01/rpds_py-0.30.0-cp311-cp311-macosx_10_12_x86_64.whl", hash = "sha256:a2bffea6a4ca9f01b3f8e548302470306689684e61602aa3d141e34da06cf425" },
+    { url = "http://cm3588:3141/root/pypi/+f/dc4/f992dfe1e2bc3/rpds_py-0.30.0-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:dc4f992dfe1e2bc3ebc7444f6c7051b4bc13cd8e33e43511e8ffd13bf407010d" },
+    { url = "http://cm3588:3141/root/pypi/+f/422/c3cb9856d80b0/rpds_py-0.30.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:422c3cb9856d80b09d30d2eb255d0754b23e090034e1deb4083f8004bd0761e4" },
+    { url = "http://cm3588:3141/root/pypi/+f/07a/e8a593e1c3c6b/rpds_py-0.30.0-cp311-cp311-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:07ae8a593e1c3c6b82ca3292efbe73c30b61332fd612e05abee07c79359f292f" },
+    { url = "http://cm3588:3141/root/pypi/+f/12f/90dd7557b6bd5/rpds_py-0.30.0-cp311-cp311-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:12f90dd7557b6bd57f40abe7747e81e0c0b119bef015ea7726e69fe550e394a4" },
+    { url = "http://cm3588:3141/root/pypi/+f/99b/47d6ad9a6da00/rpds_py-0.30.0-cp311-cp311-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:99b47d6ad9a6da00bec6aabe5a6279ecd3c06a329d4aa4771034a21e335c3a97" },
+    { url = "http://cm3588:3141/root/pypi/+f/33f/559f310450450/rpds_py-0.30.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:33f559f3104504506a44bb666b93a33f5d33133765b0c216a5bf2f1e1503af89" },
+    { url = "http://cm3588:3141/root/pypi/+f/946/fe926af6e44f3/rpds_py-0.30.0-cp311-cp311-manylinux_2_31_riscv64.whl", hash = "sha256:946fe926af6e44f3697abbc305ea168c2c31d3e3ef1058cf68f379bf0335a78d" },
+    { url = "http://cm3588:3141/root/pypi/+f/495/aeca4b93d465e/rpds_py-0.30.0-cp311-cp311-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:495aeca4b93d465efde585977365187149e75383ad2684f81519f504f5c13038" },
+    { url = "http://cm3588:3141/root/pypi/+f/d9a/0ca5da0386dee/rpds_py-0.30.0-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:d9a0ca5da0386dee0655b4ccdf46119df60e0f10da268d04fe7cc87886872ba7" },
+    { url = "http://cm3588:3141/root/pypi/+f/8d6/d1cc13664ec13/rpds_py-0.30.0-cp311-cp311-musllinux_1_2_i686.whl", hash = "sha256:8d6d1cc13664ec13c1b84241204ff3b12f9bb82464b8ad6e7a5d3486975c2eed" },
+    { url = "http://cm3588:3141/root/pypi/+f/389/6fa1be39912cf/rpds_py-0.30.0-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:3896fa1be39912cf0757753826bc8bdc8ca331a28a7c4ae46b7a21280b06bb85" },
+    { url = "http://cm3588:3141/root/pypi/+f/55f/6602263220594/rpds_py-0.30.0-cp311-cp311-win32.whl", hash = "sha256:55f66022632205940f1827effeff17c4fa7ae1953d2b74a8581baaefb7d16f8c" },
+    { url = "http://cm3588:3141/root/pypi/+f/a51/033ff701fca75/rpds_py-0.30.0-cp311-cp311-win_amd64.whl", hash = "sha256:a51033ff701fca756439d641c0ad09a41d9242fa69121c7d8769604a0a629825" },
+    { url = "http://cm3588:3141/root/pypi/+f/47b/0ef6231c58f50/rpds_py-0.30.0-cp311-cp311-win_arm64.whl", hash = "sha256:47b0ef6231c58f506ef0b74d44e330405caa8428e770fec25329ed2cb971a229" },
+    { url = "http://cm3588:3141/root/pypi/+f/a16/1f20d9a430068/rpds_py-0.30.0-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:a161f20d9a43006833cd7068375a94d035714d73a172b681d8881820600abfad" },
+    { url = "http://cm3588:3141/root/pypi/+f/6ab/c8880d9d036ec/rpds_py-0.30.0-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:6abc8880d9d036ecaafe709079969f56e876fcf107f7a8e9920ba6d5a3878d05" },
+    { url = "http://cm3588:3141/root/pypi/+f/ca2/8829ae5f5d569/rpds_py-0.30.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ca28829ae5f5d569bb62a79512c842a03a12576375d5ece7d2cadf8abe96ec28" },
+    { url = "http://cm3588:3141/root/pypi/+f/a10/10ed9524c73b9/rpds_py-0.30.0-cp312-cp312-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:a1010ed9524c73b94d15919ca4d41d8780980e1765babf85f9a2f90d247153dd" },
+    { url = "http://cm3588:3141/root/pypi/+f/f8d/1736cfb49381b/rpds_py-0.30.0-cp312-cp312-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:f8d1736cfb49381ba528cd5baa46f82fdc65c06e843dab24dd70b63d09121b3f" },
+    { url = "http://cm3588:3141/root/pypi/+f/d94/8b135c4693daf/rpds_py-0.30.0-cp312-cp312-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:d948b135c4693daff7bc2dcfc4ec57237a29bd37e60c2fabf5aff2bbacf3e2f1" },
+    { url = "http://cm3588:3141/root/pypi/+f/47f/236970bccb223/rpds_py-0.30.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:47f236970bccb2233267d89173d3ad2703cd36a0e2a6e92d0560d333871a3d23" },
+    { url = "http://cm3588:3141/root/pypi/+f/2e6/ecb5a5bcacf59/rpds_py-0.30.0-cp312-cp312-manylinux_2_31_riscv64.whl", hash = "sha256:2e6ecb5a5bcacf59c3f912155044479af1d0b6681280048b338b28e364aca1f6" },
+    { url = "http://cm3588:3141/root/pypi/+f/a8f/a71a2e078c527/rpds_py-0.30.0-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:a8fa71a2e078c527c3e9dc9fc5a98c9db40bcc8a92b4e8858e36d329f8684b51" },
+    { url = "http://cm3588:3141/root/pypi/+f/73c/67f2db7bc334e/rpds_py-0.30.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:73c67f2db7bc334e518d097c6d1e6fed021bbc9b7d678d6cc433478365d1d5f5" },
+    { url = "http://cm3588:3141/root/pypi/+f/5ba/103fb455be00f/rpds_py-0.30.0-cp312-cp312-musllinux_1_2_i686.whl", hash = "sha256:5ba103fb455be00f3b1c2076c9d4264bfcb037c976167a6047ed82f23153f02e" },
+    { url = "http://cm3588:3141/root/pypi/+f/7ce/e9c752c036458/rpds_py-0.30.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:7cee9c752c0364588353e627da8a7e808a66873672bcb5f52890c33fd965b394" },
+    { url = "http://cm3588:3141/root/pypi/+f/1ab/5b83dbcf55acc/rpds_py-0.30.0-cp312-cp312-win32.whl", hash = "sha256:1ab5b83dbcf55acc8b08fc62b796ef672c457b17dbd7820a11d6c52c06839bdf" },
+    { url = "http://cm3588:3141/root/pypi/+f/a09/0322ca841abd4/rpds_py-0.30.0-cp312-cp312-win_amd64.whl", hash = "sha256:a090322ca841abd453d43456ac34db46e8b05fd9b3b4ac0c78bcde8b089f959b" },
+    { url = "http://cm3588:3141/root/pypi/+f/669/b1805bd639dd2/rpds_py-0.30.0-cp312-cp312-win_arm64.whl", hash = "sha256:669b1805bd639dd2989b281be2cfd951c6121b65e729d9b843e9639ef1fd555e" },
+    { url = "http://cm3588:3141/root/pypi/+f/c22/62bdba0ad4fc6/rpds_py-0.30.0-pp311-pypy311_pp73-macosx_10_12_x86_64.whl", hash = "sha256:c2262bdba0ad4fc6fb5545660673925c2d2a5d9e2e0fb603aad545427be0fc58" },
+    { url = "http://cm3588:3141/root/pypi/+f/ee6/af14263f25eed/rpds_py-0.30.0-pp311-pypy311_pp73-macosx_11_0_arm64.whl", hash = "sha256:ee6af14263f25eedc3bb918a3c04245106a42dfd4f5c2285ea6f997b1fc3f89a" },
+    { url = "http://cm3588:3141/root/pypi/+f/3ad/bb8179ce342d2/rpds_py-0.30.0-pp311-pypy311_pp73-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3adbb8179ce342d235c31ab8ec511e66c73faa27a47e076ccc92421add53e2bb" },
+    { url = "http://cm3588:3141/root/pypi/+f/250/fa00e9543ac9b/rpds_py-0.30.0-pp311-pypy311_pp73-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:250fa00e9543ac9b97ac258bd37367ff5256666122c2d0f2bc97577c60a1818c" },
+    { url = "http://cm3588:3141/root/pypi/+f/985/4cf4f488b3d57/rpds_py-0.30.0-pp311-pypy311_pp73-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:9854cf4f488b3d57b9aaeb105f06d78e5529d3145b1e4a41750167e8c213c6d3" },
+    { url = "http://cm3588:3141/root/pypi/+f/993/914b8e560023b/rpds_py-0.30.0-pp311-pypy311_pp73-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:993914b8e560023bc0a8bf742c5f303551992dcb85e247b1e5c7f4a7d145bda5" },
+    { url = "http://cm3588:3141/root/pypi/+f/58e/dca431fb9b299/rpds_py-0.30.0-pp311-pypy311_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:58edca431fb9b29950807e301826586e5bbf24163677732429770a697ffe6738" },
+    { url = "http://cm3588:3141/root/pypi/+f/dea/5b552272a9447/rpds_py-0.30.0-pp311-pypy311_pp73-manylinux_2_31_riscv64.whl", hash = "sha256:dea5b552272a944763b34394d04577cf0f9bd013207bc32323b5a89a53cf9c2f" },
+    { url = "http://cm3588:3141/root/pypi/+f/ba3/af48635eb83d0/rpds_py-0.30.0-pp311-pypy311_pp73-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:ba3af48635eb83d03f6c9735dfb21785303e73d22ad03d489e88adae6eab8877" },
+    { url = "http://cm3588:3141/root/pypi/+f/dff/13836529b921e/rpds_py-0.30.0-pp311-pypy311_pp73-musllinux_1_2_aarch64.whl", hash = "sha256:dff13836529b921e22f15cb099751209a60009731a68519630a24d61f0b1b30a" },
+    { url = "http://cm3588:3141/root/pypi/+f/1b1/51685b23929ab/rpds_py-0.30.0-pp311-pypy311_pp73-musllinux_1_2_i686.whl", hash = "sha256:1b151685b23929ab7beec71080a8889d4d6d9fa9a983d213f07121205d48e2c4" },
+    { url = "http://cm3588:3141/root/pypi/+f/ac3/7f9f516c51e57/rpds_py-0.30.0-pp311-pypy311_pp73-musllinux_1_2_x86_64.whl", hash = "sha256:ac37f9f516c51e5753f27dfdef11a88330f04de2d564be3991384b2f3535d02e" },
 ]
 
 [[package]]
@@ -3245,6 +4006,15 @@ wheels = [
 ]
 
 [[package]]
+name = "send2trash"
+version = "2.1.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/1c7/2b39f09457db3/send2trash-2.1.0.tar.gz", hash = "sha256:1c72b39f09457db3c05ce1d19158c2cbef4c32b8bedd02c155e49282b7ea7459" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/0da/2f112e6d6bb22/send2trash-2.1.0-py3-none-any.whl", hash = "sha256:0da2f112e6d6bb22de6aa6daa7e144831a4febf2a87261451c4ad849fe9a873c" },
+]
+
+[[package]]
 name = "sentencepiece"
 version = "0.2.0"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -3353,6 +4123,15 @@ wheels = [
 ]
 
 [[package]]
+name = "soupsieve"
+version = "2.8.3"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/326/7f1eeea4251fb/soupsieve-2.8.3.tar.gz", hash = "sha256:3267f1eeea4251fb42728b6dfb746edc9acaffc4a45b27e19450b676586e8349" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/ed6/4f2ba4eebeab0/soupsieve-2.8.3-py3-none-any.whl", hash = "sha256:ed64f2ba4eebeab06cc4962affce381647455978ffc1e36bb79a545b91f45a95" },
+]
+
+[[package]]
 name = "spandrel"
 version = "0.4.2"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -3373,6 +4152,20 @@ dependencies = [
 sdist = { url = "http://cm3588:3141/root/pypi/+f/fef/a4ea966c6a5b7/spandrel-0.4.2.tar.gz", hash = "sha256:fefa4ea966c6a5b7721dcf24f3e2062a5a96a395c8bedcb570fb55971fdcbccb" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/6c9/3e3ecbeb0e548/spandrel-0.4.2-py3-none-any.whl", hash = "sha256:6c93e3ecbeb0e548fd2df45a605472b34c1614287c56b51bb33cdef7ae5235b5" },
+]
+
+[[package]]
+name = "stack-data"
+version = "0.6.3"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "asttokens" },
+    { name = "executing" },
+    { name = "pure-eval" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/836/a778de4fec4dc/stack_data-0.6.3.tar.gz", hash = "sha256:836a778de4fec4dcd1dcd89ed8abff8a221f58308462e1c4aa2a3cf30148f0b9" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/d55/58e0c25a4cb08/stack_data-0.6.3-py3-none-any.whl", hash = "sha256:d5558e0c25a4cb0853cddad3d77da9891a08cb85dd9f9f91b9f8cd66e511e695" },
 ]
 
 [[package]]
@@ -3397,6 +4190,32 @@ dependencies = [
 sdist = { url = "http://cm3588:3141/root/pypi/+f/d3d/3fe8df1e5a0b4/sympy-1.14.0.tar.gz", hash = "sha256:d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/e09/1cc3e99d2141a/sympy-1.14.0-py3-none-any.whl", hash = "sha256:e091cc3e99d2141a0ba2847328f5479b05d94a6635cb96148ccb3f34671bd8f5" },
+]
+
+[[package]]
+name = "terminado"
+version = "0.18.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "ptyprocess", marker = "os_name != 'nt' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
+    { name = "pywinpty", marker = "(os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu') or (os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cuda') or (os_name == 'nt' and platform_machine != 'aarch64' and sys_platform == 'linux' and extra != 'extra-8-invokeai-rocm') or (os_name == 'nt' and sys_platform != 'darwin' and sys_platform != 'linux') or (os_name != 'nt' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (os_name != 'nt' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (os_name != 'nt' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'darwin' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm')" },
+    { name = "tornado" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/de0/9f2c4b85de476/terminado-0.18.1.tar.gz", hash = "sha256:de09f2c4b85de4765f7714688fff57d3e75bad1f909b589fde880460c753fd2e" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/a44/68e1b37bb318f/terminado-0.18.1-py3-none-any.whl", hash = "sha256:a4468e1b37bb318f8a86514f65814e1afc977cf29b3992a4500d9dd305dcceb0" },
+]
+
+[[package]]
+name = "tinycss2"
+version = "1.4.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+dependencies = [
+    { name = "webencodings" },
+]
+sdist = { url = "http://cm3588:3141/root/pypi/+f/10c/0972f6fc0fbee/tinycss2-1.4.0.tar.gz", hash = "sha256:10c0972f6fc0fbee87c3edb76549357415e94548c1ae10ebccdea16fb404a9b7" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/3a4/9cf47b7675da0/tinycss2-1.4.0-py3-none-any.whl", hash = "sha256:3a49cf47b7675da0b15d0c6e1df8df4ebd96e9394bb905a5775adb0d884c5289" },
 ]
 
 [[package]]
@@ -3757,6 +4576,15 @@ wheels = [
 ]
 
 [[package]]
+name = "traitlets"
+version = "5.14.3"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/9ed/0579d3502c94b/traitlets-5.14.3.tar.gz", hash = "sha256:9ed0579d3502c94b4b3732ac120375cda96f923114522847de4b3bb98b96b6b7" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/b74/e89e397b1ed28/traitlets-5.14.3-py3-none-any.whl", hash = "sha256:b74e89e397b1ed28cc831db7aea759ba6640cb3de13090ca145426688ff1ac4f" },
+]
+
+[[package]]
 name = "trampoline"
 version = "0.1.2"
 source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
@@ -3859,6 +4687,15 @@ source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
 sdist = { url = "http://cm3588:3141/root/pypi/+f/b60/a638fcc0daffa/tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/1a4/03fada01ff922/tzdata-2025.2-py2.py3-none-any.whl", hash = "sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8" },
+]
+
+[[package]]
+name = "uri-template"
+version = "1.3.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/0e0/0f8eb65e18c7d/uri-template-1.3.0.tar.gz", hash = "sha256:0e00f8eb65e18c7de20d595a14336e9f337ead580c70934141624b6d1ffdacc7" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/a44/a133ea12d44a0/uri_template-1.3.0-py3-none-any.whl", hash = "sha256:a44a133ea12d44a0c0f06d7d42a52d71282e77e2f937d8abd5655b8d56fc1363" },
 ]
 
 [[package]]
@@ -4021,6 +4858,33 @@ source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
 sdist = { url = "http://cm3588:3141/root/pypi/+f/72e/a0c06399eb286/wcwidth-0.2.13.tar.gz", hash = "sha256:72ea0c06399eb286d978fdedb6923a9eb47e1c486ce63e9b4e64fc18303972b5" }
 wheels = [
     { url = "http://cm3588:3141/root/pypi/+f/3da/69048e4540d84/wcwidth-0.2.13-py2.py3-none-any.whl", hash = "sha256:3da69048e4540d84af32131829ff948f1e022c1c6bdb8d6102117aac784f6859" },
+]
+
+[[package]]
+name = "webcolors"
+version = "25.10.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/62a/bae86504f66d0/webcolors-25.10.0.tar.gz", hash = "sha256:62abae86504f66d0f6364c2a8520de4a0c47b80c03fc3a5f1815fedbef7c19bf" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/032/c727334856fc0/webcolors-25.10.0-py3-none-any.whl", hash = "sha256:032c727334856fc0b968f63daa252a1ac93d33db2f5267756623c210e57a4f1d" },
+]
+
+[[package]]
+name = "webencodings"
+version = "0.5.1"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/b36/a1c245f2d3049/webencodings-0.5.1.tar.gz", hash = "sha256:b36a1c245f2d304965eb4e0a82848379241dc04b865afcc4aab16748587e1923" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/a0a/f1213f3c22264/webencodings-0.5.1-py2.py3-none-any.whl", hash = "sha256:a0af1213f3c2226497a97e2b3aa01a7e4bee4f403f95be16fc9acd2947514a78" },
+]
+
+[[package]]
+name = "websocket-client"
+version = "1.9.0"
+source = { registry = "http://cm3588:3141/root/pypi/+simple/" }
+sdist = { url = "http://cm3588:3141/root/pypi/+f/9e8/13624b6eb6199/websocket_client-1.9.0.tar.gz", hash = "sha256:9e813624b6eb619999a97dc7958469217c3176312b3a16a4bd1bc7e08a46ec98" }
+wheels = [
+    { url = "http://cm3588:3141/root/pypi/+f/af2/48a825037ef59/websocket_client-1.9.0-py3-none-any.whl", hash = "sha256:af248a825037ef591efbf6ed20cc5faa03d3b47b9e5a2230a529eeee1c1fc3ef" },
 ]
 
 [[package]]

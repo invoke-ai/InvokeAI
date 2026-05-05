@@ -542,9 +542,10 @@ class ModelConfigFactory:
         # Now do any post-processing needed for specific model types/bases/etc.
         match config.type:
             case ModelType.Main:
-                # Pass variant if available (e.g., for Flux2 models)
+                # Pass variant if available (e.g., for Flux2 models). Name is used to detect
+                # ERNIE-Image-Turbo since it doesn't have a distinct variant on the config.
                 variant = getattr(config, "variant", None)
-                config.default_settings = MainModelDefaultSettings.from_base(config.base, variant)
+                config.default_settings = MainModelDefaultSettings.from_base(config.base, variant, config.name)
             case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
                 config.default_settings = ControlAdapterDefaultSettings.from_model_name(config.name)
             case ModelType.LoRA:

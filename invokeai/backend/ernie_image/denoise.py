@@ -14,6 +14,7 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
+from invokeai.backend.ernie_image.sampling_utils import unpatchify_latents
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 
@@ -58,6 +59,11 @@ def denoise(
     total_steps = len(timesteps) - 1
     use_scheduler = scheduler is not None
 
+    # ERNIE-Image's transformer uses standard sinusoidal time embeddings (`Timesteps(...)` from
+    # diffusers) which expect timesteps in `[0, num_train_timesteps]`. Sigmas are in [0, 1].
+    # The model gets `sigma * model_timestep_scale`; sigma stays in [0, 1] for the Euler math.
+    model_timestep_scale = float(scheduler.config.num_train_timesteps) if use_scheduler else 1000.0
+
     if use_scheduler:
         # Drop the final sigma -- diffusers schedulers append it themselves.
         sigmas = np.array(timesteps[:-1], dtype=np.float32)
@@ -71,8 +77,10 @@ def denoise(
         pbar = tqdm(total=total_steps, desc="ERNIE-Image denoising")
         for step_index in range(len(scheduler.timesteps)):
             timestep = scheduler.timesteps[step_index]
-            t_curr = timestep.item() / scheduler.config.num_train_timesteps
-            t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
+            # The scheduler's timestep is already in `[0, num_train_timesteps]`; pass directly.
+            t_model = timestep.item()
+            t_sigma = t_model / model_timestep_scale
+            t_vec = torch.full((img.shape[0],), t_model, dtype=img.dtype, device=img.device)
 
             pred = _forward(model, img, t_vec, text_bth, text_lens)
             step_cfg = cfg_scale[min(step_index, len(cfg_scale) - 1)]
@@ -89,13 +97,15 @@ def denoise(
                 img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
 
             pbar.update(1)
-            preview = img - t_curr * pred
+            # Predicted x0 estimate, unpatched so the preview decoder can use standard
+            # 32-channel latent RGB factors.
+            preview = unpatchify_latents(img - t_sigma * pred)
             step_callback(
                 PipelineIntermediateState(
                     step=step_index + 1,
                     order=1,
                     total_steps=total_steps,
-                    timestep=int(t_curr * 1000),
+                    timestep=int(t_model),
                     latents=preview,
                 ),
             )
@@ -108,7 +118,10 @@ def denoise(
     for i in range(total_steps):
         t_curr = timesteps[i]
         t_next = timesteps[i + 1]
-        t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
+        # Sigmas are [0, 1]; scale up to the model's training-timestep range.
+        t_vec = torch.full(
+            (img.shape[0],), t_curr * model_timestep_scale, dtype=img.dtype, device=img.device
+        )
 
         pred = _forward(model, img, t_vec, text_bth, text_lens)
         step_cfg = cfg_scale[min(i, len(cfg_scale) - 1)]
@@ -125,7 +138,7 @@ def denoise(
             img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_next)
 
         pbar.update(1)
-        preview = img - t_curr * pred
+        preview = unpatchify_latents(img - t_curr * pred)
         step_callback(
             PipelineIntermediateState(
                 step=i + 1,
