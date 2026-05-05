@@ -238,7 +238,7 @@ const slice = createSlice({
       }
       state.animaT5EncoderModel = result.data;
     },
-    setAnimaScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
+    setAnimaScheduler: (state, action: PayloadAction<'euler' | 'euler_a' | 'heun' | 'dpmpp_2m' | 'dpmpp_2m_sde' | 'lcm'>) => {
       state.animaScheduler = action.payload;
     },
     kleinVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
