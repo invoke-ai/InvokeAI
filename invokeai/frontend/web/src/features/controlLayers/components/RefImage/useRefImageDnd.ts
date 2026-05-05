@@ -27,6 +27,9 @@ export const useRefImageDnd = (ref: RefObject<HTMLElement>, id: string) => {
           setDndListState({ type: 'is-dragging' });
           setIsDragging(true);
         },
+        // Per pragmatic-dnd's contract, `onDrop` fires regardless of how the drag ended (explicit
+        // drop, cancel via Esc, drop on no targets, error recovery), so it is safe to use this as
+        // the single reset point for `isDragging`.
         onDrop() {
           setDndListState(idle);
           setIsDragging(false);

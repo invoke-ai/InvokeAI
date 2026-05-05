@@ -1,6 +1,5 @@
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
-import { reorderWithEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/util/reorder-with-edge';
 import { Button, Collapse, Divider, Flex, IconButton } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
@@ -30,6 +29,7 @@ import { PiBoundingBoxBold, PiUploadBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
 import { RefImageHeader } from './RefImageHeader';
+import { getReorderedRefImageIds } from './RefImageList.helpers';
 import { RefImageSettings } from './RefImageSettings';
 
 export const RefImageList = memo(() => {
@@ -56,37 +56,16 @@ export const RefImageList = memo(() => {
           return;
         }
 
-        const indexOfSource = ids.indexOf(sourceData.payload.id);
-        const indexOfTarget = ids.indexOf(targetData.payload.id);
-
-        if (indexOfTarget < 0 || indexOfSource < 0) {
-          return;
-        }
-
-        if (indexOfSource === indexOfTarget) {
-          return;
-        }
-
-        const closestEdgeOfTarget = extractClosestEdge(targetData);
-
-        let edgeIndexDelta = 0;
-        if (closestEdgeOfTarget === 'right') {
-          edgeIndexDelta = 1;
-        } else if (closestEdgeOfTarget === 'left') {
-          edgeIndexDelta = -1;
-        }
-
-        if (indexOfSource === indexOfTarget + edgeIndexDelta) {
-          return;
-        }
-
-        const nextIds = reorderWithEdge({
-          list: ids,
-          startIndex: indexOfSource,
-          indexOfTarget,
-          closestEdgeOfTarget,
-          axis: 'horizontal',
+        const nextIds = getReorderedRefImageIds({
+          ids,
+          sourceId: sourceData.payload.id,
+          targetId: targetData.payload.id,
+          closestEdgeOfTarget: extractClosestEdge(targetData),
         });
+
+        if (nextIds === null) {
+          return;
+        }
 
         flushSync(() => {
           dispatch(refImagesReordered({ ids: nextIds }));
