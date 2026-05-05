@@ -28,7 +28,7 @@ import {
 import { useGetStarterModelsQuery } from 'services/api/endpoints/models';
 import type { ExternalProviderConfig, StarterModel } from 'services/api/types';
 
-const PROVIDER_SORT_ORDER = ['gemini', 'openai'];
+const PROVIDER_SORT_ORDER = ['gemini', 'openai', 'alibabacloud'];
 
 type ProviderCardProps = {
   provider: ExternalProviderConfig;

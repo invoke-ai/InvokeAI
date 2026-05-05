@@ -830,6 +830,7 @@ export const zParamsState = z.object({
   openaiInputFidelity: z.enum(['low', 'high']).nullable().default(null),
   // Gemini-specific external options
   geminiTemperature: z.number().min(0).max(2).nullable().default(null),
+  geminiThinkingLevel: z.enum(['minimal', 'high']).nullable().default(null),
   dimensions: zDimensionsState,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
@@ -908,6 +909,7 @@ export const getInitialParamsState = (): ParamsState => ({
   openaiBackground: 'auto',
   openaiInputFidelity: null,
   geminiTemperature: null,
+  geminiThinkingLevel: null,
   dimensions: {
     width: 512,
     height: 512,
