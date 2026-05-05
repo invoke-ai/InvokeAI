@@ -26,6 +26,8 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SDXL_Config,
     MainModelDefaultSettings,
 )
+from invokeai.backend.model_manager.configs.qwen3_encoder import Qwen3Encoder_Qwen3Encoder_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.configs.textual_inversion import TI_File_SD1_Config
 from invokeai.backend.model_manager.configs.vae import VAE_Diffusers_SD1_Config
 from invokeai.backend.model_manager.taxonomy import (
@@ -35,6 +37,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelSourceType,
     ModelType,
     ModelVariantType,
+    Qwen3VariantType,
     SchedulerPredictionType,
 )
 from invokeai.backend.util.logging import InvokeAILogger
@@ -110,6 +113,30 @@ def test_model_records_updates_model_class(store: ModelRecordServiceBase):
     )
     new_config = store.update_model(config.key, changes, allow_class_change=True)
     assert isinstance(new_config, LoRA_LyCORIS_SDXL_Config)
+
+
+def test_update_changing_type_drops_stale_format_and_variant(store: ModelRecordServiceBase):
+    """When the type changes, format/variant from the old class must not block validation of the new class.
+
+    Regression test for https://github.com/invoke-ai/InvokeAI/issues/9090: switching a misidentified
+    Qwen3 encoder to TextLLM previously failed because the old `format=qwen3_encoder` and `variant`
+    fields were carried over and no discriminator under `type=text_llm` matched.
+    """
+    config = Qwen3Encoder_Qwen3Encoder_Config(
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path="/tmp/Qwen2.5-1.5B-Instruct",
+        file_size=1024,
+        name="Qwen2.5-1.5B-Instruct",
+        hash="ABC123",
+        variant=Qwen3VariantType.Qwen3_4B,
+    )
+    config.key = "key1"
+    store.add_model(config)
+
+    changes = ModelRecordChanges(type=ModelType.TextLLM)
+    new_config = store.update_model(config.key, changes, allow_class_change=True)
+    assert isinstance(new_config, TextLLM_Diffusers_Config)
 
 
 def test_model_records_rejects_invalid_attr_changes(store: ModelRecordServiceBase):
