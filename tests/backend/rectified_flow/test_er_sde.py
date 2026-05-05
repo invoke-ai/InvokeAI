@@ -143,7 +143,11 @@ def test_er_sde_rf_step_state_mutation_after_first_call():
 
 
 def test_er_sde_rf_step_state_after_second_call_has_d_x0():
-    """After call 2: old_x0 updated, old_d_x0 set, sigma_prev_prev set."""
+    """After call 2: old_x0 updated, old_d_x0 set with correct value, sigma_prev_prev set.
+
+    x_t is intentionally re-used across both calls — this test checks state
+    threading, not trajectory correctness.
+    """
     torch.manual_seed(0)
     x_t = torch.randn(1, 16, 1, 8, 8, dtype=torch.float64)
     v = torch.randn_like(x_t)
@@ -160,6 +164,12 @@ def test_er_sde_rf_step_state_after_second_call_has_d_x0():
     assert state.old_d_x0 is not None
     assert state.sigma_prev_curr == 0.6
     assert state.sigma_prev_prev == 0.8
+
+    # d_x0 = (x0_call2 - x0_call1) / (lambda(0.6) - lambda(0.8))
+    # x0 = x_t - sigma * v, so x0_call2 - x0_call1 = (0.8 - 0.6) * v = 0.2 * v.
+    # lambda(s) = s/(1-s); lambda(0.6) = 1.5, lambda(0.8) = 4.0.
+    expected_d_x0 = (0.2 * v) / (1.5 - 4.0)
+    assert torch.allclose(state.old_d_x0, expected_d_x0)
 
 
 def test_er_sde_rf_step_order_2_engages_after_one_step():
@@ -187,4 +197,5 @@ def test_er_sde_rf_step_order_2_engages_after_one_step():
         x_t=x_t, v=v, sigma_curr=0.6, sigma_next=0.4,
         state=state_2nd, noise=noise,
     )
+    # Order-2 correction coefficient ~0.18 for these sigmas; 1e-3 leaves ample headroom.
     assert not torch.allclose(out_1st, out_2nd, atol=1e-3)
