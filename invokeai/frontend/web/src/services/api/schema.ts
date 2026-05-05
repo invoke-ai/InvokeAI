@@ -3182,7 +3182,7 @@ export type components = {
              * @default euler
              * @enum {string}
              */
-            scheduler?: "euler" | "heun" | "dpmpp_2m" | "dpmpp_2m_sde" | "lcm";
+            scheduler?: "euler" | "heun" | "dpmpp_2m" | "dpmpp_2m_sde" | "er_sde" | "lcm";
             /**
              * type
              * @default anima_denoise
