@@ -20,6 +20,8 @@ from diffusers import (
 )
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
+from invokeai.backend.rectified_flow.er_sde_scheduler import ERSDEScheduler
+
 # TODO: add dpmpp_3s/dpmpp_3s_k when fix released
 # https://github.com/huggingface/diffusers/issues/9007
 
@@ -50,6 +52,7 @@ SCHEDULER_NAME_VALUES = Literal[
     "dpmpp_3m_k",
     "dpmpp_sde",
     "dpmpp_sde_k",
+    "er_sde",
     "unipc",
     "unipc_k",
     "lcm",
@@ -89,6 +92,10 @@ SCHEDULER_MAP: dict[SCHEDULER_NAME_VALUES, tuple[Type[SchedulerMixin], dict[str,
     "dpmpp_3m_k": (DPMSolverMultistepScheduler, {"use_karras_sigmas": True, "solver_order": 3}),
     "dpmpp_sde": (DPMSolverSDEScheduler, {"use_karras_sigmas": False, "noise_sampler_seed": 0}),
     "dpmpp_sde_k": (DPMSolverSDEScheduler, {"use_karras_sigmas": True, "noise_sampler_seed": 0}),
+    "er_sde": (
+        ERSDEScheduler,
+        {"solver_order": 3, "use_flow_sigmas": False, "stochastic": True},
+    ),
     "unipc": (UniPCMultistepScheduler, {"use_karras_sigmas": False, "cpu_only": True}),
     "unipc_k": (UniPCMultistepScheduler, {"use_karras_sigmas": True, "cpu_only": True}),
     "lcm": (LCMScheduler, {}),

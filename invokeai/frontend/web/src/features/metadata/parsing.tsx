@@ -67,7 +67,6 @@ import { zModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifier } from 'features/nodes/types/v2/common';
 import { modelSelected } from 'features/parameters/store/actions';
 import type {
-  ParameterAnimaScheduler,
   ParameterCFGRescaleMultiplier,
   ParameterCFGScale,
   ParameterCLIPSkip,
@@ -94,7 +93,6 @@ import type {
 } from 'features/parameters/types/parameterSchemas';
 import {
   zLoRAWeight,
-  zParameterAnimaScheduler,
   zParameterCFGRescaleMultiplier,
   zParameterCFGScale,
   zParameterCLIPSkip,
@@ -475,16 +473,12 @@ const FluxDypeExponent: SingleMetadataHandler<ParameterFluxDypeExponent> = {
 //#endregion FluxDypeExponent
 
 //#region Scheduler
-// Anima images can record er_sde, which is not in the general scheduler enum.
-// Accept either union member at parse; recall dispatches per base.
-type AnyScheduler = ParameterScheduler | ParameterAnimaScheduler;
-const Scheduler: SingleMetadataHandler<AnyScheduler> = {
+const Scheduler: SingleMetadataHandler<ParameterScheduler> = {
   [SingleMetadataKey]: true,
   type: 'Scheduler',
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'scheduler');
-    const general = zParameterScheduler.safeParse(raw);
-    const parsed: AnyScheduler = general.success ? general.data : zParameterAnimaScheduler.parse(raw);
+    const parsed = zParameterScheduler.parse(raw);
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
@@ -513,17 +507,13 @@ const Scheduler: SingleMetadataHandler<AnyScheduler> = {
         store.dispatch(setAnimaScheduler(value));
       }
     } else {
-      // SD, SDXL, SD3, CogView4, etc. use the general scheduler.
-      // er_sde is Anima-only and unreachable here once the model base is non-Anima;
-      // narrow it out so setScheduler's stricter type accepts the value.
-      if (value !== 'er_sde') {
-        store.dispatch(setScheduler(value));
-      }
+      // SD, SDXL, SD3, CogView4, etc. use the general scheduler
+      store.dispatch(setScheduler(value));
     }
   },
   i18nKey: 'metadata.scheduler',
   LabelComponent: MetadataLabel,
-  ValueComponent: ({ value }: SingleMetadataValueProps<AnyScheduler>) => <MetadataPrimitiveValue value={value} />,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ParameterScheduler>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion Scheduler
 
