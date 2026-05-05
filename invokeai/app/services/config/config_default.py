@@ -32,9 +32,11 @@ LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
 CONFIG_SCHEMA_VERSION = "4.0.2"
 EXTERNAL_PROVIDER_CONFIG_FIELDS = (
+    "external_alibabacloud_api_key",
+    "external_alibabacloud_base_url",
     "external_gemini_api_key",
-    "external_openai_api_key",
     "external_gemini_base_url",
+    "external_openai_api_key",
     "external_openai_base_url",
 )
 
@@ -120,6 +122,8 @@ class InvokeAIAppConfig(BaseSettings):
         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
+        external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.
+        external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.
         external_gemini_api_key: API key for Gemini image generation.
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
@@ -223,6 +227,10 @@ class InvokeAIAppConfig(BaseSettings):
     strict_password_checking:      bool = Field(default=False,              description="Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.")
 
     # EXTERNAL PROVIDERS
+    external_alibabacloud_api_key: Optional[str] = Field(default=None, description="API key for Alibaba Cloud DashScope image generation.")
+    external_alibabacloud_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Alibaba Cloud DashScope image generation."
+    )
     external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
     external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")
     external_gemini_base_url: Optional[str] = Field(
