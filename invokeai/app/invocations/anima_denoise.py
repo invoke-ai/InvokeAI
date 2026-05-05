@@ -56,7 +56,6 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
     RectifiedFlowInpaintExtension,
     assert_broadcastable,
 )
-from invokeai.backend.rectified_flow.er_sde import ErSdeState, er_sde_rf_step
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, Range
 from invokeai.backend.util.devices import TorchDevice
@@ -169,7 +168,7 @@ class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
     title="Denoise - Anima",
     tags=["image", "anima"],
     category="image",
-    version="1.4.0",
+    version="1.5.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseInvocation(BaseInvocation):
@@ -495,10 +494,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         step_callback = self._build_step_callback(context)
 
-        # Initialize diffusers scheduler if not using built-in Euler or ER-SDE
+        # Initialize diffusers scheduler if not using built-in Euler.
         scheduler: SchedulerMixin | None = None
-        is_er_sde = self.scheduler == "er_sde"
-        use_scheduler = self.scheduler not in ("euler", "er_sde")
+        use_scheduler = self.scheduler != "euler"
 
         if use_scheduler:
             scheduler_class, scheduler_kwargs = ANIMA_SCHEDULER_MAP[self.scheduler]
@@ -514,7 +512,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
             num_scheduler_steps = total_steps
 
         step_generator: torch.Generator | None = None
-        if use_scheduler or is_er_sde:
+        if use_scheduler:
             step_generator = torch.Generator(device=device).manual_seed(self.seed)
 
         with ExitStack() as exit_stack:
@@ -667,66 +665,6 @@ class AnimaDenoiseInvocation(BaseInvocation):
                                 )
                             )
                 pbar.close()
-            elif is_er_sde:
-                # ER-SDE solver (Cui et al., arXiv:2309.06169). Math lives in
-                # invokeai/backend/rectified_flow/er_sde.py — see module docstring
-                # for the rectified-flow adaptation.
-                er_sde_state = ErSdeState()
-                for step_idx in tqdm(range(total_steps), desc="Denoising (Anima er_sde)"):
-                    sigma_curr = sigmas[step_idx]
-                    sigma_next = sigmas[step_idx + 1]
-
-                    timestep = torch.tensor(
-                        [sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
-                    ).expand(latents.shape[0])
-
-                    noise_pred_cond = _run_transformer(pos_context, latents, timestep).float()
-                    if do_cfg and neg_context is not None:
-                        noise_pred_uncond = _run_transformer(neg_context, latents, timestep).float()
-                        noise_pred = noise_pred_uncond + self.guidance_scale * (
-                            noise_pred_cond - noise_pred_uncond
-                        )
-                    else:
-                        noise_pred = noise_pred_cond
-
-                    # float32 is required to match x_t.to(torch.float32) below —
-                    # er_sde_rf_step's contract is that noise has the same dtype as x_t.
-                    fresh_noise = torch.randn(
-                        latents.shape,
-                        device=latents.device,
-                        dtype=torch.float32,
-                        generator=step_generator,
-                    )
-
-                    latents_dtype = latents.dtype
-                    latents = er_sde_rf_step(
-                        x_t=latents.to(torch.float32),
-                        v=noise_pred,
-                        sigma_curr=sigma_curr,
-                        sigma_next=sigma_next,
-                        state=er_sde_state,
-                        noise=fresh_noise,
-                    ).to(dtype=latents_dtype)
-
-                    if inpaint_extension is not None:
-                        latents_4d = latents.squeeze(2)
-                        # `sigma_next` here is what the Euler branch and the inpaint
-                        # extension's API call `sigma_prev` — both names refer to the
-                        # noise level the latents are AT after this step.
-                        latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(
-                            latents_4d, sigma_next
-                        )
-                        latents = latents_4d.unsqueeze(2)
-
-                    step_callback(
-                        PipelineIntermediateState(
-                            step=step_idx + 1,
-                            order=1,
-                            total_steps=total_steps,
-                            timestep=int(sigma_curr * 1000),
-                            latents=latents.squeeze(2),
-                        ),
-                    )
             else:
                 # Built-in Euler implementation (default for Anima)
                 for step_idx in tqdm(range(total_steps), desc="Denoising (Anima)"):
