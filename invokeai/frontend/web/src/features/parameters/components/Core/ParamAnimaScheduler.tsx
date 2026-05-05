@@ -13,6 +13,7 @@ const ANIMA_SCHEDULER_OPTIONS: ComboboxOption[] = [
   { value: 'heun', label: 'Heun (2nd order)' },
   { value: 'dpmpp_2m', label: 'DPM++ 2M' },
   { value: 'dpmpp_2m_sde', label: 'DPM++ 2M SDE' },
+  { value: 'er_sde', label: 'ER-SDE' },
   { value: 'lcm', label: 'LCM' },
 ];
 
