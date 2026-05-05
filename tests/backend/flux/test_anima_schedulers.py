@@ -104,5 +104,3 @@ def test_anima_literal_covers_every_map_key():
     literal_values = set(typing.get_args(ANIMA_SCHEDULER_NAME_VALUES))
     for name in ANIMA_SCHEDULER_MAP:
         assert name in literal_values, f"{name} is in the map but missing from the Literal"
-
-
