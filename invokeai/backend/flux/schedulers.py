@@ -62,9 +62,11 @@ if _HAS_LCM:
     ZIMAGE_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler
 
 
-# Anima scheduler types (same Flow Matching schedulers as Flux/Z-Image)
-# Anima uses rectified flow with shift=3.0 and multiplier=1000.
-# Recommended: 30 steps with Euler, CFG 4-5.
+# Anima scheduler types.
+# Anima uses rectified flow with shift=3.0. Sigmas are pre-shifted in
+# anima_denoise.py via loglinear_timestep_shift, so FlowMatch schedulers
+# receive shift=1.0 to avoid double-shifting. DPM++ flow_prediction
+# schedulers carry flow_shift=3.0 in their per-entry kwargs.
 ANIMA_SCHEDULER_NAME_VALUES = Literal["euler", "heun", "lcm"]
 
 ANIMA_SCHEDULER_LABELS: dict[str, str] = {
@@ -73,10 +75,10 @@ ANIMA_SCHEDULER_LABELS: dict[str, str] = {
     "lcm": "LCM",
 }
 
-ANIMA_SCHEDULER_MAP: dict[str, Type[SchedulerMixin]] = {
-    "euler": FlowMatchEulerDiscreteScheduler,
-    "heun": FlowMatchHeunDiscreteScheduler,
+ANIMA_SCHEDULER_MAP: dict[str, tuple[Type[SchedulerMixin], dict]] = {
+    "euler": (FlowMatchEulerDiscreteScheduler, {}),
+    "heun": (FlowMatchHeunDiscreteScheduler, {}),
 }
 
 if _HAS_LCM:
-    ANIMA_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler
+    ANIMA_SCHEDULER_MAP["lcm"] = (FlowMatchLCMScheduler, {})
