@@ -140,3 +140,51 @@ def test_er_sde_rf_step_state_mutation_after_first_call():
     assert state.old_d_x0 is None
     assert state.sigma_prev_curr == 0.8
     assert state.sigma_prev_prev is None
+
+
+def test_er_sde_rf_step_state_after_second_call_has_d_x0():
+    """After call 2: old_x0 updated, old_d_x0 set, sigma_prev_prev set."""
+    torch.manual_seed(0)
+    x_t = torch.randn(1, 16, 1, 8, 8, dtype=torch.float64)
+    v = torch.randn_like(x_t)
+    state = _make_state()
+    er_sde_rf_step(
+        x_t=x_t, v=v, sigma_curr=0.8, sigma_next=0.6,
+        state=state, noise=torch.randn_like(x_t),
+    )
+    er_sde_rf_step(
+        x_t=x_t, v=v, sigma_curr=0.6, sigma_next=0.4,
+        state=state, noise=torch.randn_like(x_t),
+    )
+    assert state.old_x0 is not None
+    assert state.old_d_x0 is not None
+    assert state.sigma_prev_curr == 0.6
+    assert state.sigma_prev_prev == 0.8
+
+
+def test_er_sde_rf_step_order_2_engages_after_one_step():
+    """When state has one-step history, the 2nd-order Taylor term must
+    contribute — output must differ from running 1st-order from empty state."""
+    torch.manual_seed(0)
+    x_t = torch.randn(1, 16, 1, 8, 8, dtype=torch.float64)
+    v = torch.randn_like(x_t)
+    noise = torch.randn_like(x_t)
+
+    # Setup: run one step to populate state.old_x0.
+    state_2nd = _make_state()
+    er_sde_rf_step(
+        x_t=x_t, v=v, sigma_curr=0.8, sigma_next=0.6,
+        state=state_2nd, noise=torch.randn_like(x_t),
+    )
+
+    # 1st-order only (empty state).
+    out_1st = er_sde_rf_step(
+        x_t=x_t, v=v, sigma_curr=0.6, sigma_next=0.4,
+        state=_make_state(), noise=noise,
+    )
+    # 2nd-order (history available).
+    out_2nd = er_sde_rf_step(
+        x_t=x_t, v=v, sigma_curr=0.6, sigma_next=0.4,
+        state=state_2nd, noise=noise,
+    )
+    assert not torch.allclose(out_1st, out_2nd, atol=1e-3)

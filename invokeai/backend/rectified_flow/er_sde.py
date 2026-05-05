@@ -108,7 +108,7 @@ def er_sde_rf_step(
     - Order 1 (used at step 0, when sigma_next == 0, or as multistep warmup):
       ports `vp_1_order` from the reference impl.
     - Order 2 (used from step 1+, except when sigma_next == 0): ports
-      `vp_2_order_taylor`. Added in a follow-up task.
+      `vp_2_order_taylor`.
     - Order 3 (used from step 2+, except when sigma_next == 0): ports
       `vp_3_order_taylor`. Added in a follow-up task.
 
@@ -158,9 +158,26 @@ def er_sde_rf_step(
     noise_std = math.sqrt(inner) * alpha_next
     x_next = r_alphas * r_fn * x_t + alpha_next * (1.0 - r_fn) * x0 + noise_std * noise
 
-    # State update for the next call. Order 2/3 update old_d_x0 in follow-up tasks.
+    # Multistep extensions: only when we have history AND this is not the terminal step.
+    # (Reference's ve_3_order_taylor includes `or sigmas[i+1] == 0` for the same reason;
+    # vp_3 omits it but the omission appears to be an oversight.)
+    have_one_back = state.old_x0 is not None and state.sigma_prev_curr is not None
+    not_terminal = sigma_next > 0.0
+    new_d_x0: torch.Tensor | None = None
+
+    if have_one_back and not_terminal:
+        # 2nd-order Taylor term — ports vp_2_order_taylor.
+        lambda_prev_curr = _lambda(state.sigma_prev_curr)
+        d_x0 = (x0 - state.old_x0) / (lambda_curr - lambda_prev_curr)
+        s_int = _integral_one_over_fn(lambda_next, lambda_curr)
+        x_next = x_next + alpha_next * (
+            lambda_next - lambda_curr + s_int * fn_next
+        ) * d_x0
+        new_d_x0 = d_x0
+
+    # State update for the next call.
     state.sigma_prev_prev = state.sigma_prev_curr
     state.sigma_prev_curr = sigma_curr
-    state.old_d_x0 = None
+    state.old_d_x0 = new_d_x0
     state.old_x0 = x0
     return x_next
