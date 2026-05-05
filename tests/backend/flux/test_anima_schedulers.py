@@ -104,3 +104,14 @@ def test_anima_literal_covers_every_map_key():
     literal_values = set(typing.get_args(ANIMA_SCHEDULER_NAME_VALUES))
     for name in ANIMA_SCHEDULER_MAP:
         assert name in literal_values, f"{name} is in the map but missing from the Literal"
+
+
+def test_anima_scheduler_literal_includes_er_sde():
+    """er_sde must appear in the literal type and have a label, but NOT
+    in ANIMA_SCHEDULER_MAP — it has a custom code path in anima_denoise.py."""
+    import typing
+
+    literal_args = typing.get_args(ANIMA_SCHEDULER_NAME_VALUES)
+    assert "er_sde" in literal_args
+    assert "er_sde" in ANIMA_SCHEDULER_LABELS
+    assert "er_sde" not in ANIMA_SCHEDULER_MAP
