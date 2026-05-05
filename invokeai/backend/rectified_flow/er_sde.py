@@ -161,7 +161,13 @@ def er_sde_rf_step(
     # Multistep extensions: only when we have history AND this is not the terminal step.
     # (Reference's ve_3_order_taylor includes `or sigmas[i+1] == 0` for the same reason;
     # vp_3 omits it but the omission appears to be an oversight.)
-    have_one_back = state.old_x0 is not None and state.sigma_prev_curr is not None
+    # Also skip when sigma_prev_curr is at the sigma=1 boundary: _lambda(1.0) diverges,
+    # and the finite-difference derivative across the limit branch is not meaningful.
+    have_one_back = (
+        state.old_x0 is not None
+        and state.sigma_prev_curr is not None
+        and 1.0 - state.sigma_prev_curr >= _SIGMA_ONE_TOLERANCE
+    )
     not_terminal = sigma_next > 0.0
     new_d_x0: torch.Tensor | None = None
 

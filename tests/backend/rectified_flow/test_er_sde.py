@@ -239,3 +239,41 @@ def test_er_sde_rf_step_order_3_engages_after_two_steps():
     # 3rd-order correction is ~0.0004 per unit-v element for these sigmas; with
     # 1024 elements and a fixed seed, ~12 elements reliably exceed atol=1e-3.
     assert not torch.allclose(out_2nd, out_3rd, atol=1e-3)
+
+
+def test_er_sde_rf_step_no_zerodivision_when_prev_sigma_was_one():
+    """Regression test: when step 0 goes through the sigma_curr=1 limit branch,
+    step 1 must NOT raise ZeroDivisionError.
+
+    Root cause: the sigma=1 boundary path sets state.sigma_prev_curr=1.0.
+    On step 1, have_one_back was True and the code called _lambda(1.0) =
+    1.0 / (1.0 - 1.0) which is division by zero. The fix adds a guard that
+    suppresses have_one_back when sigma_prev_curr is within _SIGMA_ONE_TOLERANCE
+    of 1.0, because the finite-difference derivative across that limit step is
+    not meaningful.
+    """
+    torch.manual_seed(0)
+    x_t = torch.randn(1, 16, 1, 8, 8, dtype=torch.float64)
+    v = torch.randn_like(x_t)
+    state = _make_state()
+
+    # Step 0: sigma_curr=1.0 -> closed-form limit branch; sets sigma_prev_curr=1.0.
+    x_t = er_sde_rf_step(
+        x_t=x_t, v=v,
+        sigma_curr=1.0, sigma_next=0.9,
+        state=state, noise=torch.randn_like(x_t),
+    )
+    # Step 1: sigma_prev_curr=1.0 -> _lambda(1.0) was ZeroDivisionError before fix.
+    x_t = er_sde_rf_step(
+        x_t=x_t, v=v,
+        sigma_curr=0.9, sigma_next=0.7,
+        state=state, noise=torch.randn_like(x_t),
+    )
+    assert torch.isfinite(x_t).all()
+    # Step 2: verify full sequence completes without error.
+    x_t = er_sde_rf_step(
+        x_t=x_t, v=v,
+        sigma_curr=0.7, sigma_next=0.0,
+        state=state, noise=torch.randn_like(x_t),
+    )
+    assert torch.isfinite(x_t).all()
