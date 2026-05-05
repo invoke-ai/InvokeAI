@@ -42,7 +42,12 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.anima.anima_transformer_patch import patch_anima_for_regional_prompting
 from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
 from invokeai.backend.anima.regional_prompting import AnimaRegionalPromptingExtension
-from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_LABELS, ANIMA_SCHEDULER_MAP, ANIMA_SCHEDULER_NAME_VALUES
+from invokeai.backend.flux.schedulers import (
+    ANIMA_SCHEDULER_LABELS,
+    ANIMA_SCHEDULER_MAP,
+    ANIMA_SCHEDULER_NAME_VALUES,
+    ANIMA_SHIFT,
+)
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_TRANSFORMER_PREFIX
@@ -59,8 +64,6 @@ from invokeai.backend.util.devices import TorchDevice
 ANIMA_LATENT_SCALE_FACTOR = 8
 # Anima uses 16 latent channels
 ANIMA_LATENT_CHANNELS = 16
-# Anima uses fixed shift=3.0 for the rectified flow schedule
-ANIMA_SHIFT = 3.0
 # Anima uses raw sigma values as timesteps (no rescaling)
 ANIMA_MULTIPLIER = 1.0
 

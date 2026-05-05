@@ -39,19 +39,23 @@ def test_anima_scheduler_map_includes_new_dpmpp_entries():
 
 
 def test_anima_dpmpp_2m_uses_flow_prediction():
+    from invokeai.backend.flux.schedulers import ANIMA_SHIFT
+
     cls, kwargs = ANIMA_SCHEDULER_MAP["dpmpp_2m"]
     assert kwargs["prediction_type"] == "flow_prediction"
     assert kwargs["use_flow_sigmas"] is True
-    assert kwargs["flow_shift"] == 3.0
+    assert kwargs["flow_shift"] == ANIMA_SHIFT
     assert kwargs["solver_order"] == 2
     assert "algorithm_type" not in kwargs  # deterministic, default algorithm
 
 
 def test_anima_dpmpp_2m_sde_uses_sde_algorithm():
+    from invokeai.backend.flux.schedulers import ANIMA_SHIFT
+
     cls, kwargs = ANIMA_SCHEDULER_MAP["dpmpp_2m_sde"]
     assert kwargs["prediction_type"] == "flow_prediction"
     assert kwargs["use_flow_sigmas"] is True
-    assert kwargs["flow_shift"] == 3.0
+    assert kwargs["flow_shift"] == ANIMA_SHIFT
     assert kwargs["algorithm_type"] == "sde-dpmsolver++"
     assert kwargs["solver_order"] == 2
 
@@ -67,10 +71,8 @@ def test_anima_dpmpp_2m_produces_anima_compatible_sigma_schedule():
     sigmas. This test verifies that equivalence end-to-end.
     """
     import inspect
-    from invokeai.app.invocations.anima_denoise import (
-        ANIMA_SHIFT,
-        loglinear_timestep_shift,
-    )
+    from invokeai.app.invocations.anima_denoise import loglinear_timestep_shift
+    from invokeai.backend.flux.schedulers import ANIMA_SHIFT
 
     num_steps = 10
 
@@ -95,3 +97,14 @@ def test_anima_dpmpp_2m_produces_anima_compatible_sigma_schedule():
     assert max_diff < 1e-3, (
         f"DPM++ 2M sigma schedule diverges from Anima reference (max abs diff = {max_diff:.6f})"
     )
+
+
+def test_anima_literal_covers_every_map_key():
+    """Catch the silent failure mode where a new entry lands in the map but
+    the Literal isn't updated — Pydantic validation would still accept it
+    via runtime introspection but type-check tooling would not."""
+    import typing
+
+    literal_values = set(typing.get_args(ANIMA_SCHEDULER_NAME_VALUES))
+    for name in ANIMA_SCHEDULER_MAP:
+        assert name in literal_values, f"{name} is in the map but missing from the Literal"

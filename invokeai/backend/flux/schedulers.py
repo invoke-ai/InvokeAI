@@ -70,6 +70,10 @@ if _HAS_LCM:
 # DPMSolverMultistepScheduler entries carry flow_shift=3.0 explicitly because
 # they do not receive pre-shifted sigmas via set_timesteps(sigmas=...) in the
 # same way — the shift is baked into the solver's sigma schedule.
+
+# Fixed shift factor for the Anima rectified-flow noise schedule.
+ANIMA_SHIFT = 3.0
+
 ANIMA_SCHEDULER_NAME_VALUES = Literal["euler", "heun", "dpmpp_2m", "dpmpp_2m_sde", "lcm"]
 
 ANIMA_SCHEDULER_LABELS: dict[str, str] = {
@@ -88,7 +92,7 @@ ANIMA_SCHEDULER_MAP: dict[str, tuple[Type[SchedulerMixin], dict[str, Any]]] = {
         {
             "prediction_type": "flow_prediction",
             "use_flow_sigmas": True,
-            "flow_shift": 3.0,  # matches anima_denoise.ANIMA_SHIFT
+            "flow_shift": ANIMA_SHIFT,
             "solver_order": 2,
         },
     ),
@@ -97,7 +101,7 @@ ANIMA_SCHEDULER_MAP: dict[str, tuple[Type[SchedulerMixin], dict[str, Any]]] = {
         {
             "prediction_type": "flow_prediction",
             "use_flow_sigmas": True,
-            "flow_shift": 3.0,  # matches anima_denoise.ANIMA_SHIFT
+            "flow_shift": ANIMA_SHIFT,
             "algorithm_type": "sde-dpmsolver++",
             "solver_order": 2,
         },
