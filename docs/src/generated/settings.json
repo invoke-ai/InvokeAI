@@ -743,6 +743,28 @@
     {
       "category": "EXTERNAL PROVIDERS",
       "default": null,
+      "description": "API key for Alibaba Cloud DashScope image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ALIBABACLOUD_API_KEY",
+      "literal_values": [],
+      "name": "external_alibabacloud_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for Alibaba Cloud DashScope image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ALIBABACLOUD_BASE_URL",
+      "literal_values": [],
+      "name": "external_alibabacloud_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
       "description": "API key for Gemini image generation.",
       "env_var": "INVOKEAI_EXTERNAL_GEMINI_API_KEY",
       "literal_values": [],
