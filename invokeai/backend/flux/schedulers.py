@@ -85,6 +85,12 @@ ANIMA_SCHEDULER_LABELS: dict[str, str] = {
     "lcm": "LCM",
 }
 
+# When adding a new Anima scheduler:
+# - If it wraps a diffusers SchedulerMixin: add to all three of NAME_VALUES, LABELS, and this MAP.
+# - If it has a custom code path in anima_denoise.py (e.g. er_sde, which uses
+#   the pure helper in invokeai/backend/rectified_flow/er_sde.py): add to
+#   NAME_VALUES and LABELS only — leave it out of this MAP. The dispatch
+#   in anima_denoise._run_diffusion routes such schedulers to their custom branch.
 ANIMA_SCHEDULER_MAP: dict[str, tuple[Type[SchedulerMixin], dict[str, Any]]] = {
     "euler": (FlowMatchEulerDiscreteScheduler, {"shift": 1.0}),
     "heun": (FlowMatchHeunDiscreteScheduler, {"shift": 1.0}),

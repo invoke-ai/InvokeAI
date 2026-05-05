@@ -1,5 +1,7 @@
 """Tests for Anima scheduler registry."""
 
+import typing
+
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
 from invokeai.backend.flux.schedulers import (
@@ -99,8 +101,6 @@ def test_anima_literal_covers_every_map_key():
     """Catch the silent failure mode where a new entry lands in the map but
     the Literal isn't updated — Pydantic validation would still accept it
     via runtime introspection but type-check tooling would not."""
-    import typing
-
     literal_values = set(typing.get_args(ANIMA_SCHEDULER_NAME_VALUES))
     for name in ANIMA_SCHEDULER_MAP:
         assert name in literal_values, f"{name} is in the map but missing from the Literal"
@@ -109,9 +109,8 @@ def test_anima_literal_covers_every_map_key():
 def test_anima_scheduler_literal_includes_er_sde():
     """er_sde must appear in the literal type and have a label, but NOT
     in ANIMA_SCHEDULER_MAP — it has a custom code path in anima_denoise.py."""
-    import typing
-
     literal_args = typing.get_args(ANIMA_SCHEDULER_NAME_VALUES)
     assert "er_sde" in literal_args
     assert "er_sde" in ANIMA_SCHEDULER_LABELS
+    assert ANIMA_SCHEDULER_LABELS["er_sde"] == "ER-SDE"
     assert "er_sde" not in ANIMA_SCHEDULER_MAP
