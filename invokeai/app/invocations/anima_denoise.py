@@ -689,6 +689,8 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     else:
                         noise_pred = noise_pred_cond
 
+                    # float32 is required to match x_t.to(torch.float32) below —
+                    # er_sde_rf_step's contract is that noise has the same dtype as x_t.
                     fresh_noise = torch.randn(
                         latents.shape,
                         device=latents.device,
@@ -708,6 +710,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
                     if inpaint_extension is not None:
                         latents_4d = latents.squeeze(2)
+                        # `sigma_next` here is what the Euler branch and the inpaint
+                        # extension's API call `sigma_prev` — both names refer to the
+                        # noise level the latents are AT after this step.
                         latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(
                             latents_4d, sigma_next
                         )
