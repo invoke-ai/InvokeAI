@@ -126,29 +126,34 @@ def _anima_euler_ancestral_step(
 ) -> torch.Tensor:
     """One ancestral Euler step for rectified-flow models.
 
-    Algorithm (under CONST / flow-matching parameterization, with structure
-    inspired by LTXEulerAncestralRFScheduler in diffusers main):
+    Rectified-flow forward process: x_t = (1 - sigma_t) * x_data + sigma_t * noise.
+    Given current latents at sigma_curr and the model's velocity prediction
+    `v = noise_curr - x_data`, we recover both x_data and the implied noise
+    direction, mix the implied noise with fresh noise (variance-preserving), and
+    re-form the sample at sigma_prev.
 
-        x0       = latents - sigma_curr * v                      # denoised reconstruction
-        sigma_up = eta * sigma_prev * sqrt(max(1 - (sigma_prev / sigma_curr)^2, 0))
-        sigma_dn = sqrt(max(sigma_prev^2 - sigma_up^2, 0))
-        direction = (latents - x0) / sigma_curr                  # equals v under flow matching
-        x_prev   = x0 + sigma_dn * direction + s_noise * sigma_up * noise
+        x_data      = latents - sigma_curr * v
+        noise_curr  = latents + (1 - sigma_curr) * v          # so that latents = (1-sigma_curr)*x_data + sigma_curr*noise_curr
+        mixed_noise = sqrt(1 - eta^2) * noise_curr + eta * s_noise * noise
+        x_prev      = (1 - sigma_prev) * x_data + sigma_prev * mixed_noise
 
-    With eta=0, sigma_up=0 and sigma_dn=sigma_prev, recovering the deterministic
-    Euler step `latents + (sigma_prev - sigma_curr) * v` exactly:
-    `x0 + sigma_prev * v = (latents - sigma_curr * v) + sigma_prev * v`. At the
-    terminal step (sigma_prev == 0) the early-return guard short-circuits to
-    the deterministic Euler step directly — no spurious noise injection.
+    Limits:
+      - eta=0 → mixed_noise = noise_curr → x_prev expands to the deterministic
+        Euler step `latents + (sigma_prev - sigma_curr) * v`.
+      - eta=1 → mixed_noise = s_noise * fresh_noise → full ancestral resample
+        at sigma_prev (no velocity coefficient in the result).
+
+    The terminal-step early return handles sigma_curr == 0 (no current noise to
+    decompose) and sigma_prev == 0 (target is pure x_data).
 
     Args:
         latents:    Current latents x_t. Shape [B, C, T, H, W] for Anima.
         v:          Velocity prediction (model output, post-CFG).
         sigma_curr: Sigma at the current step.
         sigma_prev: Sigma at the next step (target).
-        noise:      Pre-sampled noise tensor with the same shape and dtype as latents.
+        noise:      Pre-sampled noise tensor with the same shape as latents.
         eta:        Ancestral noise scale, 0.0=deterministic Euler, 1.0=full ancestral.
-        s_noise:    Multiplier on the injected noise.
+        s_noise:    Multiplier on the injected noise term.
 
     Returns:
         Latents at sigma_prev.
@@ -156,16 +161,11 @@ def _anima_euler_ancestral_step(
     if sigma_prev == 0.0 or sigma_curr == 0.0:
         return latents + (sigma_prev - sigma_curr) * v
 
-    x0 = latents - sigma_curr * v
-    ratio_sq = (sigma_prev / sigma_curr) ** 2
-    sigma_up = eta * sigma_prev * math.sqrt(max(1.0 - ratio_sq, 0.0))
-    sigma_dn = math.sqrt(max(sigma_prev**2 - sigma_up**2, 0.0))
-
-    direction = (latents - x0) / sigma_curr  # equals v under flow matching
-    x_prev = x0 + sigma_dn * direction
-    if sigma_up > 0.0:
-        x_prev = x_prev + s_noise * sigma_up * noise
-    return x_prev
+    x_data = latents - sigma_curr * v
+    noise_curr = latents + (1.0 - sigma_curr) * v
+    keep_factor = math.sqrt(max(1.0 - eta * eta, 0.0))
+    mixed_noise = keep_factor * noise_curr + eta * s_noise * noise
+    return (1.0 - sigma_prev) * x_data + sigma_prev * mixed_noise
 
 
 class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
