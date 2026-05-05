@@ -497,12 +497,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         if use_scheduler:
             scheduler_class, scheduler_kwargs = ANIMA_SCHEDULER_MAP[self.scheduler]
-            init_kwargs: dict = {"num_train_timesteps": 1000, **scheduler_kwargs}
-            if scheduler_kwargs.get("use_flow_sigmas"):
-                init_kwargs["flow_shift"] = ANIMA_SHIFT
-            else:
-                init_kwargs["shift"] = 1.0
-            scheduler = scheduler_class(**init_kwargs)
+            scheduler = scheduler_class(num_train_timesteps=1000, **scheduler_kwargs)
             is_lcm = self.scheduler == "lcm"
             set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
             if not is_lcm and "sigmas" in set_timesteps_sig.parameters:

@@ -4,7 +4,7 @@ This module provides the scheduler types and mapping for Flow Matching models
 (Flux and Z-Image), supporting multiple schedulers from the diffusers library.
 """
 
-from typing import Literal, Type
+from typing import Any, Literal, Type
 
 from diffusers import (
     FlowMatchEulerDiscreteScheduler,
@@ -65,8 +65,7 @@ if _HAS_LCM:
 # Anima scheduler types.
 # Anima uses rectified flow with shift=3.0. Sigmas are pre-shifted in
 # anima_denoise.py via loglinear_timestep_shift, so FlowMatch schedulers
-# receive shift=1.0 to avoid double-shifting. DPM++ flow_prediction
-# schedulers carry flow_shift=3.0 in their per-entry kwargs.
+# carry shift=1.0 in their per-entry kwargs to avoid double-shifting.
 ANIMA_SCHEDULER_NAME_VALUES = Literal["euler", "heun", "lcm"]
 
 ANIMA_SCHEDULER_LABELS: dict[str, str] = {
@@ -75,10 +74,10 @@ ANIMA_SCHEDULER_LABELS: dict[str, str] = {
     "lcm": "LCM",
 }
 
-ANIMA_SCHEDULER_MAP: dict[str, tuple[Type[SchedulerMixin], dict]] = {
-    "euler": (FlowMatchEulerDiscreteScheduler, {}),
-    "heun": (FlowMatchHeunDiscreteScheduler, {}),
+ANIMA_SCHEDULER_MAP: dict[str, tuple[Type[SchedulerMixin], dict[str, Any]]] = {
+    "euler": (FlowMatchEulerDiscreteScheduler, {"shift": 1.0}),
+    "heun": (FlowMatchHeunDiscreteScheduler, {"shift": 1.0}),
 }
 
 if _HAS_LCM:
-    ANIMA_SCHEDULER_MAP["lcm"] = (FlowMatchLCMScheduler, {})
+    ANIMA_SCHEDULER_MAP["lcm"] = (FlowMatchLCMScheduler, {"shift": 1.0})

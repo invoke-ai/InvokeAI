@@ -1,7 +1,5 @@
 """Tests for Anima scheduler registry and ancestral-Euler helper."""
 
-import pytest
-import torch
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
 from invokeai.backend.flux.schedulers import (
@@ -24,14 +22,9 @@ def test_anima_scheduler_map_entries_are_class_kwargs_tuples():
 
 
 def test_anima_scheduler_map_entries_can_be_constructed():
-    """Every entry must construct cleanly with Anima's standard init args."""
+    """Every entry must construct cleanly by splatting its kwargs."""
     for name, (cls, kwargs) in ANIMA_SCHEDULER_MAP.items():
-        init_kwargs = {"num_train_timesteps": 1000, **kwargs}
-        if kwargs.get("use_flow_sigmas"):
-            init_kwargs["flow_shift"] = 3.0
-        else:
-            init_kwargs["shift"] = 1.0
-        scheduler = cls(**init_kwargs)
+        scheduler = cls(num_train_timesteps=1000, **kwargs)
         assert isinstance(scheduler, SchedulerMixin), f"{name} did not produce a SchedulerMixin"
 
 
