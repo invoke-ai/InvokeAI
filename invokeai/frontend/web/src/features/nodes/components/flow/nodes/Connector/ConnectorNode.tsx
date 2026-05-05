@@ -10,9 +10,15 @@ import type { CSSProperties } from 'react';
 import { memo } from 'react';
 import { PiDotOutlineFill } from 'react-icons/pi';
 
+const CONNECTOR_NODE_SIZE = 35;
+const CONNECTOR_HANDLE_SIZE = 24;
+const CONNECTOR_HANDLE_OFFSET = -CONNECTOR_HANDLE_SIZE / 2;
+
 const handleVisualSx = {
-  w: 3,
-  h: 3,
+  position: 'absolute',
+  top: '50%',
+  w: 4,
+  h: 4,
   borderRadius: 'full',
   borderWidth: 2,
   borderColor: 'base.900',
@@ -20,15 +26,44 @@ const handleVisualSx = {
   pointerEvents: 'none',
 } satisfies SystemStyleObject;
 
+const inputHandleVisualSx = {
+  ...handleVisualSx,
+  left: 0,
+  transform: 'translate(-50%, -50%)',
+} satisfies SystemStyleObject;
+
+const outputHandleVisualSx = {
+  ...handleVisualSx,
+  right: 0,
+  transform: 'translate(50%, -50%)',
+} satisfies SystemStyleObject;
+
+const connectorSx = {
+  '& .connector-border': {
+    pointerEvents: 'none',
+    position: 'absolute',
+    inset: 0,
+    borderRadius: 'inherit',
+    shadow: '0 0 0 1px var(--invoke-colors-base-500)',
+  },
+  _hover: {
+    '& .connector-border': {
+      shadow: '0 0 0 1px var(--invoke-colors-blue-300)',
+    },
+    '&[data-is-selected="true"] .connector-border': {
+      shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
+    },
+  },
+  '&[data-is-selected="true"] .connector-border': {
+    shadow: '0 0 0 2px var(--invoke-colors-blue-300)',
+  },
+} satisfies SystemStyleObject;
+
 const handleStyles = {
   position: 'absolute',
-  width: '1rem',
-  height: '1rem',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  top: '50%',
-  transform: 'translateY(-50%)',
+  width: `${CONNECTOR_HANDLE_SIZE}px`,
+  height: `${CONNECTOR_HANDLE_SIZE}px`,
+  top: `calc(50% + ${CONNECTOR_HANDLE_OFFSET}px)`,
   zIndex: 1,
   background: 'none',
   border: 'none',
@@ -36,28 +71,36 @@ const handleStyles = {
 
 const inputHandleStyles = {
   ...handleStyles,
-  insetInlineStart: 0,
-  justifyContent: 'flex-start',
+  left: 0,
+  transform: 'none',
 } satisfies CSSProperties;
 
 const outputHandleStyles = {
   ...handleStyles,
-  insetInlineEnd: 0,
-  justifyContent: 'flex-end',
+  right: 0,
+  transform: 'none',
 } satisfies CSSProperties;
 
 const ConnectorNode = ({ id, selected }: NodeProps<Node<ConnectorNodeData>>) => {
   return (
-    <NonInvocationNodeWrapper nodeId={id} selected={selected} width={25} borderRadius="full" withChrome={false}>
+    <NonInvocationNodeWrapper
+      nodeId={id}
+      selected={selected}
+      width={CONNECTOR_NODE_SIZE}
+      borderRadius="full"
+      withChrome={false}
+    >
       <Box
         data-connector-node-context-menu="true"
         data-connector-node-id={id}
+        data-is-selected={selected}
         position="relative"
-        w={25}
-        h={25}
+        w={CONNECTOR_NODE_SIZE}
+        h={CONNECTOR_NODE_SIZE}
         display="flex"
         alignItems="center"
         justifyContent="center"
+        sx={connectorSx}
       >
         <Handle
           className={NO_DRAG_CLASS}
@@ -66,18 +109,19 @@ const ConnectorNode = ({ id, selected }: NodeProps<Node<ConnectorNodeData>>) => 
           position={Position.Left}
           style={inputHandleStyles}
         >
-          <Box sx={handleVisualSx} />
+          <Box sx={inputHandleVisualSx} />
         </Handle>
         <Box
-          w={13}
-          h={13}
+          position="relative"
+          w={CONNECTOR_NODE_SIZE}
+          h={CONNECTOR_NODE_SIZE}
           display="flex"
           alignItems="center"
           justifyContent="center"
           borderRadius="full"
           bg={selected ? 'base.650' : 'base.700'}
-          boxShadow={selected ? '0 0 0 2px var(--invoke-colors-blue-300)' : '0 0 0 1px var(--invoke-colors-base-500)'}
         >
+          <Box className="connector-border" />
           <Icon as={PiDotOutlineFill} boxSize={5} color={selected ? 'base.50' : 'base.100'} />
         </Box>
         <Handle
@@ -87,7 +131,7 @@ const ConnectorNode = ({ id, selected }: NodeProps<Node<ConnectorNodeData>>) => 
           position={Position.Right}
           style={outputHandleStyles}
         >
-          <Box sx={handleVisualSx} />
+          <Box sx={outputHandleVisualSx} />
         </Handle>
       </Box>
     </NonInvocationNodeWrapper>
