@@ -175,6 +175,9 @@ def er_sde_rf_step(
         ) * d_x0
         new_d_x0 = d_x0
 
+        # Both conditions are needed: the sigma~=1 boundary path advances
+        # sigma_prev_prev while clearing old_d_x0, so a single-field check
+        # would be insufficient if a near-unity sigma occurs mid-sequence.
         have_two_back = state.old_d_x0 is not None and state.sigma_prev_prev is not None
         if have_two_back:
             # 3rd-order Taylor term — ports vp_3_order_taylor.

@@ -236,4 +236,6 @@ def test_er_sde_rf_step_order_3_engages_after_two_steps():
         x_t=x_t, v=v, sigma_curr=0.6, sigma_next=0.5,
         state=state_3rd, noise=noise,
     )
+    # 3rd-order correction is ~0.0004 per unit-v element for these sigmas; with
+    # 1024 elements and a fixed seed, ~12 elements reliably exceed atol=1e-3.
     assert not torch.allclose(out_2nd, out_3rd, atol=1e-3)
