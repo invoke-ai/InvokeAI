@@ -387,7 +387,12 @@
         "expandPromptWithLLM": "Expand Prompt with LLM",
         "expandPrompt": "Expand Prompt",
         "selectTextLLM": "Select Text LLM...",
-        "expand": "Expand"
+        "expand": "Expand",
+        "noTextLLMInstalledTitle": "No Text LLM installed",
+        "noTextLLMInstalledDescription": "Prompt expansion needs a Text LLM (causal language model). We recommend Qwen2.5-1.5B-Instruct (~3 GB) — small, fast, and available as a starter model.",
+        "noVisionModelInstalledTitle": "No vision model installed",
+        "noVisionModelInstalledDescription": "Image-to-prompt needs a vision-language model (e.g. LLaVA Onevision). The 0.5B starter (~1 GB) is the lightweight default.",
+        "openModelManager": "Open Model Manager"
     },
     "queue": {
         "queue": "Queue",
@@ -770,6 +775,14 @@
                 "title": "Reset Layer",
                 "desc": "Reset the selected layer. Only applies to Inpaint Mask and Regional Guidance."
             },
+            "mergeDown": {
+                "title": "Merge Layer Down",
+                "desc": "Merge the selected layer into the layer directly below it."
+            },
+            "mergeVisible": {
+                "title": "Merge All Visible Layers",
+                "desc": "Merge all visible layers of the selected layer type."
+            },
             "undo": {
                 "title": "Undo",
                 "desc": "Undo the last canvas action."
@@ -1141,7 +1154,7 @@
         "externalApiKey": "API Key",
         "externalApiKeyPlaceholder": "Paste your API key",
         "externalApiKeyPlaceholderSet": "API key configured",
-        "externalApiKeyHelper": "Stored in your InvokeAI config file.",
+        "externalApiKeyHelper": "Stored in api_keys.yaml in your InvokeAI root directory.",
         "externalBaseUrl": "Base URL (optional)",
         "externalBaseUrlPlaceholder": "https://...",
         "externalBaseUrlHelper": "Override the default API base URL if needed.",
