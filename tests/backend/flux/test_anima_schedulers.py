@@ -1,5 +1,6 @@
 """Tests for Anima scheduler registry and ancestral-Euler helper."""
 
+import torch
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
 from invokeai.backend.flux.schedulers import (
@@ -108,3 +109,63 @@ def test_anima_literal_covers_every_map_key():
     literal_values = set(typing.get_args(ANIMA_SCHEDULER_NAME_VALUES))
     for name in ANIMA_SCHEDULER_MAP:
         assert name in literal_values, f"{name} is in the map but missing from the Literal"
+
+
+from invokeai.app.invocations.anima_denoise import _anima_euler_ancestral_step
+
+
+def _deterministic_euler_step(latents, v, sigma_curr, sigma_prev):
+    """Reference deterministic Euler step (matches the built-in Euler loop)."""
+    return latents + (sigma_prev - sigma_curr) * v
+
+
+def test_anima_euler_ancestral_step_eta_zero_matches_deterministic_euler():
+    """With eta=0, the ancestral step must be byte-identical to deterministic Euler."""
+    torch.manual_seed(0)
+    latents = torch.randn(1, 16, 1, 8, 8)
+    v = torch.randn(1, 16, 1, 8, 8)
+    noise = torch.randn_like(latents)
+    sigma_curr, sigma_prev = 0.6, 0.4
+
+    deterministic = _deterministic_euler_step(latents, v, sigma_curr, sigma_prev)
+    ancestral_eta_zero = _anima_euler_ancestral_step(
+        latents=latents, v=v, sigma_curr=sigma_curr, sigma_prev=sigma_prev,
+        noise=noise, eta=0.0, s_noise=1.0,
+    )
+    assert torch.allclose(deterministic, ancestral_eta_zero, atol=1e-6)
+
+
+def test_anima_euler_ancestral_step_eta_one_differs_from_deterministic():
+    """With eta=1, output must differ from deterministic Euler (noise was injected)."""
+    torch.manual_seed(0)
+    latents = torch.randn(1, 16, 1, 8, 8)
+    v = torch.randn(1, 16, 1, 8, 8)
+    noise = torch.randn_like(latents)
+    sigma_curr, sigma_prev = 0.6, 0.4
+
+    deterministic = _deterministic_euler_step(latents, v, sigma_curr, sigma_prev)
+    ancestral_eta_one = _anima_euler_ancestral_step(
+        latents=latents, v=v, sigma_curr=sigma_curr, sigma_prev=sigma_prev,
+        noise=noise, eta=1.0, s_noise=1.0,
+    )
+    assert not torch.allclose(deterministic, ancestral_eta_one, atol=1e-3)
+
+
+def test_anima_euler_ancestral_step_preserves_shape_and_dtype():
+    latents = torch.randn(1, 16, 1, 8, 8, dtype=torch.float32)
+    v = torch.randn_like(latents)
+    noise = torch.randn_like(latents)
+    out = _anima_euler_ancestral_step(latents, v, 0.6, 0.4, noise, eta=1.0, s_noise=1.0)
+    assert out.shape == latents.shape
+    assert out.dtype == latents.dtype
+
+
+def test_anima_euler_ancestral_step_at_final_step_is_clean():
+    """When sigma_prev == 0, no noise should be injected even with eta=1."""
+    latents = torch.randn(1, 16, 1, 8, 8)
+    v = torch.randn_like(latents)
+    noise = torch.randn_like(latents)
+    sigma_curr, sigma_prev = 0.05, 0.0
+    out = _anima_euler_ancestral_step(latents, v, sigma_curr, sigma_prev, noise, eta=1.0, s_noise=1.0)
+    deterministic = _deterministic_euler_step(latents, v, sigma_curr, sigma_prev)
+    assert torch.allclose(out, deterministic, atol=1e-6)
