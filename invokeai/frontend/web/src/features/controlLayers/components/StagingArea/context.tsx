@@ -59,6 +59,9 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
       },
       onDiscard: ({ item_id, status }) => {
         store.dispatch(canvasQueueItemDiscarded({ itemId: item_id }));
+        if (selectQueueItems(store.getState()).length === 0) {
+          store.dispatch(canvasSessionReset());
+        }
         if (status === 'in_progress' || status === 'pending') {
           store.dispatch(queueApi.endpoints.cancelQueueItem.initiate({ item_id }, { track: false }));
         }
@@ -72,14 +75,22 @@ export const StagingAreaContextProvider = memo(({ children, sessionId }: PropsWi
       onAccept: (item, imageDTO) => {
         const bboxRect = selectBboxRect(store.getState());
         const { x, y } = bboxRect;
-        const imageObject = imageDTOToImageObject(imageDTO);
+        const imageObject = imageDTOToImageObject(imageDTO, { usePixelBbox: false });
+        const scale = Math.min(bboxRect.width / imageDTO.width, bboxRect.height / imageDTO.height);
+        const scaledWidth = Math.round(imageDTO.width * scale);
+        const scaledHeight = Math.round(imageDTO.height * scale);
+        const position = {
+          x: x + Math.round((bboxRect.width - scaledWidth) / 2),
+          y: y + Math.round((bboxRect.height - scaledHeight) / 2),
+        };
         const selectedEntityIdentifier = selectSelectedEntityIdentifier(store.getState());
+
         const overrides: Partial<CanvasRasterLayerState> = {
-          position: { x, y },
+          position,
           objects: [imageObject],
         };
-
         store.dispatch(rasterLayerAdded({ overrides, isSelected: selectedEntityIdentifier?.type === 'raster_layer' }));
+
         store.dispatch(canvasSessionReset());
         store.dispatch(
           queueApi.endpoints.cancelQueueItemsByDestination.initiate({ destination: sessionId }, { track: false })
@@ -117,12 +128,6 @@ export const useStagingAreaContext = () => {
   const ctx = useContext(StagingAreaContext);
   assert(ctx !== null, "'useStagingAreaContext' must be used within a StagingAreaContextProvider");
   return ctx;
-};
-
-export const useOutputImageDTO = (itemId: number) => {
-  const ctx = useStagingAreaContext();
-  const allProgressData = useStore(ctx.$progressData, { keys: [itemId] });
-  return allProgressData[itemId]?.imageDTO ?? null;
 };
 
 export const useProgressDatum = (itemId: number): ProgressData => {

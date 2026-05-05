@@ -8,10 +8,12 @@ import {
   selectZImageSeedVarianceEnabled,
   selectZImageSeedVarianceRandomizePercent,
   selectZImageSeedVarianceStrength,
+  selectZImageShift,
   selectZImageVaeModel,
 } from 'features/controlLayers/store/paramsSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
+import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { addZImageControl } from 'features/nodes/util/graph/generation/addControlAdapters';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
@@ -58,6 +60,9 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
   // (1.0 means no CFG effect, matching FLUX convention)
   const { cfgScale: guidance_scale, steps, zImageScheduler } = params;
 
+  // Shift override (null = auto-calculate from image dimensions)
+  const zImageShift = selectZImageShift(state);
+
   // Seed Variance Enhancer settings
   const seedVarianceEnabled = selectZImageSeedVarianceEnabled(state);
   const seedVarianceStrength = selectZImageSeedVarianceStrength(state);
@@ -73,7 +78,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     model,
     vae_model: zImageVaeModel ?? undefined,
     qwen3_encoder_model: zImageQwen3EncoderModel ?? undefined,
-    qwen3_source_model: zImageQwen3SourceModel ?? undefined,
+    qwen3_source_model: (zImageQwen3SourceModel as ModelIdentifierField | null) ?? undefined,
   });
 
   const positivePrompt = g.addNode({
@@ -122,6 +127,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     guidance_scale,
     steps,
     scheduler: zImageScheduler,
+    shift: zImageShift ?? undefined,
   });
   const l2i = g.addNode({
     type: 'z_image_l2i',
@@ -216,6 +222,7 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     z_image_seed_variance_enabled: seedVarianceEnabled,
     z_image_seed_variance_strength: seedVarianceStrength,
     z_image_seed_variance_randomize_percent: seedVarianceRandomizePercent,
+    z_image_shift: zImageShift ?? undefined,
   });
   g.addEdgeToMetadata(seed, 'value', 'seed');
   g.addEdgeToMetadata(positivePrompt, 'value', 'positive_prompt');

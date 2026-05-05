@@ -35,8 +35,16 @@ export const zGalleryState = z.object({
   comparisonMode: zComparisonMode,
   comparisonFit: zComparisonFit,
   shouldShowArchivedBoards: z.boolean(),
+  showVirtualBoards: z.boolean(),
+  virtualBoardsSectionOpen: z.boolean(),
   boardsListOrderBy: zBoardRecordOrderBy,
   boardsListOrderDir: zOrderDir,
 });
 
 export type GalleryState = z.infer<typeof zGalleryState>;
+
+const VIRTUAL_BOARD_ID_PREFIX = 'by_date:';
+
+export const isVirtualBoardId = (id: string): boolean => id.startsWith(VIRTUAL_BOARD_ID_PREFIX);
+
+export const getDateFromVirtualBoardId = (id: string): string => id.replace(VIRTUAL_BOARD_ID_PREFIX, '');

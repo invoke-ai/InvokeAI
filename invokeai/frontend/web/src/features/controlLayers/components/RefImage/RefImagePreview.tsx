@@ -13,8 +13,10 @@ import {
 import { isIPAdapterConfig } from 'features/controlLayers/store/types';
 import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PiExclamationMarkBold, PiEyeSlashBold, PiImageBold } from 'react-icons/pi';
 import { useImageDTOFromCroppableImage } from 'services/api/endpoints/images';
+import { isExternalApiModelConfig } from 'services/api/types';
 
 import { RefImageWarningTooltipContent } from './RefImageWarningTooltipContent';
 
@@ -64,6 +66,7 @@ const getImageSxWithWeight = (weight: number): SystemStyleObject => {
 };
 
 export const RefImagePreview = memo(() => {
+  const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const id = useRefImageIdContext();
   const entity = useRefImageEntity(id);
@@ -71,18 +74,19 @@ export const RefImagePreview = memo(() => {
   const selectedEntityId = useAppSelector(selectSelectedRefEntityId);
   const isPanelOpen = useAppSelector(selectIsRefImagePanelOpen);
   const [showWeightDisplay, setShowWeightDisplay] = useState(false);
+  const isExternalModel = !!mainModelConfig && isExternalApiModelConfig(mainModelConfig);
 
   const imageDTO = useImageDTOFromCroppableImage(entity.config.image);
 
   const sx = useMemo(() => {
-    if (!isIPAdapterConfig(entity.config)) {
+    if (!isIPAdapterConfig(entity.config) || isExternalModel) {
       return baseSx;
     }
     return getImageSxWithWeight(entity.config.weight);
-  }, [entity.config]);
+  }, [entity.config, isExternalModel]);
 
   useEffect(() => {
-    if (!isIPAdapterConfig(entity.config)) {
+    if (!isIPAdapterConfig(entity.config) || isExternalModel) {
       return;
     }
     setShowWeightDisplay(true);
@@ -92,7 +96,7 @@ export const RefImagePreview = memo(() => {
     return () => {
       window.clearTimeout(timeout);
     };
-  }, [entity.config]);
+  }, [entity.config, isExternalModel]);
 
   const warnings = useMemo(() => {
     return getGlobalReferenceImageWarnings(entity, mainModelConfig);
@@ -105,7 +109,7 @@ export const RefImagePreview = memo(() => {
   if (!entity.config.image) {
     return (
       <IconButton
-        aria-label="Select Ref Image"
+        aria-label={t('controlLayers.selectRefImage')}
         h="full"
         variant="ghost"
         aspectRatio="1/1"
@@ -154,7 +158,7 @@ export const RefImagePreview = memo(() => {
         ) : (
           <Skeleton h="full" aspectRatio="1/1" />
         )}
-        {isIPAdapterConfig(entity.config) && (
+        {isIPAdapterConfig(entity.config) && !isExternalModel && (
           <Flex
             position="absolute"
             inset={0}

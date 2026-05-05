@@ -11,11 +11,13 @@ from pydantic import ValidationError
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.model_records import (
     DuplicateModelException,
+    ModelRecordOrderBy,
     ModelRecordServiceBase,
     ModelRecordServiceSQL,
     UnknownModelException,
 )
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SDXL_Config
 from invokeai.backend.model_manager.configs.main import (
@@ -24,6 +26,8 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SDXL_Config,
     MainModelDefaultSettings,
 )
+from invokeai.backend.model_manager.configs.qwen3_encoder import Qwen3Encoder_Qwen3Encoder_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.configs.textual_inversion import TI_File_SD1_Config
 from invokeai.backend.model_manager.configs.vae import VAE_Diffusers_SD1_Config
 from invokeai.backend.model_manager.taxonomy import (
@@ -33,6 +37,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelSourceType,
     ModelType,
     ModelVariantType,
+    Qwen3VariantType,
     SchedulerPredictionType,
 )
 from invokeai.backend.util.logging import InvokeAILogger
@@ -108,6 +113,30 @@ def test_model_records_updates_model_class(store: ModelRecordServiceBase):
     )
     new_config = store.update_model(config.key, changes, allow_class_change=True)
     assert isinstance(new_config, LoRA_LyCORIS_SDXL_Config)
+
+
+def test_update_changing_type_drops_stale_format_and_variant(store: ModelRecordServiceBase):
+    """When the type changes, format/variant from the old class must not block validation of the new class.
+
+    Regression test for https://github.com/invoke-ai/InvokeAI/issues/9090: switching a misidentified
+    Qwen3 encoder to TextLLM previously failed because the old `format=qwen3_encoder` and `variant`
+    fields were carried over and no discriminator under `type=text_llm` matched.
+    """
+    config = Qwen3Encoder_Qwen3Encoder_Config(
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path="/tmp/Qwen2.5-1.5B-Instruct",
+        file_size=1024,
+        name="Qwen2.5-1.5B-Instruct",
+        hash="ABC123",
+        variant=Qwen3VariantType.Qwen3_4B,
+    )
+    config.key = "key1"
+    store.add_model(config)
+
+    changes = ModelRecordChanges(type=ModelType.TextLLM)
+    new_config = store.update_model(config.key, changes, allow_class_change=True)
+    assert isinstance(new_config, TextLLM_Diffusers_Config)
 
 
 def test_model_records_rejects_invalid_attr_changes(store: ModelRecordServiceBase):
@@ -362,6 +391,73 @@ def test_filter_2(store: ModelRecordServiceBase):
         model_name="dup_name1",
     )
     assert len(matches) == 1
+
+
+def test_search_by_attr_sorting(store: ModelRecordServiceSQL):
+    config1 = Main_Diffusers_SD1_Config(
+        path="/tmp/config1",
+        name="alpha",
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.Main,
+        hash="CONFIG1HASH",
+        file_size=1000,
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
+    )
+    config2 = Main_Diffusers_SD2_Config(
+        path="/tmp/config2",
+        name="beta",
+        base=BaseModelType.StableDiffusion2,
+        type=ModelType.Main,
+        hash="CONFIG2HASH",
+        file_size=2000,
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        variant=ModelVariantType.Normal,
+        prediction_type=SchedulerPredictionType.Epsilon,
+        repo_variant=ModelRepoVariant.Default,
+    )
+    config3 = VAE_Diffusers_SD1_Config(
+        path="/tmp/config3",
+        name="gamma",
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.VAE,
+        hash="CONFIG3HASH",
+        file_size=500,
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        repo_variant=ModelRepoVariant.Default,
+    )
+    for c in config1, config2, config3:
+        store.add_model(c)
+
+    # Test sorting by Name Ascending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Name, direction=SQLiteDirection.Ascending)
+    assert len(matches) == 3
+    assert matches[0].name == "alpha"
+    assert matches[1].name == "beta"
+    assert matches[2].name == "gamma"
+
+    # Test sorting by Name Descending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Name, direction=SQLiteDirection.Descending)
+    assert matches[0].name == "gamma"
+    assert matches[1].name == "beta"
+    assert matches[2].name == "alpha"
+
+    # Test sorting by Size Ascending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Size, direction=SQLiteDirection.Ascending)
+    assert matches[0].name == "gamma"  # 500
+    assert matches[1].name == "alpha"  # 1000
+    assert matches[2].name == "beta"  # 2000
+
+    # Test sorting by Size Descending
+    matches = store.search_by_attr(order_by=ModelRecordOrderBy.Size, direction=SQLiteDirection.Descending)
+    assert matches[0].name == "beta"  # 2000
+    assert matches[1].name == "alpha"  # 1000
+    assert matches[2].name == "gamma"  # 500
 
 
 def test_model_record_changes():

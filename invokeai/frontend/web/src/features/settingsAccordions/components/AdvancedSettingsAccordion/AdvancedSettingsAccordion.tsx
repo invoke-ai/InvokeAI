@@ -4,13 +4,17 @@ import { skipToken } from '@reduxjs/toolkit/query';
 import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppSelector } from 'app/store/storeHooks';
 import {
+  selectIsAnima,
+  selectIsExternal,
   selectIsFLUX,
   selectIsFlux2,
+  selectIsQwenImage,
   selectIsSD3,
   selectIsZImage,
   selectParamsSlice,
   selectVAEKey,
 } from 'features/controlLayers/store/paramsSlice';
+import ParamAnimaModelSelect from 'features/parameters/components/Advanced/ParamAnimaModelSelect';
 import ParamCFGRescaleMultiplier from 'features/parameters/components/Advanced/ParamCFGRescaleMultiplier';
 import ParamCLIPEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPEmbedModelSelect';
 import ParamCLIPGEmbedModelSelect from 'features/parameters/components/Advanced/ParamCLIPGEmbedModelSelect';
@@ -24,6 +28,8 @@ import {
   ParamHiDiffusionToggle,
   ParamHiDiffusionWindowAttnToggle,
 } from 'features/parameters/components/Advanced/ParamHiDiffusionToggle';
+import ParamQwenImageComponentSourceSelect from 'features/parameters/components/Advanced/ParamQwenImageComponentSourceSelect';
+import ParamQwenImageQuantization from 'features/parameters/components/Advanced/ParamQwenImageQuantization';
 import ParamT5EncoderModelSelect from 'features/parameters/components/Advanced/ParamT5EncoderModelSelect';
 import ParamZImageQwen3VaeModelSelect from 'features/parameters/components/Advanced/ParamZImageQwen3VaeModelSelect';
 import ParamSeamlessXAxis from 'features/parameters/components/Seamless/ParamSeamlessXAxis';
@@ -52,6 +58,9 @@ export const AdvancedSettingsAccordion = memo(() => {
   const isFlux2 = useAppSelector(selectIsFlux2);
   const isSD3 = useAppSelector(selectIsSD3);
   const isZImage = useAppSelector(selectIsZImage);
+  const isExternal = useAppSelector(selectIsExternal);
+  const isQwenImage = useAppSelector(selectIsQwenImage);
+  const isAnima = useAppSelector(selectIsAnima);
 
   const selectBadges = useMemo(
     () =>
@@ -101,16 +110,20 @@ export const AdvancedSettingsAccordion = memo(() => {
     defaultIsOpen: false,
   });
 
+  if (isExternal) {
+    return null;
+  }
+
   return (
     <StandaloneAccordion label={t('accordions.advanced.title')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
       <Flex gap={4} alignItems="center" p={4} flexDir="column" data-testid="advanced-settings-accordion">
-        {!isZImage && !isFlux2 && (
+        {!isZImage && !isAnima && !isFlux2 && !isQwenImage && (
           <Flex gap={4} w="full">
             {isFLUX ? <ParamFLUXVAEModelSelect /> : <ParamVAEModelSelect />}
             {!isFLUX && !isSD3 && <ParamVAEPrecision />}
           </Flex>
         )}
-        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && (
+        {!isFLUX && !isFlux2 && !isSD3 && !isZImage && !isQwenImage && !isAnima && (
           <>
             <FormControlGroup formLabelProps={formLabelProps}>
               <ParamClipSkip />
@@ -153,6 +166,17 @@ export const AdvancedSettingsAccordion = memo(() => {
         {isZImage && (
           <FormControlGroup>
             <ParamZImageQwen3VaeModelSelect />
+          </FormControlGroup>
+        )}
+        {isQwenImage && (
+          <FormControlGroup>
+            <ParamQwenImageComponentSourceSelect />
+            <ParamQwenImageQuantization />
+          </FormControlGroup>
+        )}
+        {isAnima && (
+          <FormControlGroup>
+            <ParamAnimaModelSelect />
           </FormControlGroup>
         )}
       </Flex>

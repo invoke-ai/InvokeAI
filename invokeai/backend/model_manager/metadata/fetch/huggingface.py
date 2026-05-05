@@ -19,8 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 import requests
-from huggingface_hub import HfApi, configure_http_backend, hf_hub_url
-from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError
+from huggingface_hub import hf_hub_url
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 
@@ -47,13 +46,28 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         this module without an internet connection.
         """
         self._requests = session or requests.Session()
-        configure_http_backend(backend_factory=lambda: self._requests)
 
     @classmethod
     def from_json(cls, json: str) -> HuggingFaceMetadata:
         """Given the JSON representation of the metadata, return the corresponding Pydantic object."""
         metadata = HuggingFaceMetadata.model_validate_json(json)
         return metadata
+
+    def _fetch_model_info(self, repo_id: str, variant: Optional[ModelRepoVariant] = None) -> dict:
+        """Fetch model info from HuggingFace API using self._requests session.
+
+        This allows the session to be mocked in tests via requests_testadapter.
+        """
+        url = f"https://huggingface.co/api/models/{repo_id}"
+        params: dict[str, str] = {"blobs": "True"}
+        if variant is not None:
+            params["revision"] = str(variant)
+
+        response = self._requests.get(url, params=params)
+        if response.status_code == 404:
+            raise UnknownMetadataException(f"'{repo_id}' not found.")
+        response.raise_for_status()
+        return response.json()
 
     def from_id(self, id: str, variant: Optional[ModelRepoVariant] = None) -> AnyModelRepoMetadata:
         """Return a HuggingFaceMetadata object given the model's repo_id."""
@@ -67,10 +81,10 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         repo_id = id.split("::")[0] or id
         while not model_info:
             try:
-                model_info = HfApi().model_info(repo_id=repo_id, files_metadata=True, revision=variant)
-            except RepositoryNotFoundError as excp:
-                raise UnknownMetadataException(f"'{repo_id}' not found. See trace for details.") from excp
-            except RevisionNotFoundError:
+                model_info = self._fetch_model_info(repo_id, variant)
+            except UnknownMetadataException:
+                raise
+            except requests.HTTPError:
                 if variant is None:
                     raise
                 else:
@@ -80,15 +94,18 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
 
         _, name = repo_id.split("/")
 
-        for s in model_info.siblings or []:
-            assert s.rfilename is not None
-            assert s.size is not None
+        for s in model_info.get("siblings") or []:
+            rfilename = s.get("rfilename")
+            size = s.get("size")
+            assert rfilename is not None
+            assert size is not None
+            lfs = s.get("lfs")
             files.append(
                 RemoteModelFile(
-                    url=hf_hub_url(repo_id, s.rfilename, revision=variant or "main"),
-                    path=Path(name, s.rfilename),
-                    size=s.size,
-                    sha256=s.lfs.get("sha256") if s.lfs else None,
+                    url=hf_hub_url(repo_id, rfilename, revision=variant or "main"),
+                    path=Path(name, rfilename),
+                    size=size,
+                    sha256=lfs.get("sha256") if lfs else None,
                 )
             )
 
@@ -115,10 +132,10 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         )
 
         return HuggingFaceMetadata(
-            id=model_info.id,
+            id=model_info["id"],
             name=name,
             files=files,
-            api_response=json.dumps(model_info.__dict__, default=str),
+            api_response=json.dumps(model_info, default=str),
             is_diffusers=is_diffusers,
             ckpt_urls=ckpt_urls,
         )

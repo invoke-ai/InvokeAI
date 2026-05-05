@@ -176,6 +176,8 @@ class FieldDescriptions:
     sd3_model = "SD3 model (MMDiTX) to load"
     cogview4_model = "CogView4 model (Transformer) to load"
     z_image_model = "Z-Image model (Transformer) to load"
+    qwen_image_model = "Qwen Image Edit model (Transformer) to load"
+    qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -232,6 +234,7 @@ class FieldDescriptions:
     instantx_control_mode = "The control mode for InstantX ControlNet union models. Ignored for other ControlNet models. The standard mapping is: canny (0), tile (1), depth (2), blur (3), pose (4), gray (5), low quality (6). Negative values will be treated as 'None'."
     flux_redux_conditioning = "FLUX Redux conditioning tensor"
     vllm_model = "The VLLM model to use"
+    text_llm_model = "The text language model to use for text generation"
     flux_fill_conditioning = "FLUX Fill conditioning tensor"
     flux_kontext_conditioning = "FLUX Kontext conditioning (reference image)"
 
@@ -345,6 +348,27 @@ class ZImageConditioningField(BaseModel):
     )
 
 
+class QwenImageConditioningField(BaseModel):
+    """A Qwen Image Edit conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class AnimaConditioningField(BaseModel):
+    """An Anima conditioning tensor primitive value.
+
+    Anima conditioning contains Qwen3 0.6B hidden states and T5-XXL token IDs,
+    which are combined by the LLM Adapter inside the transformer.
+    """
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+    mask: Optional[TensorField] = Field(
+        default=None,
+        description="The mask associated with this conditioning tensor for regional prompting. "
+        "Excluded regions should be set to False, included regions should be set to True.",
+    )
+
+
 class ConditioningField(BaseModel):
     """A conditioning tensor primitive value"""
 
@@ -437,6 +461,7 @@ class InputFieldJSONSchemaExtra(BaseModel):
     ui_model_type: Optional[list[ModelType]] = None
     ui_model_variant: Optional[list[ClipVariantType | ModelVariantType]] = None
     ui_model_format: Optional[list[ModelFormat]] = None
+    ui_model_provider_id: Optional[list[str]] = None
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -618,6 +643,7 @@ def InputField(
     ui_model_type: Optional[ModelType | list[ModelType]] = None,
     ui_model_variant: Optional[ClipVariantType | ModelVariantType | list[ClipVariantType | ModelVariantType]] = None,
     ui_model_format: Optional[ModelFormat | list[ModelFormat]] = None,
+    ui_model_provider_id: Optional[str | list[str]] = None,
 ) -> Any:
     """
     Creates an input field for an invocation.
@@ -667,6 +693,11 @@ def InputField(
         `ui_model_format=ModelFormat.Diffusers` will show only models in the diffusers format. This arg is only valid
         if this Input field is annotated as a `ModelIdentifierField`.
 
+        ui_model_provider_id: Specifies the external provider id(s) to filter the model list by in the Workflow Editor.
+        For example, `ui_model_provider_id="openai"` will show only models registered under the OpenAI external provider.
+        This arg is only valid if this Input field is annotated as a `ModelIdentifierField` and the target models are
+        external API models.
+
         ui_choice_labels: Specifies the labels to use for the choices in an enum field. If omitted, the enum values
         will be used. This arg is only valid if the field is annotated with as a `Literal`. For example,
         `Literal["choice1", "choice2", "choice3"]` with `ui_choice_labels={"choice1": "Choice 1", "choice2": "Choice 2",
@@ -706,6 +737,11 @@ def InputField(
             json_schema_extra_.ui_model_format = ui_model_format
         else:
             json_schema_extra_.ui_model_format = [ui_model_format]
+    if ui_model_provider_id is not None:
+        if isinstance(ui_model_provider_id, list):
+            json_schema_extra_.ui_model_provider_id = ui_model_provider_id
+        else:
+            json_schema_extra_.ui_model_provider_id = [ui_model_provider_id]
     if ui_type is not None:
         json_schema_extra_.ui_type = ui_type
 
