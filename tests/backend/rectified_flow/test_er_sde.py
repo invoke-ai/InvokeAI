@@ -77,7 +77,9 @@ def test_er_sde_rf_step_sigma_next_zero_terminal_returns_x0():
         state=state, noise=noise,
     )
     expected = x_t - 0.05 * v
-    assert torch.allclose(out, expected, atol=1e-5)
+    # Algebraically exact (not approximate): with sigma_next=0, fn_next=0,
+    # so r_fn=0 and noise_std=0, giving x_next = (1-0)*x_0 + 0 = x_0.
+    assert torch.equal(out, expected), f"max abs diff: {(out - expected).abs().max()}"
 
 
 def test_er_sde_rf_step_preserves_shape_and_dtype():

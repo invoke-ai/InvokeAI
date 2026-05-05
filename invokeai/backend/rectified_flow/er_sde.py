@@ -44,7 +44,13 @@ def _fn(x: float) -> float:
 
 
 def _integral_one_over_fn(lambda_next: float, lambda_curr: float) -> float:
-    """Left Riemann sum of int_{lambda_next}^{lambda_curr} 1/_fn(lam) dlam."""
+    """Left Riemann sum of int_{lambda_next}^{lambda_curr} 1/_fn(lam) dlam.
+
+    Precondition: lambda_next > 0. The integrand has a logarithmic singularity
+    at lam=0 (_fn(0)=0), so callers must skip this when sigma_next=0 — the
+    multistep guard `not_terminal = sigma_next > 0.0` in er_sde_rf_step
+    enforces this.
+    """
     delta = lambda_curr - lambda_next
     if delta <= 0:
         return 0.0
@@ -57,7 +63,11 @@ def _integral_one_over_fn(lambda_next: float, lambda_curr: float) -> float:
 
 
 def _integral_lam_minus_curr_over_fn(lambda_next: float, lambda_curr: float) -> float:
-    """Left Riemann sum of int_{lambda_next}^{lambda_curr} (lam - lambda_curr)/_fn(lam) dlam."""
+    """Left Riemann sum of int_{lambda_next}^{lambda_curr} (lam - lambda_curr)/_fn(lam) dlam.
+
+    Precondition: lambda_next > 0. Same singularity at lam=0 as
+    _integral_one_over_fn — callers must skip this when sigma_next=0.
+    """
     delta = lambda_curr - lambda_next
     if delta <= 0:
         return 0.0
