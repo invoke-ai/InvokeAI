@@ -107,10 +107,30 @@ def test_anima_literal_covers_every_map_key():
 
 
 def test_anima_scheduler_literal_includes_er_sde():
-    """er_sde must appear in the literal type and have a label, but NOT
-    in ANIMA_SCHEDULER_MAP — it has a custom code path in anima_denoise.py."""
+    """er_sde must appear in the literal type, have a label, and be
+    registered in ANIMA_SCHEDULER_MAP for dispatch through the universal
+    scheduler path."""
     literal_args = typing.get_args(ANIMA_SCHEDULER_NAME_VALUES)
     assert "er_sde" in literal_args
     assert "er_sde" in ANIMA_SCHEDULER_LABELS
     assert ANIMA_SCHEDULER_LABELS["er_sde"] == "ER-SDE"
-    assert "er_sde" not in ANIMA_SCHEDULER_MAP
+    assert "er_sde" in ANIMA_SCHEDULER_MAP
+
+
+def test_anima_scheduler_map_er_sde_entry():
+    """ANIMA_SCHEDULER_MAP['er_sde'] must map to ERSDEScheduler with rectified-flow kwargs.
+
+    This is the wiring that lets Anima dispatch er_sde through the universal scheduler
+    path (replacing the legacy elif is_er_sde: branch in anima_denoise.py).
+    """
+    from invokeai.backend.flux.schedulers import ANIMA_SHIFT
+    from invokeai.backend.rectified_flow.er_sde_scheduler import ERSDEScheduler
+
+    assert "er_sde" in ANIMA_SCHEDULER_MAP, "er_sde must be in ANIMA_SCHEDULER_MAP"
+    cls, kwargs = ANIMA_SCHEDULER_MAP["er_sde"]
+    assert cls is ERSDEScheduler
+    assert kwargs["use_flow_sigmas"] is True
+    assert kwargs["prediction_type"] == "flow_prediction"
+    assert kwargs["solver_order"] == 3
+    assert kwargs["stochastic"] is True
+    assert kwargs["flow_shift"] == ANIMA_SHIFT

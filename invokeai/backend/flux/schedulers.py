@@ -13,6 +13,8 @@ from diffusers import (
 )
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
+from invokeai.backend.rectified_flow.er_sde_scheduler import ERSDEScheduler
+
 # Note: FlowMatchLCMScheduler may not be available in all diffusers versions
 try:
     from diffusers import FlowMatchLCMScheduler
@@ -85,12 +87,11 @@ ANIMA_SCHEDULER_LABELS: dict[str, str] = {
     "lcm": "LCM",
 }
 
-# When adding a new Anima scheduler:
-# - If it wraps a diffusers SchedulerMixin: add to all three of NAME_VALUES, LABELS, and this MAP.
-# - If it has a custom code path in anima_denoise.py (e.g. er_sde, which uses
-#   the pure helper in invokeai/backend/rectified_flow/er_sde.py): add to
-#   NAME_VALUES and LABELS only — leave it out of this MAP. The dispatch
-#   in anima_denoise._run_diffusion routes such schedulers to their custom branch.
+# When adding a new Anima scheduler: add to all three of NAME_VALUES, LABELS,
+# and this MAP. The MAP entry is `(SchedulerClass, scheduler_kwargs)`. For
+# rectified-flow schedulers, set `use_flow_sigmas=True` and use
+# `prediction_type="flow_prediction"`. The pre-shifted sigma schedule is passed
+# via `set_timesteps(sigmas=...)` from anima_denoise._run_diffusion.
 ANIMA_SCHEDULER_MAP: dict[str, tuple[Type[SchedulerMixin], dict[str, Any]]] = {
     "euler": (FlowMatchEulerDiscreteScheduler, {"shift": 1.0}),
     "heun": (FlowMatchHeunDiscreteScheduler, {"shift": 1.0}),
@@ -111,6 +112,16 @@ ANIMA_SCHEDULER_MAP: dict[str, tuple[Type[SchedulerMixin], dict[str, Any]]] = {
             "flow_shift": ANIMA_SHIFT,
             "algorithm_type": "sde-dpmsolver++",
             "solver_order": 2,
+        },
+    ),
+    "er_sde": (
+        ERSDEScheduler,
+        {
+            "prediction_type": "flow_prediction",
+            "use_flow_sigmas": True,
+            "flow_shift": ANIMA_SHIFT,
+            "solver_order": 3,
+            "stochastic": True,
         },
     ),
 }
