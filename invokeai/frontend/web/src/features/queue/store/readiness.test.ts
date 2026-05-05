@@ -108,6 +108,9 @@ const baseParams = {
   hrfMethod: 'latent',
   hrfUpscaleModel: null,
   hrfTileControlNetModel: null,
+  hrfModel: null,
+  hrfLoraMode: 'reuse_generate',
+  hrfLoras: [],
   refinerModel: null,
 } as unknown as ParamsState;
 
@@ -121,6 +124,7 @@ const buildGenerateTabArg = (overrides: {
   hrfMethod?: ParamsState['hrfMethod'];
   hrfUpscaleModel?: unknown;
   hrfTileControlNetModel?: unknown;
+  hrfModel?: unknown;
   refinerModel?: unknown;
   hasFlux2DiffusersVaeSource?: boolean;
   hasFlux2DiffusersQwen3Source?: boolean;
@@ -135,6 +139,7 @@ const buildGenerateTabArg = (overrides: {
     hrfMethod: overrides.hrfMethod ?? 'latent',
     hrfUpscaleModel: overrides.hrfUpscaleModel ?? null,
     hrfTileControlNetModel: overrides.hrfTileControlNetModel ?? null,
+    hrfModel: overrides.hrfModel ?? null,
     refinerModel: overrides.refinerModel ?? null,
   } as unknown as ParamsState,
   refImages: baseRefImages,
@@ -201,6 +206,9 @@ const hasHrfUpscaleModelMissingReason = (reasons: { content: string }[]) =>
 
 const hasHrfTileControlNetMissingReason = (reasons: { content: string }[]) =>
   reasons.some((r) => r.content.includes('hrfTileControlNetModelMissing'));
+
+const hasHrfModelOverrideBaseMismatchReason = (reasons: { content: string }[]) =>
+  reasons.some((r) => r.content.includes('hrfModelOverrideBaseMismatch'));
 
 // --- Tests ---
 
@@ -333,6 +341,51 @@ describe('High Resolution Fix readiness checks - generate tab', () => {
     expect(hasHrfUpscaleModelBaseReason(reasons)).toBe(false);
     expect(hasHrfUpscaleModelMissingReason(reasons)).toBe(false);
     expect(hasHrfTileControlNetMissingReason(reasons)).toBe(false);
+  });
+
+  it('does not apply stale upscale-model-only readiness checks to latent HRF', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({
+        model: sdxlModel,
+        hrfEnabled: true,
+        hrfMethod: 'latent',
+        hrfModel: { key: 'sd1', hash: 'h', name: 'SD1', base: 'sd-1', type: 'main' },
+        hrfUpscaleModel: null,
+        hrfTileControlNetModel: null,
+      })
+    );
+
+    expect(hasHrfUpscaleModelMissingReason(reasons)).toBe(false);
+    expect(hasHrfTileControlNetMissingReason(reasons)).toBe(false);
+    expect(hasHrfModelOverrideBaseMismatchReason(reasons)).toBe(false);
+  });
+
+  it('errors when dedicated HRF model base differs from the Generate model base', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({
+        model: sdxlModel,
+        hrfEnabled: true,
+        hrfMethod: 'upscale_model',
+        hrfUpscaleModel: upscaleModel,
+        hrfTileControlNetModel: tileControlNetModel,
+        hrfModel: { key: 'sd1', hash: 'h', name: 'SD1', base: 'sd-1', type: 'main' },
+      })
+    );
+    expect(hasHrfModelOverrideBaseMismatchReason(reasons)).toBe(true);
+  });
+
+  it('validates Tile ControlNet against the dedicated HRF model base', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildGenerateTabArg({
+        model: sdxlModel,
+        hrfEnabled: true,
+        hrfMethod: 'upscale_model',
+        hrfUpscaleModel: upscaleModel,
+        hrfTileControlNetModel: { ...tileControlNetModel, base: 'sd-1' },
+        hrfModel: { key: 'hrf-sdxl', hash: 'h', name: 'HRF SDXL', base: 'sdxl', type: 'main' },
+      })
+    );
+    expect(hasHrfTileControlNetMissingReason(reasons)).toBe(true);
   });
 });
 

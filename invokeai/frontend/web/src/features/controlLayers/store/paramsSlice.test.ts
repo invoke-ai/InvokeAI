@@ -8,6 +8,8 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  modelChanged,
+  paramsSliceConfig,
   selectHrfFinalDimensions,
   selectModelSupportsDimensions,
   selectModelSupportsGuidance,
@@ -17,7 +19,9 @@ import {
   selectModelSupportsRefImages,
   selectModelSupportsSeed,
   selectModelSupportsSteps,
+  setHrfMethod,
 } from './paramsSlice';
+import { getInitialParamsState, type ParamsState } from './types';
 
 const buildExternalModelIdentifier = (config: ExternalApiModelConfig) =>
   ({
@@ -169,5 +173,87 @@ describe('paramsSlice HRF selectors', () => {
         type: 'main',
       })
     ).toBe(false);
+  });
+});
+
+describe('paramsSlice HRF reducers', () => {
+  it('clears upscale-model-only refinement overrides when switching to latent HRF', () => {
+    const state = getInitialParamsState();
+    state.hrfMethod = 'upscale_model';
+    state.hrfSteps = 12;
+    state.hrfModel = { key: 'hrf-model', hash: 'h', name: 'HRF Model', base: 'sdxl', type: 'main' };
+    state.hrfLoraMode = 'dedicated';
+    state.hrfLoras = [
+      {
+        id: 'lora',
+        isEnabled: true,
+        model: { key: 'lora', hash: 'h', name: 'LoRA', base: 'sdxl', type: 'lora' },
+        weight: 0.6,
+      },
+    ] as ParamsState['hrfLoras'];
+
+    const nextState = paramsSliceConfig.slice.reducer(state, setHrfMethod('latent'));
+
+    expect(nextState.hrfMethod).toBe('latent');
+    expect(nextState.hrfSteps).toBeNull();
+    expect(nextState.hrfModel).toBeNull();
+    expect(nextState.hrfLoraMode).toBe('reuse_generate');
+    expect(nextState.hrfLoras).toEqual([]);
+  });
+
+  it('filters dedicated HRF LoRAs when the Generate model base changes', () => {
+    const state = getInitialParamsState();
+    const previousModel = { key: 'sdxl', hash: 'h', name: 'SDXL', base: 'sdxl', type: 'main' } as const;
+    const nextModel = { key: 'sd1', hash: 'h', name: 'SD1', base: 'sd-1', type: 'main' } as const;
+    state.model = previousModel;
+    state.hrfMethod = 'upscale_model';
+    state.hrfLoraMode = 'dedicated';
+    state.hrfLoras = [
+      {
+        id: 'sdxl-lora',
+        isEnabled: true,
+        model: { key: 'sdxl-lora', hash: 'h', name: 'SDXL LoRA', base: 'sdxl', type: 'lora' },
+        weight: 0.6,
+      },
+      {
+        id: 'sd1-lora',
+        isEnabled: true,
+        model: { key: 'sd1-lora', hash: 'h', name: 'SD1 LoRA', base: 'sd-1', type: 'lora' },
+        weight: 0.7,
+      },
+    ] as ParamsState['hrfLoras'];
+
+    const nextState = paramsSliceConfig.slice.reducer(state, modelChanged({ model: nextModel, previousModel }));
+
+    expect(nextState.hrfLoraMode).toBe('dedicated');
+    expect(nextState.hrfLoras).toHaveLength(1);
+    expect(nextState.hrfLoras[0]?.model.key).toBe('sd1-lora');
+  });
+});
+
+describe('paramsSlice HRF migrations', () => {
+  it('migrates legacy HRF Structure to explicit Tile Control Weight', () => {
+    const v5State = {
+      ...getInitialParamsState(),
+      _version: 5,
+      hrfStructure: 0,
+    } as unknown as Record<string, unknown>;
+    delete v5State.hrfTileControlWeight;
+    delete v5State.hrfSteps;
+    delete v5State.hrfModel;
+    delete v5State.hrfLoraMode;
+    delete v5State.hrfLoras;
+
+    const migrated = paramsSliceConfig.persistConfig!.migrate(v5State);
+
+    expect(migrated).toMatchObject({
+      _version: 6,
+      hrfTileControlWeight: 0.625,
+      hrfSteps: null,
+      hrfModel: null,
+      hrfLoraMode: 'reuse_generate',
+      hrfLoras: [],
+    });
+    expect('hrfStructure' in migrated).toBe(false);
   });
 });

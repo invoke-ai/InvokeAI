@@ -1,6 +1,6 @@
 import type { AppStore } from 'app/store/store';
 import type * as paramsSliceModule from 'features/controlLayers/store/paramsSlice';
-import { ImageMetadataHandlers } from 'features/metadata/parsing';
+import { ImageMetadataHandlers, MetadataUtils } from 'features/metadata/parsing';
 import type * as modelsApiModule from 'services/api/endpoints/models';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -22,7 +22,7 @@ vi.mock('features/controlLayers/store/paramsSlice', async (importOriginal) => {
   return { ...mod, selectBase: () => currentBase };
 });
 
-const fakeModel = (type: 'vae' | 'qwen3_encoder', base: string) => ({
+const fakeModel = (type: 'main' | 'vae' | 'qwen3_encoder' | 'lora', base: string) => ({
   key: `${type}-key`,
   hash: 'hash',
   name: `Some ${type}`,
@@ -31,6 +31,7 @@ const fakeModel = (type: 'vae' | 'qwen3_encoder', base: string) => ({
 });
 
 let nextResolved: ReturnType<typeof fakeModel> = fakeModel('vae', 'flux2');
+let resolvedModels: Record<string, ReturnType<typeof fakeModel>> = {};
 
 vi.mock('services/api/endpoints/models', async (importOriginal) => {
   const mod = await importOriginal<typeof modelsApiModule>();
@@ -48,15 +49,22 @@ vi.mock('services/api/endpoints/models', async (importOriginal) => {
 
 const makeStore = (): AppStore =>
   ({
-    dispatch: vi.fn(() => ({
-      unwrap: () => Promise.resolve(nextResolved),
-    })),
+    dispatch: vi.fn((action) => {
+      if (action?.type === 'generation/modelSelected') {
+        currentBase = action.payload.base;
+        return action;
+      }
+      return {
+        unwrap: () => Promise.resolve(resolvedModels[action?.key] ?? nextResolved),
+      };
+    }),
     getState: () => ({}),
   }) as unknown as AppStore;
 
 beforeEach(() => {
   currentBase = 'flux2';
   nextResolved = fakeModel('vae', 'flux2');
+  resolvedModels = {};
 });
 
 describe('ImageMetadataHandlers — Klein recall gating', () => {
@@ -169,6 +177,47 @@ describe('ImageMetadataHandlers — Klein recall gating', () => {
 
       const parsed = await ImageMetadataHandlers.Guidance.parse({ guidance: 3.5 }, store);
       expect(parsed).toBe(3.5);
+    });
+  });
+
+  describe('HRF LoRAs', () => {
+    it('recalls dedicated HRF LoRAs after the recalled main model changes base', async () => {
+      currentBase = 'sd-1';
+      const mainModel = fakeModel('main', 'sdxl');
+      const hrfLora = fakeModel('lora', 'sdxl');
+      resolvedModels = {
+        [mainModel.key]: mainModel,
+        [hrfLora.key]: hrfLora,
+      };
+      const store = makeStore();
+
+      const recalled = await MetadataUtils.recallByHandlers({
+        metadata: {
+          model: mainModel,
+          hrf_loras: [{ model: hrfLora, weight: 0.6 }],
+        },
+        handlers: [ImageMetadataHandlers.HrfLoRAs, ImageMetadataHandlers.MainModel],
+        store,
+        silent: true,
+      });
+
+      expect(Object.keys(ImageMetadataHandlers).indexOf('HrfLoRAs')).toBeGreaterThan(
+        Object.keys(ImageMetadataHandlers).indexOf('MainModel')
+      );
+      expect(recalled.has(ImageMetadataHandlers.MainModel)).toBe(true);
+      expect(recalled.has(ImageMetadataHandlers.HrfLoRAs)).toBe(true);
+      expect(store.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'generation/modelSelected',
+          payload: expect.objectContaining({ base: 'sdxl' }),
+        })
+      );
+      expect(store.dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'params/setHrfLoras',
+          payload: [expect.objectContaining({ model: expect.objectContaining({ key: hrfLora.key }), weight: 0.6 })],
+        })
+      );
     });
   });
 });

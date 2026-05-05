@@ -2,8 +2,11 @@ import type { RootState } from 'app/store/store';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
-import type { GenerationMode } from 'features/controlLayers/store/types';
+import type { GenerationMode, LoRA } from 'features/controlLayers/store/types';
 import type { BaseModelType } from 'features/nodes/types/common';
+import { zModelIdentifierField } from 'features/nodes/types/common';
+import { addLoRAs } from 'features/nodes/util/graph/generation/addLoRAs';
+import { addSDXLLoRAs } from 'features/nodes/util/graph/generation/addSDXLLoRAs';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { DenoiseLatentsNodes, LatentToImageNodes } from 'features/nodes/util/graph/types';
 import { getGridSize } from 'features/parameters/util/optimalDimension';
@@ -21,9 +24,22 @@ type AddHighResFixArg = {
   seed: Invocation<'integer'>;
 };
 
+type HrfModelLoader = Invocation<'main_model_loader'> | Invocation<'sdxl_model_loader'>;
+type HrfVaeSource = HrfModelLoader | Invocation<'seamless'>;
+type FreshHrfModelInputs = {
+  modelLoader: HrfModelLoader;
+  vaeSource: HrfVaeSource;
+};
+type ConditioningSource = {
+  node_id: string;
+  field: AnyInvocationOutputField;
+};
+
 const SKIPPED_DENOISE_INPUT_FIELDS = new Set(['latents', 'noise']);
+const FRESH_HRF_MODEL_INPUT_FIELDS = new Set(['unet', 'positive_conditioning', 'negative_conditioning']);
 const TILED_DENOISE_INPUT_FIELDS = new Set(['positive_conditioning', 'negative_conditioning', 'unet']);
 const SKIPPED_LATENT_TO_IMAGE_INPUT_FIELDS = new Set(['latents', 'metadata']);
+const LATENT_HRF_L2I_TILE_SIZE = 1024;
 
 const getHighResFixFinalDimensions = (state: RootState) => {
   const params = selectParamsSlice(state);
@@ -155,7 +171,7 @@ const cloneSDXLConditioningForFinalDimensions = (
 
   const collect = g.addNode({
     type: 'collect',
-    id: getPrefixedId('hrf_sdxl_conditioning_collect'),
+    id: getPrefixedId(`hrf_${sourceNode.id.split(':')[0]}_conditioning_collect`),
   });
 
   for (const edge of itemEdges) {
@@ -179,10 +195,14 @@ const copyDenoiseInputs = (
   from: AnyInvocation,
   to: AnyInvocation,
   finalDimensions: { width: number; height: number },
-  allowedInputFields?: Set<string>
+  allowedInputFields?: Set<string>,
+  skippedInputFields?: Set<string>
 ) => {
   for (const edge of g.getEdgesTo(from)) {
     if (SKIPPED_DENOISE_INPUT_FIELDS.has(edge.destination.field)) {
+      continue;
+    }
+    if (skippedInputFields?.has(edge.destination.field)) {
       continue;
     }
     if (allowedInputFields && !allowedInputFields.has(edge.destination.field)) {
@@ -250,7 +270,7 @@ const addTileControlNet = (
   hrfDenoise: AnyInvocation,
   imageSource: Invocation<'unsharp_mask'>,
   tileControlNetModel: NonNullable<ReturnType<typeof selectParamsSlice>['hrfTileControlNetModel']>,
-  structure: number,
+  tileControlWeight: number,
   tileControlEnd: number
 ) => {
   const controlNet = g.addNode({
@@ -259,7 +279,7 @@ const addTileControlNet = (
     control_model: tileControlNetModel,
     control_mode: 'balanced',
     resize_mode: 'just_resize',
-    control_weight: (structure + 10) * 0.0325 + 0.3,
+    control_weight: tileControlWeight,
     begin_step_percent: 0,
     end_step_percent: tileControlEnd,
   });
@@ -269,6 +289,329 @@ const addTileControlNet = (
     source: { node_id: controlNet.id, field: 'control' },
     destination: { node_id: hrfDenoise.id, field: 'control' },
   });
+};
+
+const getConditioningSources = (
+  g: Graph,
+  denoise: Invocation<'denoise_latents'>,
+  field: 'positive_conditioning' | 'negative_conditioning'
+): ConditioningSource[] => {
+  const edge = g.getEdgesTo(denoise).find((edge) => edge.destination.field === field);
+  assert(edge, `Missing ${field} edge for HRF second pass`);
+
+  const sourceNode = g.getNode(edge.source.node_id);
+  if (sourceNode.type !== 'collect') {
+    return [{ node_id: edge.source.node_id, field: edge.source.field as AnyInvocationOutputField }];
+  }
+
+  const itemEdges = g.getEdgesTo(sourceNode).filter((edge) => edge.destination.field === 'item');
+  assert(itemEdges.length > 0, `HRF second pass expects at least one ${field} conditioning source`);
+
+  return itemEdges.map((edge) => ({
+    node_id: edge.source.node_id,
+    field: edge.source.field as AnyInvocationOutputField,
+  }));
+};
+
+const connectConditioningToDenoise = (
+  g: Graph,
+  hrfDenoise: Invocation<'denoise_latents'> | Invocation<'tiled_multi_diffusion_denoise_latents'>,
+  field: 'positive_conditioning' | 'negative_conditioning',
+  conditioning: Array<Invocation<'compel'> | Invocation<'sdxl_compel_prompt'>>
+) => {
+  assert(conditioning.length > 0, `HRF second pass expects at least one ${field} conditioning node`);
+
+  if (conditioning.length === 1) {
+    g.addEdgeFromObj({
+      source: { node_id: conditioning[0]!.id, field: 'conditioning' },
+      destination: { node_id: hrfDenoise.id, field },
+    });
+    return;
+  }
+
+  assert(hrfDenoise.type === 'denoise_latents', 'Tiled HRF second pass supports only single conditioning inputs');
+
+  const collect = g.addNode({
+    type: 'collect',
+    id: getPrefixedId(`hrf_${field}_collect`),
+  });
+
+  for (const cond of conditioning) {
+    g.addEdge(cond, 'conditioning', collect, 'item');
+  }
+
+  g.addEdgeFromObj({
+    source: { node_id: collect.id, field: 'collection' },
+    destination: { node_id: hrfDenoise.id, field },
+  });
+};
+
+const cloneSD1ConditioningSources = (
+  g: Graph,
+  denoise: Invocation<'denoise_latents'>,
+  field: 'positive_conditioning' | 'negative_conditioning'
+) => {
+  return getConditioningSources(g, denoise, field).map((source) => {
+    const sourceNode = g.getNode(source.node_id);
+    assert(sourceNode.type === 'compel', 'SD1 HRF refinement requires SD1 conditioning');
+
+    const clone = g.addNode({
+      ...sourceNode,
+      id: getPrefixedId(`hrf_${sourceNode.id.split(':')[0]}`),
+    });
+    copyInputEdges(g, sourceNode, clone, new Set(['clip']));
+    return clone;
+  });
+};
+
+const cloneSDXLConditioningSources = (
+  g: Graph,
+  denoise: Invocation<'denoise_latents'>,
+  field: 'positive_conditioning' | 'negative_conditioning',
+  finalDimensions: { width: number; height: number }
+) => {
+  return getConditioningSources(g, denoise, field).map((source) => {
+    const sourceNode = g.getNode(source.node_id);
+    assert(sourceNode.type === 'sdxl_compel_prompt', 'SDXL HRF refinement requires SDXL conditioning');
+
+    const clone = g.addNode({
+      ...sourceNode,
+      id: getPrefixedId(`hrf_${sourceNode.id.split(':')[0]}`),
+      original_width: finalDimensions.width,
+      original_height: finalDimensions.height,
+      target_width: finalDimensions.width,
+      target_height: finalDimensions.height,
+    });
+    copyInputEdges(g, sourceNode, clone, new Set(['clip', 'clip2']));
+    return clone;
+  });
+};
+
+const findOriginalSeamlessNode = (g: Graph, denoise: Invocation<'denoise_latents'>) => {
+  let current: AnyInvocation = denoise;
+  const visited = new Set<string>();
+
+  while (!visited.has(current.id)) {
+    visited.add(current.id);
+    const unetEdge = g.getEdgesTo(current).find((edge) => edge.destination.field === 'unet');
+    if (!unetEdge) {
+      return null;
+    }
+
+    const sourceNode = g.getNode(unetEdge.source.node_id);
+    if (sourceNode.type === 'seamless') {
+      return sourceNode;
+    }
+
+    current = sourceNode;
+  }
+
+  return null;
+};
+
+const addFreshHrfSeamless = (
+  g: Graph,
+  denoise: Invocation<'denoise_latents'>,
+  hrfDenoise: Invocation<'denoise_latents'> | Invocation<'tiled_multi_diffusion_denoise_latents'>,
+  modelLoader: HrfModelLoader,
+  useHrfModelVae: boolean
+) => {
+  const originalSeamless = findOriginalSeamlessNode(g, denoise);
+  if (!originalSeamless) {
+    return null;
+  }
+
+  const seamless = g.addNode({
+    ...originalSeamless,
+    id: getPrefixedId('hrf_seamless'),
+  });
+
+  g.addEdge(modelLoader, 'unet', seamless, 'unet');
+
+  if (useHrfModelVae) {
+    g.addEdge(modelLoader, 'vae', seamless, 'vae');
+  } else {
+    const originalVaeEdge = g.getEdgesTo(originalSeamless).find((edge) => edge.destination.field === 'vae');
+    if (originalVaeEdge) {
+      g.addEdgeFromObj({
+        source: { ...originalVaeEdge.source },
+        destination: { node_id: seamless.id, field: 'vae' },
+      });
+    } else {
+      g.addEdge(modelLoader, 'vae', seamless, 'vae');
+    }
+  }
+
+  g.addEdge(seamless, 'unet', hrfDenoise, 'unet');
+  return seamless;
+};
+
+const getEnabledHrfLoRAs = (state: RootState): LoRA[] | null => {
+  const params = selectParamsSlice(state);
+
+  if (params.hrfLoraMode === 'none') {
+    return null;
+  }
+
+  if (params.hrfLoraMode === 'dedicated') {
+    return getEnabledDedicatedHrfLoRAs(state);
+  }
+
+  return state.loras.loras.filter((lora) => lora.isEnabled);
+};
+
+const getEnabledDedicatedHrfLoRAs = (state: RootState): LoRA[] => {
+  const params = selectParamsSlice(state);
+  const effectiveHrfBase = params.hrfModel?.base ?? params.model?.base;
+  if (!effectiveHrfBase) {
+    return [];
+  }
+  return params.hrfLoras.filter((lora) => lora.isEnabled && lora.model.base === effectiveHrfBase);
+};
+
+const getHrfLoRAMetadata = (state: RootState) => {
+  const params = selectParamsSlice(state);
+  if (params.hrfLoraMode !== 'dedicated') {
+    return undefined;
+  }
+
+  return getEnabledDedicatedHrfLoRAs(state).map((lora) => ({
+    model: zModelIdentifierField.parse(lora.model),
+    weight: lora.weight,
+  }));
+};
+
+const addFreshSD1HrfModelInputs = (
+  state: RootState,
+  g: Graph,
+  denoise: Invocation<'denoise_latents'>,
+  hrfDenoise: Invocation<'denoise_latents'> | Invocation<'tiled_multi_diffusion_denoise_latents'>
+): FreshHrfModelInputs => {
+  const params = selectParamsSlice(state);
+  const hrfModel = params.hrfModel ?? params.model;
+  assert(hrfModel?.base === 'sd-1', 'SD1 HRF refinement model must be an SD1 model');
+
+  const modelLoader = g.addNode({
+    type: 'main_model_loader',
+    id: getPrefixedId('hrf_sd1_model_loader'),
+    model: hrfModel,
+  });
+  const clipSkip = g.addNode({
+    type: 'clip_skip',
+    id: getPrefixedId('hrf_clip_skip'),
+    skipped_layers: params.clipSkip,
+  });
+
+  const positiveConditioning = cloneSD1ConditioningSources(g, denoise, 'positive_conditioning');
+  const negativeConditioning = cloneSD1ConditioningSources(g, denoise, 'negative_conditioning');
+  const hrfSeamless = addFreshHrfSeamless(g, denoise, hrfDenoise, modelLoader, params.hrfModel !== null);
+
+  g.addEdge(modelLoader, 'clip', clipSkip, 'clip');
+  for (const cond of positiveConditioning) {
+    g.addEdge(clipSkip, 'clip', cond, 'clip');
+  }
+  for (const cond of negativeConditioning) {
+    g.addEdge(clipSkip, 'clip', cond, 'clip');
+  }
+  if (!hrfSeamless) {
+    g.addEdgeFromObj({
+      source: { node_id: modelLoader.id, field: 'unet' },
+      destination: { node_id: hrfDenoise.id, field: 'unet' },
+    });
+  }
+  connectConditioningToDenoise(g, hrfDenoise, 'positive_conditioning', positiveConditioning);
+  connectConditioningToDenoise(g, hrfDenoise, 'negative_conditioning', negativeConditioning);
+
+  const enabledLoRAs = getEnabledHrfLoRAs(state);
+  if (enabledLoRAs?.length) {
+    addLoRAs(
+      state,
+      g,
+      hrfDenoise,
+      modelLoader,
+      hrfSeamless,
+      clipSkip,
+      positiveConditioning[0]!,
+      negativeConditioning[0]!,
+      {
+        loras: enabledLoRAs,
+        idPrefix: 'hrf',
+        metadataKey: params.hrfLoraMode === 'dedicated' ? 'hrf_loras' : 'loras',
+        extraPositiveConditioning: positiveConditioning.slice(1),
+        extraNegativeConditioning: negativeConditioning.slice(1),
+      }
+    );
+  }
+
+  return { modelLoader, vaeSource: hrfSeamless ?? modelLoader };
+};
+
+const addFreshSDXLHrfModelInputs = (
+  state: RootState,
+  g: Graph,
+  denoise: Invocation<'denoise_latents'>,
+  hrfDenoise: Invocation<'denoise_latents'> | Invocation<'tiled_multi_diffusion_denoise_latents'>,
+  finalDimensions: { width: number; height: number }
+): FreshHrfModelInputs => {
+  const params = selectParamsSlice(state);
+  const hrfModel = params.hrfModel ?? params.model;
+  assert(hrfModel?.base === 'sdxl', 'SDXL HRF refinement model must be an SDXL model');
+
+  const modelLoader = g.addNode({
+    type: 'sdxl_model_loader',
+    id: getPrefixedId('hrf_sdxl_model_loader'),
+    model: hrfModel,
+  });
+
+  const positiveConditioning = cloneSDXLConditioningSources(g, denoise, 'positive_conditioning', finalDimensions);
+  const negativeConditioning = cloneSDXLConditioningSources(g, denoise, 'negative_conditioning', finalDimensions);
+  const hrfSeamless = addFreshHrfSeamless(g, denoise, hrfDenoise, modelLoader, params.hrfModel !== null);
+
+  for (const cond of positiveConditioning) {
+    g.addEdge(modelLoader, 'clip', cond, 'clip');
+    g.addEdge(modelLoader, 'clip2', cond, 'clip2');
+  }
+  for (const cond of negativeConditioning) {
+    g.addEdge(modelLoader, 'clip', cond, 'clip');
+    g.addEdge(modelLoader, 'clip2', cond, 'clip2');
+  }
+  if (!hrfSeamless) {
+    g.addEdgeFromObj({
+      source: { node_id: modelLoader.id, field: 'unet' },
+      destination: { node_id: hrfDenoise.id, field: 'unet' },
+    });
+  }
+  connectConditioningToDenoise(g, hrfDenoise, 'positive_conditioning', positiveConditioning);
+  connectConditioningToDenoise(g, hrfDenoise, 'negative_conditioning', negativeConditioning);
+
+  const enabledLoRAs = getEnabledHrfLoRAs(state);
+  if (enabledLoRAs?.length) {
+    addSDXLLoRAs(state, g, hrfDenoise, modelLoader, hrfSeamless, positiveConditioning[0]!, negativeConditioning[0]!, {
+      loras: enabledLoRAs,
+      idPrefix: 'hrf',
+      metadataKey: params.hrfLoraMode === 'dedicated' ? 'hrf_loras' : 'loras',
+      extraPositiveConditioning: positiveConditioning.slice(1),
+      extraNegativeConditioning: negativeConditioning.slice(1),
+    });
+  }
+
+  return { modelLoader, vaeSource: hrfSeamless ?? modelLoader };
+};
+
+const addFreshHrfModelInputs = (
+  state: RootState,
+  g: Graph,
+  denoise: Invocation<'denoise_latents'>,
+  hrfDenoise: Invocation<'denoise_latents'> | Invocation<'tiled_multi_diffusion_denoise_latents'>,
+  finalDimensions: { width: number; height: number }
+): FreshHrfModelInputs => {
+  const params = selectParamsSlice(state);
+
+  if (params.model?.base === 'sdxl') {
+    return addFreshSDXLHrfModelInputs(state, g, denoise, hrfDenoise, finalDimensions);
+  }
+
+  return addFreshSD1HrfModelInputs(state, g, denoise, hrfDenoise);
 };
 
 const addLatentHighResFix = ({
@@ -319,6 +662,9 @@ const addLatentHighResFix = ({
   g.addEdge(denoise, 'latents', resizeLatents, 'latents');
   g.addEdge(resizeLatents, 'latents', hrfDenoise, 'latents');
   g.addEdge(hrfDenoise, 'latents', l2i, 'latents');
+  if (l2i.type === 'l2i') {
+    g.updateNode(l2i, { tile_size: LATENT_HRF_L2I_TILE_SIZE, tiled: true });
+  }
 
   g.upsertMetadata({
     width: finalDimensions.width,
@@ -387,10 +733,13 @@ const addUpscaleModelHighResFix = ({ g, state, denoise, l2i, noise, seed }: AddH
   });
 
   const useClassicDenoise = hasUnsupportedTiledDenoiseInputs(g, denoise);
+  const hrfSteps = params.hrfSteps ?? denoise.steps;
+  const needsFreshHrfModelInputs = params.hrfModel !== null || params.hrfLoraMode !== 'reuse_generate';
   const hrfDenoise = useClassicDenoise
     ? g.addNode({
         ...denoise,
         id: getPrefixedId('hrf_denoise_latents'),
+        steps: hrfSteps,
         denoising_start,
         denoising_end,
       })
@@ -400,7 +749,7 @@ const addUpscaleModelHighResFix = ({ g, state, denoise, l2i, noise, seed }: AddH
         tile_height: params.hrfTileSize,
         tile_width: params.hrfTileSize,
         tile_overlap: params.hrfTileOverlap,
-        steps: denoise.steps,
+        steps: hrfSteps,
         cfg_scale: denoise.cfg_scale,
         cfg_rescale_multiplier: denoise.cfg_rescale_multiplier,
         scheduler: denoise.scheduler,
@@ -413,14 +762,28 @@ const addUpscaleModelHighResFix = ({ g, state, denoise, l2i, noise, seed }: AddH
     denoise,
     hrfDenoise,
     finalDimensions,
-    useClassicDenoise ? undefined : TILED_DENOISE_INPUT_FIELDS
+    useClassicDenoise ? undefined : TILED_DENOISE_INPUT_FIELDS,
+    needsFreshHrfModelInputs ? FRESH_HRF_MODEL_INPUT_FIELDS : undefined
   );
+
+  if (needsFreshHrfModelInputs) {
+    if (params.hrfModel) {
+      g.deleteEdgesTo(i2l, ['vae']);
+      g.deleteEdgesTo(l2i, ['vae']);
+    }
+
+    const { vaeSource: hrfVaeSource } = addFreshHrfModelInputs(state, g, denoise, hrfDenoise, finalDimensions);
+    if (params.hrfModel) {
+      g.addEdge(hrfVaeSource, 'vae', i2l, 'vae');
+      g.addEdge(hrfVaeSource, 'vae', l2i, 'vae');
+    }
+  }
   addTileControlNet(
     g,
     hrfDenoise,
     unsharpMask,
     params.hrfTileControlNetModel,
-    params.hrfStructure,
+    params.hrfTileControlWeight,
     params.hrfTileControlEnd
   );
 
@@ -460,10 +823,14 @@ const addUpscaleModelHighResFix = ({ g, state, denoise, l2i, noise, seed }: AddH
     hrf_scale: params.hrfScale,
     hrf_upscale_model: params.hrfUpscaleModel,
     hrf_tile_controlnet_model: params.hrfTileControlNetModel,
-    hrf_structure: params.hrfStructure,
+    hrf_tile_control_weight: params.hrfTileControlWeight,
     hrf_tile_control_end: params.hrfTileControlEnd,
     hrf_tile_size: params.hrfTileSize,
     hrf_tile_overlap: params.hrfTileOverlap,
+    hrf_steps: params.hrfSteps ?? undefined,
+    hrf_model: params.hrfModel ?? undefined,
+    hrf_lora_mode: params.hrfLoraMode,
+    hrf_loras: getHrfLoRAMetadata(state),
   });
   g.addEdgeToMetadata(spandrelAutoscale, 'width', 'width');
   g.addEdgeToMetadata(spandrelAutoscale, 'height', 'height');

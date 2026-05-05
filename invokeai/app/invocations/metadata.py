@@ -270,7 +270,11 @@ class CoreMetadataInvocation(BaseInvocation):
     )
     hrf_structure: Optional[float] = InputField(
         default=None,
-        description="The high resolution fix tile ControlNet structure value.",
+        description="Legacy high resolution fix tile ControlNet structure value.",
+    )
+    hrf_tile_control_weight: Optional[float] = InputField(
+        default=None,
+        description="The high resolution fix tile ControlNet control weight.",
     )
     hrf_tile_control_end: Optional[float] = InputField(
         default=None,
@@ -283,6 +287,22 @@ class CoreMetadataInvocation(BaseInvocation):
     hrf_tile_overlap: Optional[int] = InputField(
         default=None,
         description="The high resolution fix tiled processing tile overlap.",
+    )
+    hrf_steps: Optional[int] = InputField(
+        default=None,
+        description="The number of steps used for the high resolution fix refinement pass.",
+    )
+    hrf_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The optional model override used for the high resolution fix refinement pass.",
+    )
+    hrf_lora_mode: Optional[str] = InputField(
+        default=None,
+        description="The LoRA mode used for the high resolution fix refinement pass.",
+    )
+    hrf_loras: Optional[list[LoRAMetadataField]] = InputField(
+        default=None,
+        description="The dedicated LoRAs used for the high resolution fix refinement pass.",
     )
 
     # SDXL

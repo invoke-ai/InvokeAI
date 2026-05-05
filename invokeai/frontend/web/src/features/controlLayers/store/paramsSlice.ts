@@ -10,8 +10,10 @@ import { logout } from 'features/auth/store/authSlice';
 import type {
   AspectRatioID,
   HrfLatentInterpolationMode,
+  HrfLoraMode,
   HrfMethod,
   InfillMethod,
+  LoRA,
   ParamsState,
   RgbaColor,
 } from 'features/controlLayers/store/types';
@@ -28,7 +30,7 @@ import {
   SUPPORTS_OPTIMIZED_DENOISING_BASE_MODELS,
   SUPPORTS_REF_IMAGES_BASE_MODELS,
 } from 'features/modelManagerV2/models';
-import type { BaseModelType, ModelIdentifierField } from 'features/nodes/types/common';
+import { type BaseModelType, type ModelIdentifierField, zModelIdentifierField } from 'features/nodes/types/common';
 import { CLIP_SKIP_MAP } from 'features/parameters/types/constants';
 import type {
   ParameterCanvasCoherenceMode,
@@ -53,9 +55,14 @@ import type {
 import { getExternalPanelControl, hasExternalPanelControl } from 'features/parameters/util/externalPanelSchema';
 import { getGridSize, getIsSizeOptimal, getOptimalDimension } from 'features/parameters/util/optimalDimension';
 import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import type { AnyModelConfigWithExternal, ControlNetModelConfig } from 'services/api/types';
+import type { AnyModelConfigWithExternal, ControlNetModelConfig, LoRAModelConfig } from 'services/api/types';
 import { isExternalApiModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
+import { v4 as uuidv4 } from 'uuid';
+
+const DEFAULT_HRF_LORA_WEIGHT = 0.75;
+
+const selectHrfLoRA = (state: ParamsState, id: string) => state.hrfLoras.find((lora) => lora.id === id);
 
 const slice = createSlice({
   name: 'params',
@@ -128,6 +135,12 @@ const slice = createSlice({
     },
     setHrfMethod: (state, action: PayloadAction<HrfMethod>) => {
       state.hrfMethod = action.payload;
+      if (action.payload === 'latent') {
+        state.hrfSteps = null;
+        state.hrfModel = null;
+        state.hrfLoraMode = 'reuse_generate';
+        state.hrfLoras = [];
+      }
     },
     setHrfScale: (state, action: PayloadAction<number>) => {
       state.hrfScale = action.payload;
@@ -150,8 +163,8 @@ const slice = createSlice({
         state.hrfTileControlNetModel = result.data;
       }
     },
-    setHrfStructure: (state, action: PayloadAction<number>) => {
-      state.hrfStructure = action.payload;
+    setHrfTileControlWeight: (state, action: PayloadAction<number>) => {
+      state.hrfTileControlWeight = action.payload;
     },
     setHrfTileControlEnd: (state, action: PayloadAction<number>) => {
       state.hrfTileControlEnd = action.payload;
@@ -161,6 +174,57 @@ const slice = createSlice({
     },
     setHrfTileOverlap: (state, action: PayloadAction<number>) => {
       state.hrfTileOverlap = action.payload;
+    },
+    setHrfSteps: (state, action: PayloadAction<number | null>) => {
+      const result = zParamsState.shape.hrfSteps.safeParse(action.payload);
+      if (result.success) {
+        state.hrfSteps = result.data;
+      }
+    },
+    setHrfModel: (state, action: PayloadAction<ParameterModel | null>) => {
+      const result = zParamsState.shape.hrfModel.safeParse(action.payload);
+      if (result.success) {
+        state.hrfModel = result.data;
+      }
+    },
+    setHrfLoraMode: (state, action: PayloadAction<HrfLoraMode>) => {
+      state.hrfLoraMode = action.payload;
+    },
+    setHrfLoras: (state, action: PayloadAction<LoRA[]>) => {
+      state.hrfLoras = action.payload;
+    },
+    hrfLoraAdded: {
+      reducer: (state, action: PayloadAction<{ model: LoRAModelConfig; id: string }>) => {
+        const { model, id } = action.payload;
+        const parsedModel = zModelIdentifierField.parse(model);
+        const defaultLoRAConfig: Pick<LoRA, 'weight' | 'isEnabled'> = {
+          weight: model.default_settings?.weight ?? DEFAULT_HRF_LORA_WEIGHT,
+          isEnabled: true,
+        };
+        state.hrfLoras = state.hrfLoras.filter((lora) => lora.model.key !== parsedModel.key);
+        state.hrfLoras.push({ ...defaultLoRAConfig, model: parsedModel, id });
+      },
+      prepare: (payload: { model: LoRAModelConfig }) => ({ payload: { ...payload, id: uuidv4() } }),
+    },
+    hrfLoraDeleted: (state, action: PayloadAction<{ id: string }>) => {
+      const { id } = action.payload;
+      state.hrfLoras = state.hrfLoras.filter((lora) => lora.id !== id);
+    },
+    hrfLoraWeightChanged: (state, action: PayloadAction<{ id: string; weight: number }>) => {
+      const { id, weight } = action.payload;
+      const lora = selectHrfLoRA(state, id);
+      if (!lora) {
+        return;
+      }
+      lora.weight = weight;
+    },
+    hrfLoraIsEnabledChanged: (state, action: PayloadAction<{ id: string; isEnabled: boolean }>) => {
+      const { id, isEnabled } = action.payload;
+      const lora = selectHrfLoRA(state, id);
+      if (!lora) {
+        return;
+      }
+      lora.isEnabled = isEnabled;
     },
     setSeamlessXAxis: (state, action: PayloadAction<boolean>) => {
       state.seamlessXAxis = action.payload;
@@ -185,12 +249,22 @@ const slice = createSlice({
 
       if (model?.base === 'external') {
         state.hrfEnabled = false;
+        state.hrfModel = null;
       }
 
       // If the model base changes (e.g. SD1.5 -> SDXL), we need to change a few things
       if (model === null || previousModel?.base === model.base) {
         return;
       }
+
+      if (state.hrfModel?.base !== model.base) {
+        state.hrfModel = null;
+      }
+      if (state.hrfTileControlNetModel?.base !== model.base) {
+        state.hrfTileControlNetModel = null;
+      }
+      const effectiveHrfBase = state.hrfModel?.base ?? model.base;
+      state.hrfLoras = state.hrfLoras.filter((lora) => lora.model.base === effectiveHrfBase);
 
       applyClipSkip(state, model, state.clipSkip);
     },
@@ -675,10 +749,18 @@ export const {
   setHrfLatentInterpolationMode,
   setHrfUpscaleModel,
   setHrfTileControlNetModel,
-  setHrfStructure,
+  setHrfTileControlWeight,
   setHrfTileControlEnd,
   setHrfTileSize,
   setHrfTileOverlap,
+  setHrfSteps,
+  setHrfModel,
+  setHrfLoraMode,
+  setHrfLoras,
+  hrfLoraAdded,
+  hrfLoraDeleted,
+  hrfLoraWeightChanged,
+  hrfLoraIsEnabledChanged,
   setSeamlessXAxis,
   setSeamlessYAxis,
   setShouldRandomizeSeed,
@@ -786,6 +868,18 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.hrfTileControlEnd = 0.2;
       }
 
+      if (state._version === 5) {
+        // v5 -> v6, replace the Invoke Upscale "Structure" abstraction with explicit Generate HRF controls
+        state._version = 6;
+        const legacyHrfStructure = typeof state.hrfStructure === 'number' ? state.hrfStructure : 0;
+        state.hrfTileControlWeight = (legacyHrfStructure + 10) * 0.0325 + 0.3;
+        delete state.hrfStructure;
+        state.hrfSteps = null;
+        state.hrfModel = null;
+        state.hrfLoraMode = 'reuse_generate';
+        state.hrfLoras = [];
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -859,10 +953,18 @@ export const selectHrfStrength = createParamsSelector((params) => params.hrfStre
 export const selectHrfLatentInterpolationMode = createParamsSelector((params) => params.hrfLatentInterpolationMode);
 export const selectHrfUpscaleModel = createParamsSelector((params) => params.hrfUpscaleModel);
 export const selectHrfTileControlNetModel = createParamsSelector((params) => params.hrfTileControlNetModel);
-export const selectHrfStructure = createParamsSelector((params) => params.hrfStructure);
+export const selectHrfTileControlWeight = createParamsSelector((params) => params.hrfTileControlWeight);
 export const selectHrfTileControlEnd = createParamsSelector((params) => params.hrfTileControlEnd);
 export const selectHrfTileSize = createParamsSelector((params) => params.hrfTileSize);
 export const selectHrfTileOverlap = createParamsSelector((params) => params.hrfTileOverlap);
+export const selectHrfSteps = createParamsSelector((params) => params.hrfSteps);
+export const selectHrfModel = createParamsSelector((params) => params.hrfModel);
+export const selectHrfLoraMode = createParamsSelector((params) => params.hrfLoraMode);
+export const selectHrfLoras = createParamsSelector((params) => params.hrfLoras);
+export const buildSelectHrfLoRA = (id: string) =>
+  createSelector([selectParamsSlice], (params) => {
+    return selectHrfLoRA(params, id);
+  });
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
 export const selectNegativePromptWithFallback = createParamsSelector((params) => params.negativePrompt ?? '');

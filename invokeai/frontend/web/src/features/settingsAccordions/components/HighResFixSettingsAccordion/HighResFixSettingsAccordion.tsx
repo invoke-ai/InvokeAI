@@ -1,17 +1,23 @@
-import type { ComboboxOnChange } from '@invoke-ai/ui-library';
+import type { ComboboxOnChange, FormLabelProps } from '@invoke-ai/ui-library';
 import {
   Box,
   Button,
   ButtonGroup,
+  Card,
+  CardBody,
+  CardHeader,
   Combobox,
   CompositeNumberInput,
   CompositeSlider,
+  Expander,
   Flex,
   FormControl,
   FormControlGroup,
   FormLabel,
+  IconButton,
   StandaloneAccordion,
   Switch,
+  Text,
   Tooltip,
 } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
@@ -20,45 +26,76 @@ import { createMemoizedSelector } from 'app/store/createMemoizedSelector';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import { useModelCombobox } from 'common/hooks/useModelCombobox';
+import { DEFAULT_LORA_WEIGHT_CONFIG } from 'features/controlLayers/store/lorasSlice';
 import {
+  buildSelectHrfLoRA,
+  hrfLoraAdded,
+  hrfLoraDeleted,
+  hrfLoraIsEnabledChanged,
+  hrfLoraWeightChanged,
   selectBase,
   selectHrfEnabled,
   selectHrfFinalDimensions,
   selectHrfLatentInterpolationMode,
+  selectHrfLoraMode,
+  selectHrfLoras,
   selectHrfMethod,
+  selectHrfModel,
   selectHrfScale,
+  selectHrfSteps,
   selectHrfStrength,
-  selectHrfStructure,
   selectHrfTileControlEnd,
   selectHrfTileControlNetModel,
+  selectHrfTileControlWeight,
   selectHrfTileOverlap,
   selectHrfTileSize,
   selectHrfUpscaleModel,
   selectIsRefinerModelSelected,
   selectModelSupportsHrf,
+  selectSteps,
   setHrfEnabled,
   setHrfLatentInterpolationMode,
+  setHrfLoraMode,
   setHrfMethod,
+  setHrfModel,
   setHrfScale,
+  setHrfSteps,
   setHrfStrength,
-  setHrfStructure,
   setHrfTileControlEnd,
   setHrfTileControlNetModel,
+  setHrfTileControlWeight,
   setHrfTileOverlap,
   setHrfTileSize,
   setHrfUpscaleModel,
 } from 'features/controlLayers/store/paramsSlice';
+import type { LoRA } from 'features/controlLayers/store/types';
 import { zHrfLatentInterpolationMode, zHrfMethod } from 'features/controlLayers/store/types';
+import { CONSTRAINTS as STEPS_CONSTRAINTS } from 'features/parameters/components/Core/ParamSteps';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
+import { useExpanderToggle } from 'features/settingsAccordions/hooks/useExpanderToggle';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import type { ChangeEvent } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/api/endpoints/models';
-import { useControlNetModels, useSpandrelImageToImageModels } from 'services/api/hooks/modelsByType';
+import { PiTrashSimpleBold } from 'react-icons/pi';
+import {
+  modelConfigsAdapterSelectors,
+  selectModelConfigsQuery,
+  useGetModelConfigQuery,
+} from 'services/api/endpoints/models';
+import {
+  useControlNetModels,
+  useLoRAModels,
+  useMainModels,
+  useSpandrelImageToImageModels,
+} from 'services/api/hooks/modelsByType';
 import {
   type ControlNetModelConfig,
   isControlNetModelConfig,
+  isExternalApiModelConfig,
+  isMainOrExternalModelConfig,
+  type LoRAModelConfig,
+  type MainOrExternalModelConfig,
   type SpandrelImageToImageModelConfig,
 } from 'services/api/types';
 
@@ -82,14 +119,14 @@ const STRENGTH_CONSTRAINTS = {
   fineStep: 0.01,
 };
 
-const STRUCTURE_CONSTRAINTS = {
-  initial: 0,
-  sliderMin: -10,
-  sliderMax: 10,
-  numberInputMin: -10,
-  numberInputMax: 10,
-  coarseStep: 1,
-  fineStep: 1,
+const TILE_CONTROL_WEIGHT_CONSTRAINTS = {
+  initial: 0.625,
+  sliderMin: 0,
+  sliderMax: 1.5,
+  numberInputMin: 0,
+  numberInputMax: 2,
+  coarseStep: 0.025,
+  fineStep: 0.005,
 };
 
 const TILE_CONTROL_END_CONSTRAINTS = {
@@ -122,6 +159,24 @@ const TILE_OVERLAP_CONSTRAINTS = {
   fineStep: 8,
 };
 
+const formLabelProps: FormLabelProps = {
+  m: 0,
+  w: '10.5rem',
+  minW: '10.5rem',
+  maxW: '10.5rem',
+  flexShrink: 0,
+  whiteSpace: 'normal',
+  lineHeight: 1.2,
+  overflowWrap: 'break-word',
+};
+
+const formControlProps = {
+  alignItems: 'center',
+  gap: 3,
+  minW: 0,
+  w: 'full',
+};
+
 const selectHrfTileControlNetModelConfig = createSelector(
   selectModelConfigsQuery,
   selectHrfTileControlNetModel,
@@ -137,33 +192,34 @@ const selectHrfTileControlNetModelConfig = createSelector(
   }
 );
 
+const selectHrfModelConfig = createSelector(selectModelConfigsQuery, selectHrfModel, (modelConfigs, model) => {
+  if (!modelConfigs.data || !model) {
+    return null;
+  }
+  const modelConfig = modelConfigsAdapterSelectors.selectById(modelConfigs.data, model.key);
+  if (!modelConfig || !isMainOrExternalModelConfig(modelConfig) || isExternalApiModelConfig(modelConfig)) {
+    return null;
+  }
+  return modelConfig;
+});
+
+const selectHrfLoRAIds = createMemoizedSelector(selectHrfLoras, (loras) => loras.map(({ id }) => id));
+const selectHrfLoRAModelKeys = createMemoizedSelector(selectHrfLoras, (loras) => loras.map(({ model }) => model.key));
+
 const selectBadges = createMemoizedSelector(
-  [
-    selectHrfEnabled,
-    selectHrfMethod,
-    selectHrfScale,
-    selectHrfStrength,
-    selectHrfFinalDimensions,
-    selectHrfUpscaleModel,
-  ],
-  (enabled, method, scale, strength, finalDimensions, upscaleModel) => {
+  [selectHrfEnabled, selectHrfMethod, selectHrfScale, selectHrfStrength, selectHrfFinalDimensions],
+  (enabled, method, scale, strength, finalDimensions) => {
     if (!enabled) {
       return EMPTY_ARRAY;
     }
 
     const methodBadge = method === 'upscale_model' ? 'Model' : 'Latent';
-    const badges = [
+    return [
       methodBadge,
       `${scale}x`,
       `${Math.round(strength * 100)}%`,
       `${finalDimensions.width}x${finalDimensions.height}`,
     ];
-
-    if (method === 'upscale_model' && upscaleModel) {
-      badges.push(upscaleModel.name);
-    }
-
-    return badges;
   }
 );
 
@@ -180,7 +236,7 @@ const ParamHrfEnabled = memo(() => {
   );
 
   return (
-    <FormControl w="min-content">
+    <FormControl>
       <InformationalPopover feature="paramHrf">
         <FormLabel m={0}>{t('hrf.enableHrf')}</FormLabel>
       </InformationalPopover>
@@ -209,11 +265,16 @@ const ParamHrfMethod = memo(() => {
       <InformationalPopover feature="paramUpscaleMethod">
         <FormLabel>{t('hrf.upscaleMethod')}</FormLabel>
       </InformationalPopover>
-      <ButtonGroup size="sm" variant="outline">
-        <Button colorScheme={method === 'latent' ? 'invokeBlue' : undefined} onClick={onClickLatent}>
+      <ButtonGroup size="sm" variant="outline" w="full">
+        <Button flex={1} minW={0} colorScheme={method === 'latent' ? 'invokeBlue' : undefined} onClick={onClickLatent}>
           {t('hrf.latent')}
         </Button>
-        <Button colorScheme={method === 'upscale_model' ? 'invokeBlue' : undefined} onClick={onClickUpscaleModel}>
+        <Button
+          flex={1}
+          minW={0}
+          colorScheme={method === 'upscale_model' ? 'invokeBlue' : undefined}
+          onClick={onClickUpscaleModel}
+        >
           {t('hrf.upscaleModelMethod')}
         </Button>
       </ButtonGroup>
@@ -376,13 +437,13 @@ const ParamHrfUpscaleModel = memo(() => {
   });
 
   return (
-    <FormControl orientation="vertical">
+    <FormControl>
       <InformationalPopover feature="upscaleModel">
         <FormLabel>{t('upscaling.upscaleModel')}</FormLabel>
       </InformationalPopover>
       <Flex w="full" alignItems="center" gap={2}>
         <Tooltip label={tooltipLabel}>
-          <Box w="full">
+          <Box w="full" minW={0}>
             <Combobox
               value={value}
               placeholder={placeholder}
@@ -404,7 +465,9 @@ const ParamHrfTileControlNetModel = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const tileControlNetModel = useAppSelector(selectHrfTileControlNetModelConfig);
-  const currentBaseModel = useAppSelector(selectBase);
+  const generateBaseModel = useAppSelector(selectBase);
+  const hrfModel = useAppSelector(selectHrfModel);
+  const currentBaseModel = hrfModel?.base ?? generateBaseModel;
   const [modelConfigs, { isLoading }] = useControlNetModels();
 
   const onChange = useCallback(
@@ -461,47 +524,51 @@ const ParamHrfTileControlNetModel = memo(() => {
 
 ParamHrfTileControlNetModel.displayName = 'ParamHrfTileControlNetModel';
 
-const ParamHrfStructure = memo(() => {
+const ParamHrfTileControlWeight = memo(() => {
   const dispatch = useAppDispatch();
-  const structure = useAppSelector(selectHrfStructure);
+  const tileControlWeight = useAppSelector(selectHrfTileControlWeight);
   const { t } = useTranslation();
 
   const onChange = useCallback(
     (v: number) => {
-      dispatch(setHrfStructure(v));
+      dispatch(setHrfTileControlWeight(v));
     },
     [dispatch]
   );
 
   return (
     <FormControl>
-      <InformationalPopover feature="structure">
-        <FormLabel>{t('upscaling.structure')}</FormLabel>
+      <InformationalPopover feature="controlNet">
+        <FormLabel>{t('hrf.tileControlWeight')}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
-        value={structure}
-        defaultValue={STRUCTURE_CONSTRAINTS.initial}
-        min={STRUCTURE_CONSTRAINTS.sliderMin}
-        max={STRUCTURE_CONSTRAINTS.sliderMax}
-        step={STRUCTURE_CONSTRAINTS.coarseStep}
-        fineStep={STRUCTURE_CONSTRAINTS.fineStep}
+        value={tileControlWeight}
+        defaultValue={TILE_CONTROL_WEIGHT_CONSTRAINTS.initial}
+        min={TILE_CONTROL_WEIGHT_CONSTRAINTS.sliderMin}
+        max={TILE_CONTROL_WEIGHT_CONSTRAINTS.sliderMax}
+        step={TILE_CONTROL_WEIGHT_CONSTRAINTS.coarseStep}
+        fineStep={TILE_CONTROL_WEIGHT_CONSTRAINTS.fineStep}
         onChange={onChange}
-        marks={[STRUCTURE_CONSTRAINTS.sliderMin, STRUCTURE_CONSTRAINTS.initial, STRUCTURE_CONSTRAINTS.sliderMax]}
+        marks={[
+          TILE_CONTROL_WEIGHT_CONSTRAINTS.sliderMin,
+          TILE_CONTROL_WEIGHT_CONSTRAINTS.initial,
+          TILE_CONTROL_WEIGHT_CONSTRAINTS.sliderMax,
+        ]}
       />
       <CompositeNumberInput
-        value={structure}
-        defaultValue={STRUCTURE_CONSTRAINTS.initial}
-        min={STRUCTURE_CONSTRAINTS.numberInputMin}
-        max={STRUCTURE_CONSTRAINTS.numberInputMax}
-        step={STRUCTURE_CONSTRAINTS.coarseStep}
-        fineStep={STRUCTURE_CONSTRAINTS.fineStep}
+        value={tileControlWeight}
+        defaultValue={TILE_CONTROL_WEIGHT_CONSTRAINTS.initial}
+        min={TILE_CONTROL_WEIGHT_CONSTRAINTS.numberInputMin}
+        max={TILE_CONTROL_WEIGHT_CONSTRAINTS.numberInputMax}
+        step={TILE_CONTROL_WEIGHT_CONSTRAINTS.coarseStep}
+        fineStep={TILE_CONTROL_WEIGHT_CONSTRAINTS.fineStep}
         onChange={onChange}
       />
     </FormControl>
   );
 });
 
-ParamHrfStructure.displayName = 'ParamHrfStructure';
+ParamHrfTileControlWeight.displayName = 'ParamHrfTileControlWeight';
 
 const ParamHrfTileControlEnd = memo(() => {
   const dispatch = useAppDispatch();
@@ -637,6 +704,314 @@ const ParamHrfTileOverlap = memo(() => {
 
 ParamHrfTileOverlap.displayName = 'ParamHrfTileOverlap';
 
+const ParamHrfSteps = memo(() => {
+  const dispatch = useAppDispatch();
+  const hrfSteps = useAppSelector(selectHrfSteps);
+  const generateSteps = useAppSelector(selectSteps);
+  const { t } = useTranslation();
+
+  const onToggle = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setHrfSteps(event.target.checked ? generateSteps : null));
+    },
+    [dispatch, generateSteps]
+  );
+
+  const onChange = useCallback(
+    (v: number) => {
+      dispatch(setHrfSteps(v));
+    },
+    [dispatch]
+  );
+
+  const isCustom = hrfSteps !== null;
+
+  return (
+    <FormControl>
+      <InformationalPopover feature="paramSteps">
+        <FormLabel>{t('hrf.steps')}</FormLabel>
+      </InformationalPopover>
+      <Flex alignItems="center" minW={0} flex={1}>
+        <Switch size="sm" isChecked={isCustom} onChange={onToggle} flexShrink={0} />
+      </Flex>
+      <CompositeNumberInput
+        value={hrfSteps ?? generateSteps}
+        defaultValue={STEPS_CONSTRAINTS.initial}
+        min={STEPS_CONSTRAINTS.numberInputMin}
+        max={STEPS_CONSTRAINTS.numberInputMax}
+        step={STEPS_CONSTRAINTS.coarseStep}
+        fineStep={STEPS_CONSTRAINTS.fineStep}
+        onChange={onChange}
+        isDisabled={!isCustom}
+        w={24}
+        flexShrink={0}
+      />
+    </FormControl>
+  );
+});
+
+ParamHrfSteps.displayName = 'ParamHrfSteps';
+
+const ParamHrfModel = memo(() => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const selectedModelConfig = useAppSelector(selectHrfModelConfig);
+  const currentBaseModel = useAppSelector(selectBase);
+
+  const filter = useCallback(
+    (model: MainOrExternalModelConfig) => {
+      return (
+        !isExternalApiModelConfig(model) && model.base === currentBaseModel && ['sd-1', 'sdxl'].includes(model.base)
+      );
+    },
+    [currentBaseModel]
+  );
+  const [modelConfigs, { isLoading }] = useMainModels(filter);
+
+  const onChange = useCallback(
+    (model: MainOrExternalModelConfig | null) => {
+      dispatch(setHrfModel(model && !isExternalApiModelConfig(model) ? model : null));
+    },
+    [dispatch]
+  );
+
+  return (
+    <FormControl>
+      <InformationalPopover feature="paramModel">
+        <FormLabel>{t('hrf.model')}</FormLabel>
+      </InformationalPopover>
+      <ModelPicker
+        pickerId="hrf-model"
+        modelConfigs={modelConfigs}
+        selectedModelConfig={selectedModelConfig ?? undefined}
+        onChange={onChange}
+        allowEmpty
+        placeholder={t('hrf.reuseGenerateModel')}
+        noOptionsText={currentBaseModel ? t('hrf.noCompatibleModels') : t('models.selectModel')}
+        isDisabled={isLoading || !modelConfigs.length}
+      />
+    </FormControl>
+  );
+});
+
+ParamHrfModel.displayName = 'ParamHrfModel';
+
+const ParamHrfLoraMode = memo(() => {
+  const dispatch = useAppDispatch();
+  const mode = useAppSelector(selectHrfLoraMode);
+  const { t } = useTranslation();
+
+  const onClickReuseGenerate = useCallback(() => {
+    dispatch(setHrfLoraMode('reuse_generate'));
+  }, [dispatch]);
+
+  const onClickNone = useCallback(() => {
+    dispatch(setHrfLoraMode('none'));
+  }, [dispatch]);
+
+  const onClickDedicated = useCallback(() => {
+    dispatch(setHrfLoraMode('dedicated'));
+  }, [dispatch]);
+
+  return (
+    <FormControl>
+      <InformationalPopover feature="lora">
+        <FormLabel>{t('hrf.loraMode')}</FormLabel>
+      </InformationalPopover>
+      <ButtonGroup size="sm" variant="outline" w="full">
+        <Button
+          flex={1}
+          minW={0}
+          colorScheme={mode === 'reuse_generate' ? 'invokeBlue' : undefined}
+          onClick={onClickReuseGenerate}
+        >
+          {t('hrf.reuseGenerateLoras')}
+        </Button>
+        <Button flex={1} minW={0} colorScheme={mode === 'none' ? 'invokeBlue' : undefined} onClick={onClickNone}>
+          {t('hrf.noLoras')}
+        </Button>
+        <Button
+          flex={1}
+          minW={0}
+          colorScheme={mode === 'dedicated' ? 'invokeBlue' : undefined}
+          onClick={onClickDedicated}
+        >
+          {t('hrf.dedicatedLoras')}
+        </Button>
+      </ButtonGroup>
+    </FormControl>
+  );
+});
+
+ParamHrfLoraMode.displayName = 'ParamHrfLoraMode';
+
+const ParamHrfLoraSelect = memo(() => {
+  const dispatch = useAppDispatch();
+  const [modelConfigs, { isLoading }] = useLoRAModels();
+  const { t } = useTranslation();
+  const addedLoRAModelKeys = useAppSelector(selectHrfLoRAModelKeys);
+  const currentBaseModel = useAppSelector(selectBase);
+  const hrfModel = useAppSelector(selectHrfModel);
+  const hrfBase = hrfModel?.base ?? currentBaseModel;
+
+  const compatibleLoRAs = useMemo(() => {
+    if (!hrfBase) {
+      return EMPTY_ARRAY;
+    }
+    return modelConfigs.filter((model) => model.base === hrfBase);
+  }, [hrfBase, modelConfigs]);
+
+  const getIsDisabled = useCallback(
+    (model: LoRAModelConfig): boolean => {
+      return addedLoRAModelKeys.includes(model.key);
+    },
+    [addedLoRAModelKeys]
+  );
+
+  const onChange = useCallback(
+    (model: LoRAModelConfig | null) => {
+      if (!model) {
+        return;
+      }
+      dispatch(hrfLoraAdded({ model }));
+    },
+    [dispatch]
+  );
+
+  const placeholder = useMemo(() => {
+    if (isLoading) {
+      return t('common.loading');
+    }
+    if (compatibleLoRAs.length === 0) {
+      return hrfBase ? t('models.noCompatibleLoRAs') : t('models.selectModel');
+    }
+    return t('hrf.addDedicatedLora');
+  }, [compatibleLoRAs.length, hrfBase, isLoading, t]);
+
+  return (
+    <FormControl gap={2}>
+      <InformationalPopover feature="lora">
+        <FormLabel>{t('hrf.dedicatedLoras')}</FormLabel>
+      </InformationalPopover>
+      <ModelPicker
+        pickerId="hrf-lora-select"
+        modelConfigs={compatibleLoRAs}
+        onChange={onChange}
+        grouped={false}
+        selectedModelConfig={undefined}
+        allowEmpty
+        placeholder={placeholder}
+        getIsOptionDisabled={getIsDisabled}
+        noOptionsText={hrfBase ? t('models.noCompatibleLoRAs') : t('models.selectModel')}
+      />
+    </FormControl>
+  );
+});
+
+ParamHrfLoraSelect.displayName = 'ParamHrfLoraSelect';
+
+const HrfLoRAList = memo(() => {
+  const ids = useAppSelector(selectHrfLoRAIds);
+
+  if (!ids.length) {
+    return null;
+  }
+
+  return (
+    <Flex flexWrap="wrap" gap={2}>
+      {ids.map((id) => (
+        <HrfLoRACard key={id} id={id} />
+      ))}
+    </Flex>
+  );
+});
+
+HrfLoRAList.displayName = 'HrfLoRAList';
+
+const HrfLoRACard = memo((props: { id: string }) => {
+  const selectLoRA = useMemo(() => buildSelectHrfLoRA(props.id), [props.id]);
+  const lora = useAppSelector(selectLoRA);
+
+  if (!lora) {
+    return null;
+  }
+  return <HrfLoRAContent lora={lora} />;
+});
+
+HrfLoRACard.displayName = 'HrfLoRACard';
+
+const HrfLoRAContent = memo(({ lora }: { lora: LoRA }) => {
+  const { t } = useTranslation();
+  const dispatch = useAppDispatch();
+  const { data: loraConfig } = useGetModelConfigQuery(lora.model.key);
+
+  const onChange = useCallback(
+    (v: number) => {
+      dispatch(hrfLoraWeightChanged({ id: lora.id, weight: v }));
+    },
+    [dispatch, lora.id]
+  );
+
+  const onToggle = useCallback(() => {
+    dispatch(hrfLoraIsEnabledChanged({ id: lora.id, isEnabled: !lora.isEnabled }));
+  }, [dispatch, lora.id, lora.isEnabled]);
+
+  const onRemove = useCallback(() => {
+    dispatch(hrfLoraDeleted({ id: lora.id }));
+  }, [dispatch, lora.id]);
+
+  return (
+    <Card variant="lora">
+      <CardHeader>
+        <Flex alignItems="center" justifyContent="space-between" width="100%" gap={2}>
+          <Text noOfLines={1} wordBreak="break-all" color={lora.isEnabled ? 'base.200' : 'base.500'}>
+            {loraConfig?.name ?? lora.model.key.substring(0, 8)}
+          </Text>
+          <Flex alignItems="center" gap={2}>
+            <Switch size="sm" onChange={onToggle} isChecked={lora.isEnabled} />
+            <IconButton
+              aria-label={t('lora.removeLoRA')}
+              variant="ghost"
+              size="sm"
+              onClick={onRemove}
+              icon={<PiTrashSimpleBold />}
+            />
+          </Flex>
+        </Flex>
+      </CardHeader>
+      <InformationalPopover feature="loraWeight">
+        <CardBody>
+          <CompositeSlider
+            value={lora.weight}
+            onChange={onChange}
+            min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
+            max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
+            step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
+            fineStep={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
+            marks={[-1, 0, 1, 2]}
+            defaultValue={DEFAULT_LORA_WEIGHT_CONFIG.initial}
+            isDisabled={!lora.isEnabled}
+          />
+          <CompositeNumberInput
+            value={lora.weight}
+            onChange={onChange}
+            min={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
+            max={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
+            step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
+            fineStep={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
+            w={20}
+            flexShrink={0}
+            defaultValue={DEFAULT_LORA_WEIGHT_CONFIG.initial}
+            isDisabled={!lora.isEnabled}
+          />
+        </CardBody>
+      </InformationalPopover>
+    </Card>
+  );
+});
+
+HrfLoRAContent.displayName = 'HrfLoRAContent';
+
 export const HighResFixSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const badges = useAppSelector(selectBadges);
@@ -644,8 +1019,13 @@ export const HighResFixSettingsAccordion = memo(() => {
   const method = useAppSelector(selectHrfMethod);
   const modelSupportsHrf = useAppSelector(selectModelSupportsHrf);
   const isRefinerModelSelected = useAppSelector(selectIsRefinerModelSelected);
+  const hrfLoraMode = useAppSelector(selectHrfLoraMode);
   const { isOpen, onToggle } = useStandaloneAccordionToggle({
     id: 'high-res-fix-settings-generate-tab',
+    defaultIsOpen: false,
+  });
+  const { isOpen: isOpenExpander, onToggle: onToggleExpander } = useExpanderToggle({
+    id: 'high-res-fix-settings-generate-tab-advanced',
     defaultIsOpen: false,
   });
 
@@ -657,28 +1037,50 @@ export const HighResFixSettingsAccordion = memo(() => {
 
   return (
     <StandaloneAccordion label={t('hrf.hrf')} badges={badges} isOpen={isOpen} onToggle={onToggle}>
-      <Flex px={4} pt={4} pb={4} w="full" h="full" flexDir="column" gap={4}>
-        <ParamHrfEnabled />
-        {enabled && (
-          <FormControlGroup>
-            <ParamHrfMethod />
-            <ParamHrfScale />
-            <ParamHrfStrength />
-            {parsedMethod === 'latent' ? (
-              <ParamHrfLatentInterpolationMode />
-            ) : (
+      <Flex px={4} pt={4} pb={enabled ? 0 : 4} w="full" h="full" flexDir="column" gap={4}>
+        <FormControlGroup formLabelProps={formLabelProps} formControlProps={formControlProps}>
+          <ParamHrfEnabled />
+          {enabled && (
+            <>
+              <ParamHrfMethod />
+              <ParamHrfScale />
+              <ParamHrfStrength />
+              {parsedMethod === 'upscale_model' && (
+                <>
+                  <ParamHrfUpscaleModel />
+                  <ParamHrfTileControlNetModel />
+                </>
+              )}
+            </>
+          )}
+        </FormControlGroup>
+      </Flex>
+      {enabled && (
+        <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
+          <Flex gap={4} flexDir="column" px={4} pb={4}>
+            <FormControlGroup formLabelProps={formLabelProps} formControlProps={formControlProps}>
+              {parsedMethod === 'latent' && <ParamHrfLatentInterpolationMode />}
+              {parsedMethod === 'upscale_model' && (
+                <>
+                  <ParamHrfTileControlWeight />
+                  <ParamHrfTileControlEnd />
+                  <ParamHrfTileSize />
+                  <ParamHrfTileOverlap />
+                  <ParamHrfModel />
+                  <ParamHrfLoraMode />
+                  <ParamHrfSteps />
+                </>
+              )}
+            </FormControlGroup>
+            {parsedMethod === 'upscale_model' && hrfLoraMode === 'dedicated' && (
               <>
-                <ParamHrfUpscaleModel />
-                <ParamHrfTileControlNetModel />
-                <ParamHrfStructure />
-                <ParamHrfTileControlEnd />
-                <ParamHrfTileSize />
-                <ParamHrfTileOverlap />
+                <ParamHrfLoraSelect />
+                <HrfLoRAList />
               </>
             )}
-          </FormControlGroup>
-        )}
-      </Flex>
+          </Flex>
+        </Expander>
+      )}
     </StandaloneAccordion>
   );
 });

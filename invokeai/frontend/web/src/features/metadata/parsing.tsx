@@ -38,12 +38,16 @@ import {
   setGuidance,
   setHrfEnabled,
   setHrfLatentInterpolationMode,
+  setHrfLoraMode,
+  setHrfLoras,
   setHrfMethod,
+  setHrfModel,
   setHrfScale,
+  setHrfSteps,
   setHrfStrength,
-  setHrfStructure,
   setHrfTileControlEnd,
   setHrfTileControlNetModel,
+  setHrfTileControlWeight,
   setHrfTileOverlap,
   setHrfTileSize,
   setHrfUpscaleModel,
@@ -74,6 +78,7 @@ import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
 import type {
   CanvasMetadata,
   HrfLatentInterpolationMode,
+  HrfLoraMode,
   HrfMethod as HrfMethodType,
   LoRA,
   RefImageState,
@@ -82,6 +87,7 @@ import {
   zCanvasMetadata,
   zCanvasReferenceImageState_OLD,
   zHrfLatentInterpolationMode,
+  zHrfLoraMode,
   zHrfMethod,
   zRefImageState,
 } from 'features/controlLayers/store/types';
@@ -756,12 +762,28 @@ const HrfStructure: SingleMetadataHandler<number> = {
   parse: (metadata, _store) => {
     const raw = getProperty(metadata, 'hrf_structure');
     const parsed = z.number().min(-10).max(10).parse(raw);
+    return Promise.resolve((parsed + 10) * 0.0325 + 0.3);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfTileControlWeight(value));
+  },
+  i18nKey: 'hrf.metadata.legacyStructure',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+
+const HrfTileControlWeight: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfTileControlWeight',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_tile_control_weight');
+    const parsed = z.number().min(0).max(2).parse(raw);
     return Promise.resolve(parsed);
   },
   recall: (value, store) => {
-    store.dispatch(setHrfStructure(value));
+    store.dispatch(setHrfTileControlWeight(value));
   },
-  i18nKey: 'hrf.metadata.structure',
+  i18nKey: 'hrf.metadata.tileControlWeight',
   LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
 };
@@ -812,6 +834,55 @@ const HrfTileOverlap: SingleMetadataHandler<number> = {
   i18nKey: 'hrf.metadata.tileOverlap',
   LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+
+const HrfSteps: SingleMetadataHandler<number> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfSteps',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_steps');
+    const parsed = zParameterSteps.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfSteps(value));
+  },
+  i18nKey: 'hrf.metadata.steps',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<number>) => <MetadataPrimitiveValue value={value} />,
+};
+
+const HrfModel: SingleMetadataHandler<ModelIdentifierField> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfModel',
+  parse: (metadata, store) => {
+    const raw = getProperty(metadata, 'hrf_model');
+    return parseModelIdentifier(raw, store, 'main');
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfModel(value as ParameterModel));
+  },
+  i18nKey: 'hrf.metadata.model',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField>) => (
+    <MetadataPrimitiveValue value={`${value.name} (${value.base.toUpperCase()})`} />
+  ),
+};
+
+const HrfLoraModeMetadata: SingleMetadataHandler<HrfLoraMode> = {
+  [SingleMetadataKey]: true,
+  type: 'HrfLoraMode',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'hrf_lora_mode');
+    const parsed = zHrfLoraMode.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(setHrfLoraMode(value));
+  },
+  i18nKey: 'hrf.metadata.loraMode',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<HrfLoraMode>) => <MetadataPrimitiveValue value={value} />,
 };
 //#endregion High Resolution Fix
 
@@ -1452,6 +1523,57 @@ const LoRAs: CollectionMetadataHandler<LoRA[]> = {
 };
 //#endregion LoRAs
 
+//#region HRF LoRAs
+const HrfLoRAs: CollectionMetadataHandler<LoRA[]> = {
+  [CollectionMetadataKey]: true,
+  type: 'HrfLoRAs',
+  parse: async (metadata, store) => {
+    const rawArray = getProperty(metadata, 'hrf_loras');
+
+    if (!rawArray) {
+      return [];
+    }
+
+    assert(isArray(rawArray));
+
+    const loras: LoRA[] = [];
+
+    for (const rawItem of rawArray) {
+      try {
+        const rawIdentifier = getProperty(rawItem, 'model');
+        const identifier = await parseModelIdentifier(rawIdentifier, store, 'lora');
+        assert(identifier.type === 'lora');
+        assert(isCompatibleWithMainModel(identifier, store));
+
+        const weight = getProperty(rawItem, 'weight');
+
+        loras.push({
+          id: getPrefixedId('hrf_lora'),
+          model: identifier,
+          weight: zLoRAWeight.parse(weight),
+          isEnabled: true,
+        });
+      } catch {
+        continue;
+      }
+    }
+
+    return loras;
+  },
+  recallOne: (value, store) => {
+    store.dispatch(setHrfLoras([value]));
+  },
+  recall: (values, store) => {
+    store.dispatch(setHrfLoras(values));
+  },
+  i18nKey: 'hrf.metadata.loras',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: CollectionMetadataValueProps<LoRA[]>) => (
+    <MetadataPrimitiveValue value={`${value.model.name} (${value.model.base.toUpperCase()}) - ${value.weight}`} />
+  ),
+};
+//#endregion HRF LoRAs
+
 //#region CanvasLayers
 const CanvasLayers: SingleMetadataHandler<CanvasMetadata> = {
   [SingleMetadataKey]: true,
@@ -1734,9 +1856,13 @@ export const ImageMetadataHandlers = {
   HrfUpscaleModel,
   HrfTileControlNetModel,
   HrfStructure,
+  HrfTileControlWeight,
   HrfTileControlEnd,
   HrfTileSize,
   HrfTileOverlap,
+  HrfSteps,
+  HrfModel,
+  HrfLoraMode: HrfLoraModeMetadata,
   SeamlessX,
   SeamlessY,
   RefinerModel,
@@ -1766,6 +1892,7 @@ export const ImageMetadataHandlers = {
   QwenImageShift,
   ZImageShift,
   LoRAs,
+  HrfLoRAs,
   CanvasLayers,
   RefImages,
   ImageSize,
@@ -1850,10 +1977,8 @@ const recallByHandlers = async (arg: {
     (handler) => !skip.some((skippedHandler) => skippedHandler.type === handler.type)
   );
 
-  // It's possible for some metadata item's recall to clobber the recall of another. For example, the model recall
-  // may change the width and height. If we are also recalling the width and height directly, we need to ensure that the
-  // model is recalled first, so it doesn't accidentally override the width and height. This is the only known case
-  // where the order of recall matters.
+  // It's possible for some metadata item's recall to clobber another or to affect compatibility checks. For example,
+  // model recall may change dimensions, and LoRA-like handlers validate against the current model base.
   const sortedHandlers = filteredHandlers.sort((a, b) => {
     if (a === ImageMetadataHandlers.MainModel) {
       return -1; // MainModel should be recalled first

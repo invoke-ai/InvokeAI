@@ -366,15 +366,26 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
       reasons.push({ content: i18n.t('parameters.invoke.hrfRefinerUnsupported') });
     }
     if (params.hrfMethod === 'upscale_model') {
+      const hrfBase =
+        params.hrfModel?.base ?? (model && !isExternalApiModelConfig(model) ? model.base : params.model?.base);
       if (model && !isExternalApiModelConfig(model) && !['sd-1', 'sdxl'].includes(model.base)) {
         reasons.push({ content: i18n.t('parameters.invoke.hrfUpscaleModelBaseUnsupported') });
+      }
+      if (params.hrfModel) {
+        if (params.hrfModel.base === 'external') {
+          reasons.push({ content: i18n.t('parameters.invoke.hrfModelOverrideExternalUnsupported') });
+        } else if (!['sd-1', 'sdxl'].includes(params.hrfModel.base)) {
+          reasons.push({ content: i18n.t('parameters.invoke.hrfModelOverrideBaseUnsupported') });
+        } else if (model && !isExternalApiModelConfig(model) && params.hrfModel.base !== model.base) {
+          reasons.push({ content: i18n.t('parameters.invoke.hrfModelOverrideBaseMismatch') });
+        }
       }
       if (!params.hrfUpscaleModel) {
         reasons.push({ content: i18n.t('parameters.invoke.hrfUpscaleModelMissing') });
       }
       if (!params.hrfTileControlNetModel) {
         reasons.push({ content: i18n.t('parameters.invoke.hrfTileControlNetModelMissing') });
-      } else if (model && !isExternalApiModelConfig(model) && params.hrfTileControlNetModel.base !== model.base) {
+      } else if (hrfBase && params.hrfTileControlNetModel.base !== hrfBase) {
         reasons.push({ content: i18n.t('parameters.invoke.hrfTileControlNetModelMissing') });
       }
     }

@@ -755,8 +755,11 @@ export type HrfLatentInterpolationMode = z.infer<typeof zHrfLatentInterpolationM
 export const zHrfMethod = z.enum(['latent', 'upscale_model']);
 export type HrfMethod = z.infer<typeof zHrfMethod>;
 
+export const zHrfLoraMode = z.enum(['reuse_generate', 'none', 'dedicated']);
+export type HrfLoraMode = z.infer<typeof zHrfLoraMode>;
+
 export const zParamsState = z.object({
-  _version: z.literal(5),
+  _version: z.literal(6),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -778,10 +781,14 @@ export const zParamsState = z.object({
   hrfLatentInterpolationMode: zHrfLatentInterpolationMode,
   hrfUpscaleModel: zParameterSpandrelImageToImageModel.nullable(),
   hrfTileControlNetModel: zModelIdentifierField.nullable(),
-  hrfStructure: z.number().min(-10).max(10),
+  hrfTileControlWeight: z.number().min(0).max(2),
   hrfTileControlEnd: z.number().min(0).max(1),
   hrfTileSize: z.number().int().min(8),
   hrfTileOverlap: z.number().int().min(8),
+  hrfSteps: z.number().int().min(1).nullable(),
+  hrfModel: zParameterModel.nullable(),
+  hrfLoraMode: zHrfLoraMode,
+  hrfLoras: z.array(zLoRA),
   iterations: z.number(),
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
@@ -851,7 +858,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 5,
+  _version: 6,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -873,10 +880,14 @@ export const getInitialParamsState = (): ParamsState => ({
   hrfLatentInterpolationMode: 'bicubic',
   hrfUpscaleModel: null,
   hrfTileControlNetModel: null,
-  hrfStructure: 0,
+  hrfTileControlWeight: 0.625,
   hrfTileControlEnd: 0.2,
   hrfTileSize: 1024,
   hrfTileOverlap: 128,
+  hrfSteps: null,
+  hrfModel: null,
+  hrfLoraMode: 'reuse_generate',
+  hrfLoras: [],
   iterations: 1,
   scheduler: 'dpmpp_3m_k',
   fluxScheduler: 'euler',
