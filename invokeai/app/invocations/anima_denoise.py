@@ -742,7 +742,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     fresh_noise = torch.randn(
                         latents.shape,
                         device=latents.device,
-                        dtype=latents.dtype,
+                        dtype=torch.float32,
                         generator=step_generator,
                     )
 
@@ -753,7 +753,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
                         v=noise_pred,
                         sigma_curr=sigma_curr,
                         sigma_prev=sigma_prev,
-                        noise=fresh_noise.to(dtype=torch.float32),
+                        noise=fresh_noise,
                         eta=1.0,
                         s_noise=1.0,
                     )
