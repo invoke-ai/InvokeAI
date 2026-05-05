@@ -31,3 +31,67 @@ def test_anima_scheduler_map_entries_can_be_constructed():
 def test_anima_scheduler_labels_cover_every_map_key():
     for name in ANIMA_SCHEDULER_MAP.keys():
         assert name in ANIMA_SCHEDULER_LABELS, f"{name} has no label"
+
+
+def test_anima_scheduler_map_includes_new_dpmpp_entries():
+    assert "dpmpp_2m" in ANIMA_SCHEDULER_MAP
+    assert "dpmpp_2m_sde" in ANIMA_SCHEDULER_MAP
+
+
+def test_anima_dpmpp_2m_uses_flow_prediction():
+    cls, kwargs = ANIMA_SCHEDULER_MAP["dpmpp_2m"]
+    assert kwargs["prediction_type"] == "flow_prediction"
+    assert kwargs["use_flow_sigmas"] is True
+    assert kwargs["flow_shift"] == 3.0
+    assert kwargs["solver_order"] == 2
+    assert "algorithm_type" not in kwargs  # deterministic, default algorithm
+
+
+def test_anima_dpmpp_2m_sde_uses_sde_algorithm():
+    cls, kwargs = ANIMA_SCHEDULER_MAP["dpmpp_2m_sde"]
+    assert kwargs["prediction_type"] == "flow_prediction"
+    assert kwargs["use_flow_sigmas"] is True
+    assert kwargs["flow_shift"] == 3.0
+    assert kwargs["algorithm_type"] == "sde-dpmsolver++"
+    assert kwargs["solver_order"] == 2
+
+
+def test_anima_dpmpp_2m_produces_anima_compatible_sigma_schedule():
+    """The DPM++ 2M scheduler, when run through the same dispatch logic as
+    anima_denoise._run_diffusion, must produce a sigma schedule equivalent
+    to Anima's reference schedule (loglinear_timestep_shift with shift=3.0).
+
+    On diffusers 0.35.1, DPMSolverMultistepScheduler.set_timesteps does not
+    accept `sigmas=`, so the runtime falls back to num_inference_steps and
+    relies on the scheduler's internal flow_shift=3.0 to compute equivalent
+    sigmas. This test verifies that equivalence end-to-end.
+    """
+    import inspect
+    from invokeai.app.invocations.anima_denoise import (
+        ANIMA_SHIFT,
+        loglinear_timestep_shift,
+    )
+
+    num_steps = 10
+
+    # Reference: Anima's own pre-shifted sigma schedule.
+    anima_sigmas = [
+        loglinear_timestep_shift(ANIMA_SHIFT, 1.0 - i / num_steps)
+        for i in range(num_steps + 1)
+    ]
+
+    cls, kwargs = ANIMA_SCHEDULER_MAP["dpmpp_2m"]
+    scheduler = cls(num_train_timesteps=1000, **kwargs)
+
+    # Mirror anima_denoise.py:502-506 dispatch.
+    sig = inspect.signature(scheduler.set_timesteps)
+    if "sigmas" in sig.parameters:
+        scheduler.set_timesteps(sigmas=anima_sigmas, device="cpu")
+    else:
+        scheduler.set_timesteps(num_inference_steps=num_steps, device="cpu")
+
+    diffusers_sigmas = [float(s) for s in scheduler.sigmas[: len(anima_sigmas)]]
+    max_diff = max(abs(a - b) for a, b in zip(anima_sigmas, diffusers_sigmas, strict=True))
+    assert max_diff < 1e-3, (
+        f"DPM++ 2M sigma schedule diverges from Anima reference (max abs diff = {max_diff:.6f})"
+    )
