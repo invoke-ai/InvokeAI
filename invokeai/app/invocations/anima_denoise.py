@@ -735,9 +735,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
                     if do_cfg and neg_context is not None:
                         noise_pred_uncond = _run_transformer(neg_context, latents, timestep).float()
-                        noise_pred = noise_pred_uncond + self.guidance_scale * (
-                            noise_pred_cond - noise_pred_uncond
-                        )
+                        noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
                     else:
                         noise_pred = noise_pred_cond
 

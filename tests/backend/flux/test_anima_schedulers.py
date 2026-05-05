@@ -3,12 +3,12 @@
 import torch
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
+from invokeai.app.invocations.anima_denoise import _anima_euler_ancestral_step
 from invokeai.backend.flux.schedulers import (
     ANIMA_SCHEDULER_LABELS,
     ANIMA_SCHEDULER_MAP,
     ANIMA_SCHEDULER_NAME_VALUES,
 )
-from invokeai.app.invocations.anima_denoise import _anima_euler_ancestral_step
 
 
 def test_anima_scheduler_map_entries_are_class_kwargs_tuples():
@@ -73,16 +73,14 @@ def test_anima_dpmpp_2m_produces_anima_compatible_sigma_schedule():
     sigmas. This test verifies that equivalence end-to-end.
     """
     import inspect
+
     from invokeai.app.invocations.anima_denoise import loglinear_timestep_shift
     from invokeai.backend.flux.schedulers import ANIMA_SHIFT
 
     num_steps = 10
 
     # Reference: Anima's own pre-shifted sigma schedule.
-    anima_sigmas = [
-        loglinear_timestep_shift(ANIMA_SHIFT, 1.0 - i / num_steps)
-        for i in range(num_steps + 1)
-    ]
+    anima_sigmas = [loglinear_timestep_shift(ANIMA_SHIFT, 1.0 - i / num_steps) for i in range(num_steps + 1)]
 
     cls, kwargs = ANIMA_SCHEDULER_MAP["dpmpp_2m"]
     scheduler = cls(num_train_timesteps=1000, **kwargs)
@@ -96,9 +94,7 @@ def test_anima_dpmpp_2m_produces_anima_compatible_sigma_schedule():
 
     diffusers_sigmas = [float(s) for s in scheduler.sigmas[: len(anima_sigmas)]]
     max_diff = max(abs(a - b) for a, b in zip(anima_sigmas, diffusers_sigmas, strict=True))
-    assert max_diff < 1e-3, (
-        f"DPM++ 2M sigma schedule diverges from Anima reference (max abs diff = {max_diff:.6f})"
-    )
+    assert max_diff < 1e-3, f"DPM++ 2M sigma schedule diverges from Anima reference (max abs diff = {max_diff:.6f})"
 
 
 def test_anima_literal_covers_every_map_key():
@@ -127,8 +123,13 @@ def test_anima_euler_ancestral_step_eta_zero_matches_deterministic_euler():
 
     deterministic = _deterministic_euler_step(latents, v, sigma_curr, sigma_prev)
     ancestral_eta_zero = _anima_euler_ancestral_step(
-        latents=latents, v=v, sigma_curr=sigma_curr, sigma_prev=sigma_prev,
-        noise=noise, eta=0.0, s_noise=1.0,
+        latents=latents,
+        v=v,
+        sigma_curr=sigma_curr,
+        sigma_prev=sigma_prev,
+        noise=noise,
+        eta=0.0,
+        s_noise=1.0,
     )
     assert torch.allclose(deterministic, ancestral_eta_zero, atol=1e-6)
 
@@ -143,8 +144,13 @@ def test_anima_euler_ancestral_step_eta_one_differs_from_deterministic():
 
     deterministic = _deterministic_euler_step(latents, v, sigma_curr, sigma_prev)
     ancestral_eta_one = _anima_euler_ancestral_step(
-        latents=latents, v=v, sigma_curr=sigma_curr, sigma_prev=sigma_prev,
-        noise=noise, eta=1.0, s_noise=1.0,
+        latents=latents,
+        v=v,
+        sigma_curr=sigma_curr,
+        sigma_prev=sigma_prev,
+        noise=noise,
+        eta=1.0,
+        s_noise=1.0,
     )
     assert not torch.allclose(deterministic, ancestral_eta_one, atol=1e-3)
 
