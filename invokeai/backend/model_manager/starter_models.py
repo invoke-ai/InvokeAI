@@ -819,13 +819,47 @@ flux_redux = StarterModel(
 )
 # endregion
 
-# region LlavaOnevisionModel
+# region LlavaOnevisionModel (vision-language models for Image-to-Prompt)
 llava_onevision = StarterModel(
     name="LLaVA Onevision Qwen2 0.5B",
     base=BaseModelType.Any,
     source="llava-hf/llava-onevision-qwen2-0.5b-ov-hf",
-    description="LLaVA Onevision VLLM model",
+    description="LLaVA Onevision vision-language model (~1 GB). Lightweight default for the Image-to-Prompt feature.",
     type=ModelType.LlavaOnevision,
+)
+
+llava_onevision_7b = StarterModel(
+    name="LLaVA Onevision Qwen2 7B",
+    base=BaseModelType.Any,
+    source="llava-hf/llava-onevision-qwen2-7b-ov-hf",
+    description="LLaVA Onevision 7B vision-language model. Larger, higher-quality alternative for Image-to-Prompt. (~16 GB)",
+    type=ModelType.LlavaOnevision,
+)
+# endregion
+
+# region TextLLM (causal language models for Prompt Expansion)
+qwen2_5_1_5b_instruct = StarterModel(
+    name="Qwen2.5-1.5B-Instruct",
+    base=BaseModelType.Any,
+    source="Qwen/Qwen2.5-1.5B-Instruct",
+    description="Qwen2.5 1.5B instruction-tuned LLM. Recommended default for the Prompt Expansion feature — small and fast. (~3 GB)",
+    type=ModelType.TextLLM,
+)
+
+qwen2_5_3b_instruct = StarterModel(
+    name="Qwen2.5-3B-Instruct",
+    base=BaseModelType.Any,
+    source="Qwen/Qwen2.5-3B-Instruct",
+    description="Qwen2.5 3B instruction-tuned LLM. Better prompt expansion quality at the cost of more VRAM. (~6 GB)",
+    type=ModelType.TextLLM,
+)
+
+smollm2_1_7b_instruct = StarterModel(
+    name="SmolLM2-1.7B-Instruct",
+    base=BaseModelType.Any,
+    source="HuggingFaceTB/SmolLM2-1.7B-Instruct",
+    description="SmolLM2 1.7B instruction-tuned LLM (Apache-2.0). Alternative to Qwen for prompt expansion. (~3 GB)",
+    type=ModelType.TextLLM,
 )
 # endregion
 
@@ -1149,6 +1183,131 @@ gemini_3_1_flash_image_preview = StarterModel(
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
 )
+QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS = ["1:1", "4:3", "3:4", "16:9", "9:16"]
+QWEN_IMAGE_MAX_ALLOWED_ASPECT_RATIOS = ["1:1", "4:3", "3:4", "16:9", "9:16"]
+WAN_V2_ALLOWED_ASPECT_RATIOS = ["1:1", "4:3", "3:4", "16:9", "9:16"]
+
+alibabacloud_qwen_image_2_pro = StarterModel(
+    name="Qwen Image 2.0 Pro",
+    base=BaseModelType.External,
+    source="external://alibabacloud/qwen-image-2.0-pro",
+    description="Alibaba Cloud Qwen Image 2.0 Pro model (external API). Best quality text-to-image with excellent bilingual text rendering. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=2048, height=2048),
+            "4:3": ExternalImageSize(width=2368, height=1728),
+            "3:4": ExternalImageSize(width=1728, height=2368),
+            "16:9": ExternalImageSize(width=2688, height=1536),
+            "9:16": ExternalImageSize(width=1536, height=2688),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+alibabacloud_qwen_image_2 = StarterModel(
+    name="Qwen Image 2.0",
+    base=BaseModelType.External,
+    source="external://alibabacloud/qwen-image-2.0",
+    description="Alibaba Cloud Qwen Image 2.0 model (external API). Fast text-to-image with good bilingual text rendering. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=2048, height=2048),
+            "4:3": ExternalImageSize(width=2368, height=1728),
+            "3:4": ExternalImageSize(width=1728, height=2368),
+            "16:9": ExternalImageSize(width=2688, height=1536),
+            "9:16": ExternalImageSize(width=1536, height=2688),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+alibabacloud_qwen_image_max = StarterModel(
+    name="Qwen Image Max",
+    base=BaseModelType.External,
+    source="external://alibabacloud/qwen-image-max",
+    description="Alibaba Cloud Qwen Image Max model (external API). High quality text-to-image generation. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=QWEN_IMAGE_MAX_ALLOWED_ASPECT_RATIOS,
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1328, height=1328),
+            "4:3": ExternalImageSize(width=1472, height=1104),
+            "3:4": ExternalImageSize(width=1104, height=1472),
+            "16:9": ExternalImageSize(width=1664, height=928),
+            "9:16": ExternalImageSize(width=928, height=1664),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1328, height=1328, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+alibabacloud_wan26_t2i = StarterModel(
+    name="Wan 2.6 Text-to-Image",
+    base=BaseModelType.External,
+    source="external://alibabacloud/wan2.6-t2i",
+    description="Alibaba Cloud Wan 2.6 text-to-image model (external API). Photorealistic image generation. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=WAN_V2_ALLOWED_ASPECT_RATIOS,
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=1024, height=1024),
+            "4:3": ExternalImageSize(width=1440, height=1080),
+            "3:4": ExternalImageSize(width=1080, height=1440),
+            "16:9": ExternalImageSize(width=1440, height=810),
+            "9:16": ExternalImageSize(width=810, height=1440),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
+    panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
+)
+alibabacloud_qwen_image_edit_max = StarterModel(
+    name="Qwen Image Edit Max",
+    base=BaseModelType.External,
+    source="external://alibabacloud/qwen-image-edit-max",
+    description="Alibaba Cloud Qwen Image Edit Max model (external API). Image editing with industrial design and geometric reasoning, driven by up to 3 reference images. Requires a configured Alibaba Cloud DashScope API key and may incur provider usage costs.",
+    type=ModelType.ExternalImageGenerator,
+    format=ModelFormat.ExternalApi,
+    capabilities=ExternalModelCapabilities(
+        modes=["txt2img"],
+        supports_negative_prompt=False,
+        supports_reference_images=True,
+        supports_seed=True,
+        max_images_per_request=4,
+        allowed_aspect_ratios=QWEN_IMAGE_2_ALLOWED_ASPECT_RATIOS,
+        aspect_ratio_sizes={
+            "1:1": ExternalImageSize(width=2048, height=2048),
+            "4:3": ExternalImageSize(width=2368, height=1728),
+            "3:4": ExternalImageSize(width=1728, height=2368),
+            "16:9": ExternalImageSize(width=2688, height=1536),
+            "9:16": ExternalImageSize(width=1536, height=2688),
+        },
+    ),
+    default_settings=ExternalApiModelDefaultSettings(width=2048, height=2048, num_images=1),
+    panel_schema=ExternalModelPanelSchema(prompts=[{"name": "reference_images"}], image=[{"name": "dimensions"}]),
+)
 OPENAI_GPT_IMAGE_ASPECT_RATIOS = ["1:1", "3:2", "2:3"]
 OPENAI_GPT_IMAGE_ASPECT_RATIO_SIZES = {
     "1:1": ExternalImageSize(width=1024, height=1024),
@@ -1350,6 +1509,10 @@ STARTER_MODELS: list[StarterModel] = [
     siglip,
     flux_redux,
     llava_onevision,
+    llava_onevision_7b,
+    qwen2_5_1_5b_instruct,
+    qwen2_5_3b_instruct,
+    smollm2_1_7b_instruct,
     flux_fill,
     flux2_vae,
     flux2_klein_4b,
@@ -1395,6 +1558,11 @@ STARTER_MODELS: list[StarterModel] = [
     openai_gpt_image_1,
     openai_gpt_image_1_mini,
     openai_dall_e_3,
+    alibabacloud_qwen_image_2_pro,
+    alibabacloud_qwen_image_2,
+    alibabacloud_qwen_image_max,
+    alibabacloud_wan26_t2i,
+    alibabacloud_qwen_image_edit_max,
     anima_preview3,
     anima_qwen3_encoder,
     anima_vae,
