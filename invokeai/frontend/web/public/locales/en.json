@@ -1141,7 +1141,7 @@
         "externalApiKey": "API Key",
         "externalApiKeyPlaceholder": "Paste your API key",
         "externalApiKeyPlaceholderSet": "API key configured",
-        "externalApiKeyHelper": "Stored in your InvokeAI config file.",
+        "externalApiKeyHelper": "Stored in api_keys.yaml in your InvokeAI root directory.",
         "externalBaseUrl": "Base URL (optional)",
         "externalBaseUrlPlaceholder": "https://...",
         "externalBaseUrlHelper": "Override the default API base URL if needed.",
