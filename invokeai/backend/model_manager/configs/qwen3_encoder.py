@@ -186,6 +186,14 @@ class Qwen3Encoder_Qwen3Encoder_Config(Config_Base):
         if config_path_nested.exists():
             expected_config_path = config_path_nested
         elif config_path_direct.exists():
+            # Standalone text_encoder downloads do not bundle tokenizer files. If we see tokenizer files at the
+            # root next to config.json, this is a complete causal LM (TextLLM), not a Qwen3 encoder subfolder.
+            tokenizer_files = ("tokenizer.json", "tokenizer.model", "tokenizer_config.json")
+            if any((mod.path / f).exists() for f in tokenizer_files):
+                raise NotAMatchError(
+                    "directory looks like a complete causal LM (config.json and tokenizer files at root), "
+                    "not a standalone Qwen3 encoder"
+                )
             expected_config_path = config_path_direct
         else:
             raise NotAMatchError(
