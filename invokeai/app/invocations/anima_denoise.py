@@ -511,6 +511,8 @@ class AnimaDenoiseInvocation(BaseInvocation):
         else:
             num_scheduler_steps = total_steps
 
+        step_generator = torch.Generator(device=device).manual_seed(self.seed)
+
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
 
@@ -613,7 +615,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     else:
                         noise_pred = noise_pred_cond
 
-                    step_output = scheduler.step(model_output=noise_pred, timestep=sched_timestep, sample=latents)
+                    step_output = scheduler.step(
+                        model_output=noise_pred,
+                        timestep=sched_timestep,
+                        sample=latents,
+                        generator=step_generator,
+                    )
                     latents = step_output.prev_sample
 
                     if step_index + 1 < len(scheduler.sigmas):
