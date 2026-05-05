@@ -110,7 +110,7 @@ def er_sde_rf_step(
     - Order 2 (used from step 1+, except when sigma_next == 0): ports
       `vp_2_order_taylor`.
     - Order 3 (used from step 2+, except when sigma_next == 0): ports
-      `vp_3_order_taylor`. Added in a follow-up task.
+      `vp_3_order_taylor`.
 
     The sigma_curr = 1.0 boundary (alpha_curr = 0, lambda_curr = inf) is
     handled as a closed-form limit; see the inline comment.
@@ -174,6 +174,16 @@ def er_sde_rf_step(
             lambda_next - lambda_curr + s_int * fn_next
         ) * d_x0
         new_d_x0 = d_x0
+
+        have_two_back = state.old_d_x0 is not None and state.sigma_prev_prev is not None
+        if have_two_back:
+            # 3rd-order Taylor term — ports vp_3_order_taylor.
+            lambda_prev_prev = _lambda(state.sigma_prev_prev)
+            dd_x0 = 2.0 * (d_x0 - state.old_d_x0) / (lambda_curr - lambda_prev_prev)
+            s_d_int = _integral_lam_minus_curr_over_fn(lambda_next, lambda_curr)
+            x_next = x_next + alpha_next * (
+                (lambda_next - lambda_curr) ** 2 / 2.0 + s_d_int * fn_next
+            ) * dd_x0
 
     # State update for the next call.
     state.sigma_prev_prev = state.sigma_prev_curr

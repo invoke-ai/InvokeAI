@@ -199,3 +199,41 @@ def test_er_sde_rf_step_order_2_engages_after_one_step():
     )
     # Order-2 correction coefficient ~0.18 for these sigmas; 1e-3 leaves ample headroom.
     assert not torch.allclose(out_1st, out_2nd, atol=1e-3)
+
+
+def test_er_sde_rf_step_order_3_engages_after_two_steps():
+    """When state has two-step history, the 3rd-order Taylor term must
+    contribute — output must differ from a state with one-step history only."""
+    torch.manual_seed(0)
+    x_t = torch.randn(1, 16, 1, 8, 8, dtype=torch.float64)
+    v = torch.randn_like(x_t)
+    noise = torch.randn_like(x_t)
+
+    # state_3rd: two prior calls -> both old_x0 and old_d_x0 populated.
+    state_3rd = _make_state()
+    er_sde_rf_step(
+        x_t=x_t, v=v, sigma_curr=0.8, sigma_next=0.7,
+        state=state_3rd, noise=torch.randn_like(x_t),
+    )
+    er_sde_rf_step(
+        x_t=x_t, v=v, sigma_curr=0.7, sigma_next=0.6,
+        state=state_3rd, noise=torch.randn_like(x_t),
+    )
+
+    # state_2nd: one prior call -> only old_x0 populated. Same prior-step inputs
+    # so its old_x0 matches state_3rd's old_x0 going into the test step.
+    state_2nd = _make_state()
+    er_sde_rf_step(
+        x_t=x_t, v=v, sigma_curr=0.7, sigma_next=0.6,
+        state=state_2nd, noise=torch.randn_like(x_t),
+    )
+
+    out_2nd = er_sde_rf_step(
+        x_t=x_t, v=v, sigma_curr=0.6, sigma_next=0.5,
+        state=state_2nd, noise=noise,
+    )
+    out_3rd = er_sde_rf_step(
+        x_t=x_t, v=v, sigma_curr=0.6, sigma_next=0.5,
+        state=state_3rd, noise=noise,
+    )
+    assert not torch.allclose(out_2nd, out_3rd, atol=1e-3)
