@@ -10,7 +10,6 @@ import { useTranslation } from 'react-i18next';
 // Anima scheduler options. Mirrors ANIMA_SCHEDULER_LABELS in invokeai/backend/flux/schedulers.py.
 const ANIMA_SCHEDULER_OPTIONS: ComboboxOption[] = [
   { value: 'euler', label: 'Euler' },
-  { value: 'euler_a', label: 'Euler Ancestral' },
   { value: 'heun', label: 'Heun (2nd order)' },
   { value: 'dpmpp_2m', label: 'DPM++ 2M' },
   { value: 'dpmpp_2m_sde', label: 'DPM++ 2M SDE' },
