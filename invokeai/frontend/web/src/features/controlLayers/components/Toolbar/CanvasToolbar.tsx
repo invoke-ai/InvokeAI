@@ -22,6 +22,8 @@ import { useCanvasDeleteLayerHotkey } from 'features/controlLayers/hooks/useCanv
 import { useCanvasEntityQuickSwitchHotkey } from 'features/controlLayers/hooks/useCanvasEntityQuickSwitchHotkey';
 import { useCanvasFilterHotkey } from 'features/controlLayers/hooks/useCanvasFilterHotkey';
 import { useCanvasInvertMaskHotkey } from 'features/controlLayers/hooks/useCanvasInvertMaskHotkey';
+import { useCanvasMergeDownHotkey } from 'features/controlLayers/hooks/useCanvasMergeDownHotkey';
+import { useCanvasMergeVisibleHotkey } from 'features/controlLayers/hooks/useCanvasMergeVisibleHotkey';
 import { useCanvasResetLayerHotkey } from 'features/controlLayers/hooks/useCanvasResetLayerHotkey';
 import { useCanvasSelectBboxToolHotkey } from 'features/controlLayers/hooks/useCanvasSelectBboxToolHotkey';
 import { useCanvasToggleBboxHotkey } from 'features/controlLayers/hooks/useCanvasToggleBboxHotkey';
@@ -43,6 +45,8 @@ export const CanvasToolbar = memo(() => {
 
   useCanvasResetLayerHotkey();
   useCanvasDeleteLayerHotkey();
+  useCanvasMergeDownHotkey();
+  useCanvasMergeVisibleHotkey();
   useCanvasUndoRedoHotkeys();
   useCanvasEntityQuickSwitchHotkey();
   useNextPrevEntityHotkeys();
