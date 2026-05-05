@@ -4,7 +4,7 @@ import { createSelector } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useDisclosure } from 'common/hooks/useBoolean';
 import { useGallerySearchTerm } from 'features/gallery/components/ImageGrid/useGallerySearchTerm';
-import { selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
+import { selectGalleryLayoutMode, selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
 import { galleryViewChanged, selectGallerySlice } from 'features/gallery/store/gallerySlice';
 import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
@@ -16,7 +16,10 @@ import { PiCaretDownBold, PiCaretUpBold, PiMagnifyingGlassBold } from 'react-ico
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 import { GalleryImageGrid } from './GalleryImageGrid';
+import { GalleryImageGridMasonry } from './GalleryImageGridMasonry';
 import { GalleryImageGridPaged } from './GalleryImageGridPaged';
+import { getEffectiveGalleryLayout } from './galleryLayout';
+import { GalleryLayoutToggle } from './GalleryLayoutToggle';
 import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettingsPopover';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GallerySearch } from './ImageGrid/GallerySearch';
@@ -33,8 +36,10 @@ export const GalleryPanel = memo(() => {
   const galleryPanel = useGalleryPanel(tab);
   const isCollapsed = useStore(galleryPanel.$isCollapsed);
   const galleryView = useAppSelector(selectGalleryView);
+  const galleryLayoutMode = useAppSelector(selectGalleryLayoutMode);
   const initialSearchTerm = useAppSelector(selectSearchTerm);
   const shouldUsePagedGalleryView = useAppSelector(selectShouldUsePagedGalleryView);
+  const effectiveGalleryLayout = getEffectiveGalleryLayout(galleryLayoutMode, shouldUsePagedGalleryView);
   const searchDisclosure = useDisclosure(!!initialSearchTerm);
   const [searchTerm, onChangeSearchTerm, onResetSearchTerm] = useGallerySearchTerm();
   const handleClickImages = useCallback(() => {
@@ -57,8 +62,8 @@ export const GalleryPanel = memo(() => {
   const boardName = useBoardName(selectedBoardId);
 
   return (
-    <Flex flexDirection="column" alignItems="center" justifyContent="space-between" h="full" w="full" minH={0}>
-      <Flex gap={2} fontSize="sm" alignItems="center" w="full">
+    <Flex flexDirection="column" alignItems="center" h="full" w="full" minH={0} overflow="hidden">
+      <Flex gap={2} fontSize="sm" alignItems="center" w="full" flexShrink={0}>
         <Button
           size="sm"
           variant="ghost"
@@ -88,7 +93,8 @@ export const GalleryPanel = memo(() => {
             {t('gallery.assets')}
           </Button>
         </ButtonGroup>
-        <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end">
+        <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end" alignItems="center">
+          <GalleryLayoutToggle />
           <GalleryUploadButton />
           <GallerySettingsPopover />
           <IconButton
@@ -111,9 +117,15 @@ export const GalleryPanel = memo(() => {
           />
         </Box>
       </Collapse>
-      <Divider pt={2} />
-      <Flex w="full" h="full" pt={2}>
-        {shouldUsePagedGalleryView ? <GalleryImageGridPaged /> : <GalleryImageGrid />}
+      <Divider pt={2} flexShrink={0} />
+      <Flex w="full" flexGrow={1} flexBasis={0} minH={0} overflow="hidden" pt={2}>
+        {shouldUsePagedGalleryView ? (
+          <GalleryImageGridPaged />
+        ) : effectiveGalleryLayout === 'masonry' ? (
+          <GalleryImageGridMasonry />
+        ) : (
+          <GalleryImageGrid />
+        )}
       </Flex>
     </Flex>
   );
