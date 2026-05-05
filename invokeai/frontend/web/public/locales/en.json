@@ -177,6 +177,9 @@
         "generation": {
             "title": "Generation"
         },
+        "faceDetailer": {
+            "title": "Detailer"
+        },
         "image": {
             "title": "Image"
         },
@@ -1616,6 +1619,64 @@
         },
         "cfgScale": "CFG Scale",
         "cfgRescaleMultiplier": "CFG Rescale Multiplier",
+        "faceDetailer": {
+            "enabled": "Enable",
+            "quality": "Quality",
+            "detector": "Detector",
+            "detectorModel": "Detector Model",
+            "samModel": "SAM Model",
+            "targetPrompt": "Target",
+            "detectionThreshold": "Threshold",
+            "faceSelection": "Target Selection",
+            "targetSize": "Target Size",
+            "maxUpscale": "Max Upscale",
+            "maxProcessSize": "Max Process",
+            "cropPadding": "Crop Padding",
+            "maskExpand": "Mask Expand",
+            "maskFeather": "Mask Feather",
+            "denoiseMaskExpand": "Denoise Expand",
+            "denoiseMaskFeather": "Denoise Gradient",
+            "pasteMaskExpand": "Paste Expand",
+            "pasteMaskFeather": "Paste Feather",
+            "colorCorrectMode": "Color Match",
+            "faceId": "Target ID",
+            "minConfidence": "Confidence",
+            "padding": "Padding",
+            "strength": "Strength",
+            "steps": "Steps",
+            "cfgScale": "CFG Scale",
+            "maskBlur": "Mask Blur",
+            "developerOptions": "Developer Options",
+            "targetPresets": {
+                "label": "Target",
+                "face": "Face",
+                "head": "Head",
+                "hands": "Hands",
+                "body": "Body",
+                "custom": "Custom"
+            },
+            "detectors": {
+                "groundedSam": "DINO + SAM",
+                "mediapipe": "MediaPipe"
+            },
+            "qualities": {
+                "fast": "Fast",
+                "balanced": "Balanced",
+                "high": "High"
+            },
+            "faceSelections": {
+                "highestScore": "Highest Score",
+                "largestArea": "Largest Area",
+                "index": "Index"
+            },
+            "colorCorrectModes": {
+                "off": "Off",
+                "luma": "Luma",
+                "chroma": "Chroma",
+                "ycbcr": "YCbCr",
+                "rgb": "RGB"
+            }
+        },
         "clipSkip": "CLIP Skip",
         "coherenceMode": "Mode",
         "coherenceEdgeSize": "Edge Size",

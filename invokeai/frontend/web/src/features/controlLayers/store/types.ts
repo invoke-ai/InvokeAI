@@ -749,8 +749,67 @@ const zPositivePromptHistory = z
 export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile']);
 export type InfillMethod = z.infer<typeof zInfillMethod>;
 
+export const zDetailerDetector = z.enum(['grounding-dino-sam', 'mediapipe']);
+export type DetailerDetector = z.infer<typeof zDetailerDetector>;
+
+export const zDetailerQuality = z.enum(['fast', 'balanced', 'high']);
+export type DetailerQuality = z.infer<typeof zDetailerQuality>;
+
+export const zDetailerFaceSelection = z.enum(['highest_score', 'largest_area', 'index']);
+export type DetailerFaceSelection = z.infer<typeof zDetailerFaceSelection>;
+
+export const zDetailerDinoModel = z.enum(['grounding-dino-tiny', 'grounding-dino-base']);
+export type DetailerDinoModel = z.infer<typeof zDetailerDinoModel>;
+
+export const zDetailerSamModel = z.enum([
+  'segment-anything-base',
+  'segment-anything-large',
+  'segment-anything-huge',
+  'segment-anything-2-tiny',
+  'segment-anything-2-small',
+  'segment-anything-2-base',
+  'segment-anything-2-large',
+]);
+export type DetailerSamModel = z.infer<typeof zDetailerSamModel>;
+
+export const zDetailerUpscaleMethod = z.literal('pixel_crop_resize');
+export type DetailerUpscaleMethod = z.infer<typeof zDetailerUpscaleMethod>;
+
+export const zDetailerColorCorrectMode = z.enum(['off', 'RGB', 'YCbCr', 'YCbCr-Chroma', 'YCbCr-Luma']);
+export type DetailerColorCorrectMode = z.infer<typeof zDetailerColorCorrectMode>;
+
+export const DEFAULT_FACE_DETAILER_PARAMS = {
+  detailerEnabled: false,
+  detailerDetector: 'grounding-dino-sam' as const,
+  detailerQuality: 'balanced' as const,
+  detailerTargetPrompt: 'face',
+  detailerFaceSelection: 'highest_score' as const,
+  detailerDinoModel: 'grounding-dino-tiny' as const,
+  detailerSamModel: 'segment-anything-2-small' as const,
+  detailerDetectionThreshold: 0.25,
+  detailerTargetSize: 768,
+  detailerMaxUpscale: 8,
+  detailerMaxProcessSize: 768,
+  detailerCropPadding: 64,
+  detailerMaskExpand: 8,
+  detailerMaskFeather: 24,
+  detailerDenoiseMaskExpand: 8,
+  detailerDenoiseMaskFeather: 8,
+  detailerPasteMaskExpand: 0,
+  detailerPasteMaskFeather: 8,
+  detailerUpscaleMethod: 'pixel_crop_resize' as const,
+  detailerColorCorrectMode: 'off' as const,
+  detailerFaceId: 0,
+  detailerMinConfidence: 0.5,
+  detailerPadding: 32,
+  detailerStrength: 0.28,
+  detailerSteps: 14,
+  detailerCfgScale: 7.5,
+  detailerMaskBlur: 8,
+};
+
 export const zParamsState = z.object({
-  _version: z.literal(3),
+  _version: z.literal(8),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -764,6 +823,33 @@ export const zParamsState = z.object({
   cfgRescaleMultiplier: zParameterCFGRescaleMultiplier,
   guidance: zParameterGuidance,
   img2imgStrength: zParameterStrength,
+  detailerEnabled: z.boolean(),
+  detailerDetector: zDetailerDetector,
+  detailerQuality: zDetailerQuality,
+  detailerTargetPrompt: z.string(),
+  detailerFaceSelection: zDetailerFaceSelection,
+  detailerDinoModel: zDetailerDinoModel,
+  detailerSamModel: zDetailerSamModel,
+  detailerDetectionThreshold: z.number().min(0).max(1),
+  detailerTargetSize: z.number().int().min(64),
+  detailerMaxUpscale: z.number().min(1),
+  detailerMaxProcessSize: z.number().int().min(64),
+  detailerCropPadding: z.number().int().min(0),
+  detailerMaskExpand: z.number().int().min(0),
+  detailerMaskFeather: z.number().int().min(0),
+  detailerDenoiseMaskExpand: z.number().int().min(0),
+  detailerDenoiseMaskFeather: z.number().int().min(0),
+  detailerPasteMaskExpand: z.number().int().min(0),
+  detailerPasteMaskFeather: z.number().int().min(0),
+  detailerUpscaleMethod: zDetailerUpscaleMethod,
+  detailerColorCorrectMode: zDetailerColorCorrectMode,
+  detailerFaceId: z.number().int().min(0),
+  detailerMinConfidence: z.number().min(0).max(1),
+  detailerPadding: z.number().int().min(0),
+  detailerStrength: zParameterStrength,
+  detailerSteps: zParameterSteps,
+  detailerCfgScale: zParameterCFGScale,
+  detailerMaskBlur: z.number().int().min(0),
   optimizedDenoisingEnabled: z.boolean(),
   iterations: z.number(),
   scheduler: zParameterScheduler,
@@ -839,7 +925,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 3,
+  _version: 8,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -853,6 +939,7 @@ export const getInitialParamsState = (): ParamsState => ({
   cfgRescaleMultiplier: 0,
   guidance: 4,
   img2imgStrength: 0.75,
+  ...DEFAULT_FACE_DETAILER_PARAMS,
   optimizedDenoisingEnabled: true,
   iterations: 1,
   scheduler: 'dpmpp_3m_k',

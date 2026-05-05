@@ -4,6 +4,7 @@ import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import { addControlNets, addT2IAdapters } from 'features/nodes/util/graph/generation/addControlAdapters';
+import { addFaceDetailerPass } from 'features/nodes/util/graph/generation/addFaceDetailerPass';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addIPAdapters } from 'features/nodes/util/graph/generation/addIPAdapters';
@@ -310,6 +311,21 @@ export const buildSDXLGraph = async (arg: GraphBuilderArg): Promise<GraphBuilder
     g.addEdge(ipAdapterCollect, 'collection', denoise, 'ip_adapter');
   } else {
     g.deleteNode(ipAdapterCollect.id);
+  }
+
+  if (selectActiveTab(state) === 'generate') {
+    canvasOutput = addFaceDetailerPass({
+      g,
+      state,
+      image: canvasOutput,
+      vaeSource,
+      baseDenoise: denoise,
+      posCondCollect,
+      negCondCollect,
+      seed,
+      fp32,
+      colorCompensation: compensation,
+    });
   }
 
   if (state.system.shouldUseNSFWChecker) {

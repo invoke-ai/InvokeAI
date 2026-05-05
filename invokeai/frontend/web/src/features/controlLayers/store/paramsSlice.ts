@@ -7,10 +7,18 @@ import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMul
 import { isPlainObject } from 'es-toolkit';
 import { clamp } from 'es-toolkit/compat';
 import { logout } from 'features/auth/store/authSlice';
-import type { AspectRatioID, InfillMethod, ParamsState, RgbaColor } from 'features/controlLayers/store/types';
+import type {
+  AspectRatioID,
+  DetailerColorCorrectMode,
+  DetailerQuality,
+  InfillMethod,
+  ParamsState,
+  RgbaColor,
+} from 'features/controlLayers/store/types';
 import {
   ASPECT_RATIO_MAP,
   DEFAULT_ASPECT_RATIO_CONFIG,
+  DEFAULT_FACE_DETAILER_PARAMS,
   getInitialParamsState,
   MAX_POSITIVE_PROMPT_HISTORY,
   zParamsState,
@@ -48,6 +56,57 @@ import { modelConfigsAdapterSelectors, selectModelConfigsQuery } from 'services/
 import type { AnyModelConfigWithExternal } from 'services/api/types';
 import { isExternalApiModelConfig, isNonRefinerMainModelConfig } from 'services/api/types';
 import { assert } from 'tsafe';
+
+const DETAILER_QUALITY_PRESETS = {
+  fast: {
+    detailerTargetSize: 512,
+    detailerMaxUpscale: 4,
+    detailerMaxProcessSize: 512,
+    detailerStrength: 0.25,
+    detailerSteps: 8,
+    detailerDenoiseMaskFeather: 6,
+    detailerPasteMaskExpand: 0,
+    detailerPasteMaskFeather: 8,
+  },
+  balanced: {
+    detailerTargetSize: 768,
+    detailerMaxUpscale: 8,
+    detailerMaxProcessSize: 768,
+    detailerStrength: 0.28,
+    detailerSteps: 14,
+    detailerDenoiseMaskFeather: 8,
+    detailerPasteMaskExpand: 0,
+    detailerPasteMaskFeather: 8,
+  },
+  high: {
+    detailerTargetSize: 1024,
+    detailerMaxUpscale: 12,
+    detailerMaxProcessSize: 1024,
+    detailerStrength: 0.32,
+    detailerSteps: 18,
+    detailerDenoiseMaskFeather: 10,
+    detailerPasteMaskExpand: 0,
+    detailerPasteMaskFeather: 8,
+  },
+} satisfies Record<
+  DetailerQuality,
+  Pick<
+    ParamsState,
+    | 'detailerTargetSize'
+    | 'detailerMaxUpscale'
+    | 'detailerMaxProcessSize'
+    | 'detailerStrength'
+    | 'detailerSteps'
+    | 'detailerDenoiseMaskFeather'
+    | 'detailerPasteMaskExpand'
+    | 'detailerPasteMaskFeather'
+  >
+>;
+
+const applyDetailerQualityPreset = (state: ParamsState, quality: DetailerQuality) => {
+  state.detailerQuality = quality;
+  Object.assign(state, DETAILER_QUALITY_PRESETS[quality]);
+};
 
 const slice = createSlice({
   name: 'params',
@@ -111,6 +170,84 @@ const slice = createSlice({
     },
     setImg2imgStrength: (state, action: PayloadAction<number>) => {
       state.img2imgStrength = action.payload;
+    },
+    setDetailerEnabled: (state, action: PayloadAction<boolean>) => {
+      state.detailerEnabled = action.payload;
+    },
+    setDetailerDetector: (state, action: PayloadAction<ParamsState['detailerDetector']>) => {
+      state.detailerDetector = action.payload;
+    },
+    setDetailerQuality: (state, action: PayloadAction<DetailerQuality>) => {
+      applyDetailerQualityPreset(state, action.payload);
+    },
+    setDetailerTargetPrompt: (state, action: PayloadAction<string>) => {
+      state.detailerTargetPrompt = action.payload;
+    },
+    setDetailerFaceSelection: (state, action: PayloadAction<ParamsState['detailerFaceSelection']>) => {
+      state.detailerFaceSelection = action.payload;
+    },
+    setDetailerDinoModel: (state, action: PayloadAction<ParamsState['detailerDinoModel']>) => {
+      state.detailerDinoModel = action.payload;
+    },
+    setDetailerSamModel: (state, action: PayloadAction<ParamsState['detailerSamModel']>) => {
+      state.detailerSamModel = action.payload;
+    },
+    setDetailerDetectionThreshold: (state, action: PayloadAction<number>) => {
+      state.detailerDetectionThreshold = action.payload;
+    },
+    setDetailerTargetSize: (state, action: PayloadAction<number>) => {
+      state.detailerTargetSize = action.payload;
+    },
+    setDetailerMaxUpscale: (state, action: PayloadAction<number>) => {
+      state.detailerMaxUpscale = action.payload;
+    },
+    setDetailerMaxProcessSize: (state, action: PayloadAction<number>) => {
+      state.detailerMaxProcessSize = action.payload;
+    },
+    setDetailerCropPadding: (state, action: PayloadAction<number>) => {
+      state.detailerCropPadding = action.payload;
+    },
+    setDetailerMaskExpand: (state, action: PayloadAction<number>) => {
+      state.detailerMaskExpand = action.payload;
+    },
+    setDetailerMaskFeather: (state, action: PayloadAction<number>) => {
+      state.detailerMaskFeather = action.payload;
+    },
+    setDetailerDenoiseMaskExpand: (state, action: PayloadAction<number>) => {
+      state.detailerDenoiseMaskExpand = action.payload;
+    },
+    setDetailerDenoiseMaskFeather: (state, action: PayloadAction<number>) => {
+      state.detailerDenoiseMaskFeather = action.payload;
+    },
+    setDetailerPasteMaskExpand: (state, action: PayloadAction<number>) => {
+      state.detailerPasteMaskExpand = action.payload;
+    },
+    setDetailerPasteMaskFeather: (state, action: PayloadAction<number>) => {
+      state.detailerPasteMaskFeather = action.payload;
+    },
+    setDetailerFaceId: (state, action: PayloadAction<number>) => {
+      state.detailerFaceId = action.payload;
+    },
+    setDetailerMinConfidence: (state, action: PayloadAction<number>) => {
+      state.detailerMinConfidence = action.payload;
+    },
+    setDetailerPadding: (state, action: PayloadAction<number>) => {
+      state.detailerPadding = action.payload;
+    },
+    setDetailerStrength: (state, action: PayloadAction<number>) => {
+      state.detailerStrength = action.payload;
+    },
+    setDetailerSteps: (state, action: PayloadAction<number>) => {
+      state.detailerSteps = action.payload;
+    },
+    setDetailerCfgScale: (state, action: PayloadAction<ParameterCFGScale>) => {
+      state.detailerCfgScale = action.payload;
+    },
+    setDetailerMaskBlur: (state, action: PayloadAction<number>) => {
+      state.detailerMaskBlur = action.payload;
+    },
+    setDetailerColorCorrectMode: (state, action: PayloadAction<DetailerColorCorrectMode>) => {
+      state.detailerColorCorrectMode = action.payload;
     },
     setOptimizedDenoisingEnabled: (state, action: PayloadAction<boolean>) => {
       state.optimizedDenoisingEnabled = action.payload;
@@ -641,6 +778,32 @@ export const {
   setUpscaleCfgScale,
   setSeed,
   setImg2imgStrength,
+  setDetailerEnabled,
+  setDetailerDetector,
+  setDetailerQuality,
+  setDetailerTargetPrompt,
+  setDetailerFaceSelection,
+  setDetailerDinoModel,
+  setDetailerSamModel,
+  setDetailerDetectionThreshold,
+  setDetailerTargetSize,
+  setDetailerMaxUpscale,
+  setDetailerMaxProcessSize,
+  setDetailerCropPadding,
+  setDetailerMaskExpand,
+  setDetailerMaskFeather,
+  setDetailerDenoiseMaskExpand,
+  setDetailerDenoiseMaskFeather,
+  setDetailerPasteMaskExpand,
+  setDetailerPasteMaskFeather,
+  setDetailerFaceId,
+  setDetailerMinConfidence,
+  setDetailerPadding,
+  setDetailerStrength,
+  setDetailerSteps,
+  setDetailerCfgScale,
+  setDetailerMaskBlur,
+  setDetailerColorCorrectMode,
   setOptimizedDenoisingEnabled,
   setSeamlessXAxis,
   setSeamlessYAxis,
@@ -734,6 +897,66 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.qwenImageQwenVLEncoderModel = null;
       }
 
+      if (state._version === 3) {
+        // v3 -> v4, add Generate Tab face detailer settings
+        const detailerEnabled = state.detailerEnabled === true;
+        state._version = 4;
+        Object.assign(state, DEFAULT_FACE_DETAILER_PARAMS, { detailerEnabled });
+      }
+
+      if (state._version === 4) {
+        // v4 -> v5, upgrade the Generate Tab face detailer to DINO/SAM defaults
+        const detailerEnabled = state.detailerEnabled === true;
+        state._version = 5;
+        Object.assign(state, DEFAULT_FACE_DETAILER_PARAMS, { detailerEnabled });
+      }
+
+      if (state._version === 5) {
+        // v5 -> v6, split detailer denoise and paste masks and make the DINO target configurable
+        state._version = 6;
+        Object.assign(state, {
+          detailerTargetPrompt: state.detailerTargetPrompt ?? DEFAULT_FACE_DETAILER_PARAMS.detailerTargetPrompt,
+          detailerDenoiseMaskExpand:
+            state.detailerDenoiseMaskExpand ??
+            state.detailerMaskExpand ??
+            DEFAULT_FACE_DETAILER_PARAMS.detailerDenoiseMaskExpand,
+          detailerDenoiseMaskFeather:
+            state.detailerDenoiseMaskFeather ?? DEFAULT_FACE_DETAILER_PARAMS.detailerDenoiseMaskFeather,
+          detailerPasteMaskExpand:
+            state.detailerPasteMaskExpand ?? DEFAULT_FACE_DETAILER_PARAMS.detailerPasteMaskExpand,
+          detailerPasteMaskFeather:
+            state.detailerPasteMaskFeather ?? DEFAULT_FACE_DETAILER_PARAMS.detailerPasteMaskFeather,
+          detailerUpscaleMethod: DEFAULT_FACE_DETAILER_PARAMS.detailerUpscaleMethod,
+        });
+      }
+
+      if (state._version === 6) {
+        // v6 -> v7, apply stabilized detailer quality defaults and add optional color correction
+        state._version = 7;
+        Object.assign(state, {
+          detailerTargetSize: DEFAULT_FACE_DETAILER_PARAMS.detailerTargetSize,
+          detailerMaxUpscale: DEFAULT_FACE_DETAILER_PARAMS.detailerMaxUpscale,
+          detailerMaxProcessSize: DEFAULT_FACE_DETAILER_PARAMS.detailerMaxProcessSize,
+          detailerStrength: DEFAULT_FACE_DETAILER_PARAMS.detailerStrength,
+          detailerSteps: DEFAULT_FACE_DETAILER_PARAMS.detailerSteps,
+          detailerPasteMaskExpand: DEFAULT_FACE_DETAILER_PARAMS.detailerPasteMaskExpand,
+          detailerPasteMaskFeather: DEFAULT_FACE_DETAILER_PARAMS.detailerPasteMaskFeather,
+          detailerColorCorrectMode: DEFAULT_FACE_DETAILER_PARAMS.detailerColorCorrectMode,
+        });
+      }
+
+      if (state._version === 7) {
+        // v7 -> v8, keep color matching opt-in because it can darken detailed regions
+        state._version = 8;
+        if (
+          state.detailerColorCorrectMode === null ||
+          state.detailerColorCorrectMode === undefined ||
+          state.detailerColorCorrectMode === 'YCbCr-Luma'
+        ) {
+          state.detailerColorCorrectMode = DEFAULT_FACE_DETAILER_PARAMS.detailerColorCorrectMode;
+        }
+      }
+
       return zParamsState.parse(state);
     },
   },
@@ -801,6 +1024,32 @@ export const selectInfillPatchmatchDownscaleSize = createParamsSelector(
 );
 export const selectInfillColorValue = createParamsSelector((params) => params.infillColorValue);
 export const selectImg2imgStrength = createParamsSelector((params) => params.img2imgStrength);
+export const selectDetailerEnabled = createParamsSelector((params) => params.detailerEnabled);
+export const selectDetailerDetector = createParamsSelector((params) => params.detailerDetector);
+export const selectDetailerQuality = createParamsSelector((params) => params.detailerQuality);
+export const selectDetailerTargetPrompt = createParamsSelector((params) => params.detailerTargetPrompt);
+export const selectDetailerFaceSelection = createParamsSelector((params) => params.detailerFaceSelection);
+export const selectDetailerDinoModel = createParamsSelector((params) => params.detailerDinoModel);
+export const selectDetailerSamModel = createParamsSelector((params) => params.detailerSamModel);
+export const selectDetailerDetectionThreshold = createParamsSelector((params) => params.detailerDetectionThreshold);
+export const selectDetailerTargetSize = createParamsSelector((params) => params.detailerTargetSize);
+export const selectDetailerMaxUpscale = createParamsSelector((params) => params.detailerMaxUpscale);
+export const selectDetailerMaxProcessSize = createParamsSelector((params) => params.detailerMaxProcessSize);
+export const selectDetailerCropPadding = createParamsSelector((params) => params.detailerCropPadding);
+export const selectDetailerMaskExpand = createParamsSelector((params) => params.detailerMaskExpand);
+export const selectDetailerMaskFeather = createParamsSelector((params) => params.detailerMaskFeather);
+export const selectDetailerDenoiseMaskExpand = createParamsSelector((params) => params.detailerDenoiseMaskExpand);
+export const selectDetailerDenoiseMaskFeather = createParamsSelector((params) => params.detailerDenoiseMaskFeather);
+export const selectDetailerPasteMaskExpand = createParamsSelector((params) => params.detailerPasteMaskExpand);
+export const selectDetailerPasteMaskFeather = createParamsSelector((params) => params.detailerPasteMaskFeather);
+export const selectDetailerColorCorrectMode = createParamsSelector((params) => params.detailerColorCorrectMode);
+export const selectDetailerFaceId = createParamsSelector((params) => params.detailerFaceId);
+export const selectDetailerMinConfidence = createParamsSelector((params) => params.detailerMinConfidence);
+export const selectDetailerPadding = createParamsSelector((params) => params.detailerPadding);
+export const selectDetailerStrength = createParamsSelector((params) => params.detailerStrength);
+export const selectDetailerSteps = createParamsSelector((params) => params.detailerSteps);
+export const selectDetailerCfgScale = createParamsSelector((params) => params.detailerCfgScale);
+export const selectDetailerMaskBlur = createParamsSelector((params) => params.detailerMaskBlur);
 export const selectOptimizedDenoisingEnabled = createParamsSelector((params) => params.optimizedDenoisingEnabled);
 export const selectPositivePrompt = createParamsSelector((params) => params.positivePrompt);
 export const selectNegativePrompt = createParamsSelector((params) => params.negativePrompt);
@@ -874,6 +1123,12 @@ export const selectModelSupportsSteps = createSelector(selectModel, (model) => {
     return false;
   }
   return true;
+});
+export const selectModelSupportsFaceDetailer = createSelector(selectModel, (model) => {
+  if (!model) {
+    return false;
+  }
+  return model.base === 'sd-1' || model.base === 'sd-2' || model.base === 'sdxl';
 });
 export const selectModelSupportsDimensions = createSelector(selectModel, selectModelConfig, (model, modelConfig) => {
   if (!model) {

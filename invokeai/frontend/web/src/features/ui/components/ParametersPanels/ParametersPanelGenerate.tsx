@@ -6,6 +6,7 @@ import { selectIsCogView4, selectIsExternal, selectIsSDXL } from 'features/contr
 import { Prompts } from 'features/parameters/components/Prompts/Prompts';
 import { AdvancedSettingsAccordion } from 'features/settingsAccordions/components/AdvancedSettingsAccordion/AdvancedSettingsAccordion';
 import { ExternalSettingsAccordion } from 'features/settingsAccordions/components/ExternalSettingsAccordion/ExternalSettingsAccordion';
+import { FaceDetailerSettingsAccordion } from 'features/settingsAccordions/components/FaceDetailerSettingsAccordion/FaceDetailerSettingsAccordion';
 import { GenerationSettingsAccordion } from 'features/settingsAccordions/components/GenerationSettingsAccordion/GenerationSettingsAccordion';
 import { GenerateTabImageSettingsAccordion } from 'features/settingsAccordions/components/ImageSettingsAccordion/GenerateTabImageSettingsAccordion';
 import { RefinerSettingsAccordion } from 'features/settingsAccordions/components/RefinerSettingsAccordion/RefinerSettingsAccordion';
@@ -44,6 +45,7 @@ export const ParametersPanelGenerate = memo(() => {
               <Prompts />
               <GenerateTabImageSettingsAccordion />
               <GenerationSettingsAccordion />
+              <FaceDetailerSettingsAccordion />
               {isSDXL && <RefinerSettingsAccordion />}
               {!isCogview4 && !isExternal && <AdvancedSettingsAccordion />}
               {isExternal && <ExternalSettingsAccordion />}
