@@ -23,6 +23,7 @@ import {
 import { assert } from 'tsafe';
 
 const EXTERNAL_PROVIDER_NODE_TYPES = {
+  alibabacloud: 'alibabacloud_image_generation',
   gemini: 'gemini_image_generation',
   openai: 'openai_image_generation',
 } as const;
@@ -83,6 +84,9 @@ export const buildExternalGraph = async (arg: GraphBuilderArg): Promise<GraphBui
   } else if (model.provider_id === 'gemini') {
     if (params.geminiTemperature !== null) {
       externalNode.temperature = params.geminiTemperature;
+    }
+    if (params.geminiThinkingLevel) {
+      externalNode.thinking_level = params.geminiThinkingLevel;
     }
   }
   const externalInvocation = g.addNode(externalNode as AnyInvocation);

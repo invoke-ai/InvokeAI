@@ -34,6 +34,10 @@ type CanvasStageModuleConfig = {
    * The tolerance for snapping the scale of the canvas, as a fraction of the scale.
    */
   SCALE_SNAP_TOLERANCE: number;
+  /**
+   * The number of vertical drag pixels required to double or halve the stage scale during ctrl+MMB zoom drag.
+   */
+  ZOOM_DRAG_PIXELS_PER_DOUBLING: number;
 };
 
 const DEFAULT_CONFIG: CanvasStageModuleConfig = {
@@ -43,6 +47,7 @@ const DEFAULT_CONFIG: CanvasStageModuleConfig = {
   FIT_LAYERS_TO_STAGE_PADDING_PX: 48,
   SCALE_SNAP_POINTS: [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 5],
   SCALE_SNAP_TOLERANCE: 0.02,
+  ZOOM_DRAG_PIXELS_PER_DOUBLING: 240,
 };
 
 export class CanvasStageModule extends CanvasModuleBase {
@@ -58,6 +63,12 @@ export class CanvasStageModule extends CanvasModuleBase {
   private _activeSnapPoint: number | null = null;
   private _snapTimeout: number | null = null;
   private _lastScrollEventTimestamp: number | null = null;
+  private _zoomDragState: {
+    pointerId: number;
+    startClientY: number;
+    startScale: number;
+    center: Coordinate;
+  } | null = null;
 
   container: HTMLDivElement;
   konva: { stage: Konva.Stage };
@@ -137,10 +148,18 @@ export class CanvasStageModule extends CanvasModuleBase {
     this.subscriptions.add(() => this.konva.stage.off('wheel', this.onStageMouseWheel));
     this.subscriptions.add(() => this.konva.stage.off('dragmove', this.onStageDragMove));
     this.subscriptions.add(() => this.konva.stage.off('dragend', this.onStageDragEnd));
+    this.subscriptions.add(() => this.konva.stage.off('pointerdown', this.onStagePointerDown));
+    this.subscriptions.add(() => this.konva.stage.off('pointerup', this.onStagePointerUp));
+    this.subscriptions.add(this.detachZoomDragWindowListeners);
 
     // Whenever the tool changes, we should stop dragging the stage. For example, user is MMB-dragging the stage, then
     // switches to the brush tool, we should stop dragging the stage.
-    this.subscriptions.add(this.manager.tool.$tool.listen(this.stopDragging));
+    this.subscriptions.add(
+      this.manager.tool.$tool.listen(() => {
+        this.stopDragging();
+        this.stopZoomDragging();
+      })
+    );
   };
 
   /**
@@ -359,8 +378,7 @@ export class CanvasStageModule extends CanvasModuleBase {
       return;
     }
 
-    // When wheeling on trackpad, e.evt.ctrlKey is true - in that case, let's reverse the direction
-    const scrollAmount = e.evt.ctrlKey ? -e.evt.deltaY : e.evt.deltaY;
+    const scrollAmount = e.evt.deltaY;
 
     const now = window.performance.now();
     const deltaT = this._lastScrollEventTimestamp === null ? Infinity : now - this._lastScrollEventTimestamp;
@@ -437,23 +455,69 @@ export class CanvasStageModule extends CanvasModuleBase {
   };
 
   onStagePointerDown = (e: KonvaEventObject<PointerEvent>) => {
-    // If the middle mouse button is clicked and we are not already dragging, start dragging the stage
-    if (e.evt.button === 1) {
+    if (e.evt.button !== 1) {
+      return;
+    }
+
+    if (e.evt.ctrlKey || e.evt.metaKey) {
+      this.startZoomDragging(e.evt);
+    } else {
+      // If the middle mouse button is clicked and we are not already dragging, start dragging the stage
       this.startDragging();
     }
   };
 
   onStagePointerUp = (e: KonvaEventObject<PointerEvent>) => {
-    // If the middle mouse button is released and we are dragging, stop dragging the stage
-    if (e.evt.button === 1) {
+    if (e.evt.button !== 1) {
+      return;
+    }
+
+    if (this._zoomDragState?.pointerId === e.evt.pointerId) {
+      this.stopZoomDragging();
+    } else {
+      // If the middle mouse button is released and we are dragging, stop dragging the stage
       this.stopDragging();
     }
+  };
+
+  onWindowPointerMove = (e: PointerEvent) => {
+    this.updateZoomDragging(e);
+  };
+
+  onWindowPointerUp = (e: PointerEvent) => {
+    if (e.button !== 1) {
+      return;
+    }
+
+    if (this._zoomDragState?.pointerId === e.pointerId) {
+      this.stopZoomDragging();
+    }
+  };
+
+  onWindowBlur = () => {
+    this.stopZoomDragging();
+  };
+
+  attachZoomDragWindowListeners = () => {
+    window.addEventListener('pointermove', this.onWindowPointerMove);
+    window.addEventListener('pointerup', this.onWindowPointerUp);
+    window.addEventListener('blur', this.onWindowBlur);
+  };
+
+  detachZoomDragWindowListeners = () => {
+    window.removeEventListener('pointermove', this.onWindowPointerMove);
+    window.removeEventListener('pointerup', this.onWindowPointerUp);
+    window.removeEventListener('blur', this.onWindowBlur);
   };
 
   /**
    * Forcibly starts dragging the stage. This is useful when you want to start dragging the stage programmatically.
    */
   startDragging = () => {
+    if (this.getIsZoomDragging()) {
+      this.stopZoomDragging();
+    }
+
     // First make sure the stage is draggable
     this.setIsDraggable(true);
 
@@ -480,6 +544,59 @@ export class CanvasStageModule extends CanvasModuleBase {
     }
 
     // And render the tool to update the cursor
+    this.manager.tool.render();
+  };
+
+  startZoomDragging = (event: PointerEvent) => {
+    if (this.getIsDragging()) {
+      this.stopDragging();
+    }
+
+    if (this._snapTimeout !== null) {
+      window.clearTimeout(this._snapTimeout);
+      this._snapTimeout = null;
+    }
+
+    this.konva.stage.setPointersPositions(event);
+    const pointerPos = this.konva.stage.getPointerPosition();
+
+    this._activeSnapPoint = null;
+    this._zoomDragState = {
+      pointerId: event.pointerId,
+      startClientY: event.clientY,
+      startScale: this.getScale(),
+      center: pointerPos ?? this.getCenter(true),
+    };
+    this.attachZoomDragWindowListeners();
+    this.manager.tool.render();
+  };
+
+  updateZoomDragging = (event: PointerEvent) => {
+    const zoomDragState = this._zoomDragState;
+
+    if (!zoomDragState || zoomDragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaY = event.clientY - zoomDragState.startClientY;
+    const scaleFactor = 2 ** (-deltaY / this.config.ZOOM_DRAG_PIXELS_PER_DOUBLING);
+    const newScale = this.constrainScale(zoomDragState.startScale * scaleFactor);
+
+    this._activeSnapPoint = null;
+    this._intendedScale = newScale;
+    this._applyScale(newScale, zoomDragState.center);
+  };
+
+  stopZoomDragging = () => {
+    this.detachZoomDragWindowListeners();
+
+    if (!this._zoomDragState) {
+      return;
+    }
+
+    this._zoomDragState = null;
+    this._activeSnapPoint = null;
+    this._intendedScale = this.getScale();
     this.manager.tool.render();
   };
 
@@ -553,6 +670,10 @@ export class CanvasStageModule extends CanvasModuleBase {
 
   getIsDragging = () => {
     return this.konva.stage.isDragging();
+  };
+
+  getIsZoomDragging = () => {
+    return this._zoomDragState !== null;
   };
 
   addLayer = (layer: Konva.Layer) => {
