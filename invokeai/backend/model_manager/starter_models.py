@@ -819,13 +819,47 @@ flux_redux = StarterModel(
 )
 # endregion
 
-# region LlavaOnevisionModel
+# region LlavaOnevisionModel (vision-language models for Image-to-Prompt)
 llava_onevision = StarterModel(
     name="LLaVA Onevision Qwen2 0.5B",
     base=BaseModelType.Any,
     source="llava-hf/llava-onevision-qwen2-0.5b-ov-hf",
-    description="LLaVA Onevision VLLM model",
+    description="LLaVA Onevision vision-language model (~1 GB). Lightweight default for the Image-to-Prompt feature.",
     type=ModelType.LlavaOnevision,
+)
+
+llava_onevision_7b = StarterModel(
+    name="LLaVA Onevision Qwen2 7B",
+    base=BaseModelType.Any,
+    source="llava-hf/llava-onevision-qwen2-7b-ov-hf",
+    description="LLaVA Onevision 7B vision-language model. Larger, higher-quality alternative for Image-to-Prompt. (~16 GB)",
+    type=ModelType.LlavaOnevision,
+)
+# endregion
+
+# region TextLLM (causal language models for Prompt Expansion)
+qwen2_5_1_5b_instruct = StarterModel(
+    name="Qwen2.5-1.5B-Instruct",
+    base=BaseModelType.Any,
+    source="Qwen/Qwen2.5-1.5B-Instruct",
+    description="Qwen2.5 1.5B instruction-tuned LLM. Recommended default for the Prompt Expansion feature — small and fast. (~3 GB)",
+    type=ModelType.TextLLM,
+)
+
+qwen2_5_3b_instruct = StarterModel(
+    name="Qwen2.5-3B-Instruct",
+    base=BaseModelType.Any,
+    source="Qwen/Qwen2.5-3B-Instruct",
+    description="Qwen2.5 3B instruction-tuned LLM. Better prompt expansion quality at the cost of more VRAM. (~6 GB)",
+    type=ModelType.TextLLM,
+)
+
+smollm2_1_7b_instruct = StarterModel(
+    name="SmolLM2-1.7B-Instruct",
+    base=BaseModelType.Any,
+    source="HuggingFaceTB/SmolLM2-1.7B-Instruct",
+    description="SmolLM2 1.7B instruction-tuned LLM (Apache-2.0). Alternative to Qwen for prompt expansion. (~3 GB)",
+    type=ModelType.TextLLM,
 )
 # endregion
 
@@ -1458,6 +1492,10 @@ STARTER_MODELS: list[StarterModel] = [
     siglip,
     flux_redux,
     llava_onevision,
+    llava_onevision_7b,
+    qwen2_5_1_5b_instruct,
+    qwen2_5_3b_instruct,
+    smollm2_1_7b_instruct,
     flux_fill,
     flux2_vae,
     flux2_klein_4b,
