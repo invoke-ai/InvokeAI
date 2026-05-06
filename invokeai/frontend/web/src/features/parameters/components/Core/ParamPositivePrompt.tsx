@@ -25,6 +25,7 @@ import { PromptPopover } from 'features/prompt/PromptPopover';
 import { clearPromptUndo, consumePromptUndo } from 'features/prompt/promptUndo';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { usePromptAttentionHotkeys } from 'features/prompt/usePromptAttentionHotkeys';
+import { PromptWorkbench } from 'features/promptWorkbench/PromptWorkbench';
 import {
   selectStylePresetActivePresetId,
   selectStylePresetViewMode,
@@ -319,6 +320,7 @@ export const ParamPositivePrompt = memo(() => {
           <PromptResizeHandle textareaRef={textareaRef} minHeight={POSITIVE_PROMPT_MIN_HEIGHT} />
         </Box>
       </PromptPopover>
+      <PromptWorkbench prompt={prompt} textareaRef={textareaRef} onPromptChange={handleChange} />
       {hasLlavaModels && <DndDropOverlay dndState={dndState} label={t('prompt.imageToPrompt')} />}
     </Box>
   );
