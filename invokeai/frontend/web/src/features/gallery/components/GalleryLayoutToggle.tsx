@@ -10,7 +10,11 @@ import { PiColumnsFill, PiGridFourFill } from 'react-icons/pi';
 
 import { getEffectiveGalleryLayout } from './galleryLayout';
 
-export const GalleryLayoutToggle = memo(() => {
+type GalleryLayoutToggleProps = {
+  isDisabled?: boolean;
+};
+
+export const GalleryLayoutToggle = memo(({ isDisabled = false }: GalleryLayoutToggleProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const galleryLayoutMode = useAppSelector(selectGalleryLayoutMode);
@@ -33,6 +37,7 @@ export const GalleryLayoutToggle = memo(() => {
         colorScheme={effectiveGalleryLayout === 'grid' ? 'invokeBlue' : undefined}
         data-testid="gallery-layout-grid-button"
         icon={<PiGridFourFill />}
+        isDisabled={isDisabled}
         onClick={handleClickGrid}
         tooltip={t('gallery.galleryLayoutGridTooltip')}
       />
@@ -41,6 +46,7 @@ export const GalleryLayoutToggle = memo(() => {
         colorScheme={effectiveGalleryLayout === 'masonry' ? 'invokeBlue' : undefined}
         data-testid="gallery-layout-masonry-button"
         icon={<PiColumnsFill />}
+        isDisabled={isDisabled}
         onClick={handleClickMasonry}
         tooltip={t('gallery.galleryLayoutMasonryTooltip')}
       />

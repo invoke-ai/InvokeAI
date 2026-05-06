@@ -10,7 +10,7 @@ import { useAutoLayoutContext } from 'features/ui/layouts/auto-layout-context';
 import { useGalleryPanel } from 'features/ui/layouts/use-gallery-panel';
 import { selectShouldUsePagedGalleryView } from 'features/ui/store/uiSelectors';
 import type { CSSProperties } from 'react';
-import { memo, useCallback } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiCaretDownBold, PiCaretUpBold, PiMagnifyingGlassBold } from 'react-icons/pi';
 import { useBoardName } from 'services/api/hooks/useBoardName';
@@ -18,7 +18,8 @@ import { useBoardName } from 'services/api/hooks/useBoardName';
 import { GalleryImageGrid } from './GalleryImageGrid';
 import { GalleryImageGridMasonry } from './GalleryImageGridMasonry';
 import { GalleryImageGridPaged } from './GalleryImageGridPaged';
-import { getEffectiveGalleryLayout } from './galleryLayout';
+import type { GalleryContentView } from './galleryLayout';
+import { getGalleryContentView } from './galleryLayout';
 import { GalleryLayoutToggle } from './GalleryLayoutToggle';
 import { GallerySettingsPopover } from './GallerySettingsPopover/GallerySettingsPopover';
 import { GalleryUploadButton } from './GalleryUploadButton';
@@ -28,6 +29,36 @@ const COLLAPSE_STYLES: CSSProperties = { flexShrink: 0, minHeight: 0, width: '10
 
 const selectGalleryView = createSelector(selectGallerySlice, (gallery) => gallery.galleryView);
 const selectSearchTerm = createSelector(selectGallerySlice, (gallery) => gallery.searchTerm);
+
+const useDeferredGalleryContentView = (targetGalleryContentView: GalleryContentView) => {
+  const renderedGalleryContentViewRef = useRef(targetGalleryContentView);
+  const [renderedGalleryContentView, setRenderedGalleryContentView] = useState(targetGalleryContentView);
+  const [isSwitchingGalleryContentView, setIsSwitchingGalleryContentView] = useState(false);
+
+  useEffect(() => {
+    if (renderedGalleryContentViewRef.current === targetGalleryContentView) {
+      setIsSwitchingGalleryContentView(false);
+      return;
+    }
+
+    let mountFrame = 0;
+    let settleFrame = 0;
+
+    setIsSwitchingGalleryContentView(true);
+    mountFrame = requestAnimationFrame(() => {
+      renderedGalleryContentViewRef.current = targetGalleryContentView;
+      setRenderedGalleryContentView(targetGalleryContentView);
+      settleFrame = requestAnimationFrame(() => setIsSwitchingGalleryContentView(false));
+    });
+
+    return () => {
+      cancelAnimationFrame(mountFrame);
+      cancelAnimationFrame(settleFrame);
+    };
+  }, [targetGalleryContentView]);
+
+  return { isSwitchingGalleryContentView, renderedGalleryContentView };
+};
 
 export const GalleryPanel = memo(() => {
   const { t } = useTranslation();
@@ -39,7 +70,9 @@ export const GalleryPanel = memo(() => {
   const galleryLayoutMode = useAppSelector(selectGalleryLayoutMode);
   const initialSearchTerm = useAppSelector(selectSearchTerm);
   const shouldUsePagedGalleryView = useAppSelector(selectShouldUsePagedGalleryView);
-  const effectiveGalleryLayout = getEffectiveGalleryLayout(galleryLayoutMode, shouldUsePagedGalleryView);
+  const targetGalleryContentView = getGalleryContentView(galleryLayoutMode, shouldUsePagedGalleryView);
+  const { isSwitchingGalleryContentView, renderedGalleryContentView } =
+    useDeferredGalleryContentView(targetGalleryContentView);
   const searchDisclosure = useDisclosure(!!initialSearchTerm);
   const [searchTerm, onChangeSearchTerm, onResetSearchTerm] = useGallerySearchTerm();
   const handleClickImages = useCallback(() => {
@@ -94,7 +127,7 @@ export const GalleryPanel = memo(() => {
           </Button>
         </ButtonGroup>
         <Flex flexGrow={1} flexBasis={0} justifyContent="flex-end" alignItems="center">
-          <GalleryLayoutToggle />
+          <GalleryLayoutToggle isDisabled={isSwitchingGalleryContentView} />
           <GalleryUploadButton />
           <GallerySettingsPopover />
           <IconButton
@@ -119,9 +152,9 @@ export const GalleryPanel = memo(() => {
       </Collapse>
       <Divider pt={2} flexShrink={0} />
       <Flex w="full" flexGrow={1} flexBasis={0} minH={0} overflow="hidden" pt={2}>
-        {shouldUsePagedGalleryView ? (
+        {renderedGalleryContentView === 'paged' ? (
           <GalleryImageGridPaged />
-        ) : effectiveGalleryLayout === 'masonry' ? (
+        ) : renderedGalleryContentView === 'masonry' ? (
           <GalleryImageGridMasonry />
         ) : (
           <GalleryImageGrid />

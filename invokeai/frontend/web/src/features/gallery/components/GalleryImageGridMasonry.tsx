@@ -20,7 +20,7 @@ import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/us
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { VIEWER_PANEL_ID } from 'features/ui/layouts/shared';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import type { CSSProperties, ReactNode, RefObject } from 'react';
+import type { CSSProperties, MutableRefObject, ReactNode, RefObject } from 'react';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { imagesApi, useGetImageDTOsByNamesMutation } from 'services/api/endpoints/images';
@@ -28,9 +28,16 @@ import type { ImageDTO } from 'services/api/types';
 import { useThrottledCallback } from 'use-debounce';
 
 import {
+  deleteMasonryBackgroundInFlightImageNames,
+  getMasonryInFlightImageNames,
+  getMasonryInitialItemCount,
   getMasonryPrefetchImageNames,
+  getMasonrySkippedImageNames,
+  getMasonryWarmupImageNames,
+  getShouldScheduleNextMasonryWarmupBatch,
   getStaticMasonryColumns,
   getUncachedMasonryImageNames,
+  setMasonryBackgroundInFlightImageNames,
 } from './masonryImageFetching';
 import { getMasonryRenderState } from './masonryRenderState';
 import { scrollMasonryImageIntoView } from './masonryScrollIntoView';
@@ -43,13 +50,21 @@ type MasonryContext = {
 };
 
 type MasonryMountedRange = { endIndex: number; startIndex: number };
+type MasonryScrollDirection = 'down' | 'up' | null;
 type StaticMasonryImageDimensions = { height: number; width: number };
 
 const MASONRY_ITEM_PADDING_PX = 2;
 const MASONRY_FETCH_DELAY_MS = 50;
-const MASONRY_PREFETCH_DELAY_MS = 150;
-const MASONRY_INITIAL_ITEM_COUNT_LIMIT = 512;
-const MASONRY_STATIC_RENDER_LIMIT = 512;
+const MASONRY_PREFETCH_BATCH_SIZE = 384;
+const MASONRY_PREFETCH_DELAY_MS = 75;
+const MASONRY_INITIAL_ITEM_COUNT_LIMIT = 256;
+const MASONRY_INITIAL_ITEMS_PER_COLUMN = 48;
+const MASONRY_INITIAL_MIN_ITEM_COUNT = 128;
+const MASONRY_STATIC_RENDER_LIMIT = 1024;
+const MASONRY_BACKGROUND_INITIAL_DELAY_MS = 250;
+const MASONRY_WARMUP_BATCH_SIZE = 128;
+const MASONRY_WARMUP_DELAY_MS = 75;
+const MASONRY_WARMUP_IMAGE_LIMIT = 3000;
 
 const canHandleMasonryArrowNavigation = (
   activeTab: ReturnType<typeof selectActiveTab>,
@@ -140,7 +155,11 @@ const useMasonryThumbnailPreloader = () => {
   }, []);
 };
 
-const useMountedMasonryImageFetching = (enabled: boolean, preloadThumbnails: (imageDTOs: ImageDTO[]) => void) => {
+const useMountedMasonryImageFetching = (
+  enabled: boolean,
+  preloadThumbnails: (imageDTOs: ImageDTO[]) => void,
+  visibleInFlightImageNamesRef: MutableRefObject<Set<string>>
+) => {
   const store = useAppStore();
   const [getImageDTOsByNames] = useGetImageDTOsByNamesMutation();
   const pendingImageNamesRef = useRef<Set<string>>(new Set());
@@ -162,17 +181,29 @@ const useMountedMasonryImageFetching = (enabled: boolean, preloadThumbnails: (im
     }
 
     const cachedImageNames = imagesApi.util.selectCachedArgsForQuery(store.getState(), 'getImageDTO');
-    const uncachedImageNames = getUncachedMasonryImageNames(pendingImageNames, cachedImageNames);
+    const uncachedImageNames = getUncachedMasonryImageNames(
+      pendingImageNames,
+      cachedImageNames,
+      visibleInFlightImageNamesRef.current
+    );
 
     if (uncachedImageNames.length > 0) {
+      for (const imageName of uncachedImageNames) {
+        visibleInFlightImageNamesRef.current.add(imageName);
+      }
       void getImageDTOsByNames({ image_names: uncachedImageNames })
         .unwrap()
         .then(preloadThumbnails)
         .catch(() => {
           // The visible image components retain their existing loading/fallback behavior.
+        })
+        .finally(() => {
+          for (const imageName of uncachedImageNames) {
+            visibleInFlightImageNamesRef.current.delete(imageName);
+          }
         });
     }
-  }, [enabled, getImageDTOsByNames, preloadThumbnails, store]);
+  }, [enabled, getImageDTOsByNames, preloadThumbnails, store, visibleInFlightImageNamesRef]);
 
   const registerMissingImageName = useCallback(
     (imageName: string) => {
@@ -228,11 +259,17 @@ const useMasonryImagePrefetching = (
   columnCount: number,
   rootRef: RefObject<HTMLDivElement>,
   enabled: boolean,
-  preloadThumbnails: (imageDTOs: ImageDTO[]) => void
+  preloadThumbnails: (imageDTOs: ImageDTO[]) => void,
+  visibleInFlightImageNamesRef: MutableRefObject<Set<string>>,
+  backgroundInFlightImageNamesRef: MutableRefObject<Map<string, number>>,
+  backgroundRequestIdRef: MutableRefObject<number>
 ) => {
   const store = useAppStore();
   const [getImageDTOsByNames] = useGetImageDTOsByNamesMutation();
-  const pendingImageNamesRef = useRef<Set<string>>(new Set());
+  const scrollDirectionRef = useRef<MasonryScrollDirection>('down');
+  const scrollTopRef = useRef(0);
+  const scrollListenerRef = useRef<(() => void) | null>(null);
+  const hasInitialPrefetchDelayElapsedRef = useRef(false);
 
   const prefetchImages = useCallback(() => {
     const rootEl = rootRef.current;
@@ -243,18 +280,27 @@ const useMasonryImagePrefetching = (
     const cachedImageNames = imagesApi.util.selectCachedArgsForQuery(store.getState(), 'getImageDTO');
     const imageNamesToFetch = getMasonryPrefetchImageNames({
       cachedImageNames,
+      batchSize: MASONRY_PREFETCH_BATCH_SIZE,
       columnCount,
       imageNames,
+      inFlightImageNames: getMasonryInFlightImageNames({
+        backgroundInFlightImageNames: backgroundInFlightImageNamesRef.current,
+        visibleInFlightImageNames: visibleInFlightImageNamesRef.current,
+      }),
       mountedRange: getMountedMasonryRange(rootEl),
-    }).filter((imageName) => !pendingImageNamesRef.current.has(imageName));
+      scrollDirection: scrollDirectionRef.current,
+    });
 
     if (imageNamesToFetch.length === 0) {
       return;
     }
 
-    for (const imageName of imageNamesToFetch) {
-      pendingImageNamesRef.current.add(imageName);
-    }
+    const requestId = ++backgroundRequestIdRef.current;
+    setMasonryBackgroundInFlightImageNames({
+      backgroundInFlightImageNames: backgroundInFlightImageNamesRef.current,
+      imageNames: imageNamesToFetch,
+      requestId,
+    });
 
     void getImageDTOsByNames({ image_names: imageNamesToFetch })
       .unwrap()
@@ -263,19 +309,43 @@ const useMasonryImagePrefetching = (
         // The visible image components retain their existing loading/fallback behavior.
       })
       .finally(() => {
-        for (const imageName of imageNamesToFetch) {
-          pendingImageNamesRef.current.delete(imageName);
-        }
+        deleteMasonryBackgroundInFlightImageNames({
+          backgroundInFlightImageNames: backgroundInFlightImageNamesRef.current,
+          imageNames: imageNamesToFetch,
+          requestId,
+        });
       });
-  }, [columnCount, enabled, getImageDTOsByNames, imageNames, preloadThumbnails, rootRef, store]);
+  }, [
+    backgroundInFlightImageNamesRef,
+    backgroundRequestIdRef,
+    columnCount,
+    enabled,
+    getImageDTOsByNames,
+    imageNames,
+    preloadThumbnails,
+    rootRef,
+    store,
+    visibleInFlightImageNamesRef,
+  ]);
 
   const throttledPrefetchImages = useThrottledCallback(prefetchImages, MASONRY_PREFETCH_DELAY_MS);
 
   useEffect(() => {
     if (!enabled) {
+      hasInitialPrefetchDelayElapsedRef.current = false;
       return;
     }
-    throttledPrefetchImages();
+
+    hasInitialPrefetchDelayElapsedRef.current = false;
+    const timeout = setTimeout(() => {
+      hasInitialPrefetchDelayElapsedRef.current = true;
+      throttledPrefetchImages();
+    }, MASONRY_BACKGROUND_INITIAL_DELAY_MS);
+
+    return () => {
+      clearTimeout(timeout);
+      hasInitialPrefetchDelayElapsedRef.current = false;
+    };
   }, [columnCount, enabled, imageNames, throttledPrefetchImages]);
 
   useEffect(() => {
@@ -293,15 +363,25 @@ const useMasonryImagePrefetching = (
         frame = requestAnimationFrame(connectScroller);
         return;
       }
-      scroller.addEventListener('scroll', throttledPrefetchImages, { passive: true });
-      throttledPrefetchImages();
+      scrollTopRef.current = scroller.scrollTop;
+      const handleScroll = () => {
+        const nextScrollTop = scroller?.scrollTop ?? 0;
+        scrollDirectionRef.current = nextScrollTop < scrollTopRef.current ? 'up' : 'down';
+        scrollTopRef.current = nextScrollTop;
+        throttledPrefetchImages();
+      };
+      scrollListenerRef.current = handleScroll;
+      scroller.addEventListener('scroll', handleScroll, { passive: true });
     };
 
     frame = requestAnimationFrame(connectScroller);
 
     return () => {
       cancelAnimationFrame(frame);
-      scroller?.removeEventListener('scroll', throttledPrefetchImages);
+      if (scroller && scrollListenerRef.current) {
+        scroller.removeEventListener('scroll', scrollListenerRef.current);
+        scrollListenerRef.current = null;
+      }
     };
   }, [enabled, rootRef, throttledPrefetchImages]);
 
@@ -312,7 +392,9 @@ const useMasonryImagePrefetching = (
     }
 
     const mutationObserver = new MutationObserver(() => {
-      throttledPrefetchImages();
+      if (hasInitialPrefetchDelayElapsedRef.current) {
+        throttledPrefetchImages();
+      }
     });
     mutationObserver.observe(rootEl, { childList: true, subtree: true });
 
@@ -320,7 +402,9 @@ const useMasonryImagePrefetching = (
       typeof ResizeObserver === 'undefined'
         ? null
         : new ResizeObserver(() => {
-            throttledPrefetchImages();
+            if (hasInitialPrefetchDelayElapsedRef.current) {
+              throttledPrefetchImages();
+            }
           });
     resizeObserver?.observe(rootEl);
 
@@ -331,9 +415,152 @@ const useMasonryImagePrefetching = (
   }, [enabled, rootRef, throttledPrefetchImages]);
 };
 
-const MasonryImagePlaceholder = memo(({ imageName }: { imageName: string }) => (
-  <Flex data-item-id={imageName} aspectRatio="1/1" h="auto" w="full" bg="base.700" borderRadius="base" opacity={0.45} />
-));
+const useMasonryImageWarmup = (
+  imageNames: string[],
+  enabled: boolean,
+  preloadThumbnails: (imageDTOs: ImageDTO[]) => void,
+  visibleInFlightImageNamesRef: MutableRefObject<Set<string>>,
+  backgroundInFlightImageNamesRef: MutableRefObject<Map<string, number>>,
+  backgroundRequestIdRef: MutableRefObject<number>
+) => {
+  const store = useAppStore();
+  const [getImageDTOsByNames] = useGetImageDTOsByNamesMutation();
+  const warmupImageNamesRef = useRef<Map<string, number>>(new Map());
+  const warmupSkippedImageNamesRef = useRef<Set<string>>(new Set());
+
+  const clearWarmupImageNames = useCallback(() => {
+    for (const [imageName, requestId] of warmupImageNamesRef.current) {
+      deleteMasonryBackgroundInFlightImageNames({
+        backgroundInFlightImageNames: backgroundInFlightImageNamesRef.current,
+        imageNames: [imageName],
+        requestId,
+      });
+    }
+    warmupImageNamesRef.current.clear();
+  }, [backgroundInFlightImageNamesRef]);
+
+  useEffect(() => {
+    const warmupSkippedImageNames = warmupSkippedImageNamesRef.current;
+    if (!enabled || imageNames.length === 0) {
+      clearWarmupImageNames();
+      warmupSkippedImageNames.clear();
+      return;
+    }
+
+    let isCancelled = false;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+    clearWarmupImageNames();
+    warmupSkippedImageNames.clear();
+
+    const fetchNextBatch = () => {
+      if (isCancelled) {
+        return;
+      }
+
+      const cachedImageNames = imagesApi.util.selectCachedArgsForQuery(store.getState(), 'getImageDTO');
+      const imageNamesToFetch = getMasonryWarmupImageNames({
+        batchSize: MASONRY_WARMUP_BATCH_SIZE,
+        cachedImageNames,
+        imageNames,
+        inFlightImageNames: getMasonryInFlightImageNames({
+          backgroundInFlightImageNames: backgroundInFlightImageNamesRef.current,
+          visibleInFlightImageNames: visibleInFlightImageNamesRef.current,
+        }),
+        maxImageCount: MASONRY_WARMUP_IMAGE_LIMIT,
+        skippedImageNames: warmupSkippedImageNames,
+      });
+
+      if (imageNamesToFetch.length === 0) {
+        return;
+      }
+
+      const requestId = ++backgroundRequestIdRef.current;
+      setMasonryBackgroundInFlightImageNames({
+        backgroundInFlightImageNames: backgroundInFlightImageNamesRef.current,
+        imageNames: imageNamesToFetch,
+        requestId,
+      });
+      for (const imageName of imageNamesToFetch) {
+        warmupImageNamesRef.current.set(imageName, requestId);
+      }
+
+      void getImageDTOsByNames({ image_names: imageNamesToFetch })
+        .unwrap()
+        .then((imageDTOs) => {
+          if (isCancelled) {
+            return;
+          }
+          const skippedImageNames = getMasonrySkippedImageNames({
+            requestedImageNames: imageNamesToFetch,
+            returnedImageNames: imageDTOs.map((imageDTO) => imageDTO.image_name),
+          });
+          for (const imageName of skippedImageNames) {
+            warmupSkippedImageNames.add(imageName);
+          }
+          preloadThumbnails(imageDTOs);
+          if (
+            getShouldScheduleNextMasonryWarmupBatch({
+              didFetchBatch: true,
+              imageNamesToFetchCount: imageNamesToFetch.length,
+              isCancelled,
+            })
+          ) {
+            timeout = setTimeout(fetchNextBatch, MASONRY_WARMUP_DELAY_MS);
+          }
+        })
+        .catch(() => {
+          // Visible items keep their normal placeholder behavior if warmup fails.
+        })
+        .finally(() => {
+          deleteMasonryBackgroundInFlightImageNames({
+            backgroundInFlightImageNames: backgroundInFlightImageNamesRef.current,
+            imageNames: imageNamesToFetch,
+            requestId,
+          });
+          for (const imageName of imageNamesToFetch) {
+            if (warmupImageNamesRef.current.get(imageName) === requestId) {
+              warmupImageNamesRef.current.delete(imageName);
+            }
+          }
+        });
+    };
+
+    timeout = setTimeout(fetchNextBatch, MASONRY_BACKGROUND_INITIAL_DELAY_MS);
+
+    return () => {
+      isCancelled = true;
+      clearWarmupImageNames();
+      warmupSkippedImageNames.clear();
+      if (timeout !== null) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [
+    clearWarmupImageNames,
+    enabled,
+    getImageDTOsByNames,
+    imageNames,
+    backgroundInFlightImageNamesRef,
+    backgroundRequestIdRef,
+    preloadThumbnails,
+    store,
+    visibleInFlightImageNamesRef,
+  ]);
+};
+
+const MasonryImagePlaceholder = memo(
+  ({ aspectRatio = '1/1', imageName }: { aspectRatio?: string; imageName: string }) => (
+    <Flex
+      data-item-id={imageName}
+      aspectRatio={aspectRatio}
+      h="auto"
+      w="full"
+      bg="base.700"
+      borderRadius="base"
+      opacity={0.45}
+    />
+  )
+);
 
 MasonryImagePlaceholder.displayName = 'MasonryImagePlaceholder';
 
@@ -604,21 +831,41 @@ const GalleryImageGridMasonryContent = memo(
   ({ imageNames, isLoading, queryArgs }: GalleryImageGridMasonryContentProps) => {
     const { t } = useTranslation();
     const rootRef = useRef<HTMLDivElement>(null);
+    const visibleInFlightImageNamesRef = useRef<Set<string>>(new Set());
+    const backgroundInFlightImageNamesRef = useRef<Map<string, number>>(new Map());
+    const backgroundRequestIdRef = useRef(0);
     const { columnCount, hasMeasuredColumnCount } = useMasonryColumnCount(rootRef);
     const shouldRenderStaticMasonry = imageNames.length <= MASONRY_STATIC_RENDER_LIMIT;
-    const initialItemCount = Math.min(
-      imageNames.length,
-      MASONRY_INITIAL_ITEM_COUNT_LIMIT,
-      Math.max(columnCount * 128, 256)
-    );
+    const initialItemCount = getMasonryInitialItemCount({
+      columnCount,
+      imageCount: imageNames.length,
+      initialItemCountLimit: MASONRY_INITIAL_ITEM_COUNT_LIMIT,
+      itemsPerColumn: MASONRY_INITIAL_ITEMS_PER_COLUMN,
+      minimumInitialItemCount: MASONRY_INITIAL_MIN_ITEM_COUNT,
+    });
     const preloadThumbnails = useMasonryThumbnailPreloader();
-    const registerMissingImageName = useMountedMasonryImageFetching(!isLoading, preloadThumbnails);
+    const registerMissingImageName = useMountedMasonryImageFetching(
+      !isLoading,
+      preloadThumbnails,
+      visibleInFlightImageNamesRef
+    );
     useMasonryImagePrefetching(
       imageNames,
       columnCount,
       rootRef,
       !isLoading && !shouldRenderStaticMasonry,
-      preloadThumbnails
+      preloadThumbnails,
+      visibleInFlightImageNamesRef,
+      backgroundInFlightImageNamesRef,
+      backgroundRequestIdRef
+    );
+    useMasonryImageWarmup(
+      imageNames,
+      !isLoading && !shouldRenderStaticMasonry,
+      preloadThumbnails,
+      visibleInFlightImageNamesRef,
+      backgroundInFlightImageNamesRef,
+      backgroundRequestIdRef
     );
     useGalleryStarImageHotkey();
     useMasonryKeyboardNavigation(imageNames, columnCount, rootRef);
