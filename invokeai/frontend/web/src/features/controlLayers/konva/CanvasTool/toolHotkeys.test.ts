@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { shouldQuickSwitchToColorPickerOnAlt, shouldTranslateShapeDragOnSpace } from './toolHotkeys';
+import {
+  shouldPreserveSuspendableShapesSession,
+  shouldQuickSwitchToColorPickerOnAlt,
+  shouldTranslateShapeDragOnSpace,
+} from './toolHotkeys';
 
 describe('tool hotkeys', () => {
   it('keeps the color-picker quick-switch available before starting rect and oval drags', () => {
@@ -32,5 +36,17 @@ describe('tool hotkeys', () => {
     expect(shouldTranslateShapeDragOnSpace('rect', 'polygon', true, true)).toBe(false);
     expect(shouldTranslateShapeDragOnSpace('rect', 'freehand', true, true)).toBe(false);
     expect(shouldTranslateShapeDragOnSpace('brush', 'rect', true, true)).toBe(false);
+  });
+
+  it('preserves suspendable shapes sessions across temporary view and color-picker switches', () => {
+    expect(shouldPreserveSuspendableShapesSession('view', 'rect', true)).toBe(true);
+    expect(shouldPreserveSuspendableShapesSession('colorPicker', 'rect', true)).toBe(true);
+    expect(shouldPreserveSuspendableShapesSession('rect', 'rect', true)).toBe(true);
+  });
+
+  it('does not preserve suspendable shapes sessions for unrelated tool switches', () => {
+    expect(shouldPreserveSuspendableShapesSession('brush', 'rect', true)).toBe(false);
+    expect(shouldPreserveSuspendableShapesSession('view', null, true)).toBe(false);
+    expect(shouldPreserveSuspendableShapesSession('colorPicker', 'rect', false)).toBe(false);
   });
 });

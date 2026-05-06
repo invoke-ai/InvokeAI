@@ -2,6 +2,7 @@ import { rgbaColorToString } from 'common/util/colorCodeTransformers';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import type { CanvasToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasToolModule';
+import { shouldPreserveSuspendableShapesSession } from 'features/controlLayers/konva/CanvasTool/toolHotkeys';
 import {
   addCoords,
   floorCoord,
@@ -172,9 +173,12 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   onToolChanged = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryViewSwitch =
-      tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
-    if (tool !== 'rect' && !isTemporaryViewSwitch) {
+    const isTemporaryToolSwitch = shouldPreserveSuspendableShapesSession(
+      tool,
+      this.parent.$toolBuffer.get(),
+      this.hasSuspendableSession()
+    );
+    if (tool !== 'rect' && !isTemporaryToolSwitch) {
       this.cancel();
     }
   };
@@ -185,9 +189,12 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   render = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryViewSwitch =
-      tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
-    if (tool !== 'rect' && !isTemporaryViewSwitch) {
+    const isTemporaryToolSwitch = shouldPreserveSuspendableShapesSession(
+      tool,
+      this.parent.$toolBuffer.get(),
+      this.hasSuspendableSession()
+    );
+    if (tool !== 'rect' && !isTemporaryToolSwitch) {
       this.konva.startPointIndicator.visible(false);
       return;
     }
@@ -383,9 +390,12 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   private onModifierChanged = () => {
     const tool = this.parent.$tool.get();
-    const isTemporaryViewSwitch =
-      tool === 'view' && this.parent.$toolBuffer.get() === 'rect' && this.hasSuspendableSession();
-    if (tool !== 'rect' && !isTemporaryViewSwitch) {
+    const isTemporaryToolSwitch = shouldPreserveSuspendableShapesSession(
+      tool,
+      this.parent.$toolBuffer.get(),
+      this.hasSuspendableSession()
+    );
+    if (tool !== 'rect' && !isTemporaryToolSwitch) {
       return;
     }
 

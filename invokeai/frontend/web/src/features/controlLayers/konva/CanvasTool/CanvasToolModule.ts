@@ -12,6 +12,7 @@ import { CanvasShapeToolModule } from 'features/controlLayers/konva/CanvasTool/C
 import { CanvasTextToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasTextToolModule';
 import { CanvasViewToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasViewToolModule';
 import {
+  shouldPreserveSuspendableShapesSession,
   shouldQuickSwitchToColorPickerOnAlt,
   shouldTranslateShapeDragOnSpace,
 } from 'features/controlLayers/konva/CanvasTool/toolHotkeys';
@@ -547,8 +548,8 @@ export class CanvasToolModule extends CanvasModuleBase {
         await this.tools.gradient.onStagePointerMove(e);
       } else if (tool === 'text') {
         // Already handled above
-      } else if (this.isTemporaryShapesViewSwitch()) {
-        // Preserve in-progress polygon/freehand shapes while temporarily panning with Space.
+      } else if (this.isTemporaryShapesToolSwitch()) {
+        // Preserve in-progress polygon/freehand shapes while temporarily switching to view or color picker.
       } else {
         this.manager.stateApi.getSelectedEntityAdapter()?.bufferRenderer.clearBuffer();
       }
@@ -880,7 +881,11 @@ export class CanvasToolModule extends CanvasModuleBase {
     return Boolean(state?.type === 'polygon' && state.previewPoint);
   };
 
-  private isTemporaryShapesViewSwitch = () => {
-    return this.$tool.get() === 'view' && this.$toolBuffer.get() === 'rect' && this.tools.rect.hasSuspendableSession();
+  private isTemporaryShapesToolSwitch = () => {
+    return shouldPreserveSuspendableShapesSession(
+      this.$tool.get(),
+      this.$toolBuffer.get(),
+      this.tools.rect.hasSuspendableSession()
+    );
   };
 }

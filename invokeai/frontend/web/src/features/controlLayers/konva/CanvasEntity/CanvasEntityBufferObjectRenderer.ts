@@ -13,6 +13,7 @@ import { CanvasObjectOval } from 'features/controlLayers/konva/CanvasObject/Canv
 import { CanvasObjectPolygon } from 'features/controlLayers/konva/CanvasObject/CanvasObjectPolygon';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
+import { shouldPreserveSuspendableShapesSession } from 'features/controlLayers/konva/CanvasTool/toolHotkeys';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
@@ -85,12 +86,13 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
     this.subscriptions.add(
       this.manager.tool.$tool.listen(() => {
         if (this.hasBuffer() && !this.manager.$isBusy.get()) {
-          const isTemporaryShapesViewSwitch =
-            this.manager.tool.tools.rect.hasSuspendableSession() &&
-            ((this.manager.tool.$tool.get() === 'view' && this.manager.tool.$toolBuffer.get() === 'rect') ||
-              this.manager.tool.$tool.get() === 'rect');
+          const isTemporaryShapesToolSwitch = shouldPreserveSuspendableShapesSession(
+            this.manager.tool.$tool.get(),
+            this.manager.tool.$toolBuffer.get(),
+            this.manager.tool.tools.rect.hasSuspendableSession()
+          );
 
-          if (isTemporaryShapesViewSwitch) {
+          if (isTemporaryShapesToolSwitch) {
             return;
           }
 
