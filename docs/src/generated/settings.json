@@ -399,7 +399,7 @@
     },
     {
       "category": "CACHE",
-      "default": false,
+      "default": true,
       "description": "Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.",
       "env_var": "INVOKEAI_ENABLE_PARTIAL_LOADING",
       "literal_values": [],
