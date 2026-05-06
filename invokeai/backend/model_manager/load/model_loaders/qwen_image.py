@@ -252,10 +252,26 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
     def _load_tokenizer_with_offline_fallback(self) -> AnyModel:
         from transformers import AutoTokenizer
 
+        from invokeai.backend.util.logging import InvokeAILogger
+
+        logger = InvokeAILogger.get_logger(self.__class__.__name__)
+
         try:
             return AutoTokenizer.from_pretrained(self.DEFAULT_HF_REPO, local_files_only=True)
         except OSError:
-            return AutoTokenizer.from_pretrained(self.DEFAULT_HF_REPO)
+            logger.info(
+                f"Tokenizer for single-file Qwen VL encoder not found in HuggingFace cache; "
+                f"downloading from {self.DEFAULT_HF_REPO} (one-time, requires network access)."
+            )
+            try:
+                return AutoTokenizer.from_pretrained(self.DEFAULT_HF_REPO)
+            except OSError as e:
+                raise RuntimeError(
+                    f"Failed to load Qwen VL tokenizer. Single-file Qwen VL encoder checkpoints do not "
+                    f"include the tokenizer; it must be downloaded from HuggingFace ({self.DEFAULT_HF_REPO}) "
+                    f"on first use. Either restore network access, or install the encoder in the "
+                    f"diffusers folder layout (text_encoder/ + tokenizer/) instead. Original error: {e}"
+                ) from e
 
     def _load_text_encoder_from_singlefile(self, config: QwenVLEncoder_Checkpoint_Config) -> AnyModel:
         from safetensors.torch import load_file
@@ -316,7 +332,20 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         try:
             qwen_config = AutoConfig.from_pretrained(self.DEFAULT_HF_REPO, local_files_only=True)
         except OSError:
-            qwen_config = AutoConfig.from_pretrained(self.DEFAULT_HF_REPO)
+            logger.info(
+                f"Architecture config for single-file Qwen VL encoder not found in HuggingFace cache; "
+                f"downloading from {self.DEFAULT_HF_REPO} (one-time, ~5KB, requires network access)."
+            )
+            try:
+                qwen_config = AutoConfig.from_pretrained(self.DEFAULT_HF_REPO)
+            except OSError as e:
+                raise RuntimeError(
+                    f"Failed to load Qwen VL architecture config. Single-file Qwen VL encoder checkpoints "
+                    f"do not include the model config; it must be downloaded from HuggingFace "
+                    f"({self.DEFAULT_HF_REPO}) on first use. Either restore network access, or install the "
+                    f"encoder in the diffusers folder layout (text_encoder/config.json + tokenizer/) "
+                    f"instead. Original error: {e}"
+                ) from e
         qwen_config.torch_dtype = model_dtype
 
         new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())

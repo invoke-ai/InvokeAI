@@ -12,6 +12,8 @@ import {
   kleinVaeModelSelected,
   modelChanged,
   qwenImageComponentSourceSelected,
+  qwenImageQwenVLEncoderModelSelected,
+  qwenImageVaeModelSelected,
   resolutionPresetSelected,
   setZImageScheduler,
   syncedToOptimalDimension,
@@ -251,10 +253,18 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
         }
 
         // handle incompatible Qwen Image Edit component source - clear if switching away
-        const { qwenImageComponentSource } = state.params;
+        const { qwenImageComponentSource, qwenImageVaeModel, qwenImageQwenVLEncoderModel } = state.params;
         if (newBase !== 'qwen-image') {
           if (qwenImageComponentSource) {
             dispatch(qwenImageComponentSourceSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (qwenImageVaeModel) {
+            dispatch(qwenImageVaeModelSelected(null));
+            modelsUpdatedDisabledOrCleared += 1;
+          }
+          if (qwenImageQwenVLEncoderModel) {
+            dispatch(qwenImageQwenVLEncoderModelSelected(null));
             modelsUpdatedDisabledOrCleared += 1;
           }
         } else {

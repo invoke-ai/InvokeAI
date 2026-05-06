@@ -1,7 +1,9 @@
 import json
-from typing import Any, Literal, Self
+from pathlib import Path
+from typing import Any, Iterable, Literal, Self
 
 from pydantic import Field
+from safetensors import safe_open
 
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
@@ -19,18 +21,30 @@ _RECOGNIZED_TEXT_ENCODER_CLASSES = {
 }
 
 
-def _looks_like_qwen_vl_state_dict(state_dict: dict) -> bool:
+def _has_qwen_vl_keys(keys: Iterable[str]) -> bool:
     """A Qwen2.5-VL/Qwen2-VL checkpoint must have both LM weights and a visual
     tower — that's what distinguishes it from text-only Qwen3/Qwen2 encoders."""
-    has_lm = any(
-        isinstance(k, str) and (k == "model.embed_tokens.weight" or k.startswith("model.layers."))
-        for k in state_dict.keys()
-    )
-    has_vision = any(
-        isinstance(k, str) and (k.startswith("visual.patch_embed.") or k.startswith("visual.blocks."))
-        for k in state_dict.keys()
-    )
-    return has_lm and has_vision
+    has_lm = False
+    has_vision = False
+    for k in keys:
+        if not isinstance(k, str):
+            continue
+        if not has_lm and (k == "model.embed_tokens.weight" or k.startswith("model.layers.")):
+            has_lm = True
+        if not has_vision and (k.startswith("visual.patch_embed.") or k.startswith("visual.blocks.")):
+            has_vision = True
+        if has_lm and has_vision:
+            return True
+    return False
+
+
+def _read_safetensors_keys(path: Path) -> list[str]:
+    """Read only the key index from a safetensors file without loading tensor data.
+
+    Avoids holding multi-GB encoder weights in RAM just to classify the file.
+    """
+    with safe_open(str(path), framework="pt", device="cpu") as f:
+        return list(f.keys())
 
 
 class QwenVLEncoder_Diffusers_Config(Config_Base):
@@ -122,9 +136,19 @@ class QwenVLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
-        state_dict = mod.load_state_dict()
+        # Only safetensors checkpoints are supported as single-file Qwen VL encoders.
+        # Reject other extensions cheaply before attempting to read keys.
+        if mod.path.suffix != ".safetensors":
+            raise NotAMatchError(f"expected a .safetensors file, got {mod.path.suffix or '(no suffix)'}")
 
-        if not _looks_like_qwen_vl_state_dict(state_dict):
+        # Read only the key index — a 7GB fp8 encoder weighs ~7GB on disk, but we
+        # only need the key names to classify it, not the tensor data.
+        try:
+            keys = _read_safetensors_keys(mod.path)
+        except Exception as e:
+            raise NotAMatchError(f"could not read safetensors header: {e}") from e
+
+        if not _has_qwen_vl_keys(keys):
             raise NotAMatchError("state dict does not look like a Qwen2.5-VL/Qwen2-VL checkpoint")
 
         return cls(**override_fields)

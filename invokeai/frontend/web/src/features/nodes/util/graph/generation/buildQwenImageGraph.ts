@@ -205,6 +205,8 @@ export const buildQwenImageGraph = async (arg: GraphBuilderArg): Promise<GraphBu
     negative_prompt: prompts.negative,
     model: Graph.getModelMetadataField(modelConfig),
     qwen_image_component_source: params.qwenImageComponentSource,
+    qwen_image_vae: params.qwenImageVaeModel,
+    qwen_image_qwen_vl_encoder: params.qwenImageQwenVLEncoderModel,
     qwen_image_quantization: params.qwenImageQuantization,
     qwen_image_shift: params.qwenImageShift,
     steps,

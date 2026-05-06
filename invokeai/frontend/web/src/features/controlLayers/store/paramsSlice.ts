@@ -716,6 +716,13 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.positivePromptHistory = [];
       }
 
+      if (state._version === 2) {
+        // v2 -> v3, add standalone Qwen Image VAE and Qwen VL encoder fields
+        state._version = 3;
+        state.qwenImageVaeModel = null;
+        state.qwenImageQwenVLEncoderModel = null;
+      }
+
       return zParamsState.parse(state);
     },
   },
