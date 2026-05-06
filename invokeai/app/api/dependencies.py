@@ -17,7 +17,12 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.download.download_default import DownloadQueueService
 from invokeai.app.services.events.events_fastapievents import FastAPIEventService
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
-from invokeai.app.services.external_generation.providers import AlibabaCloudProvider, GeminiProvider, OpenAIProvider, SeedreamProvider
+from invokeai.app.services.external_generation.providers import (
+    AlibabaCloudProvider,
+    GeminiProvider,
+    OpenAIProvider,
+    SeedreamProvider,
+)
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
