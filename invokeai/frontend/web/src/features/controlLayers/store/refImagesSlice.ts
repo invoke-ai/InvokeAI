@@ -284,6 +284,25 @@ const slice = createSlice({
       entity.config = { ...config, image: entity.config.image };
     },
     refImagesReset: () => getInitialRefImagesState(),
+    refImagesReordered: (state, action: PayloadAction<{ ids: string[] }>) => {
+      const { ids } = action.payload;
+      if (ids.length !== state.entities.length) {
+        return;
+      }
+      if (new Set(ids).size !== ids.length) {
+        return;
+      }
+      const byId = new Map(state.entities.map((e) => [e.id, e]));
+      const next: RefImageState[] = [];
+      for (const id of ids) {
+        const entity = byId.get(id);
+        if (!entity) {
+          return;
+        }
+        next.push(entity);
+      }
+      state.entities = next;
+    },
   },
 });
 
@@ -301,6 +320,7 @@ export const {
   refImageFLUXReduxImageInfluenceChanged,
   refImageIsEnabledToggled,
   refImagesRecalled,
+  refImagesReordered,
 } = slice.actions;
 
 export const refImagesSliceConfig: SliceConfig<typeof slice> = {
