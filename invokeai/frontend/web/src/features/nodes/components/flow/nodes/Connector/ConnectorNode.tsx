@@ -11,7 +11,7 @@ import { memo } from 'react';
 import { PiDotOutlineFill } from 'react-icons/pi';
 
 const CONNECTOR_NODE_SIZE = 35;
-const CONNECTOR_HANDLE_SIZE = 24;
+const CONNECTOR_HANDLE_SIZE = 12;
 const CONNECTOR_HANDLE_OFFSET = -CONNECTOR_HANDLE_SIZE / 2;
 
 const handleVisualSx = {
