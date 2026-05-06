@@ -3,8 +3,10 @@ from typing import Optional, Union
 
 import numpy as np
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
+from dynamicprompts.wildcards import WildcardManager
 from pydantic import field_validator
 
+from invokeai.app.api.routers.utilities_wildcards import clean_dynamic_prompt_outputs
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
 from invokeai.app.invocations.fields import InputField, UIComponent
 from invokeai.app.invocations.primitives import StringCollectionOutput
@@ -30,14 +32,16 @@ class DynamicPromptInvocation(BaseInvocation):
     combinatorial: bool = InputField(default=False, description="Whether to use the combinatorial generator")
 
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
+        wildcards_path = context.config.get().root_path / "wildcards"
+        wildcard_manager = WildcardManager(wildcards_path) if wildcards_path.is_dir() else None
         if self.combinatorial:
-            generator = CombinatorialPromptGenerator()
+            generator = CombinatorialPromptGenerator(wildcard_manager=wildcard_manager)
             prompts = generator.generate(self.prompt, max_prompts=self.max_prompts)
         else:
-            generator = RandomPromptGenerator()
+            generator = RandomPromptGenerator(wildcard_manager=wildcard_manager)
             prompts = generator.generate(self.prompt, num_images=self.max_prompts)
 
-        return StringCollectionOutput(collection=prompts)
+        return StringCollectionOutput(collection=clean_dynamic_prompt_outputs(prompts))
 
 
 @invocation(

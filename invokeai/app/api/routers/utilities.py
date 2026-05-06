@@ -6,13 +6,23 @@ from typing import Optional, Union
 
 import torch
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
-from fastapi import Body, HTTPException
+from dynamicprompts.wildcards import WildcardManager
+from fastapi import Body, HTTPException, Query
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 from pyparsing import ParseException
 from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers.utilities_wildcards import (
+    WildcardsResponse,
+    WildcardValuesResponse,
+    clean_dynamic_prompt_outputs,
+    find_missing_wildcard_references,
+    get_wildcard_values,
+    get_wildcards_path,
+    index_wildcards,
+)
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
@@ -31,6 +41,40 @@ _model_load_lock = threading.Lock()
 class DynamicPromptsResponse(BaseModel):
     prompts: list[str]
     error: Optional[str] = None
+    warnings: list[str] = Field(default_factory=list)
+    missing_wildcards: list[str] = Field(default_factory=list)
+
+
+@utilities_router.get(
+    "/wildcards",
+    operation_id="list_wildcards",
+    responses={
+        200: {"model": WildcardsResponse},
+    },
+)
+async def list_wildcards() -> WildcardsResponse:
+    """List local dynamic prompt wildcards from INVOKEAI_ROOT/wildcards."""
+    wildcards_path = get_wildcards_path(ApiDependencies.invoker.services.configuration.root_path)
+    return index_wildcards(wildcards_path)
+
+
+@utilities_router.get(
+    "/wildcards/values",
+    operation_id="get_wildcard_values",
+    responses={
+        200: {"model": WildcardValuesResponse},
+    },
+)
+async def list_wildcard_values(
+    path: str = Query(description="The relative wildcard path to read values for"),
+    limit: int = Query(default=200, ge=1, le=1000, description="The max number of wildcard values to return"),
+) -> WildcardValuesResponse:
+    """List values for a single local dynamic prompt wildcard."""
+    wildcards_path = get_wildcards_path(ApiDependencies.invoker.services.configuration.root_path)
+    values = get_wildcard_values(wildcards_path, path, limit)
+    if values is None:
+        raise HTTPException(status_code=404, detail=f"Wildcard '{path}' not found")
+    return values
 
 
 @utilities_router.post(
@@ -49,18 +93,30 @@ async def parse_dynamicprompts(
     """Creates a batch process"""
     max_prompts = min(max_prompts, 10000)
     generator: Union[RandomPromptGenerator, CombinatorialPromptGenerator]
+    warnings: list[str] = []
+    wildcards_path = get_wildcards_path(ApiDependencies.invoker.services.configuration.root_path)
+    wildcard_index = index_wildcards(wildcards_path)
+    missing_wildcards = find_missing_wildcard_references(prompt, wildcard_index.wildcards)
+    if wildcard_index.errors:
+        warnings.append("Some wildcard files could not be indexed.")
     try:
         error: Optional[str] = None
+        wildcard_manager = WildcardManager(wildcards_path) if wildcards_path.is_dir() else None
         if combinatorial:
-            generator = CombinatorialPromptGenerator()
+            generator = CombinatorialPromptGenerator(wildcard_manager=wildcard_manager)
             prompts = generator.generate(prompt, max_prompts=max_prompts)
         else:
-            generator = RandomPromptGenerator(seed=seed)
+            generator = RandomPromptGenerator(wildcard_manager=wildcard_manager, seed=seed)
             prompts = generator.generate(prompt, num_images=max_prompts)
     except ParseException as e:
         prompts = [prompt]
         error = str(e)
-    return DynamicPromptsResponse(prompts=prompts if prompts else [""], error=error)
+    return DynamicPromptsResponse(
+        prompts=clean_dynamic_prompt_outputs(prompts) if prompts else [""],
+        error=error,
+        warnings=warnings,
+        missing_wildcards=missing_wildcards,
+    )
 
 
 # --- Expand Prompt ---

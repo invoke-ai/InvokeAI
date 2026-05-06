@@ -35,8 +35,48 @@ type ImageToPromptResponse = {
   error?: string | null;
 };
 
+export type WildcardIndexItem = {
+  token: string;
+  path: string;
+  label: string;
+  file_type: 'txt' | 'json' | 'yaml';
+  value_count: number;
+  samples: string[];
+};
+
+export type WildcardsResponse = {
+  wildcard_dir: string;
+  wildcards: WildcardIndexItem[];
+  errors: { path: string; message: string }[];
+};
+
+export type WildcardValuesResponse = {
+  token: string;
+  path: string;
+  label: string;
+  file_type: 'txt' | 'json' | 'yaml';
+  value_count: number;
+  values: string[];
+  truncated: boolean;
+};
+
 export const utilitiesApi = api.injectEndpoints({
   endpoints: (build) => ({
+    wildcards: build.query<WildcardsResponse, void>({
+      query: () => ({
+        url: buildUtilitiesUrl('wildcards'),
+        method: 'GET',
+      }),
+      providesTags: ['FetchOnReconnect'],
+    }),
+    wildcardValues: build.query<WildcardValuesResponse, { path: string; limit?: number }>({
+      query: ({ path, limit = 200 }) => ({
+        url: buildUtilitiesUrl('wildcards/values'),
+        method: 'GET',
+        params: { path, limit },
+      }),
+      providesTags: ['FetchOnReconnect'],
+    }),
     dynamicPrompts: build.query<
       paths['/api/v1/utilities/dynamicprompts']['post']['responses']['200']['content']['application/json'],
       paths['/api/v1/utilities/dynamicprompts']['post']['requestBody']['content']['application/json']
@@ -67,4 +107,5 @@ export const utilitiesApi = api.injectEndpoints({
   }),
 });
 
-export const { useExpandPromptMutation, useImageToPromptMutation } = utilitiesApi;
+export const { useExpandPromptMutation, useImageToPromptMutation, useLazyWildcardValuesQuery, useWildcardsQuery } =
+  utilitiesApi;
