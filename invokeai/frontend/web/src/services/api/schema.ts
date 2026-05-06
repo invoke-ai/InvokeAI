@@ -16423,7 +16423,7 @@ export type components = {
             /**
              * Enable Partial Loading
              * @description Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.
-             * @default false
+             * @default true
              */
             enable_partial_loading?: boolean;
             /**
