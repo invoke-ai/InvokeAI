@@ -1,12 +1,17 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { debounce } from 'es-toolkit/compat';
 import {
+  type DynamicPromptMode,
   isErrorChanged,
   isLoadingChanged,
   parsingErrorChanged,
   promptsChanged,
-  selectDynamicPromptsMaxPrompts,
+  selectDynamicPromptsMaxCombinations,
+  selectDynamicPromptsMode,
+  selectDynamicPromptsRandomSamples,
+  selectDynamicPromptsRandomSeed,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import { getDynamicPromptsQueryArg } from 'features/dynamicPrompts/util/getDynamicPromptsQueryArg';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
 import { selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import { useEffect, useMemo } from 'react';
@@ -21,33 +26,44 @@ export const useDynamicPromptsWatcher = () => {
   const { getState, dispatch } = useAppStore();
   // The prompt to process is derived from the preset-modified prompts
   const presetModifiedPrompts = useAppSelector(selectPresetModifiedPrompts);
-  const maxPrompts = useAppSelector(selectDynamicPromptsMaxPrompts);
+  const mode = useAppSelector(selectDynamicPromptsMode);
+  const randomSamples = useAppSelector(selectDynamicPromptsRandomSamples);
+  const maxCombinations = useAppSelector(selectDynamicPromptsMaxCombinations);
+  const randomSeed = useAppSelector(selectDynamicPromptsRandomSeed);
 
   const debouncedUpdateDynamicPrompts = useMemo(
     () =>
-      debounce(async (positivePrompt: string, maxPrompts: number) => {
-        // Try to fetch the dynamic prompts and store in state
-        try {
-          const req = dispatch(
-            utilitiesApi.endpoints.dynamicPrompts.initiate(
-              {
-                prompt: positivePrompt,
-                max_prompts: maxPrompts,
-              },
-              { subscribe: false }
-            )
-          );
+      debounce(
+        async (
+          positivePrompt: string,
+          mode: DynamicPromptMode,
+          randomSamples: number,
+          maxCombinations: number,
+          randomSeed: number
+        ) => {
+          const queryArg = getDynamicPromptsQueryArg({
+            prompt: positivePrompt,
+            mode,
+            randomSamples,
+            maxCombinations,
+            randomSeed,
+          });
+          // Try to fetch the dynamic prompts and store in state
+          try {
+            const req = dispatch(utilitiesApi.endpoints.dynamicPrompts.initiate(queryArg, { subscribe: false }));
 
-          const res = await req.unwrap();
+            const res = await req.unwrap();
 
-          dispatch(promptsChanged(res.prompts));
-          dispatch(parsingErrorChanged(res.error));
-          dispatch(isErrorChanged(false));
-        } catch {
-          dispatch(isErrorChanged(true));
-          dispatch(isLoadingChanged(false));
-        }
-      }, DYNAMIC_PROMPTS_DEBOUNCE_MS),
+            dispatch(promptsChanged(res.prompts));
+            dispatch(parsingErrorChanged(res.error));
+            dispatch(isErrorChanged(false));
+          } catch {
+            dispatch(isErrorChanged(true));
+            dispatch(isLoadingChanged(false));
+          }
+        },
+        DYNAMIC_PROMPTS_DEBOUNCE_MS
+      ),
     [dispatch]
   );
 
@@ -55,10 +71,14 @@ export const useDynamicPromptsWatcher = () => {
     // Before we execute, imperatively check the dynamic prompts query cache to see if we have already fetched this prompt
     const state = getState();
 
-    const cachedPrompts = utilitiesApi.endpoints.dynamicPrompts.select({
+    const queryArg = getDynamicPromptsQueryArg({
       prompt: presetModifiedPrompts.positive,
-      max_prompts: maxPrompts,
-    })(state).data;
+      mode,
+      randomSamples,
+      maxCombinations,
+      randomSeed,
+    });
+    const cachedPrompts = utilitiesApi.endpoints.dynamicPrompts.select(queryArg)(state).data;
 
     if (cachedPrompts) {
       // Yep we already did this prompt, use the cached result
@@ -80,6 +100,15 @@ export const useDynamicPromptsWatcher = () => {
       dispatch(isLoadingChanged(true));
     }
 
-    debouncedUpdateDynamicPrompts(presetModifiedPrompts.positive, maxPrompts);
-  }, [debouncedUpdateDynamicPrompts, dispatch, getState, maxPrompts, presetModifiedPrompts]);
+    debouncedUpdateDynamicPrompts(presetModifiedPrompts.positive, mode, randomSamples, maxCombinations, randomSeed);
+  }, [
+    debouncedUpdateDynamicPrompts,
+    dispatch,
+    getState,
+    maxCombinations,
+    mode,
+    presetModifiedPrompts,
+    randomSamples,
+    randomSeed,
+  ]);
 };

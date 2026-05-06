@@ -5,6 +5,7 @@ import { useAppStore } from 'app/store/storeHooks';
 import { extractMessageFromAssertionError } from 'common/util/extractMessageFromAssertionError';
 import { withResult, withResultAsync } from 'common/util/result';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import { refreshDynamicPromptsForEnqueue } from 'features/dynamicPrompts/util/refreshDynamicPromptsForEnqueue';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildAnimaGraph } from 'features/nodes/util/graph/generation/buildAnimaGraph';
@@ -27,9 +28,16 @@ import { assert, AssertionError } from 'tsafe';
 const log = logger('generation');
 
 const enqueueGenerate = async (store: AppStore, prepend: boolean) => {
-  const { dispatch, getState } = store;
+  const { dispatch } = store;
 
-  const state = getState();
+  const state = await refreshDynamicPromptsForEnqueue(store);
+  if (!state) {
+    toast({
+      status: 'error',
+      title: 'Failed to resolve dynamic prompts',
+    });
+    return;
+  }
 
   const model = state.params.model;
   if (!model) {

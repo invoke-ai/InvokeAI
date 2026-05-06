@@ -7,6 +7,7 @@ import { withResult, withResultAsync } from 'common/util/result';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { positivePromptAddedToHistory, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
+import { refreshDynamicPromptsForEnqueue } from 'features/dynamicPrompts/util/refreshDynamicPromptsForEnqueue';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { prepareLinearUIBatch } from 'features/nodes/util/graph/buildLinearBatchConfig';
 import { buildAnimaGraph } from 'features/nodes/util/graph/generation/buildAnimaGraph';
@@ -30,9 +31,16 @@ import { assert, AssertionError } from 'tsafe';
 const log = logger('generation');
 
 const enqueueCanvas = async (store: AppStore, canvasManager: CanvasManager, prepend: boolean) => {
-  const { dispatch, getState } = store;
+  const { dispatch } = store;
 
-  const state = getState();
+  const state = await refreshDynamicPromptsForEnqueue(store);
+  if (!state) {
+    toast({
+      status: 'error',
+      title: 'Failed to resolve dynamic prompts',
+    });
+    return;
+  }
 
   const destination = selectCanvasDestination(state);
 

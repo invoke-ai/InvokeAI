@@ -2,12 +2,13 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel } from '@
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
-  maxPromptsChanged,
-  selectDynamicPromptsCombinatorial,
-  selectDynamicPromptsMaxPrompts,
+  maxCombinationsChanged,
+  randomSamplesChanged,
+  selectDynamicPromptsMaxCombinations,
+  selectDynamicPromptsMode,
+  selectDynamicPromptsRandomSamples,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import { memo, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { memo, useCallback, useMemo } from 'react';
 
 const CONSTRAINTS = {
   initial: 100,
@@ -20,36 +21,42 @@ const CONSTRAINTS = {
 };
 
 const ParamDynamicPromptsMaxPrompts = () => {
-  const maxPrompts = useAppSelector(selectDynamicPromptsMaxPrompts);
-  const combinatorial = useAppSelector(selectDynamicPromptsCombinatorial);
+  const mode = useAppSelector(selectDynamicPromptsMode);
+  const randomSamples = useAppSelector(selectDynamicPromptsRandomSamples);
+  const maxCombinations = useAppSelector(selectDynamicPromptsMaxCombinations);
   const dispatch = useAppDispatch();
-  const { t } = useTranslation();
+  const value = mode === 'combinatorial' ? maxCombinations : randomSamples;
+  const label = useMemo(() => (mode === 'combinatorial' ? 'Max Combinations' : 'Random Samples'), [mode]);
 
   const handleChange = useCallback(
     (v: number) => {
-      dispatch(maxPromptsChanged(v));
+      if (mode === 'combinatorial') {
+        dispatch(maxCombinationsChanged(v));
+      } else {
+        dispatch(randomSamplesChanged(v));
+      }
     },
-    [dispatch]
+    [dispatch, mode]
   );
 
   return (
-    <FormControl isDisabled={!combinatorial}>
+    <FormControl>
       <InformationalPopover feature="dynamicPromptsMaxPrompts" inPortal={false}>
-        <FormLabel>{t('dynamicPrompts.maxPrompts')}</FormLabel>
+        <FormLabel>{label}</FormLabel>
       </InformationalPopover>
       <CompositeSlider
         min={CONSTRAINTS.sliderMin}
         max={CONSTRAINTS.sliderMax}
-        value={maxPrompts}
-        defaultValue={CONSTRAINTS.initial}
+        value={value}
+        defaultValue={mode === 'combinatorial' ? CONSTRAINTS.initial : 1}
         onChange={handleChange}
         marks
       />
       <CompositeNumberInput
         min={CONSTRAINTS.numberInputMin}
         max={CONSTRAINTS.numberInputMax}
-        value={maxPrompts}
-        defaultValue={CONSTRAINTS.initial}
+        value={value}
+        defaultValue={mode === 'combinatorial' ? CONSTRAINTS.initial : 1}
         onChange={handleChange}
       />
     </FormControl>
