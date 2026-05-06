@@ -974,7 +974,6 @@
         "viewBoards": "Просмотреть коллекции",
         "setBoardVisibility": "Установить видимость коллекции",
         "setVisibilityPrivate": "Сделать приватной",
-        "setVisibilityShared": "",
         "setVisibilityPublic": "Сделать публичной",
         "updateBoardVisibilityError": "Ошибка изменения видимости коллекции"
     },
