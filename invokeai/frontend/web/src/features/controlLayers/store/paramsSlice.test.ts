@@ -138,14 +138,41 @@ describe('paramsSlice selectors for external models', () => {
     expect(selectModelSupportsDimensions.resultFunc(model, config)).toBe(true);
   });
 
-  it('returns false for HRF support on external models', () => {
-    const config = createExternalConfig({
-      modes: ['txt2img'],
-      supports_reference_images: false,
-    });
-    const model = buildExternalModelIdentifier(config);
+  it('supports HRF only for SD1.5 and SDXL models', () => {
+    expect(
+      selectModelSupportsHrf.resultFunc({
+        key: 'sd1',
+        hash: 'h',
+        name: 'SD1',
+        base: 'sd-1',
+        type: 'main',
+      })
+    ).toBe(true);
+    expect(
+      selectModelSupportsHrf.resultFunc({
+        key: 'sdxl',
+        hash: 'h',
+        name: 'SDXL',
+        base: 'sdxl',
+        type: 'main',
+      })
+    ).toBe(true);
 
-    expect(selectModelSupportsHrf.resultFunc(model)).toBe(false);
+    const unsupportedBases = ['sd-2', 'sd-3', 'flux', 'flux2', 'anima', 'cogview4', 'qwen-image', 'z-image'] as const;
+    unsupportedBases.forEach((base) => {
+      expect(
+        selectModelSupportsHrf.resultFunc({
+          key: base,
+          hash: 'h',
+          name: base,
+          base,
+          type: 'main',
+        })
+      ).toBe(false);
+    });
+
+    const config = createExternalConfig({ modes: ['txt2img'], supports_reference_images: false });
+    expect(selectModelSupportsHrf.resultFunc(buildExternalModelIdentifier(config))).toBe(false);
   });
 });
 
@@ -155,6 +182,15 @@ describe('paramsSlice HRF selectors', () => {
   });
 
   it('supports upscale-model HRF only for SD1.5 and SDXL models', () => {
+    expect(
+      selectModelSupportsHrfUpscaleModel.resultFunc({
+        key: 'sd1',
+        hash: 'h',
+        name: 'SD1',
+        base: 'sd-1',
+        type: 'main',
+      })
+    ).toBe(true);
     expect(
       selectModelSupportsHrfUpscaleModel.resultFunc({
         key: 'sdxl',
@@ -228,6 +264,99 @@ describe('paramsSlice HRF reducers', () => {
     expect(nextState.hrfLoraMode).toBe('dedicated');
     expect(nextState.hrfLoras).toHaveLength(1);
     expect(nextState.hrfLoras[0]?.model.key).toBe('sd1-lora');
+  });
+
+  it('preserves HRF settings when switching through an unsupported base and back', () => {
+    const state = getInitialParamsState();
+    const sdxlModel = { key: 'sdxl', hash: 'h', name: 'SDXL', base: 'sdxl', type: 'main' } as const;
+    const externalModel = buildExternalModelIdentifier(
+      createExternalConfig({ modes: ['txt2img'], supports_reference_images: false })
+    );
+    state.model = sdxlModel;
+    state.hrfEnabled = true;
+    state.hrfMethod = 'upscale_model';
+    state.hrfModel = { key: 'hrf-sdxl', hash: 'h', name: 'HRF SDXL', base: 'sdxl', type: 'main' };
+    state.hrfTileControlNetModel = {
+      key: 'tile-sdxl',
+      hash: 'h',
+      name: 'Tile SDXL',
+      base: 'sdxl',
+      type: 'controlnet',
+    };
+    state.hrfLoraMode = 'dedicated';
+    state.hrfLoras = [
+      {
+        id: 'sdxl-lora',
+        isEnabled: true,
+        model: { key: 'sdxl-lora', hash: 'h', name: 'SDXL LoRA', base: 'sdxl', type: 'lora' },
+        weight: 0.6,
+      },
+    ] as ParamsState['hrfLoras'];
+
+    const unsupportedState = paramsSliceConfig.slice.reducer(
+      state,
+      modelChanged({ model: externalModel, previousModel: sdxlModel })
+    );
+    const returnedState = paramsSliceConfig.slice.reducer(
+      unsupportedState,
+      modelChanged({ model: sdxlModel, previousModel: externalModel })
+    );
+
+    expect(unsupportedState.hrfEnabled).toBe(true);
+    expect(unsupportedState.hrfModel?.key).toBe('hrf-sdxl');
+    expect(unsupportedState.hrfTileControlNetModel?.key).toBe('tile-sdxl');
+    expect(unsupportedState.hrfLoraMode).toBe('dedicated');
+    expect(unsupportedState.hrfLoras).toHaveLength(1);
+    expect(returnedState.hrfEnabled).toBe(true);
+    expect(returnedState.hrfModel?.key).toBe('hrf-sdxl');
+    expect(returnedState.hrfTileControlNetModel?.key).toBe('tile-sdxl');
+    expect(returnedState.hrfLoraMode).toBe('dedicated');
+    expect(returnedState.hrfLoras[0]?.model.key).toBe('sdxl-lora');
+  });
+
+  it('cleans preserved HRF settings when returning to a different supported base', () => {
+    const state = getInitialParamsState();
+    const sdxlModel = { key: 'sdxl', hash: 'h', name: 'SDXL', base: 'sdxl', type: 'main' } as const;
+    const sd1Model = { key: 'sd1', hash: 'h', name: 'SD1', base: 'sd-1', type: 'main' } as const;
+    const fluxModel = { key: 'flux', hash: 'h', name: 'FLUX', base: 'flux', type: 'main' } as const;
+    state.model = sdxlModel;
+    state.hrfEnabled = true;
+    state.hrfMethod = 'upscale_model';
+    state.hrfModel = { key: 'hrf-sdxl', hash: 'h', name: 'HRF SDXL', base: 'sdxl', type: 'main' };
+    state.hrfTileControlNetModel = {
+      key: 'tile-sdxl',
+      hash: 'h',
+      name: 'Tile SDXL',
+      base: 'sdxl',
+      type: 'controlnet',
+    };
+    state.hrfLoraMode = 'dedicated';
+    state.hrfLoras = [
+      {
+        id: 'sdxl-lora',
+        isEnabled: true,
+        model: { key: 'sdxl-lora', hash: 'h', name: 'SDXL LoRA', base: 'sdxl', type: 'lora' },
+        weight: 0.6,
+      },
+    ] as ParamsState['hrfLoras'];
+
+    const unsupportedState = paramsSliceConfig.slice.reducer(
+      state,
+      modelChanged({ model: fluxModel, previousModel: sdxlModel })
+    );
+    const sd1State = paramsSliceConfig.slice.reducer(
+      unsupportedState,
+      modelChanged({ model: sd1Model, previousModel: fluxModel })
+    );
+
+    expect(unsupportedState.hrfModel?.key).toBe('hrf-sdxl');
+    expect(unsupportedState.hrfTileControlNetModel?.key).toBe('tile-sdxl');
+    expect(unsupportedState.hrfLoras).toHaveLength(1);
+    expect(sd1State.hrfEnabled).toBe(true);
+    expect(sd1State.hrfModel).toBeNull();
+    expect(sd1State.hrfTileControlNetModel).toBeNull();
+    expect(sd1State.hrfLoraMode).toBe('dedicated');
+    expect(sd1State.hrfLoras).toEqual([]);
   });
 });
 

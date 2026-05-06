@@ -311,32 +311,20 @@ describe('addHighResFix', () => {
     expect(g.getMetadataNode()).toMatchObject({ hrf_steps: 12 });
   });
 
-  it('reroutes transformer txt2img graphs through latent resize and a final-size second denoise pass', () => {
+  it('preserves unsupported model-family graphs and writes disabled metadata', () => {
     const { g, seed, denoise, l2i } = buildTransformerGraph();
 
     addHighResFix({ g, state: buildState({ base: 'sd-3' }), generationMode: 'txt2img', denoise, l2i, seed });
 
     const graph = g.getGraph();
     const nodes = Object.values(graph.nodes);
-    const resize = nodes.find((node) => node.type === 'lresize');
-    const hrfDenoise = nodes.find((node) => node.id.startsWith('hrf_sd3_denoise'));
-
-    if (!hrfDenoise) {
-      throw new Error('Expected HRF SD3 denoise node');
-    }
-
-    expect(resize).toMatchObject({ type: 'lresize', width: 1024, height: 1024, mode: 'bilinear' });
-    expect(hrfDenoise).toMatchObject({ type: 'sd3_denoise', width: 1024, height: 1024, denoising_end: 1 });
-    expect((hrfDenoise as { denoising_start: number }).denoising_start).toBeCloseTo(1 - 0.35 ** 0.2);
+    expect(nodes.some((node) => node.type === 'lresize')).toBe(false);
     expect(nodes.some((node) => node.id.startsWith('hrf_noise'))).toBe(false);
     expect(graph.edges).toContainEqual({
-      source: { node_id: 'seed', field: 'value' },
-      destination: { node_id: hrfDenoise.id, field: 'seed' },
-    });
-    expect(graph.edges).not.toContainEqual({
       source: { node_id: 'sd3_denoise', field: 'latents' },
       destination: { node_id: 'sd3_l2i', field: 'latents' },
     });
+    expect(g.getMetadataNode()).toMatchObject({ hrf_enabled: false });
   });
 
   it('clones SDXL conditioning with final HRF dimensions for the second pass', () => {

@@ -8,7 +8,7 @@ import { useAssertSingleton } from 'common/hooks/useAssertSingleton';
 import { debounce, groupBy, upperFirst } from 'es-toolkit/compat';
 import { useCanvasManagerSafe } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { selectAddedLoRAs } from 'features/controlLayers/store/lorasSlice';
-import { selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { isHrfSupportedBase, selectMainModelConfig, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import { selectRefImagesSlice } from 'features/controlLayers/store/refImagesSlice';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, LoRA, ParamsState, RefImagesState } from 'features/controlLayers/store/types';
@@ -358,23 +358,17 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
     });
   }
 
-  if (params.hrfEnabled) {
-    if (params.model?.base === 'external' || (model && isExternalApiModelConfig(model))) {
-      reasons.push({ content: i18n.t('parameters.invoke.hrfExternalModelUnsupported') });
-    }
+  if (params.hrfEnabled && model && !isExternalApiModelConfig(model) && isHrfSupportedBase(model.base)) {
     if (params.refinerModel) {
       reasons.push({ content: i18n.t('parameters.invoke.hrfRefinerUnsupported') });
     }
     if (params.hrfMethod === 'upscale_model') {
       const hrfBase =
         params.hrfModel?.base ?? (model && !isExternalApiModelConfig(model) ? model.base : params.model?.base);
-      if (model && !isExternalApiModelConfig(model) && !['sd-1', 'sdxl'].includes(model.base)) {
-        reasons.push({ content: i18n.t('parameters.invoke.hrfUpscaleModelBaseUnsupported') });
-      }
       if (params.hrfModel) {
         if (params.hrfModel.base === 'external') {
           reasons.push({ content: i18n.t('parameters.invoke.hrfModelOverrideExternalUnsupported') });
-        } else if (!['sd-1', 'sdxl'].includes(params.hrfModel.base)) {
+        } else if (!isHrfSupportedBase(params.hrfModel.base)) {
           reasons.push({ content: i18n.t('parameters.invoke.hrfModelOverrideBaseUnsupported') });
         } else if (model && !isExternalApiModelConfig(model) && params.hrfModel.base !== model.base) {
           reasons.push({ content: i18n.t('parameters.invoke.hrfModelOverrideBaseMismatch') });

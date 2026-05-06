@@ -247,24 +247,21 @@ const slice = createSlice({
       const model = result.data;
       state.model = model;
 
-      if (model?.base === 'external') {
-        state.hrfEnabled = false;
-        state.hrfModel = null;
-      }
-
       // If the model base changes (e.g. SD1.5 -> SDXL), we need to change a few things
       if (model === null || previousModel?.base === model.base) {
         return;
       }
 
-      if (state.hrfModel?.base !== model.base) {
-        state.hrfModel = null;
+      if (isHrfSupportedBase(model.base)) {
+        if (state.hrfModel?.base !== model.base) {
+          state.hrfModel = null;
+        }
+        if (state.hrfTileControlNetModel?.base !== model.base) {
+          state.hrfTileControlNetModel = null;
+        }
+        const effectiveHrfBase = state.hrfModel?.base ?? model.base;
+        state.hrfLoras = state.hrfLoras.filter((lora) => lora.model.base === effectiveHrfBase);
       }
-      if (state.hrfTileControlNetModel?.base !== model.base) {
-        state.hrfTileControlNetModel = null;
-      }
-      const effectiveHrfBase = state.hrfModel?.base ?? model.base;
-      state.hrfLoras = state.hrfLoras.filter((lora) => lora.model.base === effectiveHrfBase);
 
       applyClipSkip(state, model, state.clipSkip);
     },
@@ -1047,20 +1044,20 @@ export const selectModelSupportsDimensions = createSelector(selectModel, selectM
   }
   return true;
 });
+export const isHrfSupportedBase = (base: BaseModelType | null | undefined): boolean =>
+  base === 'sd-1' || base === 'sdxl';
+
 export const selectModelSupportsHrf = createSelector(selectModel, (model) => {
   if (!model) {
     return false;
   }
-  if (model.base === 'external') {
-    return false;
-  }
-  return true;
+  return isHrfSupportedBase(model.base);
 });
 export const selectModelSupportsHrfUpscaleModel = createSelector(selectModel, (model) => {
   if (!model) {
     return false;
   }
-  return model.base === 'sd-1' || model.base === 'sdxl';
+  return isHrfSupportedBase(model.base);
 });
 export const selectSeedControl = createSelector(selectModelConfig, (modelConfig) => {
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {

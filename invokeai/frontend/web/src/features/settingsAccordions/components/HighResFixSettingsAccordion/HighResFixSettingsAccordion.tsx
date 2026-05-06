@@ -177,6 +177,10 @@ const formControlProps = {
   w: 'full',
 };
 
+type DisabledProps = {
+  isDisabled?: boolean;
+};
+
 const selectHrfTileControlNetModelConfig = createSelector(
   selectModelConfigsQuery,
   selectHrfTileControlNetModel,
@@ -247,7 +251,7 @@ const ParamHrfEnabled = memo(() => {
 
 ParamHrfEnabled.displayName = 'ParamHrfEnabled';
 
-const ParamHrfMethod = memo(() => {
+const ParamHrfMethod = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const method = useAppSelector(selectHrfMethod);
   const { t } = useTranslation();
@@ -266,7 +270,13 @@ const ParamHrfMethod = memo(() => {
         <FormLabel>{t('hrf.upscaleMethod')}</FormLabel>
       </InformationalPopover>
       <ButtonGroup size="sm" variant="outline" w="full">
-        <Button flex={1} minW={0} colorScheme={method === 'latent' ? 'invokeBlue' : undefined} onClick={onClickLatent}>
+        <Button
+          flex={1}
+          minW={0}
+          colorScheme={method === 'latent' ? 'invokeBlue' : undefined}
+          onClick={onClickLatent}
+          isDisabled={isDisabled}
+        >
           {t('hrf.latent')}
         </Button>
         <Button
@@ -274,6 +284,7 @@ const ParamHrfMethod = memo(() => {
           minW={0}
           colorScheme={method === 'upscale_model' ? 'invokeBlue' : undefined}
           onClick={onClickUpscaleModel}
+          isDisabled={isDisabled}
         >
           {t('hrf.upscaleModelMethod')}
         </Button>
@@ -284,7 +295,7 @@ const ParamHrfMethod = memo(() => {
 
 ParamHrfMethod.displayName = 'ParamHrfMethod';
 
-const ParamHrfScale = memo(() => {
+const ParamHrfScale = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const scale = useAppSelector(selectHrfScale);
   const { t } = useTranslation();
@@ -310,6 +321,7 @@ const ParamHrfScale = memo(() => {
         fineStep={SCALE_CONSTRAINTS.fineStep}
         onChange={onChange}
         marks={[SCALE_CONSTRAINTS.sliderMin, SCALE_CONSTRAINTS.initial, SCALE_CONSTRAINTS.sliderMax]}
+        isDisabled={isDisabled}
       />
       <CompositeNumberInput
         value={scale}
@@ -319,6 +331,7 @@ const ParamHrfScale = memo(() => {
         step={SCALE_CONSTRAINTS.coarseStep}
         fineStep={SCALE_CONSTRAINTS.fineStep}
         onChange={onChange}
+        isDisabled={isDisabled}
       />
     </FormControl>
   );
@@ -326,7 +339,7 @@ const ParamHrfScale = memo(() => {
 
 ParamHrfScale.displayName = 'ParamHrfScale';
 
-const ParamHrfStrength = memo(() => {
+const ParamHrfStrength = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const strength = useAppSelector(selectHrfStrength);
   const { t } = useTranslation();
@@ -352,6 +365,7 @@ const ParamHrfStrength = memo(() => {
         fineStep={STRENGTH_CONSTRAINTS.fineStep}
         onChange={onChange}
         marks={[STRENGTH_CONSTRAINTS.sliderMin, STRENGTH_CONSTRAINTS.initial, STRENGTH_CONSTRAINTS.sliderMax]}
+        isDisabled={isDisabled}
       />
       <CompositeNumberInput
         value={strength}
@@ -361,6 +375,7 @@ const ParamHrfStrength = memo(() => {
         step={STRENGTH_CONSTRAINTS.coarseStep}
         fineStep={STRENGTH_CONSTRAINTS.fineStep}
         onChange={onChange}
+        isDisabled={isDisabled}
       />
     </FormControl>
   );
@@ -368,7 +383,7 @@ const ParamHrfStrength = memo(() => {
 
 ParamHrfStrength.displayName = 'ParamHrfStrength';
 
-const ParamHrfLatentInterpolationMode = memo(() => {
+const ParamHrfLatentInterpolationMode = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const mode = useAppSelector(selectHrfLatentInterpolationMode);
   const { t } = useTranslation();
@@ -402,14 +417,14 @@ const ParamHrfLatentInterpolationMode = memo(() => {
       <InformationalPopover feature="paramUpscaleMethod">
         <FormLabel>{t('hrf.latentInterpolationMode')}</FormLabel>
       </InformationalPopover>
-      <Combobox value={value} options={options} onChange={onChange} />
+      <Combobox value={value} options={options} onChange={onChange} isDisabled={isDisabled} />
     </FormControl>
   );
 });
 
 ParamHrfLatentInterpolationMode.displayName = 'ParamHrfLatentInterpolationMode';
 
-const ParamHrfUpscaleModel = memo(() => {
+const ParamHrfUpscaleModel = memo(({ isDisabled = false }: DisabledProps) => {
   const { t } = useTranslation();
   const [modelConfigs, { isLoading }] = useSpandrelImageToImageModels();
   const model = useAppSelector(selectHrfUpscaleModel);
@@ -437,7 +452,7 @@ const ParamHrfUpscaleModel = memo(() => {
   });
 
   return (
-    <FormControl>
+    <FormControl isDisabled={isDisabled}>
       <InformationalPopover feature="upscaleModel">
         <FormLabel>{t('upscaling.upscaleModel')}</FormLabel>
       </InformationalPopover>
@@ -450,7 +465,7 @@ const ParamHrfUpscaleModel = memo(() => {
               options={options}
               onChange={onChange}
               noOptionsMessage={noOptionsMessage}
-              isDisabled={options.length === 0}
+              isDisabled={isDisabled || options.length === 0}
             />
           </Box>
         </Tooltip>
@@ -461,7 +476,7 @@ const ParamHrfUpscaleModel = memo(() => {
 
 ParamHrfUpscaleModel.displayName = 'ParamHrfUpscaleModel';
 
-const ParamHrfTileControlNetModel = memo(() => {
+const ParamHrfTileControlNetModel = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const tileControlNetModel = useAppSelector(selectHrfTileControlNetModelConfig);
@@ -495,15 +510,11 @@ const ParamHrfTileControlNetModel = memo(() => {
     },
     [currentBaseModel]
   );
+  const isMissingModel = !filteredModelConfigs.length;
+  const isInvalid = !isDisabled && isMissingModel;
 
   return (
-    <FormControl
-      isDisabled={!filteredModelConfigs.length}
-      isInvalid={!filteredModelConfigs.length}
-      minW={0}
-      flexGrow={1}
-      gap={2}
-    >
+    <FormControl isDisabled={isDisabled || isMissingModel} isInvalid={isInvalid} minW={0} flexGrow={1} gap={2}>
       <InformationalPopover feature="controlNet">
         <FormLabel m={0}>{t('upscaling.tileControl')}</FormLabel>
       </InformationalPopover>
@@ -515,8 +526,8 @@ const ParamHrfTileControlNetModel = memo(() => {
         getIsOptionDisabled={getIsOptionDisabled}
         placeholder={t('common.placeholderSelectAModel')}
         noOptionsText={t('upscaling.missingTileControlNetModel')}
-        isDisabled={isLoading || !filteredModelConfigs.length}
-        isInvalid={!filteredModelConfigs.length}
+        isDisabled={isDisabled || isLoading || isMissingModel}
+        isInvalid={isInvalid}
       />
     </FormControl>
   );
@@ -524,7 +535,7 @@ const ParamHrfTileControlNetModel = memo(() => {
 
 ParamHrfTileControlNetModel.displayName = 'ParamHrfTileControlNetModel';
 
-const ParamHrfTileControlWeight = memo(() => {
+const ParamHrfTileControlWeight = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const tileControlWeight = useAppSelector(selectHrfTileControlWeight);
   const { t } = useTranslation();
@@ -554,6 +565,7 @@ const ParamHrfTileControlWeight = memo(() => {
           TILE_CONTROL_WEIGHT_CONSTRAINTS.initial,
           TILE_CONTROL_WEIGHT_CONSTRAINTS.sliderMax,
         ]}
+        isDisabled={isDisabled}
       />
       <CompositeNumberInput
         value={tileControlWeight}
@@ -563,6 +575,7 @@ const ParamHrfTileControlWeight = memo(() => {
         step={TILE_CONTROL_WEIGHT_CONSTRAINTS.coarseStep}
         fineStep={TILE_CONTROL_WEIGHT_CONSTRAINTS.fineStep}
         onChange={onChange}
+        isDisabled={isDisabled}
       />
     </FormControl>
   );
@@ -570,7 +583,7 @@ const ParamHrfTileControlWeight = memo(() => {
 
 ParamHrfTileControlWeight.displayName = 'ParamHrfTileControlWeight';
 
-const ParamHrfTileControlEnd = memo(() => {
+const ParamHrfTileControlEnd = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const tileControlEnd = useAppSelector(selectHrfTileControlEnd);
   const { t } = useTranslation();
@@ -600,6 +613,7 @@ const ParamHrfTileControlEnd = memo(() => {
           TILE_CONTROL_END_CONSTRAINTS.initial,
           TILE_CONTROL_END_CONSTRAINTS.sliderMax,
         ]}
+        isDisabled={isDisabled}
       />
       <CompositeNumberInput
         value={tileControlEnd}
@@ -609,6 +623,7 @@ const ParamHrfTileControlEnd = memo(() => {
         step={TILE_CONTROL_END_CONSTRAINTS.coarseStep}
         fineStep={TILE_CONTROL_END_CONSTRAINTS.fineStep}
         onChange={onChange}
+        isDisabled={isDisabled}
       />
     </FormControl>
   );
@@ -616,7 +631,7 @@ const ParamHrfTileControlEnd = memo(() => {
 
 ParamHrfTileControlEnd.displayName = 'ParamHrfTileControlEnd';
 
-const ParamHrfTileSize = memo(() => {
+const ParamHrfTileSize = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const tileSize = useAppSelector(selectHrfTileSize);
   const { t } = useTranslation();
@@ -642,6 +657,7 @@ const ParamHrfTileSize = memo(() => {
         fineStep={TILE_SIZE_CONSTRAINTS.fineStep}
         onChange={onChange}
         marks={[TILE_SIZE_CONSTRAINTS.sliderMin, TILE_SIZE_CONSTRAINTS.initial, TILE_SIZE_CONSTRAINTS.sliderMax]}
+        isDisabled={isDisabled}
       />
       <CompositeNumberInput
         value={tileSize}
@@ -651,6 +667,7 @@ const ParamHrfTileSize = memo(() => {
         step={TILE_SIZE_CONSTRAINTS.coarseStep}
         fineStep={TILE_SIZE_CONSTRAINTS.fineStep}
         onChange={onChange}
+        isDisabled={isDisabled}
       />
     </FormControl>
   );
@@ -658,7 +675,7 @@ const ParamHrfTileSize = memo(() => {
 
 ParamHrfTileSize.displayName = 'ParamHrfTileSize';
 
-const ParamHrfTileOverlap = memo(() => {
+const ParamHrfTileOverlap = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const tileOverlap = useAppSelector(selectHrfTileOverlap);
   const { t } = useTranslation();
@@ -688,6 +705,7 @@ const ParamHrfTileOverlap = memo(() => {
           TILE_OVERLAP_CONSTRAINTS.initial,
           TILE_OVERLAP_CONSTRAINTS.sliderMax,
         ]}
+        isDisabled={isDisabled}
       />
       <CompositeNumberInput
         value={tileOverlap}
@@ -697,6 +715,7 @@ const ParamHrfTileOverlap = memo(() => {
         step={TILE_OVERLAP_CONSTRAINTS.coarseStep}
         fineStep={TILE_OVERLAP_CONSTRAINTS.fineStep}
         onChange={onChange}
+        isDisabled={isDisabled}
       />
     </FormControl>
   );
@@ -704,7 +723,7 @@ const ParamHrfTileOverlap = memo(() => {
 
 ParamHrfTileOverlap.displayName = 'ParamHrfTileOverlap';
 
-const ParamHrfSteps = memo(() => {
+const ParamHrfSteps = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const hrfSteps = useAppSelector(selectHrfSteps);
   const generateSteps = useAppSelector(selectSteps);
@@ -732,7 +751,7 @@ const ParamHrfSteps = memo(() => {
         <FormLabel>{t('hrf.steps')}</FormLabel>
       </InformationalPopover>
       <Flex alignItems="center" minW={0} flex={1}>
-        <Switch size="sm" isChecked={isCustom} onChange={onToggle} flexShrink={0} />
+        <Switch size="sm" isChecked={isCustom} onChange={onToggle} flexShrink={0} isDisabled={isDisabled} />
       </Flex>
       <CompositeNumberInput
         value={hrfSteps ?? generateSteps}
@@ -742,7 +761,7 @@ const ParamHrfSteps = memo(() => {
         step={STEPS_CONSTRAINTS.coarseStep}
         fineStep={STEPS_CONSTRAINTS.fineStep}
         onChange={onChange}
-        isDisabled={!isCustom}
+        isDisabled={isDisabled || !isCustom}
         w={24}
         flexShrink={0}
       />
@@ -752,7 +771,7 @@ const ParamHrfSteps = memo(() => {
 
 ParamHrfSteps.displayName = 'ParamHrfSteps';
 
-const ParamHrfModel = memo(() => {
+const ParamHrfModel = memo(({ isDisabled = false }: DisabledProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const selectedModelConfig = useAppSelector(selectHrfModelConfig);
@@ -776,7 +795,7 @@ const ParamHrfModel = memo(() => {
   );
 
   return (
-    <FormControl>
+    <FormControl isDisabled={isDisabled}>
       <InformationalPopover feature="paramModel">
         <FormLabel>{t('hrf.model')}</FormLabel>
       </InformationalPopover>
@@ -789,7 +808,7 @@ const ParamHrfModel = memo(() => {
         allowEmpty
         placeholder={t('hrf.reuseGenerateModel')}
         noOptionsText={currentBaseModel ? t('hrf.noCompatibleModels') : t('models.selectModel')}
-        isDisabled={isLoading || !modelConfigs.length}
+        isDisabled={isDisabled || isLoading || !modelConfigs.length}
       />
     </FormControl>
   );
@@ -797,7 +816,7 @@ const ParamHrfModel = memo(() => {
 
 ParamHrfModel.displayName = 'ParamHrfModel';
 
-const ParamHrfLoraMode = memo(() => {
+const ParamHrfLoraMode = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const mode = useAppSelector(selectHrfLoraMode);
   const { t } = useTranslation();
@@ -825,10 +844,17 @@ const ParamHrfLoraMode = memo(() => {
           minW={0}
           colorScheme={mode === 'reuse_generate' ? 'invokeBlue' : undefined}
           onClick={onClickReuseGenerate}
+          isDisabled={isDisabled}
         >
           {t('hrf.reuseGenerateLoras')}
         </Button>
-        <Button flex={1} minW={0} colorScheme={mode === 'none' ? 'invokeBlue' : undefined} onClick={onClickNone}>
+        <Button
+          flex={1}
+          minW={0}
+          colorScheme={mode === 'none' ? 'invokeBlue' : undefined}
+          onClick={onClickNone}
+          isDisabled={isDisabled}
+        >
           {t('hrf.noLoras')}
         </Button>
         <Button
@@ -836,6 +862,7 @@ const ParamHrfLoraMode = memo(() => {
           minW={0}
           colorScheme={mode === 'dedicated' ? 'invokeBlue' : undefined}
           onClick={onClickDedicated}
+          isDisabled={isDisabled}
         >
           {t('hrf.dedicatedLoras')}
         </Button>
@@ -846,7 +873,7 @@ const ParamHrfLoraMode = memo(() => {
 
 ParamHrfLoraMode.displayName = 'ParamHrfLoraMode';
 
-const ParamHrfLoraSelect = memo(() => {
+const ParamHrfLoraSelect = memo(({ isDisabled = false }: DisabledProps) => {
   const dispatch = useAppDispatch();
   const [modelConfigs, { isLoading }] = useLoRAModels();
   const { t } = useTranslation();
@@ -890,7 +917,7 @@ const ParamHrfLoraSelect = memo(() => {
   }, [compatibleLoRAs.length, hrfBase, isLoading, t]);
 
   return (
-    <FormControl gap={2}>
+    <FormControl gap={2} isDisabled={isDisabled}>
       <InformationalPopover feature="lora">
         <FormLabel>{t('hrf.dedicatedLoras')}</FormLabel>
       </InformationalPopover>
@@ -904,6 +931,7 @@ const ParamHrfLoraSelect = memo(() => {
         placeholder={placeholder}
         getIsOptionDisabled={getIsDisabled}
         noOptionsText={hrfBase ? t('models.noCompatibleLoRAs') : t('models.selectModel')}
+        isDisabled={isDisabled}
       />
     </FormControl>
   );
@@ -911,7 +939,7 @@ const ParamHrfLoraSelect = memo(() => {
 
 ParamHrfLoraSelect.displayName = 'ParamHrfLoraSelect';
 
-const HrfLoRAList = memo(() => {
+const HrfLoRAList = memo(({ isDisabled = false }: DisabledProps) => {
   const ids = useAppSelector(selectHrfLoRAIds);
 
   if (!ids.length) {
@@ -921,7 +949,7 @@ const HrfLoRAList = memo(() => {
   return (
     <Flex flexWrap="wrap" gap={2}>
       {ids.map((id) => (
-        <HrfLoRACard key={id} id={id} />
+        <HrfLoRACard key={id} id={id} isDisabled={isDisabled} />
       ))}
     </Flex>
   );
@@ -929,22 +957,23 @@ const HrfLoRAList = memo(() => {
 
 HrfLoRAList.displayName = 'HrfLoRAList';
 
-const HrfLoRACard = memo((props: { id: string }) => {
+const HrfLoRACard = memo((props: { id: string } & DisabledProps) => {
   const selectLoRA = useMemo(() => buildSelectHrfLoRA(props.id), [props.id]);
   const lora = useAppSelector(selectLoRA);
 
   if (!lora) {
     return null;
   }
-  return <HrfLoRAContent lora={lora} />;
+  return <HrfLoRAContent lora={lora} isDisabled={props.isDisabled} />;
 });
 
 HrfLoRACard.displayName = 'HrfLoRACard';
 
-const HrfLoRAContent = memo(({ lora }: { lora: LoRA }) => {
+const HrfLoRAContent = memo(({ lora, isDisabled = false }: { lora: LoRA } & DisabledProps) => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const { data: loraConfig } = useGetModelConfigQuery(lora.model.key);
+  const isWeightDisabled = isDisabled || !lora.isEnabled;
 
   const onChange = useCallback(
     (v: number) => {
@@ -965,17 +994,18 @@ const HrfLoRAContent = memo(({ lora }: { lora: LoRA }) => {
     <Card variant="lora">
       <CardHeader>
         <Flex alignItems="center" justifyContent="space-between" width="100%" gap={2}>
-          <Text noOfLines={1} wordBreak="break-all" color={lora.isEnabled ? 'base.200' : 'base.500'}>
+          <Text noOfLines={1} wordBreak="break-all" color={lora.isEnabled && !isDisabled ? 'base.200' : 'base.500'}>
             {loraConfig?.name ?? lora.model.key.substring(0, 8)}
           </Text>
           <Flex alignItems="center" gap={2}>
-            <Switch size="sm" onChange={onToggle} isChecked={lora.isEnabled} />
+            <Switch size="sm" onChange={onToggle} isChecked={lora.isEnabled} isDisabled={isDisabled} />
             <IconButton
               aria-label={t('lora.removeLoRA')}
               variant="ghost"
               size="sm"
               onClick={onRemove}
               icon={<PiTrashSimpleBold />}
+              isDisabled={isDisabled}
             />
           </Flex>
         </Flex>
@@ -991,7 +1021,7 @@ const HrfLoRAContent = memo(({ lora }: { lora: LoRA }) => {
             fineStep={DEFAULT_LORA_WEIGHT_CONFIG.fineStep}
             marks={[-1, 0, 1, 2]}
             defaultValue={DEFAULT_LORA_WEIGHT_CONFIG.initial}
-            isDisabled={!lora.isEnabled}
+            isDisabled={isWeightDisabled}
           />
           <CompositeNumberInput
             value={lora.weight}
@@ -1003,7 +1033,7 @@ const HrfLoRAContent = memo(({ lora }: { lora: LoRA }) => {
             w={20}
             flexShrink={0}
             defaultValue={DEFAULT_LORA_WEIGHT_CONFIG.initial}
-            isDisabled={!lora.isEnabled}
+            isDisabled={isWeightDisabled}
           />
         </CardBody>
       </InformationalPopover>
@@ -1016,6 +1046,7 @@ HrfLoRAContent.displayName = 'HrfLoRAContent';
 export const HighResFixSettingsAccordion = memo(() => {
   const { t } = useTranslation();
   const badges = useAppSelector(selectBadges);
+  const hrfEnabled = useAppSelector(selectHrfEnabled);
   const method = useAppSelector(selectHrfMethod);
   const modelSupportsHrf = useAppSelector(selectModelSupportsHrf);
   const isRefinerModelSelected = useAppSelector(selectIsRefinerModelSelected);
@@ -1030,6 +1061,7 @@ export const HighResFixSettingsAccordion = memo(() => {
   });
 
   const parsedMethod = zHrfMethod.parse(method);
+  const isDisabled = !hrfEnabled;
 
   if (!modelSupportsHrf || isRefinerModelSelected) {
     return null;
@@ -1040,37 +1072,39 @@ export const HighResFixSettingsAccordion = memo(() => {
       <Flex px={4} pt={4} pb={0} w="full" h="full" flexDir="column" gap={4}>
         <FormControlGroup formLabelProps={formLabelProps} formControlProps={formControlProps}>
           <ParamHrfEnabled />
-          <ParamHrfMethod />
-          <ParamHrfScale />
-          <ParamHrfStrength />
+        </FormControlGroup>
+        <FormControlGroup formLabelProps={formLabelProps} formControlProps={formControlProps} isDisabled={isDisabled}>
+          <ParamHrfMethod isDisabled={isDisabled} />
+          <ParamHrfScale isDisabled={isDisabled} />
+          <ParamHrfStrength isDisabled={isDisabled} />
           {parsedMethod === 'upscale_model' && (
             <>
-              <ParamHrfUpscaleModel />
-              <ParamHrfTileControlNetModel />
+              <ParamHrfUpscaleModel isDisabled={isDisabled} />
+              <ParamHrfTileControlNetModel isDisabled={isDisabled} />
             </>
           )}
         </FormControlGroup>
       </Flex>
       <Expander label={t('accordions.advanced.options')} isOpen={isOpenExpander} onToggle={onToggleExpander}>
         <Flex gap={4} flexDir="column" px={4} pb={4}>
-          <FormControlGroup formLabelProps={formLabelProps} formControlProps={formControlProps}>
-            {parsedMethod === 'latent' && <ParamHrfLatentInterpolationMode />}
+          <FormControlGroup formLabelProps={formLabelProps} formControlProps={formControlProps} isDisabled={isDisabled}>
+            {parsedMethod === 'latent' && <ParamHrfLatentInterpolationMode isDisabled={isDisabled} />}
             {parsedMethod === 'upscale_model' && (
               <>
-                <ParamHrfTileControlWeight />
-                <ParamHrfTileControlEnd />
-                <ParamHrfTileSize />
-                <ParamHrfTileOverlap />
-                <ParamHrfModel />
-                <ParamHrfLoraMode />
-                <ParamHrfSteps />
+                <ParamHrfTileControlWeight isDisabled={isDisabled} />
+                <ParamHrfTileControlEnd isDisabled={isDisabled} />
+                <ParamHrfTileSize isDisabled={isDisabled} />
+                <ParamHrfTileOverlap isDisabled={isDisabled} />
+                <ParamHrfModel isDisabled={isDisabled} />
+                <ParamHrfLoraMode isDisabled={isDisabled} />
+                <ParamHrfSteps isDisabled={isDisabled} />
               </>
             )}
           </FormControlGroup>
           {parsedMethod === 'upscale_model' && hrfLoraMode === 'dedicated' && (
             <>
-              <ParamHrfLoraSelect />
-              <HrfLoRAList />
+              <ParamHrfLoraSelect isDisabled={isDisabled} />
+              <HrfLoRAList isDisabled={isDisabled} />
             </>
           )}
         </Flex>

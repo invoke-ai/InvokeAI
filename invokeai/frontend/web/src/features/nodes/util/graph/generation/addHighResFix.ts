@@ -1,7 +1,7 @@
 import type { RootState } from 'app/store/store';
 import { roundDownToMultiple } from 'common/util/roundDownToMultiple';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
-import { selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
+import { isHrfSupportedBase, selectParamsSlice } from 'features/controlLayers/store/paramsSlice';
 import type { GenerationMode, LoRA } from 'features/controlLayers/store/types';
 import type { BaseModelType } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
@@ -91,7 +91,7 @@ const shouldApplyHighResFix = (state: RootState, generationMode: GenerationMode)
     generationMode === 'txt2img' &&
     params.hrfEnabled &&
     model !== null &&
-    model.base !== 'external' &&
+    isHrfSupportedBase(model.base) &&
     !params.refinerModel
   );
 };

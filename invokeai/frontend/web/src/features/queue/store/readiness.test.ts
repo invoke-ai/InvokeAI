@@ -293,31 +293,35 @@ describe('FLUX.2 Klein readiness checks – generate tab', () => {
 });
 
 describe('High Resolution Fix readiness checks - generate tab', () => {
-  it('errors when HRF is enabled for external models', () => {
+  it('ignores stale HRF state for external models', () => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(
       buildGenerateTabArg({ model: externalModel, hrfEnabled: true })
     );
-    expect(hasHrfExternalReason(reasons)).toBe(true);
+    expect(hasHrfExternalReason(reasons)).toBe(false);
   });
 
   it('errors when HRF is enabled with SDXL Refiner', () => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(
-      buildGenerateTabArg({ hrfEnabled: true, refinerModel: { key: 'refiner' } })
+      buildGenerateTabArg({ model: sdxlModel, hrfEnabled: true, refinerModel: { key: 'refiner' } })
     );
     expect(hasHrfRefinerReason(reasons)).toBe(true);
   });
 
-  it('errors when upscale-model HRF is enabled for unsupported model bases', () => {
+  it('ignores stale HRF state for unsupported model bases', () => {
     const reasons = getReasonsWhyCannotEnqueueGenerateTab(
       buildGenerateTabArg({
         model: flux2DiffusersModel,
         hrfEnabled: true,
         hrfMethod: 'upscale_model',
-        hrfUpscaleModel: upscaleModel,
-        hrfTileControlNetModel: tileControlNetModel,
+        hrfUpscaleModel: null,
+        hrfTileControlNetModel: null,
+        hrfModel: { key: 'anima', hash: 'h', name: 'Anima', base: 'anima', type: 'main' },
       })
     );
-    expect(hasHrfUpscaleModelBaseReason(reasons)).toBe(true);
+    expect(hasHrfUpscaleModelBaseReason(reasons)).toBe(false);
+    expect(hasHrfUpscaleModelMissingReason(reasons)).toBe(false);
+    expect(hasHrfTileControlNetMissingReason(reasons)).toBe(false);
+    expect(hasHrfModelOverrideBaseMismatchReason(reasons)).toBe(false);
   });
 
   it('errors when upscale-model HRF is missing required models', () => {
