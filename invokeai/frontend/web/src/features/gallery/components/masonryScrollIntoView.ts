@@ -11,6 +11,16 @@ type GetMasonryScrollDirectionArg = {
   targetIndex: number;
 };
 
+export type MasonrySelectedImageScrollState = {
+  hasSelectionChangedSinceMount: boolean;
+  initialSelectedImageName: string | null;
+};
+
+type GetMasonrySelectedImageScrollDecisionArg = {
+  currentSelectedImageName: string | null;
+  state: MasonrySelectedImageScrollState;
+};
+
 type ScrollMasonryImageIntoViewArg = {
   imageName: string;
   previousIndex?: number;
@@ -46,6 +56,25 @@ export const getMasonryScrollDirection = ({
     return 'down';
   }
   return null;
+};
+
+export const getMasonrySelectedImageScrollDecision = ({
+  currentSelectedImageName,
+  state,
+}: GetMasonrySelectedImageScrollDecisionArg): {
+  nextState: MasonrySelectedImageScrollState;
+  shouldScroll: boolean;
+} => {
+  const hasSelectionChangedSinceMount =
+    state.hasSelectionChangedSinceMount || currentSelectedImageName !== state.initialSelectedImageName;
+
+  return {
+    nextState: {
+      ...state,
+      hasSelectionChangedSinceMount,
+    },
+    shouldScroll: currentSelectedImageName !== null && hasSelectionChangedSinceMount,
+  };
 };
 
 const getMountedMasonryRange = (rootEl: HTMLDivElement): MasonryMountedRange | null => {

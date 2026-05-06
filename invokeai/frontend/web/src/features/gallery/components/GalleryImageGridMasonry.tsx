@@ -40,7 +40,7 @@ import {
   setMasonryBackgroundInFlightImageNames,
 } from './masonryImageFetching';
 import { getMasonryRenderState } from './masonryRenderState';
-import { scrollMasonryImageIntoView } from './masonryScrollIntoView';
+import { getMasonrySelectedImageScrollDecision, scrollMasonryImageIntoView } from './masonryScrollIntoView';
 
 type ListImageNamesQueryArgs = ReturnType<typeof selectGetImageNamesQueryArgs>;
 
@@ -795,10 +795,20 @@ const useMasonryKeyboardNavigation = (
 
 const useKeepMasonrySelectedImageInView = (imageNames: string[], rootRef: RefObject<HTMLDivElement>) => {
   const selection = useAppSelector(selectSelection);
+  const selectedImageScrollStateRef = useRef({
+    hasSelectionChangedSinceMount: false,
+    initialSelectedImageName: selection.at(-1) ?? null,
+  });
 
   useEffect(() => {
-    const targetImageName = selection.at(-1);
-    if (!targetImageName) {
+    const targetImageName = selection.at(-1) ?? null;
+    const { nextState, shouldScroll } = getMasonrySelectedImageScrollDecision({
+      currentSelectedImageName: targetImageName,
+      state: selectedImageScrollStateRef.current,
+    });
+    selectedImageScrollStateRef.current = nextState;
+
+    if (!shouldScroll || !targetImageName) {
       return;
     }
 

@@ -13,7 +13,7 @@ import {
   setMasonryBackgroundInFlightImageNames,
 } from './masonryImageFetching';
 import { getMasonryRenderState } from './masonryRenderState';
-import { getMasonryScrollDirection } from './masonryScrollIntoView';
+import { getMasonryScrollDirection, getMasonrySelectedImageScrollDecision } from './masonryScrollIntoView';
 
 describe('masonry image fetching', () => {
   test('returns uncached image names in first-seen order', () => {
@@ -410,6 +410,96 @@ describe('masonry scroll direction', () => {
         targetIndex: 7,
       })
     ).toBe('up');
+  });
+});
+
+describe('masonry selected image scroll decision', () => {
+  test('does not scroll the initial selected image', () => {
+    const decision = getMasonrySelectedImageScrollDecision({
+      currentSelectedImageName: 'a',
+      state: {
+        hasSelectionChangedSinceMount: false,
+        initialSelectedImageName: 'a',
+      },
+    });
+
+    expect(decision).toEqual({
+      nextState: {
+        hasSelectionChangedSinceMount: false,
+        initialSelectedImageName: 'a',
+      },
+      shouldScroll: false,
+    });
+  });
+
+  test('does not scroll repeated renders with the same initial selection', () => {
+    const firstDecision = getMasonrySelectedImageScrollDecision({
+      currentSelectedImageName: 'a',
+      state: {
+        hasSelectionChangedSinceMount: false,
+        initialSelectedImageName: 'a',
+      },
+    });
+    const secondDecision = getMasonrySelectedImageScrollDecision({
+      currentSelectedImageName: 'a',
+      state: firstDecision.nextState,
+    });
+
+    expect(secondDecision.shouldScroll).toBe(false);
+    expect(secondDecision.nextState.hasSelectionChangedSinceMount).toBe(false);
+  });
+
+  test('scrolls when selection changes after masonry mounts', () => {
+    const decision = getMasonrySelectedImageScrollDecision({
+      currentSelectedImageName: 'b',
+      state: {
+        hasSelectionChangedSinceMount: false,
+        initialSelectedImageName: 'a',
+      },
+    });
+
+    expect(decision).toEqual({
+      nextState: {
+        hasSelectionChangedSinceMount: true,
+        initialSelectedImageName: 'a',
+      },
+      shouldScroll: true,
+    });
+  });
+
+  test('scrolls the initial image after another post-mount selection change', () => {
+    const changedDecision = getMasonrySelectedImageScrollDecision({
+      currentSelectedImageName: 'b',
+      state: {
+        hasSelectionChangedSinceMount: false,
+        initialSelectedImageName: 'a',
+      },
+    });
+    const originalImageDecision = getMasonrySelectedImageScrollDecision({
+      currentSelectedImageName: 'a',
+      state: changedDecision.nextState,
+    });
+
+    expect(originalImageDecision.shouldScroll).toBe(true);
+    expect(originalImageDecision.nextState.hasSelectionChangedSinceMount).toBe(true);
+  });
+
+  test('does not scroll when no image is selected', () => {
+    const decision = getMasonrySelectedImageScrollDecision({
+      currentSelectedImageName: null,
+      state: {
+        hasSelectionChangedSinceMount: false,
+        initialSelectedImageName: null,
+      },
+    });
+
+    expect(decision).toEqual({
+      nextState: {
+        hasSelectionChangedSinceMount: false,
+        initialSelectedImageName: null,
+      },
+      shouldScroll: false,
+    });
   });
 });
 
