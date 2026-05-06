@@ -78,6 +78,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
   private shapeId: string | null = null;
   private dragStartPoint: Coordinate | null = null;
   private dragCurrentPoint: Coordinate | null = null;
+  private translatePreviousPointerPoint: Coordinate | null = null;
   private freehandPoints: Coordinate[] = [];
   private isDrawingFreehand = false;
   private polygonPoints: Coordinate[] = [];
@@ -139,8 +140,34 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     return Boolean(this.dragStartPoint || this.isDrawingFreehand);
   };
 
+  hasActiveRectOvalDragSession = (): boolean => {
+    const shapeType = this.manager.stateApi.getSettings().shapeType;
+    return Boolean(this.dragStartPoint && this.dragCurrentPoint && (shapeType === 'rect' || shapeType === 'oval'));
+  };
+
   hasActivePolygonSession = (): boolean => {
     return this.polygonPoints.length > 0;
+  };
+
+  isTranslatingDragSession = (): boolean => {
+    return this.translatePreviousPointerPoint !== null;
+  };
+
+  freezePolygonPreview = async () => {
+    if (!this.hasActivePolygonSession()) {
+      return;
+    }
+
+    const activeEntity = this.getActiveEntityAdapter();
+    const cursorPos = this.parent.$cursorPos.get();
+    if (!activeEntity || !cursorPos) {
+      return;
+    }
+
+    const point = this.getEntityRelativePoint(cursorPos.relative, activeEntity.state.position);
+    this.polygonPointer = point;
+    await this.updatePolygonBuffer();
+    this.render();
   };
 
   onToolChanged = () => {
@@ -176,6 +203,20 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     this.clearActiveBuffer();
     this.resetState();
     this.render();
+  };
+
+  startDragTranslation = () => {
+    const activeEntity = this.getActiveEntityAdapter();
+    const cursorPos = this.parent.$cursorPos.get();
+    if (!activeEntity || !cursorPos || !this.hasActiveRectOvalDragSession()) {
+      return;
+    }
+
+    this.translatePreviousPointerPoint = this.getEntityRelativePoint(cursorPos.relative, activeEntity.state.position);
+  };
+
+  stopDragTranslation = () => {
+    this.translatePreviousPointerPoint = null;
   };
 
   onStagePointerDown = async (e: KonvaEventObject<PointerEvent>) => {
@@ -249,6 +290,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (this.isTranslatingDragSession()) {
+      await this.translateDragShape(point);
+      return;
+    }
+
     this.dragCurrentPoint = point;
     await this.updateDragBuffer();
   };
@@ -270,6 +316,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     }
 
     if ((shapeType !== 'rect' && shapeType !== 'oval') || !this.dragStartPoint) {
+      return;
+    }
+
+    if (this.isTranslatingDragSession()) {
+      await this.translateDragShape(point);
       return;
     }
 
@@ -315,6 +366,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       shapeId: this.shapeId,
       dragStartPoint: this.dragStartPoint,
       dragCurrentPoint: this.dragCurrentPoint,
+      translatePreviousPointerPoint: this.translatePreviousPointerPoint,
       freehandPoints: this.freehandPoints,
       isDrawingFreehand: this.isDrawingFreehand,
       polygonPoints: this.polygonPoints,
@@ -383,6 +435,31 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
     this.appendFreehandPoint(point);
     await this.updateFreehandBuffer();
+  };
+
+  private translateDragShape = async (point: Coordinate) => {
+    if (!this.translatePreviousPointerPoint || !this.dragStartPoint || !this.dragCurrentPoint) {
+      return;
+    }
+
+    const dx = point.x - this.translatePreviousPointerPoint.x;
+    const dy = point.y - this.translatePreviousPointerPoint.y;
+
+    if (dx === 0 && dy === 0) {
+      return;
+    }
+
+    this.dragStartPoint = {
+      x: this.dragStartPoint.x + dx,
+      y: this.dragStartPoint.y + dy,
+    };
+    this.dragCurrentPoint = {
+      x: this.dragCurrentPoint.x + dx,
+      y: this.dragCurrentPoint.y + dy,
+    };
+    this.translatePreviousPointerPoint = point;
+
+    await this.updateDragBuffer();
   };
 
   private onPolygonPointerDown = async (
@@ -798,6 +875,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     this.shapeId = null;
     this.dragStartPoint = null;
     this.dragCurrentPoint = null;
+    this.translatePreviousPointerPoint = null;
     this.freehandPoints = [];
     this.isDrawingFreehand = false;
     this.polygonPoints = [];

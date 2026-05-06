@@ -11,6 +11,10 @@ import { CanvasMoveToolModule } from 'features/controlLayers/konva/CanvasTool/Ca
 import { CanvasShapeToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasShapeToolModule';
 import { CanvasTextToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasTextToolModule';
 import { CanvasViewToolModule } from 'features/controlLayers/konva/CanvasTool/CanvasViewToolModule';
+import {
+  shouldQuickSwitchToColorPickerOnAlt,
+  shouldTranslateShapeDragOnSpace,
+} from 'features/controlLayers/konva/CanvasTool/toolHotkeys';
 import { ZOOM_DRAG_CURSOR } from 'features/controlLayers/konva/cursors/zoomDragCursor';
 import {
   calculateNewBrushSizeFromWheelDelta,
@@ -543,6 +547,8 @@ export class CanvasToolModule extends CanvasModuleBase {
         await this.tools.gradient.onStagePointerMove(e);
       } else if (tool === 'text') {
         // Already handled above
+      } else if (this.isTemporaryShapesViewSwitch()) {
+        // Preserve in-progress polygon/freehand shapes while temporarily panning with Space.
       } else {
         this.manager.stateApi.getSelectedEntityAdapter()?.bufferRenderer.clearBuffer();
       }
@@ -674,6 +680,8 @@ export class CanvasToolModule extends CanvasModuleBase {
    * and the color picker tool is still active when you come back.
    */
   onWindowBlur = () => {
+    this.manager.stateApi.$spaceKey.set(false);
+    this.tools.rect.stopDragTranslation();
     this.revertToolBuffer();
   };
 
@@ -700,6 +708,8 @@ export class CanvasToolModule extends CanvasModuleBase {
     if (e.key === KEY_ESCAPE) {
       // Cancel shape drawing on escape
       e.preventDefault();
+      this.manager.stateApi.$spaceKey.set(false);
+      this.tools.rect.stopDragTranslation();
       if (this.$tool.get() === 'rect') {
         this.tools.rect.cancel();
       }
@@ -719,12 +729,25 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     if (isSpaceKey) {
-      // Select the view tool on space key down
       e.preventDefault();
       e.stopPropagation();
       const currentTool = this.$tool.get();
-      this.$toolBuffer.set(currentTool);
+      const shapeType = this.manager.stateApi.getSettings().shapeType;
+      const hasActiveShapeDragSession = this.tools.rect.hasActiveDragSession();
+      const isPrimaryPointerDown = this.$isPrimaryPointerDown.get();
       this.manager.stateApi.$spaceKey.set(true);
+
+      if (shouldTranslateShapeDragOnSpace(currentTool, shapeType, hasActiveShapeDragSession, isPrimaryPointerDown)) {
+        this.tools.rect.startDragTranslation();
+        return;
+      }
+
+      if (currentTool === 'rect' && this.tools.rect.hasActivePolygonSession()) {
+        void this.tools.rect.freezePolygonPreview();
+      }
+
+      // Select the view tool on space key down
+      this.$toolBuffer.set(currentTool);
       this.$tool.set('view');
       if (currentTool === 'lasso' && this.tools.lasso.hasActiveSession() && this.$isPrimaryPointerDown.get()) {
         // Start panning immediately if user is already drawing with freehand lasso.
@@ -736,6 +759,10 @@ export class CanvasToolModule extends CanvasModuleBase {
       ) {
         // Match lasso: allow an in-progress freehand shapes session to freeze and pan immediately on space.
         this.manager.stage.startDragging();
+      } else if (currentTool === 'rect' && this.tools.rect.hasActivePolygonSession()) {
+        // Match polygon lasso: when a polygon session is active, Space should immediately enter panning without
+        // requiring an extra click on the canvas.
+        this.manager.stage.startDragging();
       } else {
         this.$cursorPos.set(null);
       }
@@ -743,14 +770,17 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     if (e.key === KEY_ALT) {
-      if (this.$tool.get() === 'rect') {
+      const tool = this.$tool.get();
+      const shapeType = this.manager.stateApi.getSettings().shapeType;
+      const hasActiveShapeDragSession = this.tools.rect.hasActiveDragSession();
+      if (!shouldQuickSwitchToColorPickerOnAlt(tool, shapeType, hasActiveShapeDragSession)) {
         e.preventDefault();
         return;
       }
       // Select the color picker on alt key down
       e.preventDefault();
       e.stopPropagation();
-      this.$toolBuffer.set(this.$tool.get());
+      this.$toolBuffer.set(tool);
       this.$tool.set('colorPicker');
     }
   };
@@ -770,11 +800,15 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     if (e.key === KEY_SPACE || e.code === CODE_SPACE) {
-      // Revert the tool to the previous tool on space key up
       e.preventDefault();
       e.stopPropagation();
-      this.revertToolBuffer();
       this.manager.stateApi.$spaceKey.set(false);
+      if (this.tools.rect.isTranslatingDragSession()) {
+        this.tools.rect.stopDragTranslation();
+        return;
+      }
+      // Revert the tool to the previous tool on space key up
+      this.revertToolBuffer();
       return;
     }
 
@@ -844,5 +878,9 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   private shouldSkipWindowPointerUpCommit = (state: AnyObjectState | null) => {
     return Boolean(state?.type === 'polygon' && state.previewPoint);
+  };
+
+  private isTemporaryShapesViewSwitch = () => {
+    return this.$tool.get() === 'view' && this.$toolBuffer.get() === 'rect' && this.tools.rect.hasSuspendableSession();
   };
 }
