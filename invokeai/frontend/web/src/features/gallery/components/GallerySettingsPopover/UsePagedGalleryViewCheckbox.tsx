@@ -1,4 +1,4 @@
-import { Checkbox, FormControl, FormLabel } from '@invoke-ai/ui-library';
+import { Checkbox, FormControl, FormLabel, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { selectShouldUsePagedGalleryView } from 'features/ui/store/uiSelectors';
 import { setShouldUsePagedGalleryView } from 'features/ui/store/uiSlice';
@@ -21,7 +21,9 @@ const UsePagedGalleryViewCheckbox = () => {
   return (
     <FormControl>
       <FormLabel flexGrow={1}>{t('gallery.usePagedGalleryView')}</FormLabel>
-      <Checkbox isChecked={shouldUsePagedGalleryView} onChange={onChange} />
+      <Tooltip label={t('gallery.usePagedGalleryViewTooltip')}>
+        <Checkbox isChecked={shouldUsePagedGalleryView} onChange={onChange} />
+      </Tooltip>
     </FormControl>
   );
 };

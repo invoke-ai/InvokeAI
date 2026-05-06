@@ -41,6 +41,9 @@ importers:
       '@roarr/browser-log-writer':
         specifier: ^1.3.0
         version: 1.3.0
+      '@virtuoso.dev/masonry':
+        specifier: 1.3.5
+        version: 1.3.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@xyflow/react':
         specifier: ^12.8.2
         version: 12.8.2(@types/react@18.3.23)(immer@10.1.1)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -1659,6 +1662,18 @@ packages:
   '@typescript-eslint/visitor-keys@8.37.0':
     resolution: {integrity: sha512-YzfhzcTnZVPiLfP/oeKtDp2evwvHLMe0LOy7oe+hb9KKIumLNohYS9Hgp1ifwpu42YWxhZE8yieggz6JpqO/1w==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@virtuoso.dev/gurx@1.2.3':
+    resolution: {integrity: sha512-zqIzVOQgJGEbrG+hvNiNHdrtM2G/9zBVgBSRUAW2yT8iUOouSHAsPIxpCU/xsAYEwicXURGhU6cxzgBPVjXL+g==}
+    peerDependencies:
+      react: '>= 16 || >= 17 || >= 18 || >= 19'
+      react-dom: '>= 16 || >= 17 || >= 18 || >= 19'
+
+  '@virtuoso.dev/masonry@1.3.5':
+    resolution: {integrity: sha512-+isazFFhB0j3y5A++mQ8e5x4Y2UYXZV9lmz4Z1paFnXE/ZlXsgvWYjSA5ZYjjKHVxzDcPYV5FIjprt2rk1l05Q==}
+    peerDependencies:
+      react: '>= 18 || >= 19'
+      react-dom: '>= 18 || >= 19'
 
   '@vitejs/plugin-react-swc@3.10.2':
     resolution: {integrity: sha512-xD3Rdvrt5LgANug7WekBn1KhcvLn1H3jNBfJRL3reeOIua/WnZOEV5qi5qIBq5T8R0jUDmRtxuvk4bPhzGHDWw==}
@@ -5761,6 +5776,17 @@ snapshots:
     dependencies:
       '@typescript-eslint/types': 8.37.0
       eslint-visitor-keys: 4.2.1
+
+  '@virtuoso.dev/gurx@1.2.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
+
+  '@virtuoso.dev/masonry@1.3.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@virtuoso.dev/gurx': 1.2.3(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   '@vitejs/plugin-react-swc@3.10.2(vite@7.0.5(@types/node@22.16.0)(jiti@2.4.2))':
     dependencies:
