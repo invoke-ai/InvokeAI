@@ -5,6 +5,8 @@ import type { CanvasObjectEraserLineWithPressure } from 'features/controlLayers/
 import type { CanvasObjectGradient } from 'features/controlLayers/konva/CanvasObject/CanvasObjectGradient';
 import type { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import type { CanvasObjectLasso } from 'features/controlLayers/konva/CanvasObject/CanvasObjectLasso';
+import type { CanvasObjectOval } from 'features/controlLayers/konva/CanvasObject/CanvasObjectOval';
+import type { CanvasObjectPolygon } from 'features/controlLayers/konva/CanvasObject/CanvasObjectPolygon';
 import type { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import type {
   CanvasBrushLineState,
@@ -14,6 +16,8 @@ import type {
   CanvasGradientState,
   CanvasImageState,
   CanvasLassoState,
+  CanvasOvalState,
+  CanvasPolygonState,
   CanvasRectState,
 } from 'features/controlLayers/store/types';
 
@@ -28,6 +32,8 @@ export type AnyObjectRenderer =
   | CanvasObjectEraserLineWithPressure
   | CanvasObjectRect
   | CanvasObjectLasso
+  | CanvasObjectOval
+  | CanvasObjectPolygon
   | CanvasObjectImage
   | CanvasObjectGradient;
 /**
@@ -41,4 +47,6 @@ export type AnyObjectState =
   | CanvasImageState
   | CanvasRectState
   | CanvasLassoState
+  | CanvasOvalState
+  | CanvasPolygonState
   | CanvasGradientState;

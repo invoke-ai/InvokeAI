@@ -9,8 +9,11 @@ import { CanvasObjectEraserLineWithPressure } from 'features/controlLayers/konva
 import { CanvasObjectGradient } from 'features/controlLayers/konva/CanvasObject/CanvasObjectGradient';
 import { CanvasObjectImage } from 'features/controlLayers/konva/CanvasObject/CanvasObjectImage';
 import { CanvasObjectLasso } from 'features/controlLayers/konva/CanvasObject/CanvasObjectLasso';
+import { CanvasObjectOval } from 'features/controlLayers/konva/CanvasObject/CanvasObjectOval';
+import { CanvasObjectPolygon } from 'features/controlLayers/konva/CanvasObject/CanvasObjectPolygon';
 import { CanvasObjectRect } from 'features/controlLayers/konva/CanvasObject/CanvasObjectRect';
 import type { AnyObjectRenderer, AnyObjectState } from 'features/controlLayers/konva/CanvasObject/types';
+import { shouldPreserveSuspendableShapesSession } from 'features/controlLayers/konva/CanvasTool/toolHotkeys';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import Konva from 'konva';
 import type { Logger } from 'roarr';
@@ -83,6 +86,21 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
     this.subscriptions.add(
       this.manager.tool.$tool.listen(() => {
         if (this.hasBuffer() && !this.manager.$isBusy.get()) {
+          const isTemporaryShapesToolSwitch = shouldPreserveSuspendableShapesSession(
+            this.manager.tool.$tool.get(),
+            this.manager.tool.$toolBuffer.get(),
+            this.manager.tool.tools.rect.hasSuspendableSession()
+          );
+
+          if (isTemporaryShapesToolSwitch) {
+            return;
+          }
+
+          if (this.state?.type === 'polygon' && this.state.previewPoint) {
+            this.clearBuffer();
+            return;
+          }
+
           this.commitBuffer();
         }
       })
@@ -150,6 +168,24 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
 
       if (!this.renderer) {
         this.renderer = new CanvasObjectRect(this.state, this);
+        this.konva.group.add(this.renderer.konva.group);
+      }
+
+      didRender = this.renderer.update(this.state, true);
+    } else if (this.state.type === 'oval') {
+      assert(this.renderer instanceof CanvasObjectOval || !this.renderer);
+
+      if (!this.renderer) {
+        this.renderer = new CanvasObjectOval(this.state, this);
+        this.konva.group.add(this.renderer.konva.group);
+      }
+
+      didRender = this.renderer.update(this.state, true);
+    } else if (this.state.type === 'polygon') {
+      assert(this.renderer instanceof CanvasObjectPolygon || !this.renderer);
+
+      if (!this.renderer) {
+        this.renderer = new CanvasObjectPolygon(this.state, this);
         this.konva.group.add(this.renderer.konva.group);
       }
 
@@ -240,28 +276,40 @@ export class CanvasEntityBufferObjectRenderer extends CanvasModuleBase {
 
     this.log.trace({ buffer: this.renderer.repr() }, 'Committing buffer');
 
+    let committedState = this.state;
+
+    // Polygon previews render an outline while they are still live in the buffer.
+    // Clear that preview state before adopting the renderer into the persistent object group.
+    if (committedState.type === 'polygon' && this.renderer instanceof CanvasObjectPolygon) {
+      committedState = { ...committedState, previewPoint: undefined };
+      this.state = null;
+      this.renderer.update(committedState, true);
+    }
+
     // Move the buffer to the persistent objects group/renderers
     this.parent.renderer.adoptObjectRenderer(this.renderer);
 
     if (pushToState) {
       const entityIdentifier = this.parent.entityIdentifier;
-      switch (this.state.type) {
+      switch (committedState.type) {
         case 'brush_line':
         case 'brush_line_with_pressure':
-          this.manager.stateApi.addBrushLine({ entityIdentifier, brushLine: this.state });
+          this.manager.stateApi.addBrushLine({ entityIdentifier, brushLine: committedState });
           break;
         case 'eraser_line':
         case 'eraser_line_with_pressure':
-          this.manager.stateApi.addEraserLine({ entityIdentifier, eraserLine: this.state });
+          this.manager.stateApi.addEraserLine({ entityIdentifier, eraserLine: committedState });
           break;
         case 'rect':
-          this.manager.stateApi.addRect({ entityIdentifier, rect: this.state });
+        case 'oval':
+        case 'polygon':
+          this.manager.stateApi.addShape({ entityIdentifier, shape: committedState });
           break;
         case 'lasso':
-          this.manager.stateApi.addLasso({ entityIdentifier, lasso: this.state });
+          this.manager.stateApi.addLasso({ entityIdentifier, lasso: committedState });
           break;
         case 'gradient':
-          this.manager.stateApi.addGradient({ entityIdentifier, gradient: this.state });
+          this.manager.stateApi.addGradient({ entityIdentifier, gradient: committedState });
           break;
       }
     }

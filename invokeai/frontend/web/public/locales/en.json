@@ -728,8 +728,8 @@
                 "desc": "Select the move tool."
             },
             "selectRectTool": {
-                "title": "Rect Tool",
-                "desc": "Select the rect tool."
+                "title": "Shapes Tool",
+                "desc": "Select the shapes tool."
             },
             "selectLassoTool": {
                 "title": "Lasso Tool",
@@ -2861,9 +2861,16 @@
             "polygon": "Polygon",
             "polygonHint": "Click to add points, click the first point to close."
         },
+        "shape": {
+            "rect": "Rect",
+            "oval": "Oval",
+            "polygon": "Polygon",
+            "freehand": "Freehand"
+        },
         "tool": {
             "brush": "Brush",
             "eraser": "Eraser",
+            "shapes": "Shapes",
             "rectangle": "Rectangle",
             "lasso": "Lasso",
             "gradient": "Gradient",
