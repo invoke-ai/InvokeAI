@@ -1025,6 +1025,8 @@
         "openaiQuality": "OpenAI Quality",
         "openaiBackground": "OpenAI Background",
         "openaiInputFidelity": "OpenAI Input Fidelity",
+        "seedreamWatermark": "Seedream Watermark",
+        "seedreamOptimizePrompt": "Seedream Optimize Prompt",
         "guidance": "Guidance",
         "height": "Height",
         "imageDetails": "Image Details",
