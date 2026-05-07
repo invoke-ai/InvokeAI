@@ -6,7 +6,7 @@ import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import ScrollableContent from 'common/components/OverlayScrollbars/ScrollableContent';
-import { firefoxDndFix } from 'features/dnd/util';
+import { dndInputFix } from 'features/dnd/util';
 import { RootContainerElementEditMode } from 'features/nodes/components/sidePanel/builder/ContainerElement';
 import { buildFormElementDndData, useBuilderDndMonitor } from 'features/nodes/components/sidePanel/builder/dnd-hooks';
 import { WorkflowBuilderEditMenu } from 'features/nodes/components/sidePanel/builder/WorkflowBuilderMenu';
@@ -86,7 +86,7 @@ const useAddFormElementDnd = (
       return;
     }
     return combine(
-      firefoxDndFix(draggableElement),
+      dndInputFix(draggableElement),
       draggable({
         element: draggableElement,
         getInitialData: () => {

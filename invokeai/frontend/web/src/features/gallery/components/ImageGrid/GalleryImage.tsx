@@ -12,7 +12,7 @@ import type { DndDragPreviewMultipleImageState } from 'features/dnd/DndDragPrevi
 import { createMultipleImageDragPreview, setMultipleImageDragPreview } from 'features/dnd/DndDragPreviewMultipleImage';
 import type { DndDragPreviewSingleImageState } from 'features/dnd/DndDragPreviewSingleImage';
 import { createSingleImageDragPreview, setSingleImageDragPreview } from 'features/dnd/DndDragPreviewSingleImage';
-import { firefoxDndFix } from 'features/dnd/util';
+import { dndInputFix } from 'features/dnd/util';
 import { useImageContextMenu } from 'features/gallery/components/ContextMenu/ImageContextMenu';
 import { GalleryItemHoverIcons } from 'features/gallery/components/ImageGrid/GalleryItemHoverIcons';
 import {
@@ -129,7 +129,7 @@ export const GalleryImage = memo(({ imageDTO }: Props) => {
     });
 
     return combine(
-      firefoxDndFix(element),
+      dndInputFix(element),
       draggable({
         element,
         getInitialData: () => {
