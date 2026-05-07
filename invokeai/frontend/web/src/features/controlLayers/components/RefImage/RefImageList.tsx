@@ -1,6 +1,9 @@
+import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { Button, Collapse, Divider, Flex, IconButton } from '@invoke-ai/ui-library';
-import { useAppSelector, useAppStore } from 'app/store/storeHooks';
+import { useAppDispatch, useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
+import { colorTokenToCssVar } from 'common/util/colorTokenToCssVar';
 import { RefImagePreview } from 'features/controlLayers/components/RefImage/RefImagePreview';
 import { CanvasManagerProviderGate } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { RefImageIdContext } from 'features/controlLayers/contexts/RefImageIdContext';
@@ -9,26 +12,72 @@ import { useNewGlobalReferenceImageFromBbox } from 'features/controlLayers/hooks
 import { useCanvasIsBusySafe } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import {
   refImageAdded,
+  refImagesReordered,
   selectIsRefImagePanelOpen,
   selectRefImageEntityIds,
   selectSelectedRefEntityId,
 } from 'features/controlLayers/store/refImagesSlice';
 import { imageDTOToCroppableImage } from 'features/controlLayers/store/util';
-import { addGlobalReferenceImageDndTarget } from 'features/dnd/dnd';
+import { addGlobalReferenceImageDndTarget, singleRefImageDndSource } from 'features/dnd/dnd';
 import { DndDropTarget } from 'features/dnd/DndDropTarget';
+import { triggerPostMoveFlash } from 'features/dnd/util';
 import { selectActiveTab } from 'features/ui/store/uiSelectors';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { PiBoundingBoxBold, PiUploadBold } from 'react-icons/pi';
 import type { ImageDTO } from 'services/api/types';
 
 import { RefImageHeader } from './RefImageHeader';
+import { getReorderedRefImageIds } from './RefImageList.helpers';
 import { RefImageSettings } from './RefImageSettings';
 
 export const RefImageList = memo(() => {
   const ids = useAppSelector(selectRefImageEntityIds);
   const isPanelOpen = useAppSelector(selectIsRefImagePanelOpen);
   const selectedEntityId = useAppSelector(selectSelectedRefEntityId);
+  const dispatch = useAppDispatch();
+
+  useEffect(() => {
+    return monitorForElements({
+      canMonitor({ source }) {
+        return singleRefImageDndSource.typeGuard(source.data);
+      },
+      onDrop({ location, source }) {
+        const target = location.current.dropTargets[0];
+        if (!target) {
+          return;
+        }
+
+        const sourceData = source.data;
+        const targetData = target.data;
+
+        if (!singleRefImageDndSource.typeGuard(sourceData) || !singleRefImageDndSource.typeGuard(targetData)) {
+          return;
+        }
+
+        const nextIds = getReorderedRefImageIds({
+          ids,
+          sourceId: sourceData.payload.id,
+          targetId: targetData.payload.id,
+          closestEdgeOfTarget: extractClosestEdge(targetData),
+        });
+
+        if (nextIds === null) {
+          return;
+        }
+
+        flushSync(() => {
+          dispatch(refImagesReordered({ ids: nextIds }));
+        });
+
+        const element = document.querySelector(`[data-ref-image-id="${sourceData.payload.id}"]`);
+        if (element instanceof HTMLElement) {
+          triggerPostMoveFlash(element, colorTokenToCssVar('base.700'));
+        }
+      },
+    });
+  }, [dispatch, ids]);
 
   return (
     <Flex flexDir="column">

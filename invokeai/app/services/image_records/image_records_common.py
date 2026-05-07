@@ -115,6 +115,7 @@ IMAGE_DTO_COLS = ", ".join(
             "updated_at",
             "deleted_at",
             "starred",
+            "image_subfolder",
         ]
     ]
 )
@@ -156,6 +157,7 @@ class ImageRecord(BaseModelExcludeNull):
     starred: bool = Field(description="Whether this image is starred.")
     """Whether this image is starred."""
     has_workflow: bool = Field(description="Whether this image has a workflow.")
+    image_subfolder: str = Field(default="", description="The subfolder where the image is stored on disk.")
 
 
 class ImageRecordChanges(BaseModelExcludeNull, extra="allow"):
@@ -200,6 +202,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     is_intermediate = image_dict.get("is_intermediate", False)
     starred = image_dict.get("starred", False)
     has_workflow = image_dict.get("has_workflow", False)
+    image_subfolder = image_dict.get("image_subfolder", "")
 
     return ImageRecord(
         image_name=image_name,
@@ -215,6 +218,7 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         is_intermediate=is_intermediate,
         starred=starred,
         has_workflow=has_workflow,
+        image_subfolder=image_subfolder,
     )
 
 

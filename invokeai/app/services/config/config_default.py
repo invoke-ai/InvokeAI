@@ -30,7 +30,8 @@ ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
-CONFIG_SCHEMA_VERSION = "4.0.2"
+IMAGE_SUBFOLDER_STRATEGY = Literal["flat", "date", "type", "hash"]
+CONFIG_SCHEMA_VERSION = "4.0.3"
 EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_alibabacloud_api_key",
     "external_alibabacloud_base_url",
@@ -38,6 +39,8 @@ EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_gemini_base_url",
     "external_openai_api_key",
     "external_openai_base_url",
+    "external_seedream_api_key",
+    "external_seedream_base_url",
 )
 
 
@@ -78,6 +81,7 @@ class InvokeAIAppConfig(BaseSettings):
         legacy_conf_dir: Path to directory of legacy checkpoint config files.
         db_dir: Path to InvokeAI databases directory.
         outputs_dir: Path to directory for outputs.
+        image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
         custom_nodes_dir: Path to directory for custom nodes.
         style_presets_dir: Path to directory for style presets.
         workflow_thumbnails_dir: Path to directory for workflow thumbnails.
@@ -128,6 +132,8 @@ class InvokeAIAppConfig(BaseSettings):
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
         external_openai_base_url: Base URL override for OpenAI image generation.
+        external_seedream_api_key: API key for Seedream image generation.
+        external_seedream_base_url: Base URL override for Seedream image generation.
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
@@ -161,6 +167,7 @@ class InvokeAIAppConfig(BaseSettings):
     legacy_conf_dir:               Path = Field(default=Path("configs"), description="Path to directory of legacy checkpoint config files.")
     db_dir:                        Path = Field(default=Path("databases"),  description="Path to InvokeAI databases directory.")
     outputs_dir:                   Path = Field(default=Path("outputs"),    description="Path to directory for outputs.")
+    image_subfolder_strategy: IMAGE_SUBFOLDER_STRATEGY = Field(default="flat", description="Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
     style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
     workflow_thumbnails_dir: Path = Field(default=Path("workflow_thumbnails"), description="Path to directory for workflow thumbnails.")
@@ -186,7 +193,7 @@ class InvokeAIAppConfig(BaseSettings):
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
     model_cache_keep_alive_min:   float = Field(default=0, ge=0,            description="How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.")
     device_working_mem_gb:        float = Field(default=3,                  description="The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.")
-    enable_partial_loading:        bool = Field(default=False,              description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.")
+    enable_partial_loading:        bool = Field(default=True,               description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.")
     keep_ram_copy_of_weights:      bool = Field(default=True,               description="Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.")
     # Deprecated CACHE configs
     ram:                Optional[float] = Field(default=None, gt=0,         description="DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.")
@@ -238,6 +245,12 @@ class InvokeAIAppConfig(BaseSettings):
     )
     external_openai_base_url: Optional[str] = Field(
         default=None, description="Base URL override for OpenAI image generation."
+    )
+    external_seedream_api_key: Optional[str] = Field(
+        default=None, description="API key for Seedream image generation."
+    )
+    external_seedream_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Seedream image generation."
     )
 
     # fmt: on
@@ -493,6 +506,20 @@ def migrate_v4_0_1_to_4_0_2_config_dict(config_dict: dict[str, Any]) -> dict[str
     return parsed_config_dict
 
 
+def migrate_v4_0_2_to_4_0_3_config_dict(config_dict: dict[str, Any]) -> dict[str, Any]:
+    """Migrate v4.0.2 config dictionary to a v4.0.3 config dictionary.
+
+    Args:
+        config_dict: A dictionary of settings from a v4.0.2 config file.
+
+    Returns:
+        A config dict with the settings migrated to v4.0.3.
+    """
+    parsed_config_dict: dict[str, Any] = copy.deepcopy(config_dict)
+    parsed_config_dict["schema_version"] = "4.0.3"
+    return parsed_config_dict
+
+
 def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     """Load and migrate a config file to the latest version.
 
@@ -518,6 +545,9 @@ def load_and_migrate_config(config_path: Path) -> InvokeAIAppConfig:
     if loaded_config_dict["schema_version"] == "4.0.1":
         migrated = True
         loaded_config_dict = migrate_v4_0_1_to_4_0_2_config_dict(loaded_config_dict)
+    if loaded_config_dict["schema_version"] == "4.0.2":
+        migrated = True
+        loaded_config_dict = migrate_v4_0_2_to_4_0_3_config_dict(loaded_config_dict)
 
     if migrated:
         shutil.copy(config_path, config_path.with_suffix(".yaml.bak"))
