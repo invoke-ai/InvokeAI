@@ -15,6 +15,7 @@ import { selectCanvasMetadata, selectCanvasSlice } from 'features/controlLayers/
 import { fetchModelConfigWithTypeGuard } from 'features/metadata/util/modelFetchingHelpers';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
 import { addZImageControl } from 'features/nodes/util/graph/generation/addControlAdapters';
+import { addHighResFix } from 'features/nodes/util/graph/generation/addHighResFix';
 import { addImageToImage } from 'features/nodes/util/graph/generation/addImageToImage';
 import { addInpaint } from 'features/nodes/util/graph/generation/addInpaint';
 import { addNSFWChecker } from 'features/nodes/util/graph/generation/addNSFWChecker';
@@ -294,6 +295,17 @@ export const buildZImageGraph = async (arg: GraphBuilderArg): Promise<GraphBuild
     g.upsertMetadata({ generation_mode: 'z_image_outpaint' });
   } else {
     assert<Equals<typeof generationMode, never>>(false);
+  }
+
+  if (generationMode === 'txt2img' && selectActiveTab(state) === 'generate') {
+    canvasOutput = addHighResFix({
+      g,
+      state,
+      generationMode,
+      denoise,
+      l2i,
+      seed,
+    });
   }
 
   if (state.system.shouldUseNSFWChecker) {

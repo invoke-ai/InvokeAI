@@ -7692,6 +7692,84 @@ export type components = {
              */
             hrf_strength?: number | null;
             /**
+             * Hrf Scale
+             * @description The high resolution fix upscale factor.
+             * @default null
+             */
+            hrf_scale?: number | null;
+            /**
+             * Hrf Latent Interpolation Mode
+             * @description The latent interpolation mode used in the high resolution fix upscale pass.
+             * @default null
+             */
+            hrf_latent_interpolation_mode?: string | null;
+            /**
+             * Hrf Upscale Model
+             * @description The Spandrel upscale model used in the high resolution fix upscale pass.
+             * @default null
+             */
+            hrf_upscale_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Hrf Tile Controlnet Model
+             * @description The tile ControlNet model used in the high resolution fix upscale pass.
+             * @default null
+             */
+            hrf_tile_controlnet_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Hrf Structure
+             * @description Legacy high resolution fix tile ControlNet structure value.
+             * @default null
+             */
+            hrf_structure?: number | null;
+            /**
+             * Hrf Tile Control Weight
+             * @description The high resolution fix tile ControlNet control weight.
+             * @default null
+             */
+            hrf_tile_control_weight?: number | null;
+            /**
+             * Hrf Tile Control End
+             * @description The high resolution fix tile ControlNet end step percentage.
+             * @default null
+             */
+            hrf_tile_control_end?: number | null;
+            /**
+             * Hrf Tile Size
+             * @description The high resolution fix tiled processing tile size.
+             * @default null
+             */
+            hrf_tile_size?: number | null;
+            /**
+             * Hrf Tile Overlap
+             * @description The high resolution fix tiled processing tile overlap.
+             * @default null
+             */
+            hrf_tile_overlap?: number | null;
+            /**
+             * Hrf Steps
+             * @description The number of steps used for the high resolution fix refinement pass.
+             * @default null
+             */
+            hrf_steps?: number | null;
+            /**
+             * Hrf Model
+             * @description The optional model override used for the high resolution fix refinement pass.
+             * @default null
+             */
+            hrf_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Hrf Lora Mode
+             * @description The LoRA mode used for the high resolution fix refinement pass.
+             * @default null
+             */
+            hrf_lora_mode?: string | null;
+            /**
+             * Hrf Loras
+             * @description The dedicated LoRAs used for the high resolution fix refinement pass.
+             * @default null
+             */
+            hrf_loras?: components["schemas"]["LoRAMetadataField"][] | null;
+            /**
              * Positive Style Prompt
              * @description The positive style prompt parameter
              * @default null

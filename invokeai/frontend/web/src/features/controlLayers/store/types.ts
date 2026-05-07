@@ -23,6 +23,7 @@ import {
   zParameterScheduler,
   zParameterSDXLRefinerModel,
   zParameterSeed,
+  zParameterSpandrelImageToImageModel,
   zParameterSteps,
   zParameterStrength,
   zParameterT5EncoderModel,
@@ -748,8 +749,17 @@ const zPositivePromptHistory = z
 export const zInfillMethod = z.enum(['patchmatch', 'lama', 'cv2', 'color', 'tile']);
 export type InfillMethod = z.infer<typeof zInfillMethod>;
 
+export const zHrfLatentInterpolationMode = z.enum(['nearest', 'bilinear', 'bicubic', 'area', 'nearest-exact']);
+export type HrfLatentInterpolationMode = z.infer<typeof zHrfLatentInterpolationMode>;
+
+export const zHrfMethod = z.enum(['latent', 'upscale_model']);
+export type HrfMethod = z.infer<typeof zHrfMethod>;
+
+export const zHrfLoraMode = z.enum(['reuse_generate', 'none', 'dedicated']);
+export type HrfLoraMode = z.infer<typeof zHrfLoraMode>;
+
 export const zParamsState = z.object({
-  _version: z.literal(2),
+  _version: z.literal(6),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -764,6 +774,21 @@ export const zParamsState = z.object({
   guidance: zParameterGuidance,
   img2imgStrength: zParameterStrength,
   optimizedDenoisingEnabled: z.boolean(),
+  hrfEnabled: z.boolean(),
+  hrfMethod: zHrfMethod,
+  hrfScale: z.number().min(1).max(8),
+  hrfStrength: zParameterStrength,
+  hrfLatentInterpolationMode: zHrfLatentInterpolationMode,
+  hrfUpscaleModel: zParameterSpandrelImageToImageModel.nullable(),
+  hrfTileControlNetModel: zModelIdentifierField.nullable(),
+  hrfTileControlWeight: z.number().min(0).max(2),
+  hrfTileControlEnd: z.number().min(0).max(1),
+  hrfTileSize: z.number().int().min(8),
+  hrfTileOverlap: z.number().int().min(8),
+  hrfSteps: z.number().int().min(1).nullable(),
+  hrfModel: zParameterModel.nullable(),
+  hrfLoraMode: zHrfLoraMode,
+  hrfLoras: z.array(zLoRA),
   iterations: z.number(),
   scheduler: zParameterScheduler,
   fluxScheduler: zParameterFluxScheduler,
@@ -836,7 +861,7 @@ export const zParamsState = z.object({
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 2,
+  _version: 6,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -851,6 +876,21 @@ export const getInitialParamsState = (): ParamsState => ({
   guidance: 4,
   img2imgStrength: 0.75,
   optimizedDenoisingEnabled: true,
+  hrfEnabled: false,
+  hrfMethod: 'latent',
+  hrfScale: 2,
+  hrfStrength: 0.45,
+  hrfLatentInterpolationMode: 'bicubic',
+  hrfUpscaleModel: null,
+  hrfTileControlNetModel: null,
+  hrfTileControlWeight: 0.625,
+  hrfTileControlEnd: 0.2,
+  hrfTileSize: 1024,
+  hrfTileOverlap: 128,
+  hrfSteps: null,
+  hrfModel: null,
+  hrfLoraMode: 'reuse_generate',
+  hrfLoras: [],
   iterations: 1,
   scheduler: 'dpmpp_3m_k',
   fluxScheduler: 'euler',

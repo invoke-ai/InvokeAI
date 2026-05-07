@@ -1,8 +1,17 @@
 import type { RootState } from 'app/store/store';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
+import type { LoRA } from 'features/controlLayers/store/types';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { Invocation, S } from 'services/api/types';
+
+type AddLoRAsOptions = {
+  loras?: LoRA[];
+  metadataKey?: 'loras' | 'hrf_loras';
+  idPrefix?: string;
+  extraPositiveConditioning?: Invocation<'compel'>[];
+  extraNegativeConditioning?: Invocation<'compel'>[];
+};
 
 export const addLoRAs = (
   state: RootState,
@@ -12,12 +21,15 @@ export const addLoRAs = (
   seamless: Invocation<'seamless'> | null,
   clipSkip: Invocation<'clip_skip'>,
   posCond: Invocation<'compel'>,
-  negCond: Invocation<'compel'>
+  negCond: Invocation<'compel'>,
+  options?: AddLoRAsOptions
 ): void => {
-  const enabledLoRAs = state.loras.loras.filter(
+  const enabledLoRAs = (options?.loras ?? state.loras.loras).filter(
     (l) => l.isEnabled && (l.model.base === 'sd-1' || l.model.base === 'sd-2')
   );
   const loraCount = enabledLoRAs.length;
+  const positiveConditioning = [posCond, ...(options?.extraPositiveConditioning ?? [])];
+  const negativeConditioning = [negCond, ...(options?.extraNegativeConditioning ?? [])];
 
   if (loraCount === 0) {
     return;
@@ -29,11 +41,11 @@ export const addLoRAs = (
   // each LoRA to the UNet and CLIP.
   const loraCollector = g.addNode({
     type: 'collect',
-    id: getPrefixedId('lora_collector'),
+    id: getPrefixedId(options?.idPrefix ? `${options.idPrefix}_lora_collector` : 'lora_collector'),
   });
   const loraCollectionLoader = g.addNode({
     type: 'lora_collection_loader',
-    id: getPrefixedId('lora_collection_loader'),
+    id: getPrefixedId(options?.idPrefix ? `${options.idPrefix}_lora_collection_loader` : 'lora_collection_loader'),
   });
 
   g.addEdge(loraCollector, 'collection', loraCollectionLoader, 'loras');
@@ -42,11 +54,17 @@ export const addLoRAs = (
   g.addEdge(clipSkip, 'clip', loraCollectionLoader, 'clip');
   // Reroute UNet & CLIP connections through the LoRA collection loader
   g.deleteEdgesTo(denoise, ['unet']);
-  g.deleteEdgesTo(posCond, ['clip']);
-  g.deleteEdgesTo(negCond, ['clip']);
   g.addEdge(loraCollectionLoader, 'unet', denoise, 'unet');
-  g.addEdge(loraCollectionLoader, 'clip', posCond, 'clip');
-  g.addEdge(loraCollectionLoader, 'clip', negCond, 'clip');
+
+  for (const cond of positiveConditioning) {
+    g.deleteEdgesTo(cond, ['clip']);
+    g.addEdge(loraCollectionLoader, 'clip', cond, 'clip');
+  }
+
+  for (const cond of negativeConditioning) {
+    g.deleteEdgesTo(cond, ['clip']);
+    g.addEdge(loraCollectionLoader, 'clip', cond, 'clip');
+  }
 
   for (const lora of enabledLoRAs) {
     const { weight } = lora;
@@ -54,7 +72,7 @@ export const addLoRAs = (
 
     const loraSelector = g.addNode({
       type: 'lora_selector',
-      id: getPrefixedId('lora_selector'),
+      id: getPrefixedId(options?.idPrefix ? `${options.idPrefix}_lora_selector` : 'lora_selector'),
       lora: parsedModel,
       weight,
     });
@@ -67,5 +85,9 @@ export const addLoRAs = (
     g.addEdge(loraSelector, 'lora', loraCollector, 'item');
   }
 
-  g.upsertMetadata({ loras: loraMetadata });
+  if (options?.metadataKey === 'hrf_loras') {
+    g.upsertMetadata({ hrf_loras: loraMetadata });
+  } else {
+    g.upsertMetadata({ loras: loraMetadata });
+  }
 };

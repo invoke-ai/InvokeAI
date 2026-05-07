@@ -21,4 +21,25 @@ describe('ImageMetadataActions', () => {
     expect(handlers).toContain(ImageMetadataHandlers.QwenImageQuantization);
     expect(handlers).toContain(ImageMetadataHandlers.QwenImageShift);
   });
+
+  it('includes HRF refinement metadata handlers in the recall parameters UI', () => {
+    const element = (ImageMetadataActions as unknown as { type: (props: { metadata: unknown }) => unknown }).type({
+      metadata: { model: { key: 'test' } },
+    }) as {
+      props: {
+        children: Array<{ props?: { handler?: unknown } }>;
+      };
+    };
+
+    const handlers = element.props.children
+      .map((child) => child.props?.handler)
+      .filter((handler): handler is unknown => handler !== undefined);
+
+    expect(handlers).toContain(ImageMetadataHandlers.HrfTileControlWeight);
+    expect(handlers).toContain(ImageMetadataHandlers.HrfTileControlEnd);
+    expect(handlers).toContain(ImageMetadataHandlers.HrfSteps);
+    expect(handlers).toContain(ImageMetadataHandlers.HrfModel);
+    expect(handlers).toContain(ImageMetadataHandlers.HrfLoraMode);
+    expect(handlers).toContain(ImageMetadataHandlers.HrfLoRAs);
+  });
 });

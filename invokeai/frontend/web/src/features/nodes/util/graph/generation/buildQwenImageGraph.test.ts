@@ -58,6 +58,7 @@ const refImagesSlice = {
 };
 
 vi.mock('features/controlLayers/store/paramsSlice', () => ({
+  isHrfSupportedBase: vi.fn((base) => base === 'sd-1' || base === 'sdxl'),
   selectMainModelConfig: vi.fn(() => model),
   selectParamsSlice: vi.fn(() => params),
 }));
