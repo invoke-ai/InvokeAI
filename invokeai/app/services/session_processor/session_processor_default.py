@@ -6,6 +6,7 @@ from threading import Event as ThreadEvent
 from typing import Optional
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
+from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.services.events.events_common import (
     BatchEnqueuedEvent,
     FastAPIEvent,
@@ -27,6 +28,10 @@ from invokeai.app.services.session_processor.session_processor_base import (
     SessionRunnerBase,
 )
 from invokeai.app.services.session_processor.session_processor_common import CanceledException, SessionProcessorStatus
+from invokeai.app.services.session_processor.workflow_call_runtime import (
+    WorkflowCallCoordinator,
+    WorkflowCallQueueLifecycle,
+)
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemNotFoundError
 from invokeai.app.services.shared.graph import NodeInputError
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
@@ -58,6 +63,8 @@ class DefaultSessionRunner(SessionRunnerBase):
         self._on_after_run_node_callbacks = on_after_run_node_callbacks or []
         self._on_node_error_callbacks = on_node_error_callbacks or []
         self._on_after_run_session_callbacks = on_after_run_session_callbacks or []
+        self.workflow_call_coordinator = WorkflowCallCoordinator(self)
+        self.workflow_call_queue_lifecycle = WorkflowCallQueueLifecycle(self)
 
     def start(self, services: InvocationServices, cancel_event: ThreadEvent, profiler: Optional[Profiler] = None):
         self._services = services
@@ -69,11 +76,7 @@ class DefaultSessionRunner(SessionRunnerBase):
         denoising to check if the session has been canceled."""
         return self._cancel_event.is_set()
 
-    def run(self, queue_item: SessionQueueItem):
-        # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
-
-        self._on_before_run_session(queue_item=queue_item)
-
+    def _run_session_loop(self, queue_item: SessionQueueItem) -> None:
         # Loop over invocations until the session is complete or canceled
         while True:
             try:
@@ -107,6 +110,11 @@ class DefaultSessionRunner(SessionRunnerBase):
             ):
                 break
 
+    def run(self, queue_item: SessionQueueItem):
+        # Exceptions raised outside `run_node` are handled by the processor. There is no need to catch them here.
+
+        self._on_before_run_session(queue_item=queue_item)
+        self._run_session_loop(queue_item)
         self._on_after_run_session(queue_item=queue_item)
 
     def run_node(self, invocation: BaseInvocation, queue_item: SessionQueueItem):
@@ -125,6 +133,11 @@ class DefaultSessionRunner(SessionRunnerBase):
                     services=self._services,
                     is_canceled=self._is_canceled,
                 )
+
+                if isinstance(invocation, CallSavedWorkflowInvocation):
+                    workflow_record = invocation.validate_selected_workflow(context)
+                    self.workflow_call_coordinator.begin_workflow_call_boundary(invocation, queue_item, workflow_record)
+                    return
 
                 # Invoke the node
                 output = invocation.invoke_internal(context=context, services=self._services)
@@ -201,7 +214,7 @@ class DefaultSessionRunner(SessionRunnerBase):
 
             # The queue item may have been canceled or failed while the session was running. We should only complete it
             # if it is not already canceled or failed.
-            if queue_item.status not in ["canceled", "failed"]:
+            if queue_item.status not in ["canceled", "failed"] and queue_item.session.is_complete():
                 queue_item = self._services.session_queue.complete_queue_item(queue_item.item_id)
 
             # We'll get a GESStatsNotFoundError if we try to log stats for an untracked graph, but in the processor
@@ -316,6 +329,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
         super().__init__()
 
         self.session_runner = session_runner if session_runner else DefaultSessionRunner()
+        self.workflow_call_queue_lifecycle = self.session_runner.workflow_call_queue_lifecycle
         self._on_non_fatal_processor_error_callbacks = on_non_fatal_processor_error_callbacks or []
         self._thread_limit = thread_limit
         self._polling_interval = polling_interval
@@ -458,7 +472,7 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     cancel_event.clear()
 
                     # Run the graph
-                    self.session_runner.run(queue_item=self._queue_item)
+                    self.workflow_call_queue_lifecycle.run_queue_item(self._queue_item)
 
                 except Exception as e:
                     error_type = e.__class__.__name__

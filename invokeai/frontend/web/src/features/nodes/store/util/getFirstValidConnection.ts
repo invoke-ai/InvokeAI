@@ -9,7 +9,7 @@ import {
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
 import type { FieldInputTemplate, FieldOutputTemplate } from 'features/nodes/types/field';
 import type { AnyEdge, AnyNode } from 'features/nodes/types/invocation';
-import { isConnectorNode } from 'features/nodes/types/invocation';
+import { getInvocationNodeInputTemplate, isConnectorNode, isInvocationNode } from 'features/nodes/types/invocation';
 
 /**
  *
@@ -118,6 +118,10 @@ export const getTargetCandidateFields = (
     return validateConnection(c, nodes, edges, templates, edgePendingUpdate, true) === null ? [candidate] : [];
   }
 
+  if (!isInvocationNode(targetNode)) {
+    return [];
+  }
+
   const targetTemplate = templates[targetNode.data.type];
   if (!targetTemplate) {
     return [];
@@ -136,10 +140,14 @@ export const getTargetCandidateFields = (
     }
   }
 
-  const targetCandidateFields = map(targetTemplate.inputs).filter((field) => {
+  const targetCandidateFields = Object.entries(targetNode.data.inputs).flatMap(([fieldName, input]) => {
+    const field = getInvocationNodeInputTemplate(targetNode.data, targetTemplate, fieldName);
+    if (!field || field.name !== input.name) {
+      return [];
+    }
     const c = { source, sourceHandle, target, targetHandle: field.name };
     const connectionErrorTKey = validateConnection(c, nodes, edges, templates, edgePendingUpdate, true);
-    return connectionErrorTKey === null;
+    return connectionErrorTKey === null ? [field] : [];
   });
 
   return targetCandidateFields;
@@ -162,8 +170,11 @@ export const getSourceCandidateFields = (
 
   if (isConnectorNode(sourceNode)) {
     const sourceFieldType = resolveConnectorSourceFieldType(sourceNode.id, nodes, edges, templates);
-    const targetTemplate = !isConnectorNode(targetNode) ? templates[targetNode.data.type] : null;
-    const targetFieldType = targetTemplate?.inputs[targetHandle]?.type;
+    const targetTemplate = isInvocationNode(targetNode) ? templates[targetNode.data.type] : null;
+    const targetFieldType =
+      isInvocationNode(targetNode) && targetTemplate
+        ? getInvocationNodeInputTemplate(targetNode.data, targetTemplate, targetHandle)?.type
+        : undefined;
     const candidateType = sourceFieldType ?? targetFieldType;
     if (!candidateType) {
       return [];
@@ -188,13 +199,16 @@ export const getSourceCandidateFields = (
   }
 
   if (!isConnectorNode(targetNode)) {
+    if (!isInvocationNode(targetNode)) {
+      return [];
+    }
+
     const targetTemplate = templates[targetNode.data.type];
     if (!targetTemplate) {
       return [];
     }
 
-    const targetField = targetTemplate.inputs[targetHandle];
-
+    const targetField = getInvocationNodeInputTemplate(targetNode.data, targetTemplate, targetHandle);
     if (!targetField) {
       return [];
     }

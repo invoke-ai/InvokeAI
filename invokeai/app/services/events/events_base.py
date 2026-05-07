@@ -32,6 +32,9 @@ from invokeai.app.services.events.events_common import (
     QueueItemsRetriedEvent,
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
+    WorkflowCreatedEvent,
+    WorkflowDeletedEvent,
+    WorkflowUpdatedEvent,
 )
 
 if TYPE_CHECKING:
@@ -104,9 +107,11 @@ class EventServiceBase:
         """Emitted when a batch is enqueued"""
         self.dispatch(BatchEnqueuedEvent.build(enqueue_result, user_id))
 
-    def emit_queue_items_retried(self, retry_result: "RetryItemsResult") -> None:
+    def emit_queue_items_retried(
+        self, retry_result: "RetryItemsResult", user_ids: list[str], retried_item_ids_by_user: dict[str, list[int]]
+    ) -> None:
         """Emitted when a list of queue items are retried"""
-        self.dispatch(QueueItemsRetriedEvent.build(retry_result))
+        self.dispatch(QueueItemsRetriedEvent.build(retry_result, user_ids, retried_item_ids_by_user))
 
     def emit_queue_cleared(self, queue_id: str) -> None:
         """Emitted when a queue is cleared"""
@@ -115,6 +120,29 @@ class EventServiceBase:
     def emit_recall_parameters_updated(self, queue_id: str, user_id: str, parameters: dict) -> None:
         """Emitted when recall parameters are updated"""
         self.dispatch(RecallParametersUpdatedEvent.build(queue_id, user_id, parameters))
+
+    # endregion
+
+    # region Workflow library
+
+    def emit_workflow_created(self, workflow_id: str, user_id: str, is_public: bool) -> None:
+        """Emitted when a workflow is created."""
+        self.dispatch(WorkflowCreatedEvent.build(workflow_id=workflow_id, user_id=user_id, is_public=is_public))
+
+    def emit_workflow_updated(self, workflow_id: str, user_id: str, old_is_public: bool, new_is_public: bool) -> None:
+        """Emitted when a workflow is updated."""
+        self.dispatch(
+            WorkflowUpdatedEvent.build(
+                workflow_id=workflow_id,
+                user_id=user_id,
+                old_is_public=old_is_public,
+                new_is_public=new_is_public,
+            )
+        )
+
+    def emit_workflow_deleted(self, workflow_id: str, user_id: str, is_public: bool) -> None:
+        """Emitted when a workflow is deleted."""
+        self.dispatch(WorkflowDeletedEvent.build(workflow_id=workflow_id, user_id=user_id, is_public=is_public))
 
     # endregion
 

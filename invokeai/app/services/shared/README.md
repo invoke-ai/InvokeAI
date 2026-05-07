@@ -58,6 +58,19 @@ Runs a sequence of checks:
 
 1. **Type compatibility** `get_output_field_type` vs `get_input_field_type` and `are_connection_types_compatible`.
 
+   Special case:
+
+   - `call_saved_workflow` currently accepts dynamic destination handles of the form
+     `saved_workflow_input::{childNodeId}::{childFieldName}` as part of its temporary call-boundary contract.
+   - Those handles are allowed through graph validation even though they are not static Python model fields on the
+     invocation class.
+   - Runtime later validates them against the selected child workflow's exposed callable interface before applying
+     values to the child graph.
+   - The editor preserves dynamic caller values only while the exposed field type remains compatible; type drift at the
+     same child node/field path resets to the selected workflow's current initial value.
+   - Saved-workflow picker search is server-backed so large workflow libraries do not require scrolling every page
+     before selecting a workflow by name.
+
 1. **Iterator / collector structure** Enforce special rules:
 
    - Iterator's input must be `collection`; its outgoing edges use `item`.
@@ -105,6 +118,14 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
 - `prepared_source_mapping: dict[str, str]` - exec id -> source id.
 - `source_prepared_mapping: dict[str, set[str]]` - source id -> exec ids.
 - `indegree: dict[str, int]` - unmet inputs per exec node.
+- Workflow-call runtime state:
+  - `workflow_call_stack` - active parent call frames.
+  - `workflow_call_history` - completed or failed workflow-call relationships observed by this execution state.
+  - `workflow_call_parent` - parent workflow-call relationship metadata when this execution state is a child session.
+  - `waiting_workflow_call` - the call frame currently suspending this execution state, if any.
+  - `waiting_workflow_call_execution` - the active parent/child workflow-call relationship record for the waiting call.
+  - `waiting_workflow_call_child_session` - attached child execution state for the waiting workflow call, if any.
+  - `max_workflow_call_depth` - runtime guardrail for nested or recursive workflow calls.
 - Prepared exec metadata caches:
   - source node id
   - iteration path
@@ -115,9 +136,41 @@ mutation helpers. Those helpers reject changes once the affected nodes have alre
 ### 4.2 Core methods
 
 - `next()` Returns the next ready exec node. If none are ready, it asks the materializer to expand more source nodes and
-  then retries. Before returning a node, the runtime helper deep-copies inbound values into the node fields.
+  then retries. If the execution state is paused on a workflow call boundary, it returns `None` without scheduling more
+  work. Before returning a node, the runtime helper deep-copies inbound values into the node fields.
 - `complete(node_id, output)` Records the result, marks the exec node executed, marks the source node executed once all
   of its prepared exec copies are done, then decrements downstream indegrees and enqueues newly ready nodes.
+
+Workflow-call note:
+
+- `GraphExecutionState` can represent a paused parent execution plus an attached child execution state, but it does not
+  itself orchestrate child execution.
+- In the current implementation, `DefaultSessionRunner.run_node()` establishes the workflow call boundary and attaches
+  the child execution state, while `WorkflowCallCoordinator` handles call-specific setup and
+  `WorkflowCallQueueLifecycle` later resumes or fails the parent based on that child queue row's outcome.
+- Child `SessionQueueItem` rows created by the coordinator now carry explicit relationship metadata such as
+  `workflow_call_id`, `parent_item_id`, `parent_session_id`, `root_item_id`, and `workflow_call_depth`, even though the
+  higher-level scheduler semantics are still evolving.
+- The `session_queue` schema now has matching columns for those relationship fields, and parent queue items can enter a
+  `waiting` status while suspended on a child workflow execution.
+- Queue lifecycle semantics are now partially defined for workflow-call chains:
+  - child success resumes the waiting parent
+  - multiple child queue rows may complete under one waiting parent when the called workflow contains direct batch
+    nodes; the parent resumes only after all expected child rows complete
+  - child failure fails the waiting parent and can cascade upward through ancestors
+  - failing child rows cancel their remaining workflow-call siblings before the parent is failed
+  - cancelation is chain-aware across parents and children, including nested descendants of batched siblings
+  - "all except current" queue actions preserve the active current item plus its workflow-call chain, while still
+    canceling or deleting unrelated waiting chains
+  - startup recovery cancels interrupted `in_progress` or `waiting` workflow-call chains, including pending descendants
+  - deleting a workflow-call queue row currently deletes the whole parent/child chain rather than leaving orphaned rows
+    behind
+  - retry is root-oriented and should not be exposed directly on child queue rows in the UI
+  - child queue-row creation is cleaned up on boundary-setup failure and child fan-out is bounded by remaining queue
+    capacity
+  - child workflows that mix supported batch nodes with unrelated generator nodes are rejected for now
+- This is still an intermediate architecture step and should eventually be replaced by a more general parent/child
+  execution mechanism rather than workflow-call-specific queue lifecycle handling.
 
 ### 4.3 Runtime helper classes
 
@@ -218,7 +271,7 @@ This behavior is implemented in the runtime scheduler, not in the invocation bod
    - Execute node externally -> `output`.
    - `state.complete(node.id, output)` -> updates indegrees, `If` state, and ready queues.
 
-1. Finish when `next()` returns `None`.
+1. Finish when `next()` returns `None` and the execution state is not paused waiting on a workflow call boundary.
 
 In normal execution, all runtime expansion occurs in `execution_graph` with traceability back to source nodes.
 
@@ -239,6 +292,35 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
   complexity.
 - **Dynamic behaviors** (future): can be added in `GraphExecutionState` by creating exec nodes and edges at `complete()`
   time, as long as the DAG invariant holds.
+- **Workflow call boundaries**: `GraphExecutionState` can suspend a parent execution state on a workflow call, attach a
+  child execution state, and later resume the parent without mutating the source graph.
+
+Current limitation:
+
+- Child workflow executions are now represented as first-class queue items. Parent resume/failure is intentionally
+  handled by a dedicated workflow-call queue lifecycle component for this PR because no other feature currently needs a
+  generalized dependent-queue scheduler.
+- Called workflows currently require exactly one valid `workflow_return` node to be callable at all.
+- A single `workflow_return_value.value` may connect directly to `workflow_return.values`; multiple named return members
+  should be collected and then connected to `workflow_return.values`.
+- Direct batch-special child workflows are now supported by expanding them into multiple child queue rows.
+- Batch outputs may feed a named `workflow_return_value.value` directly. Parent resume aggregates named return maps as
+  `values: dict[str, list[Any]]`, and all rows in one batch call must return the same key set.
+- Generator-backed batch child workflows are now supported when the batch node is fed directly by a supported integer,
+  float, string, or image generator.
+- Connected batch child inputs produced by ordinary non-generator upstream nodes are still rejected before any child
+  queue row is created.
+- Workflow library API responses now include compatibility metadata so the frontend can disable unsupported callees
+  before execution rather than failing only at runtime.
+- Workflow library list compatibility uses structural generator-backed batch validation so list and picker rendering do
+  not enumerate every image in board-backed generators; workflow detail and runtime execution still resolve real
+  generator values.
+- Batch-specific compatibility failures, including multiple connected inputs to one batch field, are reported as
+  `unsupported_batch_input` rather than generic unsupported-node failures.
+- The workflow library list also surfaces that metadata as an informational unsupported state; workflows remain
+  viewable/editable even when they are not currently callable by `call_saved_workflow`.
+- Single-user workflow CRUD socket events emit only to the admin room because every single-user socket already joins
+  that room, avoiding duplicate delivery through both `user:system` and `admin`.
 
 ## 8) Error Model (selected)
 

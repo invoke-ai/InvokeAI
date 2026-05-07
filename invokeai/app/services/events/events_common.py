@@ -308,12 +308,20 @@ class QueueItemsRetriedEvent(QueueEventBase):
     __event_name__ = "queue_items_retried"
 
     retried_item_ids: list[int] = Field(description="The IDs of the queue items that were retried")
+    user_ids: list[str] = Field(description="The IDs of the users who own the retried root queue items")
+    retried_item_ids_by_user: dict[str, list[int]] = Field(
+        description="The retried root queue item IDs keyed by owner user ID."
+    )
 
     @classmethod
-    def build(cls, retry_result: RetryItemsResult) -> "QueueItemsRetriedEvent":
+    def build(
+        cls, retry_result: RetryItemsResult, user_ids: list[str], retried_item_ids_by_user: dict[str, list[int]]
+    ) -> "QueueItemsRetriedEvent":
         return cls(
             queue_id=retry_result.queue_id,
             retried_item_ids=retry_result.retried_item_ids,
+            user_ids=user_ids,
+            retried_item_ids_by_user=retried_item_ids_by_user,
         )
 
 
@@ -326,6 +334,58 @@ class QueueClearedEvent(QueueEventBase):
     @classmethod
     def build(cls, queue_id: str) -> "QueueClearedEvent":
         return cls(queue_id=queue_id)
+
+
+class WorkflowEventBase(EventBase):
+    """Base class for workflow library CRUD events."""
+
+    workflow_id: str = Field(description="The ID of the workflow")
+    user_id: str = Field(description="The owner of the workflow")
+
+
+@payload_schema.register
+class WorkflowCreatedEvent(WorkflowEventBase):
+    """Event model for workflow_created"""
+
+    __event_name__ = "workflow_created"
+
+    is_public: bool = Field(description="Whether the workflow is shared with all users")
+
+    @classmethod
+    def build(cls, workflow_id: str, user_id: str, is_public: bool) -> "WorkflowCreatedEvent":
+        return cls(workflow_id=workflow_id, user_id=user_id, is_public=is_public)
+
+
+@payload_schema.register
+class WorkflowUpdatedEvent(WorkflowEventBase):
+    """Event model for workflow_updated"""
+
+    __event_name__ = "workflow_updated"
+
+    old_is_public: bool = Field(description="Whether the workflow was shared before the update")
+    new_is_public: bool = Field(description="Whether the workflow is shared after the update")
+
+    @classmethod
+    def build(cls, workflow_id: str, user_id: str, old_is_public: bool, new_is_public: bool) -> "WorkflowUpdatedEvent":
+        return cls(
+            workflow_id=workflow_id,
+            user_id=user_id,
+            old_is_public=old_is_public,
+            new_is_public=new_is_public,
+        )
+
+
+@payload_schema.register
+class WorkflowDeletedEvent(WorkflowEventBase):
+    """Event model for workflow_deleted"""
+
+    __event_name__ = "workflow_deleted"
+
+    is_public: bool = Field(description="Whether the workflow was shared when it was deleted")
+
+    @classmethod
+    def build(cls, workflow_id: str, user_id: str, is_public: bool) -> "WorkflowDeletedEvent":
+        return cls(workflow_id=workflow_id, user_id=user_id, is_public=is_public)
 
 
 class DownloadEventBase(EventBase):

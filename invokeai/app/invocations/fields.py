@@ -49,6 +49,7 @@ class UIType(str, Enum, metaclass=MetaEnum):
     # region Misc Field Types
     Scheduler = "SchedulerField"
     Any = "AnyField"
+    SavedWorkflow = "SavedWorkflowField"
     # endregion
 
     # region Internal Field Types
