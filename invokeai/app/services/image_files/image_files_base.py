@@ -9,12 +9,12 @@ class ImageFileStorageBase(ABC):
     """Low-level service responsible for storing and retrieving image files."""
 
     @abstractmethod
-    def get(self, image_name: str) -> PILImageType:
+    def get(self, image_name: str, image_subfolder: str = "") -> PILImageType:
         """Retrieves an image as PIL Image."""
         pass
 
     @abstractmethod
-    def get_path(self, image_name: str, thumbnail: bool = False) -> Path:
+    def get_path(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
         """Gets the internal path to an image or thumbnail."""
         pass
 
@@ -34,21 +34,22 @@ class ImageFileStorageBase(ABC):
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
         thumbnail_size: int = 256,
+        image_subfolder: str = "",
     ) -> None:
         """Saves an image and a 256x256 WEBP thumbnail. Returns a tuple of the image name, thumbnail name, and created timestamp."""
         pass
 
     @abstractmethod
-    def delete(self, image_name: str) -> None:
+    def delete(self, image_name: str, image_subfolder: str = "") -> None:
         """Deletes an image and its thumbnail (if one exists)."""
         pass
 
     @abstractmethod
-    def get_workflow(self, image_name: str) -> Optional[str]:
+    def get_workflow(self, image_name: str, image_subfolder: str = "") -> Optional[str]:
         """Gets the workflow of an image."""
         pass
 
     @abstractmethod
-    def get_graph(self, image_name: str) -> Optional[str]:
+    def get_graph(self, image_name: str, image_subfolder: str = "") -> Optional[str]:
         """Gets the graph of an image."""
         pass
