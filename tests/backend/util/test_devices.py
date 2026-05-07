@@ -130,3 +130,35 @@ def test_legacy_precision_name():
         assert "float16" == choose_precision(torch.device("cuda"))
         assert "float16" == choose_precision(torch.device("mps"))
         assert "float32" == choose_precision(torch.device("cpu"))
+
+
+# --- resolve_model_precision tests ---
+
+
+def test_resolve_model_precision_auto_delegates_to_bfloat16_safe():
+    """When override is 'auto', the helper should defer to choose_bfloat16_safe_dtype."""
+    sentinel = torch.bfloat16
+    with patch.object(TorchDevice, "choose_bfloat16_safe_dtype", return_value=sentinel) as mock_safe:
+        result = TorchDevice.resolve_model_precision("auto", torch.device("cpu"))
+    assert result is sentinel
+    mock_safe.assert_called_once_with(torch.device("cpu"))
+
+
+def test_resolve_model_precision_explicit_bfloat16():
+    """An explicit 'bfloat16' override should return torch.bfloat16 unchanged."""
+    result = TorchDevice.resolve_model_precision("bfloat16", torch.device("cpu"))
+    assert result == torch.bfloat16
+
+
+def test_resolve_model_precision_explicit_float32():
+    """An explicit 'float32' override should return torch.float32 unchanged."""
+    result = TorchDevice.resolve_model_precision("float32", torch.device("cpu"))
+    assert result == torch.float32
+
+
+def test_resolve_model_precision_does_not_consult_safe_dtype_for_explicit_overrides():
+    """Explicit overrides must bypass choose_bfloat16_safe_dtype entirely."""
+    with patch.object(TorchDevice, "choose_bfloat16_safe_dtype") as mock_safe:
+        TorchDevice.resolve_model_precision("float32", torch.device("cpu"))
+        TorchDevice.resolve_model_precision("bfloat16", torch.device("cpu"))
+    mock_safe.assert_not_called()

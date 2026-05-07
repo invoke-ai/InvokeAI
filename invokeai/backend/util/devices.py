@@ -137,3 +137,20 @@ class TorchDevice:
             if device.type == "cuda":
                 return torch.float16
             return torch.float32
+
+    @classmethod
+    def resolve_model_precision(
+        cls,
+        override: Literal["auto", "bfloat16", "float32"],
+        device: Optional[torch.device] = None,
+    ) -> torch.dtype:
+        """Resolve a per-model precision override.
+
+        `auto` preserves today's behavior (bfloat16 with safe fallback). Explicit
+        `bfloat16` / `float32` force that dtype regardless of device. Used by
+        bf16-native model loaders that need a user-facing escape hatch (e.g.,
+        Anima on MPS, where bf16 is supported but slow).
+        """
+        if override == "auto":
+            return cls.choose_bfloat16_safe_dtype(device)
+        return cls._to_dtype(override)

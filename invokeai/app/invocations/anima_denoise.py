@@ -38,6 +38,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.services.config.config_default import get_config
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.anima.anima_transformer_patch import patch_anima_for_regional_prompting
 from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
@@ -395,7 +396,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         device = TorchDevice.choose_torch_device()
-        inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+        inference_dtype = TorchDevice.resolve_model_precision(get_config().anima_precision, device)
 
         if self.denoising_start >= self.denoising_end:
             raise ValueError(

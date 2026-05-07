@@ -507,6 +507,21 @@
       "validation": {}
     },
     {
+      "category": "DEVICE",
+      "default": "auto",
+      "description": "Floating point precision for the Anima model. `auto` selects bfloat16 where supported (the historical default). Set to `float32` if Anima inference is unexpectedly slow on your device \u2014 notably Apple Silicon (MPS), where bfloat16 is supported but slow.",
+      "env_var": "INVOKEAI_ANIMA_PRECISION",
+      "literal_values": [
+        "auto",
+        "bfloat16",
+        "float32"
+      ],
+      "name": "anima_precision",
+      "required": false,
+      "type": "typing.Literal['auto', 'bfloat16', 'float32']",
+      "validation": {}
+    },
+    {
       "category": "GENERATION",
       "default": false,
       "description": "Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.",
