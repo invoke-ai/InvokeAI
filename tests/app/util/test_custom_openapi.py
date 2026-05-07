@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from pydantic import create_model
 
 from invokeai.app.invocations.baseinvocation import InvocationRegistry
-from invokeai.app.util.custom_openapi import get_openapi_func
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.util.custom_openapi import get_openapi_func, normalize_path_defaults
 
 
 class _FakeOutput:
@@ -59,3 +60,32 @@ def test_invocation_output_map_required_is_sorted(monkeypatch: object) -> None:
     required = schema["components"]["schemas"]["InvocationOutputMap"]["required"]
 
     assert required == ["a_type", "b_type"], f"Expected sorted required list, got: {required}"
+
+
+def test_path_defaults_are_normalized_to_forward_slashes() -> None:
+    schema = InvokeAIAppConfig.model_json_schema()
+    schema["properties"]["convert_cache_dir"]["default"] = "models\\.convert_cache"
+    schema["properties"]["download_cache_dir"]["default"] = "models\\.download_cache"
+    schema["properties"]["nested_path"] = {
+        "oneOf": [
+            {
+                "type": "object",
+                "properties": {
+                    "cache_dir": {
+                        "type": "string",
+                        "format": "path",
+                        "default": "models\\.nested_cache",
+                    }
+                },
+            }
+        ]
+    }
+
+    normalized_schema = normalize_path_defaults(schema)
+
+    assert normalized_schema["properties"]["convert_cache_dir"]["default"] == "models/.convert_cache"
+    assert normalized_schema["properties"]["download_cache_dir"]["default"] == "models/.download_cache"
+    assert (
+        normalized_schema["properties"]["nested_path"]["oneOf"][0]["properties"]["cache_dir"]["default"]
+        == "models/.nested_cache"
+    )

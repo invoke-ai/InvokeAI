@@ -6,6 +6,7 @@ from __future__ import annotations
 import copy
 import filecmp
 import locale
+import logging
 import os
 import re
 import shutil
@@ -42,6 +43,8 @@ EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_seedream_api_key",
     "external_seedream_base_url",
 )
+
+logger = logging.getLogger(__name__)
 
 
 class URLRegexTokenPair(BaseModel):
@@ -600,6 +603,23 @@ def load_external_api_keys(api_keys_file_path: Path) -> dict[str, str]:
     return parsed_api_keys
 
 
+def ensure_fonts_dir(root_path: Path) -> None:
+    fonts_path = root_path / "Fonts"
+    fonts_readme_path = fonts_path / "README.txt"
+
+    try:
+        fonts_path.mkdir(parents=True, exist_ok=True)
+        if not fonts_readme_path.exists():
+            with open(fonts_readme_path, "wt", encoding="utf-8") as f:
+                f.write(
+                    "Custom fonts folder for InvokeAI text tools.\n\n"
+                    "Place your font files in this folder (or subfolders).\n"
+                    "Supported formats: .ttf, .otf, .woff, .woff2\n"
+                )
+    except OSError:
+        logger.warning("Unable to initialize Fonts directory at %s", fonts_path, exc_info=True)
+
+
 @lru_cache(maxsize=1)
 def get_config() -> InvokeAIAppConfig:
     """Get the global singleton app config.
@@ -677,6 +697,8 @@ def get_config() -> InvokeAIAppConfig:
         # We should never write env vars to the config file
         default_config = DefaultInvokeAIAppConfig()
         default_config.write_file(config.config_file_path, as_example=False)
+
+    ensure_fonts_dir(config.root_path)
 
     api_keys_from_file = load_external_api_keys(config.api_keys_file_path)
     if api_keys_from_file:

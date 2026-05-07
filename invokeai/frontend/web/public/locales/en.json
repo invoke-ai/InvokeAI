@@ -2688,6 +2688,10 @@
         "text": {
             "font": "Font",
             "size": "Size",
+            "lineHeight": "Spacing",
+            "lineHeightDense": "Dense",
+            "lineHeightNormal": "Normal",
+            "lineHeightSpacious": "Spacious",
             "bold": "Bold",
             "italic": "Italic",
             "underline": "Underline",
@@ -2695,11 +2699,10 @@
             "alignLeft": "Align Left",
             "alignCenter": "Align Center",
             "alignRight": "Align Right",
-            "px": "px",
-            "lineHeight": "Spacing",
-            "lineHeightDense": "Dense",
-            "lineHeightNormal": "Normal",
-            "lineHeightSpacious": "Spacious"
+            "customFonts": "User Fonts",
+            "builtInFonts": "Built-in Fonts",
+            "missingFont": "Missing Font",
+            "px": "px"
         },
         "newCanvasFromImage": "New Canvas from Image",
         "newImg2ImgCanvasFromImage": "New Img2Img from Image",

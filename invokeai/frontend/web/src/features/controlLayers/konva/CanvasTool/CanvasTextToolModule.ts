@@ -5,7 +5,11 @@ import { canvasToBlob, getPrefixedId } from 'features/controlLayers/konva/util';
 import { type CanvasTextSettingsState, selectCanvasTextSlice } from 'features/controlLayers/store/canvasTextSlice';
 import type { Coordinate, RgbaColor } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
-import { getFontStackById, TEXT_RASTER_PADDING } from 'features/controlLayers/text/textConstants';
+import {
+  getFontStackById,
+  subscribeToCustomTextFontStacks,
+  TEXT_RASTER_PADDING,
+} from 'features/controlLayers/text/textConstants';
 import {
   buildFontDescriptor,
   calculateLayerPosition,
@@ -114,6 +118,12 @@ export class CanvasTextToolModule extends CanvasModuleBase {
     );
     this.subscriptions.add(
       this.parent.$cursorPos.listen(() => {
+        this.render();
+      })
+    );
+    this.subscriptions.add(
+      subscribeToCustomTextFontStacks(() => {
+        this.cursorMetricsKey = null;
         this.render();
       })
     );

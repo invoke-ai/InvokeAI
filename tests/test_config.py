@@ -9,6 +9,7 @@ from invokeai.app.invocations.baseinvocation import InvocationRegistry
 from invokeai.app.services.config.config_default import (
     DefaultInvokeAIAppConfig,
     InvokeAIAppConfig,
+    ensure_fonts_dir,
     get_config,
     load_and_migrate_config,
 )
@@ -269,6 +270,8 @@ def test_get_config_writing(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
     assert config.config_file_path == config_file_path
     assert config_file_path.exists()
     assert example_file_path.exists()
+    assert (tmp_path / "Fonts").exists()
+    assert (tmp_path / "Fonts" / "README.txt").exists()
 
     # The example file should have the default values
     example_file_content = example_file_path.read_text()
@@ -284,6 +287,25 @@ def test_get_config_writing(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch
 
     # Undo our change to the singleton class
     InvokeAIArgs.did_parse = False
+
+
+def test_ensure_fonts_dir_logs_warning_on_oserror(
+    patch_rootdir: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+):
+    original_mkdir = Path.mkdir
+    fonts_path = tmp_path / "Fonts"
+
+    def mock_mkdir(self: Path, *args: Any, **kwargs: Any) -> None:
+        if self == fonts_path:
+            raise OSError("read-only")
+        original_mkdir(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", mock_mkdir)
+
+    with caplog.at_level("WARNING"):
+        ensure_fonts_dir(tmp_path)
+
+    assert "Unable to initialize Fonts directory" in caplog.text
 
 
 def test_get_config_reads_external_api_keys_file(patch_rootdir: None, monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
