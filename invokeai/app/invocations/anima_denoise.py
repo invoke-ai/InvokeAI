@@ -507,8 +507,10 @@ class AnimaDenoiseInvocation(BaseInvocation):
             set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
             if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
                 scheduler.set_timesteps(sigmas=sigmas, device=device)
-            elif not is_lcm and hasattr(scheduler, "set_begin_index") and (
-                self.denoising_start > 0 or self.denoising_end < 1
+            elif (
+                not is_lcm
+                and hasattr(scheduler, "set_begin_index")
+                and (self.denoising_start > 0 or self.denoising_end < 1)
             ):
                 # Scheduler doesn't accept sigmas=. Use the full schedule with set_begin_index
                 # so the internal flow_shift applies correctly and the clipped start is honoured.
