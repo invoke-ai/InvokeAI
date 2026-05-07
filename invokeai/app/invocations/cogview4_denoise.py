@@ -20,6 +20,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.universal_noise import validate_noise_tensor_shape
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.taxonomy import BaseModelType
@@ -34,7 +35,7 @@ from invokeai.backend.util.devices import TorchDevice
     title="Denoise - CogView4",
     tags=["image", "cogview4"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -43,6 +44,9 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     # If latents is provided, this means we are doing image-to-image.
     latents: Optional[LatentsField] = InputField(
         default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
+    noise: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.noise, input=Input.Connection
     )
     # denoise_mask is used for image-to-image inpainting. Only the masked region is modified.
     denoise_mask: Optional[DenoiseMaskField] = InputField(
@@ -245,15 +249,7 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Generate initial latent noise.
         num_channels_latents = transformer_info.model.config.in_channels  # type: ignore
         assert isinstance(num_channels_latents, int)
-        noise = self._get_noise(
-            batch_size=1,
-            num_channels_latents=num_channels_latents,
-            height=self.height,
-            width=self.width,
-            dtype=inference_dtype,
-            device=device,
-            seed=self.seed,
-        )
+        noise = self._prepare_noise_tensor(context, num_channels_latents, inference_dtype, device)
 
         # Prepare input latent image.
         if init_latents is not None:
@@ -355,6 +351,24 @@ class CogView4DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
 
         return latents
+
+    def _prepare_noise_tensor(
+        self, context: InvocationContext, num_channels_latents: int, inference_dtype: torch.dtype, device: torch.device
+    ) -> torch.Tensor:
+        if self.noise is not None:
+            noise = context.tensors.load(self.noise.latents_name).to(device=device, dtype=inference_dtype)
+            validate_noise_tensor_shape(noise, "CogView4", self.width, self.height, num_channels=num_channels_latents)
+            return noise
+
+        return self._get_noise(
+            batch_size=1,
+            num_channels_latents=num_channels_latents,
+            height=self.height,
+            width=self.width,
+            dtype=inference_dtype,
+            device=device,
+            seed=self.seed,
+        )
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
