@@ -656,7 +656,6 @@ export const {
   modelChanged,
 
   // Dimensions
-  sizeRecalled,
   widthChanged,
   heightChanged,
   aspectRatioLockToggled,
