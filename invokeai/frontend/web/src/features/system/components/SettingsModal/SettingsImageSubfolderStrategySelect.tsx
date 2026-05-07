@@ -8,11 +8,16 @@ import { useTranslation } from 'react-i18next';
 import { useGetRuntimeConfigQuery, useUpdateRuntimeConfigMutation } from 'services/api/endpoints/appInfo';
 import type { S } from 'services/api/types';
 
-type ImageSubfolderStrategy = NonNullable<S['InvokeAIAppConfig']['image_subfolder_strategy']>;
+type ImageSubfolderStrategy = NonNullable<S['UpdateAppGenerationSettingsRequest']['image_subfolder_strategy']>;
 
 type ImageSubfolderStrategyOption = {
   label: string;
   value: ImageSubfolderStrategy;
+};
+
+type ImageSubfolderStrategySelectOption = {
+  label: string;
+  value: string;
 };
 
 export const imageSubfolderStrategyOptions = [
@@ -25,21 +30,35 @@ export const imageSubfolderStrategyOptions = [
 export const isImageSubfolderStrategy = (value: unknown): value is ImageSubfolderStrategy =>
   imageSubfolderStrategyOptions.some((option) => option.value === value);
 
-export const getImageSubfolderStrategyOption = (strategy: ImageSubfolderStrategy) =>
-  imageSubfolderStrategyOptions.find((option) => option.value === strategy);
+export const getImageSubfolderStrategyOption = (strategy: string): ImageSubfolderStrategySelectOption =>
+  imageSubfolderStrategyOptions.find((option) => option.value === strategy) ?? {
+    label: 'settings.imageSubfolderStrategyUnknown',
+    value: strategy,
+  };
 
 export const SettingsImageSubfolderStrategySelect = memo(() => {
   const { t } = useTranslation();
   const currentUser = useAppSelector(selectCurrentUser);
   const { data: runtimeConfig } = useGetRuntimeConfigQuery();
   const [updateRuntimeConfig, { isLoading }] = useUpdateRuntimeConfigMutation();
-  const imageSubfolderStrategy = runtimeConfig?.config.image_subfolder_strategy ?? 'flat';
+  const imageSubfolderStrategy: string = runtimeConfig?.config.image_subfolder_strategy ?? 'flat';
   const canEditRuntimeConfig = runtimeConfig ? !runtimeConfig.config.multiuser || currentUser?.is_admin : false;
 
-  const options = useMemo(
-    () => imageSubfolderStrategyOptions.map((option) => ({ ...option, label: t(option.label) })),
-    [t]
-  );
+  const options = useMemo(() => {
+    const localizedOptions: ImageSubfolderStrategySelectOption[] = imageSubfolderStrategyOptions.map((option) => ({
+      ...option,
+      label: t(option.label),
+    }));
+
+    if (!isImageSubfolderStrategy(imageSubfolderStrategy)) {
+      localizedOptions.push({
+        label: t('settings.imageSubfolderStrategyUnknown', { strategy: imageSubfolderStrategy }),
+        value: imageSubfolderStrategy,
+      });
+    }
+
+    return localizedOptions;
+  }, [imageSubfolderStrategy, t]);
 
   const value = useMemo(
     () => options.find((option) => option.value === imageSubfolderStrategy),
