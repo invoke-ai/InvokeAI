@@ -4,7 +4,10 @@ import { usePersistedTextAreaSize } from 'common/hooks/usePersistedTextareaSize'
 import { negativePromptChanged, selectNegativePromptWithFallback } from 'features/controlLayers/store/paramsSlice';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
-import { PromptResizeHandle } from 'features/parameters/components/Prompts/PromptResizeHandle';
+import {
+  PROMPT_RESIZE_HANDLE_HEIGHT_PX,
+  PromptResizeHandle,
+} from 'features/parameters/components/Prompts/PromptResizeHandle';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
@@ -64,7 +67,7 @@ export const ParamNegativePrompt = memo(() => {
 
   return (
     <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
-      <Box pos="relative" w="full">
+      <Box pos="relative" w="full" pb={`${PROMPT_RESIZE_HANDLE_HEIGHT_PX}px`}>
         <Textarea
           className="negative-prompt-textarea"
           name="negativePrompt"

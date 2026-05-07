@@ -39,6 +39,8 @@ EXTERNAL_PROVIDER_CONFIG_FIELDS = (
     "external_gemini_base_url",
     "external_openai_api_key",
     "external_openai_base_url",
+    "external_seedream_api_key",
+    "external_seedream_base_url",
 )
 
 
@@ -130,6 +132,8 @@ class InvokeAIAppConfig(BaseSettings):
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
         external_openai_base_url: Base URL override for OpenAI image generation.
+        external_seedream_api_key: API key for Seedream image generation.
+        external_seedream_base_url: Base URL override for Seedream image generation.
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
@@ -241,6 +245,12 @@ class InvokeAIAppConfig(BaseSettings):
     )
     external_openai_base_url: Optional[str] = Field(
         default=None, description="Base URL override for OpenAI image generation."
+    )
+    external_seedream_api_key: Optional[str] = Field(
+        default=None, description="API key for Seedream image generation."
+    )
+    external_seedream_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Seedream image generation."
     )
 
     # fmt: on

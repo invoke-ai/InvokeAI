@@ -805,6 +805,28 @@
       "required": false,
       "type": "typing.Optional[str]",
       "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "API key for Seedream image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_SEEDREAM_API_KEY",
+      "literal_values": [],
+      "name": "external_seedream_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for Seedream image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_SEEDREAM_BASE_URL",
+      "literal_values": [],
+      "name": "external_seedream_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
     }
   ]
 }
