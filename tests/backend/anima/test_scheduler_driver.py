@@ -87,9 +87,7 @@ def test_driver_heun_completes_user_step_on_second_order_and_terminal() -> None:
     ("denoising_start", "denoising_end"),
     [(0.0, 1.0), (0.2, 1.0), (0.0, 0.8), (0.2, 0.8), (0.5, 0.75)],
 )
-def test_driver_dpmpp_clipped_schedule_starts_at_correct_sigma(
-    denoising_start: float, denoising_end: float
-) -> None:
+def test_driver_dpmpp_clipped_schedule_starts_at_correct_sigma(denoising_start: float, denoising_end: float) -> None:
     """DPM++ doesn't accept sigmas= on diffusers 0.35.1; the driver's set_begin_index
     fallback must expose a first iteration whose sigma matches the clipped Anima reference.
 
@@ -123,9 +121,7 @@ def test_driver_dpmpp_clipped_schedule_starts_at_correct_sigma(
     ("denoising_start", "denoising_end", "steps"),
     [(0.2, 0.8, 30), (0.0, 0.8, 30), (0.2, 1.0, 30), (0.5, 0.75, 20)],
 )
-def test_driver_heun_clipped_schedule_iteration_count(
-    denoising_start: float, denoising_end: float, steps: int
-) -> None:
+def test_driver_heun_clipped_schedule_iteration_count(denoising_start: float, denoising_end: float, steps: int) -> None:
     """Heun clipped schedule: iteration count is 2*(k_end-k_start), clamped so
     denoising_end=1.0 doesn't run past the 2N-1 array."""
     full_sigmas = _anima_sigmas(steps)

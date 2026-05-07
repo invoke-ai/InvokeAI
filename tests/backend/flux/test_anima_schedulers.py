@@ -3,7 +3,6 @@
 import typing
 
 import pytest
-
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
 from invokeai.backend.flux.schedulers import (
@@ -183,9 +182,9 @@ def test_anima_set_begin_index_path_step_count_with_denoising_end():
 @pytest.mark.parametrize(
     ["denoising_start", "denoising_end", "steps"],
     [
-        (0.2, 0.8, 30),   # mid-range: 18 logical steps → 36 doubled calls
-        (0.0, 0.8, 30),   # start-only clip: 24 logical steps → 48 doubled calls
-        (0.2, 1.0, 30),   # end=1.0: clamp kicks in (last step first-order only)
+        (0.2, 0.8, 30),  # mid-range: 18 logical steps → 36 doubled calls
+        (0.0, 0.8, 30),  # start-only clip: 24 logical steps → 48 doubled calls
+        (0.2, 1.0, 30),  # end=1.0: clamp kicks in (last step first-order only)
         (0.5, 0.75, 20),  # different step count
     ],
 )
@@ -212,7 +211,7 @@ def test_anima_heun_set_begin_index_path_begin_index_and_step_count(
 
     # Verify the doubled structure: len(timesteps) == 2*steps - 1
     assert len(scheduler.timesteps) == 2 * steps - 1, (
-        f"Heun timesteps length: expected {2*steps-1}, got {len(scheduler.timesteps)}"
+        f"Heun timesteps length: expected {2 * steps - 1}, got {len(scheduler.timesteps)}"
     )
 
     # The fixed code's begin index must map logical step to doubled-array space.
@@ -221,7 +220,7 @@ def test_anima_heun_set_begin_index_path_begin_index_and_step_count(
     # For mid-range (denoising_end < 1): all steps in range have first + second order.
     if denoising_end < 1.0:
         assert expected_steps == 2 * (k_end - k_start), (
-            f"mid-range step count: expected {2*(k_end-k_start)}, got {expected_steps}"
+            f"mid-range step count: expected {2 * (k_end - k_start)}, got {expected_steps}"
         )
 
     # For denoising_end=1.0: last step is first-order only → clamped to 2N-1-begin.
@@ -231,7 +230,7 @@ def test_anima_heun_set_begin_index_path_begin_index_and_step_count(
 
     # Bounds check: begin_index + num_steps must not exceed len(timesteps).
     assert expected_begin_index + expected_steps <= len(scheduler.timesteps), (
-        f"step range [{expected_begin_index}, {expected_begin_index+expected_steps}) "
+        f"step range [{expected_begin_index}, {expected_begin_index + expected_steps}) "
         f"exceeds timesteps length {len(scheduler.timesteps)}"
     )
 

@@ -115,9 +115,7 @@ class AnimaSchedulerDriver:
             in_first_order = self.scheduler.state_in_first_order if self.is_heun else True
 
             next_idx = sched_idx + 1
-            sigma_prev = (
-                self.scheduler.sigmas[next_idx].item() if next_idx < len(self.scheduler.sigmas) else 0.0
-            )
+            sigma_prev = self.scheduler.sigmas[next_idx].item() if next_idx < len(self.scheduler.sigmas) else 0.0
 
             # For Heun, a user step completes on the second-order half of each
             # pair AND on the unpaired terminal first-order step (sigma_prev==0).
