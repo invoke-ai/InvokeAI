@@ -8,6 +8,7 @@ import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { useFocusRegionWatcher } from 'common/hooks/focus';
 import { useCloseChakraTooltipsOnDragFix } from 'common/hooks/useCloseChakraTooltipsOnDragFix';
 import { useGlobalHotkeys } from 'common/hooks/useGlobalHotkeys';
+import { useTouchDeviceClass } from 'common/hooks/useTouchDeviceClass';
 import { useDndMonitor } from 'features/dnd/useDndMonitor';
 import { useDynamicPromptsWatcher } from 'features/dynamicPrompts/hooks/useDynamicPromptsWatcher';
 import { useStarterModelsToast } from 'features/modelManagerV2/hooks/useStarterModelsToast';
@@ -42,6 +43,7 @@ export const GlobalHookIsolator = memo(() => {
   useGetOpenAPISchemaQuery();
   useSyncLoggingConfig();
   useCloseChakraTooltipsOnDragFix();
+  useTouchDeviceClass();
   useDndMonitor();
   useSyncNodeErrors();
   useSyncLangDirection();

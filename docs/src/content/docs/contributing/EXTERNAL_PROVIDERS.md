@@ -1,4 +1,6 @@
-# External Provider Integration
+---
+title: External Provider Integration
+---
 
 This guide covers:
 

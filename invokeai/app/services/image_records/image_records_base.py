@@ -70,8 +70,8 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def delete_intermediates(self) -> list[str]:
-        """Deletes all intermediate image records, returning a list of deleted image names."""
+    def delete_intermediates(self) -> list[tuple[str, str]]:
+        """Deletes all intermediate image records, returning a list of (image_name, image_subfolder) tuples."""
         pass
 
     @abstractmethod
@@ -94,6 +94,7 @@ class ImageRecordStorageBase(ABC):
         node_id: Optional[str] = None,
         metadata: Optional[str] = None,
         user_id: Optional[str] = None,
+        image_subfolder: str = "",
     ) -> datetime:
         """Saves an image record."""
         pass
