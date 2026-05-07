@@ -4,13 +4,16 @@ This module provides the scheduler types and mapping for Flow Matching models
 (Flux and Z-Image), supporting multiple schedulers from the diffusers library.
 """
 
-from typing import Literal, Type
+from typing import Any, Literal, Type
 
 from diffusers import (
+    DPMSolverMultistepScheduler,
     FlowMatchEulerDiscreteScheduler,
     FlowMatchHeunDiscreteScheduler,
 )
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
+
+from invokeai.backend.rectified_flow.er_sde_scheduler import ERSDEScheduler
 
 # Note: FlowMatchLCMScheduler may not be available in all diffusers versions
 try:
@@ -62,21 +65,66 @@ if _HAS_LCM:
     ZIMAGE_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler
 
 
-# Anima scheduler types (same Flow Matching schedulers as Flux/Z-Image)
-# Anima uses rectified flow with shift=3.0 and multiplier=1000.
-# Recommended: 30 steps with Euler, CFG 4-5.
-ANIMA_SCHEDULER_NAME_VALUES = Literal["euler", "heun", "lcm"]
+# Anima scheduler types.
+# Anima uses rectified flow with shift=3.0. Sigmas are pre-shifted in
+# anima_denoise.py via loglinear_timestep_shift, so FlowMatch schedulers
+# carry shift=1.0 in their per-entry kwargs to avoid double-shifting.
+# DPMSolverMultistepScheduler entries carry flow_shift=3.0 explicitly because
+# they do not receive pre-shifted sigmas via set_timesteps(sigmas=...) in the
+# same way — the shift is baked into the solver's sigma schedule.
+
+# Fixed shift factor for the Anima rectified-flow noise schedule.
+ANIMA_SHIFT = 3.0
+
+ANIMA_SCHEDULER_NAME_VALUES = Literal["euler", "heun", "dpmpp_2m", "dpmpp_2m_sde", "er_sde", "lcm"]
 
 ANIMA_SCHEDULER_LABELS: dict[str, str] = {
     "euler": "Euler",
     "heun": "Heun (2nd order)",
+    "dpmpp_2m": "DPM++ 2M",
+    "dpmpp_2m_sde": "DPM++ 2M SDE",
+    "er_sde": "ER-SDE",
     "lcm": "LCM",
 }
 
-ANIMA_SCHEDULER_MAP: dict[str, Type[SchedulerMixin]] = {
-    "euler": FlowMatchEulerDiscreteScheduler,
-    "heun": FlowMatchHeunDiscreteScheduler,
+# When adding a new Anima scheduler: add to all three of NAME_VALUES, LABELS,
+# and this MAP. The MAP entry is `(SchedulerClass, scheduler_kwargs)`. For
+# rectified-flow schedulers, set `use_flow_sigmas=True` and use
+# `prediction_type="flow_prediction"`. The pre-shifted sigma schedule is passed
+# via `set_timesteps(sigmas=...)` from anima_denoise._run_diffusion.
+ANIMA_SCHEDULER_MAP: dict[str, tuple[Type[SchedulerMixin], dict[str, Any]]] = {
+    "euler": (FlowMatchEulerDiscreteScheduler, {"shift": 1.0}),
+    "heun": (FlowMatchHeunDiscreteScheduler, {"shift": 1.0}),
+    "dpmpp_2m": (
+        DPMSolverMultistepScheduler,
+        {
+            "prediction_type": "flow_prediction",
+            "use_flow_sigmas": True,
+            "flow_shift": ANIMA_SHIFT,
+            "solver_order": 2,
+        },
+    ),
+    "dpmpp_2m_sde": (
+        DPMSolverMultistepScheduler,
+        {
+            "prediction_type": "flow_prediction",
+            "use_flow_sigmas": True,
+            "flow_shift": ANIMA_SHIFT,
+            "algorithm_type": "sde-dpmsolver++",
+            "solver_order": 2,
+        },
+    ),
+    "er_sde": (
+        ERSDEScheduler,
+        {
+            "prediction_type": "flow_prediction",
+            "use_flow_sigmas": True,
+            "flow_shift": ANIMA_SHIFT,
+            "solver_order": 3,
+            "stochastic": True,
+        },
+    ),
 }
 
 if _HAS_LCM:
-    ANIMA_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler
+    ANIMA_SCHEDULER_MAP["lcm"] = (FlowMatchLCMScheduler, {"shift": 1.0})

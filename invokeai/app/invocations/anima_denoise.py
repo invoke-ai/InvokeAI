@@ -42,7 +42,12 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.anima.anima_transformer_patch import patch_anima_for_regional_prompting
 from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
 from invokeai.backend.anima.regional_prompting import AnimaRegionalPromptingExtension
-from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_LABELS, ANIMA_SCHEDULER_MAP, ANIMA_SCHEDULER_NAME_VALUES
+from invokeai.backend.flux.schedulers import (
+    ANIMA_SCHEDULER_LABELS,
+    ANIMA_SCHEDULER_MAP,
+    ANIMA_SCHEDULER_NAME_VALUES,
+    ANIMA_SHIFT,
+)
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_TRANSFORMER_PREFIX
@@ -59,8 +64,6 @@ from invokeai.backend.util.devices import TorchDevice
 ANIMA_LATENT_SCALE_FACTOR = 8
 # Anima uses 16 latent channels
 ANIMA_LATENT_CHANNELS = 16
-# Anima uses fixed shift=3.0 for the rectified flow schedule
-ANIMA_SHIFT = 3.0
 # Anima uses raw sigma values as timesteps (no rescaling)
 ANIMA_MULTIPLIER = 1.0
 
@@ -165,7 +168,7 @@ class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
     title="Denoise - Anima",
     tags=["image", "anima"],
     category="image",
-    version="1.2.0",
+    version="1.5.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseInvocation(BaseInvocation):
@@ -491,22 +494,38 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         step_callback = self._build_step_callback(context)
 
-        # Initialize diffusers scheduler if not using built-in Euler
+        # Initialize diffusers scheduler if not using built-in Euler.
         scheduler: SchedulerMixin | None = None
         use_scheduler = self.scheduler != "euler"
 
+        scheduler_begin_index = 0
+
         if use_scheduler:
-            scheduler_class = ANIMA_SCHEDULER_MAP[self.scheduler]
-            scheduler = scheduler_class(num_train_timesteps=1000, shift=1.0)
+            scheduler_class, scheduler_kwargs = ANIMA_SCHEDULER_MAP[self.scheduler]
+            scheduler = scheduler_class(num_train_timesteps=1000, **scheduler_kwargs)
             is_lcm = self.scheduler == "lcm"
             set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
             if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
                 scheduler.set_timesteps(sigmas=sigmas, device=device)
+            elif (
+                not is_lcm
+                and hasattr(scheduler, "set_begin_index")
+                and (self.denoising_start > 0 or self.denoising_end < 1)
+            ):
+                # Scheduler doesn't accept sigmas=. Use the full schedule with set_begin_index
+                # so the internal flow_shift applies correctly and the clipped start is honoured.
+                scheduler_begin_index = int(self.denoising_start * self.steps)
+                scheduler.set_timesteps(num_inference_steps=self.steps, device=device)
+                scheduler.set_begin_index(scheduler_begin_index)
             else:
                 scheduler.set_timesteps(num_inference_steps=total_steps, device=device)
-            num_scheduler_steps = len(scheduler.timesteps)
+            num_scheduler_steps = len(scheduler.timesteps) - scheduler_begin_index
         else:
             num_scheduler_steps = total_steps
+
+        step_generator: torch.Generator | None = None
+        if use_scheduler:
+            step_generator = torch.Generator(device=device).manual_seed(self.seed)
 
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
@@ -592,7 +611,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
                 user_step = 0
                 pbar = tqdm(total=total_steps, desc="Denoising (Anima)")
                 for step_index in range(num_scheduler_steps):
-                    sched_timestep = scheduler.timesteps[step_index]
+                    sched_timestep = scheduler.timesteps[step_index + scheduler_begin_index]
                     sigma_curr = sched_timestep.item() / scheduler.config.num_train_timesteps
 
                     is_heun = hasattr(scheduler, "state_in_first_order")
@@ -610,11 +629,16 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     else:
                         noise_pred = noise_pred_cond
 
-                    step_output = scheduler.step(model_output=noise_pred, timestep=sched_timestep, sample=latents)
+                    step_output = scheduler.step(
+                        model_output=noise_pred,
+                        timestep=sched_timestep,
+                        sample=latents,
+                        generator=step_generator,
+                    )
                     latents = step_output.prev_sample
 
-                    if step_index + 1 < len(scheduler.sigmas):
-                        sigma_prev = scheduler.sigmas[step_index + 1].item()
+                    if step_index + scheduler_begin_index + 1 < len(scheduler.sigmas):
+                        sigma_prev = scheduler.sigmas[step_index + scheduler_begin_index + 1].item()
                     else:
                         sigma_prev = 0.0
 

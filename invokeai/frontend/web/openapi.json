@@ -9461,7 +9461,7 @@
           "scheduler": {
             "default": "euler",
             "description": "Scheduler (sampler) for the denoising process.",
-            "enum": ["euler", "heun", "lcm"],
+            "enum": ["euler", "heun", "dpmpp_2m", "dpmpp_2m_sde", "er_sde", "lcm"],
             "field_kind": "input",
             "input": "any",
             "orig_default": "euler",
@@ -9471,6 +9471,9 @@
             "ui_choice_labels": {
               "euler": "Euler",
               "heun": "Heun (2nd order)",
+              "dpmpp_2m": "DPM++ 2M",
+              "dpmpp_2m_sde": "DPM++ 2M SDE",
+              "er_sde": "ER-SDE",
               "lcm": "LCM"
             }
           },
@@ -9486,7 +9489,7 @@
         "tags": ["image", "anima"],
         "title": "Denoise - Anima",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
