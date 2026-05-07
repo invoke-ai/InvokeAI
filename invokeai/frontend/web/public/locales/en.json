@@ -1358,7 +1358,7 @@
         "flux2KleinQwen3EncoderPlaceholder": "From diffusers model",
         "flux2KleinQwen3EncoderNoModelPlaceholder": "No diffusers model available",
         "qwenImageComponentSource": "VAE/Encoder Source (Diffusers)",
-        "qwenImageComponentSourcePlaceholder": "Required for GGUF models",
+        "qwenImageComponentSourcePlaceholder": "GGUF models require this unless a standalone VAE & Encoder is installed",
         "qwenImageVae": "VAE",
         "qwenImageVaePlaceholder": "From VAE/Encoder Source",
         "qwenImageQwenVLEncoder": "Qwen2.5-VL Encoder",

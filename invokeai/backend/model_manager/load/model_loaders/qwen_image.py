@@ -274,6 +274,8 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
                 ) from e
 
     def _load_text_encoder_from_singlefile(self, config: QwenVLEncoder_Checkpoint_Config) -> AnyModel:
+        import re
+
         from safetensors.torch import load_file
         from transformers import AutoConfig, Qwen2_5_VLForConditionalGeneration
 
@@ -288,12 +290,18 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
 
         sd = load_file(str(model_path))
 
-        # Dequantize ComfyUI-style fp8 weights (weight + weight_scale pairs).
-        # Same scheme as Z-Image's Qwen3 single-file loader.
-        weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(".weight_scale")]
+        # Dequantize ComfyUI-style fp8 weights. Two key naming schemes are in the wild:
+        #   - `<path>.weight` + `<path>.weight_scale`  (FLUX, Z-Image style)
+        #   - `<path>.weight` + `<path>.scale_weight`  (Qwen2.5-VL fp8_scaled style, also
+        #     emits `<path>.scale_input` for activation scaling that we discard).
+        scale_suffixes = (".weight_scale", ".scale_weight")
+        weight_scale_keys = [k for k in sd.keys() if isinstance(k, str) and k.endswith(scale_suffixes)]
         dequantized_count = 0
         for scale_key in weight_scale_keys:
-            weight_key = scale_key.replace(".weight_scale", ".weight")
+            for suffix in scale_suffixes:
+                if scale_key.endswith(suffix):
+                    weight_key = scale_key[: -len(suffix)] + ".weight"
+                    break
             if weight_key not in sd:
                 continue
             weight = sd[weight_key]
@@ -313,14 +321,40 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
         if dequantized_count > 0:
             logger.info(f"Dequantized {dequantized_count} ComfyUI-quantized weights")
 
-        # Strip ComfyUI quantization metadata (weight_scale, comfy_quant.*, scaled_fp8)
+        # Strip ComfyUI quantization metadata. `scale_input` is the activation scale used
+        # at runtime by ComfyUI's fp8 matmul kernels — we run the encoder in bf16 after
+        # dequantization, so it is not needed.
         keys_to_drop = [
             k
             for k in sd.keys()
-            if isinstance(k, str) and (k.endswith(".weight_scale") or "comfy_quant" in k or k == "scaled_fp8")
+            if isinstance(k, str)
+            and (
+                k.endswith(".weight_scale")
+                or k.endswith(".scale_weight")
+                or k.endswith(".scale_input")
+                or "comfy_quant" in k
+                or k == "scaled_fp8"
+            )
         ]
         for k in keys_to_drop:
             del sd[k]
+
+        # ComfyUI single-file checkpoints use the legacy Qwen2.5-VL key layout
+        # (`visual.X`, `model.X`); transformers ≥4.50 expects `model.visual.X` and
+        # `model.language_model.X`. Apply the same conversion mapping that
+        # `Qwen2_5_VLForConditionalGeneration.from_pretrained` would, since
+        # `load_state_dict` does not.
+        key_mapping = Qwen2_5_VLForConditionalGeneration._checkpoint_conversion_mapping
+        if key_mapping:
+            remapped_sd: dict[str, torch.Tensor] = {}
+            for old_key, tensor in sd.items():
+                new_key = old_key
+                for pattern, replacement in key_mapping.items():
+                    new_key, n_replace = re.subn(pattern, replacement, new_key)
+                    if n_replace > 0:
+                        break
+                remapped_sd[new_key] = tensor
+            sd = remapped_sd
 
         # Cast to compute dtype (skip integer/index tensors)
         for k in list(sd.keys()):
