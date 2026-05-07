@@ -14,6 +14,7 @@ from invokeai.app.api.auth_dependencies import AdminUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.config.config_default import (
     EXTERNAL_PROVIDER_CONFIG_FIELDS,
+    IMAGE_SUBFOLDER_STRATEGY,
     DefaultInvokeAIAppConfig,
     InvokeAIAppConfig,
     get_config,
@@ -108,6 +109,11 @@ _EXTERNAL_PROVIDER_CONFIG_LOCK = Lock()
 class UpdateAppGenerationSettingsRequest(BaseModel):
     """Writable generation-related app settings."""
 
+    image_subfolder_strategy: IMAGE_SUBFOLDER_STRATEGY = Field(
+        default=None,
+        description="Strategy for organizing images into subfolders.",
+        json_schema_extra=lambda schema: schema.pop("default", None),
+    )
     max_queue_history: int | None = Field(
         default=None,
         ge=0,
