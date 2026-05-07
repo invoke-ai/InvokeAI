@@ -140,6 +140,7 @@ nav:
       - New to InvokeAI?: 'help/gettingStartedWithAI.md'
       - Low VRAM mode: 'features/low-vram.md'
       - Database: 'features/database.md'
+      - HiDiffusion: 'features/hidiffusion.md'
       - Gallery: 'features/gallery.md'
       - Hot Keys: 'features/hotkeys.md'
       - External Models:
