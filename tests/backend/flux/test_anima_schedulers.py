@@ -97,6 +97,44 @@ def test_anima_dpmpp_2m_produces_anima_compatible_sigma_schedule():
     assert max_diff < 1e-3, f"DPM++ 2M sigma schedule diverges from Anima reference (max abs diff = {max_diff:.6f})"
 
 
+def test_anima_dpmpp_2m_with_denoising_start_honors_clipped_schedule():
+    """DPM++ img2img: the set_begin_index path must start at the correct sigma.
+
+    When DPMSolverMultistepScheduler doesn't accept sigmas=, anima_denoise falls back to
+    set_timesteps(num_inference_steps=full_steps) + set_begin_index(start_idx).  The
+    effective first sigma must match the clipped Anima reference schedule within 1e-3.
+    """
+    import inspect
+
+    from invokeai.app.invocations.anima_denoise import loglinear_timestep_shift
+    from invokeai.backend.flux.schedulers import ANIMA_SHIFT
+
+    num_steps = 30
+    denoising_start = 0.5
+    start_idx = int(denoising_start * num_steps)  # mirrors anima_denoise clipping math
+
+    full_sigmas = [loglinear_timestep_shift(ANIMA_SHIFT, 1.0 - i / num_steps) for i in range(num_steps + 1)]
+    expected_first_sigma = full_sigmas[start_idx]
+
+    cls, kwargs = ANIMA_SCHEDULER_MAP["dpmpp_2m"]
+    scheduler = cls(num_train_timesteps=1000, **kwargs)
+    sig = inspect.signature(scheduler.set_timesteps)
+
+    if "sigmas" in sig.parameters:
+        # Future diffusers: sigmas= supported, clipped schedule passed directly.
+        scheduler.set_timesteps(sigmas=full_sigmas[start_idx:], device="cpu")
+        actual_first_sigma = float(scheduler.sigmas[0])
+    else:
+        # Current diffusers: use set_begin_index on the full schedule.
+        scheduler.set_timesteps(num_inference_steps=num_steps, device="cpu")
+        scheduler.set_begin_index(start_idx)
+        actual_first_sigma = float(scheduler.sigmas[start_idx])
+
+    assert abs(actual_first_sigma - expected_first_sigma) < 1e-3, (
+        f"DPM++ first sigma with denoising_start=0.5: got {actual_first_sigma:.6f}, expected {expected_first_sigma:.6f}"
+    )
+
+
 def test_anima_literal_covers_every_map_key():
     """Catch the silent failure mode where a new entry lands in the map but
     the Literal isn't updated — Pydantic validation would still accept it

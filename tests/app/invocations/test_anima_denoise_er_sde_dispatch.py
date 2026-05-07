@@ -1,13 +1,9 @@
-"""Dispatch integration test for Anima ER-SDE through the universal scheduler.
+"""Dispatch wiring and sigma-contract tests for Anima ER-SDE.
 
-Verifies that AnimaDenoiseInvocation with scheduler='er_sde' routes through
-the standard use_scheduler path and instantiates an ERSDEScheduler — not
-through the legacy elif is_er_sde: branch (which is removed in a sibling
-commit).
-
-Numerical correctness is gated by tests/backend/rectified_flow/test_er_sde_scheduler_anima_parity.py
-(worst delta 5.137e-07 against er_sde_rf_step). This test catches dispatch
-wiring bugs only.
+Verifies that ANIMA_SCHEDULER_MAP['er_sde'] produces a correctly configured
+ERSDEScheduler, that set_timesteps accepts sigmas= (the contract Anima relies
+on to pass its pre-shifted schedule), and that the sigma state is set up as
+expected after set_timesteps.
 """
 
 from __future__ import annotations
