@@ -182,6 +182,22 @@
     },
     {
       "category": "PATHS",
+      "default": "flat",
+      "description": "Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.",
+      "env_var": "INVOKEAI_IMAGE_SUBFOLDER_STRATEGY",
+      "literal_values": [
+        "flat",
+        "date",
+        "type",
+        "hash"
+      ],
+      "name": "image_subfolder_strategy",
+      "required": false,
+      "type": "typing.Literal['flat', 'date', 'type', 'hash']",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
       "default": "nodes",
       "description": "Path to directory for custom nodes.",
       "env_var": "INVOKEAI_CUSTOM_NODES_DIR",
