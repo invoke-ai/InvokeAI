@@ -7,7 +7,7 @@ export const containerSx: SystemStyleObject = {
   h: 'full',
   position: 'relative',
   transitionProperty: 'none',
-  cursor: 'grab',
+  cursor: 'pointer',
   '--border-color': 'var(--invoke-colors-base-500)',
   '--border-color-selected': 'var(--invoke-colors-blue-300)',
   '--header-bg-color': 'var(--invoke-colors-base-900)',

@@ -12,6 +12,7 @@ import {
   animaT5EncoderModelSelected,
   animaVaeModelSelected,
   geminiTemperatureChanged,
+  geminiThinkingLevelChanged,
   heightChanged,
   imageSizeChanged,
   kleinQwen3EncoderModelSelected,
@@ -25,6 +26,8 @@ import {
   qwenImageQuantizationChanged,
   qwenImageShiftChanged,
   refinerModelChanged,
+  seedreamOptimizePromptChanged,
+  seedreamWatermarkChanged,
   selectBase,
   setAnimaScheduler,
   setCfgRescaleMultiplier,
@@ -1426,6 +1429,25 @@ const GeminiTemperature: SingleMetadataHandler<number> = {
 };
 //#endregion Gemini Temperature
 
+//#region Gemini Thinking Level
+const zGeminiThinkingLevel = z.enum(['minimal', 'high']);
+const GeminiThinkingLevel: SingleMetadataHandler<'minimal' | 'high'> = {
+  [SingleMetadataKey]: true,
+  type: 'GeminiThinkingLevel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'gemini_thinking_level');
+    const parsed = zGeminiThinkingLevel.parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(geminiThinkingLevelChanged(value));
+  },
+  i18nKey: 'metadata.geminiThinkingLevel',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<'minimal' | 'high'>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Gemini Thinking Level
+
 //#region OpenAI Quality
 const OpenaiQuality: SingleMetadataHandler<'auto' | 'high' | 'medium' | 'low'> = {
   [SingleMetadataKey]: true,
@@ -1484,6 +1506,42 @@ const OpenaiInputFidelity: SingleMetadataHandler<'low' | 'high'> = {
 };
 //#endregion OpenAI Input Fidelity
 
+//#region Seedream Watermark
+const SeedreamWatermark: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'SeedreamWatermark',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'seedream_watermark');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(seedreamWatermarkChanged(value));
+  },
+  i18nKey: 'metadata.seedreamWatermark',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Seedream Watermark
+
+//#region Seedream Optimize Prompt
+const SeedreamOptimizePrompt: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'SeedreamOptimizePrompt',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'seedream_optimize_prompt');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(seedreamOptimizePromptChanged(value));
+  },
+  i18nKey: 'metadata.seedreamOptimizePrompt',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Seedream Optimize Prompt
+
 export const ImageMetadataHandlers = {
   CreatedBy,
   GenerationMode,
@@ -1534,9 +1592,12 @@ export const ImageMetadataHandlers = {
   RefImages,
   ImageSize,
   GeminiTemperature,
+  GeminiThinkingLevel,
   OpenaiQuality,
   OpenaiBackground,
   OpenaiInputFidelity,
+  SeedreamWatermark,
+  SeedreamOptimizePrompt,
   // TODO: These had parsers in the prev implementation, but they were never actually used?
   // controlNet: parseControlNet,
   // controlNets: parseAllControlNets,

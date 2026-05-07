@@ -399,7 +399,7 @@
     },
     {
       "category": "CACHE",
-      "default": false,
+      "default": true,
       "description": "Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.",
       "env_var": "INVOKEAI_ENABLE_PARTIAL_LOADING",
       "literal_values": [],
@@ -727,6 +727,28 @@
     {
       "category": "EXTERNAL PROVIDERS",
       "default": null,
+      "description": "API key for Alibaba Cloud DashScope image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ALIBABACLOUD_API_KEY",
+      "literal_values": [],
+      "name": "external_alibabacloud_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for Alibaba Cloud DashScope image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ALIBABACLOUD_BASE_URL",
+      "literal_values": [],
+      "name": "external_alibabacloud_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
       "description": "API key for Gemini image generation.",
       "env_var": "INVOKEAI_EXTERNAL_GEMINI_API_KEY",
       "literal_values": [],
@@ -764,6 +786,28 @@
       "env_var": "INVOKEAI_EXTERNAL_OPENAI_BASE_URL",
       "literal_values": [],
       "name": "external_openai_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "API key for Seedream image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_SEEDREAM_API_KEY",
+      "literal_values": [],
+      "name": "external_seedream_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for Seedream image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_SEEDREAM_BASE_URL",
+      "literal_values": [],
+      "name": "external_seedream_base_url",
       "required": false,
       "type": "typing.Optional[str]",
       "validation": {}

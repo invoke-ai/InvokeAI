@@ -32,10 +32,14 @@ LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
 CONFIG_SCHEMA_VERSION = "4.0.2"
 EXTERNAL_PROVIDER_CONFIG_FIELDS = (
+    "external_alibabacloud_api_key",
+    "external_alibabacloud_base_url",
     "external_gemini_api_key",
-    "external_openai_api_key",
     "external_gemini_base_url",
+    "external_openai_api_key",
     "external_openai_base_url",
+    "external_seedream_api_key",
+    "external_seedream_base_url",
 )
 
 
@@ -120,10 +124,14 @@ class InvokeAIAppConfig(BaseSettings):
         allow_unknown_models: Allow installation of models that we are unable to identify. If enabled, models will be marked as `unknown` in the database, and will not have any metadata associated with them. If disabled, unknown models will be rejected during installation.
         multiuser: Enable multiuser support. When disabled, the application runs in single-user mode using a default system account with administrator privileges. When enabled, requires user authentication and authorization.
         strict_password_checking: Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.
+        external_alibabacloud_api_key: API key for Alibaba Cloud DashScope image generation.
+        external_alibabacloud_base_url: Base URL override for Alibaba Cloud DashScope image generation.
         external_gemini_api_key: API key for Gemini image generation.
         external_openai_api_key: API key for OpenAI image generation.
         external_gemini_base_url: Base URL override for Gemini image generation.
         external_openai_base_url: Base URL override for OpenAI image generation.
+        external_seedream_api_key: API key for Seedream image generation.
+        external_seedream_base_url: Base URL override for Seedream image generation.
     """
 
     _root: Optional[Path] = PrivateAttr(default=None)
@@ -182,7 +190,7 @@ class InvokeAIAppConfig(BaseSettings):
     log_memory_usage:              bool = Field(default=False,              description="If True, a memory snapshot will be captured before and after every model cache operation, and the result will be logged (at debug level). There is a time cost to capturing the memory snapshots, so it is recommended to only enable this feature if you are actively inspecting the model cache's behaviour.")
     model_cache_keep_alive_min:   float = Field(default=0, ge=0,            description="How long to keep models in cache after last use, in minutes. A value of 0 (the default) means models are kept in cache indefinitely. If no model generations occur within the timeout period, the model cache is cleared using the same logic as the 'Clear Model Cache' button.")
     device_working_mem_gb:        float = Field(default=3,                  description="The amount of working memory to keep available on the compute device (in GB). Has no effect if running on CPU. If you are experiencing OOM errors, try increasing this value.")
-    enable_partial_loading:        bool = Field(default=False,              description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.")
+    enable_partial_loading:        bool = Field(default=True,               description="Enable partial loading of models. This enables models to run with reduced VRAM requirements (at the cost of slower speed) by streaming the model from RAM to VRAM as its used. In some edge cases, partial loading can cause models to run more slowly if they were previously being fully loaded into VRAM.")
     keep_ram_copy_of_weights:      bool = Field(default=True,               description="Whether to keep a full RAM copy of a model's weights when the model is loaded in VRAM. Keeping a RAM copy increases average RAM usage, but speeds up model switching and LoRA patching (assuming there is sufficient RAM). Set this to False if RAM pressure is consistently high.")
     # Deprecated CACHE configs
     ram:                Optional[float] = Field(default=None, gt=0,         description="DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.")
@@ -223,6 +231,10 @@ class InvokeAIAppConfig(BaseSettings):
     strict_password_checking:      bool = Field(default=False,              description="Enforce strict password requirements. When True, passwords must contain uppercase, lowercase, and numbers. When False (default), any password is accepted but its strength (weak/moderate/strong) is reported to the user.")
 
     # EXTERNAL PROVIDERS
+    external_alibabacloud_api_key: Optional[str] = Field(default=None, description="API key for Alibaba Cloud DashScope image generation.")
+    external_alibabacloud_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Alibaba Cloud DashScope image generation."
+    )
     external_gemini_api_key: Optional[str] = Field(default=None, description="API key for Gemini image generation.")
     external_openai_api_key: Optional[str] = Field(default=None, description="API key for OpenAI image generation.")
     external_gemini_base_url: Optional[str] = Field(
@@ -230,6 +242,12 @@ class InvokeAIAppConfig(BaseSettings):
     )
     external_openai_base_url: Optional[str] = Field(
         default=None, description="Base URL override for OpenAI image generation."
+    )
+    external_seedream_api_key: Optional[str] = Field(
+        default=None, description="API key for Seedream image generation."
+    )
+    external_seedream_base_url: Optional[str] = Field(
+        default=None, description="Base URL override for Seedream image generation."
     )
 
     # fmt: on
