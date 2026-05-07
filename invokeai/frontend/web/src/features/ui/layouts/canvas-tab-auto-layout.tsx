@@ -22,6 +22,7 @@ import { memo, useCallback, useEffect } from 'react';
 
 import { CanvasTabLeftPanel } from './CanvasTabLeftPanel';
 import { CanvasWorkspacePanel } from './CanvasWorkspacePanel';
+import { DockviewCanvasHeaderActions } from './DockviewCanvasHeaderActions';
 import { DockviewTabCanvasViewer } from './DockviewTabCanvasViewer';
 import { DockviewTabCanvasWorkspace } from './DockviewTabCanvasWorkspace';
 import { DockviewTabLaunchpad } from './DockviewTabLaunchpad';
@@ -132,6 +133,7 @@ const MainPanel = memo(() => {
         onReady={onReady}
         theme={dockviewTheme}
         tabComponents={tabComponents}
+        rightHeaderActionsComponent={DockviewCanvasHeaderActions}
       />
       <FloatingCanvasLeftPanelButtons />
       <FloatingRightPanelButtons />
