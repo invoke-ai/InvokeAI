@@ -91,4 +91,5 @@ openapi:
 # Serve the mkdocs site w/ live reload
 .PHONY: docs
 docs:
-	mkdocs serve
+	cd docs && pnpm install && \
+	pnpm run dev
