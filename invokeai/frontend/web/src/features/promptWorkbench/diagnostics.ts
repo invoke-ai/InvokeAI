@@ -1,3 +1,9 @@
+import type { DynamicPromptRandomRefreshMode } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
+import {
+  getHasCyclicWildcardSyntax,
+  getHasDynamicPromptSyntax,
+  getHasMixedCyclicAndNonCyclicDynamicPromptSyntax,
+} from 'features/dynamicPrompts/util/promptIntent';
 import type { BaseModelType } from 'features/nodes/types/common';
 import type { WildcardIndexItem } from 'services/api/endpoints/utilities';
 
@@ -7,8 +13,6 @@ import { getMissingWildcardReferences, getWildcardReferences } from './wildcards
 const NUMERIC_ATTENTION_PATTERN = /\([^()\r\n]+:[+-]?\d+(?:\.\d+)?\)/;
 const COMPEL_ATTENTION_PATTERN = /\)(?:[+-]+|[+-]?\d+(?:\.\d+)?)/;
 const BRACKET_ATTENTION_PATTERN = /\[[^\]\r\n]+\]/;
-const DYNAMIC_PROMPT_PATTERN = /\{[\s\S]*\}|\$\{[\s\S]*\}|__[^\r\n]+?__/;
-const CYCLIC_WILDCARD_PATTERN = /__@[^\r\n_][^\r\n]*?__/;
 
 export type PromptDiagnosticSeverity = 'ok' | 'info' | 'warning' | 'error';
 
@@ -27,7 +31,7 @@ type GetPromptDiagnosticsArg = {
   wildcardIndexErrorCount: number;
   dynamicPromptCount: number;
   dynamicPromptMode: 'random' | 'combinatorial';
-  dynamicPromptRandomRefreshMode?: 'manual' | 'per_enqueue';
+  dynamicPromptRandomRefreshMode?: DynamicPromptRandomRefreshMode;
   dynamicPromptError?: string | null;
 };
 
@@ -39,26 +43,19 @@ export const getPromptDiagnostics = ({
   wildcardIndexErrorCount,
   dynamicPromptCount,
   dynamicPromptMode,
-  dynamicPromptRandomRefreshMode = 'manual',
+  dynamicPromptRandomRefreshMode = 'per_image',
   dynamicPromptError,
 }: GetPromptDiagnosticsArg): PromptDiagnostic[] => {
   const capabilities = getPromptModelCapabilities(modelBase);
   const hasAttentionSyntax = getHasAttentionSyntax(prompt);
   const wildcardReferences = getWildcardReferences(prompt);
   const missingWildcards = wildcardIndexUnavailable ? [] : getMissingWildcardReferences(prompt, wildcards);
-  const diagnostics: PromptDiagnostic[] = [
-    {
-      code: 'attention-support',
-      label: capabilities.supportsAttentionWeights ? 'Weights OK' : 'Weights warn',
-      severity: capabilities.supportsAttentionWeights ? 'ok' : hasAttentionSyntax ? 'warning' : 'info',
-      description: capabilities.attentionWeightsLabel,
-    },
-  ];
+  const diagnostics: PromptDiagnostic[] = [];
 
   if (hasAttentionSyntax && !capabilities.supportsAttentionWeights) {
     diagnostics.push({
       code: 'attention-unsupported',
-      label: 'Unsupported weights',
+      label: 'Weights literal?',
       severity: 'warning',
       description: 'This prompt uses weight syntax, but the selected model may encode it as literal text.',
     });
@@ -85,13 +82,6 @@ export const getPromptDiagnostics = ({
       severity: 'ok',
       description: 'All referenced wildcards are available locally.',
     });
-  } else {
-    diagnostics.push({
-      code: 'wildcards-available',
-      label: 'Wildcards',
-      severity: 'info',
-      description: `${wildcards.length} local wildcard${wildcards.length === 1 ? '' : 's'} available. Type __ to insert one.`,
-    });
   }
 
   if (!wildcardIndexUnavailable && wildcardIndexErrorCount > 0) {
@@ -114,18 +104,21 @@ export const getPromptDiagnostics = ({
     const count = Math.max(dynamicPromptCount, 1);
     const isCombinatorial = dynamicPromptMode === 'combinatorial';
     const hasCyclicWildcard = getHasCyclicWildcardSyntax(prompt);
+    const hasMixedCyclicAndNonCyclicSyntax = getHasMixedCyclicAndNonCyclicDynamicPromptSyntax(prompt);
     diagnostics.push({
       code: 'dynamic-active',
       label: getDynamicPromptLabel({
         count,
         isCombinatorial,
         hasCyclicWildcard,
+        hasMixedCyclicAndNonCyclicSyntax,
         randomRefreshMode: dynamicPromptRandomRefreshMode,
       }),
       severity: 'ok',
       description: getDynamicPromptDescription({
         isCombinatorial,
         hasCyclicWildcard,
+        hasMixedCyclicAndNonCyclicSyntax,
         randomRefreshMode: dynamicPromptRandomRefreshMode,
       }),
     });
@@ -137,50 +130,64 @@ export const getPromptDiagnostics = ({
 export const getHasAttentionSyntax = (prompt: string): boolean =>
   NUMERIC_ATTENTION_PATTERN.test(prompt) || COMPEL_ATTENTION_PATTERN.test(prompt) || BRACKET_ATTENTION_PATTERN.test(prompt);
 
-export const getHasDynamicPromptSyntax = (prompt: string): boolean => DYNAMIC_PROMPT_PATTERN.test(prompt);
-
-export const getHasCyclicWildcardSyntax = (prompt: string): boolean => CYCLIC_WILDCARD_PATTERN.test(prompt);
-
 const getDynamicPromptLabel = (arg: {
   count: number;
   isCombinatorial: boolean;
   hasCyclicWildcard: boolean;
-  randomRefreshMode: 'manual' | 'per_enqueue';
+  hasMixedCyclicAndNonCyclicSyntax: boolean;
+  randomRefreshMode: DynamicPromptRandomRefreshMode;
 }): string => {
-  const { count, isCombinatorial, hasCyclicWildcard, randomRefreshMode } = arg;
+  const { count, isCombinatorial, hasCyclicWildcard, hasMixedCyclicAndNonCyclicSyntax, randomRefreshMode } = arg;
 
   if (isCombinatorial) {
     return `All ${count}`;
+  }
+
+  if (hasMixedCyclicAndNonCyclicSyntax) {
+    return 'Mixed dynamic';
   }
 
   if (hasCyclicWildcard) {
     return `Cycle ${count}`;
   }
 
-  if (randomRefreshMode === 'per_enqueue') {
-    return `Random ${count}/run`;
+  if (randomRefreshMode === 'per_image') {
+    return 'Random/image';
   }
 
-  return `Random ${count}`;
+  if (randomRefreshMode === 'per_enqueue') {
+    return 'Random/invoke';
+  }
+
+  return 'Random preview';
 };
 
 const getDynamicPromptDescription = (arg: {
   isCombinatorial: boolean;
   hasCyclicWildcard: boolean;
-  randomRefreshMode: 'manual' | 'per_enqueue';
+  hasMixedCyclicAndNonCyclicSyntax: boolean;
+  randomRefreshMode: DynamicPromptRandomRefreshMode;
 }): string => {
-  const { isCombinatorial, hasCyclicWildcard, randomRefreshMode } = arg;
+  const { isCombinatorial, hasCyclicWildcard, hasMixedCyclicAndNonCyclicSyntax, randomRefreshMode } = arg;
 
   if (isCombinatorial) {
     return 'All-combinations prompt expansion is active for this prompt.';
   }
 
+  if (hasMixedCyclicAndNonCyclicSyntax) {
+    return 'Cyclic wildcards advance per output; random wildcards follow the selected randomness mode.';
+  }
+
   if (hasCyclicWildcard) {
-    return 'Cyclic wildcard expansion is deterministic. Use Random to roll one value on each Invoke.';
+    return 'Cyclic wildcard expansion is deterministic and cycles through values across generated outputs.';
+  }
+
+  if (randomRefreshMode === 'per_image') {
+    return 'Random prompt sampling will roll fresh values for each generated image.';
   }
 
   if (randomRefreshMode === 'per_enqueue') {
-    return 'Random prompt sampling will roll fresh values when generation is queued.';
+    return 'Random prompt sampling will roll once when generation is queued.';
   }
 
   return 'Random prompt sampling is fixed to the current preview until Reshuffle is used.';

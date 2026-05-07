@@ -1,5 +1,6 @@
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
 import { debounce } from 'es-toolkit/compat';
+import { selectIterations } from 'features/controlLayers/store/paramsSlice';
 import {
   type DynamicPromptMode,
   isErrorChanged,
@@ -8,14 +9,14 @@ import {
   promptsChanged,
   selectDynamicPromptsMaxCombinations,
   selectDynamicPromptsMode,
+  selectDynamicPromptsRandomRefreshMode,
   selectDynamicPromptsRandomSamples,
   selectDynamicPromptsRandomSeed,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import { getDynamicPromptsQueryArg } from 'features/dynamicPrompts/util/getDynamicPromptsQueryArg';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
+import { resolveDynamicPrompts } from 'features/dynamicPrompts/util/resolveDynamicPrompts';
 import { selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
 import { useEffect, useMemo } from 'react';
-import { utilitiesApi } from 'services/api/endpoints/utilities';
 
 const DYNAMIC_PROMPTS_DEBOUNCE_MS = 1000;
 
@@ -28,8 +29,10 @@ export const useDynamicPromptsWatcher = () => {
   const presetModifiedPrompts = useAppSelector(selectPresetModifiedPrompts);
   const mode = useAppSelector(selectDynamicPromptsMode);
   const randomSamples = useAppSelector(selectDynamicPromptsRandomSamples);
+  const randomRefreshMode = useAppSelector(selectDynamicPromptsRandomRefreshMode);
   const maxCombinations = useAppSelector(selectDynamicPromptsMaxCombinations);
   const randomSeed = useAppSelector(selectDynamicPromptsRandomSeed);
+  const iterations = useAppSelector(selectIterations);
 
   const debouncedUpdateDynamicPrompts = useMemo(
     () =>
@@ -39,20 +42,22 @@ export const useDynamicPromptsWatcher = () => {
           mode: DynamicPromptMode,
           randomSamples: number,
           maxCombinations: number,
-          randomSeed: number
+          randomSeed: number,
+          randomRefreshMode: 'manual' | 'per_enqueue' | 'per_image',
+          iterations: number
         ) => {
-          const queryArg = getDynamicPromptsQueryArg({
-            prompt: positivePrompt,
-            mode,
-            randomSamples,
-            maxCombinations,
-            randomSeed,
-          });
           // Try to fetch the dynamic prompts and store in state
           try {
-            const req = dispatch(utilitiesApi.endpoints.dynamicPrompts.initiate(queryArg, { subscribe: false }));
-
-            const res = await req.unwrap();
+            const res = await resolveDynamicPrompts({
+              dispatch,
+              prompt: positivePrompt,
+              mode,
+              randomSamples,
+              maxCombinations,
+              randomSeed,
+              randomRefreshMode,
+              iterations,
+            });
 
             dispatch(promptsChanged(res.prompts));
             dispatch(parsingErrorChanged(res.error));
@@ -68,24 +73,7 @@ export const useDynamicPromptsWatcher = () => {
   );
 
   useEffect(() => {
-    // Before we execute, imperatively check the dynamic prompts query cache to see if we have already fetched this prompt
     const state = getState();
-
-    const queryArg = getDynamicPromptsQueryArg({
-      prompt: presetModifiedPrompts.positive,
-      mode,
-      randomSamples,
-      maxCombinations,
-      randomSeed,
-    });
-    const cachedPrompts = utilitiesApi.endpoints.dynamicPrompts.select(queryArg)(state).data;
-
-    if (cachedPrompts) {
-      // Yep we already did this prompt, use the cached result
-      dispatch(promptsChanged(cachedPrompts.prompts));
-      dispatch(parsingErrorChanged(cachedPrompts.error));
-      return;
-    }
 
     // If the prompt is not in the cache, check if we should process it - this is just looking for dynamic prompts syntax
     if (!getShouldProcessPrompt(presetModifiedPrompts.positive)) {
@@ -100,15 +88,25 @@ export const useDynamicPromptsWatcher = () => {
       dispatch(isLoadingChanged(true));
     }
 
-    debouncedUpdateDynamicPrompts(presetModifiedPrompts.positive, mode, randomSamples, maxCombinations, randomSeed);
+    debouncedUpdateDynamicPrompts(
+      presetModifiedPrompts.positive,
+      mode,
+      randomSamples,
+      maxCombinations,
+      randomSeed,
+      randomRefreshMode,
+      iterations
+    );
   }, [
     debouncedUpdateDynamicPrompts,
     dispatch,
     getState,
+    iterations,
     maxCombinations,
     mode,
     presetModifiedPrompts,
     randomSamples,
+    randomRefreshMode,
     randomSeed,
   ]);
 };

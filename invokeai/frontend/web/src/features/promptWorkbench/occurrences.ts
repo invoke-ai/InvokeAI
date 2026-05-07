@@ -1,9 +1,11 @@
-import { type ASTNode, type Attention,parseTokens, tokenize } from 'common/util/promptAST';
+import { type ASTNode, type Attention, parseTokens, tokenize } from 'common/util/promptAST';
+import type { DynamicPromptRandomRefreshMode } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import type { WildcardIndexItem } from 'services/api/endpoints/utilities';
 
-import { normalizeWildcardReference } from './wildcards';
+import { getCyclicWildcardToken, normalizeWildcardReference } from './wildcards';
 
 const WILDCARD_OCCURRENCE_REGEX = /__([^\r\n]+?)__/g;
+const WRAPPED_WILDCARD_WEIGHT_SUFFIX_REGEX = /^[ \t]*\)(?:[+-]+|[+-]?\d+(?:\.\d+)?)$/;
 
 export type PromptRange = {
   start: number;
@@ -11,6 +13,8 @@ export type PromptRange = {
 };
 
 export type PromptWildcardBehavior = 'random' | 'cycle' | 'all' | 'missing' | 'unavailable';
+export type WildcardBehaviorIconType = 'random' | 'cycle' | 'all' | 'warning';
+export type WildcardBehaviorAction = 'random' | 'cycle' | 'fixed' | 'remove';
 
 export type PromptWildcardOccurrence = {
   id: string;
@@ -22,6 +26,7 @@ export type PromptWildcardOccurrence = {
   behavior: PromptWildcardBehavior;
   wildcard: WildcardIndexItem | null;
   valueCount: number | null;
+  weight: PromptWeightOccurrence | null;
 };
 
 export type PromptWeightOccurrence = {
@@ -48,6 +53,12 @@ type PromptReplacementResult = {
   caret: number;
 };
 
+type WildcardBehaviorActionIntent = {
+  replacement?: string;
+  opensFixedValues?: boolean;
+  removesPrompt?: boolean;
+};
+
 export const getPromptWorkbenchOccurrences = ({
   prompt,
   wildcards,
@@ -55,10 +66,21 @@ export const getPromptWorkbenchOccurrences = ({
   dynamicPromptMode,
   supportsAttentionWeights,
 }: GetPromptWorkbenchOccurrencesArg): PromptWorkbenchOccurrence[] => {
+  const wildcardOccurrences = getPromptWildcardOccurrences({ prompt, wildcards, wildcardIndexUnavailable, dynamicPromptMode });
+  const weightOccurrences = getPromptWeightOccurrences({ prompt, supportsAttentionWeights });
+  const attachedWeightIds = new Set<string>();
+  const weightedWildcardOccurrences = wildcardOccurrences.map((occurrence) => {
+    const weight = getWrappingWeightOccurrence(prompt, occurrence, weightOccurrences);
+    if (weight) {
+      attachedWeightIds.add(weight.id);
+    }
+    return { ...occurrence, weight };
+  });
+
   return [
-    ...getPromptWildcardOccurrences({ prompt, wildcards, wildcardIndexUnavailable, dynamicPromptMode }),
-    ...getPromptWeightOccurrences({ prompt, supportsAttentionWeights }),
-  ].sort((a, b) => a.range.start - b.range.start || a.range.end - b.range.end);
+    ...weightedWildcardOccurrences,
+    ...weightOccurrences.filter((occurrence) => !attachedWeightIds.has(occurrence.id)),
+  ].sort((a, b) => getOccurrenceSortRange(a).start - getOccurrenceSortRange(b).start || a.range.end - b.range.end);
 };
 
 export const getPromptWildcardOccurrences = ({
@@ -94,6 +116,7 @@ export const getPromptWildcardOccurrences = ({
         wildcardIndexUnavailable,
       }),
       wildcard: exactWildcard,
+      weight: null,
       valueCount:
         matchingWildcards.length > 0
           ? matchingWildcards.reduce((total, wildcard) => total + wildcard.value_count, 0)
@@ -106,11 +129,17 @@ export const getPromptWildcardOccurrences = ({
 
 export const getWildcardBehaviorLabel = (
   occurrence: PromptWildcardOccurrence,
-  randomRefreshMode: 'manual' | 'per_enqueue'
+  randomRefreshMode: DynamicPromptRandomRefreshMode
 ): string => {
   switch (occurrence.behavior) {
     case 'random':
-      return randomRefreshMode === 'per_enqueue' ? 'Random every Invoke' : 'Random preview';
+      if (randomRefreshMode === 'per_image') {
+        return 'Random per Image';
+      }
+      if (randomRefreshMode === 'per_enqueue') {
+        return 'Random per Invoke';
+      }
+      return 'Random preview';
     case 'cycle':
       return 'Cycle';
     case 'all':
@@ -119,6 +148,44 @@ export const getWildcardBehaviorLabel = (
       return 'Missing';
     case 'unavailable':
       return 'Unavailable';
+  }
+};
+
+export const getWildcardBehaviorShortLabel = (
+  occurrence: PromptWildcardOccurrence,
+  randomRefreshMode: DynamicPromptRandomRefreshMode
+): string => {
+  switch (occurrence.behavior) {
+    case 'random':
+      if (randomRefreshMode === 'per_image') {
+        return 'Random/image';
+      }
+      if (randomRefreshMode === 'per_enqueue') {
+        return 'Random/invoke';
+      }
+      return 'Preview';
+    case 'cycle':
+      return 'Cycle';
+    case 'all':
+      return 'All';
+    case 'missing':
+      return 'Missing';
+    case 'unavailable':
+      return 'Unavailable';
+  }
+};
+
+export const getWildcardBehaviorIconType = (occurrence: PromptWildcardOccurrence): WildcardBehaviorIconType => {
+  switch (occurrence.behavior) {
+    case 'random':
+      return 'random';
+    case 'cycle':
+      return 'cycle';
+    case 'all':
+      return 'all';
+    case 'missing':
+    case 'unavailable':
+      return 'warning';
   }
 };
 
@@ -141,6 +208,25 @@ export const getPromptWeightOccurrences = ({
 
 export const getWeightBehaviorLabel = (occurrence: PromptWeightOccurrence): string =>
   occurrence.isSupported ? 'Weight supported' : 'Weight may be literal';
+
+export const getWeightShortLabel = (occurrence: PromptWeightOccurrence): string =>
+  occurrence.isSupported ? String(occurrence.attention) : 'Literal?';
+
+export const getWildcardBehaviorActionIntent = (
+  action: WildcardBehaviorAction,
+  wildcardPath: string
+): WildcardBehaviorActionIntent => {
+  switch (action) {
+    case 'random':
+      return { replacement: `__${wildcardPath}__` };
+    case 'cycle':
+      return { replacement: getCyclicWildcardToken(wildcardPath) };
+    case 'fixed':
+      return { opensFixedValues: true };
+    case 'remove':
+      return { removesPrompt: true };
+  }
+};
 
 export const replacePromptRange = (
   prompt: string,
@@ -199,6 +285,36 @@ const findMatchingWildcards = (reference: string, wildcards: WildcardIndexItem[]
   const regex = new RegExp(`^${reference.split('*').map(escapeRegExp).join('.*')}$`);
   return wildcards.filter((wildcard) => regex.test(wildcard.path));
 };
+
+const getWrappingWeightOccurrence = (
+  prompt: string,
+  wildcardOccurrence: PromptWildcardOccurrence,
+  weightOccurrences: PromptWeightOccurrence[]
+): PromptWeightOccurrence | null => {
+  const candidates = weightOccurrences
+    .filter((weightOccurrence) => getDoesWeightCleanlyWrapWildcard(prompt, weightOccurrence, wildcardOccurrence))
+    .sort((a, b) => a.range.end - a.range.start - (b.range.end - b.range.start));
+
+  return candidates[0] ?? null;
+};
+
+const getDoesWeightCleanlyWrapWildcard = (
+  prompt: string,
+  weightOccurrence: PromptWeightOccurrence,
+  wildcardOccurrence: PromptWildcardOccurrence
+): boolean => {
+  if (weightOccurrence.range.start >= wildcardOccurrence.range.start || weightOccurrence.range.end <= wildcardOccurrence.range.end) {
+    return false;
+  }
+
+  return (
+    /^[ \t]*\([ \t]*$/.test(prompt.slice(weightOccurrence.range.start, wildcardOccurrence.range.start)) &&
+    WRAPPED_WILDCARD_WEIGHT_SUFFIX_REGEX.test(prompt.slice(wildcardOccurrence.range.end, weightOccurrence.range.end))
+  );
+};
+
+const getOccurrenceSortRange = (occurrence: PromptWorkbenchOccurrence): PromptRange =>
+  occurrence.type === 'wildcard' && occurrence.weight ? occurrence.weight.range : occurrence.range;
 
 const collectPromptWeightOccurrences = (
   nodes: ASTNode[],

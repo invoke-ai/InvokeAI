@@ -17,7 +17,7 @@ const ParamDynamicPromptsMode = () => {
       {
         value: 'random',
         label: 'Random Sample',
-        description: 'Sample prompts; refresh controls whether they reroll on Invoke.',
+        description: 'Sample prompts. Randomness applies to random wildcards.',
       },
       {
         value: 'combinatorial',

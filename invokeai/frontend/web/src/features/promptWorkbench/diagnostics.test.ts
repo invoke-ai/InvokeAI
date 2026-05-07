@@ -14,7 +14,7 @@ const wildcards = [
 ];
 
 describe('prompt workbench diagnostics', () => {
-  it('reports attention weights as supported for SDXL', () => {
+  it('hides supported attention weight status for SDXL', () => {
     const diagnostics = getPromptDiagnostics({
       prompt: '(face:1.2)',
       modelBase: 'sdxl',
@@ -24,10 +24,7 @@ describe('prompt workbench diagnostics', () => {
       dynamicPromptMode: 'random',
     });
 
-    expect(diagnostics.find((diagnostic) => diagnostic.code === 'attention-support')).toMatchObject({
-      label: 'Weights OK',
-      severity: 'ok',
-    });
+    expect(diagnostics.find((diagnostic) => diagnostic.code.startsWith('attention'))).toBeUndefined();
   });
 
   it('warns when attention syntax is used with FLUX-like models', () => {
@@ -41,6 +38,7 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'attention-unsupported')).toMatchObject({
+      label: 'Weights literal?',
       severity: 'warning',
     });
   });
@@ -79,7 +77,7 @@ describe('prompt workbench diagnostics', () => {
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'wildcards-missing')).toBeUndefined();
   });
 
-  it('does not count available wildcards as prompt references', () => {
+  it('hides generic available wildcard status when the prompt has no references', () => {
     const diagnostics = getPromptDiagnostics({
       prompt: 'portrait',
       modelBase: 'sdxl',
@@ -89,9 +87,39 @@ describe('prompt workbench diagnostics', () => {
       dynamicPromptMode: 'random',
     });
 
-    expect(diagnostics.find((diagnostic) => diagnostic.code === 'wildcards-available')).toMatchObject({
-      label: 'Wildcards',
-      severity: 'info',
+    expect(diagnostics.find((diagnostic) => diagnostic.code === 'wildcards-available')).toBeUndefined();
+    expect(diagnostics.find((diagnostic) => diagnostic.label === 'Wildcards')).toBeUndefined();
+  });
+
+  it('reports referenced wildcards when present', () => {
+    const diagnostics = getPromptDiagnostics({
+      prompt: 'portrait __camera/lens__',
+      modelBase: 'sdxl',
+      wildcards,
+      wildcardIndexErrorCount: 0,
+      dynamicPromptCount: 1,
+      dynamicPromptMode: 'random',
+    });
+
+    expect(diagnostics.find((diagnostic) => diagnostic.code === 'wildcards-found')).toMatchObject({
+      label: 'Wildcards 1',
+      severity: 'ok',
+    });
+  });
+
+  it('keeps wildcard index error warnings visible', () => {
+    const diagnostics = getPromptDiagnostics({
+      prompt: 'portrait',
+      modelBase: 'sdxl',
+      wildcards,
+      wildcardIndexErrorCount: 2,
+      dynamicPromptCount: 1,
+      dynamicPromptMode: 'random',
+    });
+
+    expect(diagnostics.find((diagnostic) => diagnostic.code === 'wildcards-index-errors')).toMatchObject({
+      label: 'Index errors 2',
+      severity: 'warning',
     });
   });
 
@@ -106,12 +134,29 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
-      label: 'Random 1',
+      label: 'Random/image',
       severity: 'ok',
     });
   });
 
-  it('reports random refresh on invoke', () => {
+  it('reports random refresh per image', () => {
+    const diagnostics = getPromptDiagnostics({
+      prompt: 'portrait __camera/lens__',
+      modelBase: 'sdxl',
+      wildcards,
+      wildcardIndexErrorCount: 0,
+      dynamicPromptCount: 1,
+      dynamicPromptMode: 'random',
+      dynamicPromptRandomRefreshMode: 'per_image',
+    });
+
+    expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
+      label: 'Random/image',
+      severity: 'ok',
+    });
+  });
+
+  it('reports random refresh per invoke', () => {
     const diagnostics = getPromptDiagnostics({
       prompt: 'portrait __camera/lens__',
       modelBase: 'sdxl',
@@ -123,7 +168,24 @@ describe('prompt workbench diagnostics', () => {
     });
 
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
-      label: 'Random 1/run',
+      label: 'Random/invoke',
+      severity: 'ok',
+    });
+  });
+
+  it('reports locked preview random refresh', () => {
+    const diagnostics = getPromptDiagnostics({
+      prompt: 'portrait __camera/lens__',
+      modelBase: 'sdxl',
+      wildcards,
+      wildcardIndexErrorCount: 0,
+      dynamicPromptCount: 1,
+      dynamicPromptMode: 'random',
+      dynamicPromptRandomRefreshMode: 'manual',
+    });
+
+    expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
+      label: 'Random preview',
       severity: 'ok',
     });
   });
@@ -142,6 +204,24 @@ describe('prompt workbench diagnostics', () => {
     expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
       label: 'Cycle 1',
       severity: 'ok',
+    });
+  });
+
+  it('reports mixed cyclic and random dynamic syntax', () => {
+    const diagnostics = getPromptDiagnostics({
+      prompt: 'portrait __@camera/lens__ {warm|cool}',
+      modelBase: 'sdxl',
+      wildcards,
+      wildcardIndexErrorCount: 0,
+      dynamicPromptCount: 2,
+      dynamicPromptMode: 'random',
+      dynamicPromptRandomRefreshMode: 'per_enqueue',
+    });
+
+    expect(diagnostics.find((diagnostic) => diagnostic.code === 'dynamic-active')).toMatchObject({
+      label: 'Mixed dynamic',
+      severity: 'ok',
+      description: 'Cyclic wildcards advance per output; random wildcards follow the selected randomness mode.',
     });
   });
 

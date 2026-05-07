@@ -1,24 +1,13 @@
 import type { RootState } from 'app/store/store';
 import { generateSeeds } from 'common/util/generateSeeds';
-import { range } from 'es-toolkit/compat';
-import type { SeedBehaviour } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import type { BaseModelType } from 'features/nodes/types/common';
+import {
+  getExtendedDynamicPrompts,
+  getShouldUsePerOutputDynamicPrompts,
+} from 'features/nodes/util/graph/dynamicPromptBatching';
 import type { Graph } from 'features/nodes/util/graph/generation/Graph';
 import type { components } from 'services/api/schema';
 import type { Batch, EnqueueBatchArg, Invocation } from 'services/api/types';
-
-const getExtendedPrompts = (arg: {
-  seedBehaviour: SeedBehaviour;
-  iterations: number;
-  prompts: string[];
-  base: BaseModelType;
-}): string[] => {
-  const { seedBehaviour, iterations, prompts } = arg;
-  if (seedBehaviour === 'PER_PROMPT') {
-    return range(iterations).flatMap(() => prompts);
-  }
-  return prompts;
-};
 
 export const prepareLinearUIBatch = (arg: {
   state: RootState;
@@ -30,13 +19,47 @@ export const prepareLinearUIBatch = (arg: {
   origin: string;
   destination: string;
 }): EnqueueBatchArg => {
-  const { state, g, base, prepend, positivePromptNode, seedNode, origin, destination } = arg;
+  const { state, g, prepend, positivePromptNode, seedNode, origin, destination } = arg;
   const { iterations, shouldRandomizeSeed, seed } = state.params;
   const { prompts, seedBehaviour } = state.dynamicPrompts;
 
   const data: Batch['data'] = [];
   const firstBatchDatumList: components['schemas']['BatchDatum'][] = [];
   const secondBatchDatumList: components['schemas']['BatchDatum'][] = [];
+
+  if (getShouldUsePerOutputDynamicPrompts(state)) {
+    const perImageBatchDatumList: components['schemas']['BatchDatum'][] = [];
+
+    if (seedNode) {
+      perImageBatchDatumList.push({
+        node_path: seedNode.id,
+        field_name: 'value',
+        items: generateSeeds({
+          count: prompts.length,
+          start: shouldRandomizeSeed ? undefined : seed,
+        }),
+      });
+    }
+
+    perImageBatchDatumList.push({
+      node_path: positivePromptNode.id,
+      field_name: 'value',
+      items: prompts,
+    });
+
+    data.push(perImageBatchDatumList);
+
+    return {
+      prepend,
+      batch: {
+        graph: g.getGraph(),
+        runs: 1,
+        data,
+        origin,
+        destination,
+      },
+    };
+  }
 
   // add seeds first to ensure the output order groups the prompts
   if (seedNode && seedBehaviour === 'PER_PROMPT') {
@@ -65,7 +88,7 @@ export const prepareLinearUIBatch = (arg: {
     data.push(secondBatchDatumList);
   }
 
-  const extendedPrompts = getExtendedPrompts({ seedBehaviour, iterations, prompts, base });
+  const extendedPrompts = getExtendedDynamicPrompts({ seedBehaviour, iterations, prompts });
 
   // zipped batch of prompts
   firstBatchDatumList.push({

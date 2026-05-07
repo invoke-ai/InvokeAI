@@ -6,26 +6,41 @@ import {
   promptsChanged,
   randomSeedChanged,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
-import { getDynamicPromptsQueryArg } from 'features/dynamicPrompts/util/getDynamicPromptsQueryArg';
 import { getShouldProcessPrompt } from 'features/dynamicPrompts/util/getShouldProcessPrompt';
+import { getDynamicPromptsOutputCount, resolveDynamicPrompts } from 'features/dynamicPrompts/util/resolveDynamicPrompts';
 import { selectPresetModifiedPrompts } from 'features/nodes/util/graph/graphBuilderUtils';
-import { utilitiesApi } from 'services/api/endpoints/utilities';
 
 const getRandomSeed = () => Date.now() + Math.floor(Math.random() * 1_000_000);
+const MAX_RANDOM_PROMPTS_FOR_ENQUEUE = 10000;
 
 export const getShouldRefreshDynamicPromptsForEnqueue = (state: RootState): boolean => {
   const { dynamicPrompts } = state;
 
-  if (dynamicPrompts.mode !== 'random' || dynamicPrompts.randomRefreshMode !== 'per_enqueue') {
+  if (dynamicPrompts.mode !== 'random' || dynamicPrompts.randomRefreshMode === 'manual') {
     return false;
   }
 
   return getShouldProcessPrompt(selectPresetModifiedPrompts(state).positive);
 };
 
+export const getDynamicPromptsEnqueueRandomSamples = (state: RootState): number => {
+  const { randomRefreshMode, randomSamples } = state.dynamicPrompts;
+  const prompt = selectPresetModifiedPrompts(state).positive;
+
+  return Math.min(
+    getDynamicPromptsOutputCount({
+      iterations: state.params.iterations,
+      prompt,
+      randomRefreshMode,
+      randomSamples,
+    }),
+    MAX_RANDOM_PROMPTS_FOR_ENQUEUE
+  );
+};
+
 /**
- * Random wildcard mode means "roll when I invoke". The preview remains useful, but the queue payload is refreshed here
- * so one-image-at-a-time workflows do not repeatedly enqueue the same cached random expansion.
+ * Dynamic prompts refresh before queueing unless the preview is locked. Per-image random mode and cycle-only per-invoke
+ * mode ask for one resolved prompt per generated output, then the batch builder zips those prompts with seeds one-to-one.
  */
 export const refreshDynamicPromptsForEnqueue = async (store: AppStore): Promise<RootState | null> => {
   const { dispatch, getState } = store;
@@ -36,25 +51,24 @@ export const refreshDynamicPromptsForEnqueue = async (store: AppStore): Promise<
   }
 
   const prompt = selectPresetModifiedPrompts(state).positive;
-  const { randomSamples, maxCombinations } = state.dynamicPrompts;
+  const { maxCombinations, randomRefreshMode, randomSamples } = state.dynamicPrompts;
   const randomSeed = getRandomSeed();
 
   dispatch(randomSeedChanged(randomSeed));
   dispatch(isLoadingChanged(true));
 
-  const queryArg = getDynamicPromptsQueryArg({
-    prompt,
-    mode: 'random',
-    randomSamples,
-    maxCombinations,
-    randomSeed,
-  });
-
   try {
-    const req = dispatch(
-      utilitiesApi.endpoints.dynamicPrompts.initiate(queryArg, { subscribe: false, forceRefetch: true })
-    );
-    const res = await req.unwrap();
+    const res = await resolveDynamicPrompts({
+      dispatch,
+      prompt,
+      mode: 'random',
+      randomSamples,
+      maxCombinations,
+      randomSeed,
+      randomRefreshMode,
+      iterations: state.params.iterations,
+      forceRefetch: true,
+    });
 
     dispatch(promptsChanged(res.prompts));
     dispatch(parsingErrorChanged(res.error));

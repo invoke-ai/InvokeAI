@@ -4,7 +4,11 @@ import {
   getPromptWeightOccurrences,
   getPromptWildcardOccurrences,
   getPromptWorkbenchOccurrences,
+  getWeightShortLabel,
+  getWildcardBehaviorActionIntent,
+  getWildcardBehaviorIconType,
   getWildcardBehaviorLabel,
+  getWildcardBehaviorShortLabel,
   removePromptRange,
   replacePromptRange,
 } from './occurrences';
@@ -44,36 +48,47 @@ describe('prompt workbench occurrences', () => {
       behavior: 'random',
       valueCount: 4,
     });
-    expect(getWildcardBehaviorLabel(occurrences[0]!, 'per_enqueue')).toBe('Random every Invoke');
+    expect(getWildcardBehaviorLabel(occurrences[0]!, 'per_image')).toBe('Random per Image');
+    expect(getWildcardBehaviorLabel(occurrences[0]!, 'per_enqueue')).toBe('Random per Invoke');
+    expect(getWildcardBehaviorShortLabel(occurrences[0]!, 'per_image')).toBe('Random/image');
+    expect(getWildcardBehaviorShortLabel(occurrences[0]!, 'per_enqueue')).toBe('Random/invoke');
+    expect(getWildcardBehaviorShortLabel(occurrences[0]!, 'manual')).toBe('Preview');
+    expect(getWildcardBehaviorIconType(occurrences[0]!)).toBe('random');
   });
 
   it('parses cyclic wildcard occurrences', () => {
-    expect(
+    const occurrence =
       getPromptWildcardOccurrences({
         prompt: 'portrait __@camera/lens__',
         wildcards,
         wildcardIndexUnavailable: false,
         dynamicPromptMode: 'random',
-      })[0]
-    ).toMatchObject({
+      })[0]!;
+
+    expect(occurrence).toMatchObject({
       path: 'camera/lens',
       behavior: 'cycle',
     });
+    expect(getWildcardBehaviorShortLabel(occurrence, 'per_image')).toBe('Cycle');
+    expect(getWildcardBehaviorIconType(occurrence)).toBe('cycle');
   });
 
   it('marks unknown wildcards as missing', () => {
-    expect(
+    const occurrence =
       getPromptWildcardOccurrences({
         prompt: 'portrait __missing/path__',
         wildcards,
         wildcardIndexUnavailable: false,
         dynamicPromptMode: 'random',
-      })[0]
-    ).toMatchObject({
+      })[0]!;
+
+    expect(occurrence).toMatchObject({
       path: 'missing/path',
       behavior: 'missing',
       valueCount: null,
     });
+    expect(getWildcardBehaviorShortLabel(occurrence, 'per_image')).toBe('Missing');
+    expect(getWildcardBehaviorIconType(occurrence)).toBe('warning');
   });
 
   it('replaces a specific duplicate wildcard occurrence', () => {
@@ -131,5 +146,102 @@ describe('prompt workbench occurrences', () => {
         supportsAttentionWeights: true,
       }).map((occurrence) => occurrence.type)
     ).toEqual(['weight', 'wildcard']);
+  });
+
+  it('returns compact wildcard labels for all-combinations prompts', () => {
+    const occurrence = getPromptWildcardOccurrences({
+      prompt: 'portrait __camera/lens__',
+      wildcards,
+      wildcardIndexUnavailable: false,
+      dynamicPromptMode: 'combinatorial',
+    })[0]!;
+
+    expect(occurrence.behavior).toBe('all');
+    expect(getWildcardBehaviorShortLabel(occurrence, 'per_image')).toBe('All');
+    expect(getWildcardBehaviorIconType(occurrence)).toBe('all');
+  });
+
+  it('returns compact weight labels for supported and unsupported weights', () => {
+    const supported = getPromptWeightOccurrences({ prompt: '(face)++', supportsAttentionWeights: true });
+    const unsupported = getPromptWeightOccurrences({ prompt: '(face)+', supportsAttentionWeights: false });
+
+    expect(getWeightShortLabel(supported[0]!)).toBe('++');
+    expect(getWeightShortLabel({ ...supported[0]!, attention: 1.2 })).toBe('1.2');
+    expect(getWeightShortLabel(unsupported[0]!)).toBe('Literal?');
+  });
+
+  it('maps wildcard behavior menu actions to prompt intent', () => {
+    expect(getWildcardBehaviorActionIntent('random', 'camera/lens')).toEqual({
+      replacement: '__camera/lens__',
+    });
+    expect(getWildcardBehaviorActionIntent('cycle', 'camera/lens')).toEqual({
+      replacement: '__@camera/lens__',
+    });
+    expect(getWildcardBehaviorActionIntent('fixed', 'camera/lens')).toEqual({ opensFixedValues: true });
+    expect(getWildcardBehaviorActionIntent('remove', 'camera/lens')).toEqual({ removesPrompt: true });
+  });
+
+  it('merges wrapper-weighted wildcards into one wildcard occurrence', () => {
+    const occurrences = getPromptWorkbenchOccurrences({
+      prompt: '(__lighting/studio__)++, (face)+',
+      wildcards,
+      wildcardIndexUnavailable: false,
+      dynamicPromptMode: 'random',
+      supportsAttentionWeights: true,
+    });
+
+    expect(occurrences).toHaveLength(2);
+    expect(occurrences[0]).toMatchObject({
+      type: 'wildcard',
+      path: 'lighting/studio',
+      weight: {
+        type: 'weight',
+        text: '(__lighting/studio__)++',
+        attention: '++',
+        isSupported: true,
+      },
+    });
+    expect(occurrences[1]).toMatchObject({
+      type: 'weight',
+      text: '(face)+',
+    });
+  });
+
+  it('marks wrapper-weighted wildcards as unsupported when the model does not support weights', () => {
+    const occurrences = getPromptWorkbenchOccurrences({
+      prompt: '(__lighting/studio__)++',
+      wildcards,
+      wildcardIndexUnavailable: false,
+      dynamicPromptMode: 'random',
+      supportsAttentionWeights: false,
+    });
+
+    expect(occurrences[0]).toMatchObject({
+      type: 'wildcard',
+      weight: {
+        isSupported: false,
+      },
+    });
+  });
+
+  it('keeps token and wrapper ranges separate for weighted wildcard edits', () => {
+    const prompt = '(__lighting/studio__)++, (face)+';
+    const occurrence = getPromptWorkbenchOccurrences({
+      prompt,
+      wildcards,
+      wildcardIndexUnavailable: false,
+      dynamicPromptMode: 'random',
+      supportsAttentionWeights: true,
+    })[0];
+
+    expect(occurrence).toMatchObject({ type: 'wildcard' });
+    if (occurrence?.type !== 'wildcard') {
+      throw new Error('Expected wildcard occurrence');
+    }
+
+    expect(replacePromptRange(prompt, occurrence.range, '__@lighting/studio__').prompt).toBe(
+      '(__@lighting/studio__)++, (face)+'
+    );
+    expect(removePromptRange(prompt, occurrence.weight!.range).prompt).toBe('(face)+');
   });
 });

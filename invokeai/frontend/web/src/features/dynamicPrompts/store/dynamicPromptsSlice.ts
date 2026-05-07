@@ -15,12 +15,12 @@ const zDynamicPromptMode = z.enum(['random', 'combinatorial']);
 export const isDynamicPromptMode = buildZodTypeGuard(zDynamicPromptMode);
 export type DynamicPromptMode = z.infer<typeof zDynamicPromptMode>;
 
-const zDynamicPromptRandomRefreshMode = z.enum(['manual', 'per_enqueue']);
+const zDynamicPromptRandomRefreshMode = z.enum(['manual', 'per_enqueue', 'per_image']);
 export const isDynamicPromptRandomRefreshMode = buildZodTypeGuard(zDynamicPromptRandomRefreshMode);
 export type DynamicPromptRandomRefreshMode = z.infer<typeof zDynamicPromptRandomRefreshMode>;
 
 const zDynamicPromptsState = z.object({
-  _version: z.literal(3),
+  _version: z.literal(4),
   mode: zDynamicPromptMode,
   randomSamples: z.number().int().min(1).max(1000),
   maxCombinations: z.number().int().min(1).max(10000),
@@ -35,12 +35,12 @@ const zDynamicPromptsState = z.object({
 export type DynamicPromptsState = z.infer<typeof zDynamicPromptsState>;
 
 const getInitialState = (): DynamicPromptsState => ({
-  _version: 3,
+  _version: 4,
   mode: 'random',
   randomSamples: 1,
   maxCombinations: 100,
   randomSeed: 0,
-  randomRefreshMode: 'per_enqueue',
+  randomRefreshMode: 'per_image',
   prompts: [],
   parsingError: undefined,
   isError: false,
@@ -107,33 +107,46 @@ export const dynamicPromptsSliceConfig: SliceConfig<typeof slice> = {
     migrate: (state) => {
       assert(isPlainObject(state));
       const initialState = getInitialState();
-      if (state._version === 2) {
+      if (state._version === 4) {
+        return zDynamicPromptsState.parse({ ...initialState, ...state });
+      }
+      if (state._version === 2 || state._version === 3) {
         const mode = isDynamicPromptMode(state.mode) ? state.mode : initialState.mode;
         return zDynamicPromptsState.parse({
           ...initialState,
           ...state,
-          _version: 3,
+          _version: 4,
           mode,
-          randomRefreshMode:
-            mode === 'random' && state.randomRefreshMode !== 'manual' ? 'per_enqueue' : 'manual',
+          randomRefreshMode: getMigratedRandomRefreshMode(mode, state.randomRefreshMode),
           seedBehaviour: isSeedBehaviour(state.seedBehaviour) ? state.seedBehaviour : initialState.seedBehaviour,
         });
       }
-      if (state._version !== 3) {
-        const legacyCombinatorial = state.combinatorial === true;
-        const legacyMaxPrompts = typeof state.maxPrompts === 'number' ? state.maxPrompts : initialState.maxCombinations;
-        return zDynamicPromptsState.parse({
-          ...initialState,
-          mode: legacyCombinatorial ? 'combinatorial' : 'random',
-          maxCombinations: legacyMaxPrompts,
-          randomRefreshMode: legacyCombinatorial ? 'manual' : 'per_enqueue',
-          seedBehaviour: isSeedBehaviour(state.seedBehaviour) ? state.seedBehaviour : initialState.seedBehaviour,
-        });
-      }
-      return zDynamicPromptsState.parse({ ...initialState, ...state });
+      const legacyCombinatorial = state.combinatorial === true;
+      const legacyMode = legacyCombinatorial ? 'combinatorial' : 'random';
+      const legacyMaxPrompts = typeof state.maxPrompts === 'number' ? state.maxPrompts : initialState.maxCombinations;
+      return zDynamicPromptsState.parse({
+        ...initialState,
+        mode: legacyMode,
+        maxCombinations: legacyMaxPrompts,
+        randomRefreshMode: getMigratedRandomRefreshMode(legacyMode, state.randomRefreshMode),
+        seedBehaviour: isSeedBehaviour(state.seedBehaviour) ? state.seedBehaviour : initialState.seedBehaviour,
+      });
     },
     persistDenylist: ['prompts', 'parsingError', 'isError', 'isLoading'],
   },
+};
+
+const getMigratedRandomRefreshMode = (
+  mode: DynamicPromptMode,
+  value: unknown
+): DynamicPromptRandomRefreshMode => {
+  if (mode !== 'random') {
+    return 'manual';
+  }
+  if (value === 'manual') {
+    return 'manual';
+  }
+  return 'per_image';
 };
 
 export const selectDynamicPromptsSlice = (state: RootState) => state.dynamicPrompts;

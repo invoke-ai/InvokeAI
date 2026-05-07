@@ -18,12 +18,12 @@ describe('dynamicPromptsSlice', () => {
 
   it('defaults fresh users to random mode', () => {
     expect(dynamicPromptsSliceConfig.getInitialState()).toMatchObject({
-      _version: 3,
+      _version: 4,
       mode: 'random',
       randomSamples: 1,
       maxCombinations: 100,
       randomSeed: 0,
-      randomRefreshMode: 'per_enqueue',
+      randomRefreshMode: 'per_image',
     });
   });
 
@@ -34,9 +34,9 @@ describe('dynamicPromptsSlice', () => {
   });
 
   it('can switch random refresh behavior', () => {
-    const state = reducer(dynamicPromptsSliceConfig.getInitialState(), randomRefreshModeChanged('manual'));
+    const state = reducer(dynamicPromptsSliceConfig.getInitialState(), randomRefreshModeChanged('per_enqueue'));
 
-    expect(state.randomRefreshMode).toBe('manual');
+    expect(state.randomRefreshMode).toBe('per_enqueue');
   });
 
   it('migrates existing combinatorial users to all-combinations mode', () => {
@@ -50,7 +50,7 @@ describe('dynamicPromptsSlice', () => {
     });
 
     expect(state).toMatchObject({
-      _version: 3,
+      _version: 4,
       mode: 'combinatorial',
       maxCombinations: 250,
       randomSamples: 1,
@@ -69,15 +69,15 @@ describe('dynamicPromptsSlice', () => {
     });
 
     expect(state).toMatchObject({
-      _version: 3,
+      _version: 4,
       mode: 'random',
       maxCombinations: 12,
       randomSamples: 1,
-      randomRefreshMode: 'per_enqueue',
+      randomRefreshMode: 'per_image',
     });
   });
 
-  it('migrates version 2 random users to reroll on invoke', () => {
+  it('migrates version 2 random users to per-image random', () => {
     expect(migrate).toBeDefined();
 
     const state = migrate?.({
@@ -93,9 +93,32 @@ describe('dynamicPromptsSlice', () => {
     });
 
     expect(state).toMatchObject({
+      _version: 4,
+      mode: 'random',
+      randomRefreshMode: 'per_image',
+    });
+  });
+
+  it('preserves version 3 locked-preview random users', () => {
+    expect(migrate).toBeDefined();
+
+    const state = migrate?.({
       _version: 3,
       mode: 'random',
-      randomRefreshMode: 'per_enqueue',
+      randomSamples: 1,
+      maxCombinations: 100,
+      randomSeed: 123,
+      randomRefreshMode: 'manual',
+      prompts: ['test'],
+      isError: false,
+      isLoading: false,
+      seedBehaviour: 'PER_ITERATION',
+    });
+
+    expect(state).toMatchObject({
+      _version: 4,
+      mode: 'random',
+      randomRefreshMode: 'manual',
     });
   });
 });

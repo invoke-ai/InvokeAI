@@ -17,13 +17,18 @@ const ParamDynamicPromptsRandomRefreshMode = () => {
   const options = useMemo<ComboboxOption[]>(
     () => [
       {
+        value: 'per_image',
+        label: 'Per Image',
+        description: 'Roll a new random sample for each generated image.',
+      },
+      {
         value: 'per_enqueue',
-        label: 'Every Invoke',
-        description: 'Roll a new random sample when generation is queued.',
+        label: 'Per Invoke',
+        description: 'Random wildcards roll once per Invoke; cyclic wildcards still advance per queued output.',
       },
       {
         value: 'manual',
-        label: 'Manual',
+        label: 'Locked Preview',
         description: 'Keep the preview fixed until Reshuffle is used.',
       },
     ],
@@ -48,7 +53,7 @@ const ParamDynamicPromptsRandomRefreshMode = () => {
 
   return (
     <FormControl>
-      <FormLabel>Refresh</FormLabel>
+      <FormLabel>Randomness</FormLabel>
       <Combobox value={value} options={options} onChange={handleChange} />
     </FormControl>
   );

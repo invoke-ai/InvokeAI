@@ -5,6 +5,8 @@ import { InformationalPopover } from 'common/components/InformationalPopover/Inf
 import {
   isSeedBehaviour,
   seedBehaviourChanged,
+  selectDynamicPromptsMode,
+  selectDynamicPromptsRandomRefreshMode,
   selectDynamicPromptsSeedBehaviour,
 } from 'features/dynamicPrompts/store/dynamicPromptsSlice';
 import { memo, useCallback, useMemo } from 'react';
@@ -13,6 +15,8 @@ import { useTranslation } from 'react-i18next';
 const ParamDynamicPromptsSeedBehaviour = () => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
+  const mode = useAppSelector(selectDynamicPromptsMode);
+  const randomRefreshMode = useAppSelector(selectDynamicPromptsRandomRefreshMode);
   const seedBehaviour = useAppSelector(selectDynamicPromptsSeedBehaviour);
 
   const options = useMemo<ComboboxOption[]>(() => {
@@ -41,6 +45,10 @@ const ParamDynamicPromptsSeedBehaviour = () => {
   );
 
   const value = useMemo(() => options.find((o) => o.value === seedBehaviour), [options, seedBehaviour]);
+
+  if (mode === 'random' && randomRefreshMode === 'per_image') {
+    return null;
+  }
 
   return (
     <FormControl>

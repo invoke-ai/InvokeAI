@@ -1,11 +1,11 @@
-import { Badge, Box, Button, Flex, IconButton, Text, Tooltip } from '@invoke-ai/ui-library';
+import { Box, Button, Flex, Menu, MenuButton, MenuItem, MenuList, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { adjustPromptAttention } from 'common/util/promptAttention';
 import { selectModel } from 'features/controlLayers/store/paramsSlice';
+import { useDynamicPromptsModal } from 'features/dynamicPrompts/hooks/useDynamicPromptsModal';
 import {
   modeChanged,
   randomRefreshModeChanged,
-  selectDynamicPromptsIsLoading,
   selectDynamicPromptsMode,
   selectDynamicPromptsParsingError,
   selectDynamicPromptsPrompts,
@@ -15,25 +15,31 @@ import { selectSystemPrefersNumericAttentionWeights } from 'features/system/stor
 import type { MouseEvent, RefObject } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { PiDiceFiveBold, PiPushPinSimpleBold, PiRepeatBold, PiSquaresFourBold } from 'react-icons/pi';
 import type { WildcardIndexItem } from 'services/api/endpoints/utilities';
 import { useLazyWildcardValuesQuery, useWildcardsQuery } from 'services/api/endpoints/utilities';
 
 import { getPromptDiagnostics, type PromptDiagnosticSeverity } from './diagnostics';
+import {
+  clampNavigationIndex,
+  getNextNavigationIndex,
+  getPromptWorkbenchKeyboardIntent,
+} from './keyboardNavigation';
 import { getPromptModelCapabilities } from './modelCapabilities';
 import {
   getPromptWorkbenchOccurrences,
+  getWildcardBehaviorActionIntent,
   type PromptRange,
-  type PromptWeightOccurrence,
   type PromptWildcardOccurrence,
   removePromptRange,
   replacePromptRange,
+  type WildcardBehaviorAction,
 } from './occurrences';
 import { PromptInspector } from './PromptInspector';
+import { PromptWildcardBehaviorMenu } from './PromptWildcardBehaviorMenu';
+import { PromptWorkbenchBadge, type PromptWorkbenchBadgeTone } from './PromptWorkbenchBadge';
 import {
   applyWildcardCompletion,
   filterWildcardOptions,
-  getCyclicWildcardToken,
   getWildcardAutocompleteStatusMessage,
   getWildcardCompletionContext,
   getWildcardDisplayPath,
@@ -52,17 +58,18 @@ type SelectionRange = {
 };
 
 const EMPTY_WILDCARDS: [] = [];
-const WILDCARD_ACTION_BUTTON_SIZE = 7;
+const getCompletionContextKey = (context: WildcardCompletionContext): string =>
+  `${context.start}:${context.end}:${context.query}`;
 
 export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: PromptWorkbenchProps) => {
   const dispatch = useAppDispatch();
+  const { onOpen: onOpenDynamicPromptsModal } = useDynamicPromptsModal();
   const model = useAppSelector(selectModel);
   const prefersNumericWeights = useAppSelector(selectSystemPrefersNumericAttentionWeights);
   const dynamicPromptMode = useAppSelector(selectDynamicPromptsMode);
   const dynamicPromptRandomRefreshMode = useAppSelector(selectDynamicPromptsRandomRefreshMode);
   const dynamicPrompts = useAppSelector(selectDynamicPromptsPrompts);
   const dynamicPromptError = useAppSelector(selectDynamicPromptsParsingError);
-  const isDynamicPromptsLoading = useAppSelector(selectDynamicPromptsIsLoading);
   const { data: wildcardsData, isError: isWildcardIndexUnavailable, isFetching: isFetchingWildcards } = useWildcardsQuery();
   const [loadWildcardValues, wildcardValuesResult] = useLazyWildcardValuesQuery();
   const wildcards = wildcardsData?.wildcards ?? EMPTY_WILDCARDS;
@@ -73,7 +80,15 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
   const [fixedWildcardPath, setFixedWildcardPath] = useState<string | null>(null);
   const [fixedWildcardContext, setFixedWildcardContext] = useState<WildcardCompletionContext | null>(null);
   const [fixedWildcardOccurrence, setFixedWildcardOccurrence] = useState<PromptWildcardOccurrence | null>(null);
+  const [isAutocompleteBehaviorMenuOpen, setIsAutocompleteBehaviorMenuOpen] = useState(false);
+  const [dismissedCompletionContextKey, setDismissedCompletionContextKey] = useState<string | null>(null);
+  const [activeWildcardIndex, setActiveWildcardIndex] = useState(0);
+  const [activeFixedValueIndex, setActiveFixedValueIndex] = useState(0);
   const selectionRef = useRef<SelectionRange>({ start: 0, end: 0 });
+  const [selection, setSelection] = useState<SelectionRange>({ start: 0, end: 0 });
+  const completionContextRef = useRef<WildcardCompletionContext | null>(null);
+  const wildcardOptionElementsRef = useRef<Array<HTMLElement | null>>([]);
+  const fixedValueElementsRef = useRef<Array<HTMLElement | null>>([]);
 
   const diagnostics = useMemo(
     () =>
@@ -101,9 +116,33 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
     ]
   );
 
-  const completionContext = useMemo(
+  const rawCompletionContextBase = useMemo(
     () => (isFocused ? getWildcardCompletionContext(prompt, caret) : null),
     [caret, isFocused, prompt]
+  );
+
+  const rawCompletionContext = useMemo(() => {
+    if (!rawCompletionContextBase) {
+      return null;
+    }
+
+    return getCompletionContextKey(rawCompletionContextBase) === dismissedCompletionContextKey
+      ? null
+      : rawCompletionContextBase;
+  }, [dismissedCompletionContextKey, rawCompletionContextBase]);
+
+  useEffect(() => {
+    if (rawCompletionContext) {
+      completionContextRef.current = rawCompletionContext;
+    }
+  }, [rawCompletionContext]);
+
+  const completionContext = useMemo(
+    () =>
+      rawCompletionContext ??
+      fixedWildcardContext ??
+      (isAutocompleteBehaviorMenuOpen ? completionContextRef.current : null),
+    [fixedWildcardContext, isAutocompleteBehaviorMenuOpen, rawCompletionContext]
   );
 
   const wildcardOptions = useMemo(() => {
@@ -143,17 +182,80 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
     wildcardValuesResult.currentData?.path === fixedWildcardPath ? wildcardValuesResult.currentData.values : null;
 
   const activeFixedWildcardOccurrenceId = fixedWildcardOccurrence?.id ?? null;
+  const hasFixedValuePicker = Boolean(fixedWildcardPath && (fixedWildcardValues || wildcardValuesResult.isFetching));
+  const fixedValueCount = fixedWildcardValues?.length ?? 0;
+
+  const setWildcardOptionElement = useCallback((index: number, element: HTMLElement | null) => {
+    wildcardOptionElementsRef.current[index] = element;
+  }, []);
+
+  const setFixedValueElement = useCallback((index: number, element: HTMLElement | null) => {
+    fixedValueElementsRef.current[index] = element;
+  }, []);
+
+  const wildcardOptionElementSetters = useMemo(
+    () =>
+      wildcardOptions.map(
+        (_wildcard, index) => (element: HTMLElement | null) => {
+          setWildcardOptionElement(index, element);
+        }
+      ),
+    [setWildcardOptionElement, wildcardOptions]
+  );
+
+  const fixedValueElementSetters = useMemo(
+    () =>
+      (fixedWildcardValues ?? []).map(
+        (_value, index) => (element: HTMLElement | null) => {
+          setFixedValueElement(index, element);
+        }
+      ),
+    [fixedWildcardValues, setFixedValueElement]
+  );
+
+  useEffect(() => {
+    setActiveWildcardIndex((currentIndex) => clampNavigationIndex(currentIndex, wildcardOptions.length));
+    wildcardOptionElementsRef.current = wildcardOptionElementsRef.current.slice(0, wildcardOptions.length);
+  }, [wildcardOptions.length]);
+
+  useEffect(() => {
+    setActiveWildcardIndex(0);
+  }, [completionContext?.query, completionContext?.start]);
+
+  useEffect(() => {
+    setActiveFixedValueIndex((currentIndex) => clampNavigationIndex(currentIndex, fixedValueCount));
+    fixedValueElementsRef.current = fixedValueElementsRef.current.slice(0, fixedValueCount);
+  }, [fixedValueCount]);
+
+  useEffect(() => {
+    setActiveFixedValueIndex(0);
+  }, [fixedWildcardPath]);
+
+  useEffect(() => {
+    wildcardOptionElementsRef.current[activeWildcardIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [activeWildcardIndex]);
+
+  useEffect(() => {
+    fixedValueElementsRef.current[activeFixedValueIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [activeFixedValueIndex]);
 
   const syncSelection = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) {
       return;
     }
+    const isTextareaFocused = document.activeElement === textarea;
+    if (!isTextareaFocused) {
+      setSelection({ start: 0, end: 0 });
+      setIsFocused(false);
+      return;
+    }
     const start = textarea.selectionStart ?? 0;
     const end = textarea.selectionEnd ?? start;
     selectionRef.current = { start, end };
+    setSelection({ start, end });
     setCaret(end);
-    setIsFocused(document.activeElement === textarea);
+    setIsFocused(true);
   }, [textareaRef]);
 
   useEffect(() => {
@@ -162,38 +264,52 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
       return;
     }
     let blurTimeout: number | undefined;
+    let selectionFrame: number | undefined;
+    const syncSelectionSoon = () => {
+      selectionFrame = window.requestAnimationFrame(syncSelection);
+    };
     const syncBlurred = () => {
       blurTimeout = window.setTimeout(() => {
+        setSelection({ start: 0, end: 0 });
         setIsFocused(false);
       }, 150);
     };
 
-    textarea.addEventListener('keyup', syncSelection);
-    textarea.addEventListener('click', syncSelection);
-    textarea.addEventListener('select', syncSelection);
-    textarea.addEventListener('focus', syncSelection);
+    textarea.addEventListener('keyup', syncSelectionSoon);
+    textarea.addEventListener('click', syncSelectionSoon);
+    textarea.addEventListener('mouseup', syncSelectionSoon);
+    textarea.addEventListener('input', syncSelectionSoon);
+    textarea.addEventListener('select', syncSelectionSoon);
+    textarea.addEventListener('focus', syncSelectionSoon);
     textarea.addEventListener('blur', syncBlurred);
+    document.addEventListener('selectionchange', syncSelectionSoon);
 
     return () => {
-      textarea.removeEventListener('keyup', syncSelection);
-      textarea.removeEventListener('click', syncSelection);
-      textarea.removeEventListener('select', syncSelection);
-      textarea.removeEventListener('focus', syncSelection);
+      textarea.removeEventListener('keyup', syncSelectionSoon);
+      textarea.removeEventListener('click', syncSelectionSoon);
+      textarea.removeEventListener('mouseup', syncSelectionSoon);
+      textarea.removeEventListener('input', syncSelectionSoon);
+      textarea.removeEventListener('select', syncSelectionSoon);
+      textarea.removeEventListener('focus', syncSelectionSoon);
       textarea.removeEventListener('blur', syncBlurred);
+      document.removeEventListener('selectionchange', syncSelectionSoon);
       if (blurTimeout !== undefined) {
         window.clearTimeout(blurTimeout);
+      }
+      if (selectionFrame !== undefined) {
+        window.cancelAnimationFrame(selectionFrame);
       }
     };
   }, [syncSelection, textareaRef]);
 
   useEffect(() => {
-    if (!completionContext) {
+    if (!completionContext && !isAutocompleteBehaviorMenuOpen && !fixedWildcardContext) {
       setFixedWildcardContext(null);
       if (!fixedWildcardOccurrence) {
         setFixedWildcardPath(null);
       }
     }
-  }, [completionContext, fixedWildcardOccurrence]);
+  }, [completionContext, fixedWildcardContext, fixedWildcardOccurrence, isAutocompleteBehaviorMenuOpen]);
 
   useEffect(() => {
     if (
@@ -211,6 +327,7 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
         textarea?.focus();
         textarea?.setSelectionRange(range.start, range.end);
         selectionRef.current = { start: range.start, end: range.end };
+        setSelection({ start: range.start, end: range.end });
         setCaret(range.end);
         setIsFocused(document.activeElement === textarea);
       });
@@ -229,6 +346,7 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
         textarea?.focus();
         textarea?.setSelectionRange(selection.start, selection.end);
         selectionRef.current = selection;
+        setSelection(selection);
         setCaret(selection.end);
         setFixedWildcardPath(null);
         setFixedWildcardContext(null);
@@ -259,6 +377,7 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
         textarea?.focus();
         textarea?.setSelectionRange(result.caret, result.caret);
         selectionRef.current = { start: result.caret, end: result.caret };
+        setSelection({ start: result.caret, end: result.caret });
         setCaret(result.caret);
         setFixedWildcardPath(null);
         setFixedWildcardContext(null);
@@ -275,68 +394,53 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
         return;
       }
       dispatch(modeChanged('random'));
-      dispatch(randomRefreshModeChanged('per_enqueue'));
+      dispatch(randomRefreshModeChanged('per_image'));
       replaceCompletion(token, completionContext);
     },
     [completionContext, dispatch, replaceCompletion]
   );
 
-  const onRandomWildcardMouseDown = useCallback(
-    (wildcard: WildcardIndexItem) => (e: MouseEvent<HTMLButtonElement>) => {
-      e.preventDefault();
-      if (!completionContext) {
-        return;
-      }
-      dispatch(modeChanged('random'));
-      dispatch(randomRefreshModeChanged('per_enqueue'));
-      replaceCompletion(wildcard.token, completionContext);
-    },
-    [completionContext, dispatch, replaceCompletion]
-  );
-
-  const onCyclicWildcardMouseDown = useCallback(
-    (wildcard: WildcardIndexItem) => (e: MouseEvent<HTMLButtonElement>) => {
-      e.preventDefault();
-      if (!completionContext) {
-        return;
-      }
-      dispatch(modeChanged('random'));
-      dispatch(randomRefreshModeChanged('manual'));
-      replaceCompletion(getCyclicWildcardToken(wildcard.path), completionContext);
-    },
-    [completionContext, dispatch, replaceCompletion]
-  );
-
-  const onExploreAllMouseDown = useCallback(
-    (wildcard: WildcardIndexItem) => (e: MouseEvent<HTMLButtonElement>) => {
-      e.preventDefault();
-      if (!completionContext) {
-        return;
-      }
-      dispatch(modeChanged('combinatorial'));
-      dispatch(randomRefreshModeChanged('manual'));
-      replaceCompletion(wildcard.token, completionContext);
-    },
-    [completionContext, dispatch, replaceCompletion]
-  );
-
-  const onPickFixedMouseDown = useCallback(
-    (wildcard: WildcardIndexItem) => (e: MouseEvent<HTMLButtonElement>) => {
-      e.preventDefault();
-      if (!completionContext) {
-        return;
-      }
+  const openFixedValuesForAutocompleteWildcard = useCallback(
+    (wildcard: WildcardIndexItem, context: WildcardCompletionContext) => {
       setFixedWildcardPath(wildcard.path);
-      setFixedWildcardContext(completionContext);
+      setFixedWildcardContext(context);
       setFixedWildcardOccurrence(null);
+      setActiveFixedValueIndex(0);
       loadWildcardValues({ path: wildcard.path, limit: 200 });
     },
-    [completionContext, loadWildcardValues]
+    [loadWildcardValues]
   );
 
-  const onFixedValueMouseDown = useCallback(
-    (value: string) => (e: MouseEvent<HTMLButtonElement>) => {
-      e.preventDefault();
+  const onAutocompleteWildcardBehaviorAction = useCallback(
+    (wildcard: WildcardIndexItem) => (action: WildcardBehaviorAction) => {
+      const context = completionContext ?? completionContextRef.current;
+      if (!context) {
+        return;
+      }
+
+      const intent = getWildcardBehaviorActionIntent(action, wildcard.path);
+      if (intent.opensFixedValues) {
+        openFixedValuesForAutocompleteWildcard(wildcard, context);
+        return;
+      }
+
+      if (intent.replacement) {
+        replaceCompletion(intent.replacement, context);
+      }
+    },
+    [completionContext, openFixedValuesForAutocompleteWildcard, replaceCompletion]
+  );
+
+  const onAutocompleteBehaviorMenuOpen = useCallback(() => {
+    setIsAutocompleteBehaviorMenuOpen(true);
+  }, []);
+
+  const onAutocompleteBehaviorMenuClose = useCallback(() => {
+    setIsAutocompleteBehaviorMenuOpen(false);
+  }, []);
+
+  const applyFixedValue = useCallback(
+    (value: string) => {
       if (fixedWildcardContext) {
         replaceCompletion(value, fixedWildcardContext);
         return;
@@ -348,15 +452,140 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
     [fixedWildcardContext, fixedWildcardOccurrence, replaceCompletion, replaceOccurrenceRange]
   );
 
+  const onFixedValueMouseDown = useCallback(
+    (value: string) => (e: MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      applyFixedValue(value);
+    },
+    [applyFixedValue]
+  );
+
   const onInspectorFixedValue = useCallback(
     (value: string) => {
-      if (!fixedWildcardOccurrence) {
+      applyFixedValue(value);
+    },
+    [applyFixedValue]
+  );
+
+  const dismissCompletion = useCallback(() => {
+    const context = fixedWildcardContext ?? rawCompletionContextBase ?? completionContextRef.current;
+    if (context) {
+      setDismissedCompletionContextKey(getCompletionContextKey(context));
+    }
+    setFixedWildcardPath(null);
+    setFixedWildcardContext(null);
+    setFixedWildcardOccurrence(null);
+    setIsAutocompleteBehaviorMenuOpen(false);
+
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+    });
+  }, [fixedWildcardContext, rawCompletionContextBase, textareaRef]);
+
+  const onPromptWorkbenchKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      const keyboardTarget = hasFixedValuePicker
+        ? 'fixed_values'
+        : completionContext && wildcardOptions.length > 0
+          ? 'autocomplete'
+          : null;
+
+      if (!keyboardTarget) {
         return;
       }
-      replaceOccurrenceRange(fixedWildcardOccurrence.range, value);
+
+      const intent = getPromptWorkbenchKeyboardIntent({
+        key: e.key,
+        shiftKey: e.shiftKey,
+        target: keyboardTarget,
+      });
+
+      if (!intent) {
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (intent === 'dismiss') {
+        dismissCompletion();
+        return;
+      }
+
+      if (intent === 'next' || intent === 'previous') {
+        if (keyboardTarget === 'fixed_values') {
+          setActiveFixedValueIndex((currentIndex) =>
+            getNextNavigationIndex({
+              currentIndex,
+              direction: intent,
+              itemCount: fixedValueCount,
+            })
+          );
+          return;
+        }
+
+        setActiveWildcardIndex((currentIndex) =>
+          getNextNavigationIndex({
+            currentIndex,
+            direction: intent,
+            itemCount: wildcardOptions.length,
+          })
+        );
+        return;
+      }
+
+      if (intent === 'insert_fixed_value') {
+        const value = fixedWildcardValues?.[activeFixedValueIndex];
+        if (value) {
+          applyFixedValue(value);
+        }
+        return;
+      }
+
+      const wildcard = wildcardOptions[activeWildcardIndex];
+      if (!wildcard || !completionContext) {
+        return;
+      }
+
+      if (intent === 'open_fixed_values') {
+        openFixedValuesForAutocompleteWildcard(wildcard, completionContext);
+        return;
+      }
+
+      if (intent === 'insert_wildcard') {
+        dispatch(modeChanged('random'));
+        dispatch(randomRefreshModeChanged('per_image'));
+        replaceCompletion(wildcard.token, completionContext);
+      }
     },
-    [fixedWildcardOccurrence, replaceOccurrenceRange]
+    [
+      activeFixedValueIndex,
+      activeWildcardIndex,
+      applyFixedValue,
+      completionContext,
+      dismissCompletion,
+      dispatch,
+      fixedValueCount,
+      fixedWildcardValues,
+      hasFixedValuePicker,
+      openFixedValuesForAutocompleteWildcard,
+      replaceCompletion,
+      wildcardOptions,
+    ]
   );
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    textarea.addEventListener('keydown', onPromptWorkbenchKeyDown);
+
+    return () => {
+      textarea.removeEventListener('keydown', onPromptWorkbenchKeyDown);
+    };
+  }, [onPromptWorkbenchKeyDown, textareaRef]);
 
   const adjustWeight = useCallback(
     (direction: 'increment' | 'decrement') => {
@@ -372,6 +601,7 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
         textarea?.focus();
         textarea?.setSelectionRange(result.selectionStart, result.selectionEnd);
         selectionRef.current = { start: result.selectionStart, end: result.selectionEnd };
+        setSelection({ start: result.selectionStart, end: result.selectionEnd });
         setCaret(result.selectionEnd);
       });
     },
@@ -394,112 +624,146 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
     adjustWeight('increment');
   }, [adjustWeight]);
 
+  const onOpenQueuedOutputsMouseDown = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+  }, []);
+
+  const onOpenQueuedOutputsClick = useCallback(() => {
+    onOpenDynamicPromptsModal();
+  }, [onOpenDynamicPromptsModal]);
+
+  const onRandomPerImageClick = useCallback(() => {
+    dispatch(modeChanged('random'));
+    dispatch(randomRefreshModeChanged('per_image'));
+  }, [dispatch]);
+
+  const onRandomPerInvokeClick = useCallback(() => {
+    dispatch(modeChanged('random'));
+    dispatch(randomRefreshModeChanged('per_enqueue'));
+  }, [dispatch]);
+
   const onRemoveWildcardOccurrence = useCallback(
     (occurrence: PromptWildcardOccurrence) => {
-      const result = removePromptRange(prompt, occurrence.range);
+      const result = removePromptRange(prompt, occurrence.weight?.range ?? occurrence.range);
       applyPromptReplacement(result.prompt, { start: result.caret, end: result.caret });
     },
     [applyPromptReplacement, prompt]
   );
 
-  const onRandomWildcardOccurrence = useCallback(
-    (occurrence: PromptWildcardOccurrence) => {
-      dispatch(modeChanged('random'));
-      dispatch(randomRefreshModeChanged('per_enqueue'));
-      replaceOccurrenceRange(occurrence.range, `__${occurrence.path}__`);
-    },
-    [dispatch, replaceOccurrenceRange]
-  );
+  const onInspectorWildcardBehaviorAction = useCallback(
+    (occurrence: PromptWildcardOccurrence, action: WildcardBehaviorAction) => {
+      const intent = getWildcardBehaviorActionIntent(action, occurrence.path);
 
-  const onPickFixedWildcardOccurrence = useCallback(
-    (occurrence: PromptWildcardOccurrence) => {
-      if (!occurrence.wildcard) {
+      if (intent.opensFixedValues) {
+        if (!occurrence.wildcard) {
+          return;
+        }
+        setFixedWildcardPath(occurrence.path);
+        setFixedWildcardContext(null);
+        setFixedWildcardOccurrence(occurrence);
+        setActiveFixedValueIndex(0);
+        loadWildcardValues({ path: occurrence.path, limit: 200 });
         return;
       }
-      setFixedWildcardPath(occurrence.path);
-      setFixedWildcardContext(null);
-      setFixedWildcardOccurrence(occurrence);
-      loadWildcardValues({ path: occurrence.path, limit: 200 });
+
+      if (intent.removesPrompt) {
+        onRemoveWildcardOccurrence(occurrence);
+        return;
+      }
+
+      if (intent.replacement) {
+        replaceOccurrenceRange(occurrence.range, intent.replacement);
+      }
     },
-    [loadWildcardValues]
+    [loadWildcardValues, onRemoveWildcardOccurrence, replaceOccurrenceRange]
   );
 
-  const onCyclicWildcardOccurrence = useCallback(
-    (occurrence: PromptWildcardOccurrence) => {
-      dispatch(modeChanged('random'));
-      dispatch(randomRefreshModeChanged('manual'));
-      replaceOccurrenceRange(occurrence.range, getCyclicWildcardToken(occurrence.path));
-    },
-    [dispatch, replaceOccurrenceRange]
+  const hasPromptWorkbenchEntries = promptWorkbenchOccurrences.length > 0;
+  const hasRandomWildcardOccurrences = promptWorkbenchOccurrences.some(
+    (occurrence) => occurrence.type === 'wildcard' && occurrence.behavior === 'random'
   );
-
-  const onExploreAllWildcardOccurrence = useCallback(
-    (occurrence: PromptWildcardOccurrence) => {
-      dispatch(modeChanged('combinatorial'));
-      dispatch(randomRefreshModeChanged('manual'));
-      replaceOccurrenceRange(occurrence.range, `__${occurrence.path}__`);
-    },
-    [dispatch, replaceOccurrenceRange]
-  );
-
-  const onAdjustWeightOccurrence = useCallback(
-    (occurrence: PromptWeightOccurrence, direction: 'increment' | 'decrement') => {
-      const result = adjustPromptAttention(
-        prompt,
-        occurrence.range.start,
-        occurrence.range.end,
-        direction,
-        prefersNumericWeights
-      );
-      applyPromptReplacement(result.prompt, { start: result.selectionStart, end: result.selectionEnd });
-    },
-    [applyPromptReplacement, prefersNumericWeights, prompt]
-  );
+  const canShowWeightControls = capabilities.supportsAttentionWeights && hasPromptWorkbenchEntries;
+  const canAdjustSelectionWeight = canShowWeightControls && selection.start !== selection.end;
 
   return (
     <Flex flexDir="column" gap={1} mt={1}>
       <Flex gap={1} alignItems="center" flexWrap="wrap">
-        {diagnostics.map((diagnostic) => (
-          <Tooltip key={diagnostic.code} label={diagnostic.description}>
-            <Badge size="sm" colorScheme={getDiagnosticColorScheme(diagnostic.severity)}>
-              {diagnostic.label}
-            </Badge>
-          </Tooltip>
-        ))}
-        {isDynamicPromptsLoading && (
-          <Badge size="sm" colorScheme="blue">
-            Dynamic loading
-          </Badge>
+        {diagnostics.map((diagnostic) =>
+          diagnostic.code === 'dynamic-active' && hasRandomWildcardOccurrences ? (
+            <Menu key={diagnostic.code}>
+              <Tooltip label={`${diagnostic.description} Change random wildcard behavior.`}>
+                <MenuButton as={Button} variant="unstyled" minW="unset" h="auto" cursor="pointer">
+                  <PromptWorkbenchBadge tone={getDiagnosticBadgeTone(diagnostic.severity)}>
+                    {diagnostic.label}
+                  </PromptWorkbenchBadge>
+                </MenuButton>
+              </Tooltip>
+              <MenuList>
+                <MenuItem onClick={onRandomPerImageClick} title="Random wildcards roll once per generated image.">
+                  Random/image
+                </MenuItem>
+                <MenuItem
+                  onClick={onRandomPerInvokeClick}
+                  title="Random wildcards roll once per Invoke; cyclic wildcards still advance per generated output."
+                >
+                  Random/invoke
+                </MenuItem>
+              </MenuList>
+            </Menu>
+          ) : diagnostic.code === 'dynamic-active' ? (
+            <Tooltip key={diagnostic.code} label={`${diagnostic.description} Open dynamic prompt preview.`}>
+              <Button
+                variant="unstyled"
+                minW="unset"
+                h="auto"
+                cursor="pointer"
+                onMouseDown={onOpenQueuedOutputsMouseDown}
+                onClick={onOpenQueuedOutputsClick}
+              >
+                <PromptWorkbenchBadge tone={getDiagnosticBadgeTone(diagnostic.severity)}>
+                  {diagnostic.label}
+                </PromptWorkbenchBadge>
+              </Button>
+            </Tooltip>
+          ) : (
+            <Tooltip key={diagnostic.code} label={diagnostic.description}>
+              <PromptWorkbenchBadge tone={getDiagnosticBadgeTone(diagnostic.severity)}>
+                {diagnostic.label}
+              </PromptWorkbenchBadge>
+            </Tooltip>
+          )
         )}
         {isFetchingWildcards && (
-          <Badge size="sm" colorScheme="blue">
+          <PromptWorkbenchBadge>
             Wildcards loading
-          </Badge>
+          </PromptWorkbenchBadge>
         )}
-        <Flex gap={1} ms="auto">
-          <Tooltip label={capabilities.attentionWeightsLabel}>
-            <Button
-              size="xs"
-              variant="outline"
-              isDisabled={!capabilities.supportsAttentionWeights}
-              onMouseDown={onDecrementMouseDown}
-              onClick={onDecrementClick}
-            >
-              -
-            </Button>
-          </Tooltip>
-          <Tooltip label={capabilities.attentionWeightsLabel}>
-            <Button
-              size="xs"
-              variant="outline"
-              isDisabled={!capabilities.supportsAttentionWeights}
-              onMouseDown={onIncrementMouseDown}
-              onClick={onIncrementClick}
-            >
-              +
-            </Button>
-          </Tooltip>
-        </Flex>
+        {canShowWeightControls && (
+          <Flex gap={1} ms="auto">
+            <Tooltip label={capabilities.attentionWeightsLabel}>
+              <Button
+                size="xs"
+                variant="outline"
+                isDisabled={!canAdjustSelectionWeight}
+                onMouseDown={onDecrementMouseDown}
+                onClick={onDecrementClick}
+              >
+                -
+              </Button>
+            </Tooltip>
+            <Tooltip label={capabilities.attentionWeightsLabel}>
+              <Button
+                size="xs"
+                variant="outline"
+                isDisabled={!canAdjustSelectionWeight}
+                onMouseDown={onIncrementMouseDown}
+                onClick={onIncrementClick}
+              >
+                +
+              </Button>
+            </Tooltip>
+          </Flex>
+        )}
       </Flex>
       {completionContext && (wildcardOptions.length > 0 || wildcardStatusMessage) && (
         <Box>
@@ -520,13 +784,15 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
                 </Text>
               </Flex>
             )}
-            {wildcardOptions.map((wildcard) => (
+            {wildcardOptions.map((wildcard, index) => (
               <Box key={wildcard.path}>
                 <Flex
+                  ref={wildcardOptionElementSetters[index]}
                   alignItems="center"
                   gap={1}
                   px={1}
                   minH={8}
+                  bg={activeWildcardIndex === index ? 'base.700' : undefined}
                   _hover={{ bg: 'base.800' }}
                   transitionProperty="common"
                   transitionDuration="0.1s"
@@ -543,7 +809,7 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
                       px={2}
                       onMouseDown={onWildcardMouseDown(wildcard.token)}
                     >
-                      <Text as="span" noOfLines={1} color="base.100" fontWeight="semibold">
+                      <Text as="span" noOfLines={1} color="base.100" fontSize="sm" fontWeight="semibold">
                         {getWildcardDisplayPath(wildcard)}
                       </Text>
                     </Button>
@@ -558,67 +824,38 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
                   >
                     {wildcard.value_count}
                   </Text>
-                  <Flex gap={0.5} flexShrink={0}>
-                    <IconButton
-                      aria-label={`Insert ${wildcard.path} as random wildcard`}
-                      tooltip="Random every Invoke"
-                      size="xs"
-                      variant="ghost"
-                      minW={WILDCARD_ACTION_BUTTON_SIZE}
-                      h={WILDCARD_ACTION_BUTTON_SIZE}
-                      icon={<PiDiceFiveBold />}
-                      onMouseDown={onRandomWildcardMouseDown(wildcard)}
-                    />
-                    <IconButton
-                      aria-label={`Pick a fixed value from ${wildcard.path}`}
-                      tooltip="Pick fixed value"
-                      size="xs"
-                      variant="ghost"
-                      minW={WILDCARD_ACTION_BUTTON_SIZE}
-                      h={WILDCARD_ACTION_BUTTON_SIZE}
-                      icon={<PiPushPinSimpleBold />}
-                      onMouseDown={onPickFixedMouseDown(wildcard)}
-                    />
-                    <IconButton
-                      aria-label={`Insert ${wildcard.path} as cyclic wildcard`}
-                      tooltip="Cycle"
-                      size="xs"
-                      variant="ghost"
-                      minW={WILDCARD_ACTION_BUTTON_SIZE}
-                      h={WILDCARD_ACTION_BUTTON_SIZE}
-                      icon={<PiRepeatBold />}
-                      onMouseDown={onCyclicWildcardMouseDown(wildcard)}
-                    />
-                    <IconButton
-                      aria-label={`Explore all combinations for ${wildcard.path}`}
-                      tooltip="Explore all"
-                      size="xs"
-                      variant="ghost"
-                      minW={WILDCARD_ACTION_BUTTON_SIZE}
-                      h={WILDCARD_ACTION_BUTTON_SIZE}
-                      icon={<PiSquaresFourBold />}
-                      onMouseDown={onExploreAllMouseDown(wildcard)}
-                    />
-                  </Flex>
+                  <PromptWildcardBehaviorMenu
+                    ariaLabel={`Insert ${wildcard.path} with wildcard behavior`}
+                    tooltip="Wildcard behavior"
+                    iconType="random"
+                    isActionable
+                    canPickFixedValue
+                    includeRemove={false}
+                    onAction={onAutocompleteWildcardBehaviorAction(wildcard)}
+                    onOpen={onAutocompleteBehaviorMenuOpen}
+                    onClose={onAutocompleteBehaviorMenuClose}
+                  />
                 </Flex>
                 {fixedWildcardPath === wildcard.path && (
-                  <Flex flexDir="column" ps={4} pe={1} pb={1} gap={0.5}>
+                  <Flex flexDir="column" ps={4} pe={1} pb={1} gap={0.5} maxH={36} overflowY="auto">
                     {wildcardValuesResult.isFetching && (
                       <Text fontSize="xs" color="base.400">
                         Loading values...
                       </Text>
                     )}
-                    {fixedWildcardValues?.map((value) => (
+                    {fixedWildcardValues?.map((value, index) => (
                       <Button
                         key={value}
+                        ref={fixedValueElementSetters[index]}
                         size="xs"
                         variant="ghost"
                         justifyContent="flex-start"
                         h={7}
                         px={2}
+                        bg={activeFixedValueIndex === index ? 'base.700' : undefined}
                         onMouseDown={onFixedValueMouseDown(value)}
                       >
-                        <Text as="span" noOfLines={1}>
+                        <Text as="span" noOfLines={1} fontSize="sm">
                           {value}
                         </Text>
                       </Button>
@@ -639,14 +876,11 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
         fixedWildcardOccurrenceId={activeFixedWildcardOccurrenceId}
         fixedWildcardValues={fixedWildcardValues}
         isFetchingFixedWildcardValues={wildcardValuesResult.isFetching}
+        activeFixedValueIndex={activeFixedValueIndex}
         onSelectRange={focusPromptRange}
-        onRemoveWildcard={onRemoveWildcardOccurrence}
-        onRandomWildcard={onRandomWildcardOccurrence}
-        onPickFixedWildcard={onPickFixedWildcardOccurrence}
-        onCyclicWildcard={onCyclicWildcardOccurrence}
-        onExploreAllWildcard={onExploreAllWildcardOccurrence}
+        onWildcardBehaviorAction={onInspectorWildcardBehaviorAction}
         onFixedValue={onInspectorFixedValue}
-        onAdjustWeight={onAdjustWeightOccurrence}
+        setFixedValueElement={setFixedValueElement}
       />
     </Flex>
   );
@@ -654,15 +888,15 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
 
 PromptWorkbench.displayName = 'PromptWorkbench';
 
-const getDiagnosticColorScheme = (severity: PromptDiagnosticSeverity): string => {
+const getDiagnosticBadgeTone = (severity: PromptDiagnosticSeverity): PromptWorkbenchBadgeTone => {
   switch (severity) {
     case 'ok':
-      return 'green';
+      return 'neutral';
     case 'warning':
-      return 'yellow';
+      return 'warning';
     case 'error':
-      return 'red';
+      return 'error';
     case 'info':
-      return 'base';
+      return 'neutral';
   }
 };
