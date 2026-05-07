@@ -71,6 +71,7 @@ When running in single-user mode (`multiuser: false`), authentication endpoints 
     "is_admin": false,
     "is_active": true,
     "created_at": "2024-01-15T10:00:00Z"
+    "updated_at": 
   },
   "expires_in": 86400
 }
@@ -573,27 +574,27 @@ Some endpoints require administrator privileges:
 **User Management:**
 
 ```python
-GET    /api/v1/users           # List users (admin only)
-POST   /api/v1/users           # Create user (admin only)
-GET    /api/v1/users/{id}      # Get user (admin only)
-PATCH  /api/v1/users/{id}      # Update user (admin only)
-DELETE /api/v1/users/{id}      # Delete user (admin only)
+GET    /api/v1/auth/users           # List users (admin only)
+POST   /api/v1/auth/users           # Create user (admin only)
+GET    /api/v1/auth/users/{id}      # Get user (admin only)
+PATCH  /api/v1/auth/users/{id}      # Update user (admin only)
+DELETE /api/v1/auth/users/{id}      # Delete user (admin only)
 ```
 
 **Model Management (Write Operations):**
 
 ```python
-POST   /api/v1/models/install          # Install model (admin only)
-DELETE /api/v1/models/i/{key}          # Delete model (admin only)
-PATCH  /api/v1/models/i/{key}          # Update model (admin only)
-PUT    /api/v1/models/convert/{key}    # Convert model (admin only)
+POST   /api/v2/models/install          # Install model (admin only)
+DELETE /api/v2/models/i/{key}          # Delete model (admin only)
+PATCH  /api/v2/models/i/{key}          # Update model (admin only)
+PUT    /api/v2/models/convert/{key}    # Convert model (admin only)
 ```
 
 **Model Management (Read Operations):**
 
 ```python
-GET /api/v1/models/                    # List models (all users)
-GET /api/v1/models/i/{key}             # Get model details (all users)
+GET /api/v2/models/                    # List models (all users)
+GET /api/v2/models/i/{key}             # Get model details (all users)
 ```
 
 ### Error Responses
@@ -640,9 +641,28 @@ Occurs when:
 - Resource doesn't exist
 - User doesn't have access to resource
 
-## New API Endpoints
+## Multiuser API Endpoints
 
 ### Authentication Endpoints
+
+#### Check if initial administrator setup is required
+
+**Endpoint:** `POST /api/v1/auth/status`
+
+**Description:** Returns a SetupStatusResponse indicating whether setup is needed and multiuser mode status.
+
+**Request:** No parameters
+
+**Response:**
+```json
+{
+  "setup_required": true,
+  "multiuser_enabled": true,
+  "strict_password_checking": true,
+  "admin_email": "string"
+}
+```
+
 
 #### Setup Administrator
 
@@ -675,6 +695,7 @@ Occurs when:
 }
 ```
 
+
 #### Get Current User
 
 **Endpoint:** `GET /api/v1/auth/me`
@@ -703,39 +724,16 @@ Authorization: Bearer <token>
 }
 ```
 
-#### Change Password
-
-**Endpoint:** `POST /api/v1/auth/change-password`
-
-**Description:** Change current user's password
-
-**Request:**
-
-```json
-{
-  "current_password": "OldPassword123",
-  "new_password": "NewPassword456"
-}
-```
-
-**Response:**
-
-```json
-{
-  "success": true
-}
-```
-
 ### User Management Endpoints (Admin Only)
 
 #### List Users
 
-**Endpoint:** `GET /api/v1/users`
+**Endpoint:** `GET /api/v1/auth/users`
 
 **Request:**
 
 ```http
-GET /api/v1/users?page=1&per_page=20
+GET /api/v1/auth/users
 Authorization: Bearer <admin_token>
 ```
 
@@ -751,19 +749,16 @@ Authorization: Bearer <admin_token>
       "is_admin": false,
       "is_active": true,
       "created_at": "2024-01-15T10:00:00Z",
+      "updated_at": "2024-04-25T17:23:00Z",
       "last_login_at": "2024-01-15T15:30:00Z"
     }
-  ],
-  "page": 1,
-  "pages": 1,
-  "per_page": 20,
-  "total": 5
+  ]
 }
 ```
 
 #### Create User
 
-**Endpoint:** `POST /api/v1/users`
+**Endpoint:** `POST /api/v1/auth/users`
 
 **Request:**
 
@@ -791,7 +786,7 @@ Authorization: Bearer <admin_token>
 
 #### Update User
 
-**Endpoint:** `PATCH /api/v1/users/{user_id}`
+**Endpoint:** `PATCH /api/v1/auth/users/{user_id}`
 
 **Request:**
 
@@ -817,7 +812,7 @@ Authorization: Bearer <admin_token>
 
 #### Delete User
 
-**Endpoint:** `DELETE /api/v1/users/{user_id}`
+**Endpoint:** `DELETE /api/v1/auth/users/{user_id}`
 
 **Response:**
 
@@ -827,85 +822,66 @@ Authorization: Bearer <admin_token>
 }
 ```
 
-#### Reset User Password
+#### List Image Boards
 
-**Endpoint:** `POST /api/v1/users/{user_id}/reset-password`
-
-**Request:**
-
-```json
-{
-  "new_password": "NewTempPass123"
-}
-```
+**Endpoint:** `GET /api/v1/boards/`
 
 **Response:**
 
 ```json
 {
-  "success": true
-}
-```
-
-### Board Sharing Endpoints
-
-#### Share Board
-
-**Endpoint:** `POST /api/v1/boards/{board_id}/share`
-
-**Request:**
-
-```json
-{
-  "user_id": "user123",
-  "permission": "write"
-}
-```
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "share": {
-    "board_id": "board456",
-    "user_id": "user123",
-    "permission": "write",
-    "shared_at": "2024-01-15T16:00:00Z"
-  }
-}
-```
-
-#### List Board Shares
-
-**Endpoint:** `GET /api/v1/boards/{board_id}/shares`
-
-**Response:**
-
-```json
-{
+  "limit": 0,
+  "offset": 0,
+  "total": 0,
   "items": [
     {
-      "user_id": "user123",
-      "display_name": "John Doe",
-      "permission": "write",
-      "shared_at": "2024-01-15T16:00:00Z"
+      "board_id": "8b31a33d-0acb-46fe-8612-83601481cf2c",
+      "board_name": "Testing Board",
+      "user_id": "string",
+      "created_at": "2026-05-07T03:04:00.738Z",
+      "updated_at": "2026-05-07T03:04:00.738Z",
+      "deleted_at": "2026-05-07T03:04:00.738Z",
+      "cover_image_name": "string",
+      "archived": false,
+      "board_visibility": "private",
+      "image_count": 0,
+      "asset_count": 0,
+      "owner_username": "string"
     }
   ]
 }
 ```
 
-#### Remove Board Share
+This returns a paged response. See the swagger page (`http://localhost:9090/docs#/boards/list_boards`) for details.
+The `board_visibility` field will be one of:
 
-**Endpoint:** `DELETE /api/v1/boards/{board_id}/share/{user_id}`
+- `private` -- private to the owner and administrator
+- `shared` -- read/write to the owner and administrator, read-only to everyone else
+- `public` -- read/write by everyone
+
+#### List One Boards
+
+**Endpoint:** `GET /api/v1/boards/{board_id}`
 
 **Response:**
 
 ```json
 {
-  "success": true
+  "board_id": "8b31a33d-0acb-46fe-8612-83601481cf2c",
+  "board_name": "Testing Board",
+  "user_id": "3c59a0ba-f4c7-4275-b96f-82179e8aaff8",
+  "created_at": "2026-03-09 16:10:47.095",
+  "updated_at": "2026-03-09 16:10:55",
+  "deleted_at": null,
+  "cover_image_name": "08689e4b-f084-4c49-83a8-4fc1edb167c4.png",
+  "archived": false,
+  "board_visibility": "shared",
+  "image_count": 55,
+  "asset_count": 0,
+  "owner_username": null
 }
 ```
+
 
 ## Best Practices
 

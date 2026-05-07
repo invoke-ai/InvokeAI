@@ -96,10 +96,6 @@ multiuser: true   # Enable multi-user mode (requires authentication)
 # multiuser: false  # Single-user mode (no authentication required)
 # If the multiuser option is absent, single-user mode is used
 
-# Database configuration
-use_memory_db: false  # Use persistent database
-db_path: databases/invokeai.db  # Database location
-
 # Session configuration (multi-user mode only)
 jwt_secret_key: "your-secret-key-here"  # Auto-generated if not specified
 jwt_token_expiry_hours: 24  # Default session timeout
@@ -214,13 +210,6 @@ Back up the database first if recovery might be needed.
 4. Cancel stuck or problematic tasks
 </Steps>
 
-**User Statistics:**
-
-- Number of boards created
-- Number of images generated
-- Storage usage (if enabled)
-- Last login time
-
 ## Model Management
 
 As an administrator, you have full access to the [Model
@@ -230,14 +219,31 @@ view the models previously installed, but cannot add or modify them.
 
 ## Security
 
+:::note[Strict Password Checking]
+It is recommended that you enable strict password checking.  This will
+force all users to select good passwords that follow the
+"minimal requirements" below. Do this by adding `strict_password_checking` to
+the `invokeai.yaml` configuration file:
+
+```
+strict_password_checking: true`
+```
+:::
+
 ### Password Policies
 
-**Enforced Requirements:**
+**Minimal Requirements:**
 
 - Minimum 8 characters
 - Must contain uppercase letters
 - Must contain lowercase letters
 - Must contain numbers
+
+If `strict_password_checking` is active (recommended), then these
+minimal requirements will be enforced and users will not be able to
+proceed until they have picked a password that satisfies
+them. Otherwise, the user will simply be warned when they use a weak
+password.
 
 **Recommended Policies:**
 
@@ -245,7 +251,6 @@ view the models previously installed, but cannot add or modify them.
 - Include special characters
 - Implement password rotation every 90 days
 - Prevent password reuse
-- Use multi-factor authentication (when available)
 
 ### Session Management
 
@@ -344,7 +349,7 @@ server {
 
 **Firewall Rules:**
 
-It is best to restrict access to trusted networks and remote IP addresses, or use a VPN to connect to your home network. Rate limit connections to InvokeAI's authentication endpoint `http://your.host:9090/login`.
+It is best to restrict access to trusted networks and remote IP addresses, or use a VPN to connect to your home network. Rate limit connections to InvokeAI's authentication endpoint `http://your.host:9090/api/v1/auth/login`.
 
 **Backup and Recovery:**
 
