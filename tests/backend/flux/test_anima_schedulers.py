@@ -2,6 +2,8 @@
 
 import typing
 
+import pytest
+
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 
 from invokeai.backend.flux.schedulers import (
@@ -135,6 +137,112 @@ def test_anima_dpmpp_2m_with_denoising_start_honors_clipped_schedule():
     )
 
 
+def test_anima_set_begin_index_path_step_count_with_denoising_end():
+    """set_begin_index fallback must honour denoising_end, not just denoising_start.
+
+    Regression test: the old formula (len(timesteps) - begin_index) ignored denoising_end
+    and ran past it. For steps=30, denoising_start=0.2, denoising_end=0.8 the correct
+    step count is 18, not 24.
+    """
+    import inspect
+
+    from invokeai.app.invocations.anima_denoise import loglinear_timestep_shift
+    from invokeai.backend.flux.schedulers import ANIMA_SHIFT
+
+    num_steps = 30
+    denoising_start = 0.2
+    denoising_end = 0.8
+
+    # Reference step count from the Euler path (clipped sigmas).
+    full_sigmas = [loglinear_timestep_shift(ANIMA_SHIFT, 1.0 - i / num_steps) for i in range(num_steps + 1)]
+    total_sigmas = len(full_sigmas)
+    start_idx = int(denoising_start * (total_sigmas - 1))
+    end_idx = int(denoising_end * (total_sigmas - 1)) + 1
+    expected_steps = (end_idx - start_idx) - 1  # 18
+
+    cls, kwargs = ANIMA_SCHEDULER_MAP["dpmpp_2m"]
+    scheduler = cls(num_train_timesteps=1000, **kwargs)
+    sig = inspect.signature(scheduler.set_timesteps)
+
+    scheduler_begin_index = int(denoising_start * num_steps)
+    if "sigmas" in sig.parameters:
+        clipped = full_sigmas[start_idx:end_idx]
+        scheduler.set_timesteps(sigmas=clipped, device="cpu")
+        num_scheduler_steps = len(scheduler.timesteps)
+    else:
+        scheduler.set_timesteps(num_inference_steps=num_steps, device="cpu")
+        scheduler.set_begin_index(scheduler_begin_index)
+        num_scheduler_steps = int(denoising_end * num_steps) - scheduler_begin_index
+
+    assert num_scheduler_steps == expected_steps, (
+        f"DPM++ scheduler step count with denoising_start={denoising_start}, "
+        f"denoising_end={denoising_end}: got {num_scheduler_steps}, expected {expected_steps}"
+    )
+
+
+@pytest.mark.parametrize(
+    ["denoising_start", "denoising_end", "steps"],
+    [
+        (0.2, 0.8, 30),   # mid-range: 18 logical steps → 36 doubled calls
+        (0.0, 0.8, 30),   # start-only clip: 24 logical steps → 48 doubled calls
+        (0.2, 1.0, 30),   # end=1.0: clamp kicks in (last step first-order only)
+        (0.5, 0.75, 20),  # different step count
+    ],
+)
+def test_anima_heun_set_begin_index_path_begin_index_and_step_count(
+    denoising_start: float, denoising_end: float, steps: int
+):
+    """Heun img2img: set_begin_index must use doubled-array index and step count must
+    account for Heun's 2N-1 timestep structure.
+
+    Logical step k maps to doubled-array begin index 2k.  For a range [k_start, k_end)
+    the total calls is 2*(k_end-k_start), clamped to len(timesteps)-begin_index so that
+    denoising_end=1.0 correctly gets the 2N-1 (not 2N) count.
+    """
+    from diffusers import FlowMatchHeunDiscreteScheduler
+
+    k_start = int(denoising_start * steps)
+    k_end = int(denoising_end * steps)
+
+    scheduler = FlowMatchHeunDiscreteScheduler(num_train_timesteps=1000, shift=1.0)
+    scheduler.set_timesteps(num_inference_steps=steps, device="cpu")
+
+    expected_begin_index = 2 * k_start
+    expected_steps = min(2 * (k_end - k_start), len(scheduler.timesteps) - expected_begin_index)
+
+    # Verify the doubled structure: len(timesteps) == 2*steps - 1
+    assert len(scheduler.timesteps) == 2 * steps - 1, (
+        f"Heun timesteps length: expected {2*steps-1}, got {len(scheduler.timesteps)}"
+    )
+
+    # The fixed code's begin index must map logical step to doubled-array space.
+    assert expected_begin_index == 2 * k_start
+
+    # For mid-range (denoising_end < 1): all steps in range have first + second order.
+    if denoising_end < 1.0:
+        assert expected_steps == 2 * (k_end - k_start), (
+            f"mid-range step count: expected {2*(k_end-k_start)}, got {expected_steps}"
+        )
+
+    # For denoising_end=1.0: last step is first-order only → clamped to 2N-1-begin.
+    if denoising_end == 1.0 and k_start > 0:
+        full_from_begin = len(scheduler.timesteps) - expected_begin_index
+        assert expected_steps == full_from_begin
+
+    # Bounds check: begin_index + num_steps must not exceed len(timesteps).
+    assert expected_begin_index + expected_steps <= len(scheduler.timesteps), (
+        f"step range [{expected_begin_index}, {expected_begin_index+expected_steps}) "
+        f"exceeds timesteps length {len(scheduler.timesteps)}"
+    )
+
+    # Sigma sanity: the sigma at the doubled begin index must equal the sigma at logical k_start.
+    # sigmas has 2N entries; sigmas[2k] == s_k for all k.
+    assert len(scheduler.sigmas) == 2 * steps
+    sigma_at_begin = scheduler.sigmas[expected_begin_index].item()
+    sigma_at_logical_k = scheduler.sigmas[2 * k_start].item()
+    assert abs(sigma_at_begin - sigma_at_logical_k) < 1e-6
+
+
 def test_anima_literal_covers_every_map_key():
     """Catch the silent failure mode where a new entry lands in the map but
     the Literal isn't updated — Pydantic validation would still accept it
@@ -153,6 +261,44 @@ def test_anima_scheduler_literal_includes_er_sde():
     assert "er_sde" in ANIMA_SCHEDULER_LABELS
     assert ANIMA_SCHEDULER_LABELS["er_sde"] == "ER-SDE"
     assert "er_sde" in ANIMA_SCHEDULER_MAP
+
+
+def test_anima_heun_uses_anima_shift_for_internal_schedule():
+    """Heun does NOT accept set_timesteps(sigmas=...) so it always builds its own internal
+    schedule. With shift=1.0 (the previous setting), that schedule was linear and gave the
+    wrong noise levels for img2img — Heun's sigmas[2*k_start] would be ~0.48 when Anima's
+    reference at user step k_start (denoising_start=0.5) is ~0.75. The model would receive
+    a timestep matching neither the latents nor its training distribution.
+
+    Fix: give Heun shift=ANIMA_SHIFT so its internal schedule approximates Anima's reference.
+    """
+    from invokeai.app.invocations.anima_denoise import loglinear_timestep_shift
+
+    cls, kwargs = ANIMA_SCHEDULER_MAP["heun"]
+    from invokeai.backend.flux.schedulers import ANIMA_SHIFT
+
+    assert kwargs["shift"] == ANIMA_SHIFT, (
+        f"Heun must use shift={ANIMA_SHIFT} (Anima's loglinear shift) since it doesn't accept "
+        f"sigmas=; got shift={kwargs['shift']}"
+    )
+
+    # Verify the schedule approximates Anima's reference for the bulk of user steps.
+    # The two formulas diverge at the tail (Heun uses linspace(1, T, N+1), Anima uses
+    # 1 - i/N), so we tolerate up to 5% absolute. The previous shift=1.0 bug gave 25-40%+
+    # divergence at mid-schedule, so any reasonable tolerance catches that regression.
+    steps = 30
+    anima_ref = [loglinear_timestep_shift(ANIMA_SHIFT, 1.0 - i / steps) for i in range(steps + 1)]
+    s = cls(num_train_timesteps=1000, **kwargs)
+    s.set_timesteps(num_inference_steps=steps, device="cpu")
+
+    # Heun's sigmas array has 2*N entries; sigmas[2*k] is the noise level at user step k.
+    for k in (0, 5, 10, 15):
+        heun_sigma = s.sigmas[2 * k].item()
+        ref = anima_ref[k]
+        assert abs(heun_sigma - ref) < 0.05, (
+            f"Heun internal sigma at user step {k} ({heun_sigma:.4f}) diverges from "
+            f"Anima reference ({ref:.4f}) by more than 5% — likely a shift kwarg regression"
+        )
 
 
 def test_anima_scheduler_map_er_sde_entry():

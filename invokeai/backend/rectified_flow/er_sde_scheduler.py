@@ -18,15 +18,10 @@ This scheduler unifies two regimes under a single API:
   and ports ``vp_*_order_*`` from the reference impl.
 * **Rectified flow / flow matching** (``use_flow_sigmas=True``) — FLUX, Z-Image,
   Anima style models with flow_prediction. Uses ``alpha_t = 1 - sigma, sigma_t = sigma``
-  and the algebra in ``invokeai/backend/rectified_flow/er_sde.py`` (the existing
-  Anima ER-SDE stepper) — see ``er_sde_rf_step`` there for the per-step ground
-  truth that this scheduler is designed to match for flow models.
+  and the rectified-flow integral helpers defined locally (``_fn``,
+  ``_integral_one_over_fn``, ``_integral_lam_minus_curr_over_fn``).
 
-The PoC keeps the rectified-flow integral helpers (``_fn``, ``_integral_one_over_fn``,
-``_integral_lam_minus_curr_over_fn``) duplicated locally rather than importing from
-``er_sde.py`` so this class is self-contained while we validate it. The two copies
-will be deduplicated once the parity test (Task D) and SD/SDXL smoke test (Task E)
-have passed.
+The rectified-flow integral helpers are kept local so this class is self-contained.
 """
 
 from __future__ import annotations

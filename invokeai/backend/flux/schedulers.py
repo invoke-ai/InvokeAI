@@ -66,12 +66,12 @@ if _HAS_LCM:
 
 
 # Anima scheduler types.
-# Anima uses rectified flow with shift=3.0. Sigmas are pre-shifted in
-# anima_denoise.py via loglinear_timestep_shift, so FlowMatch schedulers
-# carry shift=1.0 in their per-entry kwargs to avoid double-shifting.
-# DPMSolverMultistepScheduler entries carry flow_shift=3.0 explicitly because
-# they do not receive pre-shifted sigmas via set_timesteps(sigmas=...) in the
-# same way — the shift is baked into the solver's sigma schedule.
+# Anima uses rectified flow with shift=3.0. The driver passes pre-shifted sigmas via
+# set_timesteps(sigmas=...) when the scheduler accepts that signature. For those, the
+# entry carries shift=1.0 to avoid double-shifting (the scheduler uses our sigmas verbatim).
+# Schedulers that don't accept sigmas= (Heun, DPM++ on diffusers 0.35.1) build their own
+# internal schedule, so they need shift=ANIMA_SHIFT/flow_shift=ANIMA_SHIFT in kwargs to match
+# Anima's reference loglinear schedule.
 
 # Fixed shift factor for the Anima rectified-flow noise schedule.
 ANIMA_SHIFT = 3.0
@@ -90,11 +90,12 @@ ANIMA_SCHEDULER_LABELS: dict[str, str] = {
 # When adding a new Anima scheduler: add to all three of NAME_VALUES, LABELS,
 # and this MAP. The MAP entry is `(SchedulerClass, scheduler_kwargs)`. For
 # rectified-flow schedulers, set `use_flow_sigmas=True` and use
-# `prediction_type="flow_prediction"`. The pre-shifted sigma schedule is passed
-# via `set_timesteps(sigmas=...)` from anima_denoise._run_diffusion.
+# `prediction_type="flow_prediction"`. If the scheduler accepts set_timesteps(sigmas=...),
+# use shift=1.0 (driver passes pre-shifted sigmas); otherwise use shift=ANIMA_SHIFT
+# so the scheduler builds the correct internal schedule.
 ANIMA_SCHEDULER_MAP: dict[str, tuple[Type[SchedulerMixin], dict[str, Any]]] = {
     "euler": (FlowMatchEulerDiscreteScheduler, {"shift": 1.0}),
-    "heun": (FlowMatchHeunDiscreteScheduler, {"shift": 1.0}),
+    "heun": (FlowMatchHeunDiscreteScheduler, {"shift": ANIMA_SHIFT}),
     "dpmpp_2m": (
         DPMSolverMultistepScheduler,
         {
