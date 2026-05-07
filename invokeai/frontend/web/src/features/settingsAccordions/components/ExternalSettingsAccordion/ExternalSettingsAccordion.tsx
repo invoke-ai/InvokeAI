@@ -6,6 +6,7 @@ import { ExternalModelImageSizeSelect } from 'features/parameters/components/Dim
 import { ExternalModelResolutionSelect } from 'features/parameters/components/Dimensions/ExternalModelResolutionSelect';
 import { GeminiProviderOptions } from 'features/parameters/components/External/GeminiProviderOptions';
 import { OpenAIProviderOptions } from 'features/parameters/components/External/OpenAIProviderOptions';
+import { SeedreamProviderOptions } from 'features/parameters/components/External/SeedreamProviderOptions';
 import { useStandaloneAccordionToggle } from 'features/settingsAccordions/hooks/useStandaloneAccordionToggle';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -40,6 +41,7 @@ export const ExternalSettingsAccordion = memo(() => {
           <ExternalModelImageSizeSelect />
           {providerId === 'openai' && <OpenAIProviderOptions />}
           {providerId === 'gemini' && <GeminiProviderOptions />}
+          {providerId === 'seedream' && <SeedreamProviderOptions />}
         </FormControlGroup>
       </Flex>
     </StandaloneAccordion>
