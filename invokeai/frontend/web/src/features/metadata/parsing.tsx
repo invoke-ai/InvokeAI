@@ -26,6 +26,8 @@ import {
   qwenImageQuantizationChanged,
   qwenImageShiftChanged,
   refinerModelChanged,
+  seedreamOptimizePromptChanged,
+  seedreamWatermarkChanged,
   selectBase,
   setAnimaScheduler,
   setCfgRescaleMultiplier,
@@ -1504,6 +1506,42 @@ const OpenaiInputFidelity: SingleMetadataHandler<'low' | 'high'> = {
 };
 //#endregion OpenAI Input Fidelity
 
+//#region Seedream Watermark
+const SeedreamWatermark: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'SeedreamWatermark',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'seedream_watermark');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(seedreamWatermarkChanged(value));
+  },
+  i18nKey: 'metadata.seedreamWatermark',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Seedream Watermark
+
+//#region Seedream Optimize Prompt
+const SeedreamOptimizePrompt: SingleMetadataHandler<boolean> = {
+  [SingleMetadataKey]: true,
+  type: 'SeedreamOptimizePrompt',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'seedream_optimize_prompt');
+    const parsed = z.boolean().parse(raw);
+    return Promise.resolve(parsed);
+  },
+  recall: (value, store) => {
+    store.dispatch(seedreamOptimizePromptChanged(value));
+  },
+  i18nKey: 'metadata.seedreamOptimizePrompt',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<boolean>) => <MetadataPrimitiveValue value={value} />,
+};
+//#endregion Seedream Optimize Prompt
+
 export const ImageMetadataHandlers = {
   CreatedBy,
   GenerationMode,
@@ -1558,6 +1596,8 @@ export const ImageMetadataHandlers = {
   OpenaiQuality,
   OpenaiBackground,
   OpenaiInputFidelity,
+  SeedreamWatermark,
+  SeedreamOptimizePrompt,
   // TODO: These had parsers in the prev implementation, but they were never actually used?
   // controlNet: parseControlNet,
   // controlNets: parseAllControlNets,
