@@ -161,17 +161,35 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         # Build the processor
         tokenizer_config = context.models.get_config(self.qwen_vl_encoder.tokenizer)
         model_root = context.models.get_absolute_path(tokenizer_config)
-        tokenizer_dir = model_root / "tokenizer"
 
-        tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_dir), local_files_only=True)
+        # Single-file checkpoints (e.g. ComfyUI fp8_scaled): model_root is the
+        # safetensors file itself, so there's no tokenizer/processor folder
+        # alongside it. Fall back to the canonical Qwen2.5-VL repo on HF (small
+        # ~10 MB download for tokenizer+processor configs, cached for offline use).
+        if model_root.is_file():
+            HF_REPO = "Qwen/Qwen2.5-VL-7B-Instruct"
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(HF_REPO, local_files_only=True)
+            except OSError:
+                tokenizer = AutoTokenizer.from_pretrained(HF_REPO)
+            try:
+                image_processor = _ImageProcessorCls.from_pretrained(HF_REPO, local_files_only=True)
+            except OSError:
+                try:
+                    image_processor = _ImageProcessorCls.from_pretrained(HF_REPO)
+                except Exception:
+                    image_processor = _ImageProcessorCls()
+        else:
+            tokenizer_dir = model_root / "tokenizer"
+            tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_dir), local_files_only=True)
 
-        image_processor = None
-        for search_dir in [model_root / "processor", tokenizer_dir, model_root, model_root / "image_processor"]:
-            if (search_dir / "preprocessor_config.json").exists():
-                image_processor = _ImageProcessorCls.from_pretrained(str(search_dir), local_files_only=True)
-                break
-        if image_processor is None:
-            image_processor = _ImageProcessorCls()
+            image_processor = None
+            for search_dir in [model_root / "processor", tokenizer_dir, model_root, model_root / "image_processor"]:
+                if (search_dir / "preprocessor_config.json").exists():
+                    image_processor = _ImageProcessorCls.from_pretrained(str(search_dir), local_files_only=True)
+                    break
+            if image_processor is None:
+                image_processor = _ImageProcessorCls()
 
         processor = Qwen2_5_VLProcessor(
             tokenizer=tokenizer,
@@ -264,6 +282,12 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
 
         encoder_config = context.models.get_config(self.qwen_vl_encoder.text_encoder)
         model_root = context.models.get_absolute_path(encoder_config)
+        if model_root.is_file():
+            # Single-file checkpoint (e.g. ComfyUI fp8_scaled): BnB can't load from
+            # a single file, and the checkpoint is already FP8-compressed anyway.
+            # Fall back to the cached path; the user effectively gets fp8 instead of
+            # int8/nf4, which is comparable in size.
+            return self._load_cached_encoder(context)
         encoder_path = model_root / "text_encoder"
 
         if self.quantization == "nf4":

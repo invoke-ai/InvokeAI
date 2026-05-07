@@ -666,6 +666,38 @@ cogview4 = StarterModel(
 )
 # endregion
 
+# region Qwen Image components (shared between Edit and txt2img variants)
+qwen_image_vae = StarterModel(
+    name="Qwen Image VAE",
+    base=BaseModelType.QwenImage,
+    source="Qwen/Qwen-Image-Edit-2511::vae/diffusion_pytorch_model.safetensors",
+    description="Qwen Image VAE (AutoencoderKLQwenImage), shared between the Edit and txt2img variants. "
+    "Use with GGUF transformers to avoid downloading the full ~40GB Diffusers pipeline. (~250MB)",
+    type=ModelType.VAE,
+    format=ModelFormat.Checkpoint,
+)
+
+qwen_vl_encoder_fp8 = StarterModel(
+    name="Qwen2.5-VL Encoder (fp8 scaled)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+    description="ComfyUI's single-file FP8-scaled Qwen2.5-VL 7B encoder. Bundles the language model and "
+    "visual tower; tokenizer/processor are fetched from HuggingFace on first use. (~7GB)",
+    type=ModelType.QwenVLEncoder,
+    format=ModelFormat.Checkpoint,
+)
+
+qwen_vl_encoder_diffusers = StarterModel(
+    name="Qwen2.5-VL Encoder (Diffusers)",
+    base=BaseModelType.Any,
+    source="Qwen/Qwen-Image-Edit-2511::text_encoder+tokenizer+processor",
+    description="Full-precision Qwen2.5-VL 7B encoder in Diffusers folder layout (text_encoder + tokenizer + processor). "
+    "Larger than the fp8 variant but no on-the-fly dequantization. (~16GB)",
+    type=ModelType.QwenVLEncoder,
+    format=ModelFormat.QwenVLEncoder,
+)
+# endregion
+
 # region Qwen Image Edit
 qwen_image_edit = StarterModel(
     name="Qwen Image Edit 2511",
@@ -684,6 +716,7 @@ qwen_image_edit_gguf_q4_k_m = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_gguf_q2_k = StarterModel(
@@ -694,6 +727,7 @@ qwen_image_edit_gguf_q2_k = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_gguf_q6_k = StarterModel(
@@ -704,6 +738,7 @@ qwen_image_edit_gguf_q6_k = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_gguf_q8_0 = StarterModel(
@@ -714,6 +749,7 @@ qwen_image_edit_gguf_q8_0 = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     variant=QwenImageVariantType.Edit,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_edit_lightning_4step = StarterModel(
@@ -750,6 +786,7 @@ qwen_image_gguf_q4_k_m = StarterModel(
     description="Qwen Image 2512 - Q4_K_M quantized transformer. Good quality/size balance. (~13GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_gguf_q2_k = StarterModel(
@@ -759,6 +796,7 @@ qwen_image_gguf_q2_k = StarterModel(
     description="Qwen Image 2512 - Q2_K heavily quantized transformer. Smallest size, lower quality. (~7.5GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_gguf_q6_k = StarterModel(
@@ -768,6 +806,7 @@ qwen_image_gguf_q6_k = StarterModel(
     description="Qwen Image 2512 - Q6_K quantized transformer. Near-lossless quality. (~17GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_gguf_q8_0 = StarterModel(
@@ -777,6 +816,7 @@ qwen_image_gguf_q8_0 = StarterModel(
     description="Qwen Image 2512 - Q8_0 quantized transformer. Highest quality quantization. (~22GB)",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[qwen_image_vae, qwen_vl_encoder_fp8],
 )
 
 qwen_image_lightning_4step = StarterModel(
@@ -1606,6 +1646,9 @@ STARTER_MODELS: list[StarterModel] = [
     flux2_klein_qwen3_4b_encoder,
     flux2_klein_qwen3_8b_encoder,
     cogview4,
+    qwen_image_vae,
+    qwen_vl_encoder_fp8,
+    qwen_vl_encoder_diffusers,
     qwen_image_edit,
     qwen_image_edit_gguf_q2_k,
     qwen_image_edit_gguf_q4_k_m,
@@ -1717,6 +1760,8 @@ flux2_klein_bundle: list[StarterModel] = [
 ]
 
 qwen_image_bundle: list[StarterModel] = [
+    qwen_image_vae,
+    qwen_vl_encoder_fp8,
     qwen_image_edit,
     qwen_image_edit_gguf_q4_k_m,
     qwen_image_edit_gguf_q8_0,
