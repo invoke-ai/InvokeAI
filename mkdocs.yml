@@ -146,6 +146,7 @@ nav:
           - Overview: 'features/external-models/index.md'
           - Google Gemini: 'features/external-models/gemini.md'
           - OpenAI: 'features/external-models/openai.md'
+          - BytePlus Seedream: 'features/external-models/seedream.md'
           - Alibaba Cloud DashScope: 'features/external-models/alibabacloud.md'
   - Multi-User Mode:
       - User Guide: 'multiuser/user_guide.md'
