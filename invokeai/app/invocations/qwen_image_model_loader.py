@@ -34,7 +34,7 @@ class QwenImageModelLoaderOutput(BaseInvocationOutput):
     title="Main Model - Qwen Image",
     tags=["model", "qwen_image"],
     category="model",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class QwenImageModelLoaderInvocation(BaseInvocation):
@@ -42,11 +42,14 @@ class QwenImageModelLoaderInvocation(BaseInvocation):
 
     The transformer is always loaded from the main model (Diffusers or GGUF).
 
-    For GGUF quantized models, the VAE and Qwen VL encoder must come from a
-    separate Diffusers model specified in the "Component Source" field.
+    Components can be mixed and matched:
+    - VAE: standalone Qwen Image VAE checkpoint, the Component Source (Diffusers),
+      or the main model if it's Diffusers.
+    - Qwen VL Encoder: standalone Qwen2.5-VL encoder, the Component Source
+      (Diffusers), or the main model if it's Diffusers.
 
-    For Diffusers models, all components are extracted from the main model
-    automatically. The "Component Source" field is ignored.
+    Together, the standalone VAE and standalone encoder allow running a GGUF
+    transformer without ever downloading the full ~40 GB Diffusers pipeline.
     """
 
     model: ModelIdentifierField = InputField(
@@ -57,11 +60,31 @@ class QwenImageModelLoaderInvocation(BaseInvocation):
         title="Transformer",
     )
 
+    vae_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="Standalone Qwen Image VAE model. "
+        "If not provided, VAE will be loaded from the Component Source (or from the main model if it is Diffusers).",
+        input=Input.Direct,
+        ui_model_base=BaseModelType.QwenImage,
+        ui_model_type=ModelType.VAE,
+        title="VAE",
+    )
+
+    qwen_vl_encoder_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="Standalone Qwen2.5-VL encoder model. "
+        "If not provided, the encoder will be loaded from the Component Source "
+        "(or from the main model if it is Diffusers).",
+        input=Input.Direct,
+        ui_model_type=ModelType.QwenVLEncoder,
+        title="Qwen VL Encoder",
+    )
+
     component_source: Optional[ModelIdentifierField] = InputField(
         default=None,
-        description="Diffusers Qwen Image model to extract the VAE and Qwen VL encoder from. "
-        "Required when using a GGUF quantized transformer. "
-        "Ignored when the main model is already in Diffusers format.",
+        description="Diffusers Qwen Image model to extract VAE and/or Qwen VL encoder from. "
+        "Use this if you don't have separate VAE/encoder models. "
+        "Ignored for any submodel that is provided separately.",
         input=Input.Direct,
         ui_model_base=BaseModelType.QwenImage,
         ui_model_type=ModelType.Main,
@@ -76,28 +99,36 @@ class QwenImageModelLoaderInvocation(BaseInvocation):
         # Transformer always comes from the main model
         transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
 
-        if main_is_diffusers:
-            # Diffusers model: extract all components directly
+        # Resolve VAE: standalone override > main (if Diffusers) > component source
+        if self.vae_model is not None:
+            vae = self.vae_model.model_copy(update={"submodel_type": SubModelType.VAE})
+        elif main_is_diffusers:
             vae = self.model.model_copy(update={"submodel_type": SubModelType.VAE})
+        elif self.component_source is not None:
+            self._validate_component_source_format(context, self.component_source)
+            vae = self.component_source.model_copy(update={"submodel_type": SubModelType.VAE})
+        else:
+            raise ValueError(
+                "No source for VAE. Either set 'VAE' to a standalone Qwen Image VAE, "
+                "or set 'Component Source' to a Diffusers Qwen Image model."
+            )
+
+        # Resolve Qwen VL encoder: standalone override > main (if Diffusers) > component source
+        if self.qwen_vl_encoder_model is not None:
+            tokenizer = self.qwen_vl_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
+            text_encoder = self.qwen_vl_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
+        elif main_is_diffusers:
             tokenizer = self.model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             text_encoder = self.model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         elif self.component_source is not None:
-            # GGUF/checkpoint transformer: get VAE + encoder from the component source
-            source_config = context.models.get_config(self.component_source)
-            if source_config.format != ModelFormat.Diffusers:
-                raise ValueError(
-                    f"The Component Source model must be in Diffusers format. "
-                    f"The selected model '{source_config.name}' is in {source_config.format.value} format."
-                )
-            vae = self.component_source.model_copy(update={"submodel_type": SubModelType.VAE})
+            self._validate_component_source_format(context, self.component_source)
             tokenizer = self.component_source.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             text_encoder = self.component_source.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         else:
             raise ValueError(
-                "No source for VAE and Qwen VL encoder. "
-                "GGUF quantized models only contain the transformer — "
-                "please set 'Component Source' to a Diffusers Qwen Image model "
-                "to provide the VAE and text encoder."
+                "No source for Qwen VL encoder. "
+                "Either set 'Qwen VL Encoder' to a standalone Qwen2.5-VL encoder, "
+                "or set 'Component Source' to a Diffusers Qwen Image model."
             )
 
         return QwenImageModelLoaderOutput(
@@ -105,3 +136,12 @@ class QwenImageModelLoaderInvocation(BaseInvocation):
             qwen_vl_encoder=QwenVLEncoderField(tokenizer=tokenizer, text_encoder=text_encoder),
             vae=VAEField(vae=vae),
         )
+
+    @staticmethod
+    def _validate_component_source_format(context: InvocationContext, model: ModelIdentifierField) -> None:
+        source_config = context.models.get_config(model)
+        if source_config.format != ModelFormat.Diffusers:
+            raise ValueError(
+                f"The Component Source model must be in Diffusers format. "
+                f"The selected model '{source_config.name}' is in {source_config.format.value} format."
+            )
