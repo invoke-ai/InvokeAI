@@ -560,11 +560,11 @@ GET /api/v1/workflows/
 **Queue:**
 
 ```python
-# Regular users see only their queue items
-GET /api/v1/queue/  # User's queue items
+# Regular users see their own queue items in full and may see redacted details for other users' items on queue-status endpoints
+GET /api/v1/queue/...  # Queue data, sanitized for non-admin viewers
 
-# Administrators see all queue items
-GET /api/v1/queue/  # All users' queue items
+# Administrators see all queue items in full
+GET /api/v1/queue/...  # Full queue data
 ```
 
 ### Administrator Endpoints
