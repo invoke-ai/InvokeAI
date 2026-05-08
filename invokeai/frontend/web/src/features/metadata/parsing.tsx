@@ -24,7 +24,9 @@ import {
   positivePromptChanged,
   qwenImageComponentSourceSelected,
   qwenImageQuantizationChanged,
+  qwenImageQwenVLEncoderModelSelected,
   qwenImageShiftChanged,
+  qwenImageVaeModelSelected,
   refinerModelChanged,
   seedreamOptimizePromptChanged,
   seedreamWatermarkChanged,
@@ -732,6 +734,58 @@ const QwenImageComponentSource: SingleMetadataHandler<ModelIdentifierField | nul
   ),
 };
 //#endregion QwenImageComponentSource
+
+//#region QwenImageVaeModel
+const QwenImageVaeModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'QwenImageVaeModel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'qwen_image_vae');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(qwenImageVaeModelSelected(value));
+  },
+  i18nKey: 'modelManager.qwenImageVae',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion QwenImageVaeModel
+
+//#region QwenImageQwenVLEncoderModel
+const QwenImageQwenVLEncoderModel: SingleMetadataHandler<ModelIdentifierField | null> = {
+  [SingleMetadataKey]: true,
+  type: 'QwenImageQwenVLEncoderModel',
+  parse: (metadata, _store) => {
+    const raw = getProperty(metadata, 'qwen_image_qwen_vl_encoder');
+    // Reject when the key is absent so the handler is not rendered for non-Qwen images
+    if (raw === undefined) {
+      return Promise.reject();
+    }
+    if (raw === null) {
+      return Promise.resolve(null);
+    }
+    return Promise.resolve(zModelIdentifierField.parse(raw));
+  },
+  recall: (value, store) => {
+    store.dispatch(qwenImageQwenVLEncoderModelSelected(value));
+  },
+  i18nKey: 'modelManager.qwenImageQwenVLEncoder',
+  LabelComponent: MetadataLabel,
+  ValueComponent: ({ value }: SingleMetadataValueProps<ModelIdentifierField | null>) => (
+    <MetadataPrimitiveValue value={value ? value.name : 'None'} />
+  ),
+};
+//#endregion QwenImageQwenVLEncoderModel
 
 //#region QwenImageQuantization
 const QwenImageQuantization: SingleMetadataHandler<'none' | 'int8' | 'nf4'> = {
@@ -1584,6 +1638,8 @@ export const ImageMetadataHandlers = {
   ZImageSeedVarianceStrength,
   ZImageSeedVarianceRandomizePercent,
   QwenImageComponentSource,
+  QwenImageVaeModel,
+  QwenImageQwenVLEncoderModel,
   QwenImageQuantization,
   QwenImageShift,
   ZImageShift,
