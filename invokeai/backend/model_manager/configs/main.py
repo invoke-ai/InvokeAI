@@ -1120,12 +1120,20 @@ def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
     (unique to Anima - the LLM Adapter that bridges Qwen3 text encoder to the Cosmos DiT)
     alongside Cosmos Predict2 DiT keys (blocks, t_embedder, x_embedder, final_layer).
 
-    The checkpoint keys may have a `net.` prefix (e.g. `net.llm_adapter.`, `net.blocks.`).
+    The checkpoint keys may have a `net.` prefix (e.g. `net.llm_adapter.`, `net.blocks.`)
+    or a `model.diffusion_model.` prefix (ComfyUI bundled checkpoint format).
     """
     has_llm_adapter = False
     has_cosmos_dit = False
 
-    # Cosmos DiT key prefixes — support both with and without `net.` prefix
+    # LLM adapter key prefixes — support bare, `net.`, and `model.diffusion_model.` prefixes
+    llm_adapter_prefixes = (
+        "llm_adapter.",
+        "net.llm_adapter.",
+        "model.diffusion_model.llm_adapter.",
+    )
+
+    # Cosmos DiT key prefixes — support bare, `net.`, and `model.diffusion_model.` prefixes
     cosmos_prefixes = (
         "blocks.",
         "t_embedder.",
@@ -1135,16 +1143,19 @@ def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
         "net.t_embedder.",
         "net.x_embedder.",
         "net.final_layer.",
+        "model.diffusion_model.blocks.",
+        "model.diffusion_model.t_embedder.",
+        "model.diffusion_model.x_embedder.",
+        "model.diffusion_model.final_layer.",
     )
 
     for key in state_dict.keys():
         if isinstance(key, int):
             continue
-        if key.startswith("llm_adapter.") or key.startswith("net.llm_adapter."):
+        if any(key.startswith(p) for p in llm_adapter_prefixes):
             has_llm_adapter = True
-        for prefix in cosmos_prefixes:
-            if key.startswith(prefix):
-                has_cosmos_dit = True
+        if any(key.startswith(p) for p in cosmos_prefixes):
+            has_cosmos_dit = True
         if has_llm_adapter and has_cosmos_dit:
             return True
 

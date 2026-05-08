@@ -302,7 +302,11 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
   }
 
   if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
-    if (!params.qwenImageComponentSource) {
+    // GGUF needs sources for VAE + encoder. Each can come from either a standalone
+    // model or the Component Source (Diffusers).
+    const hasVaeSource = params.qwenImageVaeModel !== null || params.qwenImageComponentSource !== null;
+    const hasEncoderSource = params.qwenImageQwenVLEncoderModel !== null || params.qwenImageComponentSource !== null;
+    if (!hasVaeSource || !hasEncoderSource) {
       reasons.push({ content: i18n.t('parameters.invoke.noQwenImageComponentSourceSelected') });
     }
   }
@@ -761,7 +765,11 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
   }
 
   if (model?.base === 'qwen-image' && model.format === 'gguf_quantized') {
-    if (!params.qwenImageComponentSource) {
+    // GGUF needs sources for VAE + encoder. Each can come from either a standalone
+    // model or the Component Source (Diffusers).
+    const hasVaeSource = params.qwenImageVaeModel !== null || params.qwenImageComponentSource !== null;
+    const hasEncoderSource = params.qwenImageQwenVLEncoderModel !== null || params.qwenImageComponentSource !== null;
+    if (!hasVaeSource || !hasEncoderSource) {
       reasons.push({ content: i18n.t('parameters.invoke.noQwenImageComponentSourceSelected') });
     }
   }
