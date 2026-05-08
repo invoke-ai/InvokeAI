@@ -582,8 +582,8 @@ def test_anima_img2img_preblend_matches_scheduler_first_sigma(scheduler_name: st
     invocation = AnimaDenoiseInvocation.model_construct(steps=30)
     sigmas = invocation._get_sigmas(invocation.steps)
     sigmas = sigmas[int(0.25 * (len(sigmas) - 1)) :]
-    scheduler_class = ANIMA_SCHEDULER_MAP[scheduler_name]
-    scheduler = scheduler_class(num_train_timesteps=1000, shift=1.0)
+    scheduler_class, scheduler_kwargs = ANIMA_SCHEDULER_MAP[scheduler_name]
+    scheduler = scheduler_class(num_train_timesteps=1000, **scheduler_kwargs)
 
     assert sigmas[0] == pytest.approx(
         _get_first_scheduler_sigma(scheduler, scheduler_name=scheduler_name, sigmas=sigmas)

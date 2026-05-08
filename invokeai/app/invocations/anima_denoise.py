@@ -16,14 +16,12 @@ Key differences from Z-Image denoise:
 - Anima uses 3D latents directly, Z-Image converts 4D -> list of 5D
 """
 
-import inspect
 import math
 from contextlib import ExitStack
 from typing import Callable, Iterator, Optional, Tuple
 
 import torch
 import torchvision.transforms as tv_transforms
-from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
 
@@ -43,7 +41,12 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.anima.anima_transformer_patch import patch_anima_for_regional_prompting
 from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
 from invokeai.backend.anima.regional_prompting import AnimaRegionalPromptingExtension
-from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_LABELS, ANIMA_SCHEDULER_MAP, ANIMA_SCHEDULER_NAME_VALUES
+from invokeai.backend.anima.scheduler_driver import AnimaSchedulerDriver
+from invokeai.backend.flux.schedulers import (
+    ANIMA_SCHEDULER_LABELS,
+    ANIMA_SCHEDULER_NAME_VALUES,
+    ANIMA_SHIFT,
+)
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_TRANSFORMER_PREFIX
@@ -60,8 +63,6 @@ from invokeai.backend.util.devices import TorchDevice
 ANIMA_LATENT_SCALE_FACTOR = 8
 # Anima uses 16 latent channels
 ANIMA_LATENT_CHANNELS = 16
-# Anima uses fixed shift=3.0 for the rectified flow schedule
-ANIMA_SHIFT = 3.0
 # Anima uses raw sigma values as timesteps (no rescaling)
 ANIMA_MULTIPLIER = 1.0
 
@@ -166,7 +167,7 @@ class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
     title="Denoise - Anima",
     tags=["image", "anima"],
     category="image",
-    version="1.3.0",
+    version="1.6.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseInvocation(BaseInvocation):
@@ -512,25 +513,19 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         step_callback = self._build_step_callback(context)
 
-        # Initialize diffusers scheduler if not using built-in Euler
-        scheduler: SchedulerMixin | None = None
+        # Initialize scheduler driver if not using built-in Euler.
         use_scheduler = self.scheduler != "euler"
-
+        driver: AnimaSchedulerDriver | None = None
         if use_scheduler:
-            scheduler_class = ANIMA_SCHEDULER_MAP[self.scheduler]
-            scheduler = scheduler_class(num_train_timesteps=1000, shift=1.0)
-            is_lcm = self.scheduler == "lcm"
-            set_timesteps_sig = inspect.signature(scheduler.set_timesteps)
-            if not is_lcm and "sigmas" in set_timesteps_sig.parameters:
-                scheduler.set_timesteps(sigmas=sigmas, device=device)
-            else:
-                # LCM or a scheduler without custom-sigma support computes its own
-                # schedule from num_inference_steps. That can diverge from sigmas[0]
-                # used in the img2img preblend above.
-                scheduler.set_timesteps(num_inference_steps=total_steps, device=device)
-            num_scheduler_steps = len(scheduler.timesteps)
-        else:
-            num_scheduler_steps = total_steps
+            driver = AnimaSchedulerDriver(
+                scheduler_name=self.scheduler,
+                sigmas=sigmas,
+                steps=self.steps,
+                denoising_start=self.denoising_start,
+                denoising_end=self.denoising_end,
+                device=device,
+                seed=self.seed,
+            )
 
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(transformer_info.model_on_device())
@@ -611,19 +606,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     # t5xxl_ids=None skips the LLM Adapter — context is already pre-computed
                 )
 
-            if use_scheduler and scheduler is not None:
-                # Scheduler-based denoising
+            if driver is not None:
                 user_step = 0
                 pbar = tqdm(total=total_steps, desc="Denoising (Anima)")
-                for step_index in range(num_scheduler_steps):
-                    sched_timestep = scheduler.timesteps[step_index]
-                    sigma_curr = sched_timestep.item() / scheduler.config.num_train_timesteps
-
-                    is_heun = hasattr(scheduler, "state_in_first_order")
-                    in_first_order = scheduler.state_in_first_order if is_heun else True
-
+                for it in driver.iterations():
                     timestep = torch.tensor(
-                        [sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
+                        [it.sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
                     ).expand(latents.shape[0])
 
                     noise_pred_cond = _run_transformer(pos_context, latents, timestep).float()
@@ -634,48 +622,30 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     else:
                         noise_pred = noise_pred_cond
 
-                    step_output = scheduler.step(model_output=noise_pred, timestep=sched_timestep, sample=latents)
-                    latents = step_output.prev_sample
+                    latents = driver.step(model_output=noise_pred, timestep=it.sched_timestep, sample=latents)
 
-                    if step_index + 1 < len(scheduler.sigmas):
-                        sigma_prev = scheduler.sigmas[step_index + 1].item()
-                    else:
-                        sigma_prev = 0.0
-
-                    if inpaint_extension is not None:
-                        latents_4d = latents.squeeze(2)
-                        latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(
-                            latents_4d, sigma_prev
-                        )
-                        latents = latents_4d.unsqueeze(2)
-
-                    if is_heun:
-                        if not in_first_order:
-                            user_step += 1
-                            if user_step <= total_steps:
-                                pbar.update(1)
-                                step_callback(
-                                    PipelineIntermediateState(
-                                        step=user_step,
-                                        order=2,
-                                        total_steps=total_steps,
-                                        timestep=int(sigma_curr * 1000),
-                                        latents=latents.squeeze(2),
-                                    )
-                                )
-                    else:
-                        user_step += 1
-                        if user_step <= total_steps:
-                            pbar.update(1)
-                            step_callback(
-                                PipelineIntermediateState(
-                                    step=user_step,
-                                    order=1,
-                                    total_steps=total_steps,
-                                    timestep=int(sigma_curr * 1000),
-                                    latents=latents.squeeze(2),
-                                )
+                    if it.completes_user_step:
+                        # RectifiedFlowInpaintExtension expects this once per user step (its
+                        # docstring), so for Heun we skip the FO half of each pair to avoid
+                        # corrupting the second-order corrector's input.
+                        if inpaint_extension is not None:
+                            latents_4d = latents.squeeze(2)
+                            latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(
+                                latents_4d, it.sigma_prev
                             )
+                            latents = latents_4d.unsqueeze(2)
+
+                        user_step += 1
+                        pbar.update(1)
+                        step_callback(
+                            PipelineIntermediateState(
+                                step=user_step,
+                                order=it.order,
+                                total_steps=total_steps,
+                                timestep=int(it.sigma_curr * 1000),
+                                latents=latents.squeeze(2),
+                            )
+                        )
                 pbar.close()
             else:
                 # Built-in Euler implementation (default for Anima)
