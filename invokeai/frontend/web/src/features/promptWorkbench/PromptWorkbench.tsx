@@ -15,20 +15,18 @@ import { selectSystemPrefersNumericAttentionWeights } from 'features/system/stor
 import type { MouseEvent, RefObject } from 'react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import { PiCubeBold, PiDiceFiveBold } from 'react-icons/pi';
 import type { WildcardIndexItem } from 'services/api/endpoints/utilities';
 import { useLazyWildcardValuesQuery, useWildcardsQuery } from 'services/api/endpoints/utilities';
 
 import { getPromptDiagnostics, type PromptDiagnosticSeverity } from './diagnostics';
-import {
-  clampNavigationIndex,
-  getNextNavigationIndex,
-  getPromptWorkbenchKeyboardIntent,
-} from './keyboardNavigation';
+import { clampNavigationIndex, getNextNavigationIndex, getPromptWorkbenchKeyboardIntent } from './keyboardNavigation';
 import { getPromptModelCapabilities } from './modelCapabilities';
 import {
   getPromptWorkbenchOccurrences,
   getWildcardBehaviorActionIntent,
   type PromptRange,
+  type PromptWeightOccurrence,
   type PromptWildcardOccurrence,
   removePromptRange,
   replacePromptRange,
@@ -60,6 +58,8 @@ type SelectionRange = {
 const EMPTY_WILDCARDS: [] = [];
 const getCompletionContextKey = (context: WildcardCompletionContext): string =>
   `${context.start}:${context.end}:${context.query}`;
+const PROMPT_INTENT_PANEL_BG = 'linear-gradient(180deg, rgba(15, 23, 31, 0.92) 0%, rgba(11, 18, 25, 0.96) 100%)';
+const PROMPT_INTENT_PANEL_BORDER = 'rgba(126, 143, 164, 0.28)';
 
 export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: PromptWorkbenchProps) => {
   const dispatch = useAppDispatch();
@@ -70,7 +70,11 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
   const dynamicPromptRandomRefreshMode = useAppSelector(selectDynamicPromptsRandomRefreshMode);
   const dynamicPrompts = useAppSelector(selectDynamicPromptsPrompts);
   const dynamicPromptError = useAppSelector(selectDynamicPromptsParsingError);
-  const { data: wildcardsData, isError: isWildcardIndexUnavailable, isFetching: isFetchingWildcards } = useWildcardsQuery();
+  const {
+    data: wildcardsData,
+    isError: isWildcardIndexUnavailable,
+    isFetching: isFetchingWildcards,
+  } = useWildcardsQuery();
   const [loadWildcardValues, wildcardValuesResult] = useLazyWildcardValuesQuery();
   const wildcards = wildcardsData?.wildcards ?? EMPTY_WILDCARDS;
   const wildcardIndexErrorCount = wildcardsData?.errors.length ?? 0;
@@ -195,21 +199,17 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
 
   const wildcardOptionElementSetters = useMemo(
     () =>
-      wildcardOptions.map(
-        (_wildcard, index) => (element: HTMLElement | null) => {
-          setWildcardOptionElement(index, element);
-        }
-      ),
+      wildcardOptions.map((_wildcard, index) => (element: HTMLElement | null) => {
+        setWildcardOptionElement(index, element);
+      }),
     [setWildcardOptionElement, wildcardOptions]
   );
 
   const fixedValueElementSetters = useMemo(
     () =>
-      (fixedWildcardValues ?? []).map(
-        (_value, index) => (element: HTMLElement | null) => {
-          setFixedValueElement(index, element);
-        }
-      ),
+      (fixedWildcardValues ?? []).map((_value, index) => (element: HTMLElement | null) => {
+        setFixedValueElement(index, element);
+      }),
     [fixedWildcardValues, setFixedValueElement]
   );
 
@@ -650,6 +650,14 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
     [applyPromptReplacement, prompt]
   );
 
+  const onRemoveWeightOccurrence = useCallback(
+    (occurrence: PromptWeightOccurrence) => {
+      const result = removePromptRange(prompt, occurrence.range);
+      applyPromptReplacement(result.prompt, { start: result.caret, end: result.caret });
+    },
+    [applyPromptReplacement, prompt]
+  );
+
   const onInspectorWildcardBehaviorAction = useCallback(
     (occurrence: PromptWildcardOccurrence, action: WildcardBehaviorAction) => {
       const intent = getWildcardBehaviorActionIntent(action, occurrence.path);
@@ -684,87 +692,10 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
   );
   const canShowWeightControls = capabilities.supportsAttentionWeights && hasPromptWorkbenchEntries;
   const canAdjustSelectionWeight = canShowWeightControls && selection.start !== selection.end;
+  const hasPromptWorkbenchPanel = hasPromptWorkbenchEntries || diagnostics.length > 0;
 
   return (
     <Flex flexDir="column" gap={1} mt={1}>
-      <Flex gap={1} alignItems="center" flexWrap="wrap">
-        {diagnostics.map((diagnostic) =>
-          diagnostic.code === 'dynamic-active' && hasRandomWildcardOccurrences ? (
-            <Menu key={diagnostic.code}>
-              <Tooltip label={`${diagnostic.description} Change random wildcard behavior.`}>
-                <MenuButton as={Button} variant="unstyled" minW="unset" h="auto" cursor="pointer">
-                  <PromptWorkbenchBadge tone={getDiagnosticBadgeTone(diagnostic.severity)}>
-                    {diagnostic.label}
-                  </PromptWorkbenchBadge>
-                </MenuButton>
-              </Tooltip>
-              <MenuList>
-                <MenuItem onClick={onRandomPerImageClick} title="Random wildcards roll once per generated image.">
-                  Random/image
-                </MenuItem>
-                <MenuItem
-                  onClick={onRandomPerInvokeClick}
-                  title="Random wildcards roll once per Invoke; cyclic wildcards still advance per generated output."
-                >
-                  Random/invoke
-                </MenuItem>
-              </MenuList>
-            </Menu>
-          ) : diagnostic.code === 'dynamic-active' ? (
-            <Tooltip key={diagnostic.code} label={`${diagnostic.description} Open dynamic prompt preview.`}>
-              <Button
-                variant="unstyled"
-                minW="unset"
-                h="auto"
-                cursor="pointer"
-                onMouseDown={onOpenQueuedOutputsMouseDown}
-                onClick={onOpenQueuedOutputsClick}
-              >
-                <PromptWorkbenchBadge tone={getDiagnosticBadgeTone(diagnostic.severity)}>
-                  {diagnostic.label}
-                </PromptWorkbenchBadge>
-              </Button>
-            </Tooltip>
-          ) : (
-            <Tooltip key={diagnostic.code} label={diagnostic.description}>
-              <PromptWorkbenchBadge tone={getDiagnosticBadgeTone(diagnostic.severity)}>
-                {diagnostic.label}
-              </PromptWorkbenchBadge>
-            </Tooltip>
-          )
-        )}
-        {isFetchingWildcards && (
-          <PromptWorkbenchBadge>
-            Wildcards loading
-          </PromptWorkbenchBadge>
-        )}
-        {canShowWeightControls && (
-          <Flex gap={1} ms="auto">
-            <Tooltip label={capabilities.attentionWeightsLabel}>
-              <Button
-                size="xs"
-                variant="outline"
-                isDisabled={!canAdjustSelectionWeight}
-                onMouseDown={onDecrementMouseDown}
-                onClick={onDecrementClick}
-              >
-                -
-              </Button>
-            </Tooltip>
-            <Tooltip label={capabilities.attentionWeightsLabel}>
-              <Button
-                size="xs"
-                variant="outline"
-                isDisabled={!canAdjustSelectionWeight}
-                onMouseDown={onIncrementMouseDown}
-                onClick={onIncrementClick}
-              >
-                +
-              </Button>
-            </Tooltip>
-          </Flex>
-        )}
-      </Flex>
       {completionContext && (wildcardOptions.length > 0 || wildcardStatusMessage) && (
         <Box>
           <Flex
@@ -814,14 +745,7 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
                       </Text>
                     </Button>
                   </Tooltip>
-                  <Text
-                    fontSize="sm"
-                    fontFamily="mono"
-                    color="base.400"
-                    textAlign="end"
-                    w={8}
-                    flexShrink={0}
-                  >
+                  <Text fontSize="sm" fontFamily="mono" color="base.400" textAlign="end" w={8} flexShrink={0}>
                     {wildcard.value_count}
                   </Text>
                   <PromptWildcardBehaviorMenu
@@ -870,18 +794,124 @@ export const PromptWorkbench = memo(({ prompt, textareaRef, onPromptChange }: Pr
           </Text>
         </Box>
       )}
-      <PromptInspector
-        occurrences={promptWorkbenchOccurrences}
-        randomRefreshMode={dynamicPromptRandomRefreshMode}
-        fixedWildcardOccurrenceId={activeFixedWildcardOccurrenceId}
-        fixedWildcardValues={fixedWildcardValues}
-        isFetchingFixedWildcardValues={wildcardValuesResult.isFetching}
-        activeFixedValueIndex={activeFixedValueIndex}
-        onSelectRange={focusPromptRange}
-        onWildcardBehaviorAction={onInspectorWildcardBehaviorAction}
-        onFixedValue={onInspectorFixedValue}
-        setFixedValueElement={setFixedValueElement}
-      />
+      {hasPromptWorkbenchPanel && (
+        <Box
+          borderWidth={1}
+          borderColor={PROMPT_INTENT_PANEL_BORDER}
+          borderRadius="base"
+          bg={PROMPT_INTENT_PANEL_BG}
+          boxShadow="0 1px 0 rgba(255, 255, 255, 0.025) inset"
+          overflow="hidden"
+          p={2}
+          data-testid="prompt-intent-panel"
+        >
+          <Flex alignItems="center" gap={2} mb={2}>
+            <Flex alignItems="center" gap={2} minW={0} flexShrink={0}>
+              <Box as={PiCubeBold} color="base.300" fontSize="1.05rem" />
+              <Text color="base.100" fontSize="sm" fontWeight="semibold" lineHeight="short" noOfLines={1}>
+                Prompt intent
+              </Text>
+            </Flex>
+            <Flex gap={1} alignItems="center" justifyContent="flex-end" flexWrap="wrap" ms="auto" minW={0}>
+              {diagnostics.map((diagnostic) =>
+                diagnostic.code === 'dynamic-active' && hasRandomWildcardOccurrences ? (
+                  <Menu key={diagnostic.code}>
+                    <Tooltip label={`${diagnostic.description} Change random wildcard behavior.`}>
+                      <MenuButton as={Button} variant="unstyled" minW="unset" h="auto" cursor="pointer">
+                        <PromptWorkbenchBadge tone={getDiagnosticBadgeTone(diagnostic.severity)}>
+                          {diagnostic.label}
+                        </PromptWorkbenchBadge>
+                      </MenuButton>
+                    </Tooltip>
+                    <MenuList>
+                      <MenuItem onClick={onRandomPerImageClick} title="Random wildcards roll once per generated image.">
+                        Random/image
+                      </MenuItem>
+                      <MenuItem
+                        onClick={onRandomPerInvokeClick}
+                        title="Random wildcards roll once per Invoke; cyclic wildcards still advance per generated output."
+                      >
+                        Random/invoke
+                      </MenuItem>
+                    </MenuList>
+                  </Menu>
+                ) : diagnostic.code === 'dynamic-active' ? (
+                  <Tooltip key={diagnostic.code} label={`${diagnostic.description} Open dynamic prompt preview.`}>
+                    <Button
+                      variant="unstyled"
+                      minW="unset"
+                      h="auto"
+                      cursor="pointer"
+                      onMouseDown={onOpenQueuedOutputsMouseDown}
+                      onClick={onOpenQueuedOutputsClick}
+                    >
+                      <PromptWorkbenchBadge tone={getDiagnosticBadgeTone(diagnostic.severity)}>
+                        {diagnostic.label}
+                      </PromptWorkbenchBadge>
+                    </Button>
+                  </Tooltip>
+                ) : (
+                  <Tooltip key={diagnostic.code} label={diagnostic.description}>
+                    <PromptWorkbenchBadge
+                      tone={getDiagnosticBadgeTone(diagnostic.severity)}
+                      icon={diagnostic.code === 'wildcards-found' ? <PiDiceFiveBold /> : undefined}
+                    >
+                      {diagnostic.label}
+                    </PromptWorkbenchBadge>
+                  </Tooltip>
+                )
+              )}
+              {canShowWeightControls && (
+                <Flex gap={1} ps={1}>
+                  <Tooltip label={capabilities.attentionWeightsLabel}>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      minW={7}
+                      h={7}
+                      isDisabled={!canAdjustSelectionWeight}
+                      onMouseDown={onDecrementMouseDown}
+                      onClick={onDecrementClick}
+                    >
+                      -
+                    </Button>
+                  </Tooltip>
+                  <Tooltip label={capabilities.attentionWeightsLabel}>
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      minW={7}
+                      h={7}
+                      isDisabled={!canAdjustSelectionWeight}
+                      onMouseDown={onIncrementMouseDown}
+                      onClick={onIncrementClick}
+                    >
+                      +
+                    </Button>
+                  </Tooltip>
+                </Flex>
+              )}
+            </Flex>
+          </Flex>
+          {hasPromptWorkbenchEntries && (
+            <Box>
+              <PromptInspector
+                occurrences={promptWorkbenchOccurrences}
+                randomRefreshMode={dynamicPromptRandomRefreshMode}
+                fixedWildcardOccurrenceId={activeFixedWildcardOccurrenceId}
+                fixedWildcardValues={fixedWildcardValues}
+                isFetchingFixedWildcardValues={wildcardValuesResult.isFetching}
+                activeFixedValueIndex={activeFixedValueIndex}
+                onSelectRange={focusPromptRange}
+                onWildcardBehaviorAction={onInspectorWildcardBehaviorAction}
+                onRemoveWeightOccurrence={onRemoveWeightOccurrence}
+                onFixedValue={onInspectorFixedValue}
+                setFixedValueElement={setFixedValueElement}
+              />
+            </Box>
+          )}
+        </Box>
+      )}
     </Flex>
   );
 });
