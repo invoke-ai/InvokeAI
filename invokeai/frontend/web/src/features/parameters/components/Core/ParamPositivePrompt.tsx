@@ -16,7 +16,10 @@ import { ShowDynamicPromptsPreviewButton } from 'features/dynamicPrompts/compone
 import { NegativePromptToggleButton } from 'features/parameters/components/Core/NegativePromptToggleButton';
 import { PromptLabel } from 'features/parameters/components/Prompts/PromptLabel';
 import { PromptOverlayButtonWrapper } from 'features/parameters/components/Prompts/PromptOverlayButtonWrapper';
-import { PromptResizeHandle } from 'features/parameters/components/Prompts/PromptResizeHandle';
+import {
+  PROMPT_RESIZE_HANDLE_HEIGHT_PX,
+  PromptResizeHandle,
+} from 'features/parameters/components/Prompts/PromptResizeHandle';
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { ExpandPromptButton } from 'features/prompt/ExpandPromptButton';
@@ -278,7 +281,7 @@ export const ParamPositivePrompt = memo(() => {
   return (
     <Box pos="relative" ref={dropTargetRef}>
       <PromptPopover isOpen={isOpen} onClose={onClose} onSelect={onSelect} width={textareaRef.current?.clientWidth}>
-        <Box pos="relative">
+        <Box pos="relative" pb={`${PROMPT_RESIZE_HANDLE_HEIGHT_PX}px`}>
           <Textarea
             className="positive-prompt-textarea"
             name="prompt"

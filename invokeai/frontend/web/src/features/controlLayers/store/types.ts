@@ -828,6 +828,10 @@ export const zParamsState = z.object({
   openaiInputFidelity: z.enum(['low', 'high']).nullable().default(null),
   // Gemini-specific external options
   geminiTemperature: z.number().min(0).max(2).nullable().default(null),
+  geminiThinkingLevel: z.enum(['minimal', 'high']).nullable().default(null),
+  // Seedream-specific external options
+  seedreamWatermark: z.boolean().default(false),
+  seedreamOptimizePrompt: z.boolean().default(false),
   dimensions: zDimensionsState,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
@@ -904,6 +908,9 @@ export const getInitialParamsState = (): ParamsState => ({
   openaiBackground: 'auto',
   openaiInputFidelity: null,
   geminiTemperature: null,
+  geminiThinkingLevel: null,
+  seedreamWatermark: false,
+  seedreamOptimizePrompt: false,
   dimensions: {
     width: 512,
     height: 512,
