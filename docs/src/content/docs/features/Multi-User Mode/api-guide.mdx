@@ -30,7 +30,7 @@ This guide explains how to interact with InvokeAI's API in both single-user and 
 
 ### Authentication Flow
 
-When multi-user mode is enabled, all API endpoints (except `/api/v1/auth/setup` and `/api/v1/auth/login`) require authentication using JWT (JSON Web Token) bearer tokens.
+When multi-user mode is enabled, most API endpoints require authentication using JWT bearer tokens. The unauthenticated authentication endpoints are `GET /api/v1/auth/status`, `POST /api/v1/auth/setup`, and `POST /api/v1/auth/login`.
 
 **Authentication Process:**
 
@@ -548,11 +548,11 @@ GET /api/v1/workflows/
 **Queue:**
 
 ```python
-# Regular users see only their queue items
-GET /api/v1/queue/  # User's queue items
+# Regular users see their own queue items in full and may see redacted details for other users' items on queue-status endpoints
+GET /api/v1/queue/...  # Queue data, sanitized for non-admin viewers
 
-# Administrators see all queue items
-GET /api/v1/queue/  # All users' queue items
+# Administrators see all queue items in full
+GET /api/v1/queue/...  # Full queue data
 ```
 
 ### Administrator Endpoints
