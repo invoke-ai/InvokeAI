@@ -2,6 +2,7 @@ import { deepClone } from 'common/util/deepClone';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { zMainModelBase, zModelIdentifierField } from 'features/nodes/types/common';
 import {
+  zParameterAnimaScheduler,
   zParameterCanvasCoherenceMode,
   zParameterCFGRescaleMultiplier,
   zParameterCFGScale,
@@ -759,7 +760,7 @@ export const zHrfLoraMode = z.enum(['reuse_generate', 'none', 'dedicated']);
 export type HrfLoraMode = z.infer<typeof zHrfLoraMode>;
 
 export const zParamsState = z.object({
-  _version: z.literal(6),
+  _version: z.literal(7),
   maskBlur: z.number(),
   maskBlurMethod: zParameterMaskBlurMethod,
   canvasCoherenceMode: zParameterCanvasCoherenceMode,
@@ -834,12 +835,14 @@ export const zParamsState = z.object({
   animaVaeModel: zParameterVAEModel.nullable(), // Optional: Separate QwenImage/FLUX VAE for Anima
   animaQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 0.6B Encoder for Anima
   animaT5EncoderModel: zModelIdentifierField.nullable(), // T5-XXL tokenizer for Anima LLM Adapter
-  animaScheduler: z.enum(['euler', 'heun', 'lcm']).default('euler'),
+  animaScheduler: zParameterAnimaScheduler,
   // Flux2 Klein model components - uses Qwen3 instead of CLIP+T5
   kleinVaeModel: zParameterVAEModel.nullable(), // Optional: Separate FLUX.2 VAE for Klein
   kleinQwen3EncoderModel: zModelIdentifierField.nullable(), // Optional: Separate Qwen3 Encoder for Klein
   // Qwen Image Edit model components - GGUF transformer needs a Diffusers source for VAE/encoder
   qwenImageComponentSource: zParameterModel.nullable(), // Diffusers model providing VAE + text encoder
+  qwenImageVaeModel: zParameterVAEModel.nullable(), // Optional: Standalone Qwen Image VAE checkpoint
+  qwenImageQwenVLEncoderModel: zModelIdentifierField.nullable(), // Optional: Standalone Qwen2.5-VL encoder
   qwenImageQuantization: z.enum(['none', 'int8', 'nf4']), // BitsAndBytes quantization for Qwen VL encoder
   qwenImageShift: z.number().nullable(), // Sigma schedule shift override (e.g. 3.0 for Lightning LoRAs)
   // Z-Image Seed Variance Enhancer settings
@@ -854,11 +857,14 @@ export const zParamsState = z.object({
   // Gemini-specific external options
   geminiTemperature: z.number().min(0).max(2).nullable().default(null),
   geminiThinkingLevel: z.enum(['minimal', 'high']).nullable().default(null),
+  // Seedream-specific external options
+  seedreamWatermark: z.boolean().default(false),
+  seedreamOptimizePrompt: z.boolean().default(false),
   dimensions: zDimensionsState,
 });
 export type ParamsState = z.infer<typeof zParamsState>;
 export const getInitialParamsState = (): ParamsState => ({
-  _version: 6,
+  _version: 7,
   maskBlur: 16,
   maskBlurMethod: 'box',
   canvasCoherenceMode: 'Gaussian Blur',
@@ -935,6 +941,8 @@ export const getInitialParamsState = (): ParamsState => ({
   kleinVaeModel: null,
   kleinQwen3EncoderModel: null,
   qwenImageComponentSource: null,
+  qwenImageVaeModel: null,
+  qwenImageQwenVLEncoderModel: null,
   qwenImageQuantization: 'none' as const,
   qwenImageShift: null,
   zImageSeedVarianceEnabled: false,
@@ -946,6 +954,8 @@ export const getInitialParamsState = (): ParamsState => ({
   openaiInputFidelity: null,
   geminiTemperature: null,
   geminiThinkingLevel: null,
+  seedreamWatermark: false,
+  seedreamOptimizePrompt: false,
   dimensions: {
     width: 512,
     height: 512,

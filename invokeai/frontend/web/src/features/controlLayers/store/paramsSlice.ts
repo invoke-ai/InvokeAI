@@ -360,7 +360,10 @@ const slice = createSlice({
       }
       state.animaT5EncoderModel = result.data;
     },
-    setAnimaScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
+    setAnimaScheduler: (
+      state,
+      action: PayloadAction<'euler' | 'heun' | 'dpmpp_2m' | 'dpmpp_2m_sde' | 'er_sde' | 'lcm'>
+    ) => {
       state.animaScheduler = action.payload;
     },
     kleinVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
@@ -386,6 +389,23 @@ const slice = createSlice({
         return;
       }
       state.qwenImageComponentSource = result.data;
+    },
+    qwenImageVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
+      const result = zParamsState.shape.qwenImageVaeModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageVaeModel = result.data;
+    },
+    qwenImageQwenVLEncoderModelSelected: (
+      state,
+      action: PayloadAction<{ key: string; name: string; base: string } | null>
+    ) => {
+      const result = zParamsState.shape.qwenImageQwenVLEncoderModel.safeParse(action.payload);
+      if (!result.success) {
+        return;
+      }
+      state.qwenImageQwenVLEncoderModel = result.data;
     },
     qwenImageQuantizationChanged: (state, action: PayloadAction<'none' | 'int8' | 'nf4'>) => {
       state.qwenImageQuantization = action.payload;
@@ -628,6 +648,12 @@ const slice = createSlice({
     geminiThinkingLevelChanged: (state, action: PayloadAction<'minimal' | 'high' | null>) => {
       state.geminiThinkingLevel = action.payload;
     },
+    seedreamWatermarkChanged: (state, action: PayloadAction<boolean>) => {
+      state.seedreamWatermark = action.payload;
+    },
+    seedreamOptimizePromptChanged: (state, action: PayloadAction<boolean>) => {
+      state.seedreamOptimizePrompt = action.payload;
+    },
     resolutionPresetSelected: (
       state,
       action: PayloadAction<{ imageSize: string; aspectRatio: string; width: number; height: number }>
@@ -705,6 +731,8 @@ const resetState = (state: ParamsState): ParamsState => {
   newState.kleinVaeModel = oldState.kleinVaeModel;
   newState.kleinQwen3EncoderModel = oldState.kleinQwen3EncoderModel;
   newState.qwenImageComponentSource = oldState.qwenImageComponentSource;
+  newState.qwenImageVaeModel = oldState.qwenImageVaeModel;
+  newState.qwenImageQwenVLEncoderModel = oldState.qwenImageQwenVLEncoderModel;
   newState.qwenImageQuantization = oldState.qwenImageQuantization;
   newState.qwenImageShift = oldState.qwenImageShift;
   return newState;
@@ -774,6 +802,8 @@ export const {
   kleinVaeModelSelected,
   kleinQwen3EncoderModelSelected,
   qwenImageComponentSourceSelected,
+  qwenImageVaeModelSelected,
+  qwenImageQwenVLEncoderModelSelected,
   qwenImageQuantizationChanged,
   qwenImageShiftChanged,
   setClipSkip,
@@ -811,6 +841,8 @@ export const {
   openaiInputFidelityChanged,
   geminiTemperatureChanged,
   geminiThinkingLevelChanged,
+  seedreamWatermarkChanged,
+  seedreamOptimizePromptChanged,
   paramsRecalled,
   animaVaeModelSelected,
   animaQwen3EncoderModelSelected,
@@ -840,17 +872,24 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
       }
 
       if (state._version === 2) {
-        // v2 -> v3, add Generate tab high resolution fix settings
+        // v2 -> v3, add standalone Qwen Image VAE and Qwen VL encoder fields
         state._version = 3;
+        state.qwenImageVaeModel = null;
+        state.qwenImageQwenVLEncoderModel = null;
+      }
+
+      if (state._version === 3) {
+        // v3 -> v4, add Generate tab high resolution fix settings
+        state._version = 4;
         state.hrfEnabled = false;
         state.hrfScale = 2;
         state.hrfStrength = 0.45;
         state.hrfLatentInterpolationMode = 'bicubic';
       }
 
-      if (state._version === 3) {
-        // v3 -> v4, add Generate tab upscale-model high resolution fix settings
-        state._version = 4;
+      if (state._version === 4) {
+        // v4 -> v5, add Generate tab upscale-model high resolution fix settings
+        state._version = 5;
         state.hrfMethod = 'latent';
         state.hrfUpscaleModel = null;
         state.hrfTileControlNetModel = null;
@@ -859,22 +898,30 @@ export const paramsSliceConfig: SliceConfig<typeof slice> = {
         state.hrfTileOverlap = 128;
       }
 
-      if (state._version === 4) {
-        // v4 -> v5, add explicit Generate tab HRF Tile ControlNet timing
-        state._version = 5;
+      if (state._version === 5) {
+        // v5 -> v6, add explicit Generate tab HRF Tile ControlNet timing
+        state._version = 6;
         state.hrfTileControlEnd = 0.2;
       }
 
-      if (state._version === 5) {
-        // v5 -> v6, replace the Invoke Upscale "Structure" abstraction with explicit Generate HRF controls
-        state._version = 6;
-        const legacyHrfStructure = typeof state.hrfStructure === 'number' ? state.hrfStructure : 0;
-        state.hrfTileControlWeight = (legacyHrfStructure + 10) * 0.0325 + 0.3;
+      if (state._version === 6) {
+        // v6 -> v7, replace the Invoke Upscale "Structure" abstraction with explicit Generate HRF controls
+        state._version = 7;
+        if (!('qwenImageVaeModel' in state)) {
+          state.qwenImageVaeModel = null;
+        }
+        if (!('qwenImageQwenVLEncoderModel' in state)) {
+          state.qwenImageQwenVLEncoderModel = null;
+        }
+        if (!('hrfTileControlWeight' in state)) {
+          const legacyHrfStructure = typeof state.hrfStructure === 'number' ? state.hrfStructure : 0;
+          state.hrfTileControlWeight = (legacyHrfStructure + 10) * 0.0325 + 0.3;
+          state.hrfSteps = null;
+          state.hrfModel = null;
+          state.hrfLoraMode = 'reuse_generate';
+          state.hrfLoras = [];
+        }
         delete state.hrfStructure;
-        state.hrfSteps = null;
-        state.hrfModel = null;
-        state.hrfLoraMode = 'reuse_generate';
-        state.hrfLoras = [];
       }
 
       return zParamsState.parse(state);
@@ -922,6 +969,8 @@ export const selectAnimaScheduler = createParamsSelector((params) => params.anim
 export const selectKleinVaeModel = createParamsSelector((params) => params.kleinVaeModel);
 export const selectKleinQwen3EncoderModel = createParamsSelector((params) => params.kleinQwen3EncoderModel);
 export const selectQwenImageComponentSource = createParamsSelector((params) => params.qwenImageComponentSource);
+export const selectQwenImageVaeModel = createParamsSelector((params) => params.qwenImageVaeModel);
+export const selectQwenImageQwenVLEncoderModel = createParamsSelector((params) => params.qwenImageQwenVLEncoderModel);
 export const selectQwenImageQuantization = createParamsSelector((params) => params.qwenImageQuantization);
 export const selectQwenImageShift = createParamsSelector((params) => params.qwenImageShift);
 
@@ -1151,6 +1200,8 @@ export const selectOpenaiBackground = createParamsSelector((params) => params.op
 export const selectOpenaiInputFidelity = createParamsSelector((params) => params.openaiInputFidelity);
 export const selectGeminiTemperature = createParamsSelector((params) => params.geminiTemperature);
 export const selectGeminiThinkingLevel = createParamsSelector((params) => params.geminiThinkingLevel);
+export const selectSeedreamWatermark = createParamsSelector((params) => params.seedreamWatermark);
+export const selectSeedreamOptimizePrompt = createParamsSelector((params) => params.seedreamOptimizePrompt);
 export const selectExternalProviderId = createSelector(selectModelConfig, (modelConfig) => {
   if (modelConfig && isExternalApiModelConfig(modelConfig)) {
     return modelConfig.provider_id;

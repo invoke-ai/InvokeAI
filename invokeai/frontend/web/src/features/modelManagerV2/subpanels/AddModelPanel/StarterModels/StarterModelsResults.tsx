@@ -64,7 +64,7 @@ export const StarterModelsResults = memo(({ results }: StarterModelsResultsProps
                 </Flex>
               </Tooltip>
             </Flex>
-            <Flex gap={2}>
+            <Flex gap={2} flexWrap="wrap" justifyContent="flex-end" flex={1} minW={0}>
               {map(results.starter_bundles, (bundle) => (
                 <StarterBundleButton
                   key={bundle.name}

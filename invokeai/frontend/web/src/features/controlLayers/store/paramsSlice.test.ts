@@ -376,7 +376,7 @@ describe('paramsSlice HRF migrations', () => {
     const migrated = paramsSliceConfig.persistConfig!.migrate(v5State);
 
     expect(migrated).toMatchObject({
-      _version: 6,
+      _version: 7,
       hrfTileControlWeight: 0.625,
       hrfSteps: null,
       hrfModel: null,
@@ -384,5 +384,38 @@ describe('paramsSlice HRF migrations', () => {
       hrfLoras: [],
     });
     expect('hrfStructure' in migrated).toBe(false);
+  });
+});
+
+describe('paramsSliceConfig persisted state migration', () => {
+  const migrate = paramsSliceConfig.persistConfig?.migrate;
+
+  it('backfills new Qwen Image fields when migrating from v2 and preserves existing params', () => {
+    expect(migrate).toBeDefined();
+
+    // Build a valid pre-PR v2 persisted state by removing the fields that were added in v3
+    const initial = getInitialParamsState();
+    const v2State: Record<string, unknown> = {
+      ...initial,
+      _version: 2,
+      positivePrompt: 'a fluffy cat',
+      seed: 42,
+      shouldRandomizeSeed: false,
+      dimensions: { ...initial.dimensions, width: 768, height: 768 },
+    };
+    delete v2State.qwenImageVaeModel;
+    delete v2State.qwenImageQwenVLEncoderModel;
+
+    const result = migrate?.(v2State) as ReturnType<typeof getInitialParamsState>;
+
+    expect(result._version).toBe(7);
+    expect(result.qwenImageVaeModel).toBeNull();
+    expect(result.qwenImageQwenVLEncoderModel).toBeNull();
+    // Existing params should be preserved
+    expect(result.positivePrompt).toBe('a fluffy cat');
+    expect(result.seed).toBe(42);
+    expect(result.shouldRandomizeSeed).toBe(false);
+    expect(result.dimensions.width).toBe(768);
+    expect(result.dimensions.height).toBe(768);
   });
 });
