@@ -142,5 +142,5 @@ def apply_lora_metadata(info: AnyModelConfig, model_path: Path, model_images_pat
     if description:
         info.description = description
 
-    if trigger_phrases:
+    if trigger_phrases and not info.trigger_phrases:
         info.trigger_phrases = trigger_phrases
