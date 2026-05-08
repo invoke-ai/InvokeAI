@@ -32,6 +32,18 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
 
+    @property
+    def image_root(self) -> Path:
+        return self.__output_folder.resolve()
+
+    @property
+    def thumbnail_root(self) -> Path:
+        return self.__thumbnails_folder.resolve()
+
+    def evict_cache_paths(self, paths: list[Path]) -> None:
+        for path in paths:
+            self.__cache.pop(path.resolve(), None)
+
     def get(self, image_name: str, image_subfolder: str = "") -> PILImageType:
         try:
             image_path = self.get_path(image_name, image_subfolder=image_subfolder)
