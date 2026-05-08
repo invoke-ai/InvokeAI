@@ -50,7 +50,7 @@ Now:
 <Steps>
 1. Enter your email address (this will be your login name)
 2. Create a display name (this will be the name other users see)
-3. Choose a strong password that meets the requirements:
+3. Choose a strong password. With `strict_password_checking_enabled: true` you will be required to choose a password:
     - At least 8 characters long
     - Contains uppercase letters
     - Contains lowercase letters
@@ -58,6 +58,9 @@ Now:
 4. Confirm your password
 5. Click **Create Administrator Account**
 </Steps>
+
+With `strict_password_checking_enabled` disabled, you'll be warned if you choose a
+weak password, but not prevented from doing so.
 
 You'll now be taken to a login screen and can enter the credentials you just created.
 

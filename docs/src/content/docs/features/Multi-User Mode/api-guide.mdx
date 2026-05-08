@@ -70,8 +70,9 @@ When running in single-user mode (`multiuser: false`), authentication endpoints 
     "display_name": "John Doe",
     "is_admin": false,
     "is_active": true,
-    "created_at": "2024-01-15T10:00:00Z"
-    "updated_at": 
+    "created_at": "2024-01-15T10:00:00Z",
+    "updated_at": "2024-01-15T10:00:00Z",
+    "last_login_at": "2024-01-15T15:30:00Z"
   },
   "expires_in": 86400
 }
@@ -506,26 +507,13 @@ curl -X POST http://localhost:9090/api/v1/boards/ \
   }'
 ```
 
-**Generate Image:**
-
-```bash
-curl -X POST http://localhost:9090/api/v1/sessions/ \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "A beautiful landscape",
-    "width": 512,
-    "height": 512,
-    "steps": 30
-  }'
-```
-
 ## API Endpoint Changes
 
 ### Authentication Required
 
 All endpoints now require authentication except:
 
+- `GET /api/v1/auth/status` — Check whether multi-user setup is required
 - `POST /api/v1/auth/setup` — Initial admin setup
 - `POST /api/v1/auth/login` — User login
 
@@ -537,10 +525,10 @@ Resources are now filtered by the authenticated user:
 
 ```python
 # Before (single-user)
-GET /api/v1/boards/  # Returns all boards
+GET /api/v1/boards/?all=true  # Returns all boards
 
 # After (multi-user)
-GET /api/v1/boards/  # Returns only current user's boards
+GET /api/v1/boards/?all=true  # Returns boards the current user can access, including their own boards plus shared/public boards; admins can see all boards
 ```
 
 **Images:**
@@ -647,7 +635,7 @@ Occurs when:
 
 #### Check if initial administrator setup is required
 
-**Endpoint:** `POST /api/v1/auth/status`
+**Endpoint:** `GET /api/v1/auth/status`
 
 **Description:** Returns a SetupStatusResponse indicating whether setup is needed and multiuser mode status.
 
@@ -741,18 +729,16 @@ Authorization: Bearer <admin_token>
 
 ```json
 {
-  "items": [
-    {
-      "user_id": "abc123",
-      "email": "user@example.com",
-      "display_name": "John Doe",
-      "is_admin": false,
-      "is_active": true,
-      "created_at": "2024-01-15T10:00:00Z",
-      "updated_at": "2024-04-25T17:23:00Z",
-      "last_login_at": "2024-01-15T15:30:00Z"
-    }
-  ]
+  {
+    "user_id": "abc123",
+    "email": "user@example.com",
+    "display_name": "John Doe",
+    "is_admin": false,
+    "is_active": true,
+    "created_at": "2024-01-15T10:00:00Z",
+    "updated_at": "2024-04-25T17:23:00Z",
+    "last_login_at": "2024-01-15T15:30:00Z"
+  }
 }
 ```
 
@@ -1193,9 +1179,14 @@ Configure CORS in InvokeAI:
 
 ```yaml
 # invokeai.yaml
-cors_origins:
+allow_origins:
   - "http://localhost:3000"
   - "https://myapp.example.com"
+allow_credentials: true
+allow_methods:
+  - "*"
+allow_headers:
+  - "*"
 ```
 
 ## Additional Resources
