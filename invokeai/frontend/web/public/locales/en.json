@@ -365,8 +365,8 @@
         "loraMode": "Refinement LoRAs",
         "reuseGenerateLoras": "Reuse",
         "noLoras": "None",
-        "dedicatedLoras": "Dedicated",
-        "addDedicatedLora": "Add Dedicated LoRA",
+        "dedicatedLoras": "LoRAs",
+        "addDedicatedLora": "Add LoRA",
         "noCompatibleModels": "No Compatible Models",
         "latent": "Latent",
         "upscaleModelMethod": "Upscale Model",
@@ -2325,7 +2325,7 @@
             "heading": "Refinement Model",
             "paragraphs": [
                 "Selects an optional model used only for the Upscale refinement pass.",
-                "Reuse Base Model keeps the Generate model for refinement. A dedicated refinement model must use the same base family."
+                "Reuse Base Model keeps the base generation model for refinement. Choosing another model lets you use a compatible refinement model for the Upscale pass."
             ]
         },
         "hrfLoraMode": {
